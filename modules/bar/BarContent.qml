@@ -13,6 +13,14 @@ Item {
         "workspaceWidget": "widgets/WorkspaceWidget.qml"
     })
 
+    // Hit-test: map x coordinate in barContent space to section name
+    function hitTestSection(localX) {
+        let w = barContent.width;
+        if (localX < w / 3) return "left";
+        if (localX < w * 2 / 3) return "center";
+        return "right";
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: Theme.barPadding

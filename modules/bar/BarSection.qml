@@ -92,6 +92,7 @@ Item {
         BarWidgetWrapper {
             required property var modelData
             staggerIndex: modelData.index
+            widgetId: modelData.widgetId
 
             Loader {
                 source: section.widgetRegistry[modelData.widgetId] || ""
