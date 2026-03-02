@@ -65,38 +65,52 @@ Item {
         ScriptAction { script: wrapper._enterDone = true }
     }
 
-    // --- Settings mode drag (direct, no floating copies) ---
+    // --- Settings mode drag (visual-only offset, doesn't break Row layout) ---
+    property real dragOffsetX: 0
+
+    transform: Translate { x: wrapper.dragOffsetX }
+
     DragHandler {
         id: dragHandler
         enabled: BarLayoutService.settingsMode && wrapper._enterDone
-        target: wrapper
+        target: null  // Don't modify wrapper.x (preserve Row layout)
         xAxis.enabled: true
         yAxis.enabled: false
 
+        property real pressX: 0
+
         onActiveChanged: {
             if (active) {
+                pressX = centroid.position.x;
                 wrapper.z = 100;
                 wrapper.scale = 1.05;
             } else {
                 wrapper.scale = 1.0;
-                // Hit-test: map center to barContent coordinate space
-                let barContent = wrapper.parent;
-                while (barContent && !barContent.hitTestSection)
-                    barContent = barContent.parent;
 
-                if (barContent && barContent.hitTestSection) {
-                    let globalPt = wrapper.mapToItem(barContent,
-                        wrapper.width / 2, wrapper.height / 2);
-                    let targetSection = barContent.hitTestSection(globalPt.x);
+                // Hit-test: the visual center in barContent coords
+                let bc = wrapper.parent;
+                while (bc && !bc.hitTestSection)
+                    bc = bc.parent;
+
+                if (bc && bc.hitTestSection) {
+                    let globalPt = wrapper.mapToItem(bc,
+                        wrapper.width / 2 + wrapper.dragOffsetX,
+                        wrapper.height / 2);
+                    let targetSection = bc.hitTestSection(globalPt.x);
                     if (targetSection !== "") {
                         BarLayoutService.moveWidget(
                             wrapper.widgetId, targetSection, "left", 0);
                     }
                 }
 
-                // Snap back to layout position
-                wrapper.x = 0;
+                wrapper.dragOffsetX = 0;
                 wrapper.z = 0;
+            }
+        }
+
+        onCentroidChanged: {
+            if (active) {
+                wrapper.dragOffsetX = centroid.position.x - pressX;
             }
         }
     }
