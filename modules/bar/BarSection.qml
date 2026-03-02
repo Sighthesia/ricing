@@ -49,6 +49,21 @@ Item {
         function onSettingsModeChanged() { section.rebuildWidgets(); }
     }
 
+    // Calculate which position a widget would insert at, given localX in section space
+    function insertIndexAt(localX) {
+        let row = alignLeftRow;
+        for (let i = 0; i < row.children.length; i++) {
+            let child = row.children[i];
+            if (!child || !child.visible) continue;
+            let childCenter = child.x + child.width / 2;
+            if (localX < childCenter) return i;
+        }
+        return row.children.length;
+    }
+
+    // Expose the left Row for external position queries
+    readonly property Item widgetRow: alignLeftRow
+
     RowLayout {
         id: sectionRow
         anchors.verticalCenter: parent.verticalCenter
@@ -59,6 +74,7 @@ Item {
             id: alignLeftRow
             spacing: 6
             Repeater {
+                id: leftRepeater
                 model: section.leftWidgets
                 delegate: widgetDelegate
             }
@@ -82,6 +98,37 @@ Item {
                 model: section.rightWidgets
                 delegate: widgetDelegate
             }
+        }
+    }
+
+    // Insertion indicator line
+    Rectangle {
+        id: insertIndicator
+        visible: BarLayoutService.isDragging
+            && BarLayoutService.ghostSection === section.role
+            && BarLayoutService.ghostIndex >= 0
+        width: 2
+        height: Theme.barHeight - 12
+        anchors.verticalCenter: parent.verticalCenter
+        color: Colors.highlight
+        radius: 1
+        opacity: 0.8
+
+        x: {
+            if (!visible) return 0;
+            let idx = BarLayoutService.ghostIndex;
+            let row = alignLeftRow;
+            if (idx >= row.children.length) {
+                // After the last widget
+                let last = row.children[row.children.length - 1];
+                return last ? (sectionRow.x + row.x + last.x + last.width + 3) : sectionRow.x;
+            }
+            let child = row.children[idx];
+            return child ? (sectionRow.x + row.x + child.x - 3) : sectionRow.x;
+        }
+
+        Behavior on x {
+            NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
         }
     }
 

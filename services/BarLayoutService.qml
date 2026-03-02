@@ -9,6 +9,10 @@ Singleton {
     property bool settingsMode: false
     property bool isDragging: false
     property string dragHoverZone: ""
+    // Ghost insertion indicator: section + index + width
+    property string ghostSection: ""
+    property int ghostIndex: -1
+    property real ghostWidth: 0
     property ListModel layoutModel: ListModel {}
 
     signal layoutChanged()

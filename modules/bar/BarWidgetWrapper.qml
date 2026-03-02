@@ -70,6 +70,34 @@ Item {
 
     transform: Translate { x: wrapper.dragOffsetX }
 
+    // Find ancestor with hitTestSection function (BarContent)
+    function findBarContent() {
+        let bc = wrapper.parent;
+        while (bc && !bc.hitTestSection)
+            bc = bc.parent;
+        return bc;
+    }
+
+    // Find the BarSection child for a given section name
+    function findSection(bc, sectionName) {
+        for (let i = 0; i < bc.children.length; i++) {
+            let child = bc.children[i];
+            if (child.role === sectionName && child.insertIndexAt)
+                return child;
+        }
+        // Check deeper (inside RowLayout)
+        for (let i = 0; i < bc.children.length; i++) {
+            let layout = bc.children[i];
+            if (!layout.children) continue;
+            for (let j = 0; j < layout.children.length; j++) {
+                let child = layout.children[j];
+                if (child.role === sectionName && child.insertIndexAt)
+                    return child;
+            }
+        }
+        return null;
+    }
+
     DragHandler {
         id: dragHandler
         enabled: BarLayoutService.settingsMode && wrapper._enterDone
@@ -85,24 +113,22 @@ Item {
                 wrapper.z = 100;
                 wrapper.scale = 1.05;
                 BarLayoutService.isDragging = true;
+                BarLayoutService.ghostWidth = wrapper.width;
             } else {
                 wrapper.scale = 1.0;
+
+                let targetSection = BarLayoutService.ghostSection;
+                let targetIndex = BarLayoutService.ghostIndex;
+
                 BarLayoutService.isDragging = false;
                 BarLayoutService.dragHoverZone = "";
+                BarLayoutService.ghostSection = "";
+                BarLayoutService.ghostIndex = -1;
+                BarLayoutService.ghostWidth = 0;
 
-                // Hit-test via barContent
-                let bc = wrapper.parent;
-                while (bc && !bc.hitTestSection)
-                    bc = bc.parent;
-
-                if (bc && bc.hitTestSection) {
-                    let globalPt = wrapper.mapToItem(bc,
-                        wrapper.width / 2, wrapper.height / 2);
-                    let targetSection = bc.hitTestSection(globalPt.x);
-                    if (targetSection !== "") {
-                        BarLayoutService.moveWidget(
-                            wrapper.widgetId, targetSection, "left", 0);
-                    }
+                if (targetSection !== "") {
+                    BarLayoutService.moveWidget(
+                        wrapper.widgetId, targetSection, "left", targetIndex);
                 }
 
                 wrapper.dragOffsetX = 0;
@@ -114,14 +140,21 @@ Item {
             if (active) {
                 wrapper.dragOffsetX = centroid.scenePosition.x - startSceneX;
 
-                // Update hover zone for DropZone highlights
-                let bc = wrapper.parent;
-                while (bc && !bc.hitTestSection)
-                    bc = bc.parent;
+                let bc = wrapper.findBarContent();
                 if (bc && bc.hitTestSection) {
                     let globalPt = wrapper.mapToItem(bc,
                         wrapper.width / 2, wrapper.height / 2);
-                    BarLayoutService.dragHoverZone = bc.hitTestSection(globalPt.x);
+                    let zoneName = bc.hitTestSection(globalPt.x);
+                    BarLayoutService.dragHoverZone = zoneName;
+                    BarLayoutService.ghostSection = zoneName;
+
+                    // Find target section and calculate insert index
+                    let sec = wrapper.findSection(bc, zoneName);
+                    if (sec) {
+                        let sectionPt = wrapper.mapToItem(sec,
+                            wrapper.width / 2, wrapper.height / 2);
+                        BarLayoutService.ghostIndex = sec.insertIndexAt(sectionPt.x);
+                    }
                 }
             }
         }
