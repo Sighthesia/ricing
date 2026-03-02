@@ -9,14 +9,21 @@ Item {
     property string widgetId: ""
     default property alias content: contentContainer.data
 
-    implicitWidth: contentContainer.childrenRect.width
-    implicitHeight: contentContainer.childrenRect.height
+    // Collapse layout space during drag; content stays visible (clip: false)
+    property bool _isDragging: false
+    property real _naturalWidth: contentContainer.childrenRect.width
+    property real _naturalHeight: contentContainer.childrenRect.height
+
+    implicitWidth: _isDragging ? 0 : _naturalWidth
+    implicitHeight: _isDragging ? 0 : _naturalHeight
 
     // Background for highlight pulse + settings mode outline
     Rectangle {
         id: pulseBackground
-        anchors.fill: parent
-        anchors.margins: -2
+        width: wrapper._naturalWidth + 4
+        height: wrapper._naturalHeight + 4
+        x: -2
+        y: -2
         radius: Theme.cornerRadius + 2
         color: "transparent"
         border.color: Colors.highlight
@@ -25,24 +32,6 @@ Item {
 
         Behavior on opacity {
             NumberAnimation { duration: 180; easing.type: Easing.OutQuad }
-        }
-    }
-
-    // Ghost placeholder at original position (cancels parent Translate during drag)
-    Rectangle {
-        id: originGhost
-        width: wrapper.width
-        height: wrapper.height
-        radius: Theme.cornerRadius
-        color: Colors.highlight
-        opacity: dragHandler.active ? 0.08 : 0
-        border.color: Colors.highlight
-        border.width: dragHandler.active ? 1 : 0
-        // Cancel the parent wrapper's Translate to stay at layout position
-        transform: Translate { x: -wrapper.dragOffsetX }
-
-        Behavior on opacity {
-            NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
         }
     }
 
@@ -85,6 +74,8 @@ Item {
 
     // --- Settings mode drag (visual offset via Translate) ---
     property real dragOffsetX: 0
+    // Saved wrapper scene X at drag start (layout position, no Translate)
+    property real _dragStartLayoutX: 0
 
     transform: Translate { x: wrapper.dragOffsetX }
 
@@ -128,11 +119,15 @@ Item {
         onActiveChanged: {
             if (active) {
                 startSceneX = centroid.scenePosition.x;
+                // Record layout scene position (parent.mapToItem excludes our Translate)
+                let parentScene = wrapper.parent.mapToItem(null, 0, 0);
+                wrapper._dragStartLayoutX = parentScene.x + wrapper.x;
                 wrapper.z = 100;
                 wrapper.scale = 1.05;
+                wrapper._isDragging = true;
                 BarLayoutService.isDragging = true;
                 BarLayoutService.draggedWidgetId = wrapper.widgetId;
-                BarLayoutService.ghostWidth = wrapper.width;
+                BarLayoutService.ghostWidth = wrapper._naturalWidth;
             } else {
                 wrapper.scale = 1.0;
 
@@ -152,18 +147,28 @@ Item {
                 }
 
                 wrapper.dragOffsetX = 0;
+                wrapper._isDragging = false;
                 wrapper.z = 0;
             }
         }
 
         onCentroidChanged: {
             if (active) {
-                wrapper.dragOffsetX = centroid.scenePosition.x - startSceneX;
+                // Mouse offset since drag start
+                let mouseOffset = centroid.scenePosition.x - startSceneX;
+                // Target visual scene X = original layout position + mouse offset
+                let targetSceneX = wrapper._dragStartLayoutX + mouseOffset;
+                // Current layout position (parent coords exclude our Translate)
+                let parentScene = wrapper.parent.mapToItem(null, 0, 0);
+                let layoutSceneX = parentScene.x + wrapper.x;
+                // Translate = difference between target and current layout position
+                wrapper.dragOffsetX = targetSceneX - layoutSceneX;
 
                 let bc = wrapper.findBarContent();
                 if (bc && bc.hitTestSection) {
+                    // Use _naturalWidth for hit test since wrapper may be collapsed
                     let globalPt = wrapper.mapToItem(bc,
-                        wrapper.width / 2, wrapper.height / 2);
+                        wrapper._naturalWidth / 2, wrapper._naturalHeight / 2);
                     let zoneName = bc.hitTestSection(globalPt.x);
                     BarLayoutService.dragHoverZone = zoneName;
                     BarLayoutService.ghostSection = zoneName;
@@ -172,7 +177,7 @@ Item {
                     let sec = wrapper.findSection(bc, zoneName);
                     if (sec) {
                         let sectionPt = wrapper.mapToItem(sec,
-                            wrapper.width / 2, wrapper.height / 2);
+                            wrapper._naturalWidth / 2, wrapper._naturalHeight / 2);
                         BarLayoutService.ghostIndex = sec.insertIndexAt(sectionPt.x);
                     }
                 }
