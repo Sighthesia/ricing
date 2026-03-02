@@ -13,11 +13,13 @@ Item {
         "workspaceWidget": "widgets/WorkspaceWidget.qml"
     })
 
-    // Hit-test: map x coordinate in barContent space to section name
+    // Hit-test: map x in barContent coords to section name (accounts for padding)
     function hitTestSection(localX) {
-        let w = barContent.width;
-        if (localX < w / 3) return "left";
-        if (localX < w * 2 / 3) return "center";
+        let pad = Theme.barPadding;
+        let w = barContent.width - 2 * pad;
+        let x = localX - pad;
+        if (x < w / 3) return "left";
+        if (x < w * 2 / 3) return "center";
         return "right";
     }
 

@@ -97,8 +97,7 @@ Item {
 
                 if (bc && bc.hitTestSection) {
                     let globalPt = wrapper.mapToItem(bc,
-                        wrapper.width / 2 + wrapper.dragOffsetX,
-                        wrapper.height / 2);
+                        wrapper.width / 2, wrapper.height / 2);
                     let targetSection = bc.hitTestSection(globalPt.x);
                     if (targetSection !== "") {
                         BarLayoutService.moveWidget(
@@ -121,8 +120,7 @@ Item {
                     bc = bc.parent;
                 if (bc && bc.hitTestSection) {
                     let globalPt = wrapper.mapToItem(bc,
-                        wrapper.width / 2 + wrapper.dragOffsetX,
-                        wrapper.height / 2);
+                        wrapper.width / 2, wrapper.height / 2);
                     BarLayoutService.dragHoverZone = bc.hitTestSection(globalPt.x);
                 }
             }
