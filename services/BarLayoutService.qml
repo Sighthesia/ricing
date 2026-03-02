@@ -9,6 +9,8 @@ Singleton {
     property bool settingsMode: false
     property ListModel layoutModel: ListModel {}
 
+    signal layoutChanged()
+
     // Default layout descriptor (from bar-design.md §三)
     readonly property var defaultLayout: [
         { id: "settingsToggle",  section: "left",   alignment: "left",   order: 0, enabled: true },
@@ -27,6 +29,7 @@ Singleton {
                 break;
             }
         }
+        layoutChanged();
         // FIXME: persist to PersistentProperties
     }
 

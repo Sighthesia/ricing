@@ -43,9 +43,9 @@ Item {
         function onCountChanged() { section.rebuildWidgets(); }
     }
 
-    // Recalculate when layoutModel properties change
     Connections {
         target: BarLayoutService
+        function onLayoutChanged() { section.rebuildWidgets(); }
         function onSettingsModeChanged() { section.rebuildWidgets(); }
     }
 
