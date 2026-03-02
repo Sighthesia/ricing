@@ -28,6 +28,24 @@ Item {
         }
     }
 
+    // Ghost placeholder at original position (cancels parent Translate during drag)
+    Rectangle {
+        id: originGhost
+        width: wrapper.width
+        height: wrapper.height
+        radius: Theme.cornerRadius
+        color: Colors.highlight
+        opacity: dragHandler.active ? 0.08 : 0
+        border.color: Colors.highlight
+        border.width: dragHandler.active ? 1 : 0
+        // Cancel the parent wrapper's Translate to stay at layout position
+        transform: Translate { x: -wrapper.dragOffsetX }
+
+        Behavior on opacity {
+            NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
+        }
+    }
+
     Item {
         id: contentContainer
         width: childrenRect.width
@@ -113,6 +131,7 @@ Item {
                 wrapper.z = 100;
                 wrapper.scale = 1.05;
                 BarLayoutService.isDragging = true;
+                BarLayoutService.draggedWidgetId = wrapper.widgetId;
                 BarLayoutService.ghostWidth = wrapper.width;
             } else {
                 wrapper.scale = 1.0;
@@ -122,6 +141,7 @@ Item {
 
                 BarLayoutService.isDragging = false;
                 BarLayoutService.dragHoverZone = "";
+                BarLayoutService.draggedWidgetId = "";
                 BarLayoutService.ghostSection = "";
                 BarLayoutService.ghostIndex = -1;
                 BarLayoutService.ghostWidth = 0;

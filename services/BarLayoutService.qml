@@ -9,6 +9,7 @@ Singleton {
     property bool settingsMode: false
     property bool isDragging: false
     property string dragHoverZone: ""
+    property string draggedWidgetId: ""
     // Ghost insertion indicator: section + index + width
     property string ghostSection: ""
     property int ghostIndex: -1

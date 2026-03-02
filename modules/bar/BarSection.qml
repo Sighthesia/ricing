@@ -50,15 +50,22 @@ Item {
     }
 
     // Calculate which position a widget would insert at, given localX in section space
+    // Skips the currently-dragged widget to avoid index flickering
     function insertIndexAt(localX) {
         let row = alignLeftRow;
+        let dragId = BarLayoutService.draggedWidgetId;
+        let slots = [];
         for (let i = 0; i < row.children.length; i++) {
             let child = row.children[i];
             if (!child || !child.visible) continue;
-            let childCenter = child.x + child.width / 2;
+            if (child.widgetId && child.widgetId === dragId) continue;
+            slots.push(child);
+        }
+        for (let i = 0; i < slots.length; i++) {
+            let childCenter = slots[i].x + slots[i].width / 2;
             if (localX < childCenter) return i;
         }
-        return row.children.length;
+        return slots.length;
     }
 
     // Expose the left Row for external position queries
@@ -118,17 +125,21 @@ Item {
             if (!visible) return 0;
             let idx = BarLayoutService.ghostIndex;
             let row = alignLeftRow;
-            if (idx >= row.children.length) {
-                // After the last widget
-                let last = row.children[row.children.length - 1];
+            let dragId = BarLayoutService.draggedWidgetId;
+            // Build slots excluding the dragged widget
+            let slots = [];
+            for (let i = 0; i < row.children.length; i++) {
+                let c = row.children[i];
+                if (!c || !c.visible) continue;
+                if (c.widgetId && c.widgetId === dragId) continue;
+                slots.push(c);
+            }
+            if (idx >= slots.length) {
+                let last = slots[slots.length - 1];
                 return last ? (sectionRow.x + row.x + last.x + last.width + 3) : sectionRow.x;
             }
-            let child = row.children[idx];
+            let child = slots[idx];
             return child ? (sectionRow.x + row.x + child.x - 3) : sectionRow.x;
-        }
-
-        Behavior on x {
-            NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
         }
     }
 
