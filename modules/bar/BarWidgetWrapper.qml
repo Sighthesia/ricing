@@ -20,15 +20,13 @@ Item {
     // Background for highlight pulse + settings mode outline
     Rectangle {
         id: pulseBackground
-        width: wrapper._naturalWidth + 4
-        height: wrapper._naturalHeight + 4
-        x: -2
-        y: -2
+        anchors.fill: parent
+        anchors.margins: -2
         radius: Theme.cornerRadius + 2
         color: "transparent"
         border.color: Colors.highlight
-        border.width: BarLayoutService.settingsMode && wrapper._enterDone ? 1 : 0
-        opacity: BarLayoutService.settingsMode ? 0.5 : 0
+        border.width: BarLayoutService.settingsMode && wrapper._enterDone && !wrapper._isDragging ? 1 : 0
+        opacity: BarLayoutService.settingsMode && !wrapper._isDragging ? 0.5 : 0
 
         Behavior on opacity {
             NumberAnimation { duration: 180; easing.type: Easing.OutQuad }
@@ -72,12 +70,11 @@ Item {
         ScriptAction { script: wrapper._enterDone = true }
     }
 
-    // --- Settings mode drag (visual offset via Translate) ---
-    property real dragOffsetX: 0
-    // Saved wrapper scene X at drag start (layout position, no Translate)
-    property real _dragStartLayoutX: 0
-
-    transform: Translate { x: wrapper.dragOffsetX }
+    // --- Settings mode drag ---
+    // Saved initial mouse scene X
+    property real _dragStartMouseX: 0
+    // Saved initial wrapper center in BarContent space
+    property real _dragStartContentX: 0
 
     // Find ancestor with hitTestSection function (BarContent)
     function findBarContent() {
@@ -119,24 +116,26 @@ Item {
         onActiveChanged: {
             if (active) {
                 startSceneX = centroid.scenePosition.x;
-                // Record layout scene position (parent.mapToItem excludes our Translate)
-                let parentScene = wrapper.parent.mapToItem(null, 0, 0);
-                wrapper._dragStartLayoutX = parentScene.x + wrapper.x;
-                wrapper.z = 100;
-                wrapper.scale = 1.05;
+                // Save initial center position in BarContent coords
+                let bc = wrapper.findBarContent();
+                if (bc) {
+                    let pt = wrapper.mapToItem(bc, wrapper._naturalWidth / 2, 0);
+                    wrapper._dragStartContentX = pt.x;
+                }
                 wrapper._isDragging = true;
                 BarLayoutService.isDragging = true;
                 BarLayoutService.draggedWidgetId = wrapper.widgetId;
                 BarLayoutService.ghostWidth = wrapper._naturalWidth;
+                // Set initial visual position
+                BarLayoutService.dragVisualX = wrapper._dragStartContentX - wrapper._naturalWidth / 2;
             } else {
-                wrapper.scale = 1.0;
-
                 let targetSection = BarLayoutService.ghostSection;
                 let targetIndex = BarLayoutService.ghostIndex;
 
                 BarLayoutService.isDragging = false;
                 BarLayoutService.dragHoverZone = "";
                 BarLayoutService.draggedWidgetId = "";
+                BarLayoutService.dragVisualX = 0;
                 BarLayoutService.ghostSection = "";
                 BarLayoutService.ghostIndex = -1;
                 BarLayoutService.ghostWidth = 0;
@@ -146,47 +145,32 @@ Item {
                         wrapper.widgetId, targetSection, "left", targetIndex);
                 }
 
-                wrapper.dragOffsetX = 0;
                 wrapper._isDragging = false;
-                wrapper.z = 0;
             }
         }
 
         onCentroidChanged: {
             if (active) {
-                // Mouse offset since drag start
                 let mouseOffset = centroid.scenePosition.x - startSceneX;
-                // Target visual scene X = original layout position + mouse offset
-                let targetSceneX = wrapper._dragStartLayoutX + mouseOffset;
-                // Current layout position (parent coords exclude our Translate)
-                let parentScene = wrapper.parent.mapToItem(null, 0, 0);
-                let layoutSceneX = parentScene.x + wrapper.x;
-                // Translate = difference between target and current layout position
-                wrapper.dragOffsetX = targetSceneX - layoutSceneX;
+                // Visual center in BarContent coordinates
+                let visualCenterX = wrapper._dragStartContentX + mouseOffset;
+                BarLayoutService.dragVisualX = visualCenterX - wrapper._naturalWidth / 2;
 
                 let bc = wrapper.findBarContent();
                 if (bc && bc.hitTestSection) {
-                    // Use _naturalWidth for hit test since wrapper may be collapsed
-                    let globalPt = wrapper.mapToItem(bc,
-                        wrapper._naturalWidth / 2, wrapper._naturalHeight / 2);
-                    let zoneName = bc.hitTestSection(globalPt.x);
+                    let zoneName = bc.hitTestSection(visualCenterX);
                     BarLayoutService.dragHoverZone = zoneName;
                     BarLayoutService.ghostSection = zoneName;
 
-                    // Find target section and calculate insert index
                     let sec = wrapper.findSection(bc, zoneName);
                     if (sec) {
-                        let sectionPt = wrapper.mapToItem(sec,
-                            wrapper._naturalWidth / 2, wrapper._naturalHeight / 2);
-                        BarLayoutService.ghostIndex = sec.insertIndexAt(sectionPt.x);
+                        let secScene = sec.mapToItem(null, 0, 0);
+                        let sectionLocalX = centroid.scenePosition.x - secScene.x;
+                        BarLayoutService.ghostIndex = sec.insertIndexAt(sectionLocalX);
                     }
                 }
             }
         }
-    }
-
-    Behavior on scale {
-        NumberAnimation { duration: 180; easing.type: Easing.OutQuad }
     }
 
     // --- Highlight pulse API ---

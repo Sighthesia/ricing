@@ -58,11 +58,13 @@ Item {
         for (let i = 0; i < row.children.length; i++) {
             let child = row.children[i];
             if (!child || !child.visible) continue;
-            if (child.widgetId && child.widgetId === dragId) continue;
-            slots.push(child);
+            // Skip non-widget children (Repeater, internal items)
+            if (!child.widgetId) continue;
+            if (child.widgetId === dragId) continue;
+            slots.push({ id: child.widgetId, x: child.x, w: child.width });
         }
         for (let i = 0; i < slots.length; i++) {
-            let childCenter = slots[i].x + slots[i].width / 2;
+            let childCenter = slots[i].x + slots[i].w / 2;
             if (localX < childCenter) return i;
         }
         return slots.length;
@@ -126,12 +128,13 @@ Item {
             let idx = BarLayoutService.ghostIndex;
             let row = alignLeftRow;
             let dragId = BarLayoutService.draggedWidgetId;
-            // Build slots excluding the dragged widget
+            // Build slots excluding non-widget items and dragged widget
             let slots = [];
             for (let i = 0; i < row.children.length; i++) {
                 let c = row.children[i];
                 if (!c || !c.visible) continue;
-                if (c.widgetId && c.widgetId === dragId) continue;
+                if (!c.widgetId) continue;
+                if (c.widgetId === dragId) continue;
                 slots.push(c);
             }
             if (idx >= slots.length) {

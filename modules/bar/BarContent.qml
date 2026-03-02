@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import qs.config
 import qs.services
 
@@ -23,37 +22,41 @@ Item {
         return "right";
     }
 
-    RowLayout {
-        anchors.fill: parent
+    // Left section: anchored left
+    BarSection {
+        id: leftSection
+        role: "left"
+        widgetRegistry: barContent.widgetRegistry
+        anchors.left: parent.left
         anchors.leftMargin: Theme.barPadding
+        anchors.verticalCenter: parent.verticalCenter
+        height: parent.height
+    }
+
+    // Center section: anchored center
+    BarSection {
+        id: centerSection
+        role: "center"
+        widgetRegistry: barContent.widgetRegistry
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        height: parent.height
+    }
+
+    // Right section: anchored right
+    BarSection {
+        id: rightSection
+        role: "right"
+        widgetRegistry: barContent.widgetRegistry
+        anchors.right: parent.right
         anchors.rightMargin: Theme.barPadding
-        spacing: 0
-
-        BarSection {
-            role: "left"
-            widgetRegistry: barContent.widgetRegistry
-            Layout.fillHeight: true
-        }
-
-        Item { Layout.fillWidth: true; Layout.fillHeight: true }
-
-        BarSection {
-            role: "center"
-            widgetRegistry: barContent.widgetRegistry
-            Layout.fillHeight: true
-        }
-
-        Item { Layout.fillWidth: true; Layout.fillHeight: true }
-
-        BarSection {
-            role: "right"
-            widgetRegistry: barContent.widgetRegistry
-            Layout.fillHeight: true
-        }
+        anchors.verticalCenter: parent.verticalCenter
+        height: parent.height
     }
 
     // Settings mode drag overlay (z:999)
     DragOverlay {
         anchors.fill: parent
+        widgetRegistry: barContent.widgetRegistry
     }
 }
