@@ -41,4 +41,9 @@ Item {
             Layout.fillHeight: true
         }
     }
+
+    // Settings mode drag overlay (z:999)
+    DragOverlay {
+        anchors.fill: parent
+    }
 }
