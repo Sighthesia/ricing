@@ -8,8 +8,8 @@ Item {
     property int staggerIndex: 0
     default property alias content: contentContainer.data
 
-    implicitWidth: contentContainer.implicitWidth
-    implicitHeight: contentContainer.implicitHeight
+    implicitWidth: contentContainer.childrenRect.width
+    implicitHeight: contentContainer.childrenRect.height
 
     // Background for highlight pulse
     Rectangle {
@@ -22,7 +22,8 @@ Item {
 
     Item {
         id: contentContainer
-        anchors.fill: parent
+        width: childrenRect.width
+        height: childrenRect.height
     }
 
     // Staggered enter animation (initial state; overridden on completed)
