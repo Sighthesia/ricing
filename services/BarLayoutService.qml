@@ -1,6 +1,7 @@
 pragma Singleton
 
 import Quickshell
+import Quickshell.Io
 import QtQuick
 
 Singleton {
@@ -27,7 +28,87 @@ Singleton {
         { id: "clock",           section: "center", alignment: "left", order: 0, enabled: true }
     ]
 
-    Component.onCompleted: resetLayout()
+    readonly property string _configDir: Quickshell.workingDirectory + "/.state"
+    readonly property string _configFile: _configDir + "/layout.json"
+
+    // Persist across hot reloads
+    PersistentProperties {
+        id: persist
+        reloadableId: "barLayoutPersist"
+        property string layoutJson: ""
+    }
+
+    Component.onCompleted: {
+        // Try loading from hot-reload state first, then from disk
+        if (persist.layoutJson !== "") {
+            applyJson(persist.layoutJson);
+        } else {
+            fileReader.running = true;
+        }
+    }
+
+    // Read saved layout from disk on startup
+    Process {
+        id: fileReader
+        command: ["cat", root._configFile]
+        stdout: SplitParser {
+            onRead: data => {
+                let trimmed = data.trim();
+                if (trimmed !== "") root.applyJson(trimmed);
+            }
+        }
+        onRunningChanged: {
+            // If file doesn't exist or cat fails, fall back to default
+            if (!running && root.layoutModel.count === 0)
+                root.resetLayout();
+        }
+    }
+
+    // Write layout to disk (fire-and-forget)
+    Process {
+        id: fileWriter
+        stdinEnabled: true
+        command: ["sh", "-c", "mkdir -p '" + root._configDir + "' && cat > '" + root._configFile + "'"]
+    }
+
+    function serializeLayout() {
+        let arr = [];
+        for (let i = 0; i < layoutModel.count; i++) {
+            let item = layoutModel.get(i);
+            arr.push({
+                id: item.id, section: item.section,
+                alignment: item.alignment, order: item.order,
+                enabled: item.enabled
+            });
+        }
+        return JSON.stringify(arr);
+    }
+
+    function applyJson(json) {
+        try {
+            let arr = JSON.parse(json);
+            if (!Array.isArray(arr) || arr.length === 0) {
+                resetLayout();
+                return;
+            }
+            layoutModel.clear();
+            for (let i = 0; i < arr.length; i++)
+                layoutModel.append(arr[i]);
+            layoutChanged();
+        } catch (e) {
+            console.log("BarLayoutService: failed to parse layout JSON:", e);
+            resetLayout();
+        }
+    }
+
+    function saveLayout() {
+        let json = serializeLayout();
+        persist.layoutJson = json;
+        // Write to disk
+        fileWriter.running = false;
+        fileWriter.running = true;
+        fileWriter.write(json + "\n");
+    }
 
     function moveWidget(widgetId, toSection, toAlignment, toOrder) {
 
@@ -63,7 +144,7 @@ Singleton {
             }
         }
         layoutChanged();
-        // FIXME: persist to PersistentProperties
+        saveLayout();
     }
 
     function resetLayout() {
