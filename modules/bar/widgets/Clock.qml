@@ -6,7 +6,7 @@ import qs.config
 Rectangle {
     id: clock
 
-    color: Palette.background
+    color: Colors.background
     radius: Theme.cornerRadius
     implicitHeight: Theme.barHeight
     implicitWidth: content.width + 24
@@ -33,7 +33,7 @@ Rectangle {
                 font.pointSize: 11
                 font.bold: true
                 text: Qt.formatDateTime(systemClock.date, "MMM")
-                color: Palette.textMuted
+                color: Colors.textMuted
             }
 
             Text {
@@ -42,7 +42,7 @@ Rectangle {
                 font.pointSize: 11
                 font.bold: true
                 text: Qt.formatDateTime(systemClock.date, "d")
-                color: Palette.text
+                color: Colors.text
             }
         }
 
@@ -50,7 +50,7 @@ Rectangle {
         Rectangle {
             implicitWidth: 1
             implicitHeight: 16
-            color: Palette.text
+            color: Colors.text
             opacity: 0.3
             Layout.alignment: Qt.AlignVCenter
         }
@@ -66,7 +66,7 @@ Rectangle {
                 font.pointSize: 13
                 font.bold: true
                 text: Qt.formatDateTime(systemClock.date, "hh")
-                color: Palette.textMuted
+                color: Colors.textMuted
             }
 
             Text {
@@ -75,7 +75,7 @@ Rectangle {
                 font.pointSize: 13
                 font.bold: true
                 text: ":"
-                color: Palette.text
+                color: Colors.text
             }
 
             Text {
@@ -84,7 +84,7 @@ Rectangle {
                 font.pointSize: 13
                 font.bold: true
                 text: Qt.formatDateTime(systemClock.date, "mm")
-                color: Palette.text
+                color: Colors.text
             }
         }
     }

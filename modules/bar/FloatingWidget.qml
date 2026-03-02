@@ -54,8 +54,8 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Theme.cornerRadius
-        color: Palette.surface
-        border.color: Palette.border
+        color: Colors.surface
+        border.color: Colors.border
         border.width: 1
 
         Text {
@@ -63,7 +63,7 @@ Item {
             text: floatingWidget.widgetId
             font.family: Theme.fontFamily
             font.pixelSize: 11
-            color: Palette.text
+            color: Colors.text
         }
     }
 

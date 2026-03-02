@@ -13,9 +13,9 @@ Item {
         id: bg
         anchors.fill: parent
         radius: Theme.cornerRadius
-        color: Palette.highlight
+        color: Colors.highlight
         opacity: BarLayoutService.settingsMode
-            ? Palette.highlightAlpha
+            ? Colors.highlightAlpha
             : (hoverArea.containsMouse ? 0.08 : 0)
 
         Behavior on opacity {
@@ -37,7 +37,7 @@ Item {
         text: "\uf013"  // Nerd Font gear icon
         font.family: Theme.fontMono
         font.pixelSize: 16
-        color: Palette.text
+        color: Colors.text
 
         rotation: BarLayoutService.settingsMode ? 45 : 0
 

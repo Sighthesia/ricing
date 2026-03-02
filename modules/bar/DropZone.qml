@@ -12,7 +12,7 @@ Item {
         anchors.fill: parent
         anchors.margins: 4
         color: "transparent"
-        border.color: highlighted ? Palette.highlight : Palette.border
+        border.color: highlighted ? Colors.highlight : Colors.border
         border.width: 1
         radius: Theme.cornerRadius
         opacity: highlighted ? 0.8 : 0.4
@@ -37,7 +37,7 @@ Item {
         text: dropZone.zoneName
         font.family: Theme.fontFamily
         font.pixelSize: 10
-        color: Palette.textMuted
+        color: Colors.textMuted
         opacity: 0.5
     }
 }

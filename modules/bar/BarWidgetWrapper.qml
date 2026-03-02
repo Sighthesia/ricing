@@ -16,7 +16,7 @@ Item {
         id: pulseBackground
         anchors.fill: parent
         radius: Theme.cornerRadius
-        color: Palette.highlight
+        color: Colors.highlight
         opacity: 0
     }
 
@@ -94,13 +94,13 @@ Item {
         id: pulseAnimation
         NumberAnimation {
             target: pulseBackground; property: "opacity"
-            from: 0; to: Palette.highlightAlpha
+            from: 0; to: Colors.highlightAlpha
             duration: Theme.anim.highlightDuration
             easing.type: Theme.anim.highlightType
         }
         NumberAnimation {
             target: pulseBackground; property: "opacity"
-            from: Palette.highlightAlpha; to: 0
+            from: Colors.highlightAlpha; to: 0
             duration: Theme.anim.highlightDuration
             easing.type: Theme.anim.highlightType
         }
