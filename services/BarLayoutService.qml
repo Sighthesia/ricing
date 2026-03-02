@@ -7,6 +7,8 @@ Singleton {
     id: root
 
     property bool settingsMode: false
+    property bool isDragging: false
+    property string dragHoverZone: ""
     property ListModel layoutModel: ListModel {}
 
     signal layoutChanged()

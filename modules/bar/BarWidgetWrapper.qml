@@ -65,7 +65,7 @@ Item {
         ScriptAction { script: wrapper._enterDone = true }
     }
 
-    // --- Settings mode drag (visual-only offset, doesn't break Row layout) ---
+    // --- Settings mode drag (visual offset via Translate) ---
     property real dragOffsetX: 0
 
     transform: Translate { x: wrapper.dragOffsetX }
@@ -73,21 +73,24 @@ Item {
     DragHandler {
         id: dragHandler
         enabled: BarLayoutService.settingsMode && wrapper._enterDone
-        target: null  // Don't modify wrapper.x (preserve Row layout)
+        target: null
         xAxis.enabled: true
         yAxis.enabled: false
 
-        property real pressX: 0
+        property real startSceneX: 0
 
         onActiveChanged: {
             if (active) {
-                pressX = centroid.position.x;
+                startSceneX = centroid.scenePosition.x;
                 wrapper.z = 100;
                 wrapper.scale = 1.05;
+                BarLayoutService.isDragging = true;
             } else {
                 wrapper.scale = 1.0;
+                BarLayoutService.isDragging = false;
+                BarLayoutService.dragHoverZone = "";
 
-                // Hit-test: the visual center in barContent coords
+                // Hit-test via barContent
                 let bc = wrapper.parent;
                 while (bc && !bc.hitTestSection)
                     bc = bc.parent;
@@ -110,7 +113,18 @@ Item {
 
         onCentroidChanged: {
             if (active) {
-                wrapper.dragOffsetX = centroid.position.x - pressX;
+                wrapper.dragOffsetX = centroid.scenePosition.x - startSceneX;
+
+                // Update hover zone for DropZone highlights
+                let bc = wrapper.parent;
+                while (bc && !bc.hitTestSection)
+                    bc = bc.parent;
+                if (bc && bc.hitTestSection) {
+                    let globalPt = wrapper.mapToItem(bc,
+                        wrapper.width / 2 + wrapper.dragOffsetX,
+                        wrapper.height / 2);
+                    BarLayoutService.dragHoverZone = bc.hitTestSection(globalPt.x);
+                }
             }
         }
     }

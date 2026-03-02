@@ -1,11 +1,14 @@
 import QtQuick
 import qs.config
+import qs.services
 
 Item {
     id: dropZone
 
     required property string zoneName
-    property bool highlighted: false
+    // Auto-highlight when a widget is dragged over this zone
+    property bool highlighted: BarLayoutService.isDragging
+        && BarLayoutService.dragHoverZone === zoneName
 
     // Dashed border rectangle
     Rectangle {
