@@ -92,8 +92,6 @@ Item {
 
     SequentialAnimation {
         id: pulseAnimation
-        property int loops: 1
-        loops: pulseAnimation.loops
         NumberAnimation {
             target: pulseBackground; property: "opacity"
             from: 0; to: Palette.highlightAlpha
