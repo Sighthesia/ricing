@@ -18,12 +18,12 @@ PopupWindow {
     // Place anchor point at the bar's bottom edge, horizontally at click X.
     // The menu expands downward (Quickshell default gravity: Bottom|Right).
     anchor.rect.x: Math.max(0, Math.min(_clickX - implicitWidth / 2,
-                                         (anchorTarget ? anchorTarget.width : 0) - implicitWidth))
-    anchor.rect.y: anchorTarget ? anchorTarget.height : 0
+                                         anchorTarget.width - implicitWidth))
+    anchor.rect.y: anchorTarget.height
     anchor.rect.width: 1
     anchor.rect.height: 1
 
-    implicitWidth: Math.max(160, menuColumn.implicitWidth + 24)
+    implicitWidth: 160
     implicitHeight: menuColumn.implicitHeight + 8
 
     property real _clickX: 0
