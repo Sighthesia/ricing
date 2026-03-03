@@ -2,8 +2,8 @@ import QtQuick
 import qs.config
 import qs.services
 
-// Appearance settings page with four collapsible groups:
-// Colors, Bar, Animation, Behavior.
+// Appearance settings page with five collapsible groups:
+// Colors, Font, Bar, Animation, Behavior.
 Item {
     id: root
 
