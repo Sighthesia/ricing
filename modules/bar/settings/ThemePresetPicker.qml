@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import qs.config
 import qs.services
 
@@ -79,12 +80,16 @@ Item {
             leftMargin: Theme.settingsPanelPadding
             rightMargin: Theme.settingsPanelPadding
         }
-        height: 74   // 52px preview + 2px gap + 20px name label
+        height: 86   // 52px preview + 2px gap + 20px name label + 12px scrollbar
         orientation: ListView.Horizontal
         spacing: 6
         clip: true
         model: root.presets
         boundsBehavior: Flickable.StopAtBounds
+
+        ScrollBar.horizontal: ScrollBar {
+            policy: ScrollBar.AsNeeded
+        }
 
         delegate: Item {
             required property var modelData
