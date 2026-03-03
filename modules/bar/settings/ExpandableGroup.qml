@@ -106,9 +106,28 @@ Item {
     // Reparent all declarative children into contentCol
     default property alias content: contentCol.data
 
+    // External persistent highlight — set to true after scroll-to-section.
+    // Cleared by calling clearHighlight() or by the parent calling it externally.
+    property bool highlighted: false
+
+    function clearHighlight() {
+        highlighted = false
+    }
+
     // Briefly flash the header accent to draw attention after scroll-to-section.
     function flash() { flashAnim.restart() }
 
+    // Persistent highlight overlay (stays on until clearHighlight is called)
+    Rectangle {
+        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 4; rightMargin: 4 }
+        height: header.height
+        radius: 4
+        color: Colors.highlight
+        opacity: root.highlighted ? 0.16 : 0
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+    }
+
+    // Brief flash overlay (one-shot animation on top of persistent highlight)
     Rectangle {
         id: flashOverlay
         anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 4; rightMargin: 4 }
@@ -118,8 +137,8 @@ Item {
         opacity: 0
         SequentialAnimation {
             id: flashAnim
-            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.38; duration: 140 }
-            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0; duration: 500; easing.type: Easing.OutQuad }
+            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.28; duration: 140 }
+            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0; duration: 400; easing.type: Easing.OutQuad }
         }
     }
 }

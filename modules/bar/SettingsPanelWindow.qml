@@ -43,6 +43,16 @@ PanelWindow {
             border.color: Qt.rgba(1, 1, 1, 0.04)
             border.width: 1
         }
+
+        // Clicking blank space inside the panel clears any jump-to highlights
+        // and dismisses the search dropdown (unfocuses search field).
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                content.clearAllHighlights()
+                content.dismissSearch()
+            }
+        }
     }
 
     SettingsPanelContent {

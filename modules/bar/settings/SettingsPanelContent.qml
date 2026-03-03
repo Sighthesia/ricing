@@ -12,6 +12,15 @@ Item {
     property string currentPage: "appearance"
     property string pendingSection: ""
 
+    // Public API consumed by SettingsPanelWindow's click-to-deselect backdrop.
+    function clearAllHighlights() {
+        if (loader.item && loader.item.clearAllHighlights)
+            loader.item.clearAllHighlights()
+    }
+    function dismissSearch() {
+        searchField.focus = false
+    }
+
     implicitWidth: Math.max(searchBar.implicitWidth, mainRow.implicitWidth)
     implicitHeight: searchBar.height + 6 + mainRow.implicitHeight
 
@@ -104,7 +113,7 @@ Item {
         z: 10
         anchors { top: searchBar.bottom; topMargin: 2; left: parent.left; right: parent.right }
         height: visible ? Math.min(dropList.contentHeight + 16, 180) : 0
-        visible: searchField.text !== "" && root.filteredItems.length > 0
+        visible: searchField.activeFocus && searchField.text !== "" && root.filteredItems.length > 0
 
         Rectangle {
             anchors.fill: parent
@@ -182,6 +191,8 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
+                    // Keep search field focused so the dropdown stays open after click-through.
+                    onPressed: searchField.forceActiveFocus()
                     onClicked: {
                         var page = modelData.page
                         var sectionId = modelData.section

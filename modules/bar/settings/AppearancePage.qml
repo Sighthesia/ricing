@@ -25,8 +25,8 @@ Item {
     implicitWidth: parent ? parent.width : 340
     implicitHeight: Math.min(pageFlickable.contentHeight + 8, 480)
 
-    // Scroll to a named section and flash its header to draw attention.
-    // Called by SettingsPanelContent after the sidebar sub-item is clicked.
+    // Scroll to a named section, expand it if collapsed, and show a persistent
+    // highlight on the group header. Cleared by clearAllHighlights().
     function scrollToSection(sectionId) {
         var map = {
             "colors":    groupColors,
@@ -38,7 +38,19 @@ Item {
         if (!group) return
         group.expanded = true
         pageFlickable.contentY = Math.max(0, group.y - 4)
+        // Clear any previously highlighted group first
+        clearAllHighlights()
+        group.highlighted = true
         group.flash()
+    }
+
+    // Remove persistent highlights from all groups.
+    // Called when the user clicks on blank space in the panel.
+    function clearAllHighlights() {
+        groupColors.highlighted = false
+        groupBar.highlighted = false
+        groupAnimation.highlighted = false
+        groupBehavior.highlighted = false
     }
 
     Flickable {
