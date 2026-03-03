@@ -106,6 +106,7 @@ Item {
                 color: Colors.text
                 maximumLength: 7
                 selectByMouse: true
+                HoverHandler { cursorShape: Qt.IBeamCursor }
 
                 onEditingFinished: {
                     // Normalize: prepend # if missing

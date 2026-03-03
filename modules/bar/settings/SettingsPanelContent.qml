@@ -56,6 +56,7 @@ Item {
             font.pixelSize: Theme.fontSizeSmall
             color: Colors.text
             selectionColor: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.35)
+            HoverHandler { cursorShape: Qt.IBeamCursor }
         }
 
         Text {
