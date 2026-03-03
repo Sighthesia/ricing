@@ -100,9 +100,7 @@ Item {
         Repeater {
             model: section.widgets
             delegate: widgetDelegate
-            onItemAdded: (index, item) => {
-                // No-op for now but ensures items are tracked correctly
-            }
+            // `onItemAdded` removed: transition keying now handled by model order
         }
     }
 

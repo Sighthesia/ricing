@@ -164,11 +164,13 @@ Singleton {
         saveLayout();
     }
 
-    function isSamePlacement(widgetId, sectionName, order) {
+    // Returns true if the widget already occupies the given slot
+    // including alignment. Used to suppress no-op reorders.
+    function isSamePlacement(widgetId, sectionName, order, alignment) {
         for (let i = 0; i < layoutModel.count; i++) {
             let item = layoutModel.get(i);
             if (item.id === widgetId)
-                return item.section === sectionName && item.order === order;
+                return item.section === sectionName && item.order === order && item.alignment === alignment;
         }
         return false;
     }
