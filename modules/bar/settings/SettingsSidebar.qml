@@ -35,11 +35,7 @@ Item {
         }
     ]
 
-    Rectangle {
-        anchors.fill: parent
-        color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.5)
-        radius: Theme.cornerRadius
-    }
+    // Background intentionally omitted — sidebar blends with the panel card.
 
     Column {
         id: navCol
