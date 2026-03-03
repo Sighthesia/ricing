@@ -28,8 +28,10 @@ PopupWindow {
 
     property real _clickX: 0
 
-    // Open menu at BarContent-local x coordinate (y is unused; menu always below bar).
-    function showAt(x, y) {
+    // Open menu at BarContent-local x coordinate.
+    // `_y` is accepted for API symmetry with MouseArea.onClicked but is ignored:
+    // the menu always appears at the bar's bottom edge regardless of click y.
+    function showAt(x, _y) {
         _clickX = x;
         anchor.updateAnchor();
         visible = true;
