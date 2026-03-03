@@ -1,0 +1,31 @@
+{
+  "appearance": {
+    "accentColor": "#7aa2f7",
+    "backgroundColor": "#1a1a1a",
+    "surfaceColor": "#252525",
+    "textColor": "#c0caf5",
+    "textMutedColor": "#565f89",
+    "borderColor": "#3b4261",
+    "cornerRadius": 10,
+    "fontFamily": "LXGW WenKai GB Screen",
+    "fontMono": "JetBrainsMono Nerd Font",
+    "fontSizeBody": 14,
+    "fontSizeSmall": 10,
+    "fontSizeIcon": 16
+  },
+  "bar": {
+    "height": 36,
+    "position": "top",
+    "backgroundOpacity": 0.85,
+    "padding": 8,
+    "widgetSpacing": 6
+  },
+  "barBehavior": {
+    "autoHide": false,
+    "autoHideDelay": 500,
+    "autoShowDelay": 150
+  },
+  "animation": {
+    "speedFactor": 1.0
+  }
+}
