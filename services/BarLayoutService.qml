@@ -28,8 +28,7 @@ Singleton {
 
     // Default layout descriptor (from bar-design.md §三)
     readonly property var defaultLayout: [
-        { id: "settingsToggle",  section: "left",   alignment: "left", order: 0, enabled: true },
-        { id: "workspaceWidget", section: "left",   alignment: "left", order: 1, enabled: true },
+        { id: "workspaceWidget", section: "left",   alignment: "left", order: 0, enabled: true },
         { id: "clock",           section: "center", alignment: "left", order: 0, enabled: true }
     ]
 
