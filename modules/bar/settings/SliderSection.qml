@@ -27,8 +27,31 @@ Item {
     // Fired on every drag tick (allows live preview)
     signal valueCommitted(real newValue)
 
+    // When true, show a subtle accent tint to indicate a search match.
+    property bool searchHighlight: false
+
     implicitWidth: 296
     implicitHeight: 32
+
+    // Search match highlight background
+    Rectangle {
+        anchors.fill: parent
+        anchors.leftMargin: 4; anchors.rightMargin: 4
+        radius: 4
+        color: Colors.highlight
+        opacity: root.searchHighlight ? 0.1 : 0
+        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
+    }
+
+    // Accent left-edge strip
+    Rectangle {
+        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 4 }
+        width: 3
+        radius: 1
+        color: Colors.highlight
+        opacity: root.searchHighlight ? 0.9 : 0
+        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
+    }
 
     Row {
         anchors.fill: parent

@@ -14,11 +14,16 @@ Item {
     id: root
 
     property string title: ""
-    property bool expanded: true   // default to open
+    property bool expanded: true   // user-controlled expanded state
+    // Override: set to true from outside (e.g., search) to force the group open
+    // without permanently overwriting the user's manual expand/collapse preference.
+    property bool forceExpand: false
 
-    // Total height: header + (content if expanded)
+    readonly property bool _open: expanded || forceExpand
+
+    // Total height: header + (content if open)
     implicitWidth: parent ? parent.width : 296
-    implicitHeight: header.height + (expanded ? contentCol.implicitHeight : 0)
+    implicitHeight: header.height + (_open ? contentCol.implicitHeight : 0)
 
     Behavior on implicitHeight {
         NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Easing.InOutCubic }
@@ -55,7 +60,7 @@ Item {
             font.pixelSize: Theme.fontSizeSmall
             color: Colors.textMuted
 
-            rotation: root.expanded ? 90 : 0
+            rotation: root._open ? 90 : 0
             Behavior on rotation {
                 NumberAnimation {
                     duration: Theme.anim.moveDuration
@@ -73,7 +78,7 @@ Item {
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeSmall
             font.weight: Font.Medium
-            color: root.expanded ? Colors.text : Colors.textMuted
+            color: root._open ? Colors.text : Colors.textMuted
 
             Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
         }

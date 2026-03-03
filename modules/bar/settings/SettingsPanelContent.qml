@@ -1,10 +1,11 @@
 import QtQuick
 import qs.config
 
-// Settings panel with a search bar, left sidebar, and right page content.
-// Search bar is always visible at the top. When the user types a query the
-// normal sidebar+page view is replaced with a flat SearchResultsView. Clicking
-// a result clears the search and scrolls to the corresponding section.
+// Settings panel with a persistent search bar at the top, left sidebar, and
+// right page content. Typing in the search bar propagates the query to the
+// active page, which highlights matching items in-place and force-expands the
+// groups that contain them. The view never collapses to a separate overlay —
+// the normal sidebar + section layout stays visible at all times.
 Item {
     id: root
 
@@ -12,8 +13,7 @@ Item {
     property string pendingSection: ""
 
     implicitWidth: Math.max(searchBar.implicitWidth, mainRow.implicitWidth)
-    implicitHeight: searchBar.height + 6 +
-        (searchField.text !== "" ? searchResultsView.implicitHeight : mainRow.implicitHeight)
+    implicitHeight: searchBar.height + 6 + mainRow.implicitHeight
 
     // ── Search bar ──────────────────────────────────────────────────
     Item {
@@ -31,7 +31,6 @@ Item {
             Behavior on border.color { ColorAnimation { duration: Theme.anim.highlightDuration } }
         }
 
-        // Search icon
         Text {
             id: searchIcon
             anchors { left: parent.left; leftMargin: 10; verticalCenter: parent.verticalCenter }
@@ -48,10 +47,9 @@ Item {
             font.pixelSize: Theme.fontSizeSmall
             color: Colors.text
             selectionColor: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.35)
-            // Placeholder via a Text overlay
         }
 
-        // Placeholder text
+        // Placeholder overlay
         Text {
             visible: searchField.text === "" && !searchField.activeFocus
             anchors { left: searchField.left; verticalCenter: parent.verticalCenter }
@@ -61,7 +59,6 @@ Item {
             color: Colors.textMuted
         }
 
-        // Clear button
         Text {
             id: clearBtn
             visible: searchField.text !== ""
@@ -78,7 +75,6 @@ Item {
     Item {
         id: mainRow
         anchors { top: searchBar.bottom; topMargin: 6; left: parent.left; right: parent.right; bottom: parent.bottom }
-        visible: searchField.text === ""
         implicitWidth: sidebar.implicitWidth + contentItem.implicitWidth + 8
         implicitHeight: Math.max(sidebar.implicitHeight, contentItem.implicitHeight)
 
@@ -114,25 +110,13 @@ Item {
                     }
                 }
                 onLoaded: {
+                    // Bind live search query to the page so it reacts to future changes.
+                    if (loader.item && loader.item.hasOwnProperty("searchQuery"))
+                        loader.item.searchQuery = Qt.binding(function() { return searchField.text })
                     if (root.pendingSection !== "")
                         scrollDelay.restart()
                 }
             }
-        }
-    }
-
-    // ── Search results overlay ──────────────────────────────────────
-    // Covers the main content area while a query is active.
-    SearchResultsView {
-        id: searchResultsView
-        anchors { top: searchBar.bottom; topMargin: 6; left: parent.left; right: parent.right }
-        visible: searchField.text !== ""
-        query: searchField.text
-        onNavigateTo: (page, sectionId) => {
-            searchField.clear()
-            root.currentPage = page
-            root.pendingSection = sectionId
-            scrollDelay.restart()
         }
     }
 
@@ -147,4 +131,5 @@ Item {
         }
     }
 }
+
 

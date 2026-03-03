@@ -7,6 +7,21 @@ import qs.services
 Item {
     id: root
 
+    // Propagated from SettingsPanelContent. When non-empty, highlight matching items
+    // in place and force-expand groups that contain matches.
+    property string searchQuery: ""
+
+    function matches(label) {
+        if (!searchQuery) return false
+        return label.toLowerCase().indexOf(searchQuery.toLowerCase()) !== -1
+    }
+
+    function groupMatches(labels) {
+        if (!searchQuery) return false
+        var q = searchQuery.toLowerCase()
+        return labels.some(function(l) { return l.toLowerCase().indexOf(q) !== -1 })
+    }
+
     implicitWidth: parent ? parent.width : 340
     implicitHeight: Math.min(pageFlickable.contentHeight + 8, 480)
 
@@ -46,34 +61,41 @@ Item {
                 id: groupColors
                 title: "颜色"
                 expanded: true
+                forceExpand: root.groupMatches(["强调色","背景色","表面色","文字色","次要文字","边框色"])
 
                 ColorSection {
                     label: "强调色"
+                    searchHighlight: root.matches("强调色")
                     value: SettingsService.data.appearance.accentColor
                     onValueCommitted: (v) => SettingsService.data.appearance.accentColor = v
                 }
                 ColorSection {
                     label: "背景色"
+                    searchHighlight: root.matches("背景色")
                     value: SettingsService.data.appearance.backgroundColor
                     onValueCommitted: (v) => SettingsService.data.appearance.backgroundColor = v
                 }
                 ColorSection {
                     label: "表面色"
+                    searchHighlight: root.matches("表面色")
                     value: SettingsService.data.appearance.surfaceColor
                     onValueCommitted: (v) => SettingsService.data.appearance.surfaceColor = v
                 }
                 ColorSection {
                     label: "文字色"
+                    searchHighlight: root.matches("文字色")
                     value: SettingsService.data.appearance.textColor
                     onValueCommitted: (v) => SettingsService.data.appearance.textColor = v
                 }
                 ColorSection {
                     label: "次要文字"
+                    searchHighlight: root.matches("次要文字")
                     value: SettingsService.data.appearance.textMutedColor
                     onValueCommitted: (v) => SettingsService.data.appearance.textMutedColor = v
                 }
                 ColorSection {
                     label: "边框色"
+                    searchHighlight: root.matches("边框色")
                     value: SettingsService.data.appearance.borderColor
                     onValueCommitted: (v) => SettingsService.data.appearance.borderColor = v
                 }
@@ -84,9 +106,11 @@ Item {
                 id: groupBar
                 title: "Bar"
                 expanded: true
+                forceExpand: root.groupMatches(["高度","透明度","内边距","小部件间距","圆角","位置"])
 
                 SliderSection {
                     label: "高度"
+                    searchHighlight: root.matches("高度")
                     value: SettingsService.data.bar.height
                     from: 24; to: 60; stepSize: 1; unit: "px"
                     onValueCommitted: (v) => SettingsService.data.bar.height = v
@@ -94,6 +118,7 @@ Item {
 
                 SliderSection {
                     label: "透明度"
+                    searchHighlight: root.matches("透明度")
                     value: SettingsService.data.bar.backgroundOpacity
                     from: 0.0; to: 1.0; stepSize: 0.05
                     onValueCommitted: (v) => SettingsService.data.bar.backgroundOpacity = v
@@ -101,6 +126,7 @@ Item {
 
                 SliderSection {
                     label: "内边距"
+                    searchHighlight: root.matches("内边距")
                     value: SettingsService.data.bar.padding
                     from: 0; to: 20; stepSize: 1; unit: "px"
                     onValueCommitted: (v) => SettingsService.data.bar.padding = v
@@ -108,6 +134,7 @@ Item {
 
                 SliderSection {
                     label: "小部件间距"
+                    searchHighlight: root.matches("小部件间距")
                     value: SettingsService.data.bar.widgetSpacing
                     from: 0; to: 20; stepSize: 1; unit: "px"
                     onValueCommitted: (v) => SettingsService.data.bar.widgetSpacing = v
@@ -115,6 +142,7 @@ Item {
 
                 SliderSection {
                     label: "圆角"
+                    searchHighlight: root.matches("圆角")
                     value: SettingsService.data.appearance.cornerRadius
                     from: 0; to: 24; stepSize: 1; unit: "px"
                     onValueCommitted: (v) => SettingsService.data.appearance.cornerRadius = v
@@ -188,9 +216,11 @@ Item {
                 id: groupAnimation
                 title: "动画"
                 expanded: false
+                forceExpand: root.groupMatches(["速度系数"])
 
                 SliderSection {
                     label: "速度系数"
+                    searchHighlight: root.matches("速度系数")
                     value: SettingsService.data.animation.speedFactor
                     from: 0.2; to: 3.0; stepSize: 0.1; unit: "×"
                     onValueCommitted: (v) => SettingsService.data.animation.speedFactor = v
@@ -202,6 +232,7 @@ Item {
                 id: groupBehavior
                 title: "行为"
                 expanded: false
+                forceExpand: root.groupMatches(["自动隐藏","位置"])
 
                 // Auto-hide toggle
                 Item {
