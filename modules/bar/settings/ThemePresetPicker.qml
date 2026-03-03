@@ -15,6 +15,7 @@ Item {
         "主题预设".toLowerCase().indexOf(filterQuery.toLowerCase()) !== -1
 
     visible: _matchesFilter
+    implicitWidth: parent ? parent.width : 296
     height: cardRow.height + sectionLabel.height + 8
 
     // 7 built-in palettes; values are intentionally kept as plain strings
