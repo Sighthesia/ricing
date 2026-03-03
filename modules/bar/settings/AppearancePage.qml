@@ -74,40 +74,42 @@ Item {
                 title: "颜色"
                 expanded: true
                 forceExpand: root.groupMatches(["强调色","背景色","表面色","文字色","次要文字","边框色"])
+                visible: root.searchQuery === "" || root.groupMatches(["强调色","背景色","表面色","文字色","次要文字","边框色"])
+                height: visible ? implicitHeight : 0
 
                 ColorSection {
                     label: "强调色"
-                    searchHighlight: root.matches("强调色")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.accentColor
                     onValueCommitted: (v) => SettingsService.data.appearance.accentColor = v
                 }
                 ColorSection {
                     label: "背景色"
-                    searchHighlight: root.matches("背景色")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.backgroundColor
                     onValueCommitted: (v) => SettingsService.data.appearance.backgroundColor = v
                 }
                 ColorSection {
                     label: "表面色"
-                    searchHighlight: root.matches("表面色")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.surfaceColor
                     onValueCommitted: (v) => SettingsService.data.appearance.surfaceColor = v
                 }
                 ColorSection {
                     label: "文字色"
-                    searchHighlight: root.matches("文字色")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.textColor
                     onValueCommitted: (v) => SettingsService.data.appearance.textColor = v
                 }
                 ColorSection {
                     label: "次要文字"
-                    searchHighlight: root.matches("次要文字")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.textMutedColor
                     onValueCommitted: (v) => SettingsService.data.appearance.textMutedColor = v
                 }
                 ColorSection {
                     label: "边框色"
-                    searchHighlight: root.matches("边框色")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.borderColor
                     onValueCommitted: (v) => SettingsService.data.appearance.borderColor = v
                 }
@@ -119,10 +121,12 @@ Item {
                 title: "Bar"
                 expanded: true
                 forceExpand: root.groupMatches(["高度","透明度","内边距","小部件间距","圆角","位置"])
+                visible: root.searchQuery === "" || root.groupMatches(["高度","透明度","内边距","小部件间距","圆角","位置"])
+                height: visible ? implicitHeight : 0
 
                 SliderSection {
                     label: "高度"
-                    searchHighlight: root.matches("高度")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.bar.height
                     from: 24; to: 60; stepSize: 1; unit: "px"
                     onValueCommitted: (v) => SettingsService.data.bar.height = v
@@ -130,7 +134,7 @@ Item {
 
                 SliderSection {
                     label: "透明度"
-                    searchHighlight: root.matches("透明度")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.bar.backgroundOpacity
                     from: 0.0; to: 1.0; stepSize: 0.05
                     onValueCommitted: (v) => SettingsService.data.bar.backgroundOpacity = v
@@ -138,7 +142,7 @@ Item {
 
                 SliderSection {
                     label: "内边距"
-                    searchHighlight: root.matches("内边距")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.bar.padding
                     from: 0; to: 20; stepSize: 1; unit: "px"
                     onValueCommitted: (v) => SettingsService.data.bar.padding = v
@@ -146,7 +150,7 @@ Item {
 
                 SliderSection {
                     label: "小部件间距"
-                    searchHighlight: root.matches("小部件间距")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.bar.widgetSpacing
                     from: 0; to: 20; stepSize: 1; unit: "px"
                     onValueCommitted: (v) => SettingsService.data.bar.widgetSpacing = v
@@ -154,7 +158,7 @@ Item {
 
                 SliderSection {
                     label: "圆角"
-                    searchHighlight: root.matches("圆角")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.cornerRadius
                     from: 0; to: 24; stepSize: 1; unit: "px"
                     onValueCommitted: (v) => SettingsService.data.appearance.cornerRadius = v
@@ -163,7 +167,8 @@ Item {
                 // Position selector (reuses BehaviorSection position row directly)
                 Item {
                     width: parent ? parent.width : 296
-                    height: 32
+                    visible: root.searchQuery === "" || root.matches("位置")
+                    height: visible ? 32 : 0
 
                     Row {
                         anchors.fill: parent
@@ -229,10 +234,12 @@ Item {
                 title: "动画"
                 expanded: false
                 forceExpand: root.groupMatches(["速度系数"])
+                visible: root.searchQuery === "" || root.groupMatches(["速度系数"])
+                height: visible ? implicitHeight : 0
 
                 SliderSection {
                     label: "速度系数"
-                    searchHighlight: root.matches("速度系数")
+                    filterQuery: root.searchQuery
                     value: SettingsService.data.animation.speedFactor
                     from: 0.2; to: 3.0; stepSize: 0.1; unit: "×"
                     onValueCommitted: (v) => SettingsService.data.animation.speedFactor = v
@@ -245,11 +252,14 @@ Item {
                 title: "行为"
                 expanded: false
                 forceExpand: root.groupMatches(["自动隐藏","位置"])
+                visible: root.searchQuery === "" || root.groupMatches(["自动隐藏","位置"])
+                height: visible ? implicitHeight : 0
 
                 // Auto-hide toggle
                 Item {
                     width: parent ? parent.width : 296
-                    height: 32
+                    visible: root.searchQuery === "" || root.matches("自动隐藏")
+                    height: visible ? 32 : 0
 
                     Row {
                         anchors.fill: parent

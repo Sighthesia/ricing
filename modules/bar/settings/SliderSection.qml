@@ -27,8 +27,18 @@ Item {
     // Fired on every drag tick (allows live preview)
     signal valueCommitted(real newValue)
 
-    // When true, show a subtle accent tint to indicate a search match.
-    property bool searchHighlight: false
+    // When non-empty, this item shows only if its label matches the query,
+    // otherwise it hides itself (height=0) so the parent Column skips it.
+    property string filterQuery: ""
+
+    readonly property bool _matchesFilter: filterQuery === "" ||
+        label.toLowerCase().indexOf(filterQuery.toLowerCase()) !== -1
+
+    // Show a subtle accent tint when this item matches an active search.
+    readonly property bool searchHighlight: filterQuery !== "" && _matchesFilter
+
+    visible: _matchesFilter
+    height: _matchesFilter ? implicitHeight : 0
 
     implicitWidth: 296
     implicitHeight: 32
