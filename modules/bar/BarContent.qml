@@ -73,11 +73,7 @@ Item {
         z: 0
         acceptedButtons: Qt.RightButton
         propagateComposedEvents: true
-        onClicked: (mouse) => {
-            if (mouse.button === Qt.RightButton) {
-                contextMenu.showAt(mouse.x, mouse.y);
-            }
-        }
+        onClicked: (mouse) => contextMenu.showAt(mouse.x, mouse.y)
     }
 
     // Global Esc: close any active panel and the context menu.
