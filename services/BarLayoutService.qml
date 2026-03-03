@@ -10,6 +10,10 @@ Singleton {
     // Panel state: "none" | "layout" | "config"
     property string activePanel: "none"
 
+    // True while the right-click context menu is open.
+    // Used as a cross-window signal for the click-away backdrop.
+    property bool contextMenuOpen: false
+
     // Computed alias — keeps all existing DragOverlay/BarSection bindings unchanged
     readonly property bool settingsMode: activePanel === "layout"
 

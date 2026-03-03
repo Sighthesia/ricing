@@ -28,12 +28,24 @@ PopupWindow {
 
     property real _clickX: 0
 
+    // Sync visible state back to service when menu is closed programmatically.
+    onVisibleChanged: if (!visible) BarLayoutService.contextMenuOpen = false
+
+    // Close the menu when backdrop or external code sets contextMenuOpen = false.
+    Connections {
+        target: BarLayoutService
+        function onContextMenuOpenChanged() {
+            if (!BarLayoutService.contextMenuOpen) root.visible = false;
+        }
+    }
+
     // Open menu at BarContent-local x coordinate.
     // `_y` is accepted for API symmetry with MouseArea.onClicked but is ignored:
     // the menu always appears at the bar's bottom edge regardless of click y.
     function showAt(x, _y) {
         _clickX = x;
         anchor.updateAnchor();
+        BarLayoutService.contextMenuOpen = true;
         visible = true;
     }
 

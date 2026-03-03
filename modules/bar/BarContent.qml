@@ -82,7 +82,7 @@ Item {
         enabled: BarLayoutService.activePanel !== "none" || contextMenu.visible
         onActivated: {
             BarLayoutService.activePanel = "none";
-            contextMenu.visible = false;
+            BarLayoutService.contextMenuOpen = false;
         }
     }
 }
