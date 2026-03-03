@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import qs.config
 import qs.services
 
@@ -62,10 +63,11 @@ Item {
 
     // ── Search match highlight background ─────────────────────────────
     Rectangle {
-        anchors { fill: parent; topAnchor: parent.top; leftMargin: 4; rightMargin: 4 }
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.leftMargin: 4; anchors.rightMargin: 4
-        height: Theme.settingsRowHeight    // only highlight the header row
+        height: Theme.settingsRowHeight
         radius: 4
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.1 : 0
