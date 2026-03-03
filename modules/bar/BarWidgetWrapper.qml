@@ -99,6 +99,12 @@ Item {
     // Saved initial wrapper center in BarContent space
     property real _dragStartContentX: 0
 
+    // Cursor hint in settings mode: open hand while hoverable, closed during drag.
+    HoverHandler {
+        enabled: BarLayoutService.settingsMode && wrapper._enterDone
+        cursorShape: wrapper._isDragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+    }
+
     Timer {
         id: widthAnimationRestoreTimer
         interval: 0    // 0 = next event loop tick; used to re-enable animation after immediate suppression
