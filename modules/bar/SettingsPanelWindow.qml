@@ -60,9 +60,7 @@ PanelWindow {
     SettingsPanelContent {
         id: content
         anchors {
-            top: parent.top
-            left: parent.left
-            right: parent.right
+            fill: parent
             topMargin: 10
             leftMargin: 4
             rightMargin: 8
