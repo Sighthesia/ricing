@@ -65,12 +65,13 @@ Item {
         anchorTarget: barContent
     }
 
-    // Transparent full-bar MouseArea at z:0 — captures right-clicks on empty bar space.
+    // Transparent full-bar MouseArea at z:-1 — captures right-clicks on empty bar space.
+    // z:-1 ensures widget MouseAreas (z:0) handle cursor shape and hover events first.
     // propagateComposedEvents: true so widgets still receive their own events.
     MouseArea {
         id: barRightClick
         anchors.fill: parent
-        z: 0
+        z: -1
         acceptedButtons: Qt.RightButton
         propagateComposedEvents: true
         onClicked: (mouse) => contextMenu.showAt(mouse.x, mouse.y)
