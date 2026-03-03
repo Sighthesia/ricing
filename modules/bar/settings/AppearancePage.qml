@@ -136,14 +136,15 @@ Item {
                 visible: root.searchQuery === "" || root.groupMatches(["字体族","等宽字体","正文大小","辅助大小","图标大小"])
                 height: visible ? implicitHeight : 0
 
-                TextFieldSection {
+                FontPickerSection {
                     label: "字体族"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.fontFamily
                     onValueCommitted: (v) => SettingsService.data.appearance.fontFamily = v
                 }
-                TextFieldSection {
+                FontPickerSection {
                     label: "等宽字体"
+                    isMonospace: true
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.fontMono
                     onValueCommitted: (v) => SettingsService.data.appearance.fontMono = v
