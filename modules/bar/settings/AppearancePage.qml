@@ -62,6 +62,21 @@ Item {
                     value: SettingsService.data.appearance.surfaceColor
                     onValueCommitted: (v) => SettingsService.data.appearance.surfaceColor = v
                 }
+                ColorSection {
+                    label: "文字色"
+                    value: SettingsService.data.appearance.textColor
+                    onValueCommitted: (v) => SettingsService.data.appearance.textColor = v
+                }
+                ColorSection {
+                    label: "次要文字"
+                    value: SettingsService.data.appearance.textMutedColor
+                    onValueCommitted: (v) => SettingsService.data.appearance.textMutedColor = v
+                }
+                ColorSection {
+                    label: "边框色"
+                    value: SettingsService.data.appearance.borderColor
+                    onValueCommitted: (v) => SettingsService.data.appearance.borderColor = v
+                }
             }
 
             // ── Bar ────────────────────────────────────────────────
@@ -82,6 +97,27 @@ Item {
                     value: SettingsService.data.bar.backgroundOpacity
                     from: 0.0; to: 1.0; stepSize: 0.05
                     onValueCommitted: (v) => SettingsService.data.bar.backgroundOpacity = v
+                }
+
+                SliderSection {
+                    label: "内边距"
+                    value: SettingsService.data.bar.padding
+                    from: 0; to: 20; stepSize: 1; unit: "px"
+                    onValueCommitted: (v) => SettingsService.data.bar.padding = v
+                }
+
+                SliderSection {
+                    label: "小部件间距"
+                    value: SettingsService.data.bar.widgetSpacing
+                    from: 0; to: 20; stepSize: 1; unit: "px"
+                    onValueCommitted: (v) => SettingsService.data.bar.widgetSpacing = v
+                }
+
+                SliderSection {
+                    label: "圆角"
+                    value: SettingsService.data.appearance.cornerRadius
+                    from: 0; to: 24; stepSize: 1; unit: "px"
+                    onValueCommitted: (v) => SettingsService.data.appearance.cornerRadius = v
                 }
 
                 // Position selector (reuses BehaviorSection position row directly)

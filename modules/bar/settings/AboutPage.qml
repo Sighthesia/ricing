@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Dialogs
 import Quickshell
 import qs.config
 import qs.services
@@ -120,6 +121,104 @@ Item {
             color: Colors.textMuted
             wrapMode: Text.WordWrap
             width: parent.width
+        }
+
+        // Divider
+        Rectangle { width: parent.width; height: 1; color: Colors.border }
+
+        // Export / Import row
+        Row {
+            width: parent.width
+            spacing: 8
+
+            // ── 导出配置 ─────────────────────────
+            Rectangle {
+                width: (parent.width - 8) / 2
+                height: 34
+                radius: Theme.cornerRadius - 2
+                color: exportArea.containsMouse
+                    ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.2)
+                    : Colors.surface
+                border.color: Colors.border; border.width: 1
+                Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+
+                Row {
+                    anchors.centerIn: parent; spacing: 6
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: ""  // upload icon
+                        font.family: Theme.fontMono; font.pixelSize: Theme.fontSizeSmall
+                        color: Colors.textMuted
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "导出配置"
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
+                        color: Colors.text
+                    }
+                }
+                MouseArea {
+                    id: exportArea; anchors.fill: parent; hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    // Copy settings JSON to clipboard via wl-copy.
+                    onClicked: Quickshell.execDetached(["sh", "-c",
+                        "wl-copy < '" + SettingsService.settingsFile + "'"])
+                }
+            }
+
+            // ── 导入配置 ─────────────────────────
+            Rectangle {
+                width: (parent.width - 8) / 2
+                height: 34
+                radius: Theme.cornerRadius - 2
+                color: importArea.containsMouse
+                    ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.2)
+                    : Colors.surface
+                border.color: Colors.border; border.width: 1
+                Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+
+                Row {
+                    anchors.centerIn: parent; spacing: 6
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: ""  // download icon
+                        font.family: Theme.fontMono; font.pixelSize: Theme.fontSizeSmall
+                        color: Colors.textMuted
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "导入配置"
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
+                        color: Colors.text
+                    }
+                }
+                MouseArea {
+                    id: importArea; anchors.fill: parent; hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: importDialog.open()
+                }
+            }
+        }
+
+        Text {
+            text: "导出：将当前设置复制到剪贴板  导入：选择一个 JSON 文件覆盖当前配置"
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSmall - 1
+            color: Colors.textMuted
+            wrapMode: Text.WordWrap
+            width: parent.width
+        }
+    }
+
+    // File picker for import — copies selected JSON over the current settings file.
+    // FileView.watchChanges auto-reloads the settings without restart.
+    FileDialog {
+        id: importDialog
+        title: "选择要导入的配置文件"
+        nameFilters: ["JSON 文件 (*.json)", "所有文件 (*)"]
+        onAccepted: {
+            var src = importDialog.selectedFile.toString().replace(/^file:\/\//, "")
+            Quickshell.execDetached(["cp", src, SettingsService.settingsFile])
         }
     }
 }
