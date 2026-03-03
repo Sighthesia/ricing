@@ -1,0 +1,96 @@
+import QtQuick
+import qs.config
+
+// A labeled color row with a preview swatch and hex text input.
+//
+// Usage:
+//   ColorSection {
+//     label: "强调色"
+//     value: SettingsService.data.appearance.accentColor
+//     onValueCommitted: SettingsService.data.appearance.accentColor = newValue
+//   }
+Item {
+    id: root
+
+    property string label: ""
+    property string value: "#ffffff"
+
+    // Fired when user confirms a valid hex color (Enter key or focus lost)
+    signal valueCommitted(string newValue)
+
+    implicitWidth: 296
+    implicitHeight: 36
+
+    // Accepts only #RRGGBB (case-insensitive)
+    function isValidHex(s) {
+        return /^#[0-9a-fA-F]{6}$/.test(s)
+    }
+
+    Row {
+        anchors.fill: parent
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        spacing: 8
+
+        // Label
+        Text {
+            width: 60
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.label
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSmall
+            color: Colors.textMuted
+            elide: Text.ElideRight
+        }
+
+        // Color preview swatch
+        Rectangle {
+            width: 20; height: 20
+            anchors.verticalCenter: parent.verticalCenter
+            radius: 4
+            color: root.isValidHex(root.value) ? root.value : "#ffffff"
+            border.color: Colors.border
+            border.width: 1
+        }
+
+        // Hex text input field
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: 100; height: 26
+            radius: 4
+            color: Colors.surface
+            border.color: hexInput.activeFocus ? Colors.highlight : Colors.border
+            border.width: 1
+
+            Behavior on border.color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+
+            TextInput {
+                id: hexInput
+                anchors.fill: parent
+                anchors.margins: 4
+                text: root.value.toUpperCase()
+                font.family: Theme.fontMono
+                font.pixelSize: Theme.fontSizeSmall
+                color: Colors.text
+                maximumLength: 7
+                selectByMouse: true
+
+                onEditingFinished: {
+                    // Normalize: prepend # if missing
+                    let v = text.startsWith("#") ? text : "#" + text
+                    if (root.isValidHex(v)) {
+                        root.valueCommitted(v.toLowerCase())
+                    } else {
+                        // Invalid input: revert display to current value
+                        text = root.value.toUpperCase()
+                    }
+                }
+
+                // Keep display in sync when external value changes
+                onActiveFocusChanged: {
+                    if (!activeFocus) text = root.value.toUpperCase()
+                }
+            }
+        }
+    }
+}
