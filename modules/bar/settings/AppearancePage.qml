@@ -85,9 +85,13 @@ Item {
                 id: groupColors
                 title: "颜色"
                 expanded: true
-                forceExpand: root.groupMatches(["强调色","背景色","表面色","文字色","次要文字","边框色"])
-                visible: root.searchQuery === "" || root.groupMatches(["强调色","背景色","表面色","文字色","次要文字","边框色"])
+                forceExpand: root.groupMatches(["主题预设","强调色","背景色","表面色","文字色","次要文字","边框色"])
+                visible: root.searchQuery === "" || root.groupMatches(["主题预设","强调色","背景色","表面色","文字色","次要文字","边框色"])
                 height: visible ? implicitHeight : 0
+
+                ThemePresetPicker {
+                    filterQuery: root.searchQuery
+                }
 
                 ColorSection {
                     label: "强调色"
