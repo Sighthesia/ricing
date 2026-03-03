@@ -35,7 +35,13 @@ Item {
         }
     ]
 
-    // Background intentionally omitted — sidebar blends with the panel card.
+    // Background fills the full allocated height (driven by parent anchors,
+    // not by sidebar implicitHeight) so it never shrinks during item collapse.
+    Rectangle {
+        anchors.fill: parent
+        color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.5)
+        radius: Theme.cornerRadius
+    }
 
     Column {
         id: navCol
