@@ -15,12 +15,5 @@ Singleton {
     readonly property color textMuted:      "#565f89"
     readonly property color border:         "#3b4261"
 
-    // FIXME: FileView hot-reload hook for matugen integration
-    // FileView {
-    //     id: colorFile
-    //     path: Quickshell.env("HOME") + "/.cache/dymicshell_colors.json"
-    //     watchChanges: true
-    //     onLoaded: { /* parse JSON and override properties */ }
-    //     onFileChanged: colorFile.reload()
-    // }
+    // FIXME: matugen integration — watch a color JSON file for dynamic palette
 }

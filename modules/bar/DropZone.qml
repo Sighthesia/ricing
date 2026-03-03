@@ -13,7 +13,7 @@ Item {
     // Dashed border rectangle
     Rectangle {
         anchors.fill: parent
-        anchors.margins: 4
+        anchors.margins: Theme.iconPadding
         color: "transparent"
         border.color: highlighted ? Colors.highlight : Colors.border
         border.width: 1
@@ -39,7 +39,7 @@ Item {
         anchors.centerIn: parent
         text: dropZone.zoneName
         font.family: Theme.fontFamily
-        font.pixelSize: 10
+        font.pixelSize: Theme.fontSizeSmall
         color: Colors.textMuted
         opacity: 0.5
     }

@@ -71,8 +71,6 @@ Item {
     }
 
     // --- Settings mode drag ---
-    // Saved initial mouse scene X
-    property real _dragStartMouseX: 0
     // Saved initial wrapper center in BarContent space
     property real _dragStartContentX: 0
 
@@ -90,16 +88,6 @@ Item {
             let child = bc.children[i];
             if (child.role === sectionName && child.insertIndexAt)
                 return child;
-        }
-        // Check deeper (inside RowLayout)
-        for (let i = 0; i < bc.children.length; i++) {
-            let layout = bc.children[i];
-            if (!layout.children) continue;
-            for (let j = 0; j < layout.children.length; j++) {
-                let child = layout.children[j];
-                if (child.role === sectionName && child.insertIndexAt)
-                    return child;
-            }
         }
         return null;
     }

@@ -9,7 +9,7 @@ Rectangle {
     color: Colors.background
     radius: Theme.cornerRadius
     implicitHeight: Theme.barHeight
-    implicitWidth: content.width + 24
+    implicitWidth: content.width + Theme.widgetPadding * 2
 
     // Time source
     SystemClock {
@@ -20,7 +20,7 @@ Rectangle {
     RowLayout {
         id: content
         anchors.centerIn: parent
-        spacing: 12
+        spacing: Theme.widgetPadding
 
         // Date section: MMM d
         RowLayout {
@@ -49,7 +49,7 @@ Rectangle {
         // Vertical separator
         Rectangle {
             implicitWidth: 1
-            implicitHeight: 16
+            implicitHeight: Theme.fontSizeIcon
             color: Colors.text
             opacity: 0.3
             Layout.alignment: Qt.AlignVCenter

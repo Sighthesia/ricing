@@ -33,9 +33,20 @@ Singleton {
     // Typography
     readonly property string fontFamily: "LXGW WenKai GB Screen"
     readonly property string fontMono: "JetBrainsMono Nerd Font"
+    readonly property int fontSizeIcon: 16
+    readonly property int fontSizeBody: 14
+    readonly property int fontSizeSmall: 10
 
     // Dimensions
     readonly property real cornerRadius: 10
     readonly property real barHeight: 36
     readonly property real barPadding: 8
+    readonly property real widgetPadding: 12
+    readonly property real widgetSpacing: 6
+    readonly property real iconPadding: 4
+
+    // Drag feedback
+    readonly property real dragScale: 1.05
+    readonly property real dragOpacity: 0.9
+    readonly property int pulseInterval: 3000
 }

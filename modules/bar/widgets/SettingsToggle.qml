@@ -5,8 +5,8 @@ import qs.services
 Item {
     id: settingsToggle
 
-    implicitWidth: Theme.barHeight - 8
-    implicitHeight: Theme.barHeight - 8
+    implicitWidth: Theme.barHeight - Theme.barPadding
+    implicitHeight: Theme.barHeight - Theme.barPadding
 
     // Background rectangle: reveals on hover and settings mode
     Rectangle {
@@ -20,9 +20,7 @@ Item {
 
         Behavior on opacity {
             NumberAnimation {
-                duration: BarLayoutService.settingsMode
-                    ? 180  // OutExpo for enter
-                    : 180  // InExpo for exit (with delay handled below)
+                duration: Theme.anim.highlightDuration
                 easing.type: BarLayoutService.settingsMode
                     ? Easing.OutExpo
                     : Easing.InExpo
@@ -36,19 +34,22 @@ Item {
         anchors.centerIn: parent
         text: "\uf013"  // Nerd Font gear icon
         font.family: Theme.fontMono
-        font.pixelSize: 16
+        font.pixelSize: Theme.fontSizeIcon
         color: Colors.text
 
         rotation: BarLayoutService.settingsMode ? 45 : 0
 
         Behavior on rotation {
             NumberAnimation {
-                duration: BarLayoutService.settingsMode ? 500 : 220
+                duration: BarLayoutService.settingsMode
+                    ? Theme.anim.enterDuration : Theme.anim.exitDuration
                 easing.type: BarLayoutService.settingsMode
                     ? Easing.OutElastic
                     : Easing.InExpo
-                easing.amplitude: BarLayoutService.settingsMode ? 0.8 : 1.0
-                easing.period: BarLayoutService.settingsMode ? 0.4 : 0.3
+                easing.amplitude: BarLayoutService.settingsMode
+                    ? Theme.anim.enterAmplitude : 1.0
+                easing.period: BarLayoutService.settingsMode
+                    ? Theme.anim.enterPeriod : 0.3
             }
         }
     }
@@ -67,7 +68,7 @@ Item {
     // Periodic pulse in settings mode (every 3s)
     Timer {
         id: pulseTimer
-        interval: 3000
+        interval: Theme.pulseInterval
         repeat: true
         running: BarLayoutService.settingsMode
 

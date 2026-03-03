@@ -10,7 +10,7 @@ Rectangle {
     color: Colors.background
     radius: Theme.cornerRadius
     implicitHeight: Theme.barHeight
-    implicitWidth: layout.width + 20
+    implicitWidth: layout.width + Theme.widgetPadding + Theme.barPadding
 
     property Item activeItem: null
 
@@ -43,7 +43,7 @@ Rectangle {
     RowLayout {
         id: layout
         anchors.centerIn: parent
-        spacing: 5
+        spacing: 5  // item gap
 
         Repeater {
             model: NiriService.workspaces
@@ -55,8 +55,8 @@ Rectangle {
                 required property bool isActive
 
                 implicitWidth: isActive
-                    ? (wsText.implicitWidth + 24)
-                    : (wsText.implicitWidth + 12)
+                    ? (wsText.implicitWidth + Theme.widgetPadding * 2)
+                    : (wsText.implicitWidth + Theme.widgetPadding)
                 implicitHeight: 26
 
                 onIsActiveChanged: {
@@ -91,7 +91,7 @@ Rectangle {
                     text: wsDelegate.idx
                     font.family: Theme.fontMono
                     font.bold: true
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fontSizeBody
                     // Dark text on highlight pill, muted otherwise
                     color: wsDelegate.isActive
                         ? Colors.background

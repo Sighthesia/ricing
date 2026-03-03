@@ -48,8 +48,8 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: BarLayoutService.ghostWidth
         height: parent.height
-        scale: 1.05
-        opacity: 0.9
+        scale: Theme.dragScale
+        opacity: Theme.dragOpacity
 
         Loader {
             id: floatingLoader

@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import qs.config
 import qs.services
 
@@ -9,31 +8,21 @@ Item {
     required property string role
     property var widgetRegistry: ({})
 
-    implicitWidth: sectionRow.implicitWidth
+    implicitWidth: widgetRow.implicitWidth
     implicitHeight: parent ? parent.height : 0
 
-    // Helper: filter layoutModel entries for this section + alignment
-    function widgetsFor(alignment) {
+    // Collect enabled widgets for this section, sorted by order
+    property var widgets: []
+
+    function rebuildWidgets() {
         let result = [];
         for (let i = 0; i < BarLayoutService.layoutModel.count; i++) {
             let item = BarLayoutService.layoutModel.get(i);
-            if (item.section === section.role && item.alignment === alignment && item.enabled) {
+            if (item.section === section.role && item.enabled)
                 result.push({ widgetId: item.id, order: item.order, index: i });
-            }
         }
         result.sort((a, b) => a.order - b.order);
-        return result;
-    }
-
-    // Rebuild widget list when layoutModel changes
-    property var leftWidgets: []
-    property var centerWidgets: []
-    property var rightWidgets: []
-
-    function rebuildWidgets() {
-        leftWidgets = widgetsFor("left");
-        centerWidgets = widgetsFor("center");
-        rightWidgets = widgetsFor("right");
+        widgets = result;
     }
 
     Component.onCompleted: rebuildWidgets()
@@ -49,68 +38,37 @@ Item {
         function onSettingsModeChanged() { section.rebuildWidgets(); }
     }
 
-    // Calculate which position a widget would insert at, given localX in section space
-    // Skips the currently-dragged widget to avoid index flickering
+    /// Determine insertion index for a drag at `localX` in section space.
+    /// Skips the currently-dragged widget and non-widget children (Repeater).
     function insertIndexAt(localX) {
-        let row = alignLeftRow;
         let dragId = BarLayoutService.draggedWidgetId;
         let slots = [];
-        for (let i = 0; i < row.children.length; i++) {
-            let child = row.children[i];
+        for (let i = 0; i < widgetRow.children.length; i++) {
+            let child = widgetRow.children[i];
             if (!child || !child.visible) continue;
-            // Skip non-widget children (Repeater, internal items)
             if (!child.widgetId) continue;
             if (child.widgetId === dragId) continue;
-            slots.push({ id: child.widgetId, x: child.x, w: child.width });
+            slots.push({ x: child.x, w: child.width });
         }
         for (let i = 0; i < slots.length; i++) {
-            let childCenter = slots[i].x + slots[i].w / 2;
-            if (localX < childCenter) return i;
+            let center = slots[i].x + slots[i].w / 2;
+            if (localX < center) return i;
         }
         return slots.length;
     }
 
-    // Expose the left Row for external position queries
-    readonly property Item widgetRow: alignLeftRow
-
-    RowLayout {
-        id: sectionRow
+    Row {
+        id: widgetRow
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 8
+        spacing: Theme.widgetSpacing
 
-        // Align-left sub-row
-        Row {
-            id: alignLeftRow
-            spacing: 6
-            Repeater {
-                id: leftRepeater
-                model: section.leftWidgets
-                delegate: widgetDelegate
-            }
-        }
-
-        // Align-center sub-row
-        Row {
-            id: alignCenterRow
-            spacing: 6
-            Repeater {
-                model: section.centerWidgets
-                delegate: widgetDelegate
-            }
-        }
-
-        // Align-right sub-row
-        Row {
-            id: alignRightRow
-            spacing: 6
-            Repeater {
-                model: section.rightWidgets
-                delegate: widgetDelegate
-            }
+        Repeater {
+            model: section.widgets
+            delegate: widgetDelegate
         }
     }
 
-    // Insertion indicator line
+    // Insertion indicator line (visible during drag when hovering this section)
     Rectangle {
         id: insertIndicator
         visible: BarLayoutService.isDragging
@@ -126,12 +84,10 @@ Item {
         x: {
             if (!visible) return 0;
             let idx = BarLayoutService.ghostIndex;
-            let row = alignLeftRow;
             let dragId = BarLayoutService.draggedWidgetId;
-            // Build slots excluding non-widget items and dragged widget
             let slots = [];
-            for (let i = 0; i < row.children.length; i++) {
-                let c = row.children[i];
+            for (let i = 0; i < widgetRow.children.length; i++) {
+                let c = widgetRow.children[i];
                 if (!c || !c.visible) continue;
                 if (!c.widgetId) continue;
                 if (c.widgetId === dragId) continue;
@@ -139,14 +95,13 @@ Item {
             }
             if (idx >= slots.length) {
                 let last = slots[slots.length - 1];
-                return last ? (sectionRow.x + row.x + last.x + last.width + 3) : sectionRow.x;
+                return last ? (widgetRow.x + last.x + last.width + 3) : 0;
             }
             let child = slots[idx];
-            return child ? (sectionRow.x + row.x + child.x - 3) : sectionRow.x;
+            return child ? (widgetRow.x + child.x - 3) : 0;
         }
     }
 
-    // Shared delegate: BarWidgetWrapper + Loader
     Component {
         id: widgetDelegate
 
