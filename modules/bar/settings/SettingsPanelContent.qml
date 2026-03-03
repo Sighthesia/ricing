@@ -138,18 +138,6 @@ Item {
         }
     }
 
-    // Transparent overlay covering only the content area (below the search bar).
-    // Fires on press (not click) so the event is immediately forwarded to interactive
-    // children — sliders, toggles, etc. — keeping drag and cursor shapes intact.
-    MouseArea {
-        z: 200
-        anchors { top: searchBar.bottom; topMargin: 6; left: parent.left; right: parent.right; bottom: parent.bottom }
-        propagateComposedEvents: true
-        onPressed: (mouse) => {
-            clearAllHighlights()
-            mouse.accepted = false
-        }
-    }
 }
 
 

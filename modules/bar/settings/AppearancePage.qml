@@ -25,6 +25,15 @@ Item {
     implicitWidth: parent ? parent.width : 340
     implicitHeight: Math.min(pageFlickable.contentHeight + 8, 480)
 
+    // Auto-clear highlights 3 seconds after a scroll-to-section jump.
+    // Gives the user enough time to see which group was highlighted without
+    // requiring an explicit click to dismiss.
+    Timer {
+        id: highlightClearTimer
+        interval: 3000
+        onTriggered: root.clearAllHighlights()
+    }
+
     // Scroll to a named section, expand it if collapsed, and show a persistent
     // highlight on the group header. Cleared by clearAllHighlights().
     function scrollToSection(sectionId) {
@@ -42,6 +51,7 @@ Item {
         clearAllHighlights()
         group.highlighted = true
         group.flash()
+        highlightClearTimer.restart()
     }
 
     // Remove persistent highlights from all groups.
