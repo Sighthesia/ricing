@@ -27,15 +27,25 @@ PopupWindow {
     implicitHeight: menuColumn.implicitHeight + 8
 
     property real _clickX: 0
+    property bool _active: false
 
     // Sync visible state back to service when menu is closed programmatically.
     onVisibleChanged: if (!visible) BarLayoutService.contextMenuOpen = false
+
+    on_ActiveChanged: {
+        if (_active) {
+            visible = true;
+            enterAnim.restart();
+        } else {
+            exitAnim.restart();
+        }
+    }
 
     // Close the menu when backdrop or external code sets contextMenuOpen = false.
     Connections {
         target: BarLayoutService
         function onContextMenuOpenChanged() {
-            if (!BarLayoutService.contextMenuOpen) root.visible = false;
+            if (!BarLayoutService.contextMenuOpen) root._active = false;
         }
     }
 
@@ -46,15 +56,20 @@ PopupWindow {
         _clickX = x;
         anchor.updateAnchor();
         BarLayoutService.contextMenuOpen = true;
-        visible = true;
+        _active = true;
     }
 
     Rectangle {
+        id: menuContent
         anchors.fill: parent
         color: Colors.surface
         radius: Theme.cornerRadius
         border.color: Colors.border
         border.width: 1
+
+        opacity: 0
+        scale: 0.85
+        transformOrigin: Item.Top
 
         Column {
             id: menuColumn
@@ -112,7 +127,7 @@ PopupWindow {
                     onClicked: {
                         BarLayoutService.activePanel =
                             BarLayoutService.settingsMode ? "none" : "layout";
-                        root.visible = false;
+                        root._active = false;
                     }
                 }
             }
@@ -163,10 +178,41 @@ PopupWindow {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         BarLayoutService.activePanel = "config";
-                        root.visible = false;
+                        root._active = false;
                     }
                 }
             }
         }
+    }
+
+    ParallelAnimation {
+        id: enterAnim
+        NumberAnimation {
+            target: menuContent; property: "opacity"
+            from: 0; to: 1
+            duration: 100; easing.type: Easing.OutQuad
+        }
+        NumberAnimation {
+            target: menuContent; property: "scale"
+            from: 0.85; to: 1.0
+            duration: 130; easing.type: Easing.OutBack; easing.overshoot: 0.4
+        }
+    }
+
+    SequentialAnimation {
+        id: exitAnim
+        ParallelAnimation {
+            NumberAnimation {
+                target: menuContent; property: "opacity"
+                from: 1; to: 0
+                duration: 80; easing.type: Easing.InQuad
+            }
+            NumberAnimation {
+                target: menuContent; property: "scale"
+                from: 1.0; to: 0.88
+                duration: 80; easing.type: Easing.InQuad
+            }
+        }
+        ScriptAction { script: root.visible = false; }
     }
 }
