@@ -7,7 +7,12 @@ import QtQuick
 Singleton {
     id: root
 
-    property bool settingsMode: false
+    // Panel state: "none" | "layout" | "config"
+    property string activePanel: "none"
+
+    // Computed alias — keeps all existing DragOverlay/BarSection bindings unchanged
+    readonly property bool settingsMode: activePanel === "layout"
+
     property bool isDragging: false
     property string dragHoverZone: ""
     property string draggedWidgetId: ""
