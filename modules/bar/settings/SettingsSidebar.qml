@@ -24,6 +24,7 @@ Item {
             page: "appearance", icon: "\uf53f", label: "外观",
             sections: [
                 { id: "colors",    label: "颜色" },
+                { id: "font",      label: "字体" },
                 { id: "bar",       label: "Bar"  },
                 { id: "animation", label: "动画" },
                 { id: "behavior",  label: "行为" }

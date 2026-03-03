@@ -39,6 +39,7 @@ Item {
     function scrollToSection(sectionId) {
         var map = {
             "colors":    groupColors,
+            "font":      groupFont,
             "bar":       groupBar,
             "animation": groupAnimation,
             "behavior":  groupBehavior
@@ -58,6 +59,7 @@ Item {
     // Called when the user clicks on blank space in the panel.
     function clearAllHighlights() {
         groupColors.highlighted = false
+        groupFont.highlighted = false
         groupBar.highlighted = false
         groupAnimation.highlighted = false
         groupBehavior.highlighted = false
@@ -122,6 +124,50 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.borderColor
                     onValueCommitted: (v) => SettingsService.data.appearance.borderColor = v
+                }
+            }
+
+            // ── 字体 ──────────────────────────────────────
+            ExpandableGroup {
+                id: groupFont
+                title: "字体"
+                expanded: false
+                forceExpand: root.groupMatches(["字体族","等宽字体","正文大小","辅助大小","图标大小"])
+                visible: root.searchQuery === "" || root.groupMatches(["字体族","等宽字体","正文大小","辅助大小","图标大小"])
+                height: visible ? implicitHeight : 0
+
+                TextFieldSection {
+                    label: "字体族"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.fontFamily
+                    onValueCommitted: (v) => SettingsService.data.appearance.fontFamily = v
+                }
+                TextFieldSection {
+                    label: "等宽字体"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.fontMono
+                    onValueCommitted: (v) => SettingsService.data.appearance.fontMono = v
+                }
+                SliderSection {
+                    label: "正文大小"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.fontSizeBody
+                    from: 10; to: 24; stepSize: 1; unit: "px"
+                    onValueCommitted: (v) => SettingsService.data.appearance.fontSizeBody = v
+                }
+                SliderSection {
+                    label: "辅助大小"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.fontSizeSmall
+                    from: 8; to: 18; stepSize: 1; unit: "px"
+                    onValueCommitted: (v) => SettingsService.data.appearance.fontSizeSmall = v
+                }
+                SliderSection {
+                    label: "图标大小"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.fontSizeIcon
+                    from: 10; to: 28; stepSize: 1; unit: "px"
+                    onValueCommitted: (v) => SettingsService.data.appearance.fontSizeIcon = v
                 }
             }
 
