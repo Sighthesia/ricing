@@ -112,6 +112,23 @@ Singleton {
 
     function moveWidget(widgetId, toSection, toAlignment, toOrder) {
 
+        let currentSection = "";
+        let currentAlignment = "";
+        let currentOrder = -1;
+        for (let i = 0; i < layoutModel.count; i++) {
+            let item = layoutModel.get(i);
+            if (item.id === widgetId) {
+                currentSection = item.section;
+                currentAlignment = item.alignment;
+                currentOrder = item.order;
+                break;
+            }
+        }
+
+        if (currentOrder >= 0 && currentSection === toSection && currentOrder === toOrder) {
+            return;
+        }
+
         // Collect all widgets in target section (excluding the moving one)
         let others = [];
         let movingIdx = -1;
@@ -145,6 +162,15 @@ Singleton {
         }
         layoutChanged();
         saveLayout();
+    }
+
+    function isSamePlacement(widgetId, sectionName, order) {
+        for (let i = 0; i < layoutModel.count; i++) {
+            let item = layoutModel.get(i);
+            if (item.id === widgetId)
+                return item.section === sectionName && item.order === order;
+        }
+        return false;
     }
 
     function resetLayout() {

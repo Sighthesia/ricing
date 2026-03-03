@@ -11,6 +11,22 @@ Item {
     implicitWidth: widgetRow.implicitWidth
     implicitHeight: parent ? parent.height : 0
 
+    Behavior on implicitWidth {
+        enabled: BarLayoutService.settingsMode
+        NumberAnimation {
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+    }
+
+    Behavior on x {
+        enabled: BarLayoutService.settingsMode
+        NumberAnimation {
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+    }
+
     // Collect enabled widgets for this section, sorted by order
     property var widgets: []
 
@@ -21,6 +37,7 @@ Item {
             if (item.section === section.role && item.enabled)
                 result.push({ widgetId: item.id, order: item.order, index: i });
         }
+        // Use layoutModelIndex as stable key for Repeater
         result.sort((a, b) => a.order - b.order);
         widgets = result;
     }
@@ -62,9 +79,30 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.widgetSpacing
 
+        move: Transition {
+            enabled: BarLayoutService.settingsMode || BarLayoutService.isDragging
+            NumberAnimation {
+                properties: "x,y"
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
+
+        add: Transition {
+            enabled: BarLayoutService.settingsMode || BarLayoutService.isDragging
+            NumberAnimation {
+                property: "opacity"
+                from: 0; to: 1.0
+                duration: Theme.anim.moveDuration
+            }
+        }
+
         Repeater {
             model: section.widgets
             delegate: widgetDelegate
+            onItemAdded: (index, item) => {
+                // No-op for now but ensures items are tracked correctly
+            }
         }
     }
 
@@ -80,6 +118,13 @@ Item {
         color: Colors.highlight
         radius: 1
         opacity: 0.8
+
+        Behavior on x {
+            NumberAnimation {
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
 
         x: {
             if (!visible) return 0;

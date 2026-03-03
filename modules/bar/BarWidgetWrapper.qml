@@ -11,11 +11,25 @@ Item {
 
     // Collapse layout space during drag; content stays visible (clip: false)
     property bool _isDragging: false
+    property bool _suppressNextWidthAnimation: false
     property real _naturalWidth: contentContainer.childrenRect.width
     property real _naturalHeight: contentContainer.childrenRect.height
+    property bool _enterStarted: false
+    property bool _showSettingsOutline: BarLayoutService.settingsMode
+        && wrapper._enterDone
+        && !wrapper._isDragging
+        && wrapper.implicitWidth >= wrapper._naturalWidth - 0.5
 
     implicitWidth: _isDragging ? 0 : _naturalWidth
     implicitHeight: _isDragging ? 0 : _naturalHeight
+
+    Behavior on implicitWidth {
+        enabled: !wrapper._suppressNextWidthAnimation && BarLayoutService.settingsMode
+        NumberAnimation {
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+    }
 
     // Background for highlight pulse + settings mode outline
     Rectangle {
@@ -25,8 +39,8 @@ Item {
         radius: Theme.cornerRadius + 2
         color: "transparent"
         border.color: Colors.highlight
-        border.width: BarLayoutService.settingsMode && wrapper._enterDone && !wrapper._isDragging ? 1 : 0
-        opacity: BarLayoutService.settingsMode && !wrapper._isDragging ? 0.5 : 0
+        border.width: wrapper._showSettingsOutline ? 1 : 0
+        opacity: wrapper._showSettingsOutline ? 0.5 : 0
 
         Behavior on opacity {
             NumberAnimation { duration: 180; easing.type: Easing.OutQuad }
@@ -44,7 +58,18 @@ Item {
     scale: 0.8
     property bool _enterDone: false
 
-    Component.onCompleted: enterAnimation.start()
+    function tryStartEnterAnimation() {
+        if (wrapper._enterStarted || wrapper._enterDone)
+            return;
+        if (wrapper._naturalWidth <= 0 || wrapper._naturalHeight <= 0)
+            return;
+        wrapper._enterStarted = true;
+        enterAnimation.start();
+    }
+
+    Component.onCompleted: Qt.callLater(wrapper.tryStartEnterAnimation)
+    on_NaturalWidthChanged: wrapper.tryStartEnterAnimation()
+    on_NaturalHeightChanged: wrapper.tryStartEnterAnimation()
 
     SequentialAnimation {
         id: enterAnimation
@@ -73,6 +98,13 @@ Item {
     // --- Settings mode drag ---
     // Saved initial wrapper center in BarContent space
     property real _dragStartContentX: 0
+
+    Timer {
+        id: widthAnimationRestoreTimer
+        interval: 0
+        repeat: false
+        onTriggered: wrapper._suppressNextWidthAnimation = false
+    }
 
     // Find ancestor with hitTestSection function (BarContent)
     function findBarContent() {
@@ -116,9 +148,27 @@ Item {
                 BarLayoutService.ghostWidth = wrapper._naturalWidth;
                 // Set initial visual position
                 BarLayoutService.dragVisualX = wrapper._dragStartContentX - wrapper._naturalWidth / 2;
+
+                console.log("[DRAG START] widget:", wrapper.widgetId, "fromX:", wrapper._dragStartContentX);
+
+                // Sync initial ghost position to match current location immediately
+                if (bc && bc.hitTestSection) {
+                    let zoneName = bc.hitTestSection(wrapper._dragStartContentX);
+                    BarLayoutService.ghostSection = zoneName;
+                    let sec = wrapper.findSection(bc, zoneName);
+                    if (sec) {
+                        let secScene = sec.mapToItem(null, 0, 0);
+                        let localX = centroid.scenePosition.x - secScene.x;
+                        BarLayoutService.ghostIndex = sec.insertIndexAt(localX);
+                        console.log("[DRAG START] init ghost: section:", zoneName, "index:", BarLayoutService.ghostIndex);
+                    }
+                }
             } else {
                 let targetSection = BarLayoutService.ghostSection;
                 let targetIndex = BarLayoutService.ghostIndex;
+                let isSamePlacement = targetSection !== "" && BarLayoutService.isSamePlacement(wrapper.widgetId, targetSection, targetIndex);
+
+                console.log("[DROP] widget:", wrapper.widgetId, "toSection:", targetSection, "toIndex:", targetIndex);
 
                 BarLayoutService.isDragging = false;
                 BarLayoutService.dragHoverZone = "";
@@ -133,7 +183,13 @@ Item {
                         wrapper.widgetId, targetSection, "left", targetIndex);
                 }
 
-                wrapper._isDragging = false;
+                if (isSamePlacement) {
+                    wrapper._suppressNextWidthAnimation = true;
+                    wrapper._isDragging = false;
+                    widthAnimationRestoreTimer.restart();
+                } else {
+                    wrapper._isDragging = false;
+                }
             }
         }
 
