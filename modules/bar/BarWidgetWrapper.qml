@@ -149,7 +149,6 @@ Item {
                 // Set initial visual position
                 BarLayoutService.dragVisualX = wrapper._dragStartContentX - wrapper._naturalWidth / 2;
 
-                if (qs.debug) console.log("[DRAG START] widget:", wrapper.widgetId, "fromX:", wrapper._dragStartContentX);
 
                 // Sync initial ghost position to match current location immediately
                 if (bc && bc.hitTestSection) {
@@ -168,7 +167,6 @@ Item {
                 let targetIndex = BarLayoutService.ghostIndex;
                 let isSamePlacement = targetSection !== "" && BarLayoutService.isSamePlacement(wrapper.widgetId, targetSection, targetIndex, "left");
 
-                if (qs.debug) console.log("[DROP] widget:", wrapper.widgetId, "toSection:", targetSection, "toIndex:", targetIndex);
 
                 BarLayoutService.isDragging = false;
                 BarLayoutService.dragHoverZone = "";
