@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 
 Item {
     id: barContent
@@ -56,5 +57,36 @@ Item {
     DragOverlay {
         anchors.fill: parent
         widgetRegistry: barContent.widgetRegistry
+    }
+
+    // Right-click context menu for the bar background.
+    BarContextMenu {
+        id: contextMenu
+        anchorTarget: barContent
+    }
+
+    // Transparent full-bar MouseArea at z:0 — captures right-clicks on empty bar space.
+    // propagateComposedEvents: true so widgets still receive their own events.
+    MouseArea {
+        id: barRightClick
+        anchors.fill: parent
+        z: 0
+        acceptedButtons: Qt.RightButton
+        propagateComposedEvents: true
+        onClicked: (mouse) => {
+            if (mouse.button === Qt.RightButton) {
+                contextMenu.showAt(mouse.x, mouse.y);
+            }
+        }
+    }
+
+    // Global Esc: close any active panel and the context menu.
+    Shortcut {
+        sequence: "Escape"
+        enabled: BarLayoutService.activePanel !== "none" || contextMenu.visible
+        onActivated: {
+            BarLayoutService.activePanel = "none";
+            contextMenu.visible = false;
+        }
     }
 }
