@@ -6,8 +6,7 @@ Item {
 
     // Widget registry: maps widget ID to QML source path
     readonly property var widgetRegistry: ({
-        "settingsToggle": "widgets/SettingsToggle.qml",
-        "clock":          "widgets/Clock.qml",
+        "clock":           "widgets/Clock.qml",
         "workspaceWidget": "widgets/WorkspaceWidget.qml"
     })
 
