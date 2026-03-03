@@ -2,10 +2,9 @@ import QtQuick
 import qs.config
 
 // Settings panel with a persistent search bar at the top, left sidebar, and
-// right page content. Typing in the search bar:
-//   1. Shows a floating dropdown below the bar listing all matches + breadcrumbs.
-//   2. Highlights matching items in-place and auto-expands containing groups.
-// The normal sidebar + section layout stays visible at all times.
+// right page content. Typing in the search bar propagates the query to the
+// active page, which hides non-matching items in-place (VSCode-style filtering)
+// and auto-expands groups that contain matches.
 Item {
     id: root
 
@@ -23,34 +22,6 @@ Item {
 
     implicitWidth: Math.max(searchBar.implicitWidth, mainRow.implicitWidth)
     implicitHeight: searchBar.height + 6 + mainRow.implicitHeight
-
-    // ── Master registry of all searchable settings ──────────────────
-    readonly property var allSettingsItems: [
-        { label: "强调色",     group: "外观 › 颜色", page: "appearance", section: "colors"    },
-        { label: "背景色",     group: "外观 › 颜色", page: "appearance", section: "colors"    },
-        { label: "表面色",     group: "外观 › 颜色", page: "appearance", section: "colors"    },
-        { label: "文字色",     group: "外观 › 颜色", page: "appearance", section: "colors"    },
-        { label: "次要文字",   group: "外观 › 颜色", page: "appearance", section: "colors"    },
-        { label: "边框色",     group: "外观 › 颜色", page: "appearance", section: "colors"    },
-        { label: "高度",       group: "外观 › Bar",  page: "appearance", section: "bar"       },
-        { label: "透明度",     group: "外观 › Bar",  page: "appearance", section: "bar"       },
-        { label: "内边距",     group: "外观 › Bar",  page: "appearance", section: "bar"       },
-        { label: "小部件间距", group: "外观 › Bar",  page: "appearance", section: "bar"       },
-        { label: "圆角",       group: "外观 › Bar",  page: "appearance", section: "bar"       },
-        { label: "位置",       group: "外观 › Bar",  page: "appearance", section: "bar"       },
-        { label: "速度系数",   group: "外观 › 动画", page: "appearance", section: "animation" },
-        { label: "自动隐藏",   group: "外观 › 行为", page: "appearance", section: "behavior"  },
-    ]
-
-    property var filteredItems: {
-        var q = searchField.text
-        if (!q) return []
-        q = q.toLowerCase()
-        return allSettingsItems.filter(function(it) {
-            return it.label.toLowerCase().indexOf(q) !== -1
-                || it.group.toLowerCase().indexOf(q) !== -1
-        })
-    }
 
     // ── Search bar ──────────────────────────────────────────────────
     Item {
@@ -104,109 +75,6 @@ Item {
             font.pixelSize: Theme.fontSizeSmall
             color: Colors.textMuted
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: searchField.clear() }
-        }
-    }
-
-    // ── Search dropdown (floats above content, z=10) ─────────────────
-    Item {
-        id: searchDropdown
-        z: 10
-        anchors { top: searchBar.bottom; topMargin: 2; left: parent.left; right: parent.right }
-        height: visible ? Math.min(dropList.contentHeight + 16, 180) : 0
-        visible: searchField.activeFocus && searchField.text !== "" && root.filteredItems.length > 0
-
-        Rectangle {
-            anchors.fill: parent
-            radius: Theme.cornerRadius - 2
-            color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.97)
-            border.color: Colors.border
-            border.width: 1
-
-            // Subtle top shadow line for depth
-            Rectangle {
-                anchors { top: parent.top; left: parent.left; right: parent.right; topMargin: 1 }
-                height: 1
-                color: Qt.rgba(1, 1, 1, 0.06)
-            }
-        }
-
-        ListView {
-            id: dropList
-            anchors { fill: parent; margins: 6 }
-            model: root.filteredItems
-            clip: true
-            spacing: 1
-            boundsMovement: Flickable.StopAtBounds
-
-            delegate: Item {
-                required property var modelData
-                width: dropList.width
-                height: 36
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: Theme.cornerRadius - 4
-                    color: dropItemArea.containsMouse ? Colors.highlight : "transparent"
-                    opacity: dropItemArea.containsMouse ? 0.12 : 1
-                    Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
-                }
-
-                // Left-edge accent strip
-                Rectangle {
-                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                    width: 3; radius: 1
-                    color: Colors.highlight
-                    opacity: 0.8
-                }
-
-                Column {
-                    anchors { left: parent.left; leftMargin: 12; verticalCenter: parent.verticalCenter }
-                    spacing: 2
-                    Text {
-                        text: modelData.label
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Colors.text
-                    }
-                    Text {
-                        text: modelData.group
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall - 2
-                        color: Colors.textMuted
-                    }
-                }
-
-                Text {
-                    anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
-                    text: "\uf105"
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Colors.textMuted
-                    opacity: dropItemArea.containsMouse ? 1 : 0.4
-                    Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
-                }
-
-                MouseArea {
-                    id: dropItemArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    // Keep search field focused so the dropdown stays open after click-through.
-                    onPressed: searchField.forceActiveFocus()
-                    onClicked: {
-                        var page = modelData.page
-                        var sectionId = modelData.section
-                        searchField.clear()
-                        if (root.currentPage !== page) {
-                            root.currentPage = page
-                            root.pendingSection = sectionId
-                            // scrollDelay fires after Loader re-loads the new page
-                        } else if (loader.item && loader.item.scrollToSection) {
-                            loader.item.scrollToSection(sectionId)
-                        }
-                    }
-                }
-            }
         }
     }
 
