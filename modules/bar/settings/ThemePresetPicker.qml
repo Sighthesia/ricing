@@ -87,16 +87,6 @@ Item {
         model: root.presets
         boundsBehavior: Flickable.StopAtBounds
 
-        // Shift+vertical wheel scrolls the list horizontally.
-        WheelHandler {
-            acceptedModifiers: Qt.ShiftModifier
-            onWheel: (event) => {
-                var maxX = Math.max(0, cardRow.contentWidth - cardRow.width)
-                cardRow.contentX = Math.max(0, Math.min(
-                    cardRow.contentX - event.angleDelta.y / 120 * 80, maxX))
-            }
-        }
-
         ScrollBar.horizontal: ScrollBar {
             policy: ScrollBar.AsNeeded
         }
@@ -178,6 +168,36 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 width: parent.width
                 elide: Text.ElideRight
+            }
+        }
+    }
+
+    // Transparent overlay for Shift+wheel → horizontal scroll.
+    // Placed outside the ListView so Flickable does not consume the event first.
+    MouseArea {
+        anchors {
+            left: cardRow.left; right: cardRow.right
+            top: cardRow.top; bottom: cardRow.bottom
+        }
+        acceptedButtons: Qt.NoButton   // never steal clicks
+        propagateComposedEvents: true  // let all other events through
+
+        onWheel: (wheel) => {
+            // Handle Shift+vertical-wheel OR native horizontal-scroll (touchpad)
+            var isHorizontalIntent =
+                (wheel.modifiers & Qt.ShiftModifier) ||
+                (wheel.angleDelta.x !== 0 && wheel.angleDelta.y === 0)
+
+            if (isHorizontalIntent) {
+                var delta = wheel.angleDelta.y !== 0
+                    ? wheel.angleDelta.y   // Shift+vertical
+                    : -wheel.angleDelta.x  // native horizontal (reversed axis)
+                var maxX = Math.max(0, cardRow.contentWidth - cardRow.width)
+                cardRow.contentX = Math.max(0,
+                    Math.min(cardRow.contentX - delta / 120 * 80, maxX))
+                wheel.accepted = true
+            } else {
+                wheel.accepted = false
             }
         }
     }
