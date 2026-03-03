@@ -179,8 +179,6 @@ Item {
         spacing: 4
         visible: root._open
 
-        implicitHeight: searchBar.height + spacing + fontListRect.height
-
         // Search bar
         Rectangle {
             id: searchBar
