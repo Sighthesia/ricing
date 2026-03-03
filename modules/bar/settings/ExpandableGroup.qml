@@ -123,7 +123,7 @@ Item {
         height: header.height
         radius: 4
         color: Colors.highlight
-        opacity: root.highlighted ? 0.16 : 0
+        opacity: root.highlighted ? 0.22 : 0
         Behavior on opacity { NumberAnimation { duration: 200 } }
     }
 

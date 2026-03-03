@@ -268,6 +268,20 @@ Item {
             }
         }
     }
+
+    // Full-panel transparent click layer at the top of the z-stack.
+    // Any click anywhere in the panel clears persistent jump highlights.
+    // propagateComposedEvents ensures all underlying interactive elements
+    // (sliders, toggles, buttons) still receive their click events normally.
+    MouseArea {
+        z: 200
+        anchors.fill: parent
+        propagateComposedEvents: true
+        onClicked: (mouse) => {
+            clearAllHighlights()
+            mouse.accepted = false
+        }
+    }
 }
 
 
