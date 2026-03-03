@@ -4,4 +4,5 @@ import qs.modules.bar
 
 ShellRoot {
     BarWindow {}
+    SettingsPanelWindow {}
 }
