@@ -87,6 +87,16 @@ Item {
         model: root.presets
         boundsBehavior: Flickable.StopAtBounds
 
+        // Shift+vertical wheel scrolls the list horizontally.
+        WheelHandler {
+            acceptedModifiers: Qt.ShiftModifier
+            onWheel: (event) => {
+                var maxX = Math.max(0, cardRow.contentWidth - cardRow.width)
+                cardRow.contentX = Math.max(0, Math.min(
+                    cardRow.contentX - event.angleDelta.y / 120 * 80, maxX))
+            }
+        }
+
         ScrollBar.horizontal: ScrollBar {
             policy: ScrollBar.AsNeeded
         }
