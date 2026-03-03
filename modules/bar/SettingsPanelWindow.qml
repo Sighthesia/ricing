@@ -13,7 +13,7 @@ PanelWindow {
     anchors { top: true; right: true }
     margins { top: Theme.barHeight }
 
-    implicitWidth: 320
+    implicitWidth: 480
     implicitHeight: content.implicitHeight + 20
     color: "transparent"
 
