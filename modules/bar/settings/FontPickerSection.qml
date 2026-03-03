@@ -26,7 +26,6 @@ Item {
     property string filterQuery: ""
     readonly property bool _matchesFilter: filterQuery === "" ||
         label.toLowerCase().indexOf(filterQuery.toLowerCase()) !== -1
-    readonly property bool searchHighlight: filterQuery !== "" && _matchesFilter
     visible: _matchesFilter
     height: _matchesFilter ? implicitHeight : 0
 
@@ -59,28 +58,6 @@ Item {
         return pool.filter(function(name) {
             return name.toLowerCase().indexOf(q) !== -1
         })
-    }
-
-    // ── Search match highlight background ─────────────────────────────
-    Rectangle {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.leftMargin: 4; anchors.rightMargin: 4
-        height: Theme.settingsRowHeight
-        radius: 4
-        color: Colors.highlight
-        opacity: root.searchHighlight ? 0.1 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
-    }
-
-    Rectangle {
-        anchors { left: parent.left; top: parent.top; leftMargin: 4 }
-        width: 3; height: Theme.settingsRowHeight
-        radius: 1
-        color: Colors.highlight
-        opacity: root.searchHighlight ? 0.9 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
     }
 
     // ── Main row ──────────────────────────────────────────────────────
