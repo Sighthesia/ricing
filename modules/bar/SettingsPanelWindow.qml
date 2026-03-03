@@ -14,7 +14,9 @@ PanelWindow {
     margins { top: Theme.barHeight }
 
     implicitWidth: 480
-    implicitHeight: content.implicitHeight + 20
+    // Fixed height avoids per-frame Wayland surface resize during expand/collapse
+    // animations. Content scrolls internally via AppearancePage's Flickable.
+    implicitHeight: 580
     color: "transparent"
 
     // Keyboard input for hex color editing

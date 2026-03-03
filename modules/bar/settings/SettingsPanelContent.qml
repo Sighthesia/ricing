@@ -22,6 +22,7 @@ Item {
 
     implicitWidth: Math.max(searchBar.implicitWidth, mainRow.implicitWidth)
     implicitHeight: searchBar.height + 6 + mainRow.implicitHeight
+    clip: true
 
     // ── Search bar ──────────────────────────────────────────────────
     Item {
