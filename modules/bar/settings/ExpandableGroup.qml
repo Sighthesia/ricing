@@ -100,4 +100,21 @@ Item {
 
     // Reparent all declarative children into contentCol
     default property alias content: contentCol.data
+
+    // Briefly flash the header accent to draw attention after scroll-to-section.
+    function flash() { flashAnim.restart() }
+
+    Rectangle {
+        id: flashOverlay
+        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 4; rightMargin: 4 }
+        height: header.height
+        radius: 4
+        color: Colors.highlight
+        opacity: 0
+        SequentialAnimation {
+            id: flashAnim
+            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.38; duration: 140 }
+            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0; duration: 500; easing.type: Easing.OutQuad }
+        }
+    }
 }

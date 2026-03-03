@@ -10,6 +10,22 @@ Item {
     implicitWidth: parent ? parent.width : 340
     implicitHeight: Math.min(pageFlickable.contentHeight + 8, 480)
 
+    // Scroll to a named section and flash its header to draw attention.
+    // Called by SettingsPanelContent after the sidebar sub-item is clicked.
+    function scrollToSection(sectionId) {
+        var map = {
+            "colors":    groupColors,
+            "bar":       groupBar,
+            "animation": groupAnimation,
+            "behavior":  groupBehavior
+        }
+        var group = map[sectionId]
+        if (!group) return
+        group.expanded = true
+        pageFlickable.contentY = Math.max(0, group.y - 4)
+        group.flash()
+    }
+
     Flickable {
         id: pageFlickable
         anchors.fill: parent
@@ -27,6 +43,7 @@ Item {
 
             // ── 颜色 ───────────────────────────────────────────────
             ExpandableGroup {
+                id: groupColors
                 title: "颜色"
                 expanded: true
 
@@ -49,6 +66,7 @@ Item {
 
             // ── Bar ────────────────────────────────────────────────
             ExpandableGroup {
+                id: groupBar
                 title: "Bar"
                 expanded: true
 
@@ -131,6 +149,7 @@ Item {
 
             // ── 动画 ───────────────────────────────────────────────
             ExpandableGroup {
+                id: groupAnimation
                 title: "动画"
                 expanded: false
 
@@ -144,6 +163,7 @@ Item {
 
             // ── 行为 ───────────────────────────────────────────────
             ExpandableGroup {
+                id: groupBehavior
                 title: "行为"
                 expanded: false
 
