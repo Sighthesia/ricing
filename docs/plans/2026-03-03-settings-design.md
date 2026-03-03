@@ -21,11 +21,11 @@
 
 ### 组件职责
 
-| 文件 | 职责 |
-|------|------|
-| `services/SettingsService.qml` | 新建 Singleton；JsonAdapter + FileView 数据层；防抖写入；三个信号 |
-| `config/Theme.qml` | 已有；可覆盖属性改为绑定到 `SettingsService.data.xxx`；动画 token 通过 `speedFactor` 缩放 |
-| `config/settings-default.json` | 新建；默认值快照，作为文档和首次写入的来源 |
+| 文件                           | 职责                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------- |
+| `services/SettingsService.qml` | 新建 Singleton；JsonAdapter + FileView 数据层；防抖写入；三个信号                         |
+| `config/Theme.qml`             | 已有；可覆盖属性改为绑定到 `SettingsService.data.xxx`；动画 token 通过 `speedFactor` 缩放 |
+| `config/settings-default.json` | 新建；默认值快照，作为文档和首次写入的来源                                                |
 
 ### 数据流
 
@@ -54,44 +54,44 @@ shell.qml
 
 ### `appearance` 组（外观 Token）
 
-| 键 | 类型 | 默认值 | 说明 |
-|---|---|---|---|
-| `accentColor` | string | `"#7aa2f7"` | 高亮色、脉冲色 |
-| `backgroundColor` | string | `"#1a1a1a"` | Bar 背景 |
-| `surfaceColor` | string | `"#252525"` | widget hover 背景 |
-| `textColor` | string | `"#c0caf5"` | 主文字色 |
-| `textMutedColor` | string | `"#565f89"` | 次要文字色 |
-| `borderColor` | string | `"#3b4261"` | 投放区边框（设置模式） |
-| `cornerRadius` | real | `10` | 全局圆角半径 |
-| `fontFamily` | string | `"LXGW WenKai GB Screen"` | 正文字体 |
-| `fontMono` | string | `"JetBrainsMono Nerd Font"` | 等宽字体 |
-| `fontSizeBody` | int | `14` | 正文字号 |
-| `fontSizeSmall` | int | `10` | 小字号 |
-| `fontSizeIcon` | int | `16` | 图标字号 |
+| 键                | 类型   | 默认值                      | 说明                   |
+| ----------------- | ------ | --------------------------- | ---------------------- |
+| `accentColor`     | string | `"#7aa2f7"`                 | 高亮色、脉冲色         |
+| `backgroundColor` | string | `"#1a1a1a"`                 | Bar 背景               |
+| `surfaceColor`    | string | `"#252525"`                 | widget hover 背景      |
+| `textColor`       | string | `"#c0caf5"`                 | 主文字色               |
+| `textMutedColor`  | string | `"#565f89"`                 | 次要文字色             |
+| `borderColor`     | string | `"#3b4261"`                 | 投放区边框（设置模式） |
+| `cornerRadius`    | real   | `10`                        | 全局圆角半径           |
+| `fontFamily`      | string | `"LXGW WenKai GB Screen"`   | 正文字体               |
+| `fontMono`        | string | `"JetBrainsMono Nerd Font"` | 等宽字体               |
+| `fontSizeBody`    | int    | `14`                        | 正文字号               |
+| `fontSizeSmall`   | int    | `10`                        | 小字号                 |
+| `fontSizeIcon`    | int    | `16`                        | 图标字号               |
 
 ### `bar` 组（Bar 外观）
 
-| 键 | 类型 | 默认值 | 说明 |
-|---|---|---|---|
-| `height` | real | `36` | Bar 高度 (px) |
-| `position` | string | `"top"` | `"top"` \| `"bottom"` |
-| `backgroundOpacity` | real | `0.85` | Bar 背景透明度 0~1 |
-| `padding` | real | `8` | 内边距 |
-| `widgetSpacing` | real | `6` | widget 间距 |
+| 键                  | 类型   | 默认值  | 说明                  |
+| ------------------- | ------ | ------- | --------------------- |
+| `height`            | real   | `36`    | Bar 高度 (px)         |
+| `position`          | string | `"top"` | `"top"` \| `"bottom"` |
+| `backgroundOpacity` | real   | `0.85`  | Bar 背景透明度 0~1    |
+| `padding`           | real   | `8`     | 内边距                |
+| `widgetSpacing`     | real   | `6`     | widget 间距           |
 
 ### `barBehavior` 组（Bar 行为）
 
-| 键 | 类型 | 默认值 | 说明 |
-|---|---|---|---|
-| `autoHide` | bool | `false` | 是否启用自动隐藏 |
-| `autoHideDelay` | int | `500` | 鼠标离开后多少 ms 隐藏 |
-| `autoShowDelay` | int | `150` | 鼠标进入后多少 ms 显示 |
+| 键              | 类型 | 默认值  | 说明                   |
+| --------------- | ---- | ------- | ---------------------- |
+| `autoHide`      | bool | `false` | 是否启用自动隐藏       |
+| `autoHideDelay` | int  | `500`   | 鼠标离开后多少 ms 隐藏 |
+| `autoShowDelay` | int  | `150`   | 鼠标进入后多少 ms 显示 |
 
 ### `animation` 组（动画参数）
 
-| 键 | 类型 | 默认值 | 说明 |
-|---|---|---|---|
-| `speedFactor` | real | `1.0` | 全局动画速度系数；Theme 中所有 duration 除以此值 |
+| 键            | 类型 | 默认值 | 说明                                             |
+| ------------- | ---- | ------ | ------------------------------------------------ |
+| `speedFactor` | real | `1.0`  | 全局动画速度系数；Theme 中所有 duration 除以此值 |
 
 ---
 
@@ -216,11 +216,11 @@ readonly property QtObject anim: QtObject {
 
 ## 七、新增文件清单
 
-| 文件 | 状态 | 说明 |
-|------|------|------|
-| `services/SettingsService.qml` | 新建 | 设置系统核心 |
-| `config/settings-default.json` | 新建 | 默认值文档 + 模板 |
-| `config/Theme.qml` | 修改 | 属性绑定到 SettingsService |
+| 文件                           | 状态 | 说明                       |
+| ------------------------------ | ---- | -------------------------- |
+| `services/SettingsService.qml` | 新建 | 设置系统核心               |
+| `config/settings-default.json` | 新建 | 默认值文档 + 模板          |
+| `config/Theme.qml`             | 修改 | 属性绑定到 SettingsService |
 
 ---
 

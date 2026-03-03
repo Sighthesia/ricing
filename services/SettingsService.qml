@@ -72,6 +72,7 @@ Singleton {
             property string textMutedColor:  "#565f89"
             property string borderColor:     "#3b4261"
             property real   cornerRadius:    10
+            property real   uiScale:         1.0
             property string fontFamily:      "LXGW WenKai GB Screen"
             property string fontMono:        "JetBrainsMono Nerd Font"
             property int    fontSizeBody:    14

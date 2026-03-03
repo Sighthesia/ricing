@@ -64,7 +64,7 @@ Item {
                 Item {
                     id: topItem
                     width: parent.width
-                    height: 34
+                    height: Theme.settingsRowHeight
 
                     Rectangle {
                         anchors.fill: parent
@@ -142,7 +142,7 @@ Item {
                         delegate: Item {
                             required property var modelData
                             width: parent.width
-                            height: 28
+                            height: Theme.settingsGroupHeaderHeight
 
                             Rectangle {
                                 anchors { fill: parent; leftMargin: 8 }

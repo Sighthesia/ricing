@@ -32,7 +32,7 @@ Item {
     height: _matchesFilter ? implicitHeight : 0
 
     implicitWidth: 296
-    implicitHeight: 36
+    implicitHeight: Theme.settingsRowHeight
 
     // Search match highlight background
     Rectangle {
@@ -60,13 +60,13 @@ Item {
 
     Row {
         anchors.fill: parent
-        anchors.leftMargin: 12
-        anchors.rightMargin: 12
+        anchors.leftMargin: Theme.settingsPanelPadding
+        anchors.rightMargin: Theme.settingsPanelPadding
         spacing: 8
 
         // Label
         Text {
-            width: 60
+            width: Theme.settingsLabelWidth
             anchors.verticalCenter: parent.verticalCenter
             text: root.label
             font.family: Theme.fontFamily

@@ -35,7 +35,7 @@ Item {
     Item {
         id: header
         width: parent.width
-        height: 28
+        height: Theme.settingsGroupHeaderHeight
 
         // Hover highlight
         Rectangle {

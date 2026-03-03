@@ -41,7 +41,7 @@ Item {
     height: _matchesFilter ? implicitHeight : 0
 
     implicitWidth: 296
-    implicitHeight: 32
+    implicitHeight: Theme.settingsRowHeight
 
     // Search match highlight background
     Rectangle {
@@ -65,13 +65,13 @@ Item {
 
     Row {
         anchors.fill: parent
-        anchors.leftMargin: 12
-        anchors.rightMargin: 12
+        anchors.leftMargin: Theme.settingsPanelPadding
+        anchors.rightMargin: Theme.settingsPanelPadding
         spacing: 8
 
         // Label
         Text {
-            width: 60
+            width: Theme.settingsLabelWidth
             anchors.verticalCenter: parent.verticalCenter
             text: root.label
             font.family: Theme.fontFamily
@@ -83,7 +83,7 @@ Item {
         // Slider track + handle
         Item {
             anchors.verticalCenter: parent.verticalCenter
-            width: parent.width - 60 - 44 - 2 * parent.spacing
+            width: parent.width - Theme.settingsLabelWidth - 44 - 2 * parent.spacing
             height: 20   // tall hit area around the 4px visual track
 
             // Visual track (unfilled)

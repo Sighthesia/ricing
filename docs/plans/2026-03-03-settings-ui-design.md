@@ -112,12 +112,12 @@ Section: 行为
 
 ## 七、向后兼容保证
 
-| 组件 | 当前代码 | 变化 |
-|------|----------|------|
-| `DragOverlay.qml` | `visible: BarLayoutService.settingsMode` | 无需改 |
-| `BarSection.qml` | `enabled: BarLayoutService.settingsMode` | 无需改 |
-| `BarWidgetWrapper.qml` | `_showSettingsOutline: BarLayoutService.settingsMode` | 无需改 |
-| `SettingsToggle.qml` | `BarLayoutService.settingsMode = !settingsMode` | 改为 `activePanel` 逻辑 |
+| 组件                   | 当前代码                                              | 变化                    |
+| ---------------------- | ----------------------------------------------------- | ----------------------- |
+| `DragOverlay.qml`      | `visible: BarLayoutService.settingsMode`              | 无需改                  |
+| `BarSection.qml`       | `enabled: BarLayoutService.settingsMode`              | 无需改                  |
+| `BarWidgetWrapper.qml` | `_showSettingsOutline: BarLayoutService.settingsMode` | 无需改                  |
+| `SettingsToggle.qml`   | `BarLayoutService.settingsMode = !settingsMode`       | 改为 `activePanel` 逻辑 |
 
 ---
 

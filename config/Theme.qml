@@ -36,12 +36,15 @@ Singleton {
     readonly property int staggerDelay:
         Math.round(40 / SettingsService.data.animation.speedFactor)
 
-    // Typography — bound to settings
+    // UI scale multiplier — changes all structural element sizes uniformly
+    readonly property real uiScale: SettingsService.data.appearance.uiScale
+
+    // Typography — bound to settings; font sizes scaled by uiScale
     readonly property string fontFamily:  SettingsService.data.appearance.fontFamily
     readonly property string fontMono:    SettingsService.data.appearance.fontMono
-    readonly property int fontSizeIcon:   SettingsService.data.appearance.fontSizeIcon
-    readonly property int fontSizeBody:   SettingsService.data.appearance.fontSizeBody
-    readonly property int fontSizeSmall:  SettingsService.data.appearance.fontSizeSmall
+    readonly property int fontSizeIcon:   Math.round(SettingsService.data.appearance.fontSizeIcon  * uiScale)
+    readonly property int fontSizeBody:   Math.round(SettingsService.data.appearance.fontSizeBody  * uiScale)
+    readonly property int fontSizeSmall:  Math.round(SettingsService.data.appearance.fontSizeSmall * uiScale)
 
     // Dimensions — bound to settings
     readonly property real cornerRadius:  SettingsService.data.appearance.cornerRadius
@@ -50,6 +53,13 @@ Singleton {
     readonly property real widgetPadding: 12        // structural constant, not user-facing
     readonly property real widgetSpacing: SettingsService.data.bar.widgetSpacing
     readonly property real iconPadding:   4         // structural constant, not user-facing
+
+    // Settings panel structural tokens — keeps all settings components visually consistent;
+    // all values scale with uiScale so the panel grows/shrinks proportionally.
+    readonly property int  settingsRowHeight:         Math.round(34 * uiScale)
+    readonly property int  settingsGroupHeaderHeight: Math.round(28 * uiScale)
+    readonly property int  settingsLabelWidth:        Math.round(60 * uiScale)
+    readonly property int  settingsPanelPadding:      Math.round(12 * uiScale)
 
     // Drag feedback — visual-only, not user-facing
     readonly property real dragScale:    1.05

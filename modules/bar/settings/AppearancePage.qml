@@ -120,9 +120,17 @@ Item {
                 id: groupBar
                 title: "Bar"
                 expanded: true
-                forceExpand: root.groupMatches(["高度","透明度","内边距","小部件间距","圆角","位置"])
-                visible: root.searchQuery === "" || root.groupMatches(["高度","透明度","内边距","小部件间距","圆角","位置"])
+                forceExpand: root.groupMatches(["全局缩放","高度","透明度","内边距","小部件间距","圆角","位置"])
+                visible: root.searchQuery === "" || root.groupMatches(["全局缩放","高度","透明度","内边距","小部件间距","圆角","位置"])
                 height: visible ? implicitHeight : 0
+
+                SliderSection {
+                    label: "全局缩放"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.uiScale
+                    from: 0.75; to: 1.5; stepSize: 0.05; unit: "×"
+                    onValueCommitted: (v) => SettingsService.data.appearance.uiScale = v
+                }
 
                 SliderSection {
                     label: "高度"
@@ -168,16 +176,16 @@ Item {
                 Item {
                     width: parent ? parent.width : 296
                     visible: root.searchQuery === "" || root.matches("位置")
-                    height: visible ? 32 : 0
+                    height: visible ? Theme.settingsRowHeight : 0
 
                     Row {
                         anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
+                        anchors.leftMargin: Theme.settingsPanelPadding
+                        anchors.rightMargin: Theme.settingsPanelPadding
                         spacing: 8
 
                         Text {
-                            width: 60
+                            width: Theme.settingsLabelWidth
                             anchors.verticalCenter: parent.verticalCenter
                             text: "位置"
                             font.family: Theme.fontFamily
@@ -259,16 +267,16 @@ Item {
                 Item {
                     width: parent ? parent.width : 296
                     visible: root.searchQuery === "" || root.matches("自动隐藏")
-                    height: visible ? 32 : 0
+                    height: visible ? Theme.settingsRowHeight : 0
 
                     Row {
                         anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
+                        anchors.leftMargin: Theme.settingsPanelPadding
+                        anchors.rightMargin: Theme.settingsPanelPadding
                         spacing: 8
 
                         Text {
-                            width: 60
+                            width: Theme.settingsLabelWidth
                             anchors.verticalCenter: parent.verticalCenter
                             text: "自动隐藏"
                             font.family: Theme.fontFamily

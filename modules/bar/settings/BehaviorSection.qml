@@ -18,16 +18,16 @@ Item {
         // Position selector row
         Item {
             width: parent.width
-            height: 32
+            height: Theme.settingsRowHeight
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
+                anchors.leftMargin: Theme.settingsPanelPadding
+                anchors.rightMargin: Theme.settingsPanelPadding
                 spacing: 8
 
                 Text {
-                    width: 60
+                    width: Theme.settingsLabelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "位置"
                     font.family: Theme.fontFamily
@@ -80,16 +80,16 @@ Item {
         // Auto-hide toggle row
         Item {
             width: parent.width
-            height: 32
+            height: Theme.settingsRowHeight
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
+                anchors.leftMargin: Theme.settingsPanelPadding
+                anchors.rightMargin: Theme.settingsPanelPadding
                 spacing: 8
 
                 Text {
-                    width: 60
+                    width: Theme.settingsLabelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "自动隐藏"
                     font.family: Theme.fontFamily
