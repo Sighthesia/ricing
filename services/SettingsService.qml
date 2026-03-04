@@ -78,6 +78,10 @@ Singleton {
             property int    fontSizeBody:    14
             property int    fontSizeSmall:   10
             property int    fontSizeIcon:    16
+            property string wallpaperPath:   ""
+            property bool   matugenEnabled:  false
+            property string matugenScheme:   "scheme-tonal-spot"
+            property bool   darkMode:        true
         }
 
         property JsonObject bar: JsonObject {
