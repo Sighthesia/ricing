@@ -66,15 +66,25 @@ Item {
     }
 
     // Transparent full-bar MouseArea at z:-1 — captures right-clicks on empty bar space.
+    // In layout mode, left-clicks on blank bar area open the widget picker for that section.
     // z:-1 ensures widget MouseAreas (z:0) handle cursor shape and hover events first.
     // propagateComposedEvents: true so widgets still receive their own events.
     MouseArea {
         id: barRightClick
         anchors.fill: parent
         z: -1
-        acceptedButtons: Qt.RightButton
+        acceptedButtons: Qt.RightButton | Qt.LeftButton
         propagateComposedEvents: true
-        onClicked: (mouse) => contextMenu.showAt(mouse.x, mouse.y)
+        onClicked: (mouse) => {
+            if (mouse.button === Qt.RightButton) {
+                contextMenu.showAt(mouse.x, mouse.y);
+            } else if (BarLayoutService.settingsMode) {
+                // Left-click in layout mode: open or retarget the widget picker
+                let section = barContent.hitTestSection(mouse.x);
+                BarLayoutService.widgetPickerTargetSection = section;
+                BarLayoutService.widgetPickerOpen = true;
+            }
+        }
     }
 
     // Global Esc: close any active panel, the context menu, and the widget picker.

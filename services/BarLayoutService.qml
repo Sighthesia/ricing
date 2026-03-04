@@ -17,6 +17,10 @@ Singleton {
     // True while the widget picker panel is visible.
     property bool widgetPickerOpen: false
 
+    // Which bar section the picker should insert widgets into.
+    // Updated whenever the user clicks a section in layout mode.
+    property string widgetPickerTargetSection: "right"
+
     // Computed alias — keeps all existing DragOverlay/BarSection bindings unchanged
     readonly property bool settingsMode: activePanel === "layout"
 

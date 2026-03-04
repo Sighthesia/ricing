@@ -221,10 +221,9 @@ PanelWindow {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            // Click inserts into the right section by default.
-                            // FIXME: V2 should let the user choose a target section,
-                            //        or support dragging cards directly onto the bar.
-                            onClicked: BarLayoutService.addWidget(modelData, "right")
+                            // Insert into the section the user clicked on the bar to open the picker.
+                            // FIXME: V2 should support dragging cards directly onto the bar.
+                            onClicked: BarLayoutService.addWidget(modelData, BarLayoutService.widgetPickerTargetSection)
                         }
                     }
                 }
