@@ -110,7 +110,7 @@ Item {
             && BarLayoutService.ghostSection === section.role
             && BarLayoutService.ghostIndex >= 0
         width: 2
-        height: Theme.barHeight - 12
+        height: Theme.barHeight - Theme.widgetPadding
         anchors.verticalCenter: parent.verticalCenter
         color: Colors.highlight
         radius: 1

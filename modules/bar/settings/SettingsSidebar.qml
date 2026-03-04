@@ -81,7 +81,7 @@ Item {
                         anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
                         text: "\uf105"
                         font.family: Theme.fontMono
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.fontSizeSmall
                         color: Colors.textMuted
                         rotation: isExpanded ? 90 : 0
                         Behavior on rotation { NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Easing.InOutCubic } }

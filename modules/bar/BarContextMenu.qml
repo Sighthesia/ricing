@@ -83,7 +83,7 @@ PopupWindow {
             Item {
                 id: layoutItem
                 width: parent.width
-                height: 28
+                height: Theme.barHeight - Theme.barPadding
 
                 // Hover highlight overlay
                 Rectangle {
@@ -100,7 +100,7 @@ PopupWindow {
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.left: parent.left
-                    anchors.leftMargin: 12
+                    anchors.leftMargin: Theme.widgetPadding
                     spacing: 8
 
                     Text {
@@ -136,7 +136,7 @@ PopupWindow {
             Item {
                 id: settingsItem
                 width: parent.width
-                height: 28
+                height: Theme.barHeight - Theme.barPadding
 
                 Rectangle {
                     anchors.fill: parent
@@ -152,7 +152,7 @@ PopupWindow {
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.left: parent.left
-                    anchors.leftMargin: 12
+                    anchors.leftMargin: Theme.widgetPadding
                     spacing: 8
 
                     Text {

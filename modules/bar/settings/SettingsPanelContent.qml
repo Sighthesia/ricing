@@ -28,7 +28,7 @@ Item {
     Item {
         id: searchBar
         anchors { top: parent.top; left: parent.left; right: parent.right }
-        height: 36
+        height: Theme.barHeight
         implicitWidth: 360
 
         Rectangle {

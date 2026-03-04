@@ -30,7 +30,7 @@ Rectangle {
             Text {
                 Layout.alignment: Qt.AlignBaseline
                 font.family: Theme.fontFamily
-                font.pointSize: 11
+                font.pixelSize: Theme.fontSizeSmall
                 font.bold: true
                 text: Qt.formatDateTime(systemClock.date, "MMM")
                 color: Colors.textMuted
@@ -39,7 +39,7 @@ Rectangle {
             Text {
                 Layout.alignment: Qt.AlignBaseline
                 font.family: Theme.fontFamily
-                font.pointSize: 11
+                font.pixelSize: Theme.fontSizeSmall
                 font.bold: true
                 text: Qt.formatDateTime(systemClock.date, "d")
                 color: Colors.text
@@ -63,7 +63,7 @@ Rectangle {
             Text {
                 Layout.alignment: Qt.AlignBaseline
                 font.family: Theme.fontMono
-                font.pointSize: 13
+                font.pixelSize: Theme.fontSizeBody
                 font.bold: true
                 text: Qt.formatDateTime(systemClock.date, "hh")
                 color: Colors.textMuted
@@ -72,7 +72,7 @@ Rectangle {
             Text {
                 Layout.alignment: Qt.AlignBaseline
                 font.family: Theme.fontMono
-                font.pointSize: 13
+                font.pixelSize: Theme.fontSizeBody
                 font.bold: true
                 text: ":"
                 color: Colors.text
@@ -81,7 +81,7 @@ Rectangle {
             Text {
                 Layout.alignment: Qt.AlignBaseline
                 font.family: Theme.fontMono
-                font.pointSize: 13
+                font.pixelSize: Theme.fontSizeBody
                 font.bold: true
                 text: Qt.formatDateTime(systemClock.date, "mm")
                 color: Colors.text
