@@ -38,6 +38,7 @@ Item {
     // highlight on the group header. Cleared by clearAllHighlights().
     function scrollToSection(sectionId) {
         var map = {
+            "wallpaper": groupWallpaper,
             "colors":    groupColors,
             "font":      groupFont,
             "bar":       groupBar,
@@ -58,6 +59,7 @@ Item {
     // Remove persistent highlights from all groups.
     // Called when the user clicks on blank space in the panel.
     function clearAllHighlights() {
+        groupWallpaper.highlighted = false
         groupColors.highlighted = false
         groupFont.highlighted = false
         groupBar.highlighted = false
@@ -80,12 +82,145 @@ Item {
 
             Item { width: 1; height: 4 }
 
+            // ── 壁纸 & 动态主题色 ──────────────────────────────────
+            ExpandableGroup {
+                id: groupWallpaper
+                title: "壁纸 & 动态主题色"
+                expanded: false
+                forceExpand: root.groupMatches(["壁纸路径","动态主题色","配色算法","深色模式"])
+                visible: root.searchQuery === "" || root.groupMatches(["壁纸路径","动态主题色","配色算法","深色模式"])
+                height: visible ? implicitHeight : 0
+
+                // ── Wallpaper path ──
+                TextFieldSection {
+                    label: "壁纸路径"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.wallpaperPath
+                    onValueCommitted: function(v) {
+                        SettingsService.data.appearance.wallpaperPath = v
+                        WallpaperService.triggerMatugen()
+                    }
+                }
+
+                // ── Enable dynamic theming ──
+                ToggleSection {
+                    label: "动态主题色"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.matugenEnabled
+                    onToggled: function(v) {
+                        SettingsService.data.appearance.matugenEnabled = v
+                        if (v) WallpaperService.triggerMatugen()
+                    }
+                }
+
+                // ── Dark mode ──
+                ToggleSection {
+                    label: "深色模式"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.darkMode
+                    onToggled: function(v) {
+                        SettingsService.data.appearance.darkMode = v
+                        if (SettingsService.data.appearance.matugenEnabled)
+                            WallpaperService.triggerMatugen()
+                    }
+                }
+
+                // ── Scheme type picker (visible only when matugen is on) ──
+                Item {
+                    visible: SettingsService.data.appearance.matugenEnabled
+                    height: visible ? Theme.settingsRowHeight : 0
+                    width: parent ? parent.width : 296
+
+                    Behavior on height { NumberAnimation { duration: Theme.anim.highlightDuration } }
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.settingsPanelPadding
+                        anchors.rightMargin: Theme.settingsPanelPadding
+                        spacing: 8
+
+                        Text {
+                            width: Theme.settingsLabelWidth
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "配色算法"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Colors.textMuted
+                            elide: Text.ElideRight
+                        }
+
+                        Flickable {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - Theme.settingsLabelWidth - parent.spacing
+                            height: Theme.settingsRowHeight
+                            contentWidth: schemeRow.implicitWidth
+                            clip: true
+
+                            Row {
+                                id: schemeRow
+                                spacing: 4
+
+                                Repeater {
+                                    model: [
+                                        "scheme-tonal-spot",
+                                        "scheme-vibrant",
+                                        "scheme-expressive",
+                                        "scheme-fidelity",
+                                        "scheme-neutral",
+                                        "scheme-monochrome"
+                                    ]
+
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        required property int index
+
+                                        readonly property bool selected:
+                                            SettingsService.data.appearance.matugenScheme === modelData
+
+                                        readonly property string shortLabel:
+                                            modelData.replace("scheme-", "")
+
+                                        width: schemeLabel.implicitWidth + 12
+                                        height: 22
+                                        radius: Theme.cornerRadius - 4
+                                        color: selected ? Colors.highlight : Colors.surface
+                                        opacity: selected ? 0.9 : 0.55
+                                        Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+                                        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
+
+                                        Text {
+                                            id: schemeLabel
+                                            anchors.centerIn: parent
+                                            text: parent.shortLabel
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: Colors.text
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                SettingsService.data.appearance.matugenScheme = parent.modelData
+                                                WallpaperService.triggerMatugen()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── 颜色 ───────────────────────────────────────────────
             ExpandableGroup {
                 id: groupColors
                 title: "颜色"
                 expanded: true
                 forceExpand: root.groupMatches(["主题预设","强调色","背景色","表面色","文字色","次要文字","边框色"])
+                opacity: SettingsService.data.appearance.matugenEnabled ? 0.4 : 1.0
+                Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
                 visible: root.searchQuery === "" || root.groupMatches(["主题预设","强调色","背景色","表面色","文字色","次要文字","边框色"])
                 height: visible ? implicitHeight : 0
 
