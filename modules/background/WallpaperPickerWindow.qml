@@ -1,6 +1,7 @@
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 import Qt.labs.folderlistmodel
 import qs.config
 import qs.services
