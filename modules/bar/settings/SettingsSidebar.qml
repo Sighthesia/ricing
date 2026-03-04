@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import ".."
 
 // Left navigation sidebar with two-level hierarchy.
 // Top-level categories can be expanded to reveal sub-section shortcuts.
@@ -59,55 +60,24 @@ Item {
 
         Repeater {
             model: root.navModel
-            delegate: Column {
+            delegate: StaggerItem {
                 required property var modelData
                 required property int index
 
                 id: delegateCol
+                delay:     120 + index * 50
+                exitDelay: index * 15
                 width: parent.width
-                spacing: 1
-
-                // ── Stagger animation state ────────────────────────────────────
-                // Initial state: invisible and offset downward.
-                // runEnterAnimation / runExitAnimation broadcast signals from the
-                // sidebar root; each delegate calculates its own delay from index.
-                opacity: 0.0
-                property real _offsetY: 30.0
-                transform: Translate { y: delegateCol._offsetY }
-
-                Connections {
-                    target: root
-                    function onEnterAnimationTriggered() {
-                        // Reset instantly to prevent artefacts from interrupted cycles
-                        _enterTimer.stop()
-                        _exitTimer.stop()
-                        _opacityEnter.stop(); _offsetEnter.stop()
-                        _opacityExit.stop();  _offsetExit.stop()
-                        delegateCol.opacity  = 0.0
-                        delegateCol._offsetY = 30.0
-                        // Each item enters 50ms after the previous one
-                        _enterTimer.interval = 120 + delegateCol.index * 50
-                        _enterTimer.start()
-                    }
-                    function onExitAnimationTriggered() {
-                        _enterTimer.stop()
-                        _opacityEnter.stop(); _offsetEnter.stop()
-                        // Exit in reverse: bottom item first (highest index = shortest delay)
-                        _exitTimer.interval = delegateCol.index * 15
-                        _exitTimer.start()
-                    }
-                }
-
-                Timer { id: _enterTimer; repeat: false; onTriggered: { _opacityEnter.restart(); _offsetEnter.restart() } }
-                Timer { id: _exitTimer;  repeat: false; onTriggered: { _opacityExit.restart();  _offsetExit.restart()  } }
-
-                PropertyAnimation { id: _opacityEnter; target: delegateCol; property: "opacity";  to: 1.0;  duration: 280; easing.type: Easing.OutCubic }
-                PropertyAnimation { id: _offsetEnter;  target: delegateCol; property: "_offsetY"; to: 0.0;  duration: 280; easing.type: Easing.OutCubic }
-                PropertyAnimation { id: _opacityExit;  target: delegateCol; property: "opacity";  to: 0.0;  duration: 100; easing.type: Easing.InCubic }
-                PropertyAnimation { id: _offsetExit;   target: delegateCol; property: "_offsetY"; to: 10.0; duration: 100; easing.type: Easing.InCubic }
+                height: topItem.height + subCol.height
 
                 readonly property bool isActive:   root.currentPage === modelData.page
                 readonly property bool isExpanded: root.expandedStates[index]
+
+                Connections {
+                    target: root
+                    function onEnterAnimationTriggered() { delegateCol.runEnter() }
+                    function onExitAnimationTriggered()  { delegateCol.runExit()  }
+                }
 
                 // ── Top-level category row ─────────────────────────────────────
                 Item {
@@ -177,6 +147,8 @@ Item {
                 // ── Collapsible sub-items ──────────────────────────────────────
                 Column {
                     id: subCol
+                    anchors.top: topItem.bottom
+                    anchors.topMargin: 1
                     // Capture the parent page for use inside the inner Repeater delegate
                     property string pageId: modelData.page
                     width: parent.width
@@ -224,3 +196,4 @@ Item {
         }
     }
 }
+

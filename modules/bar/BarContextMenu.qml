@@ -36,7 +36,11 @@ PopupWindow {
         if (_active) {
             visible = true;
             enterAnim.restart();
+            s_layoutItem.runEnter()
+            s_settingsItem.runEnter()
         } else {
+            s_layoutItem.runExit()
+            s_settingsItem.runExit()
             exitAnim.restart();
         }
     }
@@ -80,8 +84,10 @@ PopupWindow {
             spacing: 2
 
             // --- Layout mode item ---
-            Item {
-                id: layoutItem
+            StaggerItem {
+                id: s_layoutItem
+                delay: 0
+                exitDelay: 0
                 width: parent.width
                 height: Theme.barHeight - Theme.barPadding
 
@@ -133,8 +139,10 @@ PopupWindow {
             }
 
             // --- Settings item ---
-            Item {
-                id: settingsItem
+            StaggerItem {
+                id: s_settingsItem
+                delay: 50
+                exitDelay: 0
                 width: parent.width
                 height: Theme.barHeight - Theme.barPadding
 

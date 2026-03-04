@@ -79,153 +79,189 @@ AnimatedPanelBase {
             spacing: Theme.barPadding
 
             // Panel title
-            Text {
-                text: "\u5c0f\u7ec4\u4ef6\u5e93"
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeBody
-                font.weight: Font.Medium
-                color: Colors.text
+            StaggerItem {
+                id: s_wpTitle
+                delay: 60
+                Layout.fillWidth: true
+                implicitHeight: _titleText.implicitHeight
+
+                Text {
+                    id: _titleText
+                    text: "\u5c0f\u7ec4\u4ef6\u5e93"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeBody
+                    font.weight: Font.Medium
+                    color: Colors.text
+                }
             }
 
             // Search bar
-            Rectangle {
+            StaggerItem {
+                id: s_wpSearch
+                delay: 110
                 Layout.fillWidth: true
                 height: Theme.barHeight - Theme.barPadding
-                radius: Theme.cornerRadius
-                color: Colors.surface
-                border.color: Colors.border
-                border.width: 1
 
-                Text {
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.widgetPadding
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "\u641c\u7d22\u5c0f\u7ec4\u4ef6\u2026"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Colors.textMuted
-                    visible: searchInput.displayText.length === 0
-                }
-
-                TextInput {
-                    id: searchInput
+                Rectangle {
                     anchors.fill: parent
-                    anchors.leftMargin: Theme.widgetPadding
-                    anchors.rightMargin: Theme.widgetPadding
-                    verticalAlignment: TextInput.AlignVCenter
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Colors.text
-                    clip: true
-                    onTextChanged: root.searchQuery = text
+                    radius: Theme.cornerRadius
+                    color: Colors.surface
+                    border.color: Colors.border
+                    border.width: 1
 
-                    Keys.onEscapePressed: {
-                        if (text.length > 0) {
-                            clear();
-                        } else {
-                            BarLayoutService.widgetPickerOpen = false;
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: Theme.widgetPadding
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "\u641c\u7d22\u5c0f\u7ec4\u4ef6\u2026"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Colors.textMuted
+                        visible: searchInput.displayText.length === 0
+                    }
+
+                    TextInput {
+                        id: searchInput
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.widgetPadding
+                        anchors.rightMargin: Theme.widgetPadding
+                        verticalAlignment: TextInput.AlignVCenter
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Colors.text
+                        clip: true
+                        onTextChanged: root.searchQuery = text
+
+                        Keys.onEscapePressed: {
+                            if (text.length > 0) {
+                                clear();
+                            } else {
+                                BarLayoutService.widgetPickerOpen = false;
+                            }
                         }
                     }
                 }
             }
 
             // Widget card grid
-            GridView {
-                id: grid
+            StaggerItem {
+                id: s_wpGrid
+                delay: 160
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                clip: true
-                cellWidth: 148
-                cellHeight: 104
 
-                model: root.filteredWidgets
+                GridView {
+                    id: grid
+                    anchors.fill: parent
+                    clip: true
+                    cellWidth: 148
+                    cellHeight: 104
 
-                delegate: Item {
-                    width: grid.cellWidth
-                    height: grid.cellHeight
+                    model: root.filteredWidgets
 
-                    Rectangle {
-                        id: card
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        radius: Theme.cornerRadius
-                        color: cardHover.containsMouse ? Colors.surface : "transparent"
-                        border.color: cardHover.containsMouse ? Colors.border : "transparent"
-                        border.width: 1
+                    delegate: Item {
+                        width: grid.cellWidth
+                        height: grid.cellHeight
 
-                        Behavior on color {
-                            ColorAnimation { duration: Theme.anim.highlightDuration }
-                        }
-
-                        ColumnLayout {
+                        Rectangle {
+                            id: card
                             anchors.fill: parent
-                            anchors.margins: 6
-                            spacing: 4
+                            anchors.margins: 4
+                            radius: Theme.cornerRadius
+                            color: cardHover.containsMouse ? Colors.surface : "transparent"
+                            border.color: cardHover.containsMouse ? Colors.border : "transparent"
+                            border.width: 1
 
-                            // Live widget preview — scaled down to fit the card
-                            Item {
-                                Layout.fillWidth: true
-                                height: 60
-                                clip: true
+                            Behavior on color {
+                                ColorAnimation { duration: Theme.anim.highlightDuration }
+                            }
 
-                                Loader {
-                                    id: widgetLoader
-                                    anchors.centerIn: parent
-                                    source: root.widgetRegistry[modelData] || ""
-                                    transform: Scale {
-                                        xScale: 0.65
-                                        yScale: 0.65
-                                        origin.x: widgetLoader.width / 2
-                                        origin.y: widgetLoader.height / 2
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                spacing: 4
+
+                                // Live widget preview — scaled down to fit the card
+                                Item {
+                                    Layout.fillWidth: true
+                                    height: 60
+                                    clip: true
+
+                                    Loader {
+                                        id: widgetLoader
+                                        anchors.centerIn: parent
+                                        source: root.widgetRegistry[modelData] || ""
+                                        transform: Scale {
+                                            xScale: 0.65
+                                            yScale: 0.65
+                                            origin.x: widgetLoader.width / 2
+                                            origin.y: widgetLoader.height / 2
+                                        }
                                     }
+                                }
+
+                                // Widget name label
+                                Text {
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: root.widgetNames[modelData] || modelData
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Colors.textMuted
+                                    elide: Text.ElideRight
                                 }
                             }
 
-                            // Widget name label
-                            Text {
-                                Layout.fillWidth: true
-                                horizontalAlignment: Text.AlignHCenter
-                                text: root.widgetNames[modelData] || modelData
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSmall
-                                color: Colors.textMuted
-                                elide: Text.ElideRight
+                            // Instance count badge — shown only when at least one instance exists
+                            Rectangle {
+                                visible: root.countInstances(modelData) > 0
+                                width: 18
+                                height: 18
+                                radius: 9
+                                color: Colors.highlight
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.topMargin: 2
+                                anchors.rightMargin: 2
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: root.countInstances(modelData)
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Math.max(8, Theme.fontSizeSmall - 2)
+                                    color: "white"
+                                }
                             }
-                        }
 
-                        // Instance count badge — shown only when at least one instance exists
-                        Rectangle {
-                            visible: root.countInstances(modelData) > 0
-                            width: 18
-                            height: 18
-                            radius: 9
-                            color: Colors.highlight
-                            anchors.top: parent.top
-                            anchors.right: parent.right
-                            anchors.topMargin: 2
-                            anchors.rightMargin: 2
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: root.countInstances(modelData)
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Math.max(8, Theme.fontSizeSmall - 2)
-                                color: "white"
+                            MouseArea {
+                                id: cardHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                // Insert into the section the user clicked on the bar to open the picker.
+                                // FIXME: V2 should support dragging cards directly onto the bar.
+                                onClicked: BarLayoutService.addWidget(modelData, BarLayoutService.widgetPickerTargetSection)
                             }
-                        }
-
-                        MouseArea {
-                            id: cardHover
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            // Insert into the section the user clicked on the bar to open the picker.
-                            // FIXME: V2 should support dragging cards directly onto the bar.
-                            onClicked: BarLayoutService.addWidget(modelData, BarLayoutService.widgetPickerTargetSection)
                         }
                     }
                 }
             }
+        }
+    }
+
+    // Forward AnimatedPanelBase transition signals so structural blocks run
+    // stagger enter/exit animations when the picker panel opens/closes.
+    Connections {
+        target: root
+        function onPanelOpening() {
+            s_wpTitle.runEnter()
+            s_wpSearch.runEnter()
+            s_wpGrid.runEnter()
+        }
+        function onPanelClosing() {
+            s_wpTitle.runExit()
+            s_wpSearch.runExit()
+            s_wpGrid.runExit()
         }
     }
 }

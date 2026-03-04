@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import ".."
 
 // Settings panel with a persistent search bar at the top, left sidebar, and
 // right page content. Typing in the search bar propagates the query to the
@@ -22,63 +23,31 @@ Item {
 
     // ── Stagger enter/exit animation API ──────────────────────────────
     // Called by SettingsPanelWindow when AnimatedPanelBase emits
-    // panelOpening / panelClosing.  Resets items to invisible state,
-    // then launches staggered timers for each structural block.
+    // panelOpening / panelClosing.  Each structural block is a StaggerItem
+    // with its delay encoded — just invoke once and the cascade plays itself.
     function runEnterAnimation() {
-        _resetStaggerItems()
-        _sbEnterTimer.interval = 80;  _sbEnterTimer.restart()
         sidebar.runEnterAnimation()
-        _ciEnterTimer.interval = 160; _ciEnterTimer.restart()
+        searchBar.runEnter()
+        contentItem.runEnter()
     }
 
     function runExitAnimation() {
-        _sbEnterTimer.stop(); _sbExitTimer.interval = 0; _sbExitTimer.restart()
         sidebar.runExitAnimation()
-        _ciEnterTimer.stop(); _ciExitTimer.interval = 0; _ciExitTimer.restart()
+        searchBar.runExit()
+        contentItem.runExit()
     }
-
-    function _resetStaggerItems() {
-        // Snap to invisible/offset state before starting a new enter cycle.
-        _sbEnterTimer.stop();  _sbExitTimer.stop()
-        _sbOpacityEnter.stop(); _sbOffsetEnter.stop()
-        _sbOpacityExit.stop();  _sbOffsetExit.stop()
-        searchBar.opacity  = 0.0; searchBar._offsetY  = 30.0
-        _ciEnterTimer.stop();  _ciExitTimer.stop()
-        _ciOpacityEnter.stop(); _ciOffsetEnter.stop()
-        _ciOpacityExit.stop();  _ciOffsetExit.stop()
-        contentItem.opacity = 0.0; contentItem._offsetY = 30.0
-    }
-
-    // searchBar stagger timers & animations
-    Timer { id: _sbEnterTimer; repeat: false; onTriggered: { _sbOpacityEnter.restart(); _sbOffsetEnter.restart() } }
-    Timer { id: _sbExitTimer;  repeat: false; onTriggered: { _sbOpacityExit.restart();  _sbOffsetExit.restart()  } }
-    PropertyAnimation { id: _sbOpacityEnter; target: searchBar; property: "opacity";  to: 1.0;  duration: 280; easing.type: Easing.OutCubic }
-    PropertyAnimation { id: _sbOffsetEnter;  target: searchBar; property: "_offsetY"; to: 0.0;  duration: 280; easing.type: Easing.OutCubic }
-    PropertyAnimation { id: _sbOpacityExit;  target: searchBar; property: "opacity";  to: 0.0;  duration: 100; easing.type: Easing.InCubic }
-    PropertyAnimation { id: _sbOffsetExit;   target: searchBar; property: "_offsetY"; to: 10.0; duration: 100; easing.type: Easing.InCubic }
-
-    // contentItem stagger timers & animations
-    Timer { id: _ciEnterTimer; repeat: false; onTriggered: { _ciOpacityEnter.restart(); _ciOffsetEnter.restart() } }
-    Timer { id: _ciExitTimer;  repeat: false; onTriggered: { _ciOpacityExit.restart();  _ciOffsetExit.restart()  } }
-    PropertyAnimation { id: _ciOpacityEnter; target: contentItem; property: "opacity";  to: 1.0;  duration: 280; easing.type: Easing.OutCubic }
-    PropertyAnimation { id: _ciOffsetEnter;  target: contentItem; property: "_offsetY"; to: 0.0;  duration: 280; easing.type: Easing.OutCubic }
-    PropertyAnimation { id: _ciOpacityExit;  target: contentItem; property: "opacity";  to: 0.0;  duration: 100; easing.type: Easing.InCubic }
-    PropertyAnimation { id: _ciOffsetExit;   target: contentItem; property: "_offsetY"; to: 10.0; duration: 100; easing.type: Easing.InCubic }
 
     implicitWidth: Math.max(searchBar.implicitWidth, mainRow.implicitWidth)
     implicitHeight: searchBar.height + 6 + mainRow.implicitHeight
     clip: true
 
     // ── Search bar ──────────────────────────────────────────────────
-    Item {
+    StaggerItem {
         id: searchBar
         anchors { top: parent.top; left: parent.left; right: parent.right }
         height: Theme.barHeight
         implicitWidth: 360
-        // Stagger animation state — initial: invisible, offset 30px down
-        opacity: 0.0
-        property real _offsetY: 30.0
-        transform: Translate { y: searchBar._offsetY }
+        delay: 80
 
         Rectangle {
             anchors.fill: parent
@@ -151,15 +120,12 @@ Item {
             }
         }
 
-        Item {
+        StaggerItem {
             id: contentItem
             anchors { top: parent.top; left: sidebar.right; right: parent.right; bottom: parent.bottom; leftMargin: 8 }
             implicitWidth: loader.implicitWidth
             implicitHeight: loader.implicitHeight
-            // Stagger animation state — initial: invisible, offset 30px down
-            opacity: 0.0
-            property real _offsetY: 30.0
-            transform: Translate { y: contentItem._offsetY }
+            delay: 160
 
             Loader {
                 id: loader
