@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 import ".."
 
 // Settings panel with a persistent search bar at the top, left sidebar, and
@@ -47,7 +48,7 @@ Item {
         anchors { top: parent.top; left: parent.left; right: parent.right }
         height: Theme.barHeight
         implicitWidth: 360
-        delay: 80
+        delay: SettingsService.data.animation.staggerLevel1BaseDelay
 
         Rectangle {
             anchors.fill: parent
@@ -125,7 +126,8 @@ Item {
             anchors { top: parent.top; left: sidebar.right; right: parent.right; bottom: parent.bottom; leftMargin: 8 }
             implicitWidth: loader.implicitWidth
             implicitHeight: loader.implicitHeight
-            delay: 160
+            delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                 + SettingsService.data.animation.staggerLevel1Step * 2
 
             Loader {
                 id: loader

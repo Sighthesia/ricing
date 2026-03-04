@@ -1,4 +1,5 @@
 import QtQuick
+import qs.services
 
 // General-purpose stagger animation wrapper.
 //
@@ -35,13 +36,13 @@ Item {
     property int exitDelay: 0
 
     // Duration for enter/exit animations.
-    property int enterDuration: 280
-    property int exitDuration:  100
+    property int enterDuration: SettingsService.data.animation.staggerEnterDuration
+    property int exitDuration:  SettingsService.data.animation.staggerExitDuration
 
     // Y translation distance: items slide UP from +enterOffsetY to 0 on enter,
     // and slide DOWN from 0 to +exitOffsetY on exit.
-    property real enterOffsetY: 30.0
-    property real exitOffsetY:  10.0
+    property real enterOffsetY: SettingsService.data.animation.staggerEnterOffsetY
+    property real exitOffsetY:  SettingsService.data.animation.staggerExitOffsetY
 
     // Initial state: invisible and offset downward.
     // runEnter() snaps to this state before starting the timer, ensuring a

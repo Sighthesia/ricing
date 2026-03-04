@@ -81,7 +81,7 @@ AnimatedPanelBase {
             // Panel title
             StaggerItem {
                 id: s_wpTitle
-                delay: 60
+                delay: SettingsService.data.animation.staggerLevel1BaseDelay
                 Layout.fillWidth: true
                 implicitHeight: _titleText.implicitHeight
 
@@ -98,7 +98,8 @@ AnimatedPanelBase {
             // Search bar
             StaggerItem {
                 id: s_wpSearch
-                delay: 110
+                delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                     + SettingsService.data.animation.staggerLevel1Step
                 Layout.fillWidth: true
                 height: Theme.barHeight - Theme.barPadding
 
@@ -146,7 +147,8 @@ AnimatedPanelBase {
             // Widget card grid
             StaggerItem {
                 id: s_wpGrid
-                delay: 160
+                delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                     + SettingsService.data.animation.staggerLevel1Step * 2
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 

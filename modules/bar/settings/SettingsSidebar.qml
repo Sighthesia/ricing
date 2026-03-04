@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 import ".."
 
 // Left navigation sidebar with two-level hierarchy.
@@ -65,8 +66,9 @@ Item {
                 required property int index
 
                 id: delegateCol
-                delay:     120 + index * 50
-                exitDelay: index * 15
+                 delay: SettingsService.data.animation.staggerLevel2BaseDelay
+                     + index * SettingsService.data.animation.staggerLevel2Step
+                 exitDelay: index * SettingsService.data.animation.staggerExitStep
                 width: parent.width
                 height: topItem.height + subCol.height
 

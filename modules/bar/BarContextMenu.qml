@@ -86,7 +86,7 @@ PopupWindow {
             // --- Layout mode item ---
             StaggerItem {
                 id: s_layoutItem
-                delay: 0
+                delay: SettingsService.data.animation.staggerLevel1BaseDelay
                 exitDelay: 0
                 width: parent.width
                 height: Theme.barHeight - Theme.barPadding
@@ -141,7 +141,8 @@ PopupWindow {
             // --- Settings item ---
             StaggerItem {
                 id: s_settingsItem
-                delay: 50
+                delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                     + SettingsService.data.animation.staggerLevel1Step
                 exitDelay: 0
                 width: parent.width
                 height: Theme.barHeight - Theme.barPadding

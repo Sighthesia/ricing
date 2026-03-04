@@ -96,6 +96,15 @@ Singleton {
 
         property JsonObject animation: JsonObject {
             property real speedFactor: 1.0
+            property int  staggerLevel1BaseDelay: 60
+            property int  staggerLevel1Step:      50
+            property int  staggerLevel2BaseDelay: 120
+            property int  staggerLevel2Step:      50
+            property int  staggerExitStep:        15
+            property int  staggerEnterDuration:   280
+            property int  staggerExitDuration:    100
+            property real staggerEnterOffsetY:    30
+            property real staggerExitOffsetY:     10
         }
     }
 }

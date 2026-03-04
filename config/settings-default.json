@@ -27,6 +27,15 @@
         "autoShowDelay": 150
     },
     "animation": {
-        "speedFactor": 1.0
+        "speedFactor": 1.0,
+        "staggerLevel1BaseDelay": 60,
+        "staggerLevel1Step": 50,
+        "staggerLevel2BaseDelay": 120,
+        "staggerLevel2Step": 50,
+        "staggerExitStep": 15,
+        "staggerEnterDuration": 280,
+        "staggerExitDuration": 100,
+        "staggerEnterOffsetY": 30,
+        "staggerExitOffsetY": 10
     }
 }

@@ -302,8 +302,8 @@ Item {
                 id: groupAnimation
                 title: "动画"
                 expanded: false
-                forceExpand: root.groupMatches(["速度系数"])
-                visible: root.searchQuery === "" || root.groupMatches(["速度系数"])
+                forceExpand: root.groupMatches(["速度系数","一级基础延迟","一级步长","二级基础延迟","二级步长","退出步长","入场时长","出场时长","入场偏移","出场偏移"])
+                visible: root.searchQuery === "" || root.groupMatches(["速度系数","一级基础延迟","一级步长","二级基础延迟","二级步长","退出步长","入场时长","出场时长","入场偏移","出场偏移"])
                 height: visible ? implicitHeight : 0
 
                 SliderSection {
@@ -312,6 +312,78 @@ Item {
                     value: SettingsService.data.animation.speedFactor
                     from: 0.2; to: 3.0; stepSize: 0.1; unit: "×"
                     onValueCommitted: (v) => SettingsService.data.animation.speedFactor = v
+                }
+
+                SliderSection {
+                    label: "一级基础延迟"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.animation.staggerLevel1BaseDelay
+                    from: 0; to: 300; stepSize: 5; unit: "ms"
+                    onValueCommitted: (v) => SettingsService.data.animation.staggerLevel1BaseDelay = v
+                }
+
+                SliderSection {
+                    label: "一级步长"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.animation.staggerLevel1Step
+                    from: 0; to: 200; stepSize: 5; unit: "ms"
+                    onValueCommitted: (v) => SettingsService.data.animation.staggerLevel1Step = v
+                }
+
+                SliderSection {
+                    label: "二级基础延迟"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.animation.staggerLevel2BaseDelay
+                    from: 0; to: 400; stepSize: 5; unit: "ms"
+                    onValueCommitted: (v) => SettingsService.data.animation.staggerLevel2BaseDelay = v
+                }
+
+                SliderSection {
+                    label: "二级步长"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.animation.staggerLevel2Step
+                    from: 0; to: 200; stepSize: 5; unit: "ms"
+                    onValueCommitted: (v) => SettingsService.data.animation.staggerLevel2Step = v
+                }
+
+                SliderSection {
+                    label: "退出步长"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.animation.staggerExitStep
+                    from: 0; to: 120; stepSize: 1; unit: "ms"
+                    onValueCommitted: (v) => SettingsService.data.animation.staggerExitStep = v
+                }
+
+                SliderSection {
+                    label: "入场时长"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.animation.staggerEnterDuration
+                    from: 60; to: 600; stepSize: 10; unit: "ms"
+                    onValueCommitted: (v) => SettingsService.data.animation.staggerEnterDuration = v
+                }
+
+                SliderSection {
+                    label: "出场时长"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.animation.staggerExitDuration
+                    from: 40; to: 400; stepSize: 10; unit: "ms"
+                    onValueCommitted: (v) => SettingsService.data.animation.staggerExitDuration = v
+                }
+
+                SliderSection {
+                    label: "入场偏移"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.animation.staggerEnterOffsetY
+                    from: 0; to: 80; stepSize: 1; unit: "px"
+                    onValueCommitted: (v) => SettingsService.data.animation.staggerEnterOffsetY = v
+                }
+
+                SliderSection {
+                    label: "出场偏移"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.animation.staggerExitOffsetY
+                    from: 0; to: 80; stepSize: 1; unit: "px"
+                    onValueCommitted: (v) => SettingsService.data.animation.staggerExitOffsetY = v
                 }
             }
 
