@@ -64,28 +64,18 @@ Singleton {
     }
 
     // ── matugen invocation ───────────────────────────────────────────────────
+    // matugen uses ~/.config/matugen/config.toml to write output files — we do
+    // NOT capture stdout. Colors.qml watches the generated colors.json directly.
     Process {
         id: matugenProcess
 
-        stdout: StdioCollector {
-            id: matugenCollector
-        }
-
         onExited: function(exitCode, exitStatus) {
-            const buf = matugenCollector.text.trim()
-            if (exitCode !== 0 || buf === "") {
+            if (exitCode !== 0) {
                 root.matugenFailed("matugen exited with code " + exitCode)
                 return
             }
-            matugenColorsWriter.setText(buf)
             root.matugenCompleted()
         }
-    }
-
-    // Writes matugen JSON output to disk so Colors.qml can pick it up via FileView.
-    FileView {
-        id: matugenColorsWriter
-        path: SettingsService.configDir + "matugen-colors.json"
     }
 
     // Public: trigger matugen manually (e.g., when user changes the path in UI).
@@ -103,10 +93,14 @@ Singleton {
             debounceTimer.restart()
             return
         }
+        // Let matugen use its own config.toml for template output.
+        // -m dark/light controls which palette node the templates receive.
+        // --source-color-index 0 bypasses dialoguer's interactive TTY prompt
+        // that fails when matugen is invoked from a non-terminal context.
+        const mode = SettingsService.data.appearance.darkMode ? "dark" : "light"
         matugenProcess.command = [
-            "matugen", "image", wallpaperPath,
-            "--json", "hex",
-            "--type", SettingsService.data.appearance.matugenScheme
+            "matugen", "image", wallpaperPath, "-m", mode,
+            "--source-color-index", "0", "-q"
         ]
         matugenProcess.running = true
     }
