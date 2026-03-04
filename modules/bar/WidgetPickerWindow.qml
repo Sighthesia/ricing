@@ -1,26 +1,25 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Wayland
 import qs.config
 import qs.services
 
-// Full-width panel displayed below the bar in layout mode.
-// Shows all registered widgets as live-rendered cards; clicking a card inserts it.
+// Widget picker panel — same visual style as SettingsPanelWindow.
+// Opens below the bar on the right side when BarLayoutService.widgetPickerOpen is true.
 PanelWindow {
     id: root
 
-    // Sit directly below the bar
-    anchors { top: true; left: true; right: true }
-    margins.top: Theme.barHeight
+    // Mirror SettingsPanelWindow positioning: top-right, margin pushes below bar
+    anchors { top: true; right: true }
+    margins { top: Theme.barHeight }
 
-    // Reserve wayland space for this panel's height when visible
-    exclusiveZone: panelBg.height
-
-    WlrLayershell.layer: WlrLayer.Top
+    implicitWidth: 480
+    implicitHeight: 480
     color: "transparent"
 
-    // Visible only while the picker is requested AND layout mode is active
+    focusable: true
+
+    // Visible only while widgetPickerOpen AND in layout mode
     visible: BarLayoutService.widgetPickerOpen && BarLayoutService.settingsMode
     onVisibleChanged: if (!visible) BarLayoutService.widgetPickerOpen = false
 
@@ -55,31 +54,43 @@ PanelWindow {
         return n;
     }
 
+    // Outer card — same structure as SettingsPanelWindow
     Rectangle {
-        id: panelBg
-        anchors {
-            top: parent.top
-            left: parent.left
-            right: parent.right
-        }
-        height: mainColumn.implicitHeight + Theme.barPadding * 2
+        anchors.fill: parent
+        anchors.topMargin: 4
+        anchors.rightMargin: 4
+        anchors.bottomMargin: 4
+        radius: Theme.cornerRadius
         color: Colors.background
         border.color: Colors.border
         border.width: 1
 
+        // Subtle inner highlight border
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.cornerRadius - 1
+            color: "transparent"
+            border.color: Qt.rgba(1, 1, 1, 0.04)
+            border.width: 1
+        }
+
         ColumnLayout {
-            id: mainColumn
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                margins: Theme.barPadding
-            }
+            anchors.fill: parent
+            anchors.margins: 12
             spacing: Theme.barPadding
+
+            // Panel title
+            Text {
+                text: "\u5c0f\u7ec4\u4ef6\u5e93"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeBody
+                font.weight: Font.Medium
+                color: Colors.text
+            }
 
             // Search bar
             Rectangle {
-                id: searchBar
                 Layout.fillWidth: true
                 height: Theme.barHeight - Theme.barPadding
                 radius: Theme.cornerRadius
@@ -115,7 +126,6 @@ PanelWindow {
                             clear();
                         } else {
                             BarLayoutService.widgetPickerOpen = false;
-                            BarLayoutService.activePanel = "none";
                         }
                     }
                 }
@@ -125,11 +135,11 @@ PanelWindow {
             GridView {
                 id: grid
                 Layout.fillWidth: true
-                // Cap at 2 rows; scroll if more widgets than fit
-                height: Math.min(implicitHeight, cellHeight * 2)
+                Layout.fillHeight: true
                 clip: true
-                cellWidth: 160
-                cellHeight: 96
+                cellWidth: 148
+                cellHeight: 104
+
                 model: root.filteredWidgets
 
                 delegate: Item {
@@ -154,10 +164,10 @@ PanelWindow {
                             anchors.margins: 6
                             spacing: 4
 
-                            // Live widget preview — scaled down to fit the card preview area
+                            // Live widget preview — scaled down to fit the card
                             Item {
                                 Layout.fillWidth: true
-                                height: 52
+                                height: 60
                                 clip: true
 
                                 Loader {
