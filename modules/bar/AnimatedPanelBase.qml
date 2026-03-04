@@ -29,6 +29,11 @@ PanelWindow {
     // Internal state machine: "closed" | "opening" | "open" | "closing"
     property string _state: "closed"
 
+    // Broadcast open/close transitions so child content can run stagger animations.
+    // Emitted before animations start, giving listeners time to schedule their own timers.
+    signal panelOpening
+    signal panelClosing
+
     onActiveChanged: {
         if (active) {
             if (_state === "closed" || _state === "closing") {
@@ -37,6 +42,7 @@ PanelWindow {
                 _opacityDelayTimer.stop();
 
                 _state = "opening";
+                panelOpening();
                 _scaleOpenAnim.restart();
                 _opacityDelayTimer.restart();
             }
@@ -47,6 +53,7 @@ PanelWindow {
                 _opacityDelayTimer.stop();
 
                 _state = "closing";
+                panelClosing();
                 _opacityCloseAnim.restart();
                 _scaleCloseAnim.restart();
             }

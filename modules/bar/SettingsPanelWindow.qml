@@ -65,4 +65,12 @@ AnimatedPanelBase {
             bottomMargin: 10
         }
     }
+
+    // Forward AnimatedPanelBase transition signals to content so it can run
+    // stagger enter/exit animations on its child items.
+    Connections {
+        target: panelWindow
+        function onPanelOpening() { content.runEnterAnimation() }
+        function onPanelClosing() { content.runExitAnimation() }
+    }
 }
