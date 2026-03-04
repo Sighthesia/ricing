@@ -14,6 +14,9 @@ Singleton {
     // Used as a cross-window signal for the click-away backdrop.
     property bool contextMenuOpen: false
 
+    // True while the widget picker panel is visible.
+    property bool widgetPickerOpen: false
+
     // Computed alias — keeps all existing DragOverlay/BarSection bindings unchanged
     readonly property bool settingsMode: activePanel === "layout"
 
@@ -188,5 +191,24 @@ Singleton {
         for (let i = 0; i < defaultLayout.length; i++) {
             layoutModel.append(defaultLayout[i]);
         }
+    }
+
+    // Inserts a new widget instance at the end of the given section.
+    function addWidget(widgetId, section) {
+        let maxOrder = -1;
+        for (let i = 0; i < layoutModel.count; i++) {
+            let item = layoutModel.get(i);
+            if (item.section === section && item.order > maxOrder)
+                maxOrder = item.order;
+        }
+        layoutModel.append({
+            id: widgetId,
+            section: section,
+            alignment: "left",
+            order: maxOrder + 1,
+            enabled: true
+        });
+        layoutChanged();
+        saveLayout();
     }
 }

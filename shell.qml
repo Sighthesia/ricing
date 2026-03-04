@@ -6,4 +6,5 @@ ShellRoot {
     BarWindow {}
     SettingsPanelWindow {}
     ContextMenuBackdrop {}
+    WidgetPickerWindow {}
 }

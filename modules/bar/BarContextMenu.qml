@@ -182,6 +182,57 @@ PopupWindow {
                     }
                 }
             }
+
+            // --- Widget picker item ---
+            Item {
+                id: pickerItem
+                width: parent.width
+                height: Theme.barHeight - Theme.barPadding
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    radius: Theme.cornerRadius - 2
+                    color: Colors.highlight
+                    opacity: pickerArea.containsMouse ? 0.12 : 0
+                    Behavior on opacity {
+                        NumberAnimation { duration: Theme.anim.highlightDuration }
+                    }
+                }
+
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.widgetPadding
+                    spacing: 8
+
+                    Text {
+                        text: "\uf009"
+                        font.family: Theme.fontMono
+                        font.pixelSize: Theme.fontSizeIcon
+                        color: Colors.text
+                        opacity: 0.7
+                    }
+
+                    Text {
+                        text: "小组件库"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeBody
+                        color: Colors.text
+                    }
+                }
+
+                MouseArea {
+                    id: pickerArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        BarLayoutService.widgetPickerOpen = true;
+                        root._active = false;
+                    }
+                }
+            }
         }
     }
 

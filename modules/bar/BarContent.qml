@@ -77,13 +77,14 @@ Item {
         onClicked: (mouse) => contextMenu.showAt(mouse.x, mouse.y)
     }
 
-    // Global Esc: close any active panel and the context menu.
+    // Global Esc: close any active panel, the context menu, and the widget picker.
     Shortcut {
         sequence: "Escape"
-        enabled: BarLayoutService.activePanel !== "none" || contextMenu.visible
+        enabled: BarLayoutService.activePanel !== "none" || contextMenu.visible || BarLayoutService.widgetPickerOpen
         onActivated: {
             BarLayoutService.activePanel = "none";
             BarLayoutService.contextMenuOpen = false;
+            BarLayoutService.widgetPickerOpen = false;
         }
     }
 }
