@@ -42,11 +42,11 @@ Item {
         _sbEnterTimer.stop();  _sbExitTimer.stop()
         _sbOpacityEnter.stop(); _sbOffsetEnter.stop()
         _sbOpacityExit.stop();  _sbOffsetExit.stop()
-        searchBar.opacity  = 0.0; searchBar._offsetY  = 20.0
+        searchBar.opacity  = 0.0; searchBar._offsetY  = 30.0
         _ciEnterTimer.stop();  _ciExitTimer.stop()
         _ciOpacityEnter.stop(); _ciOffsetEnter.stop()
         _ciOpacityExit.stop();  _ciOffsetExit.stop()
-        contentItem.opacity = 0.0; contentItem._offsetY = 20.0
+        contentItem.opacity = 0.0; contentItem._offsetY = 30.0
     }
 
     // searchBar stagger timers & animations
@@ -75,9 +75,9 @@ Item {
         anchors { top: parent.top; left: parent.left; right: parent.right }
         height: Theme.barHeight
         implicitWidth: 360
-        // Stagger animation state — initial: invisible, offset 20px down
+        // Stagger animation state — initial: invisible, offset 30px down
         opacity: 0.0
-        property real _offsetY: 20.0
+        property real _offsetY: 30.0
         transform: Translate { y: searchBar._offsetY }
 
         Rectangle {
@@ -156,9 +156,9 @@ Item {
             anchors { top: parent.top; left: sidebar.right; right: parent.right; bottom: parent.bottom; leftMargin: 8 }
             implicitWidth: loader.implicitWidth
             implicitHeight: loader.implicitHeight
-            // Stagger animation state — initial: invisible, offset 20px down
+            // Stagger animation state — initial: invisible, offset 30px down
             opacity: 0.0
-            property real _offsetY: 20.0
+            property real _offsetY: 30.0
             transform: Translate { y: contentItem._offsetY }
 
             Loader {

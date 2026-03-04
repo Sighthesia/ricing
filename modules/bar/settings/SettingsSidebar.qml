@@ -72,7 +72,7 @@ Item {
                 // runEnterAnimation / runExitAnimation broadcast signals from the
                 // sidebar root; each delegate calculates its own delay from index.
                 opacity: 0.0
-                property real _offsetY: 20.0
+                property real _offsetY: 30.0
                 transform: Translate { y: delegateCol._offsetY }
 
                 Connections {
@@ -84,9 +84,9 @@ Item {
                         _opacityEnter.stop(); _offsetEnter.stop()
                         _opacityExit.stop();  _offsetExit.stop()
                         delegateCol.opacity  = 0.0
-                        delegateCol._offsetY = 20.0
-                        // Each item enters 35ms after the previous one
-                        _enterTimer.interval = 120 + delegateCol.index * 35
+                        delegateCol._offsetY = 30.0
+                        // Each item enters 50ms after the previous one
+                        _enterTimer.interval = 120 + delegateCol.index * 50
                         _enterTimer.start()
                     }
                     function onExitAnimationTriggered() {
