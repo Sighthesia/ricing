@@ -1,12 +1,11 @@
-import Quickshell
 import QtQuick
 import qs.config
 import qs.services
 import "./settings"
 
 // Floating settings panel that appears below the Bar at the right side of the screen.
-// Opens when BarLayoutService.activePanel === "config".
-PanelWindow {
+// Uses AnimatedPanelBase for a drop-down expand/collapse animation.
+AnimatedPanelBase {
     id: panelWindow
 
     // Sit at top-right; top margin pushes the panel below the bar
@@ -17,13 +16,12 @@ PanelWindow {
     // Fixed height avoids per-frame Wayland surface resize during expand/collapse
     // animations. Content scrolls internally via AppearancePage's Flickable.
     implicitHeight: 580
-    color: "transparent"
 
     // Keyboard input for hex color editing
     focusable: true
 
-    // Show only when config tab is active; PanelWindow visibility handles show/hide
-    visible: BarLayoutService.activePanel === "config"
+    // Logical open/close trigger — AnimatedPanelBase manages actual window visibility
+    active: BarLayoutService.activePanel === "config"
 
     // Panel background card
     Rectangle {

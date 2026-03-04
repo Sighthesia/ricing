@@ -1,12 +1,11 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import qs.config
 import qs.services
 
 // Widget picker panel — same visual style as SettingsPanelWindow.
-// Opens below the bar on the right side when BarLayoutService.widgetPickerOpen is true.
-PanelWindow {
+// Uses AnimatedPanelBase for a drop-down expand/collapse animation.
+AnimatedPanelBase {
     id: root
 
     // Mirror SettingsPanelWindow positioning: top-right, margin pushes below bar
@@ -15,13 +14,12 @@ PanelWindow {
 
     implicitWidth: 480
     implicitHeight: 480
-    color: "transparent"
 
     focusable: true
 
-    // Visible only while widgetPickerOpen AND in layout mode
-    visible: BarLayoutService.widgetPickerOpen && BarLayoutService.settingsMode
-    onVisibleChanged: if (!visible) BarLayoutService.widgetPickerOpen = false
+    // Logical open/close trigger — AnimatedPanelBase manages actual window visibility
+    active: BarLayoutService.widgetPickerOpen && BarLayoutService.settingsMode
+    onActiveChanged: if (!active) BarLayoutService.widgetPickerOpen = false
 
     // Widget registry — mirrors BarContent.widgetRegistry.
     // FIXME: promote to a shared singleton in V2 to avoid duplication.
