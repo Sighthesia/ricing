@@ -170,12 +170,21 @@ AnimatedPanelBase {
                             anchors.fill: parent
                             anchors.margins: 4
                             radius: Theme.cornerRadius
-                            color: cardHover.containsMouse ? Colors.surface : "transparent"
+                            color: "transparent"
                             border.color: cardHover.containsMouse ? Colors.border : "transparent"
                             border.width: 1
 
-                            Behavior on color {
+                            Behavior on border.color {
                                 ColorAnimation { duration: Theme.anim.highlightDuration }
+                            }
+
+                            // Wipe-reveal background — rendered first so it sits behind content.
+                            HoverRevealHighlight {
+                                anchors.fill: parent
+                                radius: Theme.cornerRadius
+                                hovered: cardHover.containsMouse
+                                highlightColor: Colors.surface
+                                highlightOpacity: 1.0
                             }
 
                             ColumnLayout {

@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import ".."
 
 // A collapsible section with an animated expand/collapse toggle.
 // Place settings controls as children — they appear below the header when expanded.
@@ -37,16 +38,15 @@ Item {
         width: parent.width
         height: Theme.settingsGroupHeaderHeight
 
-        // Hover highlight
-        Rectangle {
+        // Hover wipe highlight
+        HoverRevealHighlight {
             anchors.fill: parent
             anchors.leftMargin: 4
             anchors.rightMargin: 4
             radius: 4
-            color: headerArea.containsMouse ? Colors.surface : "transparent"
-            opacity: 0.6
-
-            Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+            hovered: headerArea.containsMouse
+            highlightColor: Colors.surface
+            highlightOpacity: 0.6
         }
 
         // Expand/collapse arrow

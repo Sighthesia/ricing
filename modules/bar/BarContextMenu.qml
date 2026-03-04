@@ -92,15 +92,13 @@ PopupWindow {
                 height: Theme.barHeight - Theme.barPadding
 
                 // Hover highlight overlay
-                Rectangle {
+                HoverRevealHighlight {
                     anchors.fill: parent
                     anchors.margins: 1
                     radius: Theme.cornerRadius - 2
-                    color: Colors.highlight
-                    opacity: layoutArea.containsMouse ? 0.12 : 0
-                    Behavior on opacity {
-                        NumberAnimation { duration: Theme.anim.highlightDuration }
-                    }
+                    hovered: layoutArea.containsMouse
+                    highlightColor: Colors.highlight
+                    highlightOpacity: 0.12
                 }
 
                 Row {
@@ -147,15 +145,13 @@ PopupWindow {
                 width: parent.width
                 height: Theme.barHeight - Theme.barPadding
 
-                Rectangle {
+                HoverRevealHighlight {
                     anchors.fill: parent
                     anchors.margins: 1
                     radius: Theme.cornerRadius - 2
-                    color: Colors.highlight
-                    opacity: settingsArea.containsMouse ? 0.12 : 0
-                    Behavior on opacity {
-                        NumberAnimation { duration: Theme.anim.highlightDuration }
-                    }
+                    hovered: settingsArea.containsMouse
+                    highlightColor: Colors.highlight
+                    highlightOpacity: 0.12
                 }
 
                 Row {

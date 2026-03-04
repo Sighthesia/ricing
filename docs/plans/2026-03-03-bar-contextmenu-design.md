@@ -24,12 +24,12 @@ menu on the bar is more discoverable and keeps the bar cleaner.
 
 ### Files Changed
 
-| Operation | File | Reason |
-|-----------|------|--------|
-| Delete | `modules/bar/widgets/SettingsToggle.qml` | Replaced by context menu |
-| Create | `modules/bar/BarContextMenu.qml` | PopupWindow-based context menu |
-| Modify | `modules/bar/BarContent.qml` | Right-click MouseArea, Esc shortcut, menu instance |
-| Modify | `services/BarLayoutService.qml` | Remove `settingsToggle` from `defaultLayout` |
+| Operation | File                                     | Reason                                             |
+| --------- | ---------------------------------------- | -------------------------------------------------- |
+| Delete    | `modules/bar/widgets/SettingsToggle.qml` | Replaced by context menu                           |
+| Create    | `modules/bar/BarContextMenu.qml`         | PopupWindow-based context menu                     |
+| Modify    | `modules/bar/BarContent.qml`             | Right-click MouseArea, Esc shortcut, menu instance |
+| Modify    | `services/BarLayoutService.qml`          | Remove `settingsToggle` from `defaultLayout`       |
 
 ### BarContextMenu.qml
 

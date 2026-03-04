@@ -27,12 +27,12 @@ reorder existing widgets via drag-and-drop.
 
 ### Files Changed
 
-| Operation | File | Reason |
-|-----------|------|--------|
-| Modify | `services/BarLayoutService.qml` | Add `widgetPickerOpen: bool`, `addWidget()` |
-| Modify | `modules/bar/BarContextMenu.qml` | Add third menu item "小组件库" |
-| Create | `modules/bar/WidgetPickerWindow.qml` | Full-width PanelWindow picker panel |
-| Modify | `shell.qml` | Register `WidgetPickerWindow {}` |
+| Operation | File                                 | Reason                                      |
+| --------- | ------------------------------------ | ------------------------------------------- |
+| Modify    | `services/BarLayoutService.qml`      | Add `widgetPickerOpen: bool`, `addWidget()` |
+| Modify    | `modules/bar/BarContextMenu.qml`     | Add third menu item "小组件库"              |
+| Create    | `modules/bar/WidgetPickerWindow.qml` | Full-width PanelWindow picker panel         |
+| Modify    | `shell.qml`                          | Register `WidgetPickerWindow {}`            |
 
 ### BarLayoutService changes
 

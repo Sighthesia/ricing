@@ -90,9 +90,18 @@ Item {
                     Rectangle {
                         anchors.fill: parent
                         radius: Theme.cornerRadius - 4
-                        color: isActive ? Colors.highlight : (topArea.containsMouse ? Colors.surface : "transparent")
-                        opacity: isActive ? 0.25 : 0.5
-                        Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+                        color: Colors.highlight
+                        opacity: isActive ? 0.25 : 0
+                        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
+                    }
+
+                    // Hover wipe — only active when the item is not the current page.
+                    HoverRevealHighlight {
+                        anchors.fill: parent
+                        radius: Theme.cornerRadius - 4
+                        hovered: topArea.containsMouse && !isActive
+                        highlightColor: Colors.surface
+                        highlightOpacity: 0.5
                     }
 
                     // Expand arrow shown only when sub-items exist
@@ -167,12 +176,12 @@ Item {
                             width: parent.width
                             height: Theme.settingsGroupHeaderHeight
 
-                            Rectangle {
+                            HoverRevealHighlight {
                                 anchors { fill: parent; leftMargin: 8 }
                                 radius: Theme.cornerRadius - 4
-                                color: subArea.containsMouse ? Colors.surface : "transparent"
-                                opacity: 0.5
-                                Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+                                hovered: subArea.containsMouse
+                                highlightColor: Colors.surface
+                                highlightOpacity: 0.5
                             }
 
                             Text {

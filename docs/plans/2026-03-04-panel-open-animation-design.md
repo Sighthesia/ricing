@@ -52,12 +52,12 @@ child component layouts.
 
 ## Animation Sequence
 
-| Phase          | Property | Direction | Easing   | Duration | Delay |
-|----------------|----------|-----------|----------|----------|-------|
-| Opening        | scaleY   | 0 → 1     | OutBack  | 280 ms   | —     |
-| Opening        | opacity  | 0 → 1     | OutQuad  | 180 ms   | 60 ms |
-| Closing        | opacity  | 1 → 0     | InQuad   | 120 ms   | —     |
-| Closing        | scaleY   | 1 → 0     | InBack   | 200 ms   | —     |
+| Phase   | Property | Direction | Easing  | Duration | Delay |
+| ------- | -------- | --------- | ------- | -------- | ----- |
+| Opening | scaleY   | 0 → 1     | OutBack | 280 ms   | —     |
+| Opening | opacity  | 0 → 1     | OutQuad | 180 ms   | 60 ms |
+| Closing | opacity  | 1 → 0     | InQuad  | 120 ms   | —     |
+| Closing | scaleY   | 1 → 0     | InBack  | 200 ms   | —     |
 
 Transform origin: `(0, 0)` — grows downward from the bar's bottom edge.
 
@@ -65,11 +65,11 @@ Transform origin: `(0, 0)` — grows downward from the bar's bottom edge.
 
 ## File Changes
 
-| File | Change | Lines |
-|------|--------|-------|
-| `modules/bar/AnimatedPanelBase.qml` | New — ~70 lines | — |
-| `modules/bar/SettingsPanelWindow.qml` | Root: `PanelWindow` → `AnimatedPanelBase`, `visible:` → `active:` | ~3 |
-| `modules/bar/WidgetPickerWindow.qml` | Same as above | ~3 |
+| File                                  | Change                                                            | Lines |
+| ------------------------------------- | ----------------------------------------------------------------- | ----- |
+| `modules/bar/AnimatedPanelBase.qml`   | New — ~70 lines                                                   | —     |
+| `modules/bar/SettingsPanelWindow.qml` | Root: `PanelWindow` → `AnimatedPanelBase`, `visible:` → `active:` | ~3    |
+| `modules/bar/WidgetPickerWindow.qml`  | Same as above                                                     | ~3    |
 
 ---
 

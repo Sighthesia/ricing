@@ -52,14 +52,14 @@ Initial state (before any enter): `opacity = 0.0`, `_offsetY = 20`.
 
 ## Enter Timing (relative to `panelOpening`)
 
-| Item              | Delay  | Duration | Easing   |
-|-------------------|--------|----------|----------|
-| Panel scaleY      | 0 ms   | 280 ms   | OutBack  |
-| searchBar         | 80 ms  | 280 ms   | OutCubic |
-| sidebar nav[0]    | 120 ms | 280 ms   | OutCubic |
-| sidebar nav[1]    | 155 ms | 280 ms   | OutCubic |
-| sidebar nav[n]    | 120 + n×35 ms | 280 ms | OutCubic |
-| contentItem       | 160 ms | 280 ms   | OutCubic |
+| Item           | Delay         | Duration | Easing   |
+| -------------- | ------------- | -------- | -------- |
+| Panel scaleY   | 0 ms          | 280 ms   | OutBack  |
+| searchBar      | 80 ms         | 280 ms   | OutCubic |
+| sidebar nav[0] | 120 ms        | 280 ms   | OutCubic |
+| sidebar nav[1] | 155 ms        | 280 ms   | OutCubic |
+| sidebar nav[n] | 120 + n×35 ms | 280 ms   | OutCubic |
+| contentItem    | 160 ms        | 280 ms   | OutCubic |
 
 ---
 
@@ -67,12 +67,12 @@ Initial state (before any enter): `opacity = 0.0`, `_offsetY = 20`.
 
 Exit is fast and overlaps with panel scaleY close (200 ms InBack).
 
-| Item           | Delay       | Duration | Easing  |
-|----------------|-------------|----------|---------|
-| Panel scaleY   | 0 ms        | 200 ms   | InBack  |
-| searchBar      | 0 ms        | 100 ms   | InCubic |
-| contentItem    | 0 ms        | 100 ms   | InCubic |
-| sidebar nav[n] | n × 15 ms   | 100 ms   | InCubic |
+| Item           | Delay     | Duration | Easing  |
+| -------------- | --------- | -------- | ------- |
+| Panel scaleY   | 0 ms      | 200 ms   | InBack  |
+| searchBar      | 0 ms      | 100 ms   | InCubic |
+| contentItem    | 0 ms      | 100 ms   | InCubic |
+| sidebar nav[n] | n × 15 ms | 100 ms   | InCubic |
 
 Exit animation: `opacity → 0`, `_offsetY → 10` (slide down slightly, then disappear).
 
@@ -87,9 +87,9 @@ flag) before restarting Timers, so rapid open→close→open cycles start clean.
 
 ## File Changes
 
-| File | Change |
-|------|--------|
-| `AnimatedPanelBase.qml` | Add `signal panelOpening` / `signal panelClosing` |
-| `SettingsPanelWindow.qml` | Add `Connections` forwarding signals to `content` |
+| File                       | Change                                                                                                |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `AnimatedPanelBase.qml`    | Add `signal panelOpening` / `signal panelClosing`                                                     |
+| `SettingsPanelWindow.qml`  | Add `Connections` forwarding signals to `content`                                                     |
 | `SettingsPanelContent.qml` | Add `_offsetY` + opacity animation + Timer to searchBar and contentItem wrapper; add public functions |
-| `SettingsSidebar.qml` | Add signals + delegate-level stagger Timers + PropertyAnimations |
+| `SettingsSidebar.qml`      | Add signals + delegate-level stagger Timers + PropertyAnimations                                      |
