@@ -82,6 +82,7 @@ Singleton {
             property bool   matugenEnabled:  false
             property string matugenScheme:   "scheme-tonal-spot"
             property bool   darkMode:        true
+            property string wallpaperDirectory: ""
         }
 
         property JsonObject bar: JsonObject {

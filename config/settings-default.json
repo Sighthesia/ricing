@@ -16,7 +16,8 @@
         "wallpaperPath":  "",
         "matugenEnabled": false,
         "matugenScheme":  "scheme-tonal-spot",
-        "darkMode":       true
+        "darkMode":       true,
+        "wallpaperDirectory": ""
     },
     "bar": {
         "height": 36,
