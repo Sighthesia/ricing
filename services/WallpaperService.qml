@@ -95,11 +95,15 @@ Singleton {
         }
         // Let matugen use its own config.toml for template output.
         // -m dark/light controls which palette node the templates receive.
+        // -t applies the selected MD3 scheme algorithm (tonal-spot, vibrant…).
         // --source-color-index 0 bypasses dialoguer's interactive TTY prompt
         // that fails when matugen is invoked from a non-terminal context.
         const mode = SettingsService.data.appearance.darkMode ? "dark" : "light"
+        const scheme = SettingsService.data.appearance.matugenScheme || "scheme-tonal-spot"
         matugenProcess.command = [
-            "matugen", "image", wallpaperPath, "-m", mode,
+            "matugen", "image", wallpaperPath,
+            "-m", mode,
+            "-t", scheme,
             "--source-color-index", "0", "-q"
         ]
         matugenProcess.running = true
