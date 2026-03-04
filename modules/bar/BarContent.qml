@@ -79,10 +79,16 @@ Item {
             if (mouse.button === Qt.RightButton) {
                 contextMenu.showAt(mouse.x, mouse.y);
             } else if (BarLayoutService.settingsMode) {
-                // Left-click in layout mode: open or retarget the widget picker
+                // Left-click in layout mode: toggle picker for the clicked section.
+                // Clicking the already-active section closes the picker.
                 let section = barContent.hitTestSection(mouse.x);
-                BarLayoutService.widgetPickerTargetSection = section;
-                BarLayoutService.widgetPickerOpen = true;
+                if (BarLayoutService.widgetPickerOpen
+                        && BarLayoutService.widgetPickerTargetSection === section) {
+                    BarLayoutService.widgetPickerOpen = false;
+                } else {
+                    BarLayoutService.widgetPickerTargetSection = section;
+                    BarLayoutService.widgetPickerOpen = true;
+                }
             }
         }
     }

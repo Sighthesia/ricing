@@ -103,6 +103,18 @@ Item {
         }
     }
 
+    // Active target highlight: shown when the widget picker is open and targeting this section
+    Rectangle {
+        anchors.fill: parent
+        radius: Theme.cornerRadius
+        color: Colors.highlight
+        opacity: BarLayoutService.widgetPickerOpen
+                 && BarLayoutService.widgetPickerTargetSection === section.role ? 0.08 : 0
+        Behavior on opacity {
+            NumberAnimation { duration: Theme.anim.highlightDuration }
+        }
+    }
+
     // Insertion indicator line (visible during drag when hovering this section)
     Rectangle {
         id: insertIndicator
