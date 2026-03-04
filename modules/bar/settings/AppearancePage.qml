@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Dialogs
 import qs.config
 import qs.services
 
@@ -91,14 +92,139 @@ Item {
                 visible: root.searchQuery === "" || root.groupMatches(["壁纸路径","动态主题色","配色算法","深色模式"])
                 height: visible ? implicitHeight : 0
 
-                // ── Wallpaper path ──
-                TextFieldSection {
-                    label: "壁纸路径"
-                    filterQuery: root.searchQuery
-                    value: SettingsService.data.appearance.wallpaperPath
-                    onValueCommitted: function(v) {
-                        SettingsService.data.appearance.wallpaperPath = v
-                        WallpaperService.triggerMatugen()
+                // ── Wallpaper path with file browser ──
+                Item {
+                    id: wallpaperPathRow
+                    width: parent ? parent.width : 296
+                    implicitHeight: Theme.settingsRowHeight
+                    visible: root.searchQuery === "" || root.matches("壁纸路径")
+                    height: visible ? implicitHeight : 0
+
+                    // Search match highlight
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.leftMargin: 4; anchors.rightMargin: 4
+                        radius: 4
+                        color: Colors.highlight
+                        opacity: root.matches("壁纸路径") && root.searchQuery !== "" ? 0.1 : 0
+                        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
+                    }
+                    Rectangle {
+                        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 4 }
+                        width: 3; radius: 1
+                        color: Colors.highlight
+                        opacity: root.matches("壁纸路径") && root.searchQuery !== "" ? 0.9 : 0
+                        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
+                    }
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.settingsPanelPadding
+                        anchors.rightMargin: Theme.settingsPanelPadding
+                        spacing: 8
+
+                        Text {
+                            width: Theme.settingsLabelWidth
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "壁纸路径"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Colors.textMuted
+                            elide: Text.ElideRight
+                        }
+
+                        // Input field (shrunk to leave room for the browse button)
+                        Rectangle {
+                            id: wallpaperFieldRect
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - Theme.settingsLabelWidth - browseBtn.width - parent.spacing * 2
+                            height: parent.height - 8
+                            radius: 4
+                            color: Colors.surface
+                            border.color: wallpaperInput.activeFocus ? Colors.highlight : Colors.border
+                            border.width: 1
+                            Behavior on border.color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+
+                            TextInput {
+                                id: wallpaperInput
+                                anchors.fill: parent
+                                anchors.leftMargin: 6; anchors.rightMargin: 6
+                                anchors.topMargin: 2; anchors.bottomMargin: 2
+                                // Strip "file://" prefix that FileDialog returns
+                                text: SettingsService.data.appearance.wallpaperPath
+                                font.family: Theme.fontMono
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Colors.text
+                                selectByMouse: true
+                                clip: true
+                                HoverHandler { cursorShape: Qt.IBeamCursor }
+
+                                onEditingFinished: {
+                                    const trimmed = text.trim()
+                                    if (trimmed !== "") {
+                                        SettingsService.data.appearance.wallpaperPath = trimmed
+                                        WallpaperService.triggerMatugen()
+                                    } else {
+                                        text = SettingsService.data.appearance.wallpaperPath
+                                    }
+                                }
+                                onActiveFocusChanged: {
+                                    if (!activeFocus) text = SettingsService.data.appearance.wallpaperPath
+                                }
+                            }
+                        }
+
+                        // Browse button
+                        Rectangle {
+                            id: browseBtn
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: browseBtnText.implicitWidth + 16
+                            height: parent.height - 8
+                            radius: 4
+                            color: browseBtnArea.containsMouse ? Colors.highlight : Colors.surface
+                            border.color: Colors.border
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+
+                            Text {
+                                id: browseBtnText
+                                anchors.centerIn: parent
+                                text: "浏览"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Colors.text
+                            }
+
+                            MouseArea {
+                                id: browseBtnArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: wallpaperFileDialog.open()
+                            }
+                        }
+                    }
+
+                    // XDG file chooser dialog — resolves via xdg-desktop-portal on Wayland
+                    FileDialog {
+                        id: wallpaperFileDialog
+                        title: "选择壁纸文件"
+                        fileMode: FileDialog.OpenFile
+                        currentFolder: {
+                            const cur = SettingsService.data.appearance.wallpaperPath
+                            if (cur === "") return "file://" + Quickshell.env("HOME") + "/Pictures"
+                            // Derive directory from current path
+                            const lastSlash = cur.lastIndexOf("/")
+                            return lastSlash > 0 ? "file://" + cur.substring(0, lastSlash) : "file://" + Quickshell.env("HOME")
+                        }
+                        nameFilters: ["图片文件 (*.jpg *.jpeg *.png *.bmp *.gif *.webp)", "所有文件 (*)"]
+                        onAccepted: {
+                            // selectedFile is a QUrl (file:///path); strip scheme for storage
+                            const raw = wallpaperFileDialog.selectedFile.toString()
+                            const path = raw.startsWith("file://") ? raw.slice(7) : raw
+                            SettingsService.data.appearance.wallpaperPath = path
+                            WallpaperService.triggerMatugen()
+                        }
                     }
                 }
 
