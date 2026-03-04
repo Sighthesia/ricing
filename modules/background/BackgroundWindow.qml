@@ -23,68 +23,61 @@ Variants {
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
         anchors { top: true; bottom: true; left: true; right: true }
+        // Ignore the bar's exclusive zone so the background covers the full screen.
+        exclusionMode: ExclusionMode.Ignore
 
         color: "black"
 
         // ── Transition state ─────────────────────────────────────────
-        // Normalized progress [0,1] — drives discMask size
         property real transitionProgress: 0.0
-
-        // Disc center as fractions of screen size [0,1]
         property real discCenterX: 0.5
         property real discCenterY: 0.5
-
-        // The diagonal of the screen — disc must be at least this large to cover everything
         readonly property real discMaxRadius: Math.hypot(bgRoot.width, bgRoot.height)
 
-        // ── Current wallpaper (always visible) ───────────────────────
+        // ── Current wallpaper — source managed imperatively to avoid startup flash ──
         Image {
             id: currentWallpaper
             anchors.fill: parent
-            source: SettingsService.data.appearance.wallpaperPath !== ""
-                    ? ("file://" + SettingsService.data.appearance.wallpaperPath)
-                    : ""
             fillMode: Image.PreserveAspectCrop
-            asynchronous: false   // must be ready before transition starts
+            asynchronous: false
             cache: false
         }
 
-        // ── Next wallpaper texture (invisible — used only by OpacityMask) ──
+        // ── Next wallpaper texture (read by OpacityMask; never painted directly) ──
         Image {
             id: nextWallpaper
             anchors.fill: parent
             fillMode: Image.PreserveAspectCrop
             asynchronous: false
             cache: false
-            visible: false    // never painted directly; OpacityMask reads its texture
+            visible: false
         }
 
-        // ── Disc mask shape ──────────────────────────────────────────
-        // White circle centered at (discCenterX, discCenterY) * screen size.
-        // Growing radius reveals the new wallpaper beneath.
-        Rectangle {
-            id: discMask
-            visible: false   // OpacityMask uses it as a texture only
+        // ── Disc mask container ───────────────────────────────────────
+        // Must fill the entire screen with layer.enabled so OpacityMask
+        // samples the mask at screen resolution — prevents the circle from
+        // being stretched into an ellipse on non-square viewports.
+        Item {
+            id: discMaskContainer
+            anchors.fill: parent
+            layer.enabled: true
+            layer.smooth: true
 
-            // Diameter grows from 0 to 2 * discMaxRadius driven by transitionProgress
-            width:  bgRoot.transitionProgress * bgRoot.discMaxRadius * 2
-            height: width
-            radius: width / 2
-
-            // Center on the chosen origin point
-            x: bgRoot.discCenterX * bgRoot.width  - width / 2
-            y: bgRoot.discCenterY * bgRoot.height - height / 2
-
-            color: "white"
+            Rectangle {
+                width:  bgRoot.transitionProgress * bgRoot.discMaxRadius * 2
+                height: width
+                radius: width / 2
+                x: bgRoot.discCenterX * bgRoot.width  - width / 2
+                y: bgRoot.discCenterY * bgRoot.height - height / 2
+                color: "white"
+            }
         }
 
         // ── Masked new-wallpaper layer ────────────────────────────────
-        // Renders nextWallpaper clipped to discMask's circular shape,
-        // floating above currentWallpaper.
         OpacityMask {
             anchors.fill: parent
             source:     nextWallpaper
-            maskSource: discMask
+            maskSource: discMaskContainer
         }
 
         // ── Animation ────────────────────────────────────────────────
@@ -96,32 +89,26 @@ Variants {
             to:    1.0
             duration: 900
             easing.type: Easing.OutCubic
-
             onFinished: _swapAndReset()
         }
 
-        // ── Swap helper: promote next→current, reset disc ────────────
         function _swapAndReset() {
-            currentWallpaper.source   = nextWallpaper.source
-            nextWallpaper.source      = ""
-            transitionProgress        = 0.0
+            currentWallpaper.source = nextWallpaper.source
+            nextWallpaper.source    = ""
+            transitionProgress      = 0.0
         }
 
-        // ── Public API: start a transition to a new wallpaper ─────────
-        // Called by the WallpaperChanged connection below.
         function startTransition(path) {
-            // If an animation is already running, jump to end first
             if (transitionAnim.running) {
                 transitionAnim.stop()
                 _swapAndReset()
             }
-            nextWallpaper.source  = "file://" + path
+            nextWallpaper.source = "file://" + path
             discCenterX = Math.random()
             discCenterY = Math.random()
             transitionAnim.restart()
         }
 
-        // ── React to wallpaper changes ────────────────────────────────
         Connections {
             target: WallpaperService
             function onWallpaperChanged(path) {
@@ -129,17 +116,19 @@ Variants {
             }
         }
 
-        // ── Startup transition (disc from center after 150ms) ─────────
+        // ── Startup transition ────────────────────────────────────────
+        // Screen starts black; after 150 ms the saved wallpaper disc-reveals
+        // from the center. No initial source binding avoids the pre-animation flash.
         Timer {
             id: startupTimer
             interval: 150
             repeat: false
             onTriggered: {
-                if (SettingsService.data.appearance.wallpaperPath !== "") {
+                let path = SettingsService.data.appearance.wallpaperPath
+                if (path !== "") {
                     bgRoot.discCenterX = 0.5
                     bgRoot.discCenterY = 0.5
-                    nextWallpaper.source = currentWallpaper.source
-                    currentWallpaper.source = ""
+                    nextWallpaper.source   = "file://" + path
                     bgRoot.transitionProgress = 0.0
                     transitionAnim.restart()
                 }
