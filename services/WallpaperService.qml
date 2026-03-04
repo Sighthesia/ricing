@@ -8,59 +8,25 @@ import qs.services
 Singleton {
     id: root
 
-    // Emitted after a wallpaper path change is detected or set manually.
+    // Emitted after setWallpaper() is called — listeners (e.g., BackgroundWindow)
+    // should react to this rather than polling swww.
     signal wallpaperChanged(string path)
     // Emitted after matugen writes colors successfully.
     signal matugenCompleted()
     // Emitted when matugen execution fails (not installed, bad exit code, etc.).
     signal matugenFailed(string error)
 
+    // Mirrors SettingsService so QML bindings can observe wallpaper changes.
+    property string currentWallpaper: SettingsService.data.appearance.wallpaperPath
+
     readonly property bool matugenRunning: matugenProcess.running
 
-    // Debounce rapid wallpaper changes (e.g., slideshows) before invoking matugen.
+    // Debounce rapid setWallpaper() calls before invoking matugen.
     Timer {
         id: debounceTimer
-        interval: 800
+        interval: 500
+        repeat: false
         onTriggered: _runMatugen(SettingsService.data.appearance.wallpaperPath)
-    }
-
-    // Poll swww every 5 s to detect externally changed wallpapers.
-    Timer {
-        id: swwwPollTimer
-        interval: 5000
-        repeat: true
-        running: SettingsService.data.appearance.matugenEnabled
-        triggeredOnStart: true
-        onTriggered: swwwQueryProcess.running = true
-    }
-
-    // ── swww query ──────────────────────────────────────────────────────────
-    Process {
-        id: swwwQueryProcess
-        command: ["swww", "query"]
-
-        stdout: StdioCollector {
-            id: swwwCollector
-            onStreamFinished: {
-                const buf = text.trim()
-                if (buf === "") return
-
-                // swww query output example:
-                //   eDP-1: image: /path/to/wallpaper.jpg
-                // Take the last non-empty line; parse path after "image: ".
-                const lines = buf.split("\n").filter(l => l.trim() !== "")
-                const last = lines[lines.length - 1]
-                const match = last.match(/image:\s+(.+)$/)
-                if (!match) return
-
-                const detected = match[1].trim()
-                if (detected !== SettingsService.data.appearance.wallpaperPath) {
-                    SettingsService.data.appearance.wallpaperPath = detected
-                    root.wallpaperChanged(detected)
-                    debounceTimer.restart()
-                }
-            }
-        }
     }
 
     // ── matugen invocation ───────────────────────────────────────────────────
@@ -78,7 +44,16 @@ Singleton {
         }
     }
 
-    // Public: trigger matugen manually (e.g., when user changes the path in UI).
+    // Public: set the active wallpaper path and trigger a matugen run.
+    // Called by BackgroundWindow (and any other consumer) instead of invoking swww.
+    function setWallpaper(path) {
+        SettingsService.data.appearance.wallpaperPath = path
+        wallpaperChanged(path)
+        debounceTimer.restart()
+    }
+
+    // Public: trigger matugen manually without changing the wallpaper path
+    // (e.g., when the user toggles dark/light mode in the settings UI).
     function triggerMatugen() {
         const path = SettingsService.data.appearance.wallpaperPath
         if (path === "") return
@@ -107,5 +82,11 @@ Singleton {
             "--source-color-index", "0", "-q"
         ]
         matugenProcess.running = true
+    }
+
+    Component.onCompleted: {
+        // Run matugen once at startup so color scheme is current.
+        const path = SettingsService.data.appearance.wallpaperPath
+        if (path !== "") _runMatugen(path)
     }
 }
