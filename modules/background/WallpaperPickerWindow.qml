@@ -154,6 +154,7 @@ AnimatedPanelBase {
                     onPicked: function(path, dir) {
                         if (dir) {
                             root.currentDirectory = path
+                            SettingsService.data.appearance.wallpaperDirectory = path
                         } else {
                             WallpaperService.setWallpaper(path)
                             BarLayoutService.wallpaperPickerOpen = false
