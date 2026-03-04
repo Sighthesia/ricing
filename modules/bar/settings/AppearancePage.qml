@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Dialogs
 import qs.config
 import qs.services
 
@@ -150,7 +149,6 @@ Item {
                                 anchors.fill: parent
                                 anchors.leftMargin: 6; anchors.rightMargin: 6
                                 anchors.topMargin: 2; anchors.bottomMargin: 2
-                                // Strip "file://" prefix that FileDialog returns
                                 text: SettingsService.data.appearance.wallpaperPath
                                 font.family: Theme.fontMono
                                 font.pixelSize: Theme.fontSizeSmall
@@ -162,8 +160,7 @@ Item {
                                 onEditingFinished: {
                                     const trimmed = text.trim()
                                     if (trimmed !== "") {
-                                        SettingsService.data.appearance.wallpaperPath = trimmed
-                                        WallpaperService.triggerMatugen()
+                                        WallpaperService.setWallpaper(trimmed)
                                     } else {
                                         text = SettingsService.data.appearance.wallpaperPath
                                     }
@@ -200,32 +197,11 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: wallpaperFileDialog.open()
+                                onClicked: BarLayoutService.wallpaperPickerOpen = true
                             }
                         }
                     }
 
-                    // XDG file chooser dialog — resolves via xdg-desktop-portal on Wayland
-                    FileDialog {
-                        id: wallpaperFileDialog
-                        title: "选择壁纸文件"
-                        fileMode: FileDialog.OpenFile
-                        currentFolder: {
-                            const cur = SettingsService.data.appearance.wallpaperPath
-                            if (cur === "") return "file://" + Quickshell.env("HOME") + "/Pictures"
-                            // Derive directory from current path
-                            const lastSlash = cur.lastIndexOf("/")
-                            return lastSlash > 0 ? "file://" + cur.substring(0, lastSlash) : "file://" + Quickshell.env("HOME")
-                        }
-                        nameFilters: ["图片文件 (*.jpg *.jpeg *.png *.bmp *.gif *.webp)", "所有文件 (*)"]
-                        onAccepted: {
-                            // selectedFile is a QUrl (file:///path); strip scheme for storage
-                            const raw = wallpaperFileDialog.selectedFile.toString()
-                            const path = raw.startsWith("file://") ? raw.slice(7) : raw
-                            SettingsService.data.appearance.wallpaperPath = path
-                            WallpaperService.triggerMatugen()
-                        }
-                    }
                 }
 
                 // ── Enable dynamic theming ──

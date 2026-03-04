@@ -17,6 +17,9 @@ Singleton {
     // True while the widget picker panel is visible.
     property bool widgetPickerOpen: false
 
+    // True while the wallpaper picker overlay is visible.
+    property bool wallpaperPickerOpen: false
+
     // Which bar section the picker should insert widgets into.
     // Updated whenever the user clicks a section in layout mode.
     property string widgetPickerTargetSection: "right"
