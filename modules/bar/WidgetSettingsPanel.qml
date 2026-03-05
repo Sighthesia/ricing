@@ -256,13 +256,20 @@ PopupWindow {
                 title: "功能"
                 expanded: false
 
+                Loader {
+                    width: parent.width
+                    active: root._widgetId === "workspaceWidget"
+                    sourceComponent: WorkspaceWidgetSection { width: parent.width }
+                }
+
                 Text {
                     width: parent.width
+                    visible: root._widgetId !== "workspaceWidget"
+                    height: visible ? Theme.settingsRowHeight : 0
                     text: "暂无可用设置"
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
                     color: Colors.textMuted; opacity: 0.5
                     horizontalAlignment: Text.AlignHCenter
-                    height: Theme.settingsRowHeight
                     verticalAlignment: Text.AlignVCenter
                 }
             }
