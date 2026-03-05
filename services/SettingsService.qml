@@ -111,5 +111,15 @@ Singleton {
             property real staggerEnterOffsetY:    30
             property real staggerExitOffsetY:     10
         }
+
+        property JsonObject notifications: JsonObject {
+            property string position:         "top_right"
+            property int    maxVisible:       5
+            property int    lowDuration:      3000
+            property int    normalDuration:   5000
+            property int    criticalDuration: 0
+            property bool   persistHistory:   true
+            property int    maxHistory:       100
+        }
     }
 }
