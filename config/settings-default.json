@@ -51,5 +51,11 @@
         "criticalDuration": 0,
         "persistHistory": true,
         "maxHistory": 100
+    },
+    "workspaceWidget": {
+        "defaultMode": "focus",
+        "titleMaxWidth": 240,
+        "revertDelay": 1500,
+        "hoverEnabled": true
     }
 }
