@@ -337,6 +337,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
+        cursorShape: Qt.PointingHandCursor
         onEntered: {
             if (!root._hoverActive || root._justReverted) return
             _revertTimer.stop()
