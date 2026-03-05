@@ -97,6 +97,7 @@ Item {
 
                     // Hover wipe — only active when the item is not the current page.
                     HoverRevealHighlight {
+                        id: topHighlight
                         anchors.fill: parent
                         radius: Theme.cornerRadius - 4
                         hovered: topArea.containsMouse && !isActive
@@ -138,12 +139,20 @@ Item {
                         }
                     }
 
+                    ClickRipple {
+                        id: topRipple
+                        anchors.fill: parent
+                        radius: Theme.cornerRadius - 4
+                        rippleColor: Colors.highlight
+                    }
+
                     MouseArea {
                         id: topArea
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
+                        onClicked: (mouse) => {
+                            topRipple.triggerRipple(mouse.x, mouse.y)
                             root.pageSelected(modelData.page)
                             // Toggle sub-items for categories that have them
                             if (modelData.sections.length > 0) {
@@ -177,6 +186,7 @@ Item {
                             height: Theme.settingsGroupHeaderHeight
 
                             HoverRevealHighlight {
+                                id: subHighlight
                                 anchors { fill: parent; leftMargin: 8 }
                                 radius: Theme.cornerRadius - 4
                                 hovered: subArea.containsMouse
@@ -192,13 +202,23 @@ Item {
                                 color: Colors.textMuted
                             }
 
+                            ClickRipple {
+                                id: subRipple
+                                anchors { fill: parent; leftMargin: 8 }
+                                radius: Theme.cornerRadius - 4
+                                rippleColor: Colors.highlight
+                            }
+
                             MouseArea {
                                 id: subArea
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 // subCol.pageId captures the outer category page string.
-                                onClicked: root.sectionRequested(subCol.pageId, modelData.id)
+                                onClicked: (mouse) => {
+                                    subRipple.triggerRipple(mouse.x, mouse.y)
+                                    root.sectionRequested(subCol.pageId, modelData.id)
+                                }
                             }
                         }
                     }

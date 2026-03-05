@@ -53,6 +53,15 @@ PopupWindow {
         }
     }
 
+    // Deferred dismiss — gives the click ripple time to bloom before the menu
+    // fades away. Only used when the user explicitly clicks a menu item.
+    Timer {
+        id: _dismissTimer
+        interval: 130
+        repeat: false
+        onTriggered: root._active = false
+    }
+
     // Open menu at BarContent-local x coordinate.
     // `_y` is accepted for API symmetry with MouseArea.onClicked but is ignored:
     // the menu always appears at the bar's bottom edge regardless of click y.
@@ -93,6 +102,7 @@ PopupWindow {
 
                 // Hover highlight overlay
                 HoverRevealHighlight {
+                    id: layoutHighlight
                     anchors.fill: parent
                     anchors.margins: 1
                     radius: Theme.cornerRadius - 2
@@ -123,15 +133,24 @@ PopupWindow {
                     }
                 }
 
+                // Ripple above content, below mouse capture.
+                ClickRipple {
+                    id: layoutRipple
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    rippleColor: Colors.highlight
+                }
+
                 MouseArea {
                     id: layoutArea
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
+                    onClicked: (mouse) => {
+                        layoutRipple.triggerRipple(mouse.x, mouse.y)
                         BarLayoutService.activePanel =
                             BarLayoutService.settingsMode ? "none" : "layout";
-                        root._active = false;
+                        _dismissTimer.restart()
                     }
                 }
             }
@@ -146,6 +165,7 @@ PopupWindow {
                 height: Theme.barHeight - Theme.barPadding
 
                 HoverRevealHighlight {
+                    id: settingsHighlight
                     anchors.fill: parent
                     anchors.margins: 1
                     radius: Theme.cornerRadius - 2
@@ -176,14 +196,23 @@ PopupWindow {
                     }
                 }
 
+                // Ripple above content, below mouse capture.
+                ClickRipple {
+                    id: settingsRipple
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    rippleColor: Colors.highlight
+                }
+
                 MouseArea {
                     id: settingsArea
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
+                    onClicked: (mouse) => {
+                        settingsRipple.triggerRipple(mouse.x, mouse.y)
                         BarLayoutService.activePanel = "config";
-                        root._active = false;
+                        _dismissTimer.restart()
                     }
                 }
             }

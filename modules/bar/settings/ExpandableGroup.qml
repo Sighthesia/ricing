@@ -40,6 +40,7 @@ Item {
 
         // Hover wipe highlight
         HoverRevealHighlight {
+            id: headerHighlight
             anchors.fill: parent
             anchors.leftMargin: 4
             anchors.rightMargin: 4
@@ -83,13 +84,25 @@ Item {
             Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
         }
 
+        ClickRipple {
+            id: headerRipple
+            anchors.fill: parent
+            anchors.leftMargin: 4
+            anchors.rightMargin: 4
+            radius: 4
+            rippleColor: Colors.highlight
+        }
+
         // Click target
         MouseArea {
             id: headerArea
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: root.expanded = !root.expanded
+            onClicked: (mouse) => {
+                headerRipple.triggerRipple(mouse.x, mouse.y)
+                root.expanded = !root.expanded
+            }
         }
     }
 

@@ -244,6 +244,14 @@ AnimatedPanelBase {
                                 }
                             }
 
+                            ClickRipple {
+                                id: cardRipple
+                                anchors.fill: parent
+                                radius: Theme.cornerRadius
+                                rippleColor: Colors.highlight
+                                rippleOpacity: 0.18
+                            }
+
                             MouseArea {
                                 id: cardHover
                                 anchors.fill: parent
@@ -251,7 +259,10 @@ AnimatedPanelBase {
                                 cursorShape: Qt.PointingHandCursor
                                 // Insert into the section the user clicked on the bar to open the picker.
                                 // FIXME: V2 should support dragging cards directly onto the bar.
-                                onClicked: BarLayoutService.addWidget(modelData, BarLayoutService.widgetPickerTargetSection)
+                                onClicked: (mouse) => {
+                                    cardRipple.triggerRipple(mouse.x, mouse.y)
+                                    BarLayoutService.addWidget(modelData, BarLayoutService.widgetPickerTargetSection)
+                                }
                             }
                         }
                     }
