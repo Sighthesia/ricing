@@ -68,9 +68,22 @@ AnimatedPanelBase {
 
     // Forward AnimatedPanelBase transition signals to content so it can run
     // stagger enter/exit animations on its child items.
+    // Delay the enter stagger so it fires after the panel's own opacity animation
+    // is mostly complete (60ms delay + 180ms duration = ~240ms total). This ensures
+    // users see the panel expand first, then content slides in — without the internal
+    // stagger being masked by the outer _wrapper opacity fade.
+    Timer {
+        id: _staggerDelay
+        interval: 200; repeat: false
+        onTriggered: content.runEnterAnimation()
+    }
+
     Connections {
         target: panelWindow
-        function onPanelOpening() { content.runEnterAnimation() }
-        function onPanelClosing() { content.runExitAnimation() }
+        function onPanelOpening() { _staggerDelay.restart() }
+        function onPanelClosing() {
+            _staggerDelay.stop()
+            content.runExitAnimation()
+        }
     }
 }

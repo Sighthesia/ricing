@@ -17,6 +17,17 @@ Singleton {
     // True while the widget picker panel is visible.
     property bool widgetPickerOpen: false
 
+    // Which widget instance is currently being configured (instanceKey format: "{widgetId}_{n}").
+    // Empty string means no widget is selected.
+    property string activeWidgetInstanceKey: ""
+
+    // Bar-coordinate X of the centre of the widget under configuration.
+    // Used by WidgetSettingsPanel to position itself.
+    property real widgetSettingsX: 0
+
+    // True while the widget settings panel is visible.
+    property bool widgetSettingsPanelOpen: false
+
     // True while the wallpaper picker overlay is visible.
     property bool wallpaperPickerOpen: false
 
@@ -26,6 +37,13 @@ Singleton {
 
     // Computed alias — keeps all existing DragOverlay/BarSection bindings unchanged
     readonly property bool settingsMode: activePanel === "layout"
+
+    onSettingsModeChanged: {
+        if (!settingsMode) {
+            widgetSettingsPanelOpen = false;
+            activeWidgetInstanceKey = "";
+        }
+    }
 
     property bool isDragging: false
     property string dragHoverZone: ""
@@ -193,6 +211,18 @@ Singleton {
         return false;
     }
 
+    // Returns the stable instance key for the widget at layoutModel[modelIndex].
+    // Key format: "{widgetId}_{n}" where n counts how many prior entries share the same widgetId.
+    function instanceKeyAt(modelIndex) {
+        if (modelIndex < 0 || modelIndex >= layoutModel.count) return "";
+        let targetId = layoutModel.get(modelIndex).id;
+        let n = 0;
+        for (let i = 0; i < modelIndex; i++) {
+            if (layoutModel.get(i).id === targetId) n++;
+        }
+        return targetId + "_" + n;
+    }
+
     function resetLayout() {
         layoutModel.clear();
         for (let i = 0; i < defaultLayout.length; i++) {
@@ -217,5 +247,23 @@ Singleton {
         });
         layoutChanged();
         saveLayout();
+    }
+
+    // Removes the widget instance identified by instanceKey from the layout model.
+    // instanceKey must match what instanceKeyAt() would return for that entry.
+    function removeWidget(instanceKey) {
+        for (let i = 0; i < layoutModel.count; i++) {
+            if (instanceKeyAt(i) === instanceKey) {
+                layoutModel.remove(i);
+                if (activeWidgetInstanceKey === instanceKey) {
+                    widgetSettingsPanelOpen = false;
+                    activeWidgetInstanceKey = "";
+                }
+                layoutChanged();
+                saveLayout();
+                return;
+            }
+        }
+        console.warn("BarLayoutService: removeWidget called with unknown key:", instanceKey);
     }
 }

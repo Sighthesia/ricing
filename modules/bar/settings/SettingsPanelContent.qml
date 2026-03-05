@@ -27,15 +27,32 @@ Item {
     // panelOpening / panelClosing.  Each structural block is a StaggerItem
     // with its delay encoded — just invoke once and the cascade plays itself.
     function runEnterAnimation() {
-        sidebar.runEnterAnimation()
+        // Use a 0-interval timer so sidebar delegates have one event-loop cycle
+        // to finish instantiation (first open) before receiving the signal.
+        _sidebarStaggerDelay.restart()
         searchBar.runEnter()
         contentItem.runEnter()
+        // Delegate group stagger to the loaded page if it supports it.
+        if (loader.item && loader.item.runEnterAnimation)
+            loader.item.runEnterAnimation()
     }
 
     function runExitAnimation() {
         sidebar.runExitAnimation()
         searchBar.runExit()
         contentItem.runExit()
+        if (loader.item && loader.item.runExitAnimation)
+            loader.item.runExitAnimation()
+    }
+
+    // One-frame delay ensures Repeater delegates inside SettingsSidebar have
+    // finished instantiating before we emit enterAnimationTriggered. Without
+    // this, the signal fires before Connections handlers are attached on the
+    // very first panel open.
+    Timer {
+        id: _sidebarStaggerDelay
+        interval: 0; repeat: false
+        onTriggered: sidebar.runEnterAnimation()
     }
 
     implicitWidth: Math.max(searchBar.implicitWidth, mainRow.implicitWidth)
@@ -48,7 +65,9 @@ Item {
         anchors { top: parent.top; left: parent.left; right: parent.right }
         height: Theme.barHeight
         implicitWidth: 360
-        delay: SettingsService.data.animation.staggerLevel1BaseDelay
+        delay:        60
+        enterOffsetY: 20
+        exitOffsetY:  10
 
         Rectangle {
             anchors.fill: parent
@@ -126,8 +145,9 @@ Item {
             anchors { top: parent.top; left: sidebar.right; right: parent.right; bottom: parent.bottom; leftMargin: 8 }
             implicitWidth: loader.implicitWidth
             implicitHeight: loader.implicitHeight
-            delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                 + SettingsService.data.animation.staggerLevel1Step * 2
+            delay:        180
+            enterOffsetY: 20
+            exitOffsetY:  10
 
             Loader {
                 id: loader

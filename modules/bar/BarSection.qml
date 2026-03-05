@@ -163,6 +163,7 @@ Item {
             required property var modelData
             staggerIndex: modelData.index
             widgetId: modelData.widgetId
+            instanceKey: BarLayoutService.instanceKeyAt(modelData.index)
 
             Loader {
                 source: section.widgetRegistry[modelData.widgetId] || ""

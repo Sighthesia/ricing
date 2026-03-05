@@ -21,6 +21,20 @@ Item {
         return "right";
     }
 
+    // Called by BarWidgetWrapper on right-click. Forwards to the shared context menu
+    // with widget-specific arguments for the conditional widget section.
+    function openWidgetContextMenu(instanceKey, widgetId, clickX, widgetCenterX) {
+        let label = widgetNames[widgetId] || widgetId;
+        contextMenu.showAt(clickX, 0, instanceKey, widgetCenterX, label);
+    }
+
+    // Human-readable widget type names — mirrors WidgetPickerWindow.widgetNames.
+    // FIXME: promote to a shared singleton to avoid duplication.
+    readonly property var widgetNames: ({
+        "clock":           "时钟",
+        "workspaceWidget": "工作区"
+    })
+
     // Left section: anchored left
     BarSection {
         id: leftSection
@@ -62,6 +76,11 @@ Item {
     // Right-click context menu for the bar background.
     BarContextMenu {
         id: contextMenu
+        anchorTarget: barContent
+    }
+
+    // Floating per-widget settings panel — shown when a widget is being configured.
+    WidgetSettingsPanel {
         anchorTarget: barContent
     }
 

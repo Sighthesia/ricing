@@ -1,6 +1,7 @@
 import QtQuick
 import qs.config
 import qs.services
+import ".."
 
 // Appearance settings page with five collapsible groups:
 // Colors, Font, Bar, Animation, Behavior.
@@ -10,6 +11,24 @@ Item {
     // Propagated from SettingsPanelContent. When non-empty, highlight matching items
     // in place and force-expand groups that contain matches.
     property string searchQuery: ""
+
+    // Public stagger API — called by SettingsPanelContent when the panel opens/closes.
+    function runEnterAnimation() {
+        _siWallpaper.runEnter()
+        _siColors.runEnter()
+        _siFont.runEnter()
+        _siBar.runEnter()
+        _siAnimation.runEnter()
+        _siBehavior.runEnter()
+    }
+    function runExitAnimation() {
+        _siWallpaper.runExit()
+        _siColors.runExit()
+        _siFont.runExit()
+        _siBar.runExit()
+        _siAnimation.runExit()
+        _siBehavior.runExit()
+    }
 
     function matches(label) {
         if (!searchQuery) return false
@@ -83,8 +102,17 @@ Item {
             Item { width: 1; height: 4 }
 
             // ── 壁纸 & 动态主题色 ──────────────────────────────────
+            StaggerItem {
+                id: _siWallpaper
+                width: parent.width
+                height: groupWallpaper.height
+                delay:        60
+                enterOffsetY: 22
+                exitOffsetY:  10
+                exitDelay: 0
             ExpandableGroup {
                 id: groupWallpaper
+                width: parent.width
                 title: "壁纸 & 动态主题色"
                 expanded: false
                 forceExpand: root.groupMatches(["壁纸路径","动态主题色","配色算法","深色模式"])
@@ -314,10 +342,20 @@ Item {
                     }
                 }
             }
+            } // StaggerItem _siWallpaper
 
             // ── 颜色 ───────────────────────────────────────────────
+            StaggerItem {
+                id: _siColors
+                width: parent.width
+                height: groupColors.height
+                delay:        120
+                enterOffsetY: 22
+                exitOffsetY:  10
+                exitDelay: 0
             ExpandableGroup {
                 id: groupColors
+                width: parent.width
                 title: "颜色"
                 expanded: true
                 forceExpand: root.groupMatches(["强调色","背景色","表面色","文字色","次要文字","边框色"])
@@ -363,10 +401,20 @@ Item {
                     onValueCommitted: (v) => SettingsService.data.appearance.borderColor = v
                 }
             }
+            } // StaggerItem _siColors
 
             // ── 字体 ──────────────────────────────────────
+            StaggerItem {
+                id: _siFont
+                width: parent.width
+                height: groupFont.height
+                delay:        180
+                enterOffsetY: 22
+                exitOffsetY:  10
+                exitDelay: 0
             ExpandableGroup {
                 id: groupFont
+                width: parent.width
                 title: "字体"
                 expanded: false
                 forceExpand: root.groupMatches(["字体族","等宽字体","正文大小","辅助大小","图标大小"])
@@ -408,10 +456,20 @@ Item {
                     onValueCommitted: (v) => SettingsService.data.appearance.fontSizeIcon = v
                 }
             }
+            } // StaggerItem _siFont
 
             // ── Bar ────────────────────────────────────────────────
+            StaggerItem {
+                id: _siBar
+                width: parent.width
+                height: groupBar.height
+                delay:        240
+                enterOffsetY: 22
+                exitOffsetY:  10
+                exitDelay: 0
             ExpandableGroup {
                 id: groupBar
+                width: parent.width
                 title: "Bar"
                 expanded: true
                 forceExpand: root.groupMatches(["全局缩放","高度","透明度","内边距","小部件间距","圆角","位置"])
@@ -529,14 +587,24 @@ Item {
                     }
                 }
             }
+            } // StaggerItem _siBar
 
             // ── 动画 ───────────────────────────────────────────────
+            StaggerItem {
+                id: _siAnimation
+                width: parent.width
+                height: groupAnimation.height
+                delay:        300
+                enterOffsetY: 22
+                exitOffsetY:  10
+                exitDelay: 0
             ExpandableGroup {
                 id: groupAnimation
+                width: parent.width
                 title: "动画"
                 expanded: false
-                forceExpand: root.groupMatches(["速度系数","一级基础延迟","一级步长","二级基础延迟","二级步长","退出步长","入场时长","出场时长","入场偏移","出场偏移"])
-                visible: root.searchQuery === "" || root.groupMatches(["速度系数","一级基础延迟","一级步长","二级基础延迟","二级步长","退出步长","入场时长","出场时长","入场偏移","出场偏移"])
+                forceExpand: root.groupMatches(["速度系数","入场时长","出场时长"])
+                visible: root.searchQuery === "" || root.groupMatches(["速度系数","入场时长","出场时长"])
                 height: visible ? implicitHeight : 0
 
                 SliderSection {
@@ -545,46 +613,6 @@ Item {
                     value: SettingsService.data.animation.speedFactor
                     from: 0.2; to: 3.0; stepSize: 0.1; unit: "×"
                     onValueCommitted: (v) => SettingsService.data.animation.speedFactor = v
-                }
-
-                SliderSection {
-                    label: "一级基础延迟"
-                    filterQuery: root.searchQuery
-                    value: SettingsService.data.animation.staggerLevel1BaseDelay
-                    from: 0; to: 300; stepSize: 5; unit: "ms"
-                    onValueCommitted: (v) => SettingsService.data.animation.staggerLevel1BaseDelay = v
-                }
-
-                SliderSection {
-                    label: "一级步长"
-                    filterQuery: root.searchQuery
-                    value: SettingsService.data.animation.staggerLevel1Step
-                    from: 0; to: 200; stepSize: 5; unit: "ms"
-                    onValueCommitted: (v) => SettingsService.data.animation.staggerLevel1Step = v
-                }
-
-                SliderSection {
-                    label: "二级基础延迟"
-                    filterQuery: root.searchQuery
-                    value: SettingsService.data.animation.staggerLevel2BaseDelay
-                    from: 0; to: 400; stepSize: 5; unit: "ms"
-                    onValueCommitted: (v) => SettingsService.data.animation.staggerLevel2BaseDelay = v
-                }
-
-                SliderSection {
-                    label: "二级步长"
-                    filterQuery: root.searchQuery
-                    value: SettingsService.data.animation.staggerLevel2Step
-                    from: 0; to: 200; stepSize: 5; unit: "ms"
-                    onValueCommitted: (v) => SettingsService.data.animation.staggerLevel2Step = v
-                }
-
-                SliderSection {
-                    label: "退出步长"
-                    filterQuery: root.searchQuery
-                    value: SettingsService.data.animation.staggerExitStep
-                    from: 0; to: 120; stepSize: 1; unit: "ms"
-                    onValueCommitted: (v) => SettingsService.data.animation.staggerExitStep = v
                 }
 
                 SliderSection {
@@ -602,27 +630,21 @@ Item {
                     from: 40; to: 400; stepSize: 10; unit: "ms"
                     onValueCommitted: (v) => SettingsService.data.animation.staggerExitDuration = v
                 }
-
-                SliderSection {
-                    label: "入场偏移"
-                    filterQuery: root.searchQuery
-                    value: SettingsService.data.animation.staggerEnterOffsetY
-                    from: 0; to: 80; stepSize: 1; unit: "px"
-                    onValueCommitted: (v) => SettingsService.data.animation.staggerEnterOffsetY = v
-                }
-
-                SliderSection {
-                    label: "出场偏移"
-                    filterQuery: root.searchQuery
-                    value: SettingsService.data.animation.staggerExitOffsetY
-                    from: 0; to: 80; stepSize: 1; unit: "px"
-                    onValueCommitted: (v) => SettingsService.data.animation.staggerExitOffsetY = v
-                }
             }
+            } // StaggerItem _siAnimation
 
             // ── 行为 ───────────────────────────────────────────────
+            StaggerItem {
+                id: _siBehavior
+                width: parent.width
+                height: groupBehavior.height
+                delay:        360
+                enterOffsetY: 22
+                exitOffsetY:  10
+                exitDelay: 0
             ExpandableGroup {
                 id: groupBehavior
+                width: parent.width
                 title: "行为"
                 expanded: false
                 forceExpand: root.groupMatches(["自动隐藏","位置"])
@@ -689,6 +711,7 @@ Item {
                     }
                 }
             }
+            } // StaggerItem _siBehavior
 
             Item { width: 1; height: 8 }
         }

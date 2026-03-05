@@ -7,6 +7,8 @@ Item {
 
     property int staggerIndex: 0
     property string widgetId: ""
+    // Stable instance key in format "{widgetId}_{n}". Set by BarSection delegate.
+    property string instanceKey: ""
     default property alias content: contentContainer.data
 
     // Collapse layout space during drag; content stays visible (clip: false)
@@ -42,9 +44,7 @@ Item {
         border.width: wrapper._showSettingsOutline ? 1 : 0
         opacity: wrapper._showSettingsOutline ? 0.5 : 0
 
-        Behavior on opacity {
-            NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Easing.OutQuad }
-        }
+        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Easing.OutQuad } }
     }
 
     Item {
@@ -105,8 +105,25 @@ Item {
         cursorShape: wrapper._isDragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
     }
 
+    // Right-click opens widget-specific context menu.
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        enabled: !BarLayoutService.isDragging
+        onTapped: function(eventPoint) {
+            let bc = wrapper.findBarContent();
+            if (!bc) return;
+            let centreInBar = wrapper.mapToItem(bc, wrapper._naturalWidth / 2, 0);
+            let clickInBar  = wrapper.mapToItem(bc, eventPoint.position.x, 0);
+            bc.openWidgetContextMenu(
+                wrapper.instanceKey,
+                wrapper.widgetId,
+                clickInBar.x,
+                centreInBar.x);
+        }
+    }
+
     Timer {
-        id: widthAnimationRestoreTimer
+        id: suppressAnimationTimer
         interval: 0    // 0 = next event loop tick; used to re-enable animation after immediate suppression
         repeat: false
         onTriggered: wrapper._suppressNextWidthAnimation = false

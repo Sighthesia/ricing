@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 import QtQuick
 import qs.config
 import qs.services
@@ -29,6 +30,13 @@ PopupWindow {
     property real _clickX: 0
     property bool _active: false
 
+    // Set by BarWidgetWrapper right-click; "" means bar-background right-click.
+    property string _targetWidgetKey: ""
+    // Bar-coord X of the widget centre; forwarded to LayoutService on panel open.
+    property real _targetWidgetCenterX: 0
+    // Human-readable widget type label (currently unused in display, reserved for tooltip).
+    property string _targetWidgetLabel: ""
+
     // Sync visible state back to service when menu is closed programmatically.
     onVisibleChanged: if (!visible) BarLayoutService.contextMenuOpen = false
 
@@ -38,9 +46,19 @@ PopupWindow {
             enterAnim.restart();
             s_layoutItem.runEnter()
             s_settingsItem.runEnter()
+            if (_targetWidgetKey !== "") {
+                s_widgetSettings.runEnter()
+                s_widgetCopy.runEnter()
+                s_widgetDelete.runEnter()
+            }
         } else {
             s_layoutItem.runExit()
             s_settingsItem.runExit()
+            if (_targetWidgetKey !== "") {
+                s_widgetSettings.runExit()
+                s_widgetCopy.runExit()
+                s_widgetDelete.runExit()
+            }
             exitAnim.restart();
         }
     }
@@ -62,14 +80,28 @@ PopupWindow {
         onTriggered: root._active = false
     }
 
+    Process {
+        id: _clipboardProcess
+        command: []
+    }
+
     // Open menu at BarContent-local x coordinate.
-    // `_y` is accepted for API symmetry with MouseArea.onClicked but is ignored:
-    // the menu always appears at the bar's bottom edge regardless of click y.
-    function showAt(x, _y) {
+    // instanceKey / widgetCenterX / widgetLabel are optional — supply for widget right-click.
+    function showAt(x, _y, instanceKey, widgetCenterX, widgetLabel) {
         _clickX = x;
+        _targetWidgetKey = instanceKey || "";
+        _targetWidgetCenterX = widgetCenterX || 0;
+        _targetWidgetLabel = widgetLabel || "";
         anchor.updateAnchor();
         BarLayoutService.contextMenuOpen = true;
         _active = true;
+    }
+
+    function _copyToClipboard(text) {
+        // Use wl-copy for Wayland clipboard access
+        _clipboardProcess.command = ["wl-copy", text];
+        _clipboardProcess.running = false;
+        _clipboardProcess.running = true;
     }
 
     Rectangle {
@@ -216,6 +248,161 @@ PopupWindow {
                     }
                 }
             }
+
+            // --- Widget section separator (visible only on widget right-click) ---
+            Rectangle {
+                visible: root._targetWidgetKey !== ""
+                width: parent.width - 8
+                anchors.horizontalCenter: parent.horizontalCenter
+                height: visible ? 1 : 0
+                color: Colors.border
+                opacity: 0.5
+            }
+
+            // --- "组件设置" item ---
+            StaggerItem {
+                id: s_widgetSettings
+                visible: root._targetWidgetKey !== ""
+                delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                     + SettingsService.data.animation.staggerLevel1Step * 2
+                exitDelay: 0
+                width: parent.width
+                height: visible ? Theme.barHeight - Theme.barPadding : 0
+
+                HoverRevealHighlight {
+                    anchors.fill: parent; anchors.margins: 1
+                    radius: Theme.cornerRadius - 2
+                    hovered: widgetSettingsArea.containsMouse
+                    highlightColor: Colors.highlight; highlightOpacity: 0.12
+                }
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left; anchors.leftMargin: Theme.widgetPadding
+                    spacing: 8
+                    Text {
+                        text: "\uf085"
+                        font.family: Theme.fontMono; font.pixelSize: Theme.fontSizeIcon
+                        color: Colors.text; opacity: 0.7
+                    }
+                    Text {
+                        text: "组件设置"
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
+                        color: Colors.text
+                    }
+                }
+                ClickRipple {
+                    id: widgetSettingsRipple
+                    anchors.fill: parent; anchors.margins: 1; rippleColor: Colors.highlight
+                }
+                MouseArea {
+                    id: widgetSettingsArea; anchors.fill: parent
+                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: (mouse) => {
+                        widgetSettingsRipple.triggerRipple(mouse.x, mouse.y)
+                        BarLayoutService.activePanel = "layout";
+                        BarLayoutService.activeWidgetInstanceKey = root._targetWidgetKey;
+                        BarLayoutService.widgetSettingsX = root._targetWidgetCenterX;
+                        BarLayoutService.widgetSettingsPanelOpen = true;
+                        _dismissTimer.restart()
+                    }
+                }
+            }
+
+            // --- "复制组件" item ---
+            StaggerItem {
+                id: s_widgetCopy
+                visible: root._targetWidgetKey !== ""
+                delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                     + SettingsService.data.animation.staggerLevel1Step * 3
+                exitDelay: 0
+                width: parent.width
+                height: visible ? Theme.barHeight - Theme.barPadding : 0
+
+                HoverRevealHighlight {
+                    anchors.fill: parent; anchors.margins: 1
+                    radius: Theme.cornerRadius - 2
+                    hovered: widgetCopyArea.containsMouse
+                    highlightColor: Colors.highlight; highlightOpacity: 0.12
+                }
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left; anchors.leftMargin: Theme.widgetPadding
+                    spacing: 8
+                    Text {
+                        text: "\uf0c5"
+                        font.family: Theme.fontMono; font.pixelSize: Theme.fontSizeIcon
+                        color: Colors.text; opacity: 0.7
+                    }
+                    Text {
+                        text: "复制组件"
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
+                        color: Colors.text
+                    }
+                }
+                ClickRipple {
+                    id: widgetCopyRipple
+                    anchors.fill: parent; anchors.margins: 1; rippleColor: Colors.highlight
+                }
+                MouseArea {
+                    id: widgetCopyArea; anchors.fill: parent
+                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: (mouse) => {
+                        widgetCopyRipple.triggerRipple(mouse.x, mouse.y)
+                        let widgetId = root._targetWidgetKey.split("_").slice(0, -1).join("_");
+                        let payload = WidgetConfigService.exportPayload(widgetId, root._targetWidgetKey);
+                        _copyToClipboard(JSON.stringify(payload, null, 2));
+                        _dismissTimer.restart()
+                    }
+                }
+            }
+
+            // --- "删除组件" item ---
+            StaggerItem {
+                id: s_widgetDelete
+                visible: root._targetWidgetKey !== ""
+                delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                     + SettingsService.data.animation.staggerLevel1Step * 4
+                exitDelay: 0
+                width: parent.width
+                height: visible ? Theme.barHeight - Theme.barPadding : 0
+
+                HoverRevealHighlight {
+                    anchors.fill: parent; anchors.margins: 1
+                    radius: Theme.cornerRadius - 2
+                    hovered: widgetDeleteArea.containsMouse
+                    highlightColor: "#f7768e"; highlightOpacity: 0.15
+                }
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left; anchors.leftMargin: Theme.widgetPadding
+                    spacing: 8
+                    Text {
+                        text: "\uf1f8"
+                        font.family: Theme.fontMono; font.pixelSize: Theme.fontSizeIcon
+                        color: "#f7768e"; opacity: 0.85
+                    }
+                    Text {
+                        text: "删除组件"
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
+                        color: "#f7768e"
+                    }
+                }
+                ClickRipple {
+                    id: widgetDeleteRipple
+                    anchors.fill: parent; anchors.margins: 1; rippleColor: "#f7768e"
+                }
+                MouseArea {
+                    id: widgetDeleteArea; anchors.fill: parent
+                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: (mouse) => {
+                        widgetDeleteRipple.triggerRipple(mouse.x, mouse.y)
+                        let key = root._targetWidgetKey;
+                        WidgetConfigService.removeConfig(key);
+                        BarLayoutService.removeWidget(key);
+                        _dismissTimer.restart()
+                    }
+                }
+            }
         }
     }
 
@@ -247,6 +434,13 @@ PopupWindow {
                 duration: 80; easing.type: Easing.InQuad
             }
         }
-        ScriptAction { script: root.visible = false; }
+        ScriptAction {
+            script: {
+                root.visible = false;
+                root._targetWidgetKey = "";
+                root._targetWidgetCenterX = 0;
+                root._targetWidgetLabel = "";
+            }
+        }
     }
 }

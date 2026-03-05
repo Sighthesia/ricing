@@ -66,18 +66,35 @@ Item {
                 required property int index
 
                 id: delegateCol
-                 delay: SettingsService.data.animation.staggerLevel2BaseDelay
-                     + index * SettingsService.data.animation.staggerLevel2Step
-                 exitDelay: index * SettingsService.data.animation.staggerExitStep
+                delay:        80 + index * 60
+                enterOffsetY: 28
+                exitOffsetY:  14
+                exitDelay:    index * 20
                 width: parent.width
                 height: topItem.height + subCol.height
 
                 readonly property bool isActive:   root.currentPage === modelData.page
                 readonly property bool isExpanded: root.expandedStates[index]
 
+                // Broadcast to sub-item StaggerItems when sub-items should enter/exit.
+                signal subEnterTriggered
+                signal subExitTriggered
+
+                onIsExpandedChanged: {
+                    if (isExpanded)
+                        subEnterTriggered()
+                    else
+                        subExitTriggered()
+                }
+
                 Connections {
                     target: root
-                    function onEnterAnimationTriggered() { delegateCol.runEnter() }
+                    function onEnterAnimationTriggered() {
+                        delegateCol.runEnter()
+                        // If sub-items are already visible when panel opens, stagger them in too.
+                        if (delegateCol.isExpanded)
+                            Qt.callLater(function() { delegateCol.subEnterTriggered() })
+                    }
                     function onExitAnimationTriggered()  { delegateCol.runExit()  }
                 }
 
@@ -180,10 +197,25 @@ Item {
 
                     Repeater {
                         model: modelData.sections
-                        delegate: Item {
+                        delegate: StaggerItem {
                             required property var modelData
+                            required property int index
+
+                            id: subDelegate
                             width: parent.width
                             height: Theme.settingsGroupHeaderHeight
+                            delay:        40 + index * 40
+                            // Sub-items are inside a clipped Column, so Y-offset would be
+                            // visually cut off. Use opacity-only stagger (enterOffsetY: 0).
+                            enterOffsetY: 0
+                            exitOffsetY:  0
+                            exitDelay:    index * 12
+
+                            Connections {
+                                target: delegateCol
+                                function onSubEnterTriggered() { subDelegate.runEnter() }
+                                function onSubExitTriggered()  { subDelegate.runExit()  }
+                            }
 
                             HoverRevealHighlight {
                                 id: subHighlight
