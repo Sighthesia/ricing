@@ -47,15 +47,20 @@ Singleton {
         windows.clear();
         for (let i = 0; i < windowList.length; i++) {
             const win = windowList[i];
-            const pos = win.layout && win.layout.pos_in_scrolling_layout;
+            // Guard against non-array or short-array values from unexpected niri API changes.
+            const rawPos = win.layout?.pos_in_scrolling_layout;
+            const pos = (Array.isArray(rawPos) && rawPos.length >= 2) ? rawPos : null;
             windows.append({
                 winId: String(win.id),
                 title: win.title || "Unknown",
                 appId: win.app_id || "unknown",
-                workspaceId: String(win.workspace_id) || "",
+                // String(null) === "null" which is truthy, so || "" never fires — use explicit null check.
+                workspaceId: win.workspace_id != null ? String(win.workspace_id) : "",
                 isFocused: win.is_focused || false,
-                colIdx: pos ? pos[0] : 0,
-                rowIdx: pos ? pos[1] : 0
+                // Floating windows (pos === null) have no tiled position; use a sentinel value
+                // so they sort after all tiled windows rather than colliding with [0, 0].
+                colIdx: pos ? pos[0] : 9999,
+                rowIdx: pos ? pos[1] : 9999
             });
         }
         windowsUpdated();
