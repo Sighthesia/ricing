@@ -34,6 +34,9 @@ Item {
 
     // --- state machine ---
     property string _mode: "focus"    // "focus" | "overview"
+    // Brief cooldown after auto-revert: ignores onEntered for ~50 ms so the pill
+    // growing back to focus size doesn’t immediately re-trigger hover overview.
+    property bool   _justReverted: false
 
     // _showOverview: render-driving boolean.
     readonly property bool _showOverview:
@@ -72,7 +75,20 @@ Item {
         id: _revertTimer
         interval: 1500
         repeat: false
-        onTriggered: root._mode = "focus"
+        onTriggered: {
+            root._mode = "focus"
+            // Start cooldown: ignore hover-entry for 50 ms so the pill expanding
+            // back to focus size doesn’t immediately retrigger overview.
+            root._justReverted = true
+            _revertCooldown.restart()
+        }
+    }
+
+    Timer {
+        id: _revertCooldown
+        interval: 50
+        repeat: false
+        onTriggered: root._justReverted = false
     }
 
     Component.onCompleted: _refreshFocus()
@@ -98,9 +114,7 @@ Item {
         // Width is driven by _showOverview; animated by Behavior below.
         // Both content items report their implicitWidth; pill tracks the active one.
         implicitWidth: root._showOverview
-            // In overview mode, pill is at least as wide as focus so the cursor
-            // can never exit due to shrinking — preventing hover-thrash loops.
-            ? Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2
+            ? (_overviewRow.implicitWidth + root._padH * 2)
             : (_focusRow.implicitWidth   + root._padH * 2)
 
         Behavior on implicitWidth {
@@ -296,6 +310,7 @@ Item {
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
         onEntered: {
+            if (root._justReverted) return  // ignore brief re-entry after auto-revert
             _revertTimer.stop()
             root._mode = "overview"
         }
