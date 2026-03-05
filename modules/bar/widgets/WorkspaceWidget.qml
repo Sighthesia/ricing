@@ -45,7 +45,7 @@ Item {
     Binding {
         target: root
         property: "_hoverAreaW"
-        value: root._pill.implicitWidth
+        value: _pill.implicitWidth
         when: !root._hovered
         restoreMode: Binding.RestoreNone
     }
