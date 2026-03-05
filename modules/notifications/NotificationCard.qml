@@ -1,0 +1,293 @@
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
+import Quickshell.Widgets
+import qs.config
+import qs.services
+
+// Single notification popup card.
+//
+// Parent must set all required properties. The card handles its own enter/exit
+// animations and swipe-to-dismiss. React to dismissRequested to call
+// NotificationService.dismissActive() — never remove the model item directly.
+Item {
+    id: card
+
+    // --- Required properties ---
+
+    required property string notifId
+    required property string appName
+    required property string summary
+    required property string body
+    required property string appIcon
+    required property int    urgency
+    required property string actionsJson
+
+    // Emitted when exit animation finishes — parent calls NotificationService.dismissActive(id)
+    signal dismissRequested(string id)
+
+    // Pause/resume the auto-dismiss timer on hover
+    signal hoverEntered(string id)
+    signal hoverExited(string id)
+
+    implicitWidth: 360
+    implicitHeight: _bg.implicitHeight
+
+    // --- Animation state ---
+
+    property real _opacity: 0.0
+    property real _offsetY: -20
+    property real _swipeX:  0
+    property bool _swiping: false
+    property bool _isExiting: false
+
+    opacity: _opacity
+
+    // Both Y (enter/exit) and X (swipe) combined in one transform list.
+    transform: [
+        Translate { y: card._offsetY },
+        Translate { x: card._swipeX }
+    ]
+
+    // --- Public animation API ---
+
+    function triggerEnter() {
+        _isExiting = false
+        _enterAnim.start()
+    }
+
+    function triggerExit() {
+        if (_isExiting) return
+        _isExiting = true
+        _exitAnim.start()
+    }
+
+    // Enter: ease in from above with bounce
+    ParallelAnimation {
+        id: _enterAnim
+        NumberAnimation {
+            target: card; property: "_opacity"
+            to: 1.0
+            duration: Theme.anim.enterDuration
+            easing.type: Easing.OutQuad
+        }
+        NumberAnimation {
+            target: card; property: "_offsetY"
+            to: 0
+            duration: Theme.anim.enterDuration
+            easing.type: Easing.OutBack
+        }
+    }
+
+    // Exit: snap up and fade out; emit dismissRequested on completion to avoid
+    // re-entrancy if the caller removes the model item during the animation.
+    ParallelAnimation {
+        id: _exitAnim
+        NumberAnimation {
+            target: card; property: "_opacity"
+            to: 0.0
+            duration: Theme.anim.exitDuration
+            easing.type: Theme.anim.exitType
+        }
+        NumberAnimation {
+            target: card; property: "_offsetY"
+            to: -10
+            duration: Theme.anim.exitDuration
+            easing.type: Theme.anim.exitType
+        }
+        onFinished: card.dismissRequested(card.notifId)
+    }
+
+    // Spring-return behavior for swipe — disabled while finger is down
+    Behavior on _swipeX {
+        enabled: !card._swiping
+        NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+    }
+
+    // --- Swipe-to-dismiss ---
+
+    DragHandler {
+        id: _dragH
+        target: null
+        xAxis.enabled: true
+        yAxis.enabled: false
+        onActiveChanged: {
+            if (!active) {
+                var threshold = card.implicitWidth * 0.35;
+                if (Math.abs(card._swipeX) >= threshold) {
+                    // Fly off screen then trigger exit animation
+                    card._swipeX = card._swipeX > 0
+                        ? card.implicitWidth + 20
+                        : -(card.implicitWidth + 20);
+                    card.triggerExit();
+                } else {
+                    card._swipeX = 0;
+                }
+                card._swiping = false;
+            } else {
+                card._swiping = true;
+            }
+        }
+        onTranslationChanged: {
+            if (active) card._swipeX = translation.x;
+        }
+    }
+
+    // --- Visual card ---
+
+    Rectangle {
+        id: _bg
+        anchors.left: parent.left
+        anchors.right: parent.right
+        implicitHeight: _content.implicitHeight + 24
+        radius: Theme.cornerRadius
+        color: Colors.surface
+        border.color: urgency === 2
+            ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.8)
+            : Colors.border
+        border.width: 1
+
+        // Hover detection — routes pause/resume signals to the service
+        HoverHandler {
+            id: _hover
+            onHoveredChanged: {
+                if (hovered) card.hoverEntered(card.notifId)
+                else card.hoverExited(card.notifId)
+            }
+        }
+
+        // Right-click dismisses immediately
+        TapHandler {
+            acceptedButtons: Qt.RightButton
+            onTapped: card.triggerExit()
+        }
+
+        ColumnLayout {
+            id: _content
+            anchors { left: parent.left; right: parent.right; top: parent.top }
+            anchors.margins: 12
+            spacing: 4
+
+            // Header row: icon • app name • close button
+            RowLayout {
+                spacing: 8
+                Layout.fillWidth: true
+
+                // Fallback: colored initial-letter badge when no icon path is available
+                Rectangle {
+                    width: 18; height: 18
+                    radius: 4
+                    color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
+                    visible: card.appIcon === ""
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: card.appName.length > 0 ? card.appName[0].toUpperCase() : "?"
+                        font.pixelSize: 11
+                        font.bold: true
+                        color: Colors.highlight
+                    }
+                }
+
+                IconImage {
+                    implicitSize: 18
+                    visible: card.appIcon !== ""
+                    // Absolute file paths need a file:// prefix; bare XDG icon names
+                    // are tried via image://icon/ which Quickshell may or may not provide.
+                    source: card.appIcon.startsWith("/")
+                        ? ("file://" + card.appIcon)
+                        : ("image://icon/" + card.appIcon)
+                }
+
+                Text {
+                    text: card.appName
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Colors.textMuted
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
+                }
+
+                // Close button — TapHandler is a child of Text to inherit its hit area
+                Text {
+                    text: "✕"
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Colors.textMuted
+                    padding: 4
+
+                    TapHandler { onTapped: card.triggerExit() }
+                }
+            }
+
+            // Summary line
+            Text {
+                text: card.summary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeBody
+                font.bold: true
+                color: Colors.text
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                maximumLineCount: 2
+                elide: Text.ElideRight
+            }
+
+            // Body (optional)
+            Text {
+                text: card.body
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall
+                color: Colors.textMuted
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
+                visible: card.body !== ""
+            }
+
+            // Action buttons (only rendered when actions exist)
+            RowLayout {
+                spacing: 6
+                visible: _parsedActions.length > 0
+                Layout.topMargin: 2
+
+                property var _parsedActions: {
+                    try { return JSON.parse(card.actionsJson) } catch(e) { return [] }
+                }
+
+                Repeater {
+                    model: parent._parsedActions
+                    delegate: Rectangle {
+                        required property var modelData
+                        implicitHeight: _lbl.implicitHeight + 8
+                        implicitWidth:  _lbl.implicitWidth + 16
+                        radius: Theme.cornerRadius / 2
+                        color: Qt.rgba(
+                            Colors.highlight.r, Colors.highlight.g, Colors.highlight.b,
+                            _tap.pressed ? 0.25 : 0.1
+                        )
+
+                        Text {
+                            id: _lbl
+                            anchors.centerIn: parent
+                            text: modelData.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Colors.highlight
+                        }
+
+                        TapHandler {
+                            id: _tap
+                            onTapped: NotificationService.invokeAction(card.notifId, modelData.identifier)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Component.onCompleted: {
+        // Defer one frame so the layout has settled before the enter animation starts
+        Qt.callLater(triggerEnter)
+    }
+}
