@@ -61,16 +61,27 @@ Item {
     property string _focusedTitle:  ""
 
     function _refreshFocus() {
+        let newAppId = ""
+        let newTitle = ""
         for (let i = 0; i < NiriService.windows.count; i++) {
             const w = NiriService.windows.get(i)
             if (w.isFocused) {
-                root._focusedAppId = w.appId
-                root._focusedTitle = (w.title === "Unknown") ? w.appId : w.title
-                return
+                newAppId = w.appId
+                newTitle = (w.title === "Unknown") ? w.appId : w.title
+                break
             }
         }
-        root._focusedAppId = ""
-        root._focusedTitle = ""
+        // In overview-default mode, flash to focus when the focused app changes so
+        // the user still gets title feedback on window switch (overview holds otherwise).
+        if (SettingsService.data.workspaceWidget.defaultMode === "overview"
+                && newAppId !== root._focusedAppId
+                && newAppId !== ""
+                && root._modeOverride === "") {
+            root._modeOverride = "focus"
+            _revertTimer.restart()
+        }
+        root._focusedAppId = newAppId
+        root._focusedTitle = newTitle
     }
 
     // --- icon resolution ---
@@ -111,10 +122,12 @@ Item {
         target: NiriService
         function onWindowsUpdated()      { root._refreshFocus() }
         function onWorkspaceActivated()  {
-            root._modeOverride = "overview"
+            // Flash to the *opposite* of the default mode so the user always sees
+            // a state change after a workspace switch.
+            root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === "overview"
+                ? "focus" : "overview"
             // If hovering, don't start revert — the hover exit will start it instead.
             if (!_hoverArea.containsMouse) _revertTimer.restart()
-
         }
     }
 
@@ -327,6 +340,9 @@ Item {
         onEntered: {
             if (!root._hoverActive || root._justReverted) return
             _revertTimer.stop()
+            // If already overridden (e.g. re-entry after moving out briefly), just
+            // hold the current state rather than flipping back immediately.
+            if (root._modeOverride !== "") return
             // Flip to opposite of current visual state.
             root._modeOverride = root._showOverview ? "focus" : "overview"
         }
