@@ -18,7 +18,6 @@ Item {
 
     // --- layout ---
     implicitHeight: Theme.barHeight
-    // implicitWidth is set after the visual layer is added (Task 5)
     implicitWidth: _pill.implicitWidth
 
     // --- structure constants ---
@@ -189,7 +188,7 @@ Item {
                             root._pillH   // square-ish minimum
                         )
                         radius: implicitHeight / 2
-                        color: _wsDelegate.isActive ? Colors.highlight : Colors.backgroundAlt
+                        color: _wsDelegate.isActive ? Colors.highlight : Colors.surface
 
                         Behavior on implicitWidth {
                             NumberAnimation {
