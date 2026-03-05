@@ -202,9 +202,11 @@ Item {
                         for (let i = 0; i < NiriService.windows.count; i++) {
                             const w = NiriService.windows.get(i)
                             if (w.workspaceId === _wsDelegate.wsId)
-                                arr.push({ appId: w.appId, winId: w.winId })
+                                arr.push({ appId: w.appId, winId: w.winId, col: w.colIdx, row: w.rowIdx })
                         }
-                        _wsDelegate._appIds = arr
+                        // Sort by visual position: left-to-right (col), then top-to-bottom (row).
+                        arr.sort((a, b) => a.col !== b.col ? a.col - b.col : a.row - b.row)
+                        _wsDelegate._appIds = arr.map(x => ({ appId: x.appId, winId: x.winId }))
                     }
 
                     Component.onCompleted: _refreshIcons()

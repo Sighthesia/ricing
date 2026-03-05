@@ -47,12 +47,15 @@ Singleton {
         windows.clear();
         for (let i = 0; i < windowList.length; i++) {
             const win = windowList[i];
+            const pos = win.layout && win.layout.pos_in_scrolling_layout;
             windows.append({
                 winId: String(win.id),
                 title: win.title || "Unknown",
                 appId: win.app_id || "unknown",
                 workspaceId: String(win.workspace_id) || "",
-                isFocused: win.is_focused || false
+                isFocused: win.is_focused || false,
+                colIdx: pos ? pos[0] : 0,
+                rowIdx: pos ? pos[1] : 0
             });
         }
         windowsUpdated();
