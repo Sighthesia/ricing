@@ -29,8 +29,8 @@ Item {
     readonly property int _padH:         10   // horizontal padding inside the pill
     readonly property int _iconSize:     16   // app icon in focus mode
     readonly property int _smallIcon:    13   // app icon inside workspace pills
-    readonly property int _iconSpacing:  2    // gap between icons in a workspace pill
-    readonly property int _pillGap:      6    // gap between workspace pills
+    readonly property int _iconSpacing:  3    // gap between icons in a workspace pill
+    readonly property int _pillGap:      8    // gap between workspace pills
     readonly property int _pillPadH:     8    // horizontal padding inside each workspace pill
     readonly property int _iconTitleGap: 6    // gap between focus icon and title text
     readonly property int _titleMaxW:    SettingsService.data.workspaceWidget.titleMaxWidth
@@ -152,7 +152,16 @@ Item {
 
         radius: height / 2
         color: Colors.surface
-
+        // Subtle hover tint for the entire pill
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: Colors.highlight
+            opacity: _hoverArea.containsMouse ? 0.08 : 0
+            Behavior on opacity {
+                NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType }
+            }
+        }
         // ── Overview content — workspace pills row ───────────────────────
         Row {
             id: _overviewRow
@@ -162,8 +171,8 @@ Item {
 
             Behavior on opacity {
                 NumberAnimation {
-                    duration: Theme.anim.highlightDuration
-                    easing.type: Theme.anim.highlightType
+                    duration: Theme.anim.moveDuration
+                    easing.type: Theme.anim.moveType
                 }
             }
 
@@ -235,12 +244,20 @@ Item {
                                 delegate: Image {
                                     required property string modelData
 
-                                    readonly property bool _isLoaded: status === Image.Ready
-                                    width:  _isLoaded ? root._smallIcon : 0
-                                    height: _isLoaded ? root._smallIcon : 0
+                                    readonly property bool _isLoaded:  status === Image.Ready
+                                    // Highlight the focused window's icon in the active workspace.
+                                    readonly property bool _isFocused: _wsDelegate.isActive && modelData === root._focusedAppId
+                                    width:   _isLoaded ? root._smallIcon : 0
+                                    height:  _isLoaded ? root._smallIcon : 0
+                                    // Focused icon: full opacity + slight scale-up; others: dimmed.
+                                    opacity: _wsDelegate.isActive ? (_isFocused ? 1.0 : 0.5) : 0.75
+                                    scale:   _isFocused ? 1.2 : 1.0
                                     source: root._iconPath(modelData)
                                     smooth: true
                                     fillMode: Image.PreserveAspectFit
+
+                                    Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
+                                    Behavior on scale   { NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType } }
                                 }
                             }
 
@@ -296,8 +313,8 @@ Item {
 
             Behavior on opacity {
                 NumberAnimation {
-                    duration: Theme.anim.highlightDuration
-                    easing.type: Theme.anim.highlightType
+                    duration: Theme.anim.moveDuration
+                    easing.type: Theme.anim.moveType
                 }
             }
 
