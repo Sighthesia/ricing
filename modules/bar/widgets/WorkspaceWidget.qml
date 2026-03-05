@@ -33,34 +33,17 @@ Item {
     readonly property int _pillH:        Theme.barHeight - 2 * _padV
 
     // --- state machine ---
-    // _mode is the base/preferred mode.
-    // Hover XOR-flips to the other mode while the mouse is over the widget.
-    // workspaceActivated fires _flashTimer to force overview for 1.5 s.
+    // _mode drives which content layer is shown.
+    // Both workspace switch and hover entry trigger the same 1.5s overview flash,
+    // preventing high-frequency thrashing (mode cannot revert until timer fires).
     property string _mode: "focus"    // "focus" | "overview"
-    property bool   _hovered: false
-    // Frozen hover width: tracks pill size while not hovered, then freezes on hover entry.
-    // Prevents the feedback loop: hover → pill shrinks → hover zone shrinks → mouse exits
-    // → hover exits → pill grows → mouse re-enters → repeat.
-    property real   _hoverAreaW: 60  // initial placeholder; Binding below takes over
-    Binding {
-        target: root
-        property: "_hoverAreaW"
-        value: _pill.implicitWidth
-        when: !root._hovered
-        restoreMode: Binding.RestoreNone
-    }
 
-    // _showOverview: the fully resolved, render-driving boolean.
-    // Truth table:
+    // _showOverview: render-driving boolean.
     //   no focused window → always overview
-    //   focused + _mode="focus"    + not hovered → false (focus)
-    //   focused + _mode="focus"    + hovered     → true  (overview via hover flip)
-    //   focused + _mode="overview" + not hovered → true  (overview)
-    //   focused + _mode="overview" + hovered     → false (focus via hover flip)
-    readonly property bool _showOverview: {
-        if (_focusedTitle.length === 0) return true
-        return (_mode === "overview") !== _hovered   // XOR
-    }
+    //   _mode="overview"  → true
+    //   _mode="focus"     → false
+    readonly property bool _showOverview:
+        _focusedTitle.length === 0 || _mode === "overview"
 
     // --- focused window data ---
     property string _focusedAppId: ""
@@ -88,7 +71,9 @@ Item {
         return Quickshell.iconPath("application-x-executable")
     }
 
-    // --- flash timer: workspace switch → show overview for 1.5 s then return ---
+    // --- flash timer: 1.5 s overview window, then auto-return to focus ---
+    // Shared by both workspace switch and hover entry. Multiple triggers just
+    // extend the current display window (timer restarts).
     Timer {
         id: _flashTimer
         interval: 1500
@@ -102,23 +87,22 @@ Item {
         target: NiriService
         function onWindowsUpdated()      { root._refreshFocus() }
         function onWorkspaceActivated()  {
-            // Temporarily show overview so the user sees the new workspace.
             root._mode = "overview"
             _flashTimer.restart()
         }
     }
 
-    // Hover detection drives the _hovered XOR flip.
-    // Width is frozen while hovered to prevent the resize→exit→flip feedback loop.
+    // Hover entry triggers the same 1.5 s overview flash as a workspace switch.
+    // Using onEntered only (not onExited) means the mode sticks until the timer
+    // fires — this prevents rapid thrashing when the pill resizes on mode change.
     MouseArea {
         id: _hoverArea
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: root._hoverAreaW
-        height: parent.height
+        anchors.fill: parent
         hoverEnabled: true
-        onEntered: root._hovered = true
-        onExited:  root._hovered = false
+        onEntered: {
+            root._mode = "overview"
+            _flashTimer.restart()
+        }
     }
 
     // ─── Visual pill ──────────────────────────────────────────────────────
