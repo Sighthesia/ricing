@@ -107,7 +107,7 @@ AnimatedPanelBase {
         }
     }
 
-    // Compact history item — swipe-to-delete not yet implemented
+    // FIXME: swipe-to-delete not yet implemented (see design doc §Layer 3 HistoryItem)
     component HistoryItem: Item {
         // ListView delegate role properties (appName, summary, body, id, timestamp)
         required property string appName
@@ -136,14 +136,14 @@ AnimatedPanelBase {
 
                 // App initial-letter badge
                 Rectangle {
-                    width: 28; height: 28
+                    width: 28; height: 28  // FIXME: use a size token
                     radius: 6
                     color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
 
                     Text {
                         anchors.centerIn: parent
                         text: appName.length > 0 ? appName[0].toUpperCase() : "?"
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fontSizeSmall
                         font.bold: true
                         color: Colors.highlight
                     }

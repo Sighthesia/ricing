@@ -22,6 +22,7 @@ Item {
     required property string appIcon
     required property int    urgency
     required property string actionsJson
+    required property real   timestamp
 
     // Emitted when exit animation finishes — parent calls NotificationService.dismissActive(id)
     signal dismissRequested(string id)
@@ -30,7 +31,7 @@ Item {
     signal hoverEntered(string id)
     signal hoverExited(string id)
 
-    implicitWidth: 360
+    implicitWidth: 360  // FIXME: use Theme spacing token or a named card-width constant
     implicitHeight: _bg.implicitHeight
 
     // --- Animation state ---
@@ -175,7 +176,7 @@ Item {
 
                 // Fallback: colored initial-letter badge when no icon path is available
                 Rectangle {
-                    width: 18; height: 18
+                    width: 18; height: 18  // FIXME: use a size token
                     radius: 4
                     color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
                     visible: card.appIcon === ""
@@ -183,7 +184,7 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         text: card.appName.length > 0 ? card.appName[0].toUpperCase() : "?"
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.fontSizeSmall
                         font.bold: true
                         color: Colors.highlight
                     }
@@ -206,6 +207,19 @@ Item {
                     color: Colors.textMuted
                     Layout.fillWidth: true
                     elide: Text.ElideRight
+                }
+
+                Text {
+                    text: {
+                        var diff = Date.now() - card.timestamp;
+                        if (diff < 60000)    return "刚刚";
+                        if (diff < 3600000)  return Math.floor(diff / 60000)   + "m";
+                        if (diff < 86400000) return Math.floor(diff / 3600000) + "h";
+                        return Math.floor(diff / 86400000) + "d";
+                    }
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Colors.textMuted
                 }
 
                 // Close button — TapHandler is a child of Text to inherit its hit area

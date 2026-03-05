@@ -27,6 +27,65 @@ Singleton {
     // Count of items added since markAllSeen() was last called.
     readonly property int unreadCount: _unreadCount
 
+    // --- Private state ---
+
+    property int _unreadCount: 0
+    property real _lastSeenTimestamp: 0
+
+    // id → { notification: NotificationObject, timer: Timer }
+    property var _activeNotifications: ({})
+
+    readonly property string _cacheDir:
+        (Quickshell.env("XDG_CACHE_HOME") !== ""
+            ? Quickshell.env("XDG_CACHE_HOME")
+            : Quickshell.env("HOME") + "/.cache")
+        + "/dymicshell/"
+
+    readonly property string _historyFile: _cacheDir + "notifications.json"
+
+    // --- Notification server ---
+
+    NotificationServer {
+        keepOnReload: false
+        imageSupported: true
+        actionsSupported: true
+        onNotification: (n) => root._handleNotification(n)
+    }
+
+    // --- History persistence ---
+
+    FileView {
+        id: _historyFileView
+        path: root._historyFile
+        // text() is a method, not a signal parameter — call it explicitly.
+        onLoaded: root._loadHistory(_historyFileView.text())
+        onLoadFailed: root._scheduleSave()
+    }
+
+    Timer {
+        id: _saveTimer
+        interval: 300
+        repeat: false
+        onTriggered: root._writeToDisk()
+    }
+
+    // --- Timer component for auto-dismiss ---
+
+    Component {
+        id: _dismissTimerComponent
+        Timer {
+            property string notifId: ""
+            repeat: false
+            onTriggered: root.dismissActive(notifId)
+        }
+    }
+
+    // --- Internal logic ---
+
+    Component.onCompleted: {
+        Quickshell.execDetached(["mkdir", "-p", _cacheDir])
+    }
+
     // --- Public API ---
 
     // Dismiss a popup notification without removing it from history.
@@ -75,63 +134,16 @@ Singleton {
         _scheduleSave();
     }
 
-    // --- Private state ---
-
-    property int _unreadCount: 0
-    property real _lastSeenTimestamp: 0
-
-    // id → { notification: NotificationObject, timer: Timer }
-    property var _activeNotifications: ({})
-
-    readonly property string _cacheDir:
-        (Quickshell.env("XDG_CACHE_HOME") !== ""
-            ? Quickshell.env("XDG_CACHE_HOME")
-            : Quickshell.env("HOME") + "/.cache")
-        + "/dymicshell/"
-
-    readonly property string _historyFile: _cacheDir + "notifications.json"
-
-    // --- Notification server ---
-
-    NotificationServer {
-        keepOnReload: false
-        imageSupported: true
-        actionsSupported: true
-        onNotification: (n) => root._handleNotification(n)
+    // Pause auto-dismiss timer while the cursor hovers the card.
+    function pauseTimer(id) {
+        var entry = _activeNotifications[id];
+        if (entry && entry.timer) entry.timer.running = false;
     }
 
-    // --- History persistence ---
-
-    FileView {
-        id: historyFileView
-        path: root._historyFile
-        // text() is a method, not a signal parameter — call it explicitly.
-        onLoaded: root._loadHistory(historyFileView.text())
-        onLoadFailed: root._scheduleSave()
-    }
-
-    Timer {
-        id: saveTimer
-        interval: 300
-        repeat: false
-        onTriggered: root._writeToDisk()
-    }
-
-    // --- Timer component for auto-dismiss ---
-
-    Component {
-        id: dismissTimerComponent
-        Timer {
-            property string notifId: ""
-            repeat: false
-            onTriggered: root.dismissActive(notifId)
-        }
-    }
-
-    // --- Internal logic ---
-
-    Component.onCompleted: {
-        Quickshell.execDetached(["mkdir", "-p", _cacheDir])
+    // Resume auto-dismiss timer when cursor leaves the card.
+    function resumeTimer(id) {
+        var entry = _activeNotifications[id];
+        if (entry && entry.timer) entry.timer.running = true;
     }
 
     function _handleNotification(n) {
@@ -200,7 +212,7 @@ Singleton {
         var ms = durations[data.urgency];
         if (ms <= 0) return;
 
-        var t = dismissTimerComponent.createObject(root, { notifId: data.id, interval: ms });
+        var t = _dismissTimerComponent.createObject(root, { notifId: data.id, interval: ms });
         t.start();
         if (!_activeNotifications[data.id]) _activeNotifications[data.id] = {};
         _activeNotifications[data.id].timer = t;
@@ -242,7 +254,7 @@ Singleton {
 
     function _scheduleSave() {
         if (SettingsService.data.notifications.persistHistory !== false) {
-            saveTimer.restart();
+            _saveTimer.restart();
         }
     }
 
@@ -252,7 +264,7 @@ Singleton {
             items.push(historyList.get(i));
         }
         var payload = JSON.stringify({ lastSeenTimestamp: _lastSeenTimestamp, items: items }, null, 2);
-        historyFileView.setText(payload);
+        _historyFileView.setText(payload);
     }
 
     function _loadHistory(text) {

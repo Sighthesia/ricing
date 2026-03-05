@@ -69,13 +69,12 @@ PanelWindow {
                 appIcon:     model.appIcon
                 urgency:     model.urgency
                 actionsJson: model.actionsJson
+                timestamp:   model.timestamp
 
                 onDismissRequested: (id) => NotificationService.dismissActive(id)
 
-                // FIXME: timer pause on hover is forwarded here but NotificationService
-                // does not yet expose pauseTimer(id)/resumeTimer(id) API.
-                onHoverEntered: (id) => {}
-                onHoverExited:  (id) => {}
+                onHoverEntered: (id) => NotificationService.pauseTimer(id)
+                onHoverExited:  (id) => NotificationService.resumeTimer(id)
             }
         }
     }

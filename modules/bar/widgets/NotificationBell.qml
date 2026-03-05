@@ -13,29 +13,23 @@ Rectangle {
     implicitHeight: Theme.barHeight
     implicitWidth: _row.implicitWidth + Theme.widgetPadding * 2
 
-    // Hover tint
-    Rectangle {
+    HoverRevealHighlight { anchors.fill: parent; hovered: _area.containsMouse }
+    ClickRipple { id: _ripple; anchors.fill: parent }
+
+    MouseArea {
+        id: _area
         anchors.fill: parent
-        radius: Theme.cornerRadius
-        color: Colors.text
-        opacity: _hover.hovered ? 0.08 : 0
-        Behavior on opacity {
-            NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Easing.OutQuad }
-        }
-    }
-
-    HoverHandler { id: _hover }
-
-    TapHandler {
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onTapped: (point) => {
-            if (point.button === Qt.RightButton) {
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: (mouse) => {
+            _ripple.triggerRipple(mouse.x, mouse.y)
+            if (mouse.button === Qt.RightButton) {
                 // FIXME: implement as a proper PopupWindow following BarContextMenu pattern
-                NotificationService.doNotDisturb = !NotificationService.doNotDisturb;
-                return;
+                NotificationService.doNotDisturb = !NotificationService.doNotDisturb
+                return
             }
-            BarLayoutService.notificationHistoryOpen = !BarLayoutService.notificationHistoryOpen;
+            BarLayoutService.notificationHistoryOpen = !BarLayoutService.notificationHistoryOpen
         }
     }
 
