@@ -44,12 +44,12 @@
         "staggerExitOffsetY": 10
     },
     "notifications": {
-        "position":         "top_right",
-        "maxVisible":       5,
-        "lowDuration":      3000,
-        "normalDuration":   5000,
+        "position": "top_right",
+        "maxVisible": 5,
+        "lowDuration": 3000,
+        "normalDuration": 5000,
         "criticalDuration": 0,
-        "persistHistory":   true,
-        "maxHistory":       100
+        "persistHistory": true,
+        "maxHistory": 100
     }
 }

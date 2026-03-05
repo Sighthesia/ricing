@@ -12,11 +12,11 @@ provides folder-browsing and thumbnail-grid selection.
 
 ## Reference Projects
 
-| Project | Pattern adopted |
-|---|---|
-| **noctalia-shell** | `Variants { model: Quickshell.screens }` per-screen `PanelWindow` at `WlrLayer.Background`; dual-`Image` + transition animation; `performStartupTransition()` pattern |
-| **illogical-impulse** | `FolderListModel` file-browser picker; `apply(path)` service function; random-from-folder helpers |
-| **DankMaterialShell** | Per-monitor wallpaper cycling service; `currentWallpapers` map pattern |
+| Project               | Pattern adopted                                                                                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **noctalia-shell**    | `Variants { model: Quickshell.screens }` per-screen `PanelWindow` at `WlrLayer.Background`; dual-`Image` + transition animation; `performStartupTransition()` pattern |
+| **illogical-impulse** | `FolderListModel` file-browser picker; `apply(path)` service function; random-from-folder helpers                                                                     |
+| **DankMaterialShell** | Per-monitor wallpaper cycling service; `currentWallpapers` map pattern                                                                                                |
 
 ## Architecture
 
@@ -39,15 +39,15 @@ WallpaperService (Singleton, modified)
 
 ## New / Modified Files
 
-| File | Status | Responsibility |
-|---|---|---|
-| `modules/background/BackgroundWindow.qml` | **New** | Per-screen wallpaper rendering + disc transition |
-| `modules/background/WallpaperPickerWindow.qml` | **New** | Folder-browsing wallpaper picker panel |
-| `modules/background/WallpaperPickerItem.qml` | **New** | Single thumbnail/folder card |
-| `services/WallpaperService.qml` | **Modify** | Remove swww poll; add `setWallpaper()` |
-| `shell.qml` | **Modify** | Register BackgroundWindow + WallpaperPickerWindow |
-| `modules/bar/settings/AppearancePage.qml` | **Modify** | Add "浏览…" button next to wallpaper path field |
-| `services/BarLayoutService.qml` | **Modify** | Add `wallpaperPickerOpen: bool` property |
+| File                                           | Status     | Responsibility                                    |
+| ---------------------------------------------- | ---------- | ------------------------------------------------- |
+| `modules/background/BackgroundWindow.qml`      | **New**    | Per-screen wallpaper rendering + disc transition  |
+| `modules/background/WallpaperPickerWindow.qml` | **New**    | Folder-browsing wallpaper picker panel            |
+| `modules/background/WallpaperPickerItem.qml`   | **New**    | Single thumbnail/folder card                      |
+| `services/WallpaperService.qml`                | **Modify** | Remove swww poll; add `setWallpaper()`            |
+| `shell.qml`                                    | **Modify** | Register BackgroundWindow + WallpaperPickerWindow |
+| `modules/bar/settings/AppearancePage.qml`      | **Modify** | Add "浏览…" button next to wallpaper path field   |
+| `services/BarLayoutService.qml`                | **Modify** | Add `wallpaperPickerOpen: bool` property          |
 
 ## BackgroundWindow Design
 

@@ -11,6 +11,7 @@ Singleton {
     property ListModel windows: ListModel {}
 
     signal windowsUpdated()
+    signal workspaceActivated()
 
     function updateWorkspaces(workspacesEvent) {
         const list = workspacesEvent.workspaces;
@@ -38,6 +39,7 @@ Singleton {
                 workspaces.setProperty(i, "isActive", isNowActive);
             }
         }
+        workspaceActivated();
     }
 
     function updateWindows(windowList) {

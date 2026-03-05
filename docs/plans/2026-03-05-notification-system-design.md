@@ -46,12 +46,12 @@ Single source of truth for all notification state. Never touched by UI code dire
 
 ### State
 
-| Property | Type | Description |
-|---|---|---|
-| `activeList` | `ListModel` | Currently visible popup notifications (max `maxVisible`) |
-| `historyList` | `ListModel` | Persisted history, newest first (max `maxHistory`) |
-| `doNotDisturb` | `bool` | When `true`, suppress new popups (history still appended) |
-| `unreadCount` | `int` (readonly) | Items added since `_lastSeenTimestamp` |
+| Property       | Type             | Description                                               |
+| -------------- | ---------------- | --------------------------------------------------------- |
+| `activeList`   | `ListModel`      | Currently visible popup notifications (max `maxVisible`)  |
+| `historyList`  | `ListModel`      | Persisted history, newest first (max `maxHistory`)        |
+| `doNotDisturb` | `bool`           | When `true`, suppress new popups (history still appended) |
+| `unreadCount`  | `int` (readonly) | Items added since `_lastSeenTimestamp`                    |
 
 ### Notification Data Object
 Each entry in `activeList` and `historyList`:
@@ -206,16 +206,16 @@ Exposed in the `AppearancePage` / a dedicated settings section later.
 
 ## Token Usage
 
-| Element | Token |
-|---|---|
-| Card enter animation duration | `Theme.anim.enterDuration` |
-| Card exit animation duration | `Theme.anim.exitDuration` |
-| Card background | `Colors.surface` |
-| Card border | `Colors.border` |
-| Summary text | `Colors.text` |
-| Body / app name text | `Colors.textMuted` |
-| Badge color | `Colors.highlight` |
-| Panel open/close | `AnimatedPanelBase` (reuse) |
+| Element                       | Token                       |
+| ----------------------------- | --------------------------- |
+| Card enter animation duration | `Theme.anim.enterDuration`  |
+| Card exit animation duration  | `Theme.anim.exitDuration`   |
+| Card background               | `Colors.surface`            |
+| Card border                   | `Colors.border`             |
+| Summary text                  | `Colors.text`               |
+| Body / app name text          | `Colors.textMuted`          |
+| Badge color                   | `Colors.highlight`          |
+| Panel open/close              | `AnimatedPanelBase` (reuse) |
 
 ---
 

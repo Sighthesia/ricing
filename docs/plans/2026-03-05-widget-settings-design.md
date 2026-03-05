@@ -19,22 +19,22 @@
 
 ### 2.1 New Files
 
-| File | Kind | Responsibility |
-|------|------|----------------|
-| `services/WidgetConfigService.qml` | `Singleton` | Read/write `widget-config.json`; expose `get(instanceKey)` / `set(instanceKey, patch)` |
-| `modules/bar/WidgetSettingsPanel.qml` | `AnimatedPanelBase` | Bubble panel anchored below the bar, X-aligned to target widget centre |
-| `modules/bar/widget-settings/AppearanceSection.qml` | `Item` | Colour pickers, corner radius, padding sliders |
-| `modules/bar/widget-settings/WidgetConfigSection.qml` | `Item` | Extensible per-widget-type config slot (placeholder for now) |
-| `modules/bar/widget-settings/WidgetActionsBar.qml` | `Item` | Import / Export / Delete buttons |
+| File                                                  | Kind                | Responsibility                                                                         |
+| ----------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `services/WidgetConfigService.qml`                    | `Singleton`         | Read/write `widget-config.json`; expose `get(instanceKey)` / `set(instanceKey, patch)` |
+| `modules/bar/WidgetSettingsPanel.qml`                 | `AnimatedPanelBase` | Bubble panel anchored below the bar, X-aligned to target widget centre                 |
+| `modules/bar/widget-settings/AppearanceSection.qml`   | `Item`              | Colour pickers, corner radius, padding sliders                                         |
+| `modules/bar/widget-settings/WidgetConfigSection.qml` | `Item`              | Extensible per-widget-type config slot (placeholder for now)                           |
+| `modules/bar/widget-settings/WidgetActionsBar.qml`    | `Item`              | Import / Export / Delete buttons                                                       |
 
 ### 2.2 Modified Files
 
-| File | Change |
-|------|--------|
-| `services/BarLayoutService.qml` | + `activeWidgetInstanceKey: string`, `widgetSettingsX: real`, `widgetSettingsPanelOpen: bool`; + `instanceKeyAt(modelIndex)` helper |
-| `modules/bar/BarWidgetWrapper.qml` | + right-click `TapHandler` → calls `BarContextMenu.showAt(x,y,instanceKey,widgetCenterX)` |
-| `modules/bar/BarContextMenu.qml` | + `_targetWidgetKey: string`; conditionally render widget section (separator + "组件设置", "复制组件", "删除组件") |
-| `modules/bar/BarWindow.qml` | + instantiate `WidgetSettingsPanel` |
+| File                               | Change                                                                                                                              |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `services/BarLayoutService.qml`    | + `activeWidgetInstanceKey: string`, `widgetSettingsX: real`, `widgetSettingsPanelOpen: bool`; + `instanceKeyAt(modelIndex)` helper |
+| `modules/bar/BarWidgetWrapper.qml` | + right-click `TapHandler` → calls `BarContextMenu.showAt(x,y,instanceKey,widgetCenterX)`                                           |
+| `modules/bar/BarContextMenu.qml`   | + `_targetWidgetKey: string`; conditionally render widget section (separator + "组件设置", "复制组件", "删除组件")                  |
+| `modules/bar/BarWindow.qml`        | + instantiate `WidgetSettingsPanel`                                                                                                 |
 
 ### 2.3 Data Flow
 
@@ -187,11 +187,11 @@ TapHandler {
 
 ### 5.2 Close Widget Settings
 
-| Trigger | Action |
-|---------|--------|
-| "← 返回" button in panel header | `widgetSettingsPanelOpen = false`, `activeWidgetInstanceKey = ""`, settingsMode stays `true` |
-| "退出布局模式" in bar context menu | `activePanel = "none"` → `settingsMode = false` → panel closes automatically |
-| Click outside panel (focus lost) | Same as "← 返回" |
+| Trigger                            | Action                                                                                       |
+| ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| "← 返回" button in panel header    | `widgetSettingsPanelOpen = false`, `activeWidgetInstanceKey = ""`, settingsMode stays `true` |
+| "退出布局模式" in bar context menu | `activePanel = "none"` → `settingsMode = false` → panel closes automatically                 |
+| Click outside panel (focus lost)   | Same as "← 返回"                                                                             |
 
 ### 5.3 Live Preview
 
