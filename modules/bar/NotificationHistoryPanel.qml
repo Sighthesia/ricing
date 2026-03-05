@@ -92,7 +92,7 @@ AnimatedPanelBase {
                 spacing: 6
                 model: NotificationService.historyList
 
-                delegate: _HistoryItem { width: ListView.view.width }
+                delegate: HistoryItem { width: ListView.view.width }
 
                 // Empty state
                 Text {
@@ -108,7 +108,7 @@ AnimatedPanelBase {
     }
 
     // Compact history item — swipe-to-delete not yet implemented
-    component _HistoryItem: Item {
+    component HistoryItem: Item {
         // ListView delegate role properties (appName, summary, body, id, timestamp)
         required property string appName
         required property string summary
