@@ -19,7 +19,7 @@ Item {
     // --- layout ---
     implicitHeight: Theme.barHeight
     // implicitWidth is set after the visual layer is added (Task 5)
-    implicitWidth: 60  // placeholder; replaced in Task 5
+    implicitWidth: _pill.implicitWidth
 
     // --- structure constants ---
     readonly property int _padV:         4    // vertical gap (pill ↔ bar top/bottom)
@@ -98,4 +98,179 @@ Item {
         }
     }
 
+    // Hover detection drives the _hovered XOR flip.
+    MouseArea {
+        id: _hoverArea
+        anchors.fill: parent
+        hoverEnabled: true
+        onEntered: root._hovered = true
+        onExited:  root._hovered = false
+    }
+
+    // ─── Visual pill ──────────────────────────────────────────────────────
+    // Single rounded rectangle; width animates between overview and focus sizes.
+    Rectangle {
+        id: _pill
+
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenter: parent.horizontalCenter
+        height: root._pillH
+        // Width is driven by _showOverview; animated by Behavior below.
+        // Both content items report their implicitWidth; pill tracks the active one.
+        implicitWidth: root._showOverview
+            ? (_overviewRow.implicitWidth + root._padH * 2)
+            : (_focusRow.implicitWidth   + root._padH * 2)
+
+        Behavior on implicitWidth {
+            NumberAnimation {
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
+
+        radius: height / 2
+        color: Colors.surface
+
+        // ── Overview content — workspace pills row ───────────────────────
+        Row {
+            id: _overviewRow
+            anchors.centerIn: parent
+            spacing: root._pillGap
+            opacity: root._showOverview ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Theme.anim.highlightDuration
+                    easing.type: Theme.anim.highlightType
+                }
+            }
+
+            Repeater {
+                model: NiriService.workspaces
+
+                delegate: Item {
+                    id: _wsDelegate
+
+                    required property string wsId
+                    required property int    idx
+                    required property bool   isActive
+
+                    // Per-workspace app icon list (one entry per open window).
+                    property var _appIds: []
+
+                    function _refreshIcons() {
+                        let arr = []
+                        for (let i = 0; i < NiriService.windows.count; i++) {
+                            const w = NiriService.windows.get(i)
+                            if (w.workspaceId === _wsDelegate.wsId) arr.push(w.appId)
+                        }
+                        _wsDelegate._appIds = arr
+                    }
+
+                    Component.onCompleted: _refreshIcons()
+
+                    Connections {
+                        target: NiriService
+                        function onWindowsUpdated() { _wsDelegate._refreshIcons() }
+                    }
+
+                    // Hide empty non-active workspaces; collapse layout space.
+                    visible: isActive || _appIds.length > 0
+                    width:  visible ? _wsPill.implicitWidth  : 0
+                    height: visible ? _wsPill.implicitHeight : 0
+
+                    // Inner workspace pill
+                    Rectangle {
+                        id: _wsPill
+
+                        implicitHeight: root._pillH
+                        implicitWidth: Math.max(
+                            _iconsRow.implicitWidth + root._pillPadH * 2,
+                            root._pillH   // square-ish minimum
+                        )
+                        radius: implicitHeight / 2
+                        color: _wsDelegate.isActive ? Colors.highlight : Colors.backgroundAlt
+
+                        Behavior on implicitWidth {
+                            NumberAnimation {
+                                duration: Theme.anim.moveDuration
+                                easing.type: Theme.anim.moveType
+                            }
+                        }
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.anim.highlightDuration }
+                        }
+
+                        // App icons (or workspace number when empty)
+                        Row {
+                            id: _iconsRow
+                            anchors.centerIn: parent
+                            spacing: root._iconSpacing
+
+                            Repeater {
+                                model: _wsDelegate._appIds
+
+                                delegate: Image {
+                                    required property string modelData
+
+                                    readonly property bool _ok: status === Image.Ready
+                                    width:  _ok ? root._smallIcon : 0
+                                    height: _ok ? root._smallIcon : 0
+                                    source: root._iconPath(modelData)
+                                    smooth: true
+                                    fillMode: Image.PreserveAspectFit
+                                }
+                            }
+
+                            Text {
+                                visible: _wsDelegate._appIds.length === 0
+                                text: _wsDelegate.idx
+                                font.family: Theme.fontMono
+                                font.bold: true
+                                font.pixelSize: Theme.fontSizeBody
+                                color: _wsDelegate.isActive ? Colors.background : Colors.textMuted
+
+                                Behavior on color {
+                                    ColorAnimation { duration: Theme.anim.highlightDuration }
+                                }
+                            }
+                        }
+
+                        // Hover highlight overlay
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: parent.radius
+                            color: Colors.highlight
+                            opacity: _wsArea.containsMouse ? 0.15 : 0
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: Theme.anim.highlightDuration
+                                    easing.type: Theme.anim.highlightType
+                                }
+                            }
+                        }
+
+                        MouseArea {
+                            id: _wsArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Quickshell.execDetached([
+                                "niri", "msg", "action",
+                                "focus-workspace", _wsDelegate.idx.toString()
+                            ])
+                        }
+                    }
+                }
+            }
+        }
+
+        // Focus content placeholder — added in Task 5
+        // (Row id: _focusRow must exist for the implicitWidth binding above)
+        Row {
+            id: _focusRow
+            anchors.centerIn: parent
+            opacity: 0   // hidden until Task 5 fills it in
+        }
+    }
 }
