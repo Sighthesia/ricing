@@ -77,9 +77,12 @@ Item {
         // On window focus change, flash to the opposite of defaultMode so the user
         // always gets contextual feedback: focus mode sees overview; overview mode sees title.
         // winId-based comparison handles same-app multi-window switches.
-        if (newWinId !== root._focusedWindowId && newWinId !== "" && root._modeOverride === "") {
-            root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === "overview"
-                ? "focus" : "overview"
+        // Timer is always restarted on rapid consecutive switches to prevent early revert.
+        if (newWinId !== root._focusedWindowId && newWinId !== \"\") {
+            if (root._modeOverride === \"\") {
+                root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === \"overview\"
+                    ? \"focus\" : \"overview\"
+            }
             _revertTimer.restart()
         }
         root._focusedWindowId = newWinId
