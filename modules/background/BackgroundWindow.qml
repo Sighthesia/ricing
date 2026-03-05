@@ -87,10 +87,8 @@ Variants {
             property: "transitionProgress"
             from:  0.0
             to:    1.0
-            // Duration scales inversely with user-controlled speedFactor
-            // (speedFactor > 1 => animations faster). Use Math.round for integer ms.
-            duration: Math.round(900 / SettingsService.data.animation.speedFactor)
-            easing.type: Easing.OutCubic
+            duration: Math.round(3000 / SettingsService.data.animation.speedFactor)
+            easing.type: Easing.InOutSine
             onFinished: _swapAndReset()
         }
 
