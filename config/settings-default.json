@@ -13,10 +13,10 @@
         "fontSizeBody": 14,
         "fontSizeSmall": 10,
         "fontSizeIcon": 16,
-        "wallpaperPath":  "",
+        "wallpaperPath": "",
         "matugenEnabled": false,
-        "matugenScheme":  "scheme-tonal-spot",
-        "darkMode":       true,
+        "matugenScheme": "scheme-tonal-spot",
+        "darkMode": true,
         "wallpaperDirectory": ""
     },
     "bar": {
@@ -42,5 +42,14 @@
         "staggerExitDuration": 100,
         "staggerEnterOffsetY": 30,
         "staggerExitOffsetY": 10
+    },
+    "notifications": {
+        "position":         "top_right",
+        "maxVisible":       5,
+        "lowDuration":      3000,
+        "normalDuration":   5000,
+        "criticalDuration": 0,
+        "persistHistory":   true,
+        "maxHistory":       100
     }
 }
