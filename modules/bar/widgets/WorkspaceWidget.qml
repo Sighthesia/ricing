@@ -265,12 +265,42 @@ Item {
             }
         }
 
-        // Focus content placeholder — added in Task 5
-        // (Row id: _focusRow must exist for the implicitWidth binding above)
+        // ── Focus content — app icon + window title ──────────────────────
         Row {
             id: _focusRow
             anchors.centerIn: parent
-            opacity: 0   // hidden until Task 5 fills it in
+            spacing: root._iconTitleGap
+            opacity: root._showOverview ? 0 : 1
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Theme.anim.highlightDuration
+                    easing.type: Theme.anim.highlightType
+                }
+            }
+
+            Image {
+                id: _focusIcon
+                width:  root._iconSize
+                height: root._iconSize
+                anchors.verticalCenter: parent.verticalCenter
+                source: root._iconPath(root._focusedAppId)
+                smooth: true
+                fillMode: Image.PreserveAspectFit
+            }
+
+            Text {
+                id: _titleText
+                anchors.verticalCenter: parent.verticalCenter
+                // Natural width capped at _titleMaxW; ElideRight truncates beyond that.
+                width: Math.min(implicitWidth, root._titleMaxW)
+                text: root._focusedTitle
+                elide: Text.ElideRight
+                maximumLineCount: 1
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeBody
+                color: Colors.text
+            }
         }
     }
 }
