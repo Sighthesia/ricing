@@ -7,8 +7,9 @@ Item {
 
     // Widget registry: maps widget ID to QML source path
     readonly property var widgetRegistry: ({
-        "clock":           "widgets/Clock.qml",
-        "workspaceWidget": "widgets/WorkspaceWidget.qml"
+        "clock":              "widgets/Clock.qml",
+        "workspaceWidget":    "widgets/WorkspaceWidget.qml",
+        "notificationBell":   "widgets/NotificationBell.qml"
     })
 
     // Hit-test: map x in barContent coords to section name (accounts for padding)
@@ -31,8 +32,9 @@ Item {
     // Human-readable widget type names — mirrors WidgetPickerWindow.widgetNames.
     // FIXME: promote to a shared singleton to avoid duplication.
     readonly property var widgetNames: ({
-        "clock":           "时钟",
-        "workspaceWidget": "工作区"
+        "clock":              "时钟",
+        "workspaceWidget":    "工作区",
+        "notificationBell":   "通知"
     })
 
     // Left section: anchored left

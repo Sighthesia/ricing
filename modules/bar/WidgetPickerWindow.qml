@@ -24,14 +24,16 @@ AnimatedPanelBase {
     // Widget registry — mirrors BarContent.widgetRegistry.
     // FIXME: promote to a shared singleton in V2 to avoid duplication.
     readonly property var widgetRegistry: ({
-        "clock":           Qt.resolvedUrl("widgets/Clock.qml"),
-        "workspaceWidget": Qt.resolvedUrl("widgets/WorkspaceWidget.qml")
+        "clock":             Qt.resolvedUrl("widgets/Clock.qml"),
+        "workspaceWidget":   Qt.resolvedUrl("widgets/WorkspaceWidget.qml"),
+        "notificationBell":  Qt.resolvedUrl("widgets/NotificationBell.qml")
     })
 
     // Human-readable display names for the picker cards
     readonly property var widgetNames: ({
-        "clock":           "\u65f6\u949f",
-        "workspaceWidget": "\u5de5\u4f5c\u533a"
+        "clock":             "\u65f6\u949f",
+        "workspaceWidget":   "\u5de5\u4f5c\u533a",
+        "notificationBell":  "\u901a\u77e5"
     })
 
     property string searchQuery: ""
