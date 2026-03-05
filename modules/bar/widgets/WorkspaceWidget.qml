@@ -18,7 +18,9 @@ Item {
 
     // --- layout ---
     implicitHeight: Theme.barHeight
-    implicitWidth: _pill.implicitWidth
+    // Root uses the stable max-width so the bar layout never shifts on mode change.
+    // Both modes' widths are always computed (only opacity differs), so max() is cheap.
+    implicitWidth: _hoverAreaW
 
     // --- structure constants ---
     readonly property int _padV:         4    // vertical gap (pill ↔ bar top/bottom)
@@ -96,22 +98,6 @@ Item {
             // If hovering, don't start revert — the hover exit will start it instead.
             if (!_hoverArea.containsMouse) _revertTimer.restart()
         }
-    }
-
-    // Hover area uses the stable max-width zone to avoid resize→exit thrashing.
-    // Entry cancels any pending revert; exit starts the 1.5 s countdown.
-    MouseArea {
-        id: _hoverArea
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: root._hoverAreaW
-        height: parent.height
-        hoverEnabled: true
-        onEntered: {
-            _revertTimer.stop()
-            root._mode = "overview"
-        }
-        onExited: _revertTimer.restart()
     }
 
     // ─── Visual pill ──────────────────────────────────────────────────────
@@ -309,5 +295,20 @@ Item {
                 color: Colors.text
             }
         }
+    }
+
+    // Hover area declared after _pill so it sits on top (highest z-order).
+    // acceptedButtons: Qt.NoButton ensures clicks pass through to _wsArea inside the pill.
+    // Root uses _hoverAreaW (stable max-width) so this area never shrinks on mode change.
+    MouseArea {
+        id: _hoverArea
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        onEntered: {
+            _revertTimer.stop()
+            root._mode = "overview"
+        }
+        onExited: _revertTimer.restart()
     }
 }
