@@ -78,10 +78,10 @@ Item {
         // always gets contextual feedback: focus mode sees overview; overview mode sees title.
         // winId-based comparison handles same-app multi-window switches.
         // Timer is always restarted on rapid consecutive switches to prevent early revert.
-        if (newWinId !== root._focusedWindowId && newWinId !== \"\") {
-            if (root._modeOverride === \"\") {
-                root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === \"overview\"
-                    ? \"focus\" : \"overview\"
+        if (newWinId !== root._focusedWindowId && newWinId !== "") {
+            if (root._modeOverride === "") {
+                root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === "overview"
+                    ? "focus" : "overview"
             }
             _revertTimer.restart()
         }
@@ -201,7 +201,8 @@ Item {
                         let arr = []
                         for (let i = 0; i < NiriService.windows.count; i++) {
                             const w = NiriService.windows.get(i)
-                            if (w.workspaceId === _wsDelegate.wsId) arr.push(w.appId)
+                            if (w.workspaceId === _wsDelegate.wsId)
+                                arr.push({ appId: w.appId, winId: w.winId })
                         }
                         _wsDelegate._appIds = arr
                     }
@@ -250,17 +251,17 @@ Item {
                                 model: _wsDelegate._appIds
 
                                 delegate: Image {
-                                    required property string modelData
+                                    required property var modelData
 
                                     readonly property bool _isLoaded:  status === Image.Ready
-                                    // Highlight the focused window's icon in the active workspace.
-                                    readonly property bool _isFocused: _wsDelegate.isActive && modelData === root._focusedAppId
+                                    // Highlight only the exact focused window (winId), not all same-app icons.
+                                    readonly property bool _isFocused: _wsDelegate.isActive && modelData.winId === root._focusedWindowId
                                     width:   _isLoaded ? root._smallIcon : 0
                                     height:  _isLoaded ? root._smallIcon : 0
                                     // Focused icon: full opacity + slight scale-up; others: dimmed.
                                     opacity: _wsDelegate.isActive ? (_isFocused ? 1.0 : 0.5) : 0.75
                                     scale:   _isFocused ? 1.2 : 1.0
-                                    source: root._iconPath(modelData)
+                                    source: root._iconPath(modelData.appId)
                                     smooth: true
                                     fillMode: Image.PreserveAspectFit
 
