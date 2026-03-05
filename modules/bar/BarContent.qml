@@ -44,8 +44,9 @@ Item {
         widgetRegistry: barContent.widgetRegistry
         anchors.left: parent.left
         anchors.leftMargin: Theme.barPadding
-        anchors.verticalCenter: parent.verticalCenter
-        height: parent.height
+        anchors.verticalCenter: undefined
+        anchors.top: parent.top
+        height: Theme.barHeight
     }
 
     // Center section: anchored center
@@ -54,8 +55,9 @@ Item {
         role: "center"
         widgetRegistry: barContent.widgetRegistry
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.verticalCenter: parent.verticalCenter
-        height: parent.height
+        anchors.verticalCenter: undefined
+        anchors.top: parent.top
+        height: Theme.barHeight
     }
 
     // Right section: anchored right
@@ -65,8 +67,9 @@ Item {
         widgetRegistry: barContent.widgetRegistry
         anchors.right: parent.right
         anchors.rightMargin: Theme.barPadding
-        anchors.verticalCenter: parent.verticalCenter
-        height: parent.height
+        anchors.verticalCenter: undefined
+        anchors.top: parent.top
+        height: Theme.barHeight
     }
 
     // Settings mode drag overlay (z:999)
