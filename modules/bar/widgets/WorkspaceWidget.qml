@@ -57,27 +57,32 @@ Item {
     property bool   _justReverted: false
 
     // --- focused window data ---
+    property string _focusedWindowId: ""
     property string _focusedAppId: ""
     property string _focusedTitle:  ""
 
     function _refreshFocus() {
+        let newWinId = ""
         let newAppId = ""
         let newTitle = ""
         for (let i = 0; i < NiriService.windows.count; i++) {
             const w = NiriService.windows.get(i)
             if (w.isFocused) {
+                newWinId = w.winId
                 newAppId = w.appId
                 newTitle = (w.title === "Unknown") ? w.appId : w.title
                 break
             }
         }
-        // On focused-app change, flash to the opposite of defaultMode so the user
+        // On window focus change, flash to the opposite of defaultMode so the user
         // always gets contextual feedback: focus mode sees overview; overview mode sees title.
-        if (newAppId !== root._focusedAppId && newAppId !== "" && root._modeOverride === "") {
+        // winId-based comparison handles same-app multi-window switches.
+        if (newWinId !== root._focusedWindowId && newWinId !== "" && root._modeOverride === "") {
             root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === "overview"
                 ? "focus" : "overview"
             _revertTimer.restart()
         }
+        root._focusedWindowId = newWinId
         root._focusedAppId = newAppId
         root._focusedTitle = newTitle
     }
