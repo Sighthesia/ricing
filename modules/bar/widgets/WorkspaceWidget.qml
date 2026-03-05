@@ -18,9 +18,7 @@ Item {
 
     // --- layout ---
     implicitHeight: Theme.barHeight
-    // Root uses the stable max-width so the bar layout never shifts on mode change.
-    // Both modes' widths are always computed (only opacity differs), so max() is cheap.
-    implicitWidth: _hoverAreaW
+    implicitWidth: _pill.implicitWidth
 
     // --- structure constants ---
     readonly property int _padV:         4    // vertical gap (pill ↔ bar top/bottom)
@@ -40,17 +38,6 @@ Item {
     // _showOverview: render-driving boolean.
     readonly property bool _showOverview:
         _focusedTitle.length === 0 || _mode === "overview"
-
-    // Stable hover zone = max(overview width, focus width).
-    // Prevents the feedback loop: mode change shrinks pill → cursor exits hover zone
-    // → exit fires → timer restarts → mode reverts → pill grows → cursor re-enters → loop.
-    // Both content rows compute their layouts at all times (just opacity differs),
-    // so we can always measure both widths.
-    readonly property real _hoverAreaW:
-        Math.max(
-            _overviewRow.implicitWidth + _padH * 2,
-            _focusRow.implicitWidth   + _padH * 2
-        )
 
     // --- focused window data ---
     property string _focusedAppId: ""
@@ -111,7 +98,9 @@ Item {
         // Width is driven by _showOverview; animated by Behavior below.
         // Both content items report their implicitWidth; pill tracks the active one.
         implicitWidth: root._showOverview
-            ? (_overviewRow.implicitWidth + root._padH * 2)
+            // In overview mode, pill is at least as wide as focus so the cursor
+            // can never exit due to shrinking — preventing hover-thrash loops.
+            ? Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2
             : (_focusRow.implicitWidth   + root._padH * 2)
 
         Behavior on implicitWidth {
@@ -297,9 +286,10 @@ Item {
         }
     }
 
-    // Hover area declared after _pill so it sits on top (highest z-order).
-    // acceptedButtons: Qt.NoButton ensures clicks pass through to _wsArea inside the pill.
-    // Root uses _hoverAreaW (stable max-width) so this area never shrinks on mode change.
+    // Hover area: top z-order (declared after _pill) ensures reliable hover delivery.
+    // acceptedButtons: Qt.NoButton passes clicks through to _wsArea inside the pill.
+    // Overview pill is >= focus width (see implicitWidth below), so the area never
+    // shrinks on hover-entry — preventing the resize→exit→loop feedback.
     MouseArea {
         id: _hoverArea
         anchors.fill: parent
