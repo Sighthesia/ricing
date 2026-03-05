@@ -31,7 +31,11 @@ Item {
     signal hoverEntered(string id)
     signal hoverExited(string id)
 
-    implicitWidth: 360  // FIXME: use Theme spacing token or a named card-width constant
+    // Component-local layout constants; promote to Theme tokens in a future notification token pass.
+    readonly property int _cardWidth:   360
+    readonly property int _appIconSize:  18
+
+    implicitWidth: _cardWidth
     implicitHeight: _bg.implicitHeight
 
     // --- Animation state ---
@@ -176,7 +180,7 @@ Item {
 
                 // Fallback: colored initial-letter badge when no icon path is available
                 Rectangle {
-                    width: 18; height: 18  // FIXME: use a size token
+                    width: card._appIconSize; height: card._appIconSize
                     radius: 4
                     color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
                     visible: card.appIcon === ""
@@ -191,7 +195,7 @@ Item {
                 }
 
                 IconImage {
-                    implicitSize: 18
+                    implicitSize: card._appIconSize
                     visible: card.appIcon !== ""
                     // Absolute file paths need a file:// prefix; bare XDG icon names
                     // are tried via image://icon/ which Quickshell may or may not provide.

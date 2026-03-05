@@ -21,7 +21,7 @@ Item {
     implicitWidth: _pill.implicitWidth
 
     // --- structure constants ---
-    // FIXME: _padH, _iconSize, _smallIcon, _iconSpacing, _pillGap, _pillPadH, _iconTitleGap, _titleMaxW
+    // FIXME: _padH, _iconSize, _smallIcon, _iconSpacing, _pillGap, _pillPadH, _iconTitleGap
     //        are widget-specific layout values with no current Theme.* equivalent.
     //        Promote to Theme tokens when a design token pass is done for widget internals.
     readonly property int _revertDelay:  SettingsService.data.workspaceWidget.revertDelay

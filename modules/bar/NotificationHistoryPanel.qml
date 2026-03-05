@@ -15,6 +15,9 @@ AnimatedPanelBase {
     implicitHeight: 480
     focusable: false
 
+    // Component-local layout constants; promote to Theme tokens in a future notification token pass.
+    readonly property int _appBadgeSize: 28
+
     active: BarLayoutService.notificationHistoryOpen
 
     // Mark all notifications as seen when the panel slides open
@@ -136,7 +139,7 @@ AnimatedPanelBase {
 
                 // App initial-letter badge
                 Rectangle {
-                    width: 28; height: 28  // FIXME: use a size token
+                    width: root._appBadgeSize; height: root._appBadgeSize
                     radius: 6
                     color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
 
