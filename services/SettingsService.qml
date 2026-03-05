@@ -121,5 +121,12 @@ Singleton {
             property bool   persistHistory:   true
             property int    maxHistory:       100
         }
+
+        property JsonObject workspaceWidget: JsonObject {
+            property string defaultMode:  "focus"
+            property int    titleMaxWidth: 240
+            property int    revertDelay:   1500
+            property bool   hoverEnabled:  true
+        }
     }
 }

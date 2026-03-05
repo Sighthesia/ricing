@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import "../settings"
 
 // Functional settings for the WorkspaceWidget (two-state island indicator).
 // Shown in WidgetSettingsPanel when the active widget is "workspaceWidget".
