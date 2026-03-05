@@ -33,17 +33,22 @@ Item {
     readonly property int _pillH:        Theme.barHeight - 2 * _padV
 
     // --- state machine ---
-    // _mode drives which content layer is shown.
-    // Both workspace switch and hover entry trigger the same 1.5s overview flash,
-    // preventing high-frequency thrashing (mode cannot revert until timer fires).
     property string _mode: "focus"    // "focus" | "overview"
 
     // _showOverview: render-driving boolean.
-    //   no focused window → always overview
-    //   _mode="overview"  → true
-    //   _mode="focus"     → false
     readonly property bool _showOverview:
         _focusedTitle.length === 0 || _mode === "overview"
+
+    // Stable hover zone = max(overview width, focus width).
+    // Prevents the feedback loop: mode change shrinks pill → cursor exits hover zone
+    // → exit fires → timer restarts → mode reverts → pill grows → cursor re-enters → loop.
+    // Both content rows compute their layouts at all times (just opacity differs),
+    // so we can always measure both widths.
+    readonly property real _hoverAreaW:
+        Math.max(
+            _overviewRow.implicitWidth + _padH * 2,
+            _focusRow.implicitWidth   + _padH * 2
+        )
 
     // --- focused window data ---
     property string _focusedAppId: ""
@@ -71,11 +76,11 @@ Item {
         return Quickshell.iconPath("application-x-executable")
     }
 
-    // --- flash timer: 1.5 s overview window, then auto-return to focus ---
-    // Shared by both workspace switch and hover entry. Multiple triggers just
-    // extend the current display window (timer restarts).
+    // --- revert timer: 1.5 s after overview trigger, return to focus ---
+    // Workspace switch: always starts the timer.
+    // Hover: timer starts on EXIT, not on entry — overview holds while cursor is present.
     Timer {
-        id: _flashTimer
+        id: _revertTimer
         interval: 1500
         repeat: false
         onTriggered: root._mode = "focus"
@@ -88,21 +93,25 @@ Item {
         function onWindowsUpdated()      { root._refreshFocus() }
         function onWorkspaceActivated()  {
             root._mode = "overview"
-            _flashTimer.restart()
+            // If hovering, don't start revert — the hover exit will start it instead.
+            if (!_hoverArea.containsMouse) _revertTimer.restart()
         }
     }
 
-    // Hover entry triggers the same 1.5 s overview flash as a workspace switch.
-    // Using onEntered only (not onExited) means the mode sticks until the timer
-    // fires — this prevents rapid thrashing when the pill resizes on mode change.
+    // Hover area uses the stable max-width zone to avoid resize→exit thrashing.
+    // Entry cancels any pending revert; exit starts the 1.5 s countdown.
     MouseArea {
         id: _hoverArea
-        anchors.fill: parent
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: root._hoverAreaW
+        height: parent.height
         hoverEnabled: true
         onEntered: {
+            _revertTimer.stop()
             root._mode = "overview"
-            _flashTimer.restart()
         }
+        onExited: _revertTimer.restart()
     }
 
     // ─── Visual pill ──────────────────────────────────────────────────────
