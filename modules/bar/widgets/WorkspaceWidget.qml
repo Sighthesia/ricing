@@ -71,13 +71,11 @@ Item {
                 break
             }
         }
-        // In overview-default mode, flash to focus when the focused app changes so
-        // the user still gets title feedback on window switch (overview holds otherwise).
-        if (SettingsService.data.workspaceWidget.defaultMode === "overview"
-                && newAppId !== root._focusedAppId
-                && newAppId !== ""
-                && root._modeOverride === "") {
-            root._modeOverride = "focus"
+        // On focused-app change, flash to the opposite of defaultMode so the user
+        // always gets contextual feedback: focus mode sees overview; overview mode sees title.
+        if (newAppId !== root._focusedAppId && newAppId !== "" && root._modeOverride === "") {
+            root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === "overview"
+                ? "focus" : "overview"
             _revertTimer.restart()
         }
         root._focusedAppId = newAppId
