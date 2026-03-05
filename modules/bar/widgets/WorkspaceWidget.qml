@@ -48,6 +48,10 @@ Item {
         return _focusedTitle.length === 0
     }
 
+    // Suppresses all layout Behaviors during the first render cycle so the widget
+    // doesn't animate from the default empty state to the real initial state.
+    property bool _initialized: false
+
     // ""         = natural (overview when no focused window, focus otherwise)
     // "overview" = temporarily forced overview (hover from focus, workspace switch)
     // "focus"    = temporarily forced focus (hover from overview)
@@ -122,7 +126,12 @@ Item {
         onTriggered: root._justReverted = false
     }
 
-    Component.onCompleted: _refreshFocus()
+    Component.onCompleted: {
+        _refreshFocus()
+        // Defer enabling Behaviors to the next event loop iteration so the initial
+        // state renders without any startup animation flash.
+        Qt.callLater(() => { root._initialized = true })
+    }
 
     Connections {
         target: NiriService
@@ -152,6 +161,7 @@ Item {
             : (_focusRow.implicitWidth   + root._padH * 2)
 
         Behavior on implicitWidth {
+            enabled: root._initialized
             NumberAnimation {
                 duration: Theme.anim.moveDuration
                 easing.type: Theme.anim.moveType
@@ -234,6 +244,7 @@ Item {
                         color: _wsDelegate.isActive ? Colors.highlight : Colors.surface
 
                         Behavior on implicitWidth {
+                            enabled: root._initialized
                             NumberAnimation {
                                 duration: Theme.anim.moveDuration
                                 easing.type: Theme.anim.moveType
@@ -258,10 +269,15 @@ Item {
                                     readonly property bool _isLoaded:  status === Image.Ready
                                     // Highlight only the exact focused window (winId), not all same-app icons.
                                     readonly property bool _isFocused: _wsDelegate.isActive && modelData.winId === root._focusedWindowId
-                                    width:   _isLoaded ? root._smallIcon : 0
-                                    height:  _isLoaded ? root._smallIcon : 0
+                                    // Always reserve fixed space so layout stays stable during image load;
+                                    // fade in via opacity instead of width jump.
+                                    width:   root._smallIcon
+                                    height:  root._smallIcon
                                     // Focused icon: full opacity + slight scale-up; others: dimmed.
-                                    opacity: _wsDelegate.isActive ? (_isFocused ? 1.0 : 0.5) : 0.75
+                                    // Icons fade in from 0 while loading to prevent layout jumps.
+                                    opacity: _isLoaded
+                                        ? (_wsDelegate.isActive ? (_isFocused ? 1.0 : 0.5) : 0.75)
+                                        : 0
                                     scale:   _isFocused ? 1.2 : 1.0
                                     source: root._iconPath(modelData.appId)
                                     smooth: true
