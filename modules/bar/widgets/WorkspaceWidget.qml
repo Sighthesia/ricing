@@ -38,6 +38,17 @@ Item {
     // workspaceActivated fires _flashTimer to force overview for 1.5 s.
     property string _mode: "focus"    // "focus" | "overview"
     property bool   _hovered: false
+    // Frozen hover width: tracks pill size while not hovered, then freezes on hover entry.
+    // Prevents the feedback loop: hover → pill shrinks → hover zone shrinks → mouse exits
+    // → hover exits → pill grows → mouse re-enters → repeat.
+    property real   _hoverAreaW: 60  // initial placeholder; Binding below takes over
+    Binding {
+        target: root
+        property: "_hoverAreaW"
+        value: root._pill.implicitWidth
+        when: !root._hovered
+        restoreMode: Binding.RestoreNone
+    }
 
     // _showOverview: the fully resolved, render-driving boolean.
     // Truth table:
@@ -98,9 +109,13 @@ Item {
     }
 
     // Hover detection drives the _hovered XOR flip.
+    // Width is frozen while hovered to prevent the resize→exit→flip feedback loop.
     MouseArea {
         id: _hoverArea
-        anchors.fill: parent
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: root._hoverAreaW
+        height: parent.height
         hoverEnabled: true
         onEntered: root._hovered = true
         onExited:  root._hovered = false
