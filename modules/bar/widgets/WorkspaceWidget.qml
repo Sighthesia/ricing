@@ -1,5 +1,5 @@
-import QtQuick
 import Quickshell
+import QtQuick
 import qs.config
 import qs.services
 
@@ -21,7 +21,11 @@ Item {
     implicitWidth: _pill.implicitWidth
 
     // --- structure constants ---
-    readonly property int _padV:         4    // vertical gap (pill ↔ bar top/bottom)
+    // FIXME: _padH, _iconSize, _smallIcon, _iconSpacing, _pillGap, _pillPadH, _iconTitleGap, _titleMaxW
+    //        are widget-specific layout values with no current Theme.* equivalent.
+    //        Promote to Theme tokens when a design token pass is done for widget internals.
+    readonly property int _revertDelay:     1500  // ms — overview flash duration (workspace switch / hover)
+    readonly property int _revertCooldown:  50    // ms — post-revert hover-entry dead zone
     readonly property int _padH:         10   // horizontal padding inside the pill
     readonly property int _iconSize:     16   // app icon in focus mode
     readonly property int _smallIcon:    13   // app icon inside workspace pills
@@ -30,17 +34,23 @@ Item {
     readonly property int _pillPadH:     8    // horizontal padding inside each workspace pill
     readonly property int _iconTitleGap: 6    // gap between focus icon and title text
     readonly property int _titleMaxW:    240  // max title render width (ElideRight after this)
-    readonly property int _pillH:        Theme.barHeight - 2 * _padV
+    readonly property int _pillH:        Theme.barHeight - 2 * Theme.iconPadding
 
     // --- state machine ---
-    property string _mode: "focus"    // "focus" | "overview"
-    // Brief cooldown after auto-revert: ignores onEntered for ~50 ms so the pill
-    // growing back to focus size doesn’t immediately re-trigger hover overview.
-    property bool   _justReverted: false
-
-    // _showOverview: render-driving boolean.
+    // _showOverview: render-driving boolean (step 6 — derived readonly before mutable state).
+    // Show overview when explicitly overridden, or when no window is focused and
+    // the user hasn't hovered us into forced focus.
     readonly property bool _showOverview:
-        _focusedTitle.length === 0 || _mode === "overview"
+        _modeOverride === "overview" ||
+        (_modeOverride !== "focus" && _focusedTitle.length === 0)
+
+    // ""         = natural (overview when no focused window, focus otherwise)
+    // "overview" = temporarily forced overview (hover from focus, workspace switch)
+    // "focus"    = temporarily forced focus (hover from overview)
+    property string _modeOverride: ""
+    // Brief cooldown after auto-revert: ignores onEntered for _revertCooldown ms so the
+    // pill growing back to focus size doesn't immediately re-trigger hover.
+    property bool   _justReverted: false
 
     // --- focused window data ---
     property string _focusedAppId: ""
@@ -73,20 +83,20 @@ Item {
     // Hover: timer starts on EXIT, not on entry — overview holds while cursor is present.
     Timer {
         id: _revertTimer
-        interval: 1500
+        interval: root._revertDelay
         repeat: false
         onTriggered: {
-            root._mode = "focus"
-            // Start cooldown: ignore hover-entry for 50 ms so the pill expanding
-            // back to focus size doesn’t immediately retrigger overview.
+            root._modeOverride = ""
+            // Start cooldown so the pill expanding back to focus size doesn't
+            // immediately retrigger hover overview.
             root._justReverted = true
-            _revertCooldown.restart()
+            _revertCooldownTimer.restart()
         }
     }
 
     Timer {
-        id: _revertCooldown
-        interval: 50
+        id: _revertCooldownTimer
+        interval: root._revertCooldown
         repeat: false
         onTriggered: root._justReverted = false
     }
@@ -97,9 +107,10 @@ Item {
         target: NiriService
         function onWindowsUpdated()      { root._refreshFocus() }
         function onWorkspaceActivated()  {
-            root._mode = "overview"
+            root._modeOverride = "overview"
             // If hovering, don't start revert — the hover exit will start it instead.
             if (!_hoverArea.containsMouse) _revertTimer.restart()
+
         }
     }
 
@@ -209,9 +220,9 @@ Item {
                                 delegate: Image {
                                     required property string modelData
 
-                                    readonly property bool _ok: status === Image.Ready
-                                    width:  _ok ? root._smallIcon : 0
-                                    height: _ok ? root._smallIcon : 0
+                                    readonly property bool _isLoaded: status === Image.Ready
+                                    width:  _isLoaded ? root._smallIcon : 0
+                                    height: _isLoaded ? root._smallIcon : 0
                                     source: root._iconPath(modelData)
                                     smooth: true
                                     fillMode: Image.PreserveAspectFit
@@ -312,7 +323,8 @@ Item {
         onEntered: {
             if (root._justReverted) return  // ignore brief re-entry after auto-revert
             _revertTimer.stop()
-            root._mode = "overview"
+            // Flip to opposite of current visual state.
+            root._modeOverride = root._showOverview ? "focus" : "overview"
         }
         onExited: _revertTimer.restart()
     }
