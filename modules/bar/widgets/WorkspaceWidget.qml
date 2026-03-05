@@ -24,10 +24,12 @@ Item {
     readonly property int _padV:        4       // island ↔ bar top/bottom edge
     readonly property int _padH:        10      // island ↔ pill content horizontal margin
     readonly property int _iconSize:    14      // app icon square size
+    readonly property int _iconSpacing: 2       // gap between icons inside a pill
     readonly property int _pillGap:     5       // gap between workspace pills
     readonly property int _pillPadH:    8       // horizontal padding inside each pill
     readonly property int _titleGap:    4       // separator between pills row and title
     readonly property int _titleRowH:   18      // height reserved for the title text row
+    readonly property int _iconSpacing: 2       // tight gap between app icons inside a pill
 
     // Derived heights (collapsed = pills only, expanded = pills + title)
     readonly property int _collapsedH: Theme.barHeight - 2 * _padV
@@ -50,7 +52,8 @@ Item {
         for (let i = 0; i < NiriService.windows.count; i++) {
             const w = NiriService.windows.get(i)
             if (w.isFocused) {
-                root.focusedWindowTitle = w.title || w.appId || ""
+                // NiriService guarantees title is never empty ("Unknown" when unavailable).
+                root.focusedWindowTitle = w.title
                 return
             }
         }
@@ -72,16 +75,38 @@ Item {
         x: 0
         y: root._padV
         width: pillsRow.implicitWidth + root._padH * 2
-        height: root._expanded ? root._expandedH : root._collapsedH
+        // Height starts collapsed; states drive the asymmetric expand/collapse animation.
+        height: root._collapsedH
         radius: Theme.cornerRadius
         color: Colors.background
 
-        Behavior on height {
-            NumberAnimation {
-                duration: Theme.anim.moveDuration
-                easing.type: Theme.anim.moveType
-            }
+        states: State {
+            name: "expanded"; when: root._expanded
+            PropertyChanges { target: islandBackground; height: root._expandedH }
         }
+
+        transitions: [
+            // Expand: elastic bounce-in — mirrors panel enter tokens.
+            Transition {
+                to: "expanded"
+                NumberAnimation {
+                    properties: "height"
+                    duration: Theme.anim.enterDuration
+                    easing.type: Theme.anim.enterType
+                    easing.amplitude: Theme.anim.enterAmplitude
+                    easing.period: Theme.anim.enterPeriod
+                }
+            },
+            // Collapse: exponential snap-out — mirrors panel exit tokens.
+            Transition {
+                to: ""
+                NumberAnimation {
+                    properties: "height"
+                    duration: Theme.anim.exitDuration
+                    easing.type: Theme.anim.exitType
+                }
+            }
+        ]
 
         Behavior on width {
             NumberAnimation {
@@ -162,7 +187,7 @@ Item {
                         Row {
                             id: iconRow
                             anchors.centerIn: parent
-                            spacing: 2
+                            spacing: root._iconSpacing
 
                             Repeater {
                                 model: wsDelegate._appIds
@@ -195,8 +220,9 @@ Item {
                             }
                         }
 
-                        // Inline hover highlight (HoverRevealHighlight can't be imported
-                        // from a widgets/ subdirectory — circular module dependency).
+                        // FIXME: HoverRevealHighlight and ClickRipple unavailable here —
+                        // circular module dependency (widgets/ is compiled as part of qs.modules.bar).
+                        // Resolution: extract shared interactive primitives to a qs.components module.
                         Rectangle {
                             anchors.fill: parent
                             radius: parent.radius
@@ -210,6 +236,7 @@ Item {
                             }
                         }
 
+                        // FIXME: ClickRipple missing — same circular dependency as above.
                         MouseArea {
                             id: wsArea
                             anchors.fill: parent
