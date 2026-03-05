@@ -24,7 +24,7 @@ Item {
     // FIXME: _padH, _iconSize, _smallIcon, _iconSpacing, _pillGap, _pillPadH, _iconTitleGap, _titleMaxW
     //        are widget-specific layout values with no current Theme.* equivalent.
     //        Promote to Theme tokens when a design token pass is done for widget internals.
-    readonly property int _revertDelay:     1500  // ms — overview flash duration (workspace switch / hover)
+    readonly property int _revertDelay:  SettingsService.data.workspaceWidget.revertDelay
     readonly property int _revertCooldown:  50    // ms — post-revert hover-entry dead zone
     readonly property int _padH:         10   // horizontal padding inside the pill
     readonly property int _iconSize:     16   // app icon in focus mode
@@ -33,16 +33,20 @@ Item {
     readonly property int _pillGap:      6    // gap between workspace pills
     readonly property int _pillPadH:     8    // horizontal padding inside each workspace pill
     readonly property int _iconTitleGap: 6    // gap between focus icon and title text
-    readonly property int _titleMaxW:    240  // max title render width (ElideRight after this)
+    readonly property int _titleMaxW:    SettingsService.data.workspaceWidget.titleMaxWidth
+    readonly property bool _hoverActive: SettingsService.data.workspaceWidget.hoverEnabled
     readonly property int _pillH:        Theme.barHeight - 2 * Theme.iconPadding
 
     // --- state machine ---
     // _showOverview: render-driving boolean (step 6 — derived readonly before mutable state).
-    // Show overview when explicitly overridden, or when no window is focused and
-    // the user hasn't hovered us into forced focus.
-    readonly property bool _showOverview:
-        _modeOverride === "overview" ||
-        (_modeOverride !== "focus" && _focusedTitle.length === 0)
+    // Explicit _modeOverride takes priority; natural state uses defaultMode setting.
+    readonly property bool _showOverview: {
+        if (_modeOverride === "overview") return true
+        if (_modeOverride === "focus")    return false
+        // Natural (unforced) state: use defaultMode setting
+        if (SettingsService.data.workspaceWidget.defaultMode === "overview") return true
+        return _focusedTitle.length === 0
+    }
 
     // ""         = natural (overview when no focused window, focus otherwise)
     // "overview" = temporarily forced overview (hover from focus, workspace switch)
@@ -321,7 +325,7 @@ Item {
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
         onEntered: {
-            if (root._justReverted) return  // ignore brief re-entry after auto-revert
+            if (!root._hoverActive || root._justReverted) return
             _revertTimer.stop()
             // Flip to opposite of current visual state.
             root._modeOverride = root._showOverview ? "focus" : "overview"
