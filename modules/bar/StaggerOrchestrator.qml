@@ -34,6 +34,13 @@ Item {
         return anim.staggerLevel1BaseDelay + anim.staggerLevel1Step * entry.order;
     }
 
+    function _exitDelayFor(sortedIndex, total) {
+        let anim = SettingsService.data.animation;
+        // Reverse cascade keeps close animation visually compact.
+        let rank = Math.max(0, total - 1 - sortedIndex);
+        return rank * anim.staggerExitStep;
+    }
+
     function runEnter() {
         let entries = _sortedEntries();
         for (let i = 0; i < entries.length; i++) {
@@ -49,7 +56,7 @@ Item {
         for (let i = 0; i < entries.length; i++) {
             let target = entries[i].item;
             if (!target || typeof target.runExit !== "function") continue;
-            target.exitDelay = 0;
+            target.exitDelay = _exitDelayFor(i, entries.length);
             target.runExit();
         }
     }

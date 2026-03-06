@@ -73,9 +73,10 @@ PopupWindow {
                 _state = "closing";
                 _stagger.clear();
                 _stagger.registerItem(_siHeader, 0, 1);
-                _stagger.registerItem(_siAppearance, 1, 1);
-                _stagger.registerItem(_siFunctional, 2, 1);
-                _stagger.registerItem(_siDelete, 3, 1);
+                _stagger.registerItem(_siDivider, 1, 1);
+                _stagger.registerItem(_siAppearance, 2, 1);
+                _stagger.registerItem(_siFunctional, 3, 1);
+                _stagger.registerItem(_siDelete, 4, 1);
                 _stagger.runExit();
                 // Defensive fallback: ensure panel sections always leave visible state
                 // even if orchestration timing is interrupted mid-transition.
@@ -96,9 +97,10 @@ PopupWindow {
         onTriggered: {
             _stagger.clear()
             _stagger.registerItem(_siHeader, 0, 1)
-            _stagger.registerItem(_siAppearance, 1, 1)
-            _stagger.registerItem(_siFunctional, 2, 1)
-            _stagger.registerItem(_siDelete, 3, 1)
+            _stagger.registerItem(_siDivider, 1, 1)
+            _stagger.registerItem(_siAppearance, 2, 1)
+            _stagger.registerItem(_siFunctional, 3, 1)
+            _stagger.registerItem(_siDelete, 4, 1)
             _stagger.runEnter()
             // Defensive fallback: some compositor/lifecycle races can skip the
             // orchestrated callback on first open; explicitly trigger all groups.
@@ -238,7 +240,19 @@ PopupWindow {
             } // StaggerItem _siHeader
 
             // Divider between header and groups
-            Rectangle { Layout.fillWidth: true; height: 1; color: Colors.border; opacity: 0.4; Layout.bottomMargin: 4 }
+            StaggerItem {
+                id: _siDivider
+                Layout.fillWidth: true
+                height: 1
+                exitDelay: 0
+                Layout.bottomMargin: 4
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: Colors.border
+                    opacity: 0.4
+                }
+            }
 
             // Appearance group
             StaggerItem {

@@ -32,9 +32,11 @@ Item {
         _swapTimer.stop();
         _pendingDisplayItems = [];
         _pendingResultData = [];
+        _suspendRefresh = true;
         searchField.text = "";
         _results.clear();
         root._resultData = [];
+        _suspendRefresh = false;
     }
 
     function runStructuralEnter(): void {
@@ -63,6 +65,7 @@ Item {
     property var _resultData: []
     property var _pendingDisplayItems: []
     property var _pendingResultData: []
+    property bool _suspendRefresh: false
 
     Timer {
         id: _swapTimer
@@ -80,6 +83,8 @@ Item {
     }
 
     function _refreshResults(): void {
+        if (_suspendRefresh || !LauncherService.isOpen) return;
+
         let provider = _activeProvider();
         if (!provider) return;
 
