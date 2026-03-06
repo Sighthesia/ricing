@@ -34,6 +34,10 @@ Singleton {
     // True while the notification history panel is visible.
     property bool notificationHistoryOpen: false
 
+    // Extra pixels the bar extends downward below exclusiveZone during switch flashes.
+    // Set by WorkspaceWidget when _flashActive is true; BarWindow tracks this property.
+    property int barFlashExtension: 0
+
     // Which bar section the picker should insert widgets into.
     // Updated whenever the user clicks a section in layout mode.
     property string widgetPickerTargetSection: "right"

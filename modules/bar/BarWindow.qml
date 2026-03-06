@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import qs.config
+import qs.services
 import qs.modules.bar
 
 PanelWindow {
@@ -10,7 +11,8 @@ PanelWindow {
     anchors { left: true; top: true; right: true }
     color: "transparent"
 
-    implicitHeight: Theme.barHeight
+    // Expand downward during WorkspaceWidget switch flashes (non-exclusive zone).
+    implicitHeight: Theme.barHeight + BarLayoutService.barFlashExtension
     exclusiveZone: Theme.barHeight
 
     WlrLayershell.layer: WlrLayer.Top

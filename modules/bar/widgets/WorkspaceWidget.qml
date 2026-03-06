@@ -17,7 +17,9 @@ Item {
     id: root
 
     // --- layout ---
-    implicitHeight: Theme.barHeight
+    // implicitHeight tracks the pill height (including flash expansion) so the
+    // bar item expands downward into the non-exclusive zone during switch flashes.
+    implicitHeight: _pill.implicitHeight + Theme.iconPadding
     implicitWidth: _pill.implicitWidth
 
     // --- structure constants ---
@@ -56,6 +58,22 @@ Item {
     // "overview" = temporarily forced overview (hover from focus, workspace switch)
     // "focus"    = temporarily forced focus (hover from overview)
     property string _modeOverride: ""
+    // --- flash animation constants ---
+    readonly property int _flashRowH:   16   // height of the shrunken "previous state" strip
+    readonly property int _flashGap:    4    // gap between main pill area and flash strip
+    readonly property real _flashScale: 0.72 // scale factor applied to content in flash strip
+
+    // --- flash state ---
+    // true while the pill is expanded downward showing the switch transition.
+    // Cleared by _revertTimer together with _modeOverride.
+    property bool _flashActive: false
+
+    // Snapshot of the state that was active *before* the switch occurred.
+    // Rendered in the flash strip while _flashActive is true.
+    property string _flashPrevTitle:  ""
+    property string _flashPrevAppId:  ""
+    property bool   _flashPrevWasOverview: false
+
     // Brief cooldown after auto-revert: ignores onEntered for _revertCooldown ms so the
     // pill growing back to focus size doesn't immediately re-trigger hover.
     property bool   _justReverted: false
@@ -78,11 +96,15 @@ Item {
                 break
             }
         }
-        // On window focus change, flash to the opposite of defaultMode so the user
-        // always gets contextual feedback: focus mode sees overview; overview mode sees title.
+        // On window focus change: snapshot current state → trigger flash → flip mode.
         // winId-based comparison handles same-app multi-window switches.
-        // Timer is always restarted on rapid consecutive switches to prevent early revert.
         if (newWinId !== root._focusedWindowId && newWinId !== "") {
+            // Capture what was showing before this switch.
+            root._flashPrevTitle        = root._focusedTitle
+            root._flashPrevAppId        = root._focusedAppId
+            root._flashPrevWasOverview  = root._showOverview
+            root._flashActive           = true
+
             if (root._modeOverride === "") {
                 root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === "overview"
                     ? "focus" : "overview"
@@ -112,6 +134,7 @@ Item {
         repeat: false
         onTriggered: {
             root._modeOverride = ""
+            root._flashActive  = false
             // Start cooldown so the pill expanding back to focus size doesn't
             // immediately retrigger hover overview.
             root._justReverted = true
@@ -133,10 +156,25 @@ Item {
         Qt.callLater(() => { root._initialized = true })
     }
 
+    // Keep BarLayoutService.barFlashExtension in sync so BarWindow can expand its
+    // drawing surface to accommodate the flash strip below the bar.
+    Binding {
+        target: BarLayoutService
+        property: "barFlashExtension"
+        value: root._flashActive ? (root._flashGap + root._flashRowH) : 0
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
     Connections {
         target: NiriService
         function onWindowsUpdated()      { root._refreshFocus() }
         function onWorkspaceActivated()  {
+            // Snapshot current state before the mode flip so flash strip shows "before".
+            root._flashPrevTitle       = root._focusedTitle
+            root._flashPrevAppId       = root._focusedAppId
+            root._flashPrevWasOverview = root._showOverview
+            root._flashActive          = true
+
             // Flash to the *opposite* of the default mode so the user always sees
             // a state change after a workspace switch.
             root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === "overview"
@@ -148,12 +186,30 @@ Item {
 
     // ─── Visual pill ──────────────────────────────────────────────────────
     // Single rounded rectangle; width animates between overview and focus sizes.
+    // Height expands downward during switch flash to reveal the previous-state strip.
     Rectangle {
         id: _pill
 
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Theme.iconPadding
         anchors.horizontalCenter: parent.horizontalCenter
-        height: root._pillH
+
+        // Flash expansion: grow downward by _flashGap + _flashRowH when active.
+        implicitHeight: root._flashActive
+            ? (root._pillH + root._flashGap + root._flashRowH)
+            : root._pillH
+        height: implicitHeight
+
+        Behavior on implicitHeight {
+            enabled: root._initialized
+            NumberAnimation {
+                duration: Theme.anim.enterDuration
+                easing.type: Theme.anim.enterType
+                easing.amplitude: Theme.anim.enterAmplitude
+                easing.period: Theme.anim.enterPeriod
+            }
+        }
+
         // Width is driven by _showOverview; animated by Behavior below.
         // Both content items report their implicitWidth; pill tracks the active one.
         implicitWidth: root._showOverview
@@ -168,7 +224,7 @@ Item {
             }
         }
 
-        radius: height / 2
+        radius: root._pillH / 2
         color: Colors.surface
         // Subtle hover tint for the entire pill
         Rectangle {
@@ -183,7 +239,9 @@ Item {
         // ── Overview content — workspace pills row ───────────────────────
         Row {
             id: _overviewRow
-            anchors.centerIn: parent
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: undefined
+            y: (root._pillH - implicitHeight) / 2   // centred within the main pill zone
             spacing: root._pillGap
             opacity: root._showOverview ? 1 : 0
 
@@ -334,7 +392,9 @@ Item {
         // ── Focus content — app icon + window title ──────────────────────
         Row {
             id: _focusRow
-            anchors.centerIn: parent
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: undefined
+            y: (root._pillH - implicitHeight) / 2   // centred within the main pill zone
             spacing: root._iconTitleGap
             opacity: root._showOverview ? 0 : 1
 
@@ -368,15 +428,132 @@ Item {
                 color: Colors.text
             }
         }
+
+        // ── Flash strip — shrunken "before" snapshot shown during switch ─
+        // Positioned at the bottom of the expanded pill; fades out when flash ends.
+        Item {
+            id: _flashStrip
+            anchors.left:   parent.left
+            anchors.right:  parent.right
+            anchors.leftMargin:  root._padH
+            anchors.rightMargin: root._padH
+            y: root._pillH + root._flashGap
+            height: root._flashRowH
+
+            opacity: root._flashActive ? 0.55 : 0
+            Behavior on opacity {
+                NumberAnimation { duration: Theme.anim.exitDuration; easing.type: Theme.anim.exitType }
+            }
+
+            // Shrunken Focus strip — shows when previous state was Focus mode
+            Row {
+                id: _flashFocusRow
+                anchors.centerIn: parent
+                spacing: Math.round(root._iconTitleGap * root._flashScale)
+                visible: !root._flashPrevWasOverview
+
+                Image {
+                    width:  Math.round(root._iconSize * root._flashScale)
+                    height: Math.round(root._iconSize * root._flashScale)
+                    anchors.verticalCenter: parent.verticalCenter
+                    source: root._iconPath(root._flashPrevAppId)
+                    smooth: true
+                    fillMode: Image.PreserveAspectFit
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, Math.round(root._titleMaxW * root._flashScale))
+                    text: root._flashPrevTitle
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Math.round(Theme.fontSizeSmall * root._flashScale)
+                    color: Colors.textMuted
+                }
+            }
+
+            // Shrunken Overview strip — shows when previous state was Overview mode
+            Row {
+                id: _flashOverviewRow
+                anchors.centerIn: parent
+                spacing: Math.round(root._pillGap * root._flashScale)
+                visible: root._flashPrevWasOverview
+
+                Repeater {
+                    model: NiriService.workspaces
+                    delegate: Item {
+                        required property string wsId
+                        required property int    idx
+                        required property bool   isActive
+
+                        // Reuse the same per-workspace icon data from the live model.
+                        readonly property var _wsIcons: {
+                            let arr = []
+                            for (let i = 0; i < NiriService.windows.count; i++) {
+                                const w = NiriService.windows.get(i)
+                                if (w.workspaceId === wsId) arr.push(w.appId)
+                            }
+                            return arr
+                        }
+
+                        visible: isActive || _wsIcons.length > 0
+                        width:  visible ? _miniPill.width  : 0
+                        height: visible ? _miniPill.height : 0
+
+                        Rectangle {
+                            id: _miniPill
+                            height: root._flashRowH
+                            width: Math.max(
+                                _miniIcons.implicitWidth + Math.round(root._pillPadH * root._flashScale) * 2,
+                                root._flashRowH
+                            )
+                            radius: height / 2
+                            color: isActive ? Colors.highlight : Colors.surface
+                            opacity: 0.8
+
+                            Row {
+                                id: _miniIcons
+                                anchors.centerIn: parent
+                                spacing: Math.round(root._iconSpacing * root._flashScale)
+
+                                Repeater {
+                                    model: _wsIcons
+                                    delegate: Image {
+                                        required property string modelData
+                                        readonly property bool _ok: status === Image.Ready
+                                        width:  _ok ? Math.round(root._smallIcon * root._flashScale) : 0
+                                        height: _ok ? Math.round(root._smallIcon * root._flashScale) : 0
+                                        source: root._iconPath(modelData)
+                                        smooth: true
+                                        fillMode: Image.PreserveAspectFit
+                                    }
+                                }
+
+                                Text {
+                                    visible: _wsIcons.length === 0
+                                    text: idx
+                                    font.family: Theme.fontMono
+                                    font.bold: true
+                                    font.pixelSize: Math.round(Theme.fontSizeSmall * root._flashScale)
+                                    color: isActive ? Colors.background : Colors.textMuted
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    // Hover area: top z-order (declared after _pill) ensures reliable hover delivery.
-    // acceptedButtons: Qt.NoButton passes clicks through to _wsArea inside the pill.
-    // Overview pill is >= focus width (see implicitWidth below), so the area never
-    // shrinks on hover-entry — preventing the resize→exit→loop feedback.
+    // Hover area covers only the main pill zone (not the flash strip below),
+    // so the expansion area doesn't accidentally trigger hover revert.
     MouseArea {
         id: _hoverArea
-        anchors.fill: parent
+        anchors.left:  parent.left
+        anchors.right: parent.right
+        anchors.top:   parent.top
+        height: Theme.barHeight
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
         cursorShape: Qt.PointingHandCursor
