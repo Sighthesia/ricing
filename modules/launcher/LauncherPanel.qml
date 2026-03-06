@@ -9,7 +9,9 @@ import qs.modules.bar
 AnimatedPanelBase {
     id: panelWindow
 
-    anchors { top: true; horizontalCenter: true }
+    // Anchoring only top (no left/right) lets the Wayland compositor center
+    // the window horizontally per the layer-shell protocol.
+    anchors { top: true }
     margins { top: Theme.barHeight }
 
     implicitWidth: 640

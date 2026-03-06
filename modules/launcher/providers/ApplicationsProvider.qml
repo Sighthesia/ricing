@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Services.Applications
 import QtQuick
 
 // Provides application launch results from XDG desktop entries.
