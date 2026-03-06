@@ -11,8 +11,11 @@ AnimatedPanelBase {
 
     // Anchoring only top (no left/right) lets the Wayland compositor center
     // the window horizontally per the layer-shell protocol.
+    // ExclusionMode.Ignore prevents the panel from pushing window content down —
+    // the launcher must overlay, not reserve, screen space.
     anchors { top: true }
     margins { top: Theme.barHeight }
+    exclusionMode: ExclusionMode.Ignore
 
     implicitWidth: 640
     implicitHeight: 480

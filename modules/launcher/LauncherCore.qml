@@ -4,6 +4,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import qs.modules.bar
 import "providers"
 
 // Central search + results component embedded inside LauncherPanel.
@@ -142,54 +143,69 @@ Item {
             model: _results
             clip: true
 
-            delegate: Rectangle {
-                width: resultList.width
+            delegate: StaggerItem {
+                id: _item
+                required property int index
+
+                // FIXME: 25 ms per-item step is launcher-specific; promote to a
+                // Theme.anim token when launcher stagger tokens are added.
+                delay:  SettingsService.data.animation.staggerLevel1BaseDelay
+                        + Math.min(index, 7) * 25
+                width:  resultList.width
                 height: 52
-                color: root._selectedIndex === index
-                    ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
-                    : "transparent"
 
-                RowLayout {
+                // Trigger slide-up + fade-in whenever this delegate is (re)created,
+                // i.e. on every model reset from _refreshResults.
+                Component.onCompleted: runEnter()
+
+                Rectangle {
                     anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 10
+                    color: root._selectedIndex === _item.index
+                        ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
+                        : "transparent"
 
-                    Image {
-                        source: "image://icon/" + (model.icon || "application-x-executable")
-                        width: 24; height: 24
-                        sourceSize: Qt.size(24, 24)
-                    }
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 10
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 2
-
-                        Text {
-                            text: model.name
-                            color: Colors.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeBody
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
+                        Image {
+                            source: "image://icon/" + (model.icon || "application-x-executable")
+                            width: 24; height: 24
+                            sourceSize: Qt.size(24, 24)
                         }
 
-                        Text {
-                            text: model.description
-                            color: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.55)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSmall
-                            elide: Text.ElideRight
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            visible: model.description !== ""
+                            spacing: 2
+
+                            Text {
+                                text: model.name
+                                color: Colors.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeBody
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+
+                            Text {
+                                text: model.description
+                                color: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.55)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                visible: model.description !== ""
+                            }
                         }
                     }
-                }
 
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onEntered: root._selectedIndex = index
-                    onClicked: root._activateCurrent()
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onEntered: root._selectedIndex = _item.index
+                        onClicked: root._activateCurrent()
+                    }
                 }
             }
         }
