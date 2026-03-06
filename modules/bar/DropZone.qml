@@ -6,19 +6,40 @@ Item {
     id: dropZone
 
     required property string zoneName
+
     // Auto-highlight when a widget is dragged over this zone
     property bool highlighted: BarLayoutService.isDragging
         && BarLayoutService.dragHoverZone === zoneName
 
-    // Dashed border rectangle
+    // Extra highlight when widget picker is open for this zone
+    property bool selected: BarLayoutService.widgetPickerOpen
+        && BarLayoutService.widgetPickerTargetSection === zoneName
+
+    // Must match WidgetPickerWindow.implicitWidth; shared positioning logic.
+    // FIXME: promote to a shared constant in V2.
+    readonly property int _pickerWidth: 480
+
+    // Zone indicator rectangle — full height, horizontal padding only so the
+    // border matches widget height rather than being visually shorter.
     Rectangle {
         anchors.fill: parent
-        anchors.margins: Theme.iconPadding
-        color: "transparent"
-        border.color: highlighted ? Colors.highlight : Colors.border
-        border.width: 1
+        anchors.leftMargin: Theme.iconPadding
+        anchors.rightMargin: Theme.iconPadding
+
         radius: Theme.cornerRadius
-        opacity: highlighted ? 0.8 : 0.4
+
+        // Semi-transparent fill makes each zone visually distinct without
+        // fully obscuring the widgets underneath in layout mode.
+        color: selected
+            ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.22)
+            : highlighted
+                ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
+                : Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.12)
+
+        border.color: (selected || highlighted) ? Colors.highlight : Colors.border
+        border.width: 1
+
+        opacity: selected ? 1.0 : highlighted ? 0.9 : 0.7
 
         Behavior on opacity {
             NumberAnimation {
@@ -26,21 +47,61 @@ Item {
                 easing.type: Theme.anim.highlightType
             }
         }
-
+        Behavior on color {
+            ColorAnimation { duration: Theme.anim.highlightDuration }
+        }
         Behavior on border.color {
-            ColorAnimation {
-                duration: Theme.anim.highlightDuration
-            }
+            ColorAnimation { duration: Theme.anim.highlightDuration }
         }
     }
 
-    // Zone label
+    // Zone label — pinned to the bottom-center so it doesn't obscure widget
+    // content which is typically vertically centered in the bar.
     Text {
-        anchors.centerIn: parent
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 3
+        anchors.horizontalCenter: parent.horizontalCenter
         text: dropZone.zoneName
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSizeSmall
-        color: Colors.textMuted
-        opacity: 0.5
+        color: selected ? Colors.highlight : Colors.textMuted
+        opacity: selected ? 0.9 : 0.65
+
+        Behavior on color {
+            ColorAnimation { duration: Theme.anim.highlightDuration }
+        }
+    }
+
+    // Click to select this zone and open / toggle the widget picker.
+    // DragOverlay sits at z:999, so this MouseArea captures events above
+    // all widget-level MouseAreas without needing to block them in normal mode.
+    MouseArea {
+        anchors.fill: parent
+        enabled: BarLayoutService.settingsMode
+        cursorShape: Qt.PointingHandCursor
+
+        onClicked: {
+            if (BarLayoutService.isDragging) return;
+
+            let section = dropZone.zoneName;
+            let pad = Theme.barPadding;
+            // dropZone.x is the zone's position within the Row whose leftMargin = pad,
+            // so the zone's center in bar-content coordinates is:
+            let zoneBarCenterX = dropZone.x + dropZone.width / 2 + pad;
+            // All three zones are equal-width; total bar = 3 zones + 2 * padding.
+            let barW = dropZone.width * 3 + 2 * pad;
+            let pickerW = dropZone._pickerWidth;
+            let leftM = Math.max(pad, Math.min(barW - pickerW - pad,
+                                               zoneBarCenterX - pickerW / 2));
+
+            if (BarLayoutService.widgetPickerOpen
+                    && BarLayoutService.widgetPickerTargetSection === section) {
+                BarLayoutService.widgetPickerOpen = false;
+            } else {
+                BarLayoutService.widgetPickerLeftMargin = leftM;
+                BarLayoutService.widgetPickerTargetSection = section;
+                BarLayoutService.widgetPickerOpen = true;
+            }
+        }
     }
 }

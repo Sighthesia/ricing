@@ -32,7 +32,8 @@ Item {
                 description: app.comment || app.genericName || "",
                 icon:        app.icon    || "application-x-executable",
                 onActivate:  (function(a) {
-                    return function() { a.launch(); };
+                    // DesktopEntry.execute() is the correct Quickshell API.
+                    return function() { a.execute(); };
                 })(app)
             });
         }

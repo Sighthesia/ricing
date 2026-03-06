@@ -240,13 +240,20 @@ Item {
                 // to avoid showing an empty flash strip.
                 if (root._flashActive) {
                     _revertTimer.stop()
-                    root._flashActive  = false
+                    // Clear _modeOverride FIRST so _normalY reflects the correct natural state
+                    // (empty workspace → _showOverview=true) before _flashActive triggers handlers.
                     root._modeOverride = ""
+                    root._flashActive  = false
                     // Stop all running flash/exit animations and snap to rest state
                     _pillExpandAnim.stop(); _pillCollapseAnim.stop()
                     _pillBg.height = root._pillH
                     _overviewExitAnim.stop(); _focusExitAnim.stop()
                     _overviewEnterAnim.stop(); _focusEnterAnim.stop()
+                    // Force-set correct positions after handlers fired (may have started anims)
+                    _departYAnim.stop(); _departScaleAnim.stop()
+                    _returnYAnim.stop(); _returnScaleAnim.stop()
+                    _focusDepartYAnim.stop(); _focusDepartScaleAnim.stop()
+                    _focusReturnYAnim.stop(); _focusReturnScaleAnim.stop()
                     _overviewRow.y = _overviewRow._normalY; _overviewRow.scale = 1.0
                     _focusRow.y = _focusRow._normalY; _focusRow.scale = 1.0
                     _flashCollapseReleaseTimer.restart()

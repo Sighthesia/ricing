@@ -1,0 +1,61 @@
+{
+    "animation": {
+        "speedFactor": 1,
+        "staggerEnterDuration": 280,
+        "staggerEnterOffsetY": 30,
+        "staggerExitDuration": 100,
+        "staggerExitOffsetY": 10,
+        "staggerExitStep": 15,
+        "staggerLevel1BaseDelay": 60,
+        "staggerLevel1Step": 50,
+        "staggerLevel2BaseDelay": 120,
+        "staggerLevel2Step": 50
+    },
+    "appearance": {
+        "accentColor": "#7aa2f7",
+        "backgroundColor": "#1a1a1a",
+        "borderColor": "#3b4261",
+        "cornerRadius": 10,
+        "darkMode": true,
+        "fontFamily": "LXGW WenKai GB Screen",
+        "fontMono": "JetBrainsMono Nerd Font",
+        "fontSizeBody": 14,
+        "fontSizeIcon": 16,
+        "fontSizeSmall": 10,
+        "matugenEnabled": false,
+        "matugenScheme": "scheme-tonal-spot",
+        "surfaceColor": "#252525",
+        "textColor": "#c0caf5",
+        "textMutedColor": "#565f89",
+        "uiScale": 1,
+        "wallpaperDirectory": "",
+        "wallpaperPath": ""
+    },
+    "bar": {
+        "backgroundOpacity": 0.85,
+        "height": 36,
+        "padding": 8,
+        "position": "top",
+        "widgetSpacing": 6
+    },
+    "barBehavior": {
+        "autoHide": false,
+        "autoHideDelay": 500,
+        "autoShowDelay": 150
+    },
+    "notifications": {
+        "criticalDuration": 0,
+        "lowDuration": 3000,
+        "maxHistory": 100,
+        "maxVisible": 5,
+        "normalDuration": 5000,
+        "persistHistory": true,
+        "position": "top_right"
+    },
+    "workspaceWidget": {
+        "defaultMode": "focus",
+        "hoverEnabled": true,
+        "revertDelay": 1500,
+        "titleMaxWidth": 240
+    }
+}

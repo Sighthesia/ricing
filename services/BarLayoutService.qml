@@ -42,6 +42,10 @@ Singleton {
     // Updated whenever the user clicks a section in layout mode.
     property string widgetPickerTargetSection: "right"
 
+    // Left-edge pixel offset used by WidgetPickerWindow to position itself
+    // below the active section. Updated together with widgetPickerTargetSection.
+    property real widgetPickerLeftMargin: 0
+
     // Computed alias — keeps all existing DragOverlay/BarSection bindings unchanged
     readonly property bool settingsMode: activePanel === "layout"
 

@@ -224,98 +224,98 @@ Item {
             }
         }
 
-        // Results list
-            StaggerItem {
-                id: s_resultsViewport
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                exitDelay: 0
+        // Results list — viewport wrapper receives structural stagger
+        StaggerItem {
+            id: s_resultsViewport
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            exitDelay: 0
 
-                ListView {
-                    id: resultList
-                    anchors.fill: parent
-                    model: _results
-                    clip: true
-                    // No pre-caching: delegates are created on demand when items enter the
-                    // visible viewport, so Component.onCompleted always fires on viewport
-                    // entry and triggers the slide-up animation naturally.
-                    cacheBuffer: 0
+            ListView {
+                id: resultList
+                anchors.fill: parent
+                model: _results
+                clip: true
+                // No pre-caching: delegates are created on demand when items enter the
+                // visible viewport, so Component.onCompleted always fires on viewport
+                // entry and triggers the slide-up animation naturally.
+                cacheBuffer: 0
 
-                    delegate: StaggerItem {
-                        id: _item
-                        required property int    index
-                        // Qt 6 required-property delegates don't inject the implicit `model`
-                        // context — each role must be declared explicitly.
-                        required property string name
-                        required property string description
-                        required property string icon
+                delegate: StaggerItem {
+                    id: _item
+                    required property int    index
+                    // Qt 6 required-property delegates don't inject the implicit `model`
+                    // context — each role must be declared explicitly.
+                    required property string name
+                    required property string description
+                    required property string icon
 
-                        // Use index % 8 so the stagger repeats in groups of 8 — high-index
-                        // items scrolled into view won't wait the full max delay.
-                        // FIXME: 25 ms per-item step is launcher-specific; promote to a
-                        // Theme.anim token when launcher stagger tokens are added.
-                        delay:  SettingsService.data.animation.staggerLevel1BaseDelay
-                                + (index % 8) * 25
-                        width:  resultList.width
-                        height: 52
+                    // Use index % 8 so the stagger repeats in groups of 8 — high-index
+                    // items scrolled into view won't wait the full max delay.
+                    // FIXME: 25 ms per-item step is launcher-specific; promote to a
+                    // Theme.anim token when launcher stagger tokens are added.
+                    delay:  SettingsService.data.animation.staggerLevel1BaseDelay
+                            + (index % 8) * 25
+                    width:  resultList.width
+                    height: 52
 
-                        // Trigger slide-up + fade-in whenever this delegate is (re)created.
-                        // This handles BOTH model refresh (typing) and viewport entry (scroll)
-                        // because cacheBuffer: 0 ensures delegates exist only while visible.
-                        Component.onCompleted: runEnter()
+                    // Trigger slide-up + fade-in whenever this delegate is (re)created.
+                    // This handles BOTH model refresh (typing) and viewport entry (scroll)
+                    // because cacheBuffer: 0 ensures delegates exist only while visible.
+                    Component.onCompleted: runEnter()
 
-                        Rectangle {
+                    Rectangle {
+                        anchors.fill: parent
+                        color: root._selectedIndex === _item.index
+                            ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
+                            : "transparent"
+
+                        RowLayout {
                             anchors.fill: parent
-                            color: root._selectedIndex === _item.index
-                                ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
-                                : "transparent"
+                            anchors.margins: 12
+                            spacing: 10
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.margins: 12
-                                spacing: 10
+                            Image {
+                                source: "image://icon/" + (_item.icon || "application-x-executable")
+                                width: 24; height: 24
+                                sourceSize: Qt.size(24, 24)
+                            }
 
-                                Image {
-                                    source: "image://icon/" + (_item.icon || "application-x-executable")
-                                    width: 24; height: 24
-                                    sourceSize: Qt.size(24, 24)
-                                }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
 
-                                ColumnLayout {
+                                Text {
+                                    text: _item.name
+                                    color: Colors.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeBody
+                                    elide: Text.ElideRight
                                     Layout.fillWidth: true
-                                    spacing: 2
+                                }
 
-                                    Text {
-                                        text: _item.name
-                                        color: Colors.text
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSizeBody
-                                        elide: Text.ElideRight
-                                        Layout.fillWidth: true
-                                    }
-
-                                    Text {
-                                        text: _item.description
-                                        color: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.55)
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        elide: Text.ElideRight
-                                        Layout.fillWidth: true
-                                        visible: _item.description !== ""
-                                    }
+                                Text {
+                                    text: _item.description
+                                    color: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.55)
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                    visible: _item.description !== ""
                                 }
                             }
+                        }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onEntered: root._selectedIndex = _item.index
-                                onClicked: root._activateCurrent()
-                            }
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onEntered: root._selectedIndex = _item.index
+                            onClicked: root._activateCurrent()
                         }
                     }
                 }
             }
+        }
     }
 
     function _activateCurrent(): void {

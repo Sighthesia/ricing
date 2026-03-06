@@ -106,10 +106,20 @@ Item {
                 // Left-click in layout mode: toggle picker for the clicked section.
                 // Clicking the already-active section closes the picker.
                 let section = barContent.hitTestSection(mouse.x);
+                // Align picker window below the hit section (fallback for clicks in
+                // padding areas not covered by DropZone MouseAreas).
+                let pad = Theme.barPadding;
+                let zoneW = (barContent.width - 2 * pad) / 3;
+                let idx = section === "left" ? 0 : section === "center" ? 1 : 2;
+                let barX = pad + idx * zoneW + zoneW / 2;
+                let pickerW = 480; // FIXME: must match WidgetPickerWindow.implicitWidth
+                let leftM = Math.max(pad, Math.min(barContent.width - pickerW - pad,
+                                                   barX - pickerW / 2));
                 if (BarLayoutService.widgetPickerOpen
                         && BarLayoutService.widgetPickerTargetSection === section) {
                     BarLayoutService.widgetPickerOpen = false;
                 } else {
+                    BarLayoutService.widgetPickerLeftMargin = leftM;
                     BarLayoutService.widgetPickerTargetSection = section;
                     BarLayoutService.widgetPickerOpen = true;
                 }

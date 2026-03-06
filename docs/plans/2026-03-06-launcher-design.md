@@ -42,10 +42,10 @@ The panel is declared in `shell.qml` (same pattern as `SettingsPanelWindow`,
 
 `LauncherCore` drives its provider by inspecting `searchText`:
 
-| `searchText` prefix | Active provider     |
-|---------------------|---------------------|
+| `searchText` prefix | Active provider        |
+| ------------------- | ---------------------- |
 | *(anything else)*   | `ApplicationsProvider` |
-| `>clip `            | `ClipboardProvider` |
+| `>clip `            | `ClipboardProvider`    |
 
 When searching, `LauncherCore` calls `getResults(text)` on the active provider
 and merges results into a single `ListModel`. Prefixes are stripped before they
@@ -81,11 +81,11 @@ function openClipboard()          // @ipc: open with ">clip " pre-filled
 
 Wraps `cliphist` via `Quickshell.Process`:
 
-| Method              | Shell command                               |
-|---------------------|---------------------------------------------|
-| `list(n)`           | `cliphist list -preview-width 80`           |
-| `copyToClipboard(id)` | `cliphist decode <id> \| wl-copy`         |
-| `decode(id, cb)`    | `cliphist decode <id>` → callback           |
+| Method                | Shell command                     |
+| --------------------- | --------------------------------- |
+| `list(n)`             | `cliphist list -preview-width 80` |
+| `copyToClipboard(id)` | `cliphist decode <id> \| wl-copy` |
+| `decode(id, cb)`      | `cliphist decode <id>` → callback |
 
 Parsed items: `{ id, preview, isImage }`.
 
@@ -121,10 +121,10 @@ function getResults(text): Array    // return [{name, description, icon, onActiv
 
 ## Parallel Worktree Plan
 
-| Branch                    | Scope                                               |
-|---------------------------|-----------------------------------------------------|
-| `feat/launcher-core`      | LauncherService, LauncherPanel, LauncherCore, ApplicationsProvider |
-| `feat/clipboard-service`  | ClipboardService, ClipboardProvider                 |
+| Branch                   | Scope                                                              |
+| ------------------------ | ------------------------------------------------------------------ |
+| `feat/launcher-core`     | LauncherService, LauncherPanel, LauncherCore, ApplicationsProvider |
+| `feat/clipboard-service` | ClipboardService, ClipboardProvider                                |
 
 **Integration sequence:**
 1. Both branches develop independently.

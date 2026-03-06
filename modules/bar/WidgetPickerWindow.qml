@@ -8,9 +8,10 @@ import qs.services
 AnimatedPanelBase {
     id: root
 
-    // Mirror SettingsPanelWindow positioning: top-right, margin pushes below bar
-    anchors { top: true; right: true }
-    margins { top: Theme.barHeight }
+    // Position below the active bar section; left margin is computed by the
+    // section click handler and stored in BarLayoutService.widgetPickerLeftMargin.
+    anchors { top: true; left: true }
+    margins { top: Theme.barHeight; left: BarLayoutService.widgetPickerLeftMargin }
 
     implicitWidth: 480
     implicitHeight: 480
