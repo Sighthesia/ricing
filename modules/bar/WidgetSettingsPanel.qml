@@ -14,6 +14,10 @@ import "settings"
 PopupWindow {
     id: root
 
+    StaggerOrchestrator {
+        id: _stagger
+    }
+
     required property Item anchorTarget
 
     color: "transparent"
@@ -67,9 +71,19 @@ PopupWindow {
                 _opacityDelayTimer.stop();
                 _staggerEnterTimer.stop();
                 _state = "closing";
+                _stagger.clear();
+                _stagger.registerItem(_siHeader, 0, 1);
+                _stagger.registerItem(_siDivider, 1, 1);
+                _stagger.registerItem(_siAppearance, 2, 1);
+                _stagger.registerItem(_siFunctional, 3, 1);
+                _stagger.registerItem(_siDelete, 4, 1);
+                _stagger.runExit();
+                // Defensive fallback: ensure panel sections always leave visible state
+                // even if orchestration timing is interrupted mid-transition.
                 _siHeader.runExit();
                 _siAppearance.runExit();
                 _siFunctional.runExit();
+                _siDelete.runExit();
                 _opacityCloseAnim.restart();
                 _scaleCloseAnim.restart();
             }
@@ -81,9 +95,19 @@ PopupWindow {
         id: _staggerEnterTimer
         interval: 120; repeat: false
         onTriggered: {
+            _stagger.clear()
+            _stagger.registerItem(_siHeader, 0, 1)
+            _stagger.registerItem(_siDivider, 1, 1)
+            _stagger.registerItem(_siAppearance, 2, 1)
+            _stagger.registerItem(_siFunctional, 3, 1)
+            _stagger.registerItem(_siDelete, 4, 1)
+            _stagger.runEnter()
+            // Defensive fallback: some compositor/lifecycle races can skip the
+            // orchestrated callback on first open; explicitly trigger all groups.
             _siHeader.runEnter()
             _siAppearance.runEnter()
             _siFunctional.runEnter()
+            _siDelete.runEnter()
         }
     }
 
@@ -150,7 +174,7 @@ PopupWindow {
             id: contentFlickable
             anchors {
                 top: parent.top; left: parent.left; right: parent.right
-                bottom: deleteBtn.top
+                bottom: _siDelete.top
                 margins: 12; bottomMargin: 0
             }
             contentHeight: panelLayout.implicitHeight
@@ -216,7 +240,19 @@ PopupWindow {
             } // StaggerItem _siHeader
 
             // Divider between header and groups
-            Rectangle { Layout.fillWidth: true; height: 1; color: Colors.border; opacity: 0.4; Layout.bottomMargin: 4 }
+            StaggerItem {
+                id: _siDivider
+                Layout.fillWidth: true
+                height: 1
+                exitDelay: 0
+                Layout.bottomMargin: 4
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: Colors.border
+                    opacity: 0.4
+                }
+            }
 
             // Appearance group
             StaggerItem {
@@ -278,34 +314,41 @@ PopupWindow {
         } // Flickable
 
         // Delete widget — fixed at the bottom of the panel card, always visible
-        Rectangle {
-            id: deleteBtn
+        StaggerItem {
+            id: _siDelete
             anchors {
                 left: parent.left; right: parent.right; bottom: parent.bottom
                 margins: 12; bottomMargin: 10
             }
             height: 28
-            radius: Theme.cornerRadius - 2
-            color: _deleteArea.containsMouse ? Qt.rgba(247, 118, 142, 0.15) : Colors.surface
-            border.color: _deleteArea.containsMouse ? "#f7768e" : Colors.border
-            border.width: 1
-            Behavior on color        { ColorAnimation { duration: Theme.anim.highlightDuration } }
-            Behavior on border.color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+            delay: 360
+            exitDelay: 0
 
-            Text {
-                anchors.centerIn: parent
-                text: "删除组件"
-                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
-                color: "#f7768e"
-            }
-            MouseArea {
-                id: _deleteArea; anchors.fill: parent
-                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    let key = BarLayoutService.activeWidgetInstanceKey;
-                    WidgetConfigService.removeConfig(key);
-                    BarLayoutService.removeWidget(key);
-                    // Panel closes automatically via removeWidget → settingsMode guard
+            Rectangle {
+                id: deleteBtn
+                anchors.fill: parent
+                radius: Theme.cornerRadius - 2
+                color: _deleteArea.containsMouse ? Qt.rgba(247, 118, 142, 0.15) : Colors.surface
+                border.color: _deleteArea.containsMouse ? "#f7768e" : Colors.border
+                border.width: 1
+                Behavior on color        { ColorAnimation { duration: Theme.anim.highlightDuration } }
+                Behavior on border.color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "删除组件"
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
+                    color: "#f7768e"
+                }
+                MouseArea {
+                    id: _deleteArea; anchors.fill: parent
+                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        let key = BarLayoutService.activeWidgetInstanceKey;
+                        WidgetConfigService.removeConfig(key);
+                        BarLayoutService.removeWidget(key);
+                        // Panel closes automatically via removeWidget → settingsMode guard
+                    }
                 }
             }
         }

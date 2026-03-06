@@ -38,6 +38,10 @@ AnimatedPanelBase {
 
     property string searchQuery: ""
 
+    StaggerOrchestrator {
+        id: _stagger
+    }
+
     // Filtered list of widget ids based on the current search query
     readonly property var filteredWidgets: {
         let keys = Object.keys(widgetRegistry);
@@ -167,103 +171,122 @@ AnimatedPanelBase {
                         width: grid.cellWidth
                         height: grid.cellHeight
 
-                        Rectangle {
-                            id: card
+                        StaggerItem {
+                            id: s_card
                             anchors.fill: parent
-                            anchors.margins: 4
-                            radius: Theme.cornerRadius
-                            color: "transparent"
-                            border.color: cardHover.containsMouse ? Colors.border : "transparent"
-                            border.width: 1
 
-                            Behavior on border.color {
-                                ColorAnimation { duration: Theme.anim.highlightDuration }
+                            // FIXME: 8-slot/25ms cycle is a tuned picker UX constant; promote to settings tokens if reused.
+                            delay: SettingsService.data.animation.staggerLevel2BaseDelay
+                                 + (index % 8) * 25
+                            exitDelay: 0
+
+                            Component.onCompleted: runEnter()
+
+                            Connections {
+                                target: grid
+                                function onModelChanged() {
+                                    s_card.runEnter()
+                                }
                             }
 
-                            // Wipe-reveal background — rendered first so it sits behind content.
-                            HoverRevealHighlight {
+                            Rectangle {
+                                id: card
                                 anchors.fill: parent
+                                anchors.margins: 4
                                 radius: Theme.cornerRadius
-                                hovered: cardHover.containsMouse
-                                highlightColor: Colors.surface
-                                highlightOpacity: 1.0
-                            }
+                                color: "transparent"
+                                border.color: cardHover.containsMouse ? Colors.border : "transparent"
+                                border.width: 1
 
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 6
-                                spacing: 4
+                                Behavior on border.color {
+                                    ColorAnimation { duration: Theme.anim.highlightDuration }
+                                }
 
-                                // Live widget preview — scaled down to fit the card
-                                Item {
-                                    Layout.fillWidth: true
-                                    height: 60
-                                    clip: true
+                                // Wipe-reveal background — rendered first so it sits behind content.
+                                HoverRevealHighlight {
+                                    anchors.fill: parent
+                                    radius: Theme.cornerRadius
+                                    hovered: cardHover.containsMouse
+                                    highlightColor: Colors.surface
+                                    highlightOpacity: 1.0
+                                }
 
-                                    Loader {
-                                        id: widgetLoader
-                                        anchors.centerIn: parent
-                                        source: root.widgetRegistry[modelData] || ""
-                                        transform: Scale {
-                                            xScale: 0.65
-                                            yScale: 0.65
-                                            origin.x: widgetLoader.width / 2
-                                            origin.y: widgetLoader.height / 2
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 6
+                                    spacing: 4
+
+                                    // Live widget preview — scaled down to fit the card
+                                    Item {
+                                        Layout.fillWidth: true
+                                        height: 60
+                                        clip: true
+
+                                        Loader {
+                                            id: widgetLoader
+                                            anchors.centerIn: parent
+                                            source: root.widgetRegistry[modelData] || ""
+                                            transform: Scale {
+                                                xScale: 0.65
+                                                yScale: 0.65
+                                                origin.x: widgetLoader.width / 2
+                                                origin.y: widgetLoader.height / 2
+                                            }
                                         }
+                                    }
+
+                                    // Widget name label
+                                    Text {
+                                        Layout.fillWidth: true
+                                        horizontalAlignment: Text.AlignHCenter
+                                        text: root.widgetNames[modelData] || modelData
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Colors.textMuted
+                                        elide: Text.ElideRight
                                     }
                                 }
 
-                                // Widget name label
-                                Text {
-                                    Layout.fillWidth: true
-                                    horizontalAlignment: Text.AlignHCenter
-                                    text: root.widgetNames[modelData] || modelData
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    color: Colors.textMuted
-                                    elide: Text.ElideRight
+                                // Instance count badge — shown only when at least one instance exists
+                                Rectangle {
+                                    visible: root.countInstances(modelData) > 0
+                                    width: 18
+                                    height: 18
+                                    radius: 9
+                                    color: Colors.highlight
+                                    anchors.top: parent.top
+                                    anchors.right: parent.right
+                                    anchors.topMargin: 2
+                                    anchors.rightMargin: 2
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: root.countInstances(modelData)
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Math.max(8, Theme.fontSizeSmall - 2)
+                                        color: "white"
+                                    }
                                 }
-                            }
 
-                            // Instance count badge — shown only when at least one instance exists
-                            Rectangle {
-                                visible: root.countInstances(modelData) > 0
-                                width: 18
-                                height: 18
-                                radius: 9
-                                color: Colors.highlight
-                                anchors.top: parent.top
-                                anchors.right: parent.right
-                                anchors.topMargin: 2
-                                anchors.rightMargin: 2
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: root.countInstances(modelData)
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Math.max(8, Theme.fontSizeSmall - 2)
-                                    color: "white"
+                                ClickRipple {
+                                    id: cardRipple
+                                    anchors.fill: parent
+                                    radius: Theme.cornerRadius
+                                    rippleColor: Colors.highlight
+                                    rippleOpacity: 0.18
                                 }
-                            }
 
-                            ClickRipple {
-                                id: cardRipple
-                                anchors.fill: parent
-                                radius: Theme.cornerRadius
-                                rippleColor: Colors.highlight
-                                rippleOpacity: 0.18
-                            }
-
-                            MouseArea {
-                                id: cardHover
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                // Insert into the section the user clicked on the bar to open the picker.
-                                // FIXME: V2 should support dragging cards directly onto the bar.
-                                onClicked: (mouse) => {
-                                    cardRipple.triggerRipple(mouse.x, mouse.y)
-                                    BarLayoutService.addWidget(modelData, BarLayoutService.widgetPickerTargetSection)
+                                MouseArea {
+                                    id: cardHover
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    // Insert into the section the user clicked on the bar to open the picker.
+                                    // FIXME: V2 should support dragging cards directly onto the bar.
+                                    onClicked: (mouse) => {
+                                        cardRipple.triggerRipple(mouse.x, mouse.y)
+                                        BarLayoutService.addWidget(modelData, BarLayoutService.widgetPickerTargetSection)
+                                    }
                                 }
                             }
                         }
@@ -278,14 +301,18 @@ AnimatedPanelBase {
     Connections {
         target: root
         function onPanelOpening() {
-            s_wpTitle.runEnter()
-            s_wpSearch.runEnter()
-            s_wpGrid.runEnter()
+            _stagger.clear();
+            _stagger.registerItem(s_wpTitle, 0, 1);
+            _stagger.registerItem(s_wpSearch, 1, 1);
+            _stagger.registerItem(s_wpGrid, 2, 1);
+            _stagger.runEnter();
         }
         function onPanelClosing() {
-            s_wpTitle.runExit()
-            s_wpSearch.runExit()
-            s_wpGrid.runExit()
+            _stagger.clear();
+            _stagger.registerItem(s_wpTitle, 0, 1);
+            _stagger.registerItem(s_wpSearch, 1, 1);
+            _stagger.registerItem(s_wpGrid, 2, 1);
+            _stagger.runExit();
         }
     }
 }

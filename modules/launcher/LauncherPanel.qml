@@ -23,8 +23,14 @@ AnimatedPanelBase {
 
     active: LauncherService.isOpen
 
-    onPanelOpening: _core.openPanel()
-    onPanelClosing: _core.closePanel()
+    onPanelOpening: {
+        _core.openPanel()
+        _core.runStructuralEnter()
+    }
+    onPanelClosing: {
+        _core.runStructuralExit()
+        _core.closePanel()
+    }
 
     // Panel background card
     Rectangle {

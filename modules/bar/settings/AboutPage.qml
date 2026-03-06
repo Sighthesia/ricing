@@ -3,10 +3,39 @@ import QtQuick.Dialogs
 import Quickshell
 import qs.config
 import qs.services
+import ".."
 
 // About page: version info and settings reset button.
 Item {
     id: root
+
+    StaggerOrchestrator {
+        id: _stagger
+    }
+
+    function runEnterAnimation(): void {
+        _stagger.clear()
+        _stagger.registerItem(s_header, 0, 1)
+        _stagger.registerItem(s_divider1, 1, 1)
+        _stagger.registerItem(s_resetButton, 2, 1)
+        _stagger.registerItem(s_resetHint, 3, 1)
+        _stagger.registerItem(s_divider2, 4, 1)
+        _stagger.registerItem(s_ioRow, 5, 1)
+        _stagger.registerItem(s_ioHint, 6, 1)
+        _stagger.runEnter()
+    }
+
+    function runExitAnimation(): void {
+        _stagger.clear()
+        _stagger.registerItem(s_header, 0, 1)
+        _stagger.registerItem(s_divider1, 1, 1)
+        _stagger.registerItem(s_resetButton, 2, 1)
+        _stagger.registerItem(s_resetHint, 3, 1)
+        _stagger.registerItem(s_divider2, 4, 1)
+        _stagger.registerItem(s_ioRow, 5, 1)
+        _stagger.registerItem(s_ioHint, 6, 1)
+        _stagger.runExit()
+    }
 
     implicitWidth: parent ? parent.width : 340
     implicitHeight: aboutCol.implicitHeight + 24
@@ -23,44 +52,57 @@ Item {
         spacing: 12
 
         // Shell name + version
-        Column {
+        StaggerItem {
+            id: s_header
             width: parent.width
-            spacing: 4
+            height: _headerCol.implicitHeight
 
-            Text {
-                text: "DymicShell"
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeBody
-                font.weight: Font.DemiBold
-                color: Colors.text
-            }
-
-            Text {
-                text: "Version 0.1.0"
-                font.family: Theme.fontMono
-                font.pixelSize: Theme.fontSizeSmall
-                color: Colors.textMuted
-            }
-
-            Text {
-                text: "Config: " + SettingsService.settingsFile
-                font.family: Theme.fontMono
-                font.pixelSize: Theme.fontSizeSmall - 1
-                color: Colors.textMuted
-                elide: Text.ElideMiddle
+            Column {
+                id: _headerCol
                 width: parent.width
+                spacing: 4
+
+                Text {
+                    text: "DymicShell"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeBody
+                    font.weight: Font.DemiBold
+                    color: Colors.text
+                }
+
+                Text {
+                    text: "Version 0.1.0"
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Colors.textMuted
+                }
+
+                Text {
+                    text: "Config: " + SettingsService.settingsFile
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeSmall - 1
+                    color: Colors.textMuted
+                    elide: Text.ElideMiddle
+                    width: parent.width
+                }
             }
         }
 
         // Divider
-        Rectangle {
+        StaggerItem {
+            id: s_divider1
             width: parent.width
             height: 1
-            color: Colors.border
+
+            Rectangle {
+                anchors.fill: parent
+                color: Colors.border
+            }
         }
 
         // Reset to defaults button
-        Item {
+        StaggerItem {
+            id: s_resetButton
             width: parent.width
             height: 34
 
@@ -114,22 +156,44 @@ Item {
         }
 
         // Reset confirmation hint
-        Text {
-            text: "重置后设置将在下一帧立即生效（热重载）"
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSmall - 1
-            color: Colors.textMuted
-            wrapMode: Text.WordWrap
+        StaggerItem {
+            id: s_resetHint
             width: parent.width
+            height: _resetHintText.implicitHeight
+
+            Text {
+                id: _resetHintText
+                text: "重置后设置将在下一帧立即生效（热重载）"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall - 1
+                color: Colors.textMuted
+                wrapMode: Text.WordWrap
+                width: parent.width
+            }
         }
 
         // Divider
-        Rectangle { width: parent.width; height: 1; color: Colors.border }
+        StaggerItem {
+            id: s_divider2
+            width: parent.width
+            height: 1
+
+            Rectangle {
+                anchors.fill: parent
+                color: Colors.border
+            }
+        }
 
         // Export / Import row
-        Row {
+        StaggerItem {
+            id: s_ioRow
             width: parent.width
-            spacing: 8
+            height: _ioRow.height
+
+            Row {
+                id: _ioRow
+                width: parent.width
+                spacing: 8
 
             // ── 导出配置 ─────────────────────────
             Rectangle {
@@ -166,8 +230,8 @@ Item {
                 }
             }
 
-            // ── 导入配置 ─────────────────────────
-            Rectangle {
+                // ── 导入配置 ─────────────────────────
+                Rectangle {
                 width: (parent.width - 8) / 2
                 height: 34
                 radius: Theme.cornerRadius - 2
@@ -197,16 +261,24 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: importDialog.open()
                 }
+                }
             }
         }
 
-        Text {
-            text: "导出：将当前设置复制到剪贴板  导入：选择一个 JSON 文件覆盖当前配置"
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSmall - 1
-            color: Colors.textMuted
-            wrapMode: Text.WordWrap
+        StaggerItem {
+            id: s_ioHint
             width: parent.width
+            height: _ioHintText.implicitHeight
+
+            Text {
+                id: _ioHintText
+                text: "导出：将当前设置复制到剪贴板  导入：选择一个 JSON 文件覆盖当前配置"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall - 1
+                color: Colors.textMuted
+                wrapMode: Text.WordWrap
+                width: parent.width
+            }
         }
     }
 
@@ -221,4 +293,9 @@ Item {
             Quickshell.execDetached(["cp", src, SettingsService.settingsFile])
         }
     }
+
+    // When switching to About while panel is already open, loader creates this
+    // page without a new panelOpening signal. Trigger one enter cycle so items
+    // do not remain at StaggerItem's default invisible state.
+    Component.onCompleted: Qt.callLater(runEnterAnimation)
 }
