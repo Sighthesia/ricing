@@ -31,7 +31,11 @@ Item {
     // --- Private state ---
     property var _providers: [appProvider]
 
+    // Parallel stores: ListModel holds display-only scalars; _resultData holds
+    // the full result objects including onActivate functions (ListModel cannot
+    // store JS functions — they are stripped on append).
     ListModel { id: _results }
+    property var _resultData: []
 
     function _activeProvider(): var {
         let text = searchField.text;
@@ -42,13 +46,23 @@ Item {
 
     function _refreshResults(): void {
         _results.clear();
+        root._resultData = [];
         let provider = _activeProvider();
         if (!provider) return;
 
         let q = searchField.text;
         let items = provider.getResults(q);
+        let displayItems = [];
         for (let i = 0; i < items.length; i++) {
-            _results.append(items[i]);
+            displayItems.push({
+                name:        items[i].name        || "",
+                description: items[i].description || "",
+                icon:        items[i].icon        || ""
+            });
+        }
+        root._resultData = items;
+        for (let j = 0; j < displayItems.length; j++) {
+            _results.append(displayItems[j]);
         }
         _selectedIndex = items.length > 0 ? 0 : -1;
     }
@@ -179,10 +193,10 @@ Item {
     }
 
     function _activateCurrent(): void {
-        if (root._selectedIndex < 0 || root._selectedIndex >= _results.count) return;
-        let item = _results.get(root._selectedIndex);
+        if (root._selectedIndex < 0 || root._selectedIndex >= root._resultData.length) return;
+        let item = root._resultData[root._selectedIndex];
         LauncherService.isOpen = false;
-        if (item.onActivate) item.onActivate();
+        if (item && item.onActivate) item.onActivate();
     }
 
     // Provider instances (children of LauncherCore)
