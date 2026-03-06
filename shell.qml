@@ -3,6 +3,7 @@ import Quickshell
 import qs.modules.bar
 import qs.modules.background
 import qs.modules.notifications
+import qs.modules.launcher
 
 ShellRoot {
     BackgroundWindow {}
@@ -13,4 +14,5 @@ ShellRoot {
     WallpaperPickerWindow {}
     NotificationPopupWindow {}
     NotificationHistoryPanel {}
+    LauncherPanel {}
 }
