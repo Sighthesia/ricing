@@ -37,28 +37,30 @@ PopupWindow {
     // Human-readable widget type label (currently unused in display, reserved for tooltip).
     property string _targetWidgetLabel: ""
 
+    StaggerOrchestrator {
+        id: _stagger
+    }
+
     // Sync visible state back to service when menu is closed programmatically.
     onVisibleChanged: if (!visible) BarLayoutService.contextMenuOpen = false
 
     on_ActiveChanged: {
+        _stagger.clear();
+        _stagger.registerItem(s_layoutItem, 0, 1);
+        _stagger.registerItem(s_settingsItem, 1, 1);
+        if (_targetWidgetKey !== "") {
+            _stagger.registerItem(s_widgetDivider, 2, 1);
+            _stagger.registerItem(s_widgetSettings, 3, 1);
+            _stagger.registerItem(s_widgetCopy, 4, 1);
+            _stagger.registerItem(s_widgetDelete, 5, 1);
+        }
+
         if (_active) {
             visible = true;
             enterAnim.restart();
-            s_layoutItem.runEnter()
-            s_settingsItem.runEnter()
-            if (_targetWidgetKey !== "") {
-                s_widgetSettings.runEnter()
-                s_widgetCopy.runEnter()
-                s_widgetDelete.runEnter()
-            }
+            _stagger.runEnter();
         } else {
-            s_layoutItem.runExit()
-            s_settingsItem.runExit()
-            if (_targetWidgetKey !== "") {
-                s_widgetSettings.runExit()
-                s_widgetCopy.runExit()
-                s_widgetDelete.runExit()
-            }
+            _stagger.runExit();
             exitAnim.restart();
         }
     }
@@ -250,13 +252,18 @@ PopupWindow {
             }
 
             // --- Widget section separator (visible only on widget right-click) ---
-            Rectangle {
+            StaggerItem {
+                id: s_widgetDivider
                 visible: root._targetWidgetKey !== ""
                 width: parent.width - 8
                 anchors.horizontalCenter: parent.horizontalCenter
                 height: visible ? 1 : 0
-                color: Colors.border
-                opacity: 0.5
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: Colors.border
+                    opacity: 0.5
+                }
             }
 
             // --- "组件设置" item ---
