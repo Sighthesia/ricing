@@ -17,9 +17,10 @@ Item {
     id: root
 
     // --- layout ---
-    // implicitHeight tracks the pill height (including flash expansion) so the
-    // bar item expands downward into the non-exclusive zone during switch flashes.
-    implicitHeight: _pill.implicitHeight + Theme.iconPadding
+    // implicitHeight is constant (only pill height + padding) so the bar row never
+    // shifts upward when the flash strip expands below — the pill overflows downward
+    // visually without disturbing the parent Row's vertical-centre anchor.
+    implicitHeight: _pillH + Theme.iconPadding
     implicitWidth: _pill.implicitWidth
 
     // --- structure constants ---
@@ -58,21 +59,31 @@ Item {
     // "overview" = temporarily forced overview (hover from focus, workspace switch)
     // "focus"    = temporarily forced focus (hover from overview)
     property string _modeOverride: ""
+
     // --- flash animation constants ---
-    readonly property int _flashRowH:   16   // height of the shrunken "previous state" strip
-    readonly property int _flashGap:    4    // gap between main pill area and flash strip
-    readonly property real _flashScale: 0.72 // scale factor applied to content in flash strip
+    // _flashRowH = _pillH: expansion strip is one full component height,
+    // making total expanded pill = 2 component heights for better readability.
+    readonly property int  _flashRowH:   _pillH
+    readonly property int  _flashGap:    4    // gap between main pill and flash strip
+    readonly property real _flashScale:  0.85 // slightly smaller than main to indicate secondary state
 
     // --- flash state ---
     // true while the pill is expanded downward showing the switch transition.
     // Cleared by _revertTimer together with _modeOverride.
     property bool _flashActive: false
+    // Keep the bar surface expanded while the collapse animation is running;
+    // releasing it only after collapse avoids per-frame window resize jank.
+    property bool _holdFlashExtension: false
 
     // Snapshot of the state that was active *before* the switch occurred.
     // Rendered in the flash strip while _flashActive is true.
+    // _flashPrevWsIcons: array of { wsId, idx, isActive, appIds[] } captured at switch time
+    // so the strip never reads live model data (avoids stale / repeating content on
+    // rapid consecutive switches).
     property string _flashPrevTitle:  ""
     property string _flashPrevAppId:  ""
     property bool   _flashPrevWasOverview: false
+    property var    _flashPrevWsIcons: []
 
     // Brief cooldown after auto-revert: ignores onEntered for _revertCooldown ms so the
     // pill growing back to focus size doesn't immediately re-trigger hover.
@@ -83,7 +94,49 @@ Item {
     property string _focusedAppId: ""
     property string _focusedTitle:  ""
 
-    function _refreshFocus() {
+    // Capture a snapshot of the current workspace+window icon layout for the flash strip.
+    function _snapshotWsIcons() {
+        let snap = []
+        for (let i = 0; i < NiriService.workspaces.count; i++) {
+            const ws = NiriService.workspaces.get(i)
+            let icons = []
+            for (let j = 0; j < NiriService.windows.count; j++) {
+                const w = NiriService.windows.get(j)
+                if (w.workspaceId === ws.wsId)
+                    icons.push(w.appId)
+            }
+            if (ws.isActive || icons.length > 0)
+                snap.push({ wsId: ws.wsId, idx: ws.idx, isActive: ws.isActive, appIds: icons })
+        }
+        return snap
+    }
+
+    function _triggerFlash() {
+        _flashCollapseReleaseTimer.stop()
+        root._holdFlashExtension = true
+        root._flashPrevTitle   = root._focusedTitle
+        root._flashPrevAppId   = root._focusedAppId
+        // Use the natural (non-hover-overridden) mode for the snapshot so the flash
+        // strip always reflects the stable state the user saw, not a transient hover
+        // override. Re-triggering during an active flash only refreshes ws icons.
+        if (!root._flashActive) {
+            const naturalOverview = SettingsService.data.workspaceWidget.defaultMode === "overview"
+                || root._focusedTitle.length === 0
+            root._flashPrevWasOverview = naturalOverview
+        }
+        root._flashPrevWsIcons = _snapshotWsIcons()
+        root._flashActive      = true
+        // NOTE: y is driven entirely by the declarative binding
+        //   y: root._flashActive ? _yFinal : _yInitial
+        // Setting _flashActive = true causes QML to re-evaluate the binding and
+        // start the Behavior animation from _yInitial → _yFinal automatically.
+        // An imperative assignment here would break the binding and reverse the
+        // animation direction, causing the strip to appear inside the main pill.
+    }
+
+    // skipFlash: pass true when called from onWorkspaceActivated so the workspace-
+    // switch snapshot is not overwritten by a secondary window-focus-change flash.
+    function _refreshFocus(skipFlash) {
         let newWinId = ""
         let newAppId = ""
         let newTitle = ""
@@ -98,12 +151,8 @@ Item {
         }
         // On window focus change: snapshot current state → trigger flash → flip mode.
         // winId-based comparison handles same-app multi-window switches.
-        if (newWinId !== root._focusedWindowId && newWinId !== "") {
-            // Capture what was showing before this switch.
-            root._flashPrevTitle        = root._focusedTitle
-            root._flashPrevAppId        = root._focusedAppId
-            root._flashPrevWasOverview  = root._showOverview
-            root._flashActive           = true
+        if (!skipFlash && newWinId !== root._focusedWindowId && newWinId !== "") {
+            _triggerFlash()
 
             if (root._modeOverride === "") {
                 root._modeOverride = SettingsService.data.workspaceWidget.defaultMode === "overview"
@@ -135,10 +184,21 @@ Item {
         onTriggered: {
             root._modeOverride = ""
             root._flashActive  = false
+            _flashCollapseReleaseTimer.restart()
             // Start cooldown so the pill expanding back to focus size doesn't
             // immediately retrigger hover overview.
             root._justReverted = true
             _revertCooldownTimer.restart()
+        }
+    }
+
+    Timer {
+        id: _flashCollapseReleaseTimer
+        interval: Theme.anim.moveDuration
+        repeat: false
+        onTriggered: {
+            if (!root._flashActive)
+                root._holdFlashExtension = false
         }
     }
 
@@ -156,12 +216,15 @@ Item {
         Qt.callLater(() => { root._initialized = true })
     }
 
-    // Keep BarLayoutService.barFlashExtension in sync so BarWindow can expand its
-    // drawing surface to accommodate the flash strip below the bar.
+    // Keep barFlashExtension locked while flash is active (and briefly during collapse)
+    // so BarWindow doesn't resize every animation frame. This removes compositor churn
+    // while preserving enough surface area to avoid clipping during collapse.
     Binding {
         target: BarLayoutService
         property: "barFlashExtension"
-        value: root._flashActive ? (root._flashGap + root._flashRowH) : 0
+        value: (root._flashActive || root._holdFlashExtension)
+            ? (root._flashGap + root._flashRowH)
+            : 0
         restoreMode: Binding.RestoreBindingOrValue
     }
 
@@ -170,10 +233,7 @@ Item {
         function onWindowsUpdated()      { root._refreshFocus() }
         function onWorkspaceActivated()  {
             // Snapshot current state before the mode flip so flash strip shows "before".
-            root._flashPrevTitle       = root._focusedTitle
-            root._flashPrevAppId       = root._focusedAppId
-            root._flashPrevWasOverview = root._showOverview
-            root._flashActive          = true
+            _triggerFlash()
 
             // Flash to the *opposite* of the default mode so the user always sees
             // a state change after a workspace switch.
@@ -181,6 +241,15 @@ Item {
                 ? "focus" : "overview"
             // If hovering, don't start revert — the hover exit will start it instead.
             if (!_hoverArea.containsMouse) _revertTimer.restart()
+            // Eagerly wipe stale focus state before re-querying the windows model.
+            // When switching to an empty workspace Niri may not emit onWindowsUpdated
+            // (no windows changed), so _refreshFocus would never run and the old title
+            // would linger.  Clearing here guarantees the pill shows an empty state
+            // immediately; onWindowsUpdated will overwrite with real data if needed.
+            root._focusedWindowId = ""
+            root._focusedAppId    = ""
+            root._focusedTitle    = ""
+            _refreshFocus(true)
         }
     }
 
@@ -203,10 +272,11 @@ Item {
         Behavior on implicitHeight {
             enabled: root._initialized
             NumberAnimation {
-                duration: Theme.anim.enterDuration
-                easing.type: Theme.anim.enterType
-                easing.amplitude: Theme.anim.enterAmplitude
-                easing.period: Theme.anim.enterPeriod
+                // Expand: elastic bounce-in. Collapse: tokenized smooth settle.
+                duration: root._flashActive ? Theme.anim.enterDuration : Theme.anim.moveDuration
+                easing.type: root._flashActive ? Theme.anim.enterType : Theme.anim.moveType
+                easing.amplitude: root._flashActive ? Theme.anim.enterAmplitude : 1.0
+                easing.period: root._flashActive ? Theme.anim.enterPeriod : 1.0
             }
         }
 
@@ -220,18 +290,19 @@ Item {
             enabled: root._initialized
             NumberAnimation {
                 duration: Theme.anim.moveDuration
-                easing.type: Theme.anim.moveType
+                easing.type: Easing.OutCubic
             }
         }
 
         radius: root._pillH / 2
+        clip: true
         color: Colors.surface
         // Subtle hover tint for the entire pill
         Rectangle {
             anchors.fill: parent
             radius: parent.radius
             color: Colors.highlight
-            opacity: _hoverArea.containsMouse ? 0.08 : 0
+            opacity: _hoverArea.containsMouse ? 0.12 : 0
             Behavior on opacity {
                 NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType }
             }
@@ -241,10 +312,15 @@ Item {
             id: _overviewRow
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: undefined
-            y: (root._pillH - implicitHeight) / 2   // centred within the main pill zone
+            // Active: centered; exiting to focus mode: rise up by 10px
+            y: (root._pillH - implicitHeight) / 2 - (root._showOverview ? 0 : root._pillH)
             spacing: root._pillGap
             opacity: root._showOverview ? 1 : 0
 
+            Behavior on y {
+                enabled: root._initialized
+                NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Easing.OutCubic }
+            }
             Behavior on opacity {
                 NumberAnimation {
                     duration: Theme.anim.moveDuration
@@ -394,10 +470,15 @@ Item {
             id: _focusRow
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: undefined
-            y: (root._pillH - implicitHeight) / 2   // centred within the main pill zone
+            // Active: centered; exiting to overview mode: sink down by 10px
+            y: (root._pillH - implicitHeight) / 2 + (root._showOverview ? 10 : 0)
             spacing: root._iconTitleGap
             opacity: root._showOverview ? 0 : 1
 
+            Behavior on y {
+                enabled: root._initialized
+                NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Easing.OutCubic }
+            }
             Behavior on opacity {
                 NumberAnimation {
                     duration: Theme.anim.moveDuration
@@ -430,19 +511,40 @@ Item {
         }
 
         // ── Flash strip — shrunken "before" snapshot shown during switch ─
-        // Positioned at the bottom of the expanded pill; fades out when flash ends.
+        // y is imperatively reset to _yInitial by _triggerFlash() before each
+        // activation, so the Behavior animates from the main pill centre downward
+        // on every switch — even rapid consecutive ones.
         Item {
             id: _flashStrip
             anchors.left:   parent.left
             anchors.right:  parent.right
             anchors.leftMargin:  root._padH
             anchors.rightMargin: root._padH
-            y: root._pillH + root._flashGap
+
+            // _yInitial: vertically centred in the main pill zone (old content start pos)
+            // _yFinal:   resting position in the expansion area below the pill
+            readonly property real _yFinal:   root._pillH + root._flashGap
+            readonly property real _yInitial: (root._pillH - root._flashRowH) / 2
+            y: root._flashActive ? _yFinal : _yInitial
+
+            Behavior on y {
+                enabled: root._initialized
+                NumberAnimation {
+                    duration: root._flashActive ? Theme.anim.enterDuration : Theme.anim.moveDuration
+                    easing.type: root._flashActive ? Theme.anim.enterType : Theme.anim.moveType
+                    easing.amplitude: root._flashActive ? Theme.anim.enterAmplitude : 1.0
+                    easing.period: root._flashActive ? Theme.anim.enterPeriod : 1.0
+                }
+            }
+
             height: root._flashRowH
 
             opacity: root._flashActive ? 0.55 : 0
             Behavior on opacity {
-                NumberAnimation { duration: Theme.anim.exitDuration; easing.type: Theme.anim.exitType }
+                NumberAnimation {
+                    duration: root._flashActive ? Theme.anim.enterDuration : Theme.anim.moveDuration
+                    easing.type: root._flashActive ? Theme.anim.enterType : Theme.anim.moveType
+                }
             }
 
             // Shrunken Focus strip — shows when previous state was Focus mode
@@ -463,7 +565,13 @@ Item {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, Math.round(root._titleMaxW * root._flashScale))
+                    width: {
+                        // Clamp to strip width minus icon+gap so the icon is never pushed off-screen.
+                        const iconW = Math.round(root._iconSize * root._flashScale)
+                        const gapW  = Math.round(root._iconTitleGap * root._flashScale)
+                        const avail = Math.max(0, _flashStrip.width - iconW - gapW - 2)
+                        return Math.min(implicitWidth, Math.round(root._titleMaxW * root._flashScale), avail)
+                    }
                     text: root._flashPrevTitle
                     elide: Text.ElideRight
                     maximumLineCount: 1
@@ -473,7 +581,9 @@ Item {
                 }
             }
 
-            // Shrunken Overview strip — shows when previous state was Overview mode
+            // Shrunken Overview strip — shows when previous state was Overview mode.
+            // Uses the _flashPrevWsIcons snapshot (captured at switch time) so rapid
+            // consecutive switches never show stale or live-model data.
             Row {
                 id: _flashOverviewRow
                 anchors.centerIn: parent
@@ -481,23 +591,11 @@ Item {
                 visible: root._flashPrevWasOverview
 
                 Repeater {
-                    model: NiriService.workspaces
+                    model: root._flashPrevWsIcons
                     delegate: Item {
-                        required property string wsId
-                        required property int    idx
-                        required property bool   isActive
+                        required property var modelData
 
-                        // Reuse the same per-workspace icon data from the live model.
-                        readonly property var _wsIcons: {
-                            let arr = []
-                            for (let i = 0; i < NiriService.windows.count; i++) {
-                                const w = NiriService.windows.get(i)
-                                if (w.workspaceId === wsId) arr.push(w.appId)
-                            }
-                            return arr
-                        }
-
-                        visible: isActive || _wsIcons.length > 0
+                        visible: modelData.isActive || modelData.appIds.length > 0
                         width:  visible ? _miniPill.width  : 0
                         height: visible ? _miniPill.height : 0
 
@@ -509,7 +607,7 @@ Item {
                                 root._flashRowH
                             )
                             radius: height / 2
-                            color: isActive ? Colors.highlight : Colors.surface
+                            color: modelData.isActive ? Colors.highlight : Colors.surface
                             opacity: 0.8
 
                             Row {
@@ -518,7 +616,7 @@ Item {
                                 spacing: Math.round(root._iconSpacing * root._flashScale)
 
                                 Repeater {
-                                    model: _wsIcons
+                                    model: modelData.appIds
                                     delegate: Image {
                                         required property string modelData
                                         readonly property bool _ok: status === Image.Ready
@@ -531,12 +629,12 @@ Item {
                                 }
 
                                 Text {
-                                    visible: _wsIcons.length === 0
-                                    text: idx
+                                    visible: modelData.appIds.length === 0
+                                    text: modelData.idx
                                     font.family: Theme.fontMono
                                     font.bold: true
                                     font.pixelSize: Math.round(Theme.fontSizeSmall * root._flashScale)
-                                    color: isActive ? Colors.background : Colors.textMuted
+                                    color: modelData.isActive ? Colors.background : Colors.textMuted
                                 }
                             }
                         }
@@ -563,6 +661,9 @@ Item {
             // If already overridden (e.g. re-entry after moving out briefly), just
             // hold the current state rather than flipping back immediately.
             if (root._modeOverride !== "") return
+            // produce the same flash transition that workspace switches use so the
+            // user perceives a full state change, not just a silent color swap.
+            _triggerFlash()
             // Flip to opposite of current visual state.
             root._modeOverride = root._showOverview ? "focus" : "overview"
         }
