@@ -44,6 +44,7 @@ Item {
     // _showOverview: render-driving boolean (step 6 — derived readonly before mutable state).
     // Explicit _modeOverride takes priority; natural state uses defaultMode setting.
     readonly property bool _showOverview: {
+        if (_emptyWorkspaceSettling) return true
         if (_modeOverride === "overview") return true
         if (_modeOverride === "focus")    return false
         // Natural (unforced) state: use defaultMode setting
@@ -72,6 +73,10 @@ Item {
     // The default-mode row travels to the flash strip; the alt-mode row fills the pill.
     // Cleared by _revertTimer together with _modeOverride.
     property bool _flashActive: false
+    // Snapshot of which mode was already visible in the pill when the flash started.
+    property bool _flashSourceWasOverview: false
+    // True while an active flash is gently settling into an empty workspace.
+    property bool _emptyWorkspaceSettling: false
     // Keep the bar surface expanded while the collapse animation is running;
     // releasing it only after collapse avoids per-frame window resize jank.
     property bool _holdFlashExtension: false
@@ -98,6 +103,7 @@ Item {
 
     function _triggerFlash() {
         _flashCollapseReleaseTimer.stop()
+        root._flashSourceWasOverview = root._showOverview
         root._holdFlashExtension = true
         root._flashActive = true
         // Start explicit pill background expand animation
@@ -139,6 +145,14 @@ Item {
                 _revertTimer.restart()
             }
         }
+
+        // When focus temporarily leaves all normal windows during an active flash
+        // (e.g. launcher/global overview steals focus), keep the last snapshot so
+        // the temporary focus row does not blank out mid-animation. We resync the
+        // real focus state after the flash ends.
+        if (root._flashActive && newWinId === "")
+            return
+
         root._focusedWindowId = newWinId
         root._focusedAppId = newAppId
         root._focusedTitle = newTitle
@@ -161,10 +175,12 @@ Item {
         interval: root._revertDelay
         repeat: false
         onTriggered: {
+            root._emptyWorkspaceSettling = false
             root._modeOverride = ""
             root._flashActive  = false
             root._justSwitchedWorkspace = false  // safety clear in case no onWindowsUpdated fired
             _flashCollapseReleaseTimer.restart()
+            _refreshFocus(true)
             // Start cooldown so the pill expanding back to focus size doesn't
             // immediately retrigger hover overview.
             root._justReverted = true
@@ -179,6 +195,20 @@ Item {
         onTriggered: {
             if (!root._flashActive)
                 root._holdFlashExtension = false
+        }
+    }
+
+    Timer {
+        id: _emptyWorkspaceSyncTimer
+        interval: Theme.anim.moveDuration
+        repeat: false
+        onTriggered: {
+            root._justSwitchedWorkspace = false
+            root._focusedWindowId = ""
+            root._focusedAppId    = ""
+            root._focusedTitle    = ""
+            _refreshFocus(true)
+            root._emptyWorkspaceSettling = false
         }
     }
 
@@ -215,15 +245,9 @@ Item {
             // Suppress the onWindowsUpdated that fires as a side-effect of this switch
             // to prevent a second flash from triggering on the already-cleared window state.
             root._justSwitchedWorkspace = true
-            // Eagerly wipe stale focus state before re-querying the windows model.
-            root._focusedWindowId = ""
-            root._focusedAppId    = ""
-            root._focusedTitle    = ""
-            _refreshFocus(true)
 
-            // Only flash if the new workspace actually has windows.
-            // Check the workspace model directly since _focusedTitle may not yet be
-            // populated — Niri sends workspace-activated before window-focus events.
+            // Determine the target workspace state first so we can avoid blanking the
+            // currently displayed focus row while an active flash is still visible.
             let activeWsId = ""
             for (let i = 0; i < NiriService.workspaces.count; i++) {
                 const ws = NiriService.workspaces.get(i)
@@ -235,31 +259,36 @@ Item {
                     hasWindows = true; break
                 }
             }
+
             if (!hasWindows) {
-                // Cancel any active flash when landing on an empty workspace
-                // to avoid showing an empty flash strip.
                 if (root._flashActive) {
                     _revertTimer.stop()
-                    // Clear _modeOverride FIRST so _normalY reflects the correct natural state
-                    // (empty workspace → _showOverview=true) before _flashActive triggers handlers.
+                    _emptyWorkspaceSyncTimer.stop()
+                    // Let the active flash settle back using the normal return path,
+                    // then swap to the empty-workspace overview once the collapse ends.
+                    root._emptyWorkspaceSettling = true
                     root._modeOverride = ""
                     root._flashActive  = false
-                    // Stop all running flash/exit animations and snap to rest state
-                    _pillExpandAnim.stop(); _pillCollapseAnim.stop()
-                    _pillBg.height = root._pillH
-                    _overviewExitAnim.stop(); _focusExitAnim.stop()
-                    _overviewEnterAnim.stop(); _focusEnterAnim.stop()
-                    // Force-set correct positions after handlers fired (may have started anims)
-                    _departYAnim.stop(); _departScaleAnim.stop()
-                    _returnYAnim.stop(); _returnScaleAnim.stop()
-                    _focusDepartYAnim.stop(); _focusDepartScaleAnim.stop()
-                    _focusReturnYAnim.stop(); _focusReturnScaleAnim.stop()
-                    _overviewRow.y = _overviewRow._normalY; _overviewRow.scale = 1.0
-                    _focusRow.y = _focusRow._normalY; _focusRow.scale = 1.0
                     _flashCollapseReleaseTimer.restart()
+                    _emptyWorkspaceSyncTimer.restart()
+                    return
                 }
+
+                // No active flash: sync to the empty workspace immediately.
+                root._emptyWorkspaceSettling = false
+                root._justSwitchedWorkspace = false
+                root._focusedWindowId = ""
+                root._focusedAppId    = ""
+                root._focusedTitle    = ""
+                _refreshFocus(true)
                 return
             }
+
+            // Eagerly wipe stale focus state before re-querying the windows model.
+            root._focusedWindowId = ""
+            root._focusedAppId    = ""
+            root._focusedTitle    = ""
+            _refreshFocus(true)
 
             _triggerFlash()
             // Flash to the *opposite* of the default mode so the user always sees
@@ -342,6 +371,24 @@ Item {
             radius: root._pillH / 2
             color: Colors.surface
         }
+
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: root._pillH + Math.max(0, (root._flashGap - height) / 2)
+            width: Math.max(0, _pillBg.width - root._padH * 2)
+            height: 1
+            radius: height / 2
+            color: Colors.border
+            opacity: (root._flashActive || root._holdFlashExtension) ? 0.35 : 0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Theme.anim.moveDuration
+                    easing.type: Theme.anim.moveType
+                }
+            }
+        }
+
         // Subtle hover tint for the entire pill
         Rectangle {
             anchors.fill: _pillBg
@@ -395,7 +442,8 @@ Item {
                     }
                 } else if (_overviewEnterAnim.running) {
                     _overviewEnterAnim.stop()
-                    _overviewEnterAnim.start()
+                    _overviewRow.scale = 1.0
+                    _overviewRow.y = _overviewRow._normalY
                 }
             }
             scale: 1.0
@@ -413,11 +461,18 @@ Item {
                     _departScaleAnim.to   = root._flashScale
                     _departYAnim.start()
                     _departScaleAnim.start()
-                    // The other row (focus) enters the pill — kick its entrance anim
-                    _focusEnterAnim.stop()
-                    _focusRow.scale = 0.9
-                    _focusRow.y = -_focusRow.implicitHeight
-                    _focusEnterAnim.start()
+                    if (root._flashSourceWasOverview) {
+                        // The other row (focus) was not previously visible, so it
+                        // needs the enter animation into the pill.
+                        _focusEnterAnim.stop()
+                        _focusRow.scale = 0.9
+                        _focusRow.y = -Math.max(_focusRow.implicitHeight, root._pillH)
+                        _focusEnterAnim.start()
+                    } else {
+                        _focusEnterAnim.stop()
+                        _focusRow.scale = 1.0
+                        _focusRow.y = _focusRow._normalY
+                    }
                 } else if (root._initialized) {
                     _departYAnim.stop()
                     _departScaleAnim.stop()
@@ -688,11 +743,9 @@ Item {
                         _focusRow.y = newY
                     }
                 } else if (_focusEnterAnim.running) {
-                    // Re-target enter anim when content height changes mid-flight
-                    // (e.g. title text appearing after switching from an empty workspace).
-                    // stop() freezes current y; restart reads updated _normalY binding.
                     _focusEnterAnim.stop()
-                    _focusEnterAnim.start()
+                    _focusRow.scale = 1.0
+                    _focusRow.y = _focusRow._normalY
                 }
             }
             scale: 1.0
@@ -710,11 +763,18 @@ Item {
                     _focusDepartScaleAnim.to   = root._flashScale
                     _focusDepartYAnim.start()
                     _focusDepartScaleAnim.start()
-                    // The other row (overview) enters the pill — kick its entrance anim
-                    _overviewEnterAnim.stop()
-                    _overviewRow.scale = 0.9
-                    _overviewRow.y = -_overviewRow.implicitHeight
-                    _overviewEnterAnim.start()
+                    if (!root._flashSourceWasOverview) {
+                        // The other row (overview) was not previously visible, so it
+                        // needs the enter animation into the pill.
+                        _overviewEnterAnim.stop()
+                        _overviewRow.scale = 0.9
+                        _overviewRow.y = -Math.max(_overviewRow.implicitHeight, root._pillH)
+                        _overviewEnterAnim.start()
+                    } else {
+                        _overviewEnterAnim.stop()
+                        _overviewRow.scale = 1.0
+                        _overviewRow.y = _overviewRow._normalY
+                    }
                 } else if (root._initialized) {
                     _focusDepartYAnim.stop()
                     _focusDepartScaleAnim.stop()
@@ -728,10 +788,17 @@ Item {
                     _pillExpandAnim.stop()
                     _pillCollapseAnim.stop()
                     _pillCollapseAnim.start()
-                    // The other row (overview) exits the pill — slide up + scale down
-                    _overviewEnterAnim.stop()
-                    _overviewExitAnim.stop()
-                    _overviewExitAnim.start()
+                    if (root._emptyWorkspaceSettling) {
+                        _overviewExitAnim.stop()
+                        _overviewEnterAnim.stop()
+                        _overviewRow.y = _overviewRow._normalY
+                        _overviewRow.scale = 1.0
+                    } else {
+                        // The other row (overview) exits the pill — slide up + scale down
+                        _overviewEnterAnim.stop()
+                        _overviewExitAnim.stop()
+                        _overviewExitAnim.start()
+                    }
                 } else {
                     _focusRow.y = _normalY
                     _focusRow.scale = 1.0
