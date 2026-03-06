@@ -29,7 +29,7 @@ Item {
     }
 
     // --- Private state ---
-    property var _providers: [appProvider]
+    property var _providers: [appProvider, clipProvider]
 
     // Parallel stores: ListModel holds display-only scalars; _resultData holds
     // the full result objects including onActivate functions (ListModel cannot
@@ -39,8 +39,7 @@ Item {
 
     function _activeProvider(): var {
         let text = searchField.text;
-        // FIXME: route ">clip " prefix to ClipboardProvider once feat/clipboard-service is merged
-        if (text.startsWith(">clip ") || text === ">clip") return null;
+        if (text.startsWith(">clip")) return clipProvider;
         return appProvider;
     }
 
@@ -50,7 +49,11 @@ Item {
         let provider = _activeProvider();
         if (!provider) return;
 
+        // Strip command prefix before passing to provider
         let q = searchField.text;
+        if (q.startsWith(">clip ")) q = q.substring(6);
+        else if (q === ">clip") q = "";
+
         let items = provider.getResults(q);
         let displayItems = [];
         for (let i = 0; i < items.length; i++) {
@@ -201,4 +204,5 @@ Item {
 
     // Provider instances (children of LauncherCore)
     ApplicationsProvider { id: appProvider }
+    ClipboardProvider    { id: clipProvider }
 }
