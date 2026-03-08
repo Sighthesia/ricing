@@ -24,18 +24,16 @@ Item {
     implicitWidth: _pill.implicitWidth
 
     // --- structure constants ---
-    // FIXME: _padH, _iconSize, _smallIcon, _iconSpacing, _pillGap, _pillPadH, _iconTitleGap
-    //        are widget-specific layout values with no current Theme.* equivalent.
-    //        Promote to Theme tokens when a design token pass is done for widget internals.
     readonly property int _revertDelay:  SettingsService.data.workspaceWidget.revertDelay
     readonly property int _revertCooldown:  50    // ms — post-revert hover-entry dead zone
-    readonly property int _padH:         10   // horizontal padding inside the pill
-    readonly property int _iconSize:     16   // app icon in focus mode
-    readonly property int _smallIcon:    13   // app icon inside workspace pills
-    readonly property int _iconSpacing:  3    // gap between icons in a workspace pill
-    readonly property int _pillGap:      8    // gap between workspace pills
-    readonly property int _pillPadH:     8    // horizontal padding inside each workspace pill
-    readonly property int _iconTitleGap: 6    // gap between focus icon and title text
+    readonly property int _padH:         Theme.barWidget.contentPaddingH
+    readonly property int _iconSize:     Theme.barWidget.primaryIconSize
+    readonly property int _smallIcon:    Theme.barWidget.compactIconSize
+    readonly property int _iconSpacing:  Theme.barWidget.iconSpacing
+    readonly property int _pillGap:      Theme.barWidget.pillSpacing
+    readonly property int _pillPadH:     Theme.barWidget.pillPaddingH
+    readonly property int _iconTitleGap: Theme.barWidget.iconLabelSpacing
+    readonly property int _focusPulsePad: Theme.barWidget.focusPulsePadding
     readonly property int _titleMaxW:    SettingsService.data.workspaceWidget.titleMaxWidth
     readonly property bool _hoverActive: SettingsService.data.workspaceWidget.hoverEnabled
     readonly property int _pillH:        Theme.barHeight - 2 * Theme.iconPadding
@@ -75,7 +73,8 @@ Item {
     property bool _flashActive: false
     // Snapshot of which mode was already visible in the pill when the flash started.
     property bool _flashSourceWasOverview: false
-    // True while an active flash is gently settling into an empty workspace.
+    // True while an active flash is gently settling into an overview state
+    // caused by an empty workspace or temporary loss of focused window.
     property bool _emptyWorkspaceSettling: false
     // Keep the bar surface expanded while the collapse animation is running;
     // releasing it only after collapse avoids per-frame window resize jank.
@@ -112,12 +111,41 @@ Item {
         _pillExpandAnim.start()
     }
 
+    function _activeWorkspaceHasWindows() {
+        let activeWsId = ""
+        for (let i = 0; i < NiriService.workspaces.count; i++) {
+            const ws = NiriService.workspaces.get(i)
+            if (ws.isActive) {
+                activeWsId = ws.wsId
+                break
+            }
+        }
+        if (activeWsId === "") return false
+        for (let j = 0; j < NiriService.windows.count; j++) {
+            if (NiriService.windows.get(j).workspaceId === activeWsId)
+                return true
+        }
+        return false
+    }
+
+    function _settleFlashToOverview() {
+        _revertTimer.stop()
+        _emptyWorkspaceSyncTimer.stop()
+        root._emptyWorkspaceSettling = true
+        root._modeOverride = ""
+        root._flashActive = false
+        _flashCollapseReleaseTimer.restart()
+        _emptyWorkspaceSyncTimer.restart()
+    }
+
     // skipFlash: pass true when called from onWorkspaceActivated so the workspace-
     // switch snapshot is not overwritten by a secondary window-focus-change flash.
     function _refreshFocus(skipFlash) {
+        const prevWinId = root._focusedWindowId
         let newWinId = ""
         let newAppId = ""
         let newTitle = ""
+        let suppress = false
         for (let i = 0; i < NiriService.windows.count; i++) {
             const w = NiriService.windows.get(i)
             if (w.isFocused) {
@@ -131,7 +159,7 @@ Item {
             // Consume the workspace-switch suppression flag on the first non-skip call.
             // This prevents the onWindowsUpdated that fires right after onWorkspaceActivated
             // (with _focusedTitle already cleared) from overwriting the snapshot.
-            const suppress = root._justSwitchedWorkspace
+            suppress = root._justSwitchedWorkspace
             root._justSwitchedWorkspace = false
             // On window focus change: snapshot current state → trigger flash → flip mode.
             // winId-based comparison handles same-app multi-window switches.
@@ -146,16 +174,28 @@ Item {
             }
         }
 
-        // When focus temporarily leaves all normal windows during an active flash
-        // (e.g. launcher/global overview steals focus), keep the last snapshot so
-        // the temporary focus row does not blank out mid-animation. We resync the
-        // real focus state after the flash ends.
-        if (root._flashActive && newWinId === "")
+        // During the immediate workspace-switch gap, Niri can briefly report no
+        // focused window before the new workspace focus arrives. Preserve the
+        // current snapshot only for that suppressed update. Otherwise, if focus
+        // genuinely disappears while flash is active, settle quickly into overview.
+        if (root._flashActive && newWinId === "") {
+            if (suppress)
+                return
+            root._settleFlashToOverview()
             return
+        }
 
         root._focusedWindowId = newWinId
         root._focusedAppId = newAppId
         root._focusedTitle = newTitle
+
+        const shouldPulseFocusRow = !skipFlash
+            && root._initialized
+            && prevWinId !== ""
+            && newWinId !== ""
+            && newWinId !== prevWinId
+        if (shouldPulseFocusRow)
+            _focusRow.triggerFocusChangePulse()
     }
 
     // --- icon resolution ---
@@ -204,9 +244,6 @@ Item {
         repeat: false
         onTriggered: {
             root._justSwitchedWorkspace = false
-            root._focusedWindowId = ""
-            root._focusedAppId    = ""
-            root._focusedTitle    = ""
             _refreshFocus(true)
             root._emptyWorkspaceSettling = false
         }
@@ -248,38 +285,17 @@ Item {
 
             // Determine the target workspace state first so we can avoid blanking the
             // currently displayed focus row while an active flash is still visible.
-            let activeWsId = ""
-            for (let i = 0; i < NiriService.workspaces.count; i++) {
-                const ws = NiriService.workspaces.get(i)
-                if (ws.isActive) { activeWsId = ws.wsId; break }
-            }
-            let hasWindows = false
-            for (let j = 0; j < NiriService.windows.count; j++) {
-                if (NiriService.windows.get(j).workspaceId === activeWsId) {
-                    hasWindows = true; break
-                }
-            }
+            const hasWindows = root._activeWorkspaceHasWindows()
 
             if (!hasWindows) {
                 if (root._flashActive) {
-                    _revertTimer.stop()
-                    _emptyWorkspaceSyncTimer.stop()
-                    // Let the active flash settle back using the normal return path,
-                    // then swap to the empty-workspace overview once the collapse ends.
-                    root._emptyWorkspaceSettling = true
-                    root._modeOverride = ""
-                    root._flashActive  = false
-                    _flashCollapseReleaseTimer.restart()
-                    _emptyWorkspaceSyncTimer.restart()
+                    root._settleFlashToOverview()
                     return
                 }
 
                 // No active flash: sync to the empty workspace immediately.
                 root._emptyWorkspaceSettling = false
                 root._justSwitchedWorkspace = false
-                root._focusedWindowId = ""
-                root._focusedAppId    = ""
-                root._focusedTitle    = ""
                 _refreshFocus(true)
                 return
             }
@@ -700,10 +716,15 @@ Item {
         }
 
         // ── Focus content — app icon + window title ──────────────────────
-        Row {
+        Item {
             id: _focusRow
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: undefined
+            implicitWidth: _focusContent.implicitWidth
+            implicitHeight: _focusContent.implicitHeight
+            width: implicitWidth
+            height: implicitHeight
+            clip: false
 
             // When flash is active and focus is the default mode, this row travels
             // to the flash strip below; the pill simultaneously shows overview content.
@@ -714,6 +735,15 @@ Item {
             readonly property real _normalY: (root._pillH - implicitHeight) / 2
             // Flash strip center Y — used by both depart animation and late-content recentering.
             readonly property real _flashStripY: root._pillH + root._flashGap + (root._flashRowH - implicitHeight) / 2
+            property real _pulseOpacity: 0
+
+            function triggerFocusChangePulse() {
+                if (root._focusedWindowId.length === 0 || root._focusedTitle.length === 0) return
+                if (opacity <= 0) return
+                _focusPulseAnim.stop()
+                _pulseOpacity = 0
+                _focusPulseAnim.start()
+            }
 
             // y is managed imperatively. Qt.callLater defers any normalY snap by one
             // event loop tick, surviving transient focusedAppId="" states that occur
@@ -749,8 +779,17 @@ Item {
                 }
             }
             scale: 1.0
-            spacing: root._iconTitleGap
             opacity: _isInFlashStrip ? 0.55 : (root._showOverview ? 0 : 1)
+
+            Rectangle {
+                x: -root._focusPulsePad
+                y: -root._focusPulsePad
+                width: parent.width + root._focusPulsePad * 2
+                height: parent.height + root._focusPulsePad * 2
+                radius: height / 2
+                color: Colors.highlight
+                opacity: _focusRow._pulseOpacity
+            }
 
             on_IsInFlashStripChanged: {
                 if (_isInFlashStrip) {
@@ -807,6 +846,25 @@ Item {
 
             Behavior on opacity {
                 NumberAnimation {
+                    duration: Theme.anim.moveDuration
+                    easing.type: Theme.anim.moveType
+                }
+            }
+
+            SequentialAnimation {
+                id: _focusPulseAnim
+                NumberAnimation {
+                    target: _focusRow
+                    property: "_pulseOpacity"
+                    from: 0
+                    to: 0.16
+                    duration: Theme.anim.highlightDuration
+                    easing.type: Theme.anim.highlightType
+                }
+                NumberAnimation {
+                    target: _focusRow
+                    property: "_pulseOpacity"
+                    to: 0
                     duration: Theme.anim.moveDuration
                     easing.type: Theme.anim.moveType
                 }
@@ -871,30 +929,36 @@ Item {
                 _focusRow.y = _focusRow._normalY
             }
 
-            Image {
-                id: _focusIcon
-                visible: root._focusedAppId.length > 0
-                width:  visible ? root._iconSize : 0
-                height: root._iconSize
-                anchors.verticalCenter: parent.verticalCenter
-                source: root._iconPath(root._focusedAppId)
-                smooth: true
-                fillMode: Image.PreserveAspectFit
-            }
+            Row {
+                id: _focusContent
+                anchors.centerIn: parent
+                spacing: root._iconTitleGap
 
-            Text {
-                id: _titleText
-                anchors.verticalCenter: parent.verticalCenter
-                // Natural width capped at _titleMaxW; ElideRight truncates beyond that.
-                // Do NOT reference _focusRow.parent.width here — that would create a
-                // circular binding (pill width → focus row → text → pill width).
-                width: Math.min(implicitWidth, root._titleMaxW)
-                text: root._focusedTitle
-                elide: Text.ElideRight
-                maximumLineCount: 1
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeBody
-                color: Colors.text
+                Image {
+                    id: _focusIcon
+                    visible: root._focusedAppId.length > 0
+                    width:  visible ? root._iconSize : 0
+                    height: root._iconSize
+                    anchors.verticalCenter: parent.verticalCenter
+                    source: root._iconPath(root._focusedAppId)
+                    smooth: true
+                    fillMode: Image.PreserveAspectFit
+                }
+
+                Text {
+                    id: _titleText
+                    anchors.verticalCenter: parent.verticalCenter
+                    // Natural width capped at _titleMaxW; ElideRight truncates beyond that.
+                    // Do NOT reference _focusRow.parent.width here — that would create a
+                    // circular binding (pill width → focus row → text → pill width).
+                    width: Math.min(implicitWidth, root._titleMaxW)
+                    text: root._focusedTitle
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeBody
+                    color: Colors.text
+                }
             }
         }
     }

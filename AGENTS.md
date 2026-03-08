@@ -50,6 +50,8 @@ All durations are computed as `Math.round(baseMs / SettingsService.data.animatio
 ### Sizes and Fonts: `Theme.*`
 Use `Theme.barHeight`, `Theme.fontFamily`, `Theme.fontSize`, etc. No fixed pixel values.
 
+For bar-internal micro-layout, use `Theme.barWidget.*` instead of component-local literals. If a needed token does not exist yet, extend `Theme.barWidget.*` first rather than adding new hardcoded spacing or icon sizes inside a widget.
+
 ## Settings Data Access
 
 Read settings exclusively via `SettingsService.data.<section>.<key>`:
