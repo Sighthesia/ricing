@@ -54,6 +54,19 @@ Singleton {
     readonly property real widgetSpacing: SettingsService.data.bar.widgetSpacing
     readonly property real iconPadding:   4         // structural constant, not user-facing
 
+    // Bar widget structural tokens — reusable micro-layout values shared by
+    // bar components so internal spacing scales consistently with uiScale.
+    readonly property QtObject barWidget: QtObject {
+        readonly property int contentPaddingH:  Math.round(10 * uiScale)
+        readonly property int primaryIconSize:  Math.round(16 * uiScale)
+        readonly property int compactIconSize:  Math.round(13 * uiScale)
+        readonly property int iconSpacing:      Math.round(3 * uiScale)
+        readonly property int pillSpacing:      Math.round(8 * uiScale)
+        readonly property int pillPaddingH:     Math.round(8 * uiScale)
+        readonly property int iconLabelSpacing: Math.round(6 * uiScale)
+        readonly property int focusPulsePadding: Math.round(4 * uiScale)
+    }
+
     // Settings panel structural tokens — keeps all settings components visually consistent;
     // all values scale with uiScale so the panel grows/shrinks proportionally.
     readonly property int  settingsRowHeight:         Math.round(34 * uiScale)
