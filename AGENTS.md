@@ -39,8 +39,12 @@ All animation durations and easing curves **must** reference this namespace.
 | `Theme.anim.exitDuration`      | Snap-out                   | 220 ms        | `Easing.InExpo`     |
 | `Theme.anim.moveDuration`      | Position/width transitions | 320 ms        | `Easing.InOutCubic` |
 | `Theme.anim.highlightDuration` | Hover highlight pulse      | 180 ms        | `Easing.OutQuad`    |
+| `Theme.anim.springDuration`    | Width/height settle        | 360 ms        | `Easing.OutBack`    |
+| `Theme.anim.pulseSpringDuration` | Pulse rebound            | 180 ms        | `Easing.OutBack`    |
 
 Companion easing properties (same prefix, `Type` suffix): `Theme.anim.enterType`, `Theme.anim.exitType`, etc.
+
+Super Island's pulse + rebound behavior is now the motion reference for shell-wide component resizing. Any component width/height change that should feel expressive must reuse `Theme.anim.spring*` for container settle and `Theme.anim.pulseSpring*` for light pulse rebound instead of introducing ad-hoc elastic timings.
 
 All durations are computed as `Math.round(baseMs / SettingsService.data.animation.speedFactor)` so the user can scale all animations globally.
 

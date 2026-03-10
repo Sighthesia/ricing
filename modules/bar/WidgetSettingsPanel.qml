@@ -230,7 +230,7 @@ PopupWindow {
                     text: {
                         let widgetId = root._widgetId;
                         if (!widgetId) return "组件设置";
-                        let names = { clock: "时钟", workspaceWidget: "工作区" };
+                        let names = { superIsland: "超级灵动岛", clock: "时钟", workspaceWidget: "工作区" };
                         return (names[widgetId] || widgetId) + " — 设置";
                     }
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
@@ -298,9 +298,15 @@ PopupWindow {
                     sourceComponent: WorkspaceWidgetSection { width: parent.width }
                 }
 
+                Loader {
+                    width: parent.width
+                    active: root._widgetId === "superIsland"
+                    sourceComponent: SuperIslandSection { width: parent.width }
+                }
+
                 Text {
                     width: parent.width
-                    visible: root._widgetId !== "workspaceWidget"
+                    visible: root._widgetId !== "workspaceWidget" && root._widgetId !== "superIsland"
                     height: visible ? Theme.settingsRowHeight : 0
                     text: "暂无可用设置"
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody

@@ -128,5 +128,18 @@ Singleton {
             property int    revertDelay:   1500
             property bool   hoverEnabled:  true
         }
+
+        property JsonObject superIsland: JsonObject {
+            property bool enabled: true
+            property string idleContent: "time"
+            property int defaultTimeout: 1500
+            property int importantTimeout: 1500
+            property int criticalTimeout: 1500
+            property int cooldownMs: 1800
+            property int maxQueue: 5
+            property bool showMedia: true
+            property bool showNotifications: true
+            property bool showWorkspaceEvents: true
+        }
     }
 }

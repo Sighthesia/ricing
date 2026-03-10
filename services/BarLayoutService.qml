@@ -34,9 +34,11 @@ Singleton {
     // True while the notification history panel is visible.
     property bool notificationHistoryOpen: false
 
-    // Extra pixels the bar extends downward below exclusiveZone during switch flashes.
-    // Set by WorkspaceWidget when _flashActive is true; BarWindow tracks this property.
-    property int barFlashExtension: 0
+    // Extra pixels the bar extends downward below exclusiveZone during widget flashes.
+    property int workspaceFlashExtension: 0
+    property int superIslandFlashExtension: 0
+    readonly property int barFlashExtension:
+        Math.max(workspaceFlashExtension, superIslandFlashExtension)
 
     // Which bar section the picker should insert widgets into.
     // Updated whenever the user clicks a section in layout mode.
@@ -72,7 +74,7 @@ Singleton {
     // Default layout descriptor (from bar-design.md §三)
     readonly property var defaultLayout: [
         { id: "workspaceWidget", section: "left",   alignment: "left", order: 0, enabled: true },
-        { id: "clock",           section: "center", alignment: "left", order: 0, enabled: true }
+        { id: "superIsland",     section: "center", alignment: "left", order: 0, enabled: true }
     ]
 
     readonly property string _configDir: Quickshell.workingDirectory + "/.state"

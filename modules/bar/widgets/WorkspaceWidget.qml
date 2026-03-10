@@ -268,7 +268,7 @@ Item {
     // while preserving enough surface area to avoid clipping during collapse.
     Binding {
         target: BarLayoutService
-        property: "barFlashExtension"
+        property: "workspaceFlashExtension"
         value: (root._flashActive || root._holdFlashExtension)
             ? (root._flashGap + root._flashRowH)
             : 0

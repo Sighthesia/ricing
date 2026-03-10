@@ -57,5 +57,17 @@
         "titleMaxWidth": 240,
         "revertDelay": 1500,
         "hoverEnabled": true
+    },
+    "superIsland": {
+        "enabled": true,
+        "idleContent": "time",
+        "defaultTimeout": 1500,
+        "importantTimeout": 1500,
+        "criticalTimeout": 1500,
+        "cooldownMs": 1800,
+        "maxQueue": 5,
+        "showMedia": true,
+        "showNotifications": true,
+        "showWorkspaceEvents": true
     }
 }

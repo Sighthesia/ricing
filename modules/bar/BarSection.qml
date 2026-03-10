@@ -168,6 +168,12 @@ Item {
             Loader {
                 source: section.widgetRegistry[modelData.widgetId] || ""
                 active: source !== ""
+                onLoaded: {
+                    if (item && item.hasOwnProperty("liveInstance"))
+                        item.liveInstance = true;
+                    if (item && item.hasOwnProperty("debugInstanceLabel"))
+                        item.debugInstanceLabel = "bar:" + BarLayoutService.instanceKeyAt(modelData.index);
+                }
             }
         }
     }

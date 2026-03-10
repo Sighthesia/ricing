@@ -30,6 +30,18 @@ Singleton {
         readonly property int highlightDuration:
             Math.round(180 / SettingsService.data.animation.speedFactor)
         readonly property int highlightType: Easing.OutQuad
+
+        // Spring: elastic-feel settle for expressive Super Island expansion/collapse
+        readonly property int springDuration:
+            Math.round(360 / SettingsService.data.animation.speedFactor)
+        readonly property int springType: Easing.OutBack
+        readonly property real springOvershoot: 1.18
+
+        // Pulse spring: subtle rebound so attention flashes feel lively without wobble
+        readonly property int pulseSpringDuration:
+            Math.round(180 / SettingsService.data.animation.speedFactor)
+        readonly property int pulseSpringType: Easing.OutBack
+        readonly property real pulseSpringOvershoot: 1.08
     }
 
     // Stagger delay per widget index (ms)
@@ -58,6 +70,7 @@ Singleton {
     // bar components so internal spacing scales consistently with uiScale.
     readonly property QtObject barWidget: QtObject {
         readonly property int contentPaddingH:  Math.round(10 * uiScale)
+        readonly property int contentPaddingV:  Math.max(3, Math.round(3 * uiScale))
         readonly property int primaryIconSize:  Math.round(16 * uiScale)
         readonly property int compactIconSize:  Math.round(13 * uiScale)
         readonly property int iconSpacing:      Math.round(3 * uiScale)
@@ -65,6 +78,11 @@ Singleton {
         readonly property int pillPaddingH:     Math.round(8 * uiScale)
         readonly property int iconLabelSpacing: Math.round(6 * uiScale)
         readonly property int focusPulsePadding: Math.round(4 * uiScale)
+        readonly property int stackGap:         Math.round(6 * uiScale)
+        readonly property int badgePaddingH:    Math.round(6 * uiScale)
+        readonly property int badgePaddingV:    Math.round(4 * uiScale)
+        readonly property int indicatorDotSize: Math.round(7 * uiScale)
+        readonly property int pillHeight:       Math.max(1, Math.round(root.barHeight - root.iconPadding * 2))
     }
 
     // Settings panel structural tokens — keeps all settings components visually consistent;

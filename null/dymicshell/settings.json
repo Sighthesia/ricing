@@ -52,6 +52,18 @@
         "persistHistory": true,
         "position": "top_right"
     },
+    "superIsland": {
+        "cooldownMs": 1800,
+        "criticalTimeout": 1500,
+        "defaultTimeout": 1500,
+        "enabled": true,
+        "idleContent": "time",
+        "importantTimeout": 1500,
+        "maxQueue": 5,
+        "showMedia": true,
+        "showNotifications": true,
+        "showWorkspaceEvents": true
+    },
     "workspaceWidget": {
         "defaultMode": "focus",
         "hoverEnabled": true,
