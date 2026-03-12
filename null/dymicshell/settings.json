@@ -43,6 +43,17 @@
         "autoHideDelay": 500,
         "autoShowDelay": 150
     },
+    "mediaControl": {
+        "announcementDuration": 1500,
+        "announcementEnabled": true,
+        "cavaAsciiMaxRange": 1000,
+        "cavaBars": 20,
+        "cavaEnabled": true,
+        "cavaFramerate": 60,
+        "enabled": true,
+        "hoverRevealControls": true,
+        "showWhenIdle": true
+    },
     "notifications": {
         "criticalDuration": 0,
         "lowDuration": 3000,

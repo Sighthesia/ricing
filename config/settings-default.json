@@ -69,5 +69,16 @@
         "showMedia": true,
         "showNotifications": true,
         "showWorkspaceEvents": true
+    },
+    "mediaControl": {
+        "enabled": true,
+        "showWhenIdle": true,
+        "announcementEnabled": true,
+        "hoverRevealControls": true,
+        "announcementDuration": 1500,
+        "cavaEnabled": true,
+        "cavaBars": 20,
+        "cavaAsciiMaxRange": 1000,
+        "cavaFramerate": 60
     }
 }

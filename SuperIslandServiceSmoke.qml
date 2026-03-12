@@ -11,12 +11,27 @@ ShellRoot {
     property string _initialIdleTitle: ""
     property real _transientHoldWidth: 0
     property real _hintHoldWidth: 0
+    property bool _observedExitPulseScale: false
+    property bool _observedHintExitPulseScale: false
+    property bool _awaitingHintExitPulseScale: false
 
     BarWidgets.SuperIslandWidget {
         id: superIslandWidget
         visible: false
         liveInstance: true
         debugInstanceLabel: "smoke"
+    }
+
+    Connections {
+        target: superIslandWidget
+
+        function on_PulseScaleChanged() {
+            if (superIslandWidget.transitionMode === "exit-track" && superIslandWidget._pulseScale > 1)
+                root._observedExitPulseScale = true
+
+            if (root._awaitingHintExitPulseScale && superIslandWidget._pulseScale > 1)
+                root._observedHintExitPulseScale = true
+        }
     }
 
     function _resetService() {
@@ -111,6 +126,8 @@ ShellRoot {
             root._assert(superIslandWidget.transitionMode === "exit-track", "after 1.5s the transient should exit and baseline should return")
             root._assert(superIslandWidget.mainTrackVisible === true, "main track should remain visible during return animation")
             root._assert(superIslandWidget.flashTrackVisible === true, "flash track should remain visible during return animation")
+            root._assert(root._observedExitPulseScale === true,
+                "SuperIsland should keep a center-based rebound scale during transient exit so all four edges participate")
             root._assert(superIslandWidget.implicitWidth < root._transientHoldWidth,
                 "restore animation should start shrinking width before the exit flow completes")
         })
@@ -164,8 +181,17 @@ ShellRoot {
             })
             hintPulseReleaseTimer.start()
 
+            let hintExitArmTimer = Qt.createQmlObject('import QtQuick; Timer { interval: 1450; repeat: false }', root)
+            hintExitArmTimer.triggered.connect(function() {
+                root._awaitingHintExitPulseScale = true
+            })
+            hintExitArmTimer.start()
+
             let hintExitTimer = Qt.createQmlObject('import QtQuick; Timer { interval: 1700; repeat: false }', root)
             hintExitTimer.triggered.connect(function() {
+                root._assert(root._observedHintExitPulseScale === true,
+                    "SuperIsland should keep a center-based rebound scale during hint exit so all four edges participate")
+                root._awaitingHintExitPulseScale = false
                 root._assert(superIslandWidget.implicitWidth < root._hintHoldWidth,
                     "window transient exit should start shrinking width before the collapse finishes")
             })

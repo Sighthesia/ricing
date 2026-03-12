@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import qs.config
 
 // Click ripple overlay — renders an expanding circle from the click point.
@@ -40,6 +41,11 @@ Item {
     }
 
     Item {
+        id: _rippleSource
+        anchors.fill: parent
+        opacity: root.radius > 0 ? 0 : 1
+
+        Item {
         x: root._rx - root._maxSize / 2
         y: root._ry - root._maxSize / 2
         width: root._maxSize
@@ -54,6 +60,27 @@ Item {
             scale: 0
             transformOrigin: Item.Center
         }
+    }
+
+    }
+
+    Item {
+        id: _maskSource
+        anchors.fill: parent
+        opacity: 0
+
+        Rectangle {
+            anchors.fill: parent
+            radius: root.radius
+            color: "white"
+        }
+    }
+
+    OpacityMask {
+        anchors.fill: parent
+        visible: root.radius > 0
+        source: _rippleSource
+        maskSource: _maskSource
     }
 
     ParallelAnimation {

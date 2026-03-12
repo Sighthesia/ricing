@@ -26,6 +26,7 @@ AnimatedPanelBase {
     // FIXME: promote to a shared singleton in V2 to avoid duplication.
     readonly property var widgetRegistry: ({
         "superIsland":       Qt.resolvedUrl("widgets/SuperIslandWidget.qml"),
+        "mediaControl":      Qt.resolvedUrl("widgets/MediaControlWidget.qml"),
         "clock":             Qt.resolvedUrl("widgets/Clock.qml"),
         "workspaceWidget":   Qt.resolvedUrl("widgets/WorkspaceWidget.qml"),
         "notificationBell":  Qt.resolvedUrl("widgets/NotificationBell.qml")
@@ -34,6 +35,7 @@ AnimatedPanelBase {
     // Human-readable display names for the picker cards
     readonly property var widgetNames: ({
         "superIsland":       "\u8d85\u7ea7\u7075\u52a8\u5c9b",
+        "mediaControl":      "\u5a92\u4f53\u63a7\u5236",
         "clock":             "\u65f6\u949f",
         "workspaceWidget":   "\u5de5\u4f5c\u533a",
         "notificationBell":  "\u901a\u77e5"

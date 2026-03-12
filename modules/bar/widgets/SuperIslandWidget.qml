@@ -303,6 +303,12 @@ Item {
         _pulseScaleAnim.start()
     }
 
+    function _triggerEdgeReboundScale() {
+        _pulseScaleAnim.stop()
+        root._pulseScale = 1
+        _pulseScaleAnim.start()
+    }
+
     function _resetReplaceLayers() {
         root._replaceOutgoingVisible = false
         root._replaceIncomingVisible = false
@@ -382,6 +388,7 @@ Item {
         _pillExpandAnim.stop()
         _pillCollapseAnim.stop()
         _pillCollapseAnim.start()
+        root._triggerEdgeReboundScale()
         _hintExitAnim.start()
     }
 
@@ -396,6 +403,7 @@ Item {
         _pillExpandAnim.stop()
         _pillCollapseAnim.stop()
         _pillCollapseAnim.start()
+        root._triggerEdgeReboundScale()
 
         root._mainTrackY = root._mainTrackCenterY
         root._mainTrackScale = 1
@@ -490,10 +498,9 @@ Item {
                 target: _pillBg
                 property: "height"
                 to: root._pillH + root._flashGap + root._flashRowH
-                duration: Theme.anim.enterDuration
-                easing.type: Theme.anim.enterType
-                easing.amplitude: Theme.anim.enterAmplitude
-                easing.period: Theme.anim.enterPeriod
+                duration: Theme.anim.springDuration
+                easing.type: Theme.anim.springType
+                easing.overshoot: Theme.anim.springOvershoot
             }
 
             NumberAnimation {
