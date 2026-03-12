@@ -37,8 +37,9 @@ Singleton {
     // Extra pixels the bar extends downward below exclusiveZone during widget flashes.
     property int workspaceFlashExtension: 0
     property int superIslandFlashExtension: 0
+    property int mediaControlFlashExtension: 0
     readonly property int barFlashExtension:
-        Math.max(workspaceFlashExtension, superIslandFlashExtension)
+        Math.max(workspaceFlashExtension, superIslandFlashExtension, mediaControlFlashExtension)
 
     // Which bar section the picker should insert widgets into.
     // Updated whenever the user clicks a section in layout mode.
@@ -47,6 +48,9 @@ Singleton {
     // Left-edge pixel offset used by WidgetPickerWindow to position itself
     // below the active section. Updated together with widgetPickerTargetSection.
     property real widgetPickerLeftMargin: 0
+
+    // Horizontal anchor position for the media control detail panel.
+    property real mediaControlPanelX: 0
 
     // Computed alias — keeps all existing DragOverlay/BarSection bindings unchanged
     readonly property bool settingsMode: activePanel === "layout"

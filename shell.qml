@@ -15,4 +15,5 @@ ShellRoot {
     NotificationPopupWindow {}
     NotificationHistoryPanel {}
     LauncherPanel {}
+    MediaControlPanel {}
 }

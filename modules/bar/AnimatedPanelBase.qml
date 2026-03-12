@@ -1,5 +1,6 @@
 import Quickshell
 import QtQuick
+import qs.config
 
 // Animated drop-down base for PanelWindows.
 //
@@ -19,6 +20,13 @@ PanelWindow {
 
     // Logical open/close trigger — replaces `visible:` bindings in child panels.
     property bool active: false
+    property int openOpacityDelay: Math.max(1, Math.round(Theme.anim.highlightDuration / 3))
+    property int openOpacityDuration: Theme.anim.highlightDuration
+    property int openScaleDuration: Math.max(1, Math.round(Theme.anim.springDuration * 0.78))
+    property int closeOpacityDelay: 0
+    property int closeOpacityDuration: Math.max(1, Math.round(Theme.anim.highlightDuration * 0.67))
+    property int closeScaleDuration: Math.max(1, Math.round(Theme.anim.springDuration * 0.56))
+    property int closeScaleDelay: 0
 
     color: "transparent"
 
@@ -39,6 +47,8 @@ PanelWindow {
             if (_state === "closed" || _state === "closing") {
                 _scaleCloseAnim.stop();
                 _opacityCloseAnim.stop();
+                _closeOpacityDelayTimer.stop();
+                _closeScaleDelayTimer.stop();
                 _opacityDelayTimer.stop();
 
                 _state = "opening";
@@ -51,11 +61,19 @@ PanelWindow {
                 _scaleOpenAnim.stop();
                 _opacityOpenAnim.stop();
                 _opacityDelayTimer.stop();
+                _closeOpacityDelayTimer.stop();
+                _closeScaleDelayTimer.stop();
 
                 _state = "closing";
                 panelClosing();
-                _opacityCloseAnim.restart();
-                _scaleCloseAnim.restart();
+                if (root.closeOpacityDelay > 0)
+                    _closeOpacityDelayTimer.restart();
+                else
+                    _opacityCloseAnim.restart();
+                if (root.closeScaleDelay > 0)
+                    _closeScaleDelayTimer.restart();
+                else
+                    _scaleCloseAnim.restart();
             }
         }
     }
@@ -64,9 +82,23 @@ PanelWindow {
     // mirroring noctalia's sequential opacity trigger.
     Timer {
         id: _opacityDelayTimer
-        interval: 60
+        interval: root.openOpacityDelay
         repeat: false
         onTriggered: _opacityOpenAnim.restart()
+    }
+
+    Timer {
+        id: _closeOpacityDelayTimer
+        interval: root.closeOpacityDelay
+        repeat: false
+        onTriggered: _opacityCloseAnim.restart()
+    }
+
+    Timer {
+        id: _closeScaleDelayTimer
+        interval: root.closeScaleDelay
+        repeat: false
+        onTriggered: _scaleCloseAnim.restart()
     }
 
     // Scale open: 0 → 1, OutBack gives the subtle overshoot that makes the panel
@@ -76,7 +108,7 @@ PanelWindow {
         target: _wrapper
         property: "_scaleY"
         to: 1.0
-        duration: 280
+        duration: root.openScaleDuration
         easing.type: Easing.OutBack
         easing.overshoot: 0.7
         onFinished: if (root._state === "opening") root._state = "open"
@@ -89,7 +121,7 @@ PanelWindow {
         target: _wrapper
         property: "_scaleY"
         to: 0.0
-        duration: 200
+        duration: root.closeScaleDuration
         easing.type: Easing.InBack
         easing.overshoot: 0.7
         onFinished: if (root._state === "closing") root._state = "closed"
@@ -101,7 +133,7 @@ PanelWindow {
         target: _wrapper
         property: "opacity"
         to: 1.0
-        duration: 180
+        duration: root.openOpacityDuration
         easing.type: Easing.OutQuad
     }
 
@@ -111,7 +143,7 @@ PanelWindow {
         target: _wrapper
         property: "opacity"
         to: 0.0
-        duration: 120
+        duration: root.closeOpacityDuration
         easing.type: Easing.InQuad
     }
 

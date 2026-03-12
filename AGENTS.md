@@ -33,14 +33,14 @@ Common tokens: `Colors.background`, `Colors.text`, `Colors.border`, `Colors.high
 ### Animation: `Theme.anim.*`
 All animation durations and easing curves **must** reference this namespace.
 
-| Token                          | Purpose                    | Base duration | Easing              |
-| ------------------------------ | -------------------------- | ------------- | ------------------- |
-| `Theme.anim.enterDuration`     | Bounce-in                  | 500 ms        | `Easing.OutElastic` |
-| `Theme.anim.exitDuration`      | Snap-out                   | 220 ms        | `Easing.InExpo`     |
-| `Theme.anim.moveDuration`      | Position/width transitions | 320 ms        | `Easing.InOutCubic` |
-| `Theme.anim.highlightDuration` | Hover highlight pulse      | 180 ms        | `Easing.OutQuad`    |
-| `Theme.anim.springDuration`    | Width/height settle        | 360 ms        | `Easing.OutBack`    |
-| `Theme.anim.pulseSpringDuration` | Pulse rebound            | 180 ms        | `Easing.OutBack`    |
+| Token                            | Purpose                    | Base duration | Easing              |
+| -------------------------------- | -------------------------- | ------------- | ------------------- |
+| `Theme.anim.enterDuration`       | Bounce-in                  | 500 ms        | `Easing.OutElastic` |
+| `Theme.anim.exitDuration`        | Snap-out                   | 220 ms        | `Easing.InExpo`     |
+| `Theme.anim.moveDuration`        | Position/width transitions | 320 ms        | `Easing.InOutCubic` |
+| `Theme.anim.highlightDuration`   | Hover highlight pulse      | 180 ms        | `Easing.OutQuad`    |
+| `Theme.anim.springDuration`      | Width/height settle        | 360 ms        | `Easing.OutBack`    |
+| `Theme.anim.pulseSpringDuration` | Pulse rebound              | 180 ms        | `Easing.OutBack`    |
 
 Companion easing properties (same prefix, `Type` suffix): `Theme.anim.enterType`, `Theme.anim.exitType`, etc.
 
@@ -92,6 +92,8 @@ MouseArea {
 }
 ```
 
+Any region that handles primary-button clicks must provide both hover feedback and click ripple feedback. If the surface uses a non-default fill or highlight color, enable `HoverRevealHighlight.adaptiveContrast` and pass the effective surface color so hover remains visible across light, dark, or highlighted backgrounds.
+
 ### Implicit Property Animation Pattern
 
 ```qml
@@ -125,3 +127,5 @@ Follow this ordering within every QML file:
 - **Animated windows**: use a `_state: string` state machine (`"closed"`, `"opening"`, `"open"`, `"closing"`) instead of toggling `visible` directly — prevents premature Wayland surface destruction.
 - **`AnimatedPanelBase` children**: routed via `default property alias`; place child items directly inside the component tag.
 - **`Behavior on` + token**: the standard pattern for implicit animation — always pair with `Theme.anim.*` tokens, never inline literal durations or easing values.
+- **QML comments**: place a short English comment immediately before each layout or visual/input element declaration to name the element and its role.
+- **Panel stagger**: expanded panel content must stagger top-to-bottom on enter and exit; the panel shell should start fading/scaling only after the content exit becomes visible.

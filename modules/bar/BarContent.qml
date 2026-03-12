@@ -8,6 +8,7 @@ Item {
     // Widget registry: maps widget ID to QML source path
     readonly property var widgetRegistry: ({
         "superIsland":        "widgets/SuperIslandWidget.qml",
+        "mediaControl":       "widgets/MediaControlWidget.qml",
         "clock":              "widgets/Clock.qml",
         "workspaceWidget":    "widgets/WorkspaceWidget.qml",
         "notificationBell":   "widgets/NotificationBell.qml"
@@ -34,6 +35,7 @@ Item {
     // FIXME: promote to a shared singleton to avoid duplication.
     readonly property var widgetNames: ({
         "superIsland":        "超级灵动岛",
+        "mediaControl":       "媒体控制",
         "clock":              "时钟",
         "workspaceWidget":    "工作区",
         "notificationBell":   "通知"

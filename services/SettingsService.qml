@@ -141,5 +141,17 @@ Singleton {
             property bool showNotifications: true
             property bool showWorkspaceEvents: true
         }
+
+        property JsonObject mediaControl: JsonObject {
+            property bool enabled: true
+            property bool showWhenIdle: true
+            property bool announcementEnabled: true
+            property bool hoverRevealControls: true
+            property int announcementDuration: 1500
+            property bool cavaEnabled: true
+            property int cavaBars: 20
+            property int cavaAsciiMaxRange: 1000
+            property int cavaFramerate: 60
+        }
     }
 }

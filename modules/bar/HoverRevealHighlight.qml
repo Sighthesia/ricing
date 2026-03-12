@@ -28,6 +28,8 @@ Item {
     property bool hovered: false
     property color highlightColor: Colors.highlight
     property real highlightOpacity: 0.12
+    property bool adaptiveContrast: false
+    property color surfaceColor: "transparent"
     property real radius: 0
     // Enter uses moveDuration (slower reveal); exit uses highlightDuration (quick sweep).
     // Both can be overridden per-instance.
@@ -40,6 +42,20 @@ Item {
     // Queued exit: set when mouse leaves while enter is still running.
     property bool _pendingExit: false
 
+    readonly property real _surfaceLuma:
+        (0.2126 * surfaceColor.r) + (0.7152 * surfaceColor.g) + (0.0722 * surfaceColor.b)
+    readonly property real _highlightLuma:
+        (0.2126 * highlightColor.r) + (0.7152 * highlightColor.g) + (0.0722 * highlightColor.b)
+    readonly property real _lumaDelta: Math.abs(root._surfaceLuma - root._highlightLuma)
+    readonly property color _resolvedHighlightColor:
+        !root.adaptiveContrast || root._lumaDelta >= 0.18
+            ? root.highlightColor
+            : (root._surfaceLuma > 0.55 ? Colors.background : Colors.text)
+    readonly property real _resolvedHighlightOpacity:
+        root.adaptiveContrast && root._lumaDelta < 0.18
+            ? Math.max(root.highlightOpacity, 0.14)
+            : root.highlightOpacity
+
     clip: true
 
     // Wipe bar
@@ -48,8 +64,8 @@ Item {
         width: Math.max(0, root._rightEdge - root._leftEdge)
         height: parent.height
         radius: root.radius
-        color: root.highlightColor
-        opacity: root.highlightOpacity
+        color: root._resolvedHighlightColor
+        opacity: root._resolvedHighlightOpacity
     }
 
     onHoveredChanged: {

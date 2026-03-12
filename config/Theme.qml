@@ -83,6 +83,65 @@ Singleton {
         readonly property int badgePaddingV:    Math.round(4 * uiScale)
         readonly property int indicatorDotSize: Math.round(7 * uiScale)
         readonly property int pillHeight:       Math.max(1, Math.round(root.barHeight - root.iconPadding * 2))
+        readonly property int compactMediaArtworkSize: primaryIconSize + contentPaddingV * 2
+        readonly property int mediaCompactMinWidth: Math.round(192 * uiScale)
+        readonly property int mediaCompactMaxTitleWidth: Math.round(164 * uiScale)
+        readonly property real mediaCompactArtistWidthRatio: 0.38
+        readonly property int mediaProgressThickness: Math.max(4, Math.round(4 * uiScale))
+        readonly property int mediaExpandedProgressThickness: Math.max(6, Math.round(6 * uiScale))
+        readonly property int mediaFlashControlGap: Math.round(8 * uiScale)
+        readonly property int mediaFlashButtonSize: Math.round(26 * uiScale)
+        readonly property int mediaFlashSecondaryButtonSize: Math.round(22 * uiScale)
+        readonly property int mediaFlashPrimaryButtonSize: Math.round(28 * uiScale)
+        readonly property int mediaFlashClusterGap: Math.round(6 * uiScale)
+        readonly property int mediaFlashProgressMinWidth: Math.round(72 * uiScale)
+        readonly property int mediaPanelArtworkSize: Math.round(112 * uiScale)
+        readonly property int mediaPanelWidth: Math.round(360 * uiScale)
+        readonly property real mediaPanelArtistMaxWidthRatio: 0.3
+        readonly property int mediaPanelVisualizerHeight:
+            Math.max(mediaExpandedProgressThickness * 4, contentPaddingV * 4)
+        readonly property int mediaPanelControlsTopSpacing: contentPaddingV
+        readonly property int mediaStaggerBaseDelay:
+            Math.max(1, Math.round(root.staggerDelay * 1.75))
+        readonly property int mediaStaggerStep:
+            Math.max(1, Math.round(root.staggerDelay * 1.5))
+        readonly property int mediaStaggerExitStep:
+            Math.max(1, Math.round(root.staggerDelay * 0.875))
+        readonly property int mediaStaggerHeroEnterOffset: Math.round(18 * uiScale)
+        readonly property int mediaStaggerProgressEnterOffset: Math.round(22 * uiScale)
+        readonly property int mediaStaggerControlsEnterOffset: Math.round(26 * uiScale)
+        readonly property int mediaStaggerHeroExitOffset: Math.round(10 * uiScale)
+        readonly property int mediaStaggerProgressExitOffset: Math.round(12 * uiScale)
+        readonly property int mediaStaggerControlsExitOffset: Math.round(14 * uiScale)
+        readonly property int mediaStaggerHeroExitDelay: 0
+        readonly property int mediaVisualizerBarWidth: Math.max(2, Math.round(3 * uiScale))
+        readonly property int mediaVisualizerBarGap: Math.max(1, Math.round(2 * uiScale))
+        readonly property real mediaVisualizerBarOpacity: 0.42
+        readonly property real mediaSurfaceOverlayOpacity: 0.5
+        readonly property real mediaFallbackIconOpacity: 0.82
+        readonly property real mediaTransientAccentOpacityMultiplier: 0.4
+        readonly property real mediaFlashMinScale: 0.96
+        readonly property real mediaFlashScaleRange: 0.04
+        readonly property real mediaFlashButtonRadiusRatio: 0.38
+        readonly property real mediaFlashSecondarySurfaceOpacity: 0.06
+        readonly property real mediaFlashDisabledButtonOpacity: 0.45
+        readonly property real mediaFlashSecondaryIconOpacity: 0.9
+        readonly property real mediaFlashDisabledIconOpacity: 0.5
+        readonly property real mediaFlashLabelOpacity: 0.72
+        readonly property real mediaFlashPrimaryHighlightOpacity: 0.14
+        readonly property real mediaFlashSecondaryHighlightOpacity: 0.12
+        readonly property real mediaFlashPrimaryRippleOpacity: 0.2
+        readonly property real mediaFlashSecondaryRippleOpacity: 0.28
+        readonly property int mediaFlashCompactSecondaryButtonSize:
+            Math.max(18, mediaFlashSecondaryButtonSize - 2)
+        readonly property int mediaFlashCompactPrimaryButtonSize:
+            Math.max(24, mediaFlashPrimaryButtonSize - 2)
+        readonly property int mediaFlashCompactSecondaryIconSize:
+            Math.max(12, compactIconSize - 1)
+        readonly property int mediaFlashCompactPrimaryIconSize:
+            Math.max(15, primaryIconSize - 1)
+        readonly property real mediaContentSwapIncomingStart: 0.18
+        readonly property real mediaContentSwapIncomingRange: 0.82
     }
 
     // Settings panel structural tokens — keeps all settings components visually consistent;
