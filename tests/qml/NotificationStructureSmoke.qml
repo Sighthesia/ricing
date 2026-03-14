@@ -41,6 +41,12 @@ ShellRoot {
             "NotificationService should expose clearHistory()")
         root._assert(typeof NotificationService.removeFromHistory === "function",
             "NotificationService should expose removeFromHistory()")
+        root._assert(typeof NotificationService.notificationsAvailable === "boolean",
+            "NotificationService should expose notification availability diagnostics")
+        root._assert(typeof NotificationService.notificationOwner === "string",
+            "NotificationService should expose the current notification owner")
+        root._assert(typeof NotificationService.notificationDiagnosticMessage === "string",
+            "NotificationService should expose a human-readable diagnostic message")
 
         NotificationService.activeList.append({
             id: "smoke-active",

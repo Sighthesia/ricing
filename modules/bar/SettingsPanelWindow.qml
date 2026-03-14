@@ -8,8 +8,12 @@ import "./settings"
 AnimatedPanelBase {
     id: panelWindow
 
-    // Sit at top-right; top margin pushes the panel below the bar
-    anchors { top: true; right: true }
+    readonly property var _closeButton: _closeButtonSurface
+    readonly property int _headerHeight: 32
+    readonly property bool _usesCenteredPlacement: true
+
+    // Sit below the bar; without left/right anchoring, the compositor keeps the panel centered.
+    anchors { top: true }
     margins { top: Theme.barHeight }
 
     implicitWidth: 480
@@ -53,13 +57,68 @@ AnimatedPanelBase {
                 content.dismissSearch()
             }
         }
+
+        Row {
+            anchors {
+                top: parent.top
+                left: parent.left
+                right: parent.right
+                topMargin: 12
+                leftMargin: 12
+                rightMargin: 12
+            }
+            spacing: 8
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "设置"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeBody
+                font.weight: Font.Medium
+                color: Colors.text
+            }
+
+            Item {
+                width: Math.max(0, parent.width - _closeButtonSurface.width - 48)
+                height: 1
+            }
+
+            Rectangle {
+                id: _closeButtonSurface
+                width: 28
+                height: 28
+                radius: Theme.cornerRadius - 2
+                color: _closeButtonArea.containsMouse ? Colors.surface : "transparent"
+                border.color: _closeButtonArea.containsMouse ? Colors.border : "transparent"
+                border.width: 1
+
+                Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+                Behavior on border.color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "✕"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeBody
+                    color: Colors.text
+                }
+
+                MouseArea {
+                    id: _closeButtonArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: BarLayoutService.activePanel = "none"
+                }
+            }
+        }
     }
 
     SettingsPanelContent {
         id: content
         anchors {
             fill: parent
-            topMargin: 10
+            topMargin: panelWindow._headerHeight + 14
             leftMargin: 4
             rightMargin: 8
             bottomMargin: 10

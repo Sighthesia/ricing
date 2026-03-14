@@ -232,8 +232,7 @@ PopupWindow {
                         id: backBtnArea; anchors.fill: parent
                         hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            BarLayoutService.widgetSettingsPanelOpen = false;
-                            BarLayoutService.activeWidgetInstanceKey = "";
+                            BarLayoutService.closeWidgetSettings()
                         }
                     }
                 }
@@ -393,8 +392,7 @@ PopupWindow {
         target: BarLayoutService
         function onContextMenuOpenChanged() {
             if (BarLayoutService.contextMenuOpen) {
-                BarLayoutService.widgetSettingsPanelOpen = false;
-                BarLayoutService.activeWidgetInstanceKey = "";
+                BarLayoutService.closeWidgetSettings()
             }
         }
     }

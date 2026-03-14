@@ -26,11 +26,17 @@ Singleton {
 
     // Count of items added since markAllSeen() was last called.
     readonly property int unreadCount: _unreadCount
+    readonly property bool notificationsAvailable: _notificationsAvailable
+    readonly property string notificationOwner: _notificationOwner
+    readonly property string notificationDiagnosticMessage: _notificationDiagnosticMessage
 
     // --- Private state ---
 
     property int _unreadCount: 0
     property real _lastSeenTimestamp: 0
+    property bool _notificationsAvailable: true
+    property string _notificationOwner: ""
+    property string _notificationDiagnosticMessage: "Notifications are available."
 
     // id → { notification: NotificationObject, timer: Timer }
     property var _activeNotifications: ({})
@@ -42,14 +48,34 @@ Singleton {
         + "/dymicshell/"
 
     readonly property string _historyFile: _cacheDir + "notifications.json"
+    readonly property string _notificationOwnerCommand:
+        "busctl --user status org.freedesktop.Notifications 2>/dev/null"
 
     // --- Notification server ---
 
     NotificationServer {
+        id: _notificationServer
         keepOnReload: false
         imageSupported: true
         actionsSupported: true
         onNotification: (n) => root._handleNotification(n)
+    }
+
+    Process {
+        id: _notificationOwnerProcess
+        command: ["sh", "-c", root._notificationOwnerCommand]
+        property string _buffer: ""
+
+        stdout: SplitParser {
+            onRead: (line) => {
+                _notificationOwnerProcess._buffer += line + "\n"
+            }
+        }
+
+        onExited: () => {
+            root._applyNotificationOwnerOutput(_notificationOwnerProcess._buffer)
+            _notificationOwnerProcess._buffer = ""
+        }
     }
 
     // --- History persistence ---
@@ -84,6 +110,7 @@ Singleton {
 
     Component.onCompleted: {
         Quickshell.execDetached(["mkdir", "-p", _cacheDir])
+        _refreshNotificationDiagnostics()
     }
 
     // --- Public API ---
@@ -181,6 +208,49 @@ Singleton {
 
         activeList.insert(0, data);
         _startTimer(data);
+    }
+
+    function _refreshNotificationDiagnostics() {
+        _notificationOwnerProcess.running = false
+        _notificationOwnerProcess._buffer = ""
+        _notificationOwnerProcess.running = true
+    }
+
+    function _applyNotificationOwnerOutput(output) {
+        let owner = ""
+        let lines = output ? output.split("\n") : []
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim()
+            if (line.startsWith("Name=")) {
+                owner = line.substring(5).trim()
+                break
+            }
+            if (line.startsWith("Unit=") && owner === "") {
+                owner = line.substring(5).trim()
+            }
+        }
+
+        if (owner === "") {
+            root._notificationsAvailable = true
+            root._notificationOwner = ""
+            root._notificationDiagnosticMessage = "Notifications are available."
+            return
+        }
+
+        let normalizedOwner = owner
+        if (normalizedOwner.endsWith(".service")) {
+            normalizedOwner = normalizedOwner.slice(0, -8)
+        }
+
+        let selfOwnsNotifications = normalizedOwner === "quickshell"
+            || normalizedOwner === "Quickshell"
+
+        root._notificationsAvailable = selfOwnsNotifications
+        root._notificationOwner = normalizedOwner
+        root._notificationDiagnosticMessage = selfOwnsNotifications
+            ? "Notifications are available."
+            : "Another notification daemon is active: " + normalizedOwner + ". Stop it if you want DymicShell to take over notifications."
     }
 
     function _buildData(n) {

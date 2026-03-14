@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Io
 import QtQuick
 import qs.config
 import qs.services
@@ -36,6 +35,7 @@ PopupWindow {
     property real _targetWidgetCenterX: 0
     // Human-readable widget type label (currently unused in display, reserved for tooltip).
     property string _targetWidgetLabel: ""
+    readonly property int _widgetActionCount: 1
     // FIXME: lift these shared ratios into Theme.anim.* if more panels reuse them.
     readonly property int _enterOpacityDuration:
         Math.max(1, Math.round(Theme.anim.highlightDuration * 0.56))
@@ -58,8 +58,6 @@ PopupWindow {
         if (_targetWidgetKey !== "") {
             _stagger.registerItem(s_widgetDivider, 2, 1);
             _stagger.registerItem(s_widgetSettings, 3, 1);
-            _stagger.registerItem(s_widgetCopy, 4, 1);
-            _stagger.registerItem(s_widgetDelete, 5, 1);
         }
 
         if (_active) {
@@ -89,11 +87,6 @@ PopupWindow {
         onTriggered: root._active = false
     }
 
-    Process {
-        id: _clipboardProcess
-        command: []
-    }
-
     // Open menu at BarContent-local x coordinate.
     // instanceKey / widgetCenterX / widgetLabel are optional — supply for widget right-click.
     function showAt(x, _y, instanceKey, widgetCenterX, widgetLabel) {
@@ -104,13 +97,6 @@ PopupWindow {
         anchor.updateAnchor();
         BarLayoutService.contextMenuOpen = true;
         _active = true;
-    }
-
-    function _copyToClipboard(text) {
-        // Use wl-copy for Wayland clipboard access
-        _clipboardProcess.command = ["wl-copy", text];
-        _clipboardProcess.running = false;
-        _clipboardProcess.running = true;
     }
 
     Rectangle {
@@ -313,110 +299,12 @@ PopupWindow {
                     hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     onClicked: (mouse) => {
                         widgetSettingsRipple.triggerRipple(mouse.x, mouse.y)
-                        BarLayoutService.activePanel = "layout";
-                        BarLayoutService.activeWidgetInstanceKey = root._targetWidgetKey;
-                        BarLayoutService.widgetSettingsX = root._targetWidgetCenterX;
-                        BarLayoutService.widgetSettingsPanelOpen = true;
+                        BarLayoutService.openWidgetSettings(root._targetWidgetKey, root._targetWidgetCenterX)
                         _dismissTimer.restart()
                     }
                 }
             }
 
-            // --- "复制组件" item ---
-            StaggerItem {
-                id: s_widgetCopy
-                visible: root._targetWidgetKey !== ""
-                delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                     + SettingsService.data.animation.staggerLevel1Step * 3
-                exitDelay: 0
-                width: parent.width
-                height: visible ? Theme.barHeight - Theme.barPadding : 0
-
-                HoverRevealHighlight {
-                    anchors.fill: parent; anchors.margins: 1
-                    radius: Theme.cornerRadius - 2
-                    hovered: widgetCopyArea.containsMouse
-                    highlightColor: Colors.highlight; highlightOpacity: 0.12
-                }
-                Row {
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.left: parent.left; anchors.leftMargin: Theme.widgetPadding
-                    spacing: 8
-                    Text {
-                        text: "\uf0c5"
-                        font.family: Theme.fontMono; font.pixelSize: Theme.fontSizeIcon
-                        color: Colors.text; opacity: 0.7
-                    }
-                    Text {
-                        text: "复制组件"
-                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
-                        color: Colors.text
-                    }
-                }
-                ClickRipple {
-                    id: widgetCopyRipple
-                    anchors.fill: parent; anchors.margins: 1; rippleColor: Colors.highlight
-                }
-                MouseArea {
-                    id: widgetCopyArea; anchors.fill: parent
-                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: (mouse) => {
-                        widgetCopyRipple.triggerRipple(mouse.x, mouse.y)
-                        let widgetId = root._targetWidgetKey.split("_").slice(0, -1).join("_");
-                        let payload = WidgetConfigService.exportPayload(widgetId, root._targetWidgetKey);
-                        _copyToClipboard(JSON.stringify(payload, null, 2));
-                        _dismissTimer.restart()
-                    }
-                }
-            }
-
-            // --- "删除组件" item ---
-            StaggerItem {
-                id: s_widgetDelete
-                visible: root._targetWidgetKey !== ""
-                delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                     + SettingsService.data.animation.staggerLevel1Step * 4
-                exitDelay: 0
-                width: parent.width
-                height: visible ? Theme.barHeight - Theme.barPadding : 0
-
-                HoverRevealHighlight {
-                    anchors.fill: parent; anchors.margins: 1
-                    radius: Theme.cornerRadius - 2
-                    hovered: widgetDeleteArea.containsMouse
-                    highlightColor: Colors.destructive; highlightOpacity: 0.15
-                }
-                Row {
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.left: parent.left; anchors.leftMargin: Theme.widgetPadding
-                    spacing: 8
-                    Text {
-                        text: "\uf1f8"
-                        font.family: Theme.fontMono; font.pixelSize: Theme.fontSizeIcon
-                        color: Colors.destructive; opacity: 0.85
-                    }
-                    Text {
-                        text: "删除组件"
-                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
-                        color: Colors.destructive
-                    }
-                }
-                ClickRipple {
-                    id: widgetDeleteRipple
-                    anchors.fill: parent; anchors.margins: 1; rippleColor: Colors.destructive
-                }
-                MouseArea {
-                    id: widgetDeleteArea; anchors.fill: parent
-                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: (mouse) => {
-                        widgetDeleteRipple.triggerRipple(mouse.x, mouse.y)
-                        let key = root._targetWidgetKey;
-                        WidgetConfigService.removeConfig(key);
-                        BarLayoutService.removeWidget(key);
-                        _dismissTimer.restart()
-                    }
-                }
-            }
         }
     }
 

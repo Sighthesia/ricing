@@ -21,6 +21,8 @@ Item {
         && wrapper._enterDone
         && !wrapper._isDragging
         && wrapper.implicitWidth >= wrapper._naturalWidth - 0.5
+    readonly property bool _primaryActionsSuppressed:
+        BarLayoutService.suppressWidgetPrimaryActions && !wrapper._isDragging
 
     implicitWidth: _isDragging ? 0 : _naturalWidth
     implicitHeight: _isDragging ? 0 : _naturalHeight
@@ -51,6 +53,11 @@ Item {
         id: contentContainer
         width: childrenRect.width
         height: childrenRect.height
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.LeftButton
+        enabled: wrapper._primaryActionsSuppressed
     }
 
     // --- Enter animation ---

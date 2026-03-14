@@ -8,10 +8,12 @@ import qs.services
 AnimatedPanelBase {
     id: root
 
-    // Position below the active bar section; left margin is computed by the
-    // section click handler and stored in BarLayoutService.widgetPickerLeftMargin.
-    anchors { top: true; left: true }
-    margins { top: Theme.barHeight; left: BarLayoutService.widgetPickerLeftMargin }
+    readonly property var _closeButton: _closeButtonSurface
+    readonly property bool _usesCenteredPlacement: true
+
+    // Position below the bar; without left/right anchoring, the compositor keeps the panel centered.
+    anchors { top: true }
+    margins { top: Theme.barHeight }
 
     implicitWidth: 480
     implicitHeight: 480
@@ -103,6 +105,45 @@ AnimatedPanelBase {
                     font.pixelSize: Theme.fontSizeBody
                     font.weight: Font.Medium
                     color: Colors.text
+                }
+
+                Item {
+                    anchors.right: _closeButtonSurface.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, parent.width - _titleText.implicitWidth - _closeButtonSurface.width - 8)
+                    height: 1
+                }
+
+                Rectangle {
+                    id: _closeButtonSurface
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 28
+                    height: 28
+                    radius: Theme.cornerRadius - 2
+                    color: _closeButtonArea.containsMouse ? Colors.surface : "transparent"
+                    border.color: _closeButtonArea.containsMouse ? Colors.border : "transparent"
+                    border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+                    Behavior on border.color { ColorAnimation { duration: Theme.anim.highlightDuration } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "✕"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeBody
+                        color: Colors.text
+                    }
+
+                    MouseArea {
+                        id: _closeButtonArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: BarLayoutService.widgetPickerOpen = false
+                    }
                 }
             }
 

@@ -28,6 +28,12 @@ Singleton {
     // True while the widget settings panel is visible.
     property bool widgetSettingsPanelOpen: false
 
+    // True when the current widget-settings session entered layout mode automatically.
+    property bool widgetSettingsAutoEnteredLayout: false
+
+    // True when widgets should suppress their normal primary-button actions.
+    property bool suppressWidgetPrimaryActions: settingsMode
+
     // True while the wallpaper picker overlay is visible.
     property bool wallpaperPickerOpen: false
 
@@ -59,6 +65,32 @@ Singleton {
         if (!settingsMode) {
             widgetSettingsPanelOpen = false;
             activeWidgetInstanceKey = "";
+            widgetSettingsAutoEnteredLayout = false;
+        }
+    }
+
+    function openWidgetSettings(instanceKey, widgetCenterX) {
+        let shouldAutoEnterLayout = !settingsMode
+
+        if (shouldAutoEnterLayout) {
+            activePanel = "layout"
+        }
+
+        widgetSettingsAutoEnteredLayout = shouldAutoEnterLayout
+        activeWidgetInstanceKey = instanceKey
+        widgetSettingsX = widgetCenterX
+        widgetSettingsPanelOpen = true
+    }
+
+    function closeWidgetSettings() {
+        let shouldExitLayout = widgetSettingsAutoEnteredLayout
+
+        widgetSettingsPanelOpen = false
+        activeWidgetInstanceKey = ""
+        widgetSettingsAutoEnteredLayout = false
+
+        if (shouldExitLayout) {
+            activePanel = "none"
         }
     }
 
@@ -273,8 +305,7 @@ Singleton {
             if (instanceKeyAt(i) === instanceKey) {
                 layoutModel.remove(i);
                 if (activeWidgetInstanceKey === instanceKey) {
-                    widgetSettingsPanelOpen = false;
-                    activeWidgetInstanceKey = "";
+                    closeWidgetSettings();
                 }
                 layoutChanged();
                 saveLayout();
