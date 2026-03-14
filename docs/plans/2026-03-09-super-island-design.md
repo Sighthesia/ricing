@@ -160,7 +160,7 @@ Implemented in:
 - `modules/bar/widgets/SuperIslandWidget.qml`
 - `services/MediaService.qml`
 - `modules/bar/superisland/*.qml`
-- `SuperIslandServiceSmoke.qml`
+- `tests/qml/SuperIslandServiceSmoke.qml`
 
 Current implementation also includes:
 

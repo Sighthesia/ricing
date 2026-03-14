@@ -22,6 +22,10 @@ Singleton {
         _usingMatugen ? _mc("primary",            SettingsService.data.appearance.accentColor)
                       : SettingsService.data.appearance.accentColor
 
+    readonly property color destructive:
+        _usingMatugen ? _mc("error",              "#f7768e")
+                      : "#f7768e"
+
     readonly property real  highlightAlpha: 0.15
 
     readonly property color text:

@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import qs.services
 
+// Smoke harness for MediaControlService state derivation and panel actions.
 ShellRoot {
     id: root
 

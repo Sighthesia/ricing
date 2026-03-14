@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import qs.services
 
+// Smoke harness for MediaService API exposure and basic property contracts.
 ShellRoot {
     id: root
 

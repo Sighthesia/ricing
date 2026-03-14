@@ -39,7 +39,7 @@ Item {
         : Theme.settingsRowHeight
 
     Behavior on implicitHeight {
-        NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Easing.InOutCubic }
+        NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
     }
 
     clip: true
@@ -125,7 +125,7 @@ Item {
                         color: Colors.textMuted
                         rotation: root._open ? 180 : 0
                         Behavior on rotation {
-                            NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Easing.InOutCubic }
+                            NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                         }
                     }
                 }

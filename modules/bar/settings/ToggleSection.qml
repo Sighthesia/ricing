@@ -91,7 +91,7 @@ Item {
                 color: Colors.text
                 x: root.value ? 21 : 3
                 Behavior on x {
-                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Easing.InOutCubic }
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }
             }
 

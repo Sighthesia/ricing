@@ -1,6 +1,6 @@
+import Quickshell
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import Quickshell.Widgets
 import qs.config
 import qs.services
@@ -24,13 +24,6 @@ Item {
     required property string actionsJson
     required property real   timestamp
 
-    // Emitted when exit animation finishes — parent calls NotificationService.dismissActive(id)
-    signal dismissRequested(string id)
-
-    // Pause/resume the auto-dismiss timer on hover
-    signal hoverEntered(string id)
-    signal hoverExited(string id)
-
     // Component-local layout constants; promote to Theme tokens in a future notification token pass.
     readonly property int _cardWidth:   360
     readonly property int _appIconSize:  18
@@ -45,6 +38,13 @@ Item {
     property real _swipeX:  0
     property bool _swiping: false
     property bool _isExiting: false
+
+    // Emitted when exit animation finishes — parent calls NotificationService.dismissActive(id)
+    signal dismissRequested(string id)
+
+    // Pause/resume the auto-dismiss timer on hover
+    signal hoverEntered(string id)
+    signal hoverExited(string id)
 
     opacity: _opacity
 

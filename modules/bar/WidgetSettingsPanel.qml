@@ -14,11 +14,26 @@ import "settings"
 PopupWindow {
     id: root
 
+    required property Item anchorTarget
+
+    // Mirror AnimatedPanelBase timing with Theme-derived values so this popup
+    // keeps the same motion language without local duration literals.
+    // FIXME: lift these shared ratios into Theme.anim.* if more panels adopt them.
+    readonly property int _openOpacityDelay:
+        Math.max(1, Math.round(Theme.anim.highlightDuration / 3))
+    readonly property int _openOpacityDuration: Theme.anim.highlightDuration
+    readonly property int _openScaleDuration:
+        Math.max(1, Math.round(Theme.anim.springDuration * 0.78))
+    readonly property int _closeOpacityDuration:
+        Math.max(1, Math.round(Theme.anim.highlightDuration * 0.67))
+    readonly property int _closeScaleDuration:
+        Math.max(1, Math.round(Theme.anim.springDuration * 0.56))
+    readonly property int _staggerEnterDelay:
+        Math.max(1, Math.round(root._openScaleDuration * 0.43))
+
     StaggerOrchestrator {
         id: _stagger
     }
-
-    required property Item anchorTarget
 
     color: "transparent"
 
@@ -93,7 +108,7 @@ PopupWindow {
     // Delay group stagger start until panel scale animation is partially complete.
     Timer {
         id: _staggerEnterTimer
-        interval: 120; repeat: false
+        interval: root._staggerEnterDelay; repeat: false
         onTriggered: {
             _stagger.clear()
             _stagger.registerItem(_siHeader, 0, 1)
@@ -111,37 +126,35 @@ PopupWindow {
         }
     }
 
-    // Enter animation — mirrors AnimatedPanelBase:
-    // scaleY 0→1 (OutBack 280ms) + opacity 0→1 (OutQuad 180ms, delayed 60ms)
+    // Enter animation — mirrors AnimatedPanelBase with Theme-derived timing.
     PropertyAnimation {
         id: _scaleOpenAnim
         target: panelCard; property: "_scaleY"; to: 1.0
-        duration: 280; easing.type: Easing.OutBack; easing.overshoot: 0.7
+        duration: root._openScaleDuration; easing.type: Easing.OutBack; easing.overshoot: 0.7
         onFinished: if (root._state === "opening") root._state = "open"
     }
     PropertyAnimation {
         id: _opacityOpenAnim
         target: panelCard; property: "opacity"; to: 1.0
-        duration: 180; easing.type: Easing.OutQuad
+        duration: root._openOpacityDuration; easing.type: Easing.OutQuad
     }
     Timer {
         id: _opacityDelayTimer
-        interval: 60; repeat: false
+        interval: root._openOpacityDelay; repeat: false
         onTriggered: _opacityOpenAnim.restart()
     }
 
-    // Exit animation — mirrors AnimatedPanelBase:
-    // opacity 1→0 (InQuad 120ms) || scaleY 1→0 (InBack 200ms)
+    // Exit animation — mirrors AnimatedPanelBase with Theme-derived timing.
     PropertyAnimation {
         id: _scaleCloseAnim
         target: panelCard; property: "_scaleY"; to: 0.0
-        duration: 200; easing.type: Easing.InBack; easing.overshoot: 0.7
+        duration: root._closeScaleDuration; easing.type: Easing.InBack; easing.overshoot: 0.7
         onFinished: if (root._state === "closing") root._state = "closed"
     }
     PropertyAnimation {
         id: _opacityCloseAnim
         target: panelCard; property: "opacity"; to: 0.0
-        duration: 120; easing.type: Easing.InQuad
+        duration: root._closeOpacityDuration; easing.type: Easing.InQuad
     }
 
     // Panel card
@@ -347,8 +360,10 @@ PopupWindow {
                 id: deleteBtn
                 anchors.fill: parent
                 radius: Theme.cornerRadius - 2
-                color: _deleteArea.containsMouse ? Qt.rgba(247, 118, 142, 0.15) : Colors.surface
-                border.color: _deleteArea.containsMouse ? "#f7768e" : Colors.border
+                color: _deleteArea.containsMouse
+                    ? Qt.rgba(Colors.destructive.r, Colors.destructive.g, Colors.destructive.b, 0.15)
+                    : Colors.surface
+                border.color: _deleteArea.containsMouse ? Colors.destructive : Colors.border
                 border.width: 1
                 Behavior on color        { ColorAnimation { duration: Theme.anim.highlightDuration } }
                 Behavior on border.color { ColorAnimation { duration: Theme.anim.highlightDuration } }
@@ -357,7 +372,7 @@ PopupWindow {
                     anchors.centerIn: parent
                     text: "删除组件"
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
-                    color: "#f7768e"
+                    color: Colors.destructive
                 }
                 MouseArea {
                     id: _deleteArea; anchors.fill: parent

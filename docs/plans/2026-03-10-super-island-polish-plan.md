@@ -13,7 +13,7 @@
 ### Task 1: Add failing smoke coverage for polish regressions
 
 **Files:**
-- Modify: `SuperIslandServiceSmoke.qml`
+- Modify: `tests/qml/SuperIslandServiceSmoke.qml`
 - Modify: `tests/run-super-island-smoke.sh`
 
 **Step 1: Write failing assertions for media top padding and hint/source visibility toggles**

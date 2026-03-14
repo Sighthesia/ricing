@@ -1,8 +1,9 @@
+import Quickshell
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import qs.config
 
+// Compact bar clock widget that shows the current date and time in two groups.
 Rectangle {
     id: clock
 

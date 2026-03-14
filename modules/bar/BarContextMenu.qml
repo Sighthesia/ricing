@@ -36,6 +36,13 @@ PopupWindow {
     property real _targetWidgetCenterX: 0
     // Human-readable widget type label (currently unused in display, reserved for tooltip).
     property string _targetWidgetLabel: ""
+    // FIXME: lift these shared ratios into Theme.anim.* if more panels reuse them.
+    readonly property int _enterOpacityDuration:
+        Math.max(1, Math.round(Theme.anim.highlightDuration * 0.56))
+    readonly property int _enterScaleDuration:
+        Math.max(1, Math.round(Theme.anim.springDuration * 0.36))
+    readonly property int _exitDuration:
+        Math.max(1, Math.round(Theme.anim.highlightDuration * 0.44))
 
     StaggerOrchestrator {
         id: _stagger
@@ -377,7 +384,7 @@ PopupWindow {
                     anchors.fill: parent; anchors.margins: 1
                     radius: Theme.cornerRadius - 2
                     hovered: widgetDeleteArea.containsMouse
-                    highlightColor: "#f7768e"; highlightOpacity: 0.15
+                    highlightColor: Colors.destructive; highlightOpacity: 0.15
                 }
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
@@ -386,17 +393,17 @@ PopupWindow {
                     Text {
                         text: "\uf1f8"
                         font.family: Theme.fontMono; font.pixelSize: Theme.fontSizeIcon
-                        color: "#f7768e"; opacity: 0.85
+                        color: Colors.destructive; opacity: 0.85
                     }
                     Text {
                         text: "删除组件"
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
-                        color: "#f7768e"
+                        color: Colors.destructive
                     }
                 }
                 ClickRipple {
                     id: widgetDeleteRipple
-                    anchors.fill: parent; anchors.margins: 1; rippleColor: "#f7768e"
+                    anchors.fill: parent; anchors.margins: 1; rippleColor: Colors.destructive
                 }
                 MouseArea {
                     id: widgetDeleteArea; anchors.fill: parent
@@ -418,12 +425,12 @@ PopupWindow {
         NumberAnimation {
             target: menuContent; property: "opacity"
             from: 0; to: 1
-            duration: 100; easing.type: Easing.OutQuad
+            duration: root._enterOpacityDuration; easing.type: Easing.OutQuad
         }
         NumberAnimation {
             target: menuContent; property: "scale"
             from: 0.85; to: 1.0
-            duration: 130; easing.type: Easing.OutBack; easing.overshoot: 0.4
+            duration: root._enterScaleDuration; easing.type: Easing.OutBack; easing.overshoot: 0.4
         }
     }
 
@@ -433,12 +440,12 @@ PopupWindow {
             NumberAnimation {
                 target: menuContent; property: "opacity"
                 from: 1; to: 0
-                duration: 80; easing.type: Easing.InQuad
+                duration: root._exitDuration; easing.type: Easing.InQuad
             }
             NumberAnimation {
                 target: menuContent; property: "scale"
                 from: 1.0; to: 0.88
-                duration: 80; easing.type: Easing.InQuad
+                duration: root._exitDuration; easing.type: Easing.InQuad
             }
         }
         ScriptAction {

@@ -1,6 +1,6 @@
+import Quickshell
 import QtQuick
 import QtQuick.Dialogs
-import Quickshell
 import qs.config
 import qs.services
 import ".."

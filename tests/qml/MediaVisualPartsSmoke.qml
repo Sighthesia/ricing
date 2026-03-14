@@ -1,9 +1,10 @@
 import Quickshell
 import QtQuick
-import "modules/bar/media" as MediaParts
 import qs.config
 import qs.services
+import "modules/bar/media" as MediaParts
 
+// Smoke harness for media visual components and expanded-panel layout contracts.
 ShellRoot {
     id: root
 

@@ -131,7 +131,7 @@ Item {
                         font.pixelSize: Theme.fontSizeSmall
                         color: Colors.textMuted
                         rotation: isExpanded ? 90 : 0
-                        Behavior on rotation { NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Easing.InOutCubic } }
+                        Behavior on rotation { NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType } }
                     }
 
                     Row {
@@ -193,7 +193,7 @@ Item {
                     // Animate height to zero instead of toggling visibility for a smooth collapse.
                     clip: true
                     height: isExpanded && modelData.sections.length > 0 ? implicitHeight : 0
-                    Behavior on height { NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Easing.InOutCubic } }
+                    Behavior on height { NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType } }
 
                     Repeater {
                         model: modelData.sections
@@ -259,4 +259,3 @@ Item {
         }
     }
 }
-

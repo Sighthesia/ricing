@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import qs.services
 
+// Smoke harness for CavaService frame parsing and degraded-state behavior.
 ShellRoot {
     id: root
 

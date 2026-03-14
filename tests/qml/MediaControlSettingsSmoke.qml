@@ -1,8 +1,9 @@
 import Quickshell
 import QtQuick
-import "modules/bar/widget-settings" as Sections
 import qs.services
+import "modules/bar/widget-settings" as Sections
 
+// Smoke harness for MediaControlSection settings schema and render availability.
 ShellRoot {
     id: root
 

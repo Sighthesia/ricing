@@ -1,9 +1,10 @@
 import Quickshell
 import QtQuick
-import "modules/bar/widgets" as BarWidgets
 import qs.config
 import qs.services
+import "modules/bar/widgets" as BarWidgets
 
+// Smoke harness for SuperIsland transient playback, restore, and suppression rules.
 ShellRoot {
     id: root
 

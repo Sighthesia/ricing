@@ -1,86 +1,104 @@
-# DymicShell — AI Agent Context
+# DymicShell Agent Guide
+Wayland shell built with Quickshell. Keep the repo layered, token-driven, and safe for hot-reload.
+Repo-local editor rules: no `.cursor/rules/`, `.cursorrules`, or `.github/copilot-instructions.md` exist here as of 2026-03-14.
+No repo-local `.github/skills/` entries are checked in right now.
 
-A Wayland shell built with Quickshell, following a strict three-layer architecture:
-`services/` (singleton state) → `config/` (derived tokens) → `modules/` (UI rendering).
-
-## Repository Structure
-
+## Repository Layout
+```text
+shell.qml                  # Entry point; instantiate top-level windows only
+config/                    # Semantic colors + structural theme tokens
+services/                  # Singleton state, persistence, compositor/process integration
+modules/                   # UI windows, panels, and reusable module-local components
+tests/
+  qml/                     # Smoke harnesses; run with `qs -p tests/qml/<Name>.qml`
+  qml/{config,services,modules} # Symlink roots so harnesses can resolve `qs.*` imports
+  run-settings-smoke.sh
+  run-ui-structure-smoke.sh
+  run-super-island-smoke.sh
+  run-media-control-smoke.sh
+docs/plans/               # Design and implementation history
+null/dymicshell/          # Checked-in sample/runtime artifacts; not the canonical live config
 ```
-shell.qml                  # Entry point — declares top-level window instances only
-config/
-  Colors.qml               # Semantic color tokens (Singleton)
-  Theme.qml                # Structural tokens: sizes, fonts, animation durations (Singleton)
-  settings-default.json    # All default config values (single source of truth)
-services/
-  SettingsService.qml      # JSON persistence + hot-reload; exposes SettingsService.data.*
-  BarLayoutService.qml     # Active panel state, widget layout
-  NiriService.qml          # Niri compositor workspace integration
-  WallpaperService.qml     # Wallpaper switching + Matugen color extraction
-modules/
-  bar/                     # Bar window and all overlay windows
-  background/              # Background and wallpaper picker
+Key entry points: `shell.qml`, `config/Theme.qml`, `config/Colors.qml`, `services/SettingsService.qml`, `services/BarLayoutService.qml`, `modules/bar/BarContent.qml`.
+
+## Build, Lint, and Test Commands
+Use `qs` unless the user explicitly asks for `quickshell`.
+The repo does not define `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmllint`, `qmlformat`, or CI workflow commands. Do not invent those commands unless you first verify local availability.
+
+### Whole-Shell Validation
+```bash
+timeout 10 qs --path .
+timeout 10 qs -p .
+```
+Prefer `qs --path .` for a full-shell load check.
+
+### Full Smoke Suites
+```bash
+bash tests/run-settings-smoke.sh
+bash tests/run-ui-structure-smoke.sh
+bash tests/run-super-island-smoke.sh
+bash tests/run-media-control-smoke.sh
 ```
 
-## Token System (mandatory — never use magic numbers)
+### Single Smoke Harnesses
+```bash
+timeout 12 qs -p tests/qml/SettingsStructureSmoke.qml
+timeout 12 qs -p tests/qml/NotificationStructureSmoke.qml
+timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
+timeout 12 qs -p tests/qml/SuperIslandServiceSmoke.qml
+timeout 12 qs -p tests/qml/MediaServiceSmoke.qml
+timeout 12 qs -p tests/qml/CavaServiceSmoke.qml
+timeout 12 qs -p tests/qml/MediaControlServiceSmoke.qml
+timeout 12 qs -p tests/qml/MediaVisualPartsSmoke.qml
+timeout 12 qs -p tests/qml/MediaControlWidgetSmoke.qml
+timeout 12 qs -p tests/qml/MediaControlPanelSmoke.qml
+timeout 12 qs -p tests/qml/MediaControlSettingsSmoke.qml
+```
 
+### Harness Prerequisites
+- Keep `tests/qml/{config,services,modules}` intact; the harnesses rely on those symlinks.
+- When you add or move a harness, update the matching `tests/run-*.sh` script in the same change.
+
+## Architecture Rules
+- Preserve the three-layer flow: `services/` -> `config/` -> `modules/`.
+- `shell.qml` stays declarative and only wires top-level windows together.
+- `services/` own IO, persistence, timers, process integration, and shared state.
+- `config/` derives semantic tokens from settings and service-backed data.
+- `modules/` render UI and forward actions back into services instead of duplicating state.
+- Promote reused behavior into services or shared base components.
+
+## Token System
 ### Colors: `Colors.*`
-All color properties are `readonly property color`. **Never hardcode hex values.**
-
-Colors derive from `SettingsService.data.appearance.*`; Matugen overrides are injected via `_mc(key, fallback)`.
-
-Common tokens: `Colors.background`, `Colors.text`, `Colors.border`, `Colors.highlight`
+- Never hardcode feature-level hex colors.
+- Prefer `Colors.background`, `Colors.surface`, `Colors.text`, `Colors.textMuted`, `Colors.border`, `Colors.highlight`, and `Colors.destructive`.
+- If a semantic color is missing, extend `config/Colors.qml` instead of adding a local literal.
 
 ### Animation: `Theme.anim.*`
-All animation durations and easing curves **must** reference this namespace.
+- All duration and easing choices should derive from `Theme.anim.*`.
+- Prefer `Theme.anim.move*` for layout motion, `Theme.anim.highlight*` for emphasis, and `Theme.anim.spring*` / `Theme.anim.pulseSpring*` for expressive size changes.
+- Known legacy exceptions: `modules/bar/AnimatedPanelBase.qml` and `modules/bar/ClickRipple.qml` still hardcode some timings.
+- Any unavoidable new timing literal must be marked with `// FIXME: use Theme.anim.*`.
 
-| Token                            | Purpose                    | Base duration | Easing              |
-| -------------------------------- | -------------------------- | ------------- | ------------------- |
-| `Theme.anim.enterDuration`       | Bounce-in                  | 500 ms        | `Easing.OutElastic` |
-| `Theme.anim.exitDuration`        | Snap-out                   | 220 ms        | `Easing.InExpo`     |
-| `Theme.anim.moveDuration`        | Position/width transitions | 320 ms        | `Easing.InOutCubic` |
-| `Theme.anim.highlightDuration`   | Hover highlight pulse      | 180 ms        | `Easing.OutQuad`    |
-| `Theme.anim.springDuration`      | Width/height settle        | 360 ms        | `Easing.OutBack`    |
-| `Theme.anim.pulseSpringDuration` | Pulse rebound              | 180 ms        | `Easing.OutBack`    |
+### Sizes and Typography: `Theme.*`
+- Use `Theme.barHeight`, `Theme.cornerRadius`, `Theme.fontFamily`, `Theme.fontSizeBody`, etc.
+- For bar-internal micro-layout, prefer `Theme.barWidget.*`.
+- If a shared spacing or icon size token is missing, extend `Theme.barWidget.*` first.
 
-Companion easing properties (same prefix, `Type` suffix): `Theme.anim.enterType`, `Theme.anim.exitType`, etc.
+## Settings and Persistence
+- Read settings only through `SettingsService.data.<section>.<key>`.
+- Write settings by mutating `SettingsService.data.*`; persistence is already debounced.
+- Do not add ad-hoc save timers in UI code unless you are changing persistence semantics.
+- When adding a setting, update both `config/settings-default.json` and `services/SettingsService.qml` to keep the schema/defaults aligned.
+- Do not treat `null/dymicshell/*.json` as the live runtime source of truth.
 
-Super Island's pulse + rebound behavior is now the motion reference for shell-wide component resizing. Any component width/height change that should feel expressive must reuse `Theme.anim.spring*` for container settle and `Theme.anim.pulseSpring*` for light pulse rebound instead of introducing ad-hoc elastic timings.
+## Preferred Base Components
+- `modules/bar/AnimatedPanelBase.qml` - dropdown/panel base with safe surface lifecycle.
+- `modules/bar/StaggerItem.qml` - enter/exit stagger wrapper.
+- `modules/bar/HoverRevealHighlight.qml` - standard hover affordance.
+- `modules/bar/ClickRipple.qml` - standard click feedback.
+- `modules/bar/BarWidgetWrapper.qml` - bar widget container, drag support, shared animation contract.
 
-All durations are computed as `Math.round(baseMs / SettingsService.data.animation.speedFactor)` so the user can scale all animations globally.
-
-> **Known exceptions**: `AnimatedPanelBase.qml` and `ClickRipple.qml` currently hardcode durations.
-> Mark any new hardcoded duration with `// FIXME: use Theme.anim.*`.
-
-### Sizes and Fonts: `Theme.*`
-Use `Theme.barHeight`, `Theme.fontFamily`, `Theme.fontSize`, etc. No fixed pixel values.
-
-For bar-internal micro-layout, use `Theme.barWidget.*` instead of component-local literals. If a needed token does not exist yet, extend `Theme.barWidget.*` first rather than adding new hardcoded spacing or icon sizes inside a widget.
-
-## Settings Data Access
-
-Read settings exclusively via `SettingsService.data.<section>.<key>`:
-
-```qml
-SettingsService.data.appearance.backgroundColor   // color
-SettingsService.data.bar.height                   // size
-SettingsService.data.animation.speedFactor        // animation speed
-SettingsService.data.barBehavior.autoHide         // behavior flag
-```
-
-Write via `SettingsService.save()`. Internally debounced at 500 ms.
-
-## Reusable Base Components (prefer over reimplementing)
-
-| Component              | Path                                   | Usage                                                             |
-| ---------------------- | -------------------------------------- | ----------------------------------------------------------------- |
-| `AnimatedPanelBase`    | `modules/bar/AnimatedPanelBase.qml`    | Base for all dropdown panels; use `active:` instead of `visible:` |
-| `StaggerItem`          | `modules/bar/StaggerItem.qml`          | Stagger enter/exit wrapper for list items                         |
-| `HoverRevealHighlight` | `modules/bar/HoverRevealHighlight.qml` | Shell-wide wipe-reveal hover highlight                            |
-| `ClickRipple`          | `modules/bar/ClickRipple.qml`          | Click ripple overlay; call `ripple.triggerRipple(m.x, m.y)`       |
-| `BarWidgetWrapper`     | `modules/bar/BarWidgetWrapper.qml`     | Bar widget container with enter animation and drag support        |
-
-### Interactive Item Pattern (use all three together)
-
+### Interactive Surface Pattern
 ```qml
 HoverRevealHighlight { anchors.fill: parent; hovered: area.containsMouse }
 ClickRipple { id: ripple; anchors.fill: parent }
@@ -88,44 +106,50 @@ MouseArea {
     id: area
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor
-    onClicked: (mouse) => { ripple.triggerRipple(mouse.x, mouse.y); /* business logic */ }
+    onClicked: (mouse) => { ripple.triggerRipple(mouse.x, mouse.y); /* action */ }
 }
 ```
-
-Any region that handles primary-button clicks must provide both hover feedback and click ripple feedback. If the surface uses a non-default fill or highlight color, enable `HoverRevealHighlight.adaptiveContrast` and pass the effective surface color so hover remains visible across light, dark, or highlighted backgrounds.
-
-### Implicit Property Animation Pattern
-
-```qml
-Behavior on implicitWidth {
-    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
-}
-```
+If the surface uses custom fills or highlights, enable adaptive contrast so hover feedback stays visible.
 
 ## QML File Structure
+Keep each QML file ordered as:
+1. imports
+2. top-level English comment explaining purpose/usage
+3. root `id`
+4. `required property`
+5. public mutable `property`
+6. `readonly property`
+7. private `property _...`
+8. `signal`
+9. child declarations
+10. functions
+11. `Component.onCompleted`
+12. `Connections`
 
-Follow this ordering within every QML file:
+## Import, Naming, and Formatting
+- Import order: `Quickshell*` -> `Qt*` -> `qs.config` -> `qs.services` -> `qs.modules` -> relative imports.
+- Use 4-space indentation and multiline bindings when one line becomes hard to scan.
+- Use typed properties (`bool`, `int`, `real`, `string`, `color`) when the type is known; reserve `var` for dynamic payloads.
+- Private members must start with `_`; public API must not.
+- Prefer descriptive domain names such as `MediaControlService`, `WidgetSettingsPanel`, or `NotificationHistoryPanel`.
+- Avoid grab-bag files named `utils`, `helpers`, `common`, or `shared`.
+- Add short English comments only where the role of a layout, visual, or input element is not obvious.
 
-```
-1. import statements     (Quickshell → Qt → qs.config → qs.services → qs.modules → relative)
-2. Top-level comment     (component purpose + usage note)
-3. Root id
-4. required property     (must be supplied by parent)
-5. property              (public mutable state)
-6. readonly property     (derived/computed)
-7. property _xxx         (private state — underscore prefix)
-8. signal
-9. Child component declarations
-10. Functions            (public API first, private helpers after)
-11. Component.onCompleted
-12. Connections
-```
+## State Management
+- Shared cross-window state belongs in a singleton service.
+- Animated panels/windows should use `_state: "closed" | "opening" | "open" | "closing"` instead of toggling `visible` directly.
+- Use guard clauses and early returns in JS helpers.
+- Keep component-local JS small; move reusable behavior into services or base components.
 
-## Key Conventions
+## Error Handling
+- Treat file IO, JSON parsing, compositor data, and external process output as recoverable failures.
+- Log concise diagnostics and fall back to default or empty state instead of breaking the UI.
+- Restore a consistent service state before returning from recoverable failures.
+- Clamp untrusted numeric input and guard against missing object keys.
 
-- **Private members**: prefix with `_` (e.g., `_state`, `_mc`). Public API has no prefix.
-- **Animated windows**: use a `_state: string` state machine (`"closed"`, `"opening"`, `"open"`, `"closing"`) instead of toggling `visible` directly — prevents premature Wayland surface destruction.
-- **`AnimatedPanelBase` children**: routed via `default property alias`; place child items directly inside the component tag.
-- **`Behavior on` + token**: the standard pattern for implicit animation — always pair with `Theme.anim.*` tokens, never inline literal durations or easing values.
-- **QML comments**: place a short English comment immediately before each layout or visual/input element declaration to name the element and its role.
-- **Panel stagger**: expanded panel content must stagger top-to-bottom on enter and exit; the panel shell should start fading/scaling only after the content exit becomes visible.
+## Testing and Documentation Hygiene
+- Keep smoke harnesses in `tests/qml/`, not the repository root.
+- Extend the nearest smoke harness first for regressions; avoid overlapping duplicate coverage.
+- Update `tests/run-*.sh` when harness names or paths change.
+- Update `docs/plans/` references when files or commands move.
+- Use the smoke suites plus a full-shell load check before claiming the repo still loads cleanly.

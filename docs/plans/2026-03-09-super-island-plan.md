@@ -83,7 +83,7 @@ Responsible for:
 - rendering the flash-only weak hint path for window switching
 - protecting against race conditions when a pending transient starts near the end of a return animation
 
-### `SuperIslandServiceSmoke.qml`
+### `tests/qml/SuperIslandServiceSmoke.qml`
 
 Responsible for asserting:
 

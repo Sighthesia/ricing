@@ -1,10 +1,11 @@
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
-import "../superisland" as IslandCards
 import qs.config
 import qs.services
+import "../superisland" as IslandCards
 
+// Dynamic Island-style bar widget for idle time, transient events, and hint playback.
 Item {
     id: root
 

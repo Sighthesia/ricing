@@ -3,6 +3,7 @@ import QtQuick
 import qs.services
 import qs.modules.bar
 
+// Smoke harness for MediaControlPanel open and close lifecycle behavior.
 ShellRoot {
     id: root
 

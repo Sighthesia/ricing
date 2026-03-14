@@ -44,7 +44,7 @@ Item {
         border.width: wrapper._showSettingsOutline ? 1 : 0
         opacity: wrapper._showSettingsOutline ? 0.5 : 0
 
-        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Easing.OutQuad } }
+        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType } }
     }
 
     Item {

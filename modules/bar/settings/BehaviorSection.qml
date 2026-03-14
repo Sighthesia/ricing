@@ -123,7 +123,7 @@ Item {
                         Behavior on x {
                             NumberAnimation {
                                 duration: Theme.anim.moveDuration
-                                easing.type: Easing.InOutCubic
+                                easing.type: Theme.anim.moveType
                             }
                         }
                     }
