@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Wayland
 import QtQuick
 import qs.config
 import qs.services
@@ -19,6 +20,35 @@ ShellRoot {
     function _assert(condition, message) {
         if (!condition)
             throw new Error(message)
+    }
+
+    function _findFirstStaggerItem(node) {
+        if (!node)
+            return null
+
+        if (typeof node.runEnter === "function"
+                && typeof node.runExit === "function"
+                && node.hasOwnProperty("delay")) {
+            return node
+        }
+
+        let itemChildren = node.children || []
+        for (let i = 0; i < itemChildren.length; i++) {
+            let match = root._findFirstStaggerItem(itemChildren[i])
+            if (match)
+                return match
+        }
+
+        if (node.contentItem) {
+            let contentChildren = node.contentItem.children || []
+            for (let j = 0; j < contentChildren.length; j++) {
+                let contentMatch = root._findFirstStaggerItem(contentChildren[j])
+                if (contentMatch)
+                    return contentMatch
+            }
+        }
+
+        return null
     }
 
     SettingsParts.ToggleSection {
@@ -89,6 +119,11 @@ ShellRoot {
         }
     }
 
+    BarParts.AnimatedPanelBase {
+        id: animatedPanelBase
+        visible: false
+    }
+
     Component.onCompleted: {
         root._assert(typeof BarLayoutService.widgetSettingsAutoEnteredLayout === "boolean",
             "BarLayoutService should track whether widget settings auto-entered layout mode")
@@ -98,6 +133,8 @@ ShellRoot {
             "BarContextMenu should expose only one widget-specific action")
         root._assert(typeof widgetWrapper._primaryActionsSuppressed === "boolean",
             "BarWidgetWrapper should expose whether widget primary actions are suppressed")
+        root._assert(animatedPanelBase.exclusionMode === ExclusionMode.Ignore,
+            "AnimatedPanelBase should ignore compositor exclusion by default")
         root._assert(aboutPage._showsNotificationDiagnostics === true,
             "AboutPage should surface notification diagnostics")
         root._assert(toggleSection.implicitHeight > 0,
@@ -127,7 +164,23 @@ ShellRoot {
         root._assert(widgetPickerWindow._closeButton !== undefined && widgetPickerWindow._closeButton !== null,
             "WidgetPickerWindow should expose an explicit close affordance")
 
-        console.log("SettingsStructure smoke test passed")
-        Qt.callLater(Qt.quit)
+        let appearanceEntryItem = root._findFirstStaggerItem(appearancePage)
+        root._assert(appearanceEntryItem !== null,
+            "AppearancePage should contain at least one staggered content item")
+
+        appearanceEntryCheck.restart()
+    }
+
+    Timer {
+        id: appearanceEntryCheck
+        interval: 500
+        repeat: false
+        onTriggered: {
+            let appearanceEntryItem = root._findFirstStaggerItem(appearancePage)
+            root._assert(appearanceEntryItem.opacity > 0,
+                "AppearancePage should auto-run its initial enter animation when instantiated")
+            console.log("SettingsStructure smoke test passed")
+            Qt.callLater(Qt.quit)
+        }
     }
 }

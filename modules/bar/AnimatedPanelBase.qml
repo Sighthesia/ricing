@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Wayland
 import QtQuick
 import qs.config
 
@@ -29,6 +30,7 @@ PanelWindow {
     property int closeScaleDelay: 0
 
     color: "transparent"
+    WlrLayershell.exclusionMode: ExclusionMode.Ignore
 
     // Keep Wayland surface alive while the close animation is still running;
     // only destroy it once the state machine reaches "closed".

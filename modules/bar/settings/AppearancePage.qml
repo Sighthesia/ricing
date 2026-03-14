@@ -716,4 +716,9 @@ Item {
             Item { width: 1; height: 8 }
         }
     }
+
+    // When this page is created while the settings panel is already open,
+    // SettingsPanelContent does not emit a fresh panelOpening signal. Trigger one
+    // enter cycle on creation so staggered groups do not remain at opacity 0.
+    Component.onCompleted: Qt.callLater(runEnterAnimation)
 }
