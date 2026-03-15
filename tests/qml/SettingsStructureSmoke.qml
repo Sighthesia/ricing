@@ -127,6 +127,8 @@ ShellRoot {
     Component.onCompleted: {
         root._assert(typeof BarLayoutService.widgetSettingsAutoEnteredLayout === "boolean",
             "BarLayoutService should track whether widget settings auto-entered layout mode")
+        root._assert(typeof BarLayoutService.sectionGeometry === "function",
+            "BarLayoutService should expose shared section geometry")
         root._assert(typeof BarLayoutService.suppressWidgetPrimaryActions === "boolean",
             "BarLayoutService should expose widget primary-action suppression state")
         root._assert(contextMenu._widgetActionCount === 1,

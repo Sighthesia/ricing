@@ -15,16 +15,10 @@ Item {
     property bool selected: BarLayoutService.widgetPickerOpen
         && BarLayoutService.widgetPickerTargetSection === zoneName
 
-    // Must match WidgetPickerWindow.implicitWidth; shared positioning logic.
-    // FIXME: promote to a shared constant in V2.
-    readonly property int _pickerWidth: 480
-
     // Zone indicator rectangle — full height, horizontal padding only so the
     // border matches widget height rather than being visually shorter.
     Rectangle {
         anchors.fill: parent
-        anchors.leftMargin: Theme.iconPadding
-        anchors.rightMargin: Theme.iconPadding
 
         radius: Theme.cornerRadius
 
@@ -83,25 +77,7 @@ Item {
         onClicked: {
             if (BarLayoutService.isDragging) return;
 
-            let section = dropZone.zoneName;
-            let pad = Theme.barPadding;
-            // dropZone.x is the zone's position within the Row whose leftMargin = pad,
-            // so the zone's center in bar-content coordinates is:
-            let zoneBarCenterX = dropZone.x + dropZone.width / 2 + pad;
-            // All three zones are equal-width; total bar = 3 zones + 2 * padding.
-            let barW = dropZone.width * 3 + 2 * pad;
-            let pickerW = dropZone._pickerWidth;
-            let leftM = Math.max(pad, Math.min(barW - pickerW - pad,
-                                               zoneBarCenterX - pickerW / 2));
-
-            if (BarLayoutService.widgetPickerOpen
-                    && BarLayoutService.widgetPickerTargetSection === section) {
-                BarLayoutService.widgetPickerOpen = false;
-            } else {
-                BarLayoutService.widgetPickerLeftMargin = leftM;
-                BarLayoutService.widgetPickerTargetSection = section;
-                BarLayoutService.widgetPickerOpen = true;
-            }
+            BarLayoutService.toggleWidgetPickerForSection(dropZone.zoneName)
         }
     }
 }

@@ -5,6 +5,16 @@ import qs.services
 Item {
     id: barContent
 
+    readonly property real _layoutPadding: Theme.barPadding
+
+    function _sectionGeometry(sectionName) {
+        return BarLayoutService.sectionGeometry(sectionName)
+    }
+
+    function _updateBarMetrics() {
+        BarLayoutService.setBarMetrics(barContent.width, barContent._layoutPadding)
+    }
+
     // Widget registry: maps widget ID to QML source path
     readonly property var widgetRegistry: ({
         "superIsland":        "widgets/SuperIslandWidget.qml",
@@ -16,12 +26,7 @@ Item {
 
     // Hit-test: map x in barContent coords to section name (accounts for padding)
     function hitTestSection(localX) {
-        let pad = Theme.barPadding;
-        let w = barContent.width - 2 * pad;
-        let x = localX - pad;
-        if (x < w / 3) return "left";
-        if (x < w * 2 / 3) return "center";
-        return "right";
+        return BarLayoutService.sectionForBarX(localX)
     }
 
     // Called by BarWidgetWrapper on right-click. Forwards to the shared context menu
@@ -46,8 +51,8 @@ Item {
         id: leftSection
         role: "left"
         widgetRegistry: barContent.widgetRegistry
-        anchors.left: parent.left
-        anchors.leftMargin: Theme.barPadding
+        x: barContent._sectionGeometry("left").left
+        width: barContent._sectionGeometry("left").width
         anchors.verticalCenter: undefined
         anchors.top: parent.top
         height: Theme.barHeight
@@ -58,7 +63,8 @@ Item {
         id: centerSection
         role: "center"
         widgetRegistry: barContent.widgetRegistry
-        anchors.horizontalCenter: parent.horizontalCenter
+        x: barContent._sectionGeometry("center").left
+        width: barContent._sectionGeometry("center").width
         anchors.verticalCenter: undefined
         anchors.top: parent.top
         height: Theme.barHeight
@@ -69,8 +75,8 @@ Item {
         id: rightSection
         role: "right"
         widgetRegistry: barContent.widgetRegistry
-        anchors.right: parent.right
-        anchors.rightMargin: Theme.barPadding
+        x: barContent._sectionGeometry("right").left
+        width: barContent._sectionGeometry("right").width
         anchors.verticalCenter: undefined
         anchors.top: parent.top
         height: Theme.barHeight
@@ -109,24 +115,8 @@ Item {
             } else if (BarLayoutService.settingsMode) {
                 // Left-click in layout mode: toggle picker for the clicked section.
                 // Clicking the already-active section closes the picker.
-                let section = barContent.hitTestSection(mouse.x);
-                // Align picker window below the hit section (fallback for clicks in
-                // padding areas not covered by DropZone MouseAreas).
-                let pad = Theme.barPadding;
-                let zoneW = (barContent.width - 2 * pad) / 3;
-                let idx = section === "left" ? 0 : section === "center" ? 1 : 2;
-                let barX = pad + idx * zoneW + zoneW / 2;
-                let pickerW = 480; // FIXME: must match WidgetPickerWindow.implicitWidth
-                let leftM = Math.max(pad, Math.min(barContent.width - pickerW - pad,
-                                                   barX - pickerW / 2));
-                if (BarLayoutService.widgetPickerOpen
-                        && BarLayoutService.widgetPickerTargetSection === section) {
-                    BarLayoutService.widgetPickerOpen = false;
-                } else {
-                    BarLayoutService.widgetPickerLeftMargin = leftM;
-                    BarLayoutService.widgetPickerTargetSection = section;
-                    BarLayoutService.widgetPickerOpen = true;
-                }
+                let section = barContent.hitTestSection(mouse.x)
+                BarLayoutService.toggleWidgetPickerForSection(section)
             }
         }
     }
@@ -141,4 +131,8 @@ Item {
             BarLayoutService.widgetPickerOpen = false;
         }
     }
+
+    Component.onCompleted: _updateBarMetrics()
+
+    onWidthChanged: _updateBarMetrics()
 }

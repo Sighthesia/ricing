@@ -14,13 +14,43 @@ Item {
     // Collapse layout space during drag; content stays visible (clip: false)
     property bool _isDragging: false
     property bool _suppressNextWidthAnimation: false
+    property bool _awaitingDelegateAlignment: false
     property real _naturalWidth: contentContainer.childrenRect.width
     property real _naturalHeight: contentContainer.childrenRect.height
     property bool _enterStarted: false
+    readonly property var _arrivalGeometry: {
+        let arrivals = BarLayoutService.geometryArrivals || ({})
+        if (!wrapper.instanceKey || arrivals[wrapper.instanceKey] === undefined) {
+            return null
+        }
+
+        return arrivals[wrapper.instanceKey]
+    }
+    readonly property bool _overlayArrivalActive:
+        !!wrapper._arrivalGeometry
+        && wrapper._arrivalGeometry.active === true
+        && wrapper._arrivalGeometry.phase === "overlay"
+    readonly property bool _delegateArrivalReleased:
+        !!wrapper._arrivalGeometry
+        && wrapper._arrivalGeometry.active === true
+        && wrapper._arrivalGeometry.phase === "delegate"
+        && wrapper._arrivalGeometry.delegateReleased === true
+    readonly property bool _batonReleasedForWrapper: {
+        let arrival = wrapper._arrivalGeometry
+        if (!arrival || !arrival.section) {
+            return true
+        }
+
+        return BarLayoutService.revealLockHolder(arrival.section) === wrapper.instanceKey
+    }
     property bool _showSettingsOutline: BarLayoutService.settingsMode
         && wrapper._enterDone
         && !wrapper._isDragging
         && wrapper.implicitWidth >= wrapper._naturalWidth - 0.5
+    property string _reportedInstanceKey: ""
+    // In-memory reporter token so only the active delegate instance can clear its runtime width.
+    property string _measurementReporterId:
+        "bar_wrapper_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2)
     readonly property bool _primaryActionsSuppressed:
         BarLayoutService.suppressWidgetPrimaryActions && !wrapper._isDragging
 
@@ -28,7 +58,8 @@ Item {
     implicitHeight: _isDragging ? 0 : _naturalHeight
 
     Behavior on implicitWidth {
-        enabled: !wrapper._suppressNextWidthAnimation && BarLayoutService.settingsMode
+        enabled: !wrapper._suppressNextWidthAnimation
+            && BarLayoutService.settingsMode
         NumberAnimation {
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
@@ -70,13 +101,108 @@ Item {
             return;
         if (wrapper._naturalWidth <= 0 || wrapper._naturalHeight <= 0)
             return;
+
+        if (wrapper._overlayArrivalActive) {
+            wrapper._awaitingDelegateAlignment = false
+            return;
+        }
+
+        let arrival = wrapper._arrivalGeometry
+        if (arrival && arrival.section) {
+            if (!wrapper._delegateArrivalReleased || !wrapper._batonReleasedForWrapper) {
+                wrapper._awaitingDelegateAlignment = false
+                return;
+            }
+        }
+
+        wrapper._awaitingDelegateAlignment = false
         wrapper._enterStarted = true;
         enterAnimation.start();
     }
 
-    Component.onCompleted: Qt.callLater(wrapper.tryStartEnterAnimation)
-    on_NaturalWidthChanged: wrapper.tryStartEnterAnimation()
+    function reportMeasuredWidth() {
+        if (!wrapper.instanceKey) {
+            return
+        }
+
+        let nextWidth = Math.max(0, wrapper._naturalWidth)
+        if (nextWidth <= 0) {
+            return
+        }
+
+        let accepted = BarLayoutService.setWidgetMeasuredWidth(wrapper.instanceKey, nextWidth, {
+            source: "runtime",
+            reporterId: wrapper._measurementReporterId,
+            preserveExternalSnapshot: true
+        })
+
+        if (accepted) {
+            wrapper._reportedInstanceKey = wrapper.instanceKey
+        } else if (wrapper._reportedInstanceKey === wrapper.instanceKey) {
+            wrapper._reportedInstanceKey = ""
+        }
+    }
+
+    function clearReportedMeasuredWidth() {
+        if (!wrapper._reportedInstanceKey) {
+            return
+        }
+
+        BarLayoutService.clearWidgetMeasuredWidth(wrapper._reportedInstanceKey, {
+            reporterId: wrapper._measurementReporterId
+        })
+        wrapper._reportedInstanceKey = ""
+    }
+
+    Component.onCompleted: {
+        wrapper.tryStartEnterAnimation()
+        wrapper.reportMeasuredWidth()
+        Qt.callLater(wrapper.tryStartEnterAnimation)
+        Qt.callLater(wrapper.reportMeasuredWidth)
+    }
+
+    Component.onDestruction: wrapper.clearReportedMeasuredWidth()
+
     on_NaturalHeightChanged: wrapper.tryStartEnterAnimation()
+
+    on_BatonReleasedForWrapperChanged: wrapper.tryStartEnterAnimation()
+
+    on_DelegateArrivalReleasedChanged: wrapper.tryStartEnterAnimation()
+
+    on_OverlayArrivalActiveChanged: wrapper.tryStartEnterAnimation()
+
+    onXChanged: wrapper.tryStartEnterAnimation()
+
+    onWidthChanged: wrapper.tryStartEnterAnimation()
+
+    onInstanceKeyChanged: {
+        if (wrapper._reportedInstanceKey && wrapper._reportedInstanceKey !== wrapper.instanceKey) {
+            wrapper.clearReportedMeasuredWidth()
+        }
+        wrapper.reportMeasuredWidth()
+        wrapper.tryStartEnterAnimation()
+    }
+
+    on_NaturalWidthChanged: {
+        wrapper.tryStartEnterAnimation()
+        wrapper.reportMeasuredWidth()
+    }
+
+    Timer {
+        id: delegateAlignmentRetryTimer
+        interval: 16
+        repeat: true
+        running: wrapper._awaitingDelegateAlignment && !wrapper._enterStarted && !wrapper._enterDone
+        onTriggered: wrapper.tryStartEnterAnimation()
+    }
+
+    Connections {
+        target: BarLayoutService
+
+        function onGeometryArrivalsChanged() {
+            wrapper.tryStartEnterAnimation()
+        }
+    }
 
     SequentialAnimation {
         id: enterAnimation
@@ -99,7 +225,12 @@ Item {
                 easing.period: Theme.anim.enterPeriod
             }
         }
-        ScriptAction { script: wrapper._enterDone = true }
+        ScriptAction {
+            script: {
+                wrapper._enterDone = true
+                BarLayoutService.finishArrivalReveal(wrapper.instanceKey)
+            }
+        }
     }
 
     // --- Settings mode drag ---
@@ -144,16 +275,6 @@ Item {
         return bc;
     }
 
-    // Find the BarSection child for a given section name
-    function findSection(bc, sectionName) {
-        for (let i = 0; i < bc.children.length; i++) {
-            let child = bc.children[i];
-            if (child.role === sectionName && child.insertIndexAt)
-                return child;
-        }
-        return null;
-    }
-
     DragHandler {
         id: dragHandler
         enabled: BarLayoutService.settingsMode && wrapper._enterDone
@@ -166,55 +287,24 @@ Item {
         onActiveChanged: {
             if (active) {
                 startSceneX = centroid.scenePosition.x;
-                // Save initial center position in BarContent coords
                 let bc = wrapper.findBarContent();
                 if (bc) {
                     let pt = wrapper.mapToItem(bc, wrapper._naturalWidth / 2, 0);
                     wrapper._dragStartContentX = pt.x;
                 }
                 wrapper._isDragging = true;
-                BarLayoutService.isDragging = true;
-                BarLayoutService.draggedWidgetId = wrapper.widgetId;
-                BarLayoutService.ghostWidth = wrapper._naturalWidth;
-                // Set initial visual position
-                BarLayoutService.dragVisualX = wrapper._dragStartContentX - wrapper._naturalWidth / 2;
-
-
-                // Sync initial ghost position to match current location immediately
-                if (bc && bc.hitTestSection) {
-                    let zoneName = bc.hitTestSection(wrapper._dragStartContentX);
-                    BarLayoutService.ghostSection = zoneName;
-                    let sec = wrapper.findSection(bc, zoneName);
-                    if (sec) {
-                        let secScene = sec.mapToItem(null, 0, 0);
-                        let localX = centroid.scenePosition.x - secScene.x;
-                        BarLayoutService.ghostIndex = sec.insertIndexAt(localX);
-                        console.log("[DRAG START] init ghost: section:", zoneName, "index:", BarLayoutService.ghostIndex);
-                    }
-                }
+                BarLayoutService.beginDrag(
+                    wrapper.instanceKey,
+                    wrapper.widgetId,
+                    wrapper._dragStartContentX
+                );
             } else {
-                let targetSection = BarLayoutService.ghostSection;
-                let targetIndex = BarLayoutService.ghostIndex;
-                let isSamePlacement = targetSection !== "" && BarLayoutService.isSamePlacement(wrapper.widgetId, targetSection, targetIndex, "left");
+                let dragResult = BarLayoutService.endDrag("left");
 
-
-                BarLayoutService.isDragging = false;
-                BarLayoutService.dragHoverZone = "";
-                BarLayoutService.draggedWidgetId = "";
-                BarLayoutService.dragVisualX = 0;
-                BarLayoutService.ghostSection = "";
-                BarLayoutService.ghostIndex = -1;
-                BarLayoutService.ghostWidth = 0;
-
-                if (targetSection !== "") {
-                    BarLayoutService.moveWidget(
-                        wrapper.widgetId, targetSection, "left", targetIndex);
-                }
-
-                if (isSamePlacement) {
+                if (dragResult.samePlacement) {
                     wrapper._suppressNextWidthAnimation = true;
                     wrapper._isDragging = false;
-                    widthAnimationRestoreTimer.restart();
+                    suppressAnimationTimer.restart();
                 } else {
                     wrapper._isDragging = false;
                 }
@@ -224,23 +314,8 @@ Item {
         onCentroidChanged: {
             if (active) {
                 let mouseOffset = centroid.scenePosition.x - startSceneX;
-                // Visual center in BarContent coordinates
                 let visualCenterX = wrapper._dragStartContentX + mouseOffset;
-                BarLayoutService.dragVisualX = visualCenterX - wrapper._naturalWidth / 2;
-
-                let bc = wrapper.findBarContent();
-                if (bc && bc.hitTestSection) {
-                    let zoneName = bc.hitTestSection(visualCenterX);
-                    BarLayoutService.dragHoverZone = zoneName;
-                    BarLayoutService.ghostSection = zoneName;
-
-                    let sec = wrapper.findSection(bc, zoneName);
-                    if (sec) {
-                        let secScene = sec.mapToItem(null, 0, 0);
-                        let sectionLocalX = centroid.scenePosition.x - secScene.x;
-                        BarLayoutService.ghostIndex = sec.insertIndexAt(sectionLocalX);
-                    }
-                }
+                BarLayoutService.updateDrag(visualCenterX);
             }
         }
     }

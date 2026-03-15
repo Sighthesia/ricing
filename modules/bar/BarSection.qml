@@ -8,8 +8,12 @@ Item {
     required property string role
     property var widgetRegistry: ({})
 
-    implicitWidth: widgetRow.implicitWidth
+    implicitWidth: width > 0 ? width : widgetRow.implicitWidth
     implicitHeight: parent ? parent.height : 0
+
+    readonly property var _frameGeometry: BarLayoutService.sectionGeometry(section.role)
+    readonly property real _visualOffsetX:
+        (_frameGeometry.visualLeft || 0) - (_frameGeometry.left || 0)
 
     Behavior on implicitWidth {
         enabled: BarLayoutService.settingsMode
@@ -45,37 +49,23 @@ Item {
     Component.onCompleted: rebuildWidgets()
 
     Connections {
-        target: BarLayoutService.layoutModel
-        function onCountChanged() { section.rebuildWidgets(); }
-    }
-
-    Connections {
         target: BarLayoutService
         function onLayoutChanged() { section.rebuildWidgets(); }
         function onSettingsModeChanged() { section.rebuildWidgets(); }
     }
 
     /// Determine insertion index for a drag at `localX` in section space.
-    /// Skips the currently-dragged widget and non-widget children (Repeater).
     function insertIndexAt(localX) {
-        let dragId = BarLayoutService.draggedWidgetId;
-        let slots = [];
-        for (let i = 0; i < widgetRow.children.length; i++) {
-            let child = widgetRow.children[i];
-            if (!child || !child.visible) continue;
-            if (!child.widgetId) continue;
-            if (child.widgetId === dragId) continue;
-            slots.push({ x: child.x, w: child.width });
-        }
-        for (let i = 0; i < slots.length; i++) {
-            let center = slots[i].x + slots[i].w / 2;
-            if (localX < center) return i;
-        }
-        return slots.length;
+        return BarLayoutService.insertionIndexForSectionX(
+            section.role,
+            localX,
+            BarLayoutService.draggedInstanceKey
+        )
     }
 
     Row {
         id: widgetRow
+        x: section._visualOffsetX
         anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.widgetSpacing
 
@@ -85,15 +75,6 @@ Item {
                 properties: "x,y"
                 duration: Theme.anim.moveDuration
                 easing.type: Theme.anim.moveType
-            }
-        }
-
-        add: Transition {
-            enabled: BarLayoutService.settingsMode || BarLayoutService.isDragging
-            NumberAnimation {
-                property: "opacity"
-                from: 0; to: 1.0
-                duration: Theme.anim.moveDuration
             }
         }
 
@@ -137,22 +118,12 @@ Item {
 
         x: {
             if (!visible) return 0;
-            let idx = BarLayoutService.ghostIndex;
-            let dragId = BarLayoutService.draggedWidgetId;
-            let slots = [];
-            for (let i = 0; i < widgetRow.children.length; i++) {
-                let c = widgetRow.children[i];
-                if (!c || !c.visible) continue;
-                if (!c.widgetId) continue;
-                if (c.widgetId === dragId) continue;
-                slots.push(c);
-            }
-            if (idx >= slots.length) {
-                let last = slots[slots.length - 1];
-                return last ? (widgetRow.x + last.x + last.width + 3) : 0;
-            }
-            let child = slots[idx];
-            return child ? (widgetRow.x + child.x - 3) : 0;
+            let geometry = BarLayoutService.insertionIndicatorGeometry(
+                section.role,
+                BarLayoutService.ghostIndex,
+                BarLayoutService.draggedInstanceKey
+            )
+            return geometry.sectionLocalX - width / 2
         }
     }
 
