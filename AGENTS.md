@@ -58,6 +58,8 @@ timeout 12 qs -p tests/qml/MediaControlSettingsSmoke.qml
 ### Harness Prerequisites
 - Keep `tests/qml/{config,services,modules}` intact; the harnesses rely on those symlinks.
 - When you add or move a harness, update the matching `tests/run-*.sh` script in the same change.
+- For QML features, bug fixes, behavior changes, or regressions, load the repo-local `qml-testing-strategy` skill before choosing verification commands.
+- Start with the smallest harness that proves the change, then escalate to broader smoke suites only when a narrower layer no longer supports the claim.
 
 ## Architecture Rules
 - Preserve the three-layer flow: `services/` -> `config/` -> `modules/`.
