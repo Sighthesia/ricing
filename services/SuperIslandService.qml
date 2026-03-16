@@ -378,8 +378,8 @@ Singleton {
                 type: "notification",
                 groupKey: "notification",
                 priority: "important",
-                title: item.summary || item.appName || "Notification",
-                subtitle: item.body || "",
+                title: (item.summary || item.appName || "Notification").replace(/\n/g, " "),
+                subtitle: (item.body || "").replace(/\n/g, " "),
                 icon: item.appIcon || "preferences-system-notifications",
                 timeoutMs: root._settings().defaultTimeout
             })
