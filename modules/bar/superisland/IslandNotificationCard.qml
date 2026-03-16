@@ -7,8 +7,7 @@ Item {
 
     required property var event
     required property string iconSource
-    readonly property int _iconSize:
-        Theme.barWidget.primaryIconSize + Theme.barWidget.contentPaddingV * 2
+    readonly property int _iconSize: Theme.barWidget.primaryIconSize
 
     implicitWidth: content.implicitWidth
     implicitHeight: Theme.barWidget.pillHeight
