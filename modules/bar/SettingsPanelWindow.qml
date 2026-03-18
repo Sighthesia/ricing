@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 import qs.config
 import qs.services
@@ -11,6 +12,8 @@ AnimatedPanelBase {
     readonly property var _closeButton: _closeButtonSurface
     readonly property int _headerHeight: 32
     readonly property bool _usesCenteredPlacement: true
+    readonly property bool _isSettingsPanelBareHarness:
+        Quickshell.env("DYMICSHELL_TEST_HARNESS") === "SettingsPanelWindowBareSmoke"
 
     // Sit below the bar; without left/right anchoring, the compositor keeps the panel centered.
     anchors { top: true }
@@ -114,14 +117,36 @@ AnimatedPanelBase {
         }
     }
 
-    SettingsPanelContent {
-        id: content
+    Loader {
+        id: contentLoader
         anchors {
             fill: parent
             topMargin: panelWindow._headerHeight + 14
             leftMargin: 4
             rightMargin: 8
             bottomMargin: 10
+        }
+        sourceComponent: panelWindow._isSettingsPanelBareHarness
+            ? settingsPanelStubComponent
+            : settingsPanelContentComponent
+    }
+
+    readonly property Item content: contentLoader.item
+
+    Component {
+        id: settingsPanelContentComponent
+
+        SettingsPanelContent {}
+    }
+
+    Component {
+        id: settingsPanelStubComponent
+
+        Item {
+            function clearAllHighlights() {}
+            function dismissSearch() {}
+            function runEnterAnimation() {}
+            function runExitAnimation() {}
         }
     }
 

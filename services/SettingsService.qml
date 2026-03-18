@@ -17,6 +17,7 @@ Singleton {
             : Quickshell.env("HOME") + "/.config")
         + "/dymicshell/"
     readonly property string settingsFile: configDir + "settings.json"
+    readonly property bool _isHarnessRun: Quickshell.env("DYMICSHELL_TEST_HARNESS") !== ""
 
     property bool isLoaded: false
 
@@ -44,7 +45,7 @@ Singleton {
     FileView {
         id: settingsFileView
         path: root.settingsFile
-        watchChanges: true
+        watchChanges: !root._isHarnessRun
         onFileChanged: reload()
         onAdapterUpdated: saveTimer.restart()
         onLoaded: {
@@ -152,6 +153,22 @@ Singleton {
             property int cavaBars: 20
             property int cavaAsciiMaxRange: 1000
             property int cavaFramerate: 60
+        }
+
+        property JsonObject systemMonitor: JsonObject {
+            property bool enabled: true
+            property bool hoverReveal: true
+            property bool panelEnabled: true
+            property bool flashEnabled: true
+            property var pinnedMetrics: ["cpu", "memory", "temperature"]
+            property bool showVolume: true
+            property bool showBrightness: true
+            property bool showMicrophone: true
+            property int warningCpuPercent: 85
+            property int warningMemoryPercent: 85
+            property int warningTempC: 75
+            property int criticalTempC: 90
+            property bool superIslandEscalation: true
         }
     }
 }

@@ -289,7 +289,7 @@ Expected: panel open/close flow passes.
 
 **Files:**
 - Modify: `modules/bar/WidgetSettingsPanel.qml`
-- Create: `modules/bar/widget-settings/MediaControlSection.qml`
+- Create: `modules/bar/widgetsettings/MediaControlSection.qml`
 - Modify: `config/settings-default.json`
 - Modify: `services/SettingsService.qml`
 - Test: `tests/qml/MediaControlSettingsSmoke.qml`

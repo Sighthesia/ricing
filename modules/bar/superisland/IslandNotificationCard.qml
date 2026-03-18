@@ -7,8 +7,7 @@ Item {
 
     required property var event
     required property string iconSource
-    readonly property int _iconSize:
-        Theme.barWidget.primaryIconSize + Theme.barWidget.contentPaddingV * 2
+    readonly property int _iconSize: Theme.barWidget.primaryIconSize
 
     implicitWidth: content.implicitWidth
     implicitHeight: Theme.barWidget.pillHeight
@@ -39,7 +38,8 @@ Item {
                 font.pixelSize: Theme.fontSizeBody
                 font.bold: true
                 elide: Text.ElideRight
-                Layout.maximumWidth: Math.round(220 * Theme.uiScale)
+                maximumLineCount: 1
+                Layout.maximumWidth: Math.round(180 * Theme.uiScale)
             }
 
             Text {
@@ -49,7 +49,8 @@ Item {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 elide: Text.ElideRight
-                Layout.maximumWidth: Math.round(240 * Theme.uiScale)
+                maximumLineCount: 1
+                Layout.maximumWidth: Math.round(160 * Theme.uiScale)
             }
         }
 

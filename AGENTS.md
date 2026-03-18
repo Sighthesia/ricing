@@ -42,9 +42,10 @@ bash tests/run-media-control-smoke.sh
 
 ### Single Smoke Harnesses
 ```bash
-timeout 12 qs -p tests/qml/SettingsStructureSmoke.qml
-timeout 12 qs -p tests/qml/NotificationStructureSmoke.qml
-timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
+bash tests/run-qml-harness.sh SettingsStructureSmoke
+bash tests/run-qml-harness.sh NotificationStructureSmoke
+bash tests/run-qml-harness.sh LauncherStructureSmoke
+bash tests/run-qml-harness.sh BarLayoutGeometrySmoke
 timeout 12 qs -p tests/qml/SuperIslandServiceSmoke.qml
 timeout 12 qs -p tests/qml/MediaServiceSmoke.qml
 timeout 12 qs -p tests/qml/CavaServiceSmoke.qml
@@ -153,5 +154,5 @@ Keep each QML file ordered as:
 - Keep smoke harnesses in `tests/qml/`, not the repository root.
 - Extend the nearest smoke harness first for regressions; avoid overlapping duplicate coverage.
 - Update `tests/run-*.sh` when harness names or paths change.
-- Update `docs/plans/` references when files or commands move.
+- Don't `docs/plans/` references even when files or commands move.
 - Use the smoke suites plus a full-shell load check before claiming the repo still loads cleanly.

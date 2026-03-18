@@ -3,8 +3,8 @@ import Quickshell.Wayland
 import QtQuick
 import qs.config
 import qs.services
-import "modules/bar" as BarParts
-import "modules/bar/settings" as SettingsParts
+import qs.modules.bar as BarParts
+import "../../modules/bar/settings" as SettingsParts
 
 // Smoke harness for shared settings primitives and navigation structure.
 ShellRoot {

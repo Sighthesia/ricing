@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import qs.config
@@ -10,6 +11,8 @@ AnimatedPanelBase {
 
     readonly property var _closeButton: _closeButtonSurface
     readonly property bool _usesCenteredPlacement: true
+    readonly property bool _isWidgetPickerBareHarness:
+        Quickshell.env("DYMICSHELL_TEST_HARNESS") === "WidgetPickerWindowBareSmoke"
 
     // Position below the bar; without left/right anchoring, the compositor keeps the panel centered.
     anchors { top: true }
@@ -31,7 +34,8 @@ AnimatedPanelBase {
         "mediaControl":      Qt.resolvedUrl("widgets/MediaControlWidget.qml"),
         "clock":             Qt.resolvedUrl("widgets/Clock.qml"),
         "workspaceWidget":   Qt.resolvedUrl("widgets/WorkspaceWidget.qml"),
-        "notificationBell":  Qt.resolvedUrl("widgets/NotificationBell.qml")
+        "notificationBell":  Qt.resolvedUrl("widgets/NotificationBell.qml"),
+        "superSystemMonitor": Qt.resolvedUrl("widgets/SuperSystemMonitorWidget.qml")
     })
 
     // Human-readable display names for the picker cards
@@ -40,7 +44,8 @@ AnimatedPanelBase {
         "mediaControl":      "\u5a92\u4f53\u63a7\u5236",
         "clock":             "\u65f6\u949f",
         "workspaceWidget":   "\u5de5\u4f5c\u533a",
-        "notificationBell":  "\u901a\u77e5"
+        "notificationBell":  "\u901a\u77e5",
+        "superSystemMonitor": "\u7cfb\u7edf\u76d1\u63a7"
     })
 
     property string searchQuery: ""
@@ -268,13 +273,15 @@ AnimatedPanelBase {
                                         height: 60
                                         clip: true
 
-                                        Loader {
-                                            id: widgetLoader
-                                            anchors.centerIn: parent
-                                            source: root.widgetRegistry[modelData] || ""
-                                            transform: Scale {
-                                                xScale: 0.65
-                                                yScale: 0.65
+                                         Loader {
+                                             id: widgetLoader
+                                             anchors.centerIn: parent
+                                             source: root._isWidgetPickerBareHarness && modelData === "notificationBell"
+                                                 ? ""
+                                                 : (root.widgetRegistry[modelData] || "")
+                                             transform: Scale {
+                                                 xScale: 0.65
+                                                 yScale: 0.65
                                                 origin.x: widgetLoader.width / 2
                                                 origin.y: widgetLoader.height / 2
                                             }

@@ -75,6 +75,25 @@
         "showNotifications": true,
         "showWorkspaceEvents": true
     },
+    "systemMonitor": {
+        "enabled": true,
+        "hoverReveal": true,
+        "panelEnabled": true,
+        "flashEnabled": true,
+        "pinnedMetrics": [
+            "cpu",
+            "memory",
+            "temperature"
+        ],
+        "showVolume": true,
+        "showBrightness": true,
+        "showMicrophone": true,
+        "warningCpuPercent": 85,
+        "warningMemoryPercent": 85,
+        "warningTempC": 75,
+        "criticalTempC": 90,
+        "superIslandEscalation": true
+    },
     "workspaceWidget": {
         "defaultMode": "focus",
         "hoverEnabled": true,

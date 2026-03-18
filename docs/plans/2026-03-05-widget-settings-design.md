@@ -23,9 +23,9 @@
 | ----------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
 | `services/WidgetConfigService.qml`                    | `Singleton`         | Read/write `widget-config.json`; expose `get(instanceKey)` / `set(instanceKey, patch)` |
 | `modules/bar/WidgetSettingsPanel.qml`                 | `AnimatedPanelBase` | Bubble panel anchored below the bar, X-aligned to target widget centre                 |
-| `modules/bar/widget-settings/AppearanceSection.qml`   | `Item`              | Colour pickers, corner radius, padding sliders                                         |
-| `modules/bar/widget-settings/WidgetConfigSection.qml` | `Item`              | Extensible per-widget-type config slot (placeholder for now)                           |
-| `modules/bar/widget-settings/WidgetActionsBar.qml`    | `Item`              | Import / Export / Delete buttons                                                       |
+| `modules/bar/widgetsettings/AppearanceSection.qml`   | `Item`              | Colour pickers, corner radius, padding sliders                                         |
+| `modules/bar/widgetsettings/WidgetConfigSection.qml` | `Item`              | Extensible per-widget-type config slot (placeholder for now)                           |
+| `modules/bar/widgetsettings/WidgetActionsBar.qml`    | `Item`              | Import / Export / Delete buttons                                                       |
 
 ### 2.2 Modified Files
 

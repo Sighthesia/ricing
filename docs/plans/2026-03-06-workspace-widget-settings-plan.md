@@ -145,7 +145,7 @@ feat(widgets): bind WorkspaceWidget constants to SettingsService.data.workspaceW
 ### Task 3: Create WorkspaceWidgetSection.qml
 
 **Files:**
-- Create: `modules/bar/widget-settings/WorkspaceWidgetSection.qml`
+- Create: `modules/bar/widgetsettings/WorkspaceWidgetSection.qml`
 
 **Step 1: Read reference files for patterns**
 

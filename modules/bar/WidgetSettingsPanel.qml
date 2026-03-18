@@ -3,7 +3,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
-import "widget-settings"
+import "widgetsettings"
 import "settings"
 
 // Floating bubble panel anchored below the bar, horizontally centred on the
