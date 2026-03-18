@@ -24,7 +24,7 @@ Settings are stored in `settings-default.json` under a new `"workspaceWidget"` s
 |------|--------|
 | `config/settings-default.json` | Add `"workspaceWidget"` section with 4 keys |
 | `modules/bar/widgets/WorkspaceWidget.qml` | Replace 4 hardcoded constants with `SettingsService.data.workspaceWidget.*` bindings; update `_showOverview` to respect `defaultMode` |
-| `modules/bar/widget-settings/WorkspaceWidgetSection.qml` | New file — functional settings UI for workspaceWidget |
+| `modules/bar/widgetsettings/WorkspaceWidgetSection.qml` | New file — functional settings UI for workspaceWidget |
 | `modules/bar/WidgetSettingsPanel.qml` | Show `WorkspaceWidgetSection` in the "功能" group when `_widgetId === "workspaceWidget"` |
 
 ### SettingsService access pattern

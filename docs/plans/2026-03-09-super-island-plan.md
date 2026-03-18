@@ -99,7 +99,7 @@ Responsible for asserting:
 **Files:**
 
 - `modules/bar/WidgetSettingsPanel.qml`
-- `modules/bar/widget-settings/SuperIslandSection.qml` (new)
+- `modules/bar/widgetsettings/SuperIslandSection.qml` (new)
 - `services/SettingsService.qml`
 - `config/settings-default.json`
 

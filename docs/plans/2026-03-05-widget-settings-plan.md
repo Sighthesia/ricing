@@ -511,8 +511,8 @@ readonly property var widgetNames: ({
 
 **Files:**
 - Create `modules/bar/WidgetSettingsPanel.qml`
-- Create `modules/bar/widget-settings/AppearanceSection.qml`
-- Create `modules/bar/widget-settings/WidgetActionsBar.qml`
+- Create `modules/bar/widgetsettings/AppearanceSection.qml`
+- Create `modules/bar/widgetsettings/WidgetActionsBar.qml`
 
 ### Step 1: Create `AppearanceSection.qml`
 
@@ -766,7 +766,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
-import "widget-settings"
+import "widgetsettings"
 
 // Floating bubble panel anchored below the bar, horizontally centred on the
 // active widget. Shown when BarLayoutService.widgetSettingsPanelOpen = true.
@@ -1024,8 +1024,8 @@ Rectangle {
 cd /home/Sighthesia/0_Files/Producing/Software/Quickshell/DymicShell
 git add services/WidgetConfigService.qml \
         modules/bar/WidgetSettingsPanel.qml \
-        modules/bar/widget-settings/AppearanceSection.qml \
-        modules/bar/widget-settings/WidgetActionsBar.qml \
+        modules/bar/widgetsettings/AppearanceSection.qml \
+        modules/bar/widgetsettings/WidgetActionsBar.qml \
         services/BarLayoutService.qml \
         modules/bar/BarContextMenu.qml \
         modules/bar/BarWidgetWrapper.qml \

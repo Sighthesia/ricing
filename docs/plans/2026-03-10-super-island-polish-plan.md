@@ -75,7 +75,7 @@ Expected: restore-timing assertion passes.
 ### Task 4: Add Super Island widget settings section
 
 **Files:**
-- Create: `modules/bar/widget-settings/SuperIslandSection.qml`
+- Create: `modules/bar/widgetsettings/SuperIslandSection.qml`
 - Modify: `modules/bar/WidgetSettingsPanel.qml`
 - Modify: `services/SettingsService.qml`
 - Modify: `config/settings-default.json`
