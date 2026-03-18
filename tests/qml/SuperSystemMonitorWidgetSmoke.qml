@@ -136,15 +136,18 @@ ShellRoot {
         visible: false
     }
 
-    Component.onCompleted: {
-        SettingsService.data.systemMonitor.enabled = true
-        SettingsService.data.systemMonitor.pinnedMetrics = ["cpu", "memory", "temperature"]
-        SettingsService.data.systemMonitor.warningCpuPercent = 85
-        SettingsService.data.systemMonitor.warningMemoryPercent = 85
-        SettingsService.data.systemMonitor.warningTempC = 75
-        SettingsService.data.systemMonitor.criticalTempC = 90
+     Component.onCompleted: {
+         SettingsService.data.systemMonitor.enabled = true
+         SettingsService.data.systemMonitor.pinnedMetrics = ["cpu", "memory", "temperature"]
+         SettingsService.data.systemMonitor.showVolume = true
+         SettingsService.data.systemMonitor.showBrightness = true
+         SettingsService.data.systemMonitor.showMicrophone = true
+         SettingsService.data.systemMonitor.warningCpuPercent = 85
+         SettingsService.data.systemMonitor.warningMemoryPercent = 85
+         SettingsService.data.systemMonitor.warningTempC = 75
+         SettingsService.data.systemMonitor.criticalTempC = 90
 
-        root._setNormalSnapshot()
-        Qt.callLater(root._runAssertions)
-    }
+         root._setNormalSnapshot()
+         Qt.callLater(root._runAssertions)
+     }
 }

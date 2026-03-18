@@ -366,19 +366,19 @@ Singleton {
         function onTemperatureCChanged() { root._reconcileAlerts() }
     }
 
-    Connections {
-        target: SettingsService.data ? SettingsService.data.systemMonitor : null
+    // Connections {
+    //     target: SettingsService.data ? SettingsService.data.systemMonitor : null
 
-        function onPinnedMetricsChanged() { root._reconcileAlerts() }
-        function onWarningCpuPercentChanged() { root._reconcileAlerts() }
-        function onWarningMemoryPercentChanged() { root._reconcileAlerts() }
-        function onWarningTempCChanged() { root._reconcileAlerts() }
-        function onCriticalTempCChanged() { root._reconcileAlerts() }
-        function onFlashEnabledChanged() { root._reconcileAlerts() }
-        function onSuperIslandEscalationChanged() { root._reconcileAlerts() }
-        function onPanelEnabledChanged() {
-            if (!root._isPanelEnabled())
-                root.panelOpen = false
-        }
-    }
+    //     function onPinnedMetricsChanged() { root._reconcileAlerts() }
+    //     function onWarningCpuPercentChanged() { root._reconcileAlerts() }
+    //     function onWarningMemoryPercentChanged() { root._reconcileAlerts() }
+    //     function onWarningTempCChanged() { root._reconcileAlerts() }
+    //     function onCriticalTempCChanged() { root._reconcileAlerts() }
+    //     function onFlashEnabledChanged() { root._reconcileAlerts() }
+    //     function onSuperIslandEscalationChanged() { root._reconcileAlerts() }
+    //     function onPanelEnabledChanged() {
+    //         if (!root._isPanelEnabled())
+    //             root.panelOpen = false
+    //     }
+    // }
 }
