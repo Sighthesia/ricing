@@ -2,7 +2,7 @@ import Quickshell
 import QtQuick
 import qs.config
 import qs.services
-import "modules/bar/widgets" as BarWidgets
+import "../../modules/bar/widgets" as BarWidgets
 
 // Smoke harness for MediaControlWidget flash staging and collapse behavior.
 ShellRoot {

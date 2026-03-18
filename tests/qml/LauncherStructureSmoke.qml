@@ -2,7 +2,7 @@ import Quickshell
 import QtQuick
 import qs.config
 import qs.services
-import "modules/launcher" as LauncherParts
+import qs.modules.launcher as LauncherParts
 
 // Smoke harness for launcher panel and service structural contracts.
 ShellRoot {

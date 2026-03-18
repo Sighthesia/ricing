@@ -2,8 +2,8 @@ import Quickshell
 import QtQuick
 import qs.config
 import qs.services
-import "modules/notifications" as NotificationParts
-import "modules/bar" as BarParts
+import qs.modules.notifications as NotificationParts
+import qs.modules.bar as BarParts
 
 // Smoke harness for notification popup/history structural contracts.
 ShellRoot {
