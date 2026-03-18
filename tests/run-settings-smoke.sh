@@ -2,4 +2,5 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-timeout 12 qs -p tests/qml/SettingsStructureSmoke.qml
+bash tests/run-qml-harness.sh SettingsStructureSmoke
+bash tests/run-qml-harness.sh SystemMonitorSettingsSmoke
