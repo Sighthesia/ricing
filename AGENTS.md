@@ -9,13 +9,7 @@ shell.qml                  # Entry point; instantiate top-level windows only
 config/                    # Semantic colors + structural theme tokens
 services/                  # Singleton state, persistence, compositor/process integration
 modules/                   # UI windows, panels, and reusable module-local components
-tests/
-  qml/                     # Smoke harnesses; run with `qs -p tests/qml/<Name>.qml`
-  qml/{config,services,modules} # Symlink roots so harnesses can resolve `qs.*` imports
-  run-settings-smoke.sh
-  run-ui-structure-smoke.sh
-  run-super-island-smoke.sh
-  run-media-control-smoke.sh
+  tests/
 docs/plans/               # Design and implementation history
 null/dymicshell/          # Checked-in sample/runtime artifacts; not the canonical live config
 ```
@@ -27,40 +21,10 @@ The repo does not define `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmlli
 
 ### Whole-Shell Validation
 ```bash
-timeout 10 qs --path .
-timeout 10 qs -p .
+timeout 5 qs --path .
+timeout 5 qs -p .
 ```
 Prefer `qs --path .` for a full-shell load check.
-
-### Full Smoke Suites
-```bash
-bash tests/run-settings-smoke.sh
-bash tests/run-ui-structure-smoke.sh
-bash tests/run-super-island-smoke.sh
-bash tests/run-media-control-smoke.sh
-```
-
-### Single Smoke Harnesses
-```bash
-bash tests/run-qml-harness.sh SettingsStructureSmoke
-bash tests/run-qml-harness.sh NotificationStructureSmoke
-bash tests/run-qml-harness.sh LauncherStructureSmoke
-bash tests/run-qml-harness.sh BarLayoutGeometrySmoke
-timeout 12 qs -p tests/qml/SuperIslandServiceSmoke.qml
-timeout 12 qs -p tests/qml/MediaServiceSmoke.qml
-timeout 12 qs -p tests/qml/CavaServiceSmoke.qml
-timeout 12 qs -p tests/qml/MediaControlServiceSmoke.qml
-timeout 12 qs -p tests/qml/MediaVisualPartsSmoke.qml
-timeout 12 qs -p tests/qml/MediaControlWidgetSmoke.qml
-timeout 12 qs -p tests/qml/MediaControlPanelSmoke.qml
-timeout 12 qs -p tests/qml/MediaControlSettingsSmoke.qml
-```
-
-### Harness Prerequisites
-- Keep `tests/qml/{config,services,modules}` intact; the harnesses rely on those symlinks.
-- When you add or move a harness, update the matching `tests/run-*.sh` script in the same change.
-- For QML features, bug fixes, behavior changes, or regressions, load the repo-local `qml-testing-strategy` skill before choosing verification commands.
-- Start with the smallest harness that proves the change, then escalate to broader smoke suites only when a narrower layer no longer supports the claim.
 
 ## Architecture Rules
 - Preserve the three-layer flow: `services/` -> `config/` -> `modules/`.
@@ -151,8 +115,7 @@ Keep each QML file ordered as:
 - Clamp untrusted numeric input and guard against missing object keys.
 
 ## Testing and Documentation Hygiene
-- Keep smoke harnesses in `tests/qml/`, not the repository root.
-- Extend the nearest smoke harness first for regressions; avoid overlapping duplicate coverage.
+- Keep validation commands aligned with the current shell structure.
 - Update `tests/run-*.sh` when harness names or paths change.
 - Don't `docs/plans/` references even when files or commands move.
-- Use the smoke suites plus a full-shell load check before claiming the repo still loads cleanly.
+- Use the full-shell load check before claiming the repo still loads cleanly.

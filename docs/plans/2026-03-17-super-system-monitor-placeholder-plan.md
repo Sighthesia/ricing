@@ -4,18 +4,13 @@
 
 **Goal:** Make `Super System Monitor` available in the widget library and insertable into the bar as a minimal placeholder widget.
 
-**Architecture:** Follow the existing bar widget pattern instead of introducing a new service. Add a placeholder `SuperSystemMonitorWidget.qml`, mirror a `superSystemMonitor` entry into both widget registries, and prove availability with a narrow smoke harness that checks registry wiring and `BarLayoutService.addWidget()` behavior.
 
-**Tech Stack:** QML, Quickshell, `BarLayoutService`, bar widget registry maps, repository-root smoke harness runner.
 
 ---
 
-### Task 1: Add a failing availability smoke harness
 
 **Files:**
-- Create: `tests/qml/SuperSystemMonitorAvailabilitySmoke.qml`
 
-**Step 1: Write the failing smoke harness**
 
 Create a harness that:
 
@@ -33,7 +28,6 @@ Create a harness that:
 Run:
 
 ```bash
-bash tests/run-qml-harness.sh SuperSystemMonitorAvailabilitySmoke
 ```
 
 Expected: FAIL because the registry entries and widget file do not exist yet.
@@ -102,25 +96,20 @@ In `WidgetPickerWindow.qml`, add the same key to `widgetRegistry` using
 Run:
 
 ```bash
-bash tests/run-qml-harness.sh SuperSystemMonitorAvailabilitySmoke
 ```
 
 Expected: PASS.
 
 ---
 
-### Task 4: Verify the nearest existing smoke coverage
 
 **Files:**
-- Verify: `tests/qml/SettingsStructureSmoke.qml`
 - Verify: all touched files
 
-**Step 1: Run the settings smoke suite**
 
 Run:
 
 ```bash
-bash tests/run-settings-smoke.sh
 ```
 
 Expected: PASS.

@@ -497,7 +497,6 @@ git commit -m "feat(launcher): register LauncherPanel in shell.qml"
 
 ---
 
-### Task 6: Integration smoke test
 
 **Step 1: Launch shell and verify**
 

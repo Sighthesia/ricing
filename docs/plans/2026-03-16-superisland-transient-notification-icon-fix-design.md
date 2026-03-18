@@ -33,7 +33,6 @@ readonly property int _iconSize: Theme.barWidget.primaryIconSize
 - 与其他组件的图标大小保持一致，视觉更统一
 
 ## 测试验证
-1. 运行SuperIsland服务烟雾测试：`qs -p tests/qml/SuperIslandServiceSmoke.qml`
 2. 手动测试瞬态通知显示，确认图标不再溢出
 3. 检查其他使用`primaryIconSize`的组件是否受影响
 

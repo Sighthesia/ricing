@@ -23,7 +23,6 @@ Add a trigger-focused name and description.
 
 **Step 2: Write the minimal failing baseline note in the skill body**
 
-Capture the core failure mode this skill prevents: agents escalating to high-level QML smoke too early.
 
 **Step 3: Add the main sections**
 
@@ -57,7 +56,6 @@ Do not copy the full test-selection ladder into `AGENTS.md`.
 
 **Step 3: Add one concise selection principle**
 
-State that agents should start with the smallest harness that proves the change before escalating to broader smoke suites.
 
 ---
 

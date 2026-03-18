@@ -182,7 +182,6 @@ Service reconciliation should remove any actor snapshot whose `instanceKey` no l
 
 ## Testing Strategy
 
-Update `tests/qml/BarLayoutGeometrySmoke.qml` so it verifies the handoff contract instead of trying to force the real delegate to be the first visible frame.
 
 Required coverage:
 
@@ -195,11 +194,6 @@ Required coverage:
 
 Then run:
 
-- `timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml`
-- `bash tests/run-settings-smoke.sh`
-- `bash tests/run-ui-structure-smoke.sh`
-- `bash tests/run-super-island-smoke.sh`
-- `bash tests/run-media-control-smoke.sh`
 - `timeout 10 qs --path .`
 
 ## Affected Files
@@ -207,7 +201,6 @@ Then run:
 - `services/BarLayoutService.qml`
 - `modules/bar/DragOverlay.qml`
 - `modules/bar/BarWidgetWrapper.qml`
-- `tests/qml/BarLayoutGeometrySmoke.qml`
 - `modules/bar/BarSection.qml` only if transition experiments need cleanup
 
 ## Non-Goals

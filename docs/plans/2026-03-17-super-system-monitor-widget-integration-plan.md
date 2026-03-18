@@ -6,7 +6,6 @@
 
 **Architecture:** Preserve the repo's service-to-module separation. Import the system monitor services and schema from the dedicated branch, then keep `SuperSystemMonitorWidget.qml` as a thin presenter that reads only from `SystemMonitorService` instead of assembling raw metrics itself.
 
-**Tech Stack:** QML, Quickshell, `Process`, `FileView`, `SettingsService`, bar widget registry maps, smoke harness runner.
 
 ---
 
@@ -41,40 +40,26 @@ This task only brings in the backend contract.
 
 ---
 
-### Task 2: Add failing service-level smoke coverage in the current workspace if needed
 
 **Files:**
-- Create: `tests/qml/SystemMetricsServiceSmoke.qml`
-- Create: `tests/qml/AudioDeviceServiceSmoke.qml`
-- Create: `tests/qml/BrightnessServiceSmoke.qml`
-- Create: `tests/qml/SystemMonitorServiceSmoke.qml`
-- Create: `tests/qml/SystemMonitorSettingsSmoke.qml`
-- Modify: `tests/run-settings-smoke.sh`
 
-**Step 1: Bring over the service/settings smoke harnesses**
 
 Copy the branch harnesses into the current workspace.
 
-**Step 2: Wire the settings smoke script**
 
-Ensure `tests/run-settings-smoke.sh` includes `SystemMonitorSettingsSmoke`.
 
 **Step 3: Run one harness first to confirm the RED/GREEN status matches import state**
 
-Run the nearest service smoke that proves the imported file exists, for example:
 
 ```bash
-timeout 12 qs -p tests/qml/SystemMonitorSettingsSmoke.qml
 ```
 
 Expected: PASS if Task 1 is already in place.
 
 ---
 
-### Task 3: Write the failing widget integration smoke
 
 **Files:**
-- Create: `tests/qml/SuperSystemMonitorWidgetSmoke.qml`
 
 **Step 1: Write a harness that proves real service consumption**
 
@@ -96,7 +81,6 @@ Examples of acceptable assertions:
 Run:
 
 ```bash
-bash tests/run-qml-harness.sh SuperSystemMonitorWidgetSmoke
 ```
 
 Expected: FAIL because the current widget still renders placeholder content.
@@ -127,12 +111,10 @@ Do not move threshold logic, ordering, or metric fallback rules into the widget.
 Maintain a compact pill with stable `implicitHeight` and predictable content
 width so the widget behaves well in both the bar and picker preview.
 
-**Step 4: Re-run the widget smoke**
 
 Run:
 
 ```bash
-bash tests/run-qml-harness.sh SuperSystemMonitorWidgetSmoke
 ```
 
 Expected: PASS.
@@ -144,14 +126,11 @@ Expected: PASS.
 **Files:**
 - Verify: `modules/bar/BarContent.qml`
 - Verify: `modules/bar/WidgetPickerWindow.qml`
-- Verify: `tests/qml/SuperSystemMonitorAvailabilitySmoke.qml`
 
-**Step 1: Run the existing availability smoke**
 
 Run:
 
 ```bash
-bash tests/run-qml-harness.sh SuperSystemMonitorAvailabilitySmoke
 ```
 
 Expected: PASS.
@@ -172,18 +151,14 @@ Keep `superSystemMonitor` unchanged in both registries.
 Run the smallest useful set, including at minimum:
 
 ```bash
-bash tests/run-settings-smoke.sh
 ```
 
-If the imported service smokes are not all covered by grouped scripts yet, run
 them individually as well.
 
-**Step 2: Run the widget integration smoke**
 
 Run:
 
 ```bash
-bash tests/run-qml-harness.sh SuperSystemMonitorWidgetSmoke
 ```
 
 Expected: PASS.

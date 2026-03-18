@@ -27,12 +27,7 @@ Settings schema added:
 
 ### Test Infrastructure (Committed: 4fd9691, 14ac83e)
 
-- `TestHarnessRunner.qml` - repository-root harness loader
-- `TestHarnessRunnerMinimal.qml` - isolated debugging runner
 - `tests/run-qml-harness.sh` - wrapper script
-- Service smoke tests for all four services
-- `SystemMonitorSettingsSmoke.qml` for schema validation
-- `SuperSystemMonitorAvailabilitySmoke.qml` for widget registration
 - Debug harnesses for teardown crash isolation
 
 ### Widget Placeholder (Committed: 3addced)
@@ -56,7 +51,6 @@ The placeholder widget needs to be upgraded to consume real `SystemMonitorServic
 1. Replace hardcoded CPU/MEM labels with bindings to `SystemMonitorService.metrics`
 2. Add severity visual indicator based on `SystemMonitorService.highestSeverity`
 3. Optionally show volume/brightness when enabled in settings
-4. Create/extend `SuperSystemMonitorWidgetSmoke.qml` to verify real data consumption
 
 ### Panel Integration (Phase 2 - Future)
 
@@ -70,7 +64,6 @@ This is intentionally deferred to keep Phase 1 focused.
 
 ## Teardown Crash Investigation
 
-During smoke test development, teardown segfaults were observed. Root cause analysis:
 
 ### Confirmed Issues
 
@@ -88,11 +81,6 @@ During smoke test development, teardown segfaults were observed. Root cause anal
 
 ### Evidence
 
-- `AnimatedPanelBaseBareSmoke`: crashes on teardown
-- `BarContextMenuBareSmoke`: passes (uses `PopupWindow`)
-- `SettingsPanelWindowBareSmoke`: crashes even with stubbed content
-- `WidgetPickerWindowBareSmoke`: crashes regardless of preview content
-- `MediaControlPanelSmoke`: crashes on teardown
 
 ### Recommended Fix Direction
 
@@ -104,11 +92,6 @@ The `AnimatedPanelBase` teardown issue likely requires one of:
 ### Debug Artifacts Retained
 
 The minimal debug harnesses are kept for future investigation:
-- `tests/qml/AnimatedPanelBaseBareSmoke.qml`
-- `tests/qml/SettingsPanelWindowBareSmoke.qml`
-- `tests/qml/WidgetPickerWindowBareSmoke.qml`
-- `tests/qml/BarContextMenuBareSmoke.qml`
-- `tests/qml/SettingsServiceBareSmoke.qml`
 
 ## Architecture
 
@@ -132,13 +115,10 @@ Data flow:
 
 ```bash
 # Service layer
-bash tests/run-system-monitor-smoke.sh
 
 # Widget availability
-bash tests/run-qml-harness.sh SuperSystemMonitorAvailabilitySmoke
 
 # Settings schema
-bash tests/run-qml-harness.sh SystemMonitorSettingsSmoke
 
 # Full shell
 timeout 10 qs --path .

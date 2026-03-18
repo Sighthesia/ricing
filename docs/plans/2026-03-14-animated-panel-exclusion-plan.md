@@ -4,20 +4,16 @@
 
 **Goal:** Ensure every `AnimatedPanelBase` drop-down panel behaves as a true overlay and never reserves compositor layout space.
 
-**Architecture:** Fix the bug at the shared base by giving `AnimatedPanelBase` a default non-excluding layer-shell policy. Guard the behavior with a structure smoke assertion so future animated panels inherit the correct compositor contract automatically.
 
-**Tech Stack:** QML, Quickshell `PanelWindow`, `Quickshell.Wayland.WlrLayershell`, existing smoke harnesses
 
 ---
 
 ### Task 1: Add a failing structural regression test
 
 **Files:**
-- Modify: `tests/qml/SettingsStructureSmoke.qml`
 
 **Step 1: Write the failing test**
 
-Instantiate a minimal `AnimatedPanelBase` in the smoke harness and assert it exposes the expected exclusion policy.
 
 ```qml
     BarParts.AnimatedPanelBase {
@@ -31,7 +27,6 @@ Instantiate a minimal `AnimatedPanelBase` in the smoke harness and assert it exp
 
 **Step 2: Run test to verify it fails**
 
-Run: `timeout 12 qs -p tests/qml/SettingsStructureSmoke.qml`
 
 Expected: FAIL on the new exclusion assertion.
 
@@ -41,7 +36,6 @@ Do not touch subtype panels yet. Only add the shared exclusion policy in the bas
 
 **Step 4: Run test to verify it passes**
 
-Run: `timeout 12 qs -p tests/qml/SettingsStructureSmoke.qml`
 
 Expected: PASS.
 
@@ -72,9 +66,7 @@ Add the base policy near other root window properties.
 
 Do not change anchors, animation timings, or visibility state machine logic in this task.
 
-**Step 4: Re-run the targeted smoke**
 
-Run: `timeout 12 qs -p tests/qml/SettingsStructureSmoke.qml`
 
 Expected: PASS.
 
@@ -97,8 +89,6 @@ Expected: PASS.
 Run:
 
 ```bash
-bash tests/run-settings-smoke.sh
-bash tests/run-ui-structure-smoke.sh
 ```
 
 Expected: PASS.
@@ -108,8 +98,6 @@ Expected: PASS.
 Run:
 
 ```bash
-bash tests/run-super-island-smoke.sh
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS.

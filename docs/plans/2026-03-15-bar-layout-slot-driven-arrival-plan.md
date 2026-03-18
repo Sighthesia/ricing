@@ -6,16 +6,13 @@
 
 **Architecture:** Add a one-shot arrival snapshot to `BarLayoutService` for new layout-mode insertions. `BarWidgetWrapper` reads that snapshot, compares its actual bar-space geometry against the target slot, and only starts its enter animation once the delegate is truly in place; then the snapshot is cleared and normal layout resumes.
 
-**Tech Stack:** QML, Quickshell, `ListModel`, smoke harnesses under `tests/qml/`
 
 **Design doc:** `docs/plans/2026-03-15-bar-layout-slot-driven-arrival-design.md`
 
 ---
 
-### Task 1: Lock in a failing arrival snapshot smoke
 
 **Files:**
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write the failing test**
 
@@ -47,7 +44,6 @@ root._assert(secondWrapper.opacity <= 0.01,
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because the service does not yet expose arrival geometry and the wrapper still becomes visible while positioned at the docking origin.
@@ -67,7 +63,6 @@ Use the same command and expect the failure to move from missing API to missing 
 
 **Files:**
 - Modify: `services/BarLayoutService.qml`
-- Test: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Add transient arrival state**
 
@@ -107,12 +102,10 @@ Also clear arrival state from:
 - `applyJson()`
 - `removeWidget()` when applicable
 
-**Step 4: Run the targeted smoke**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: still FAIL because the wrapper has not yet started consuming the arrival snapshot.
@@ -128,11 +121,9 @@ Confirm arrival geometry remains transient runtime state and does not affect per
 **Files:**
 - Modify: `modules/bar/BarWidgetWrapper.qml`
 - Modify if needed: `modules/bar/BarSection.qml`
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write or tighten the failing assertions**
 
-Ensure the smoke now checks the full reveal gate:
 
 - before slot alignment: wrapper remains hidden
 - after slot alignment: wrapper becomes visible
@@ -144,7 +135,6 @@ Ensure the smoke now checks the full reveal gate:
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because the wrapper still starts its enter animation before slot alignment.
@@ -174,7 +164,6 @@ Only touch `BarSection.qml` if you need to remove an earlier transition-only wor
 
 **Step 4: Run test to verify it passes**
 
-Run the geometry smoke again.
 Expected: PASS.
 
 **Step 5: Quick self-review**
@@ -186,24 +175,18 @@ Confirm the wrapper still uses service geometry as truth and does not introduce 
 ### Task 4: Run focused and broader verification
 
 **Files:**
-- Verify: `tests/qml/BarLayoutGeometrySmoke.qml`
 - Verify: `services/BarLayoutService.qml`
 - Verify: `modules/bar/BarWidgetWrapper.qml`
 - Verify if touched: `modules/bar/BarSection.qml`
 
-**Step 1: Run targeted geometry smoke**
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: PASS.
 
-**Step 2: Run structural smoke suites**
 
 ```bash
-bash tests/run-settings-smoke.sh
-bash tests/run-ui-structure-smoke.sh
 ```
 
 Expected: PASS.
@@ -211,8 +194,6 @@ Expected: PASS.
 **Step 3: Run adjacent regression suites**
 
 ```bash
-bash tests/run-super-island-smoke.sh
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS.

@@ -180,12 +180,10 @@ That keeps the solution aligned with the bug that was actually reproduced.
 
 - If an arrival snapshot is missing, the wrapper falls back to the current normal enter path.
 - If a snapshot exists but the instance disappears, service reconciliation must remove it.
-- If the wrapper never reaches the expected slot due to some unexpected geometry failure, the implementation may use a conservative timeout fallback, but only if the smoke proves it is necessary.
 - Any such fallback must be documented and remain service-owned, not a local UI guess.
 
 ## Testing Strategy
 
-Extend `tests/qml/BarLayoutGeometrySmoke.qml` so the bug is expressed in structural terms.
 
 Required coverage:
 
@@ -197,11 +195,6 @@ Required coverage:
 
 Then run:
 
-- `timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml`
-- `bash tests/run-settings-smoke.sh`
-- `bash tests/run-ui-structure-smoke.sh`
-- `bash tests/run-super-island-smoke.sh`
-- `bash tests/run-media-control-smoke.sh`
 - `timeout 10 qs --path .`
 
 ## Affected Files
@@ -209,7 +202,6 @@ Then run:
 - `services/BarLayoutService.qml`
 - `modules/bar/BarWidgetWrapper.qml`
 - `modules/bar/BarSection.qml`
-- `tests/qml/BarLayoutGeometrySmoke.qml`
 
 ## Non-Goals
 

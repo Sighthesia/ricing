@@ -4,7 +4,6 @@
 
 **Architecture:** Use one durable baseline surface, one round-trip transient flow for important content, and one flash-only weak-hint path for window switching.
 
-**Tech Stack:** Quickshell QML, singleton services, `Theme.anim.*`, `NotificationService`, `MediaService`, `NiriService`, smoke-harness validation.
 
 ---
 
@@ -22,7 +21,6 @@ Implemented:
 - workspace number folded into the window hint
 - no standalone workspace content when no focused window exists
 - hot-update behavior for consecutive window changes
-- smoke regression coverage for round-trip behavior and latest-pending retention
 
 Still open:
 
@@ -83,7 +81,6 @@ Responsible for:
 - rendering the flash-only weak hint path for window switching
 - protecting against race conditions when a pending transient starts near the end of a return animation
 
-### `tests/qml/SuperIslandServiceSmoke.qml`
 
 Responsible for asserting:
 

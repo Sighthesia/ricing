@@ -166,7 +166,6 @@ This keeps the UX readable without reintroducing private geometry math in the UI
 
 ## Testing Strategy
 
-Extend `tests/qml/BarLayoutGeometrySmoke.qml` to verify both geometry layers explicitly.
 
 Required coverage:
 
@@ -178,11 +177,6 @@ Required coverage:
 
 Then run:
 
-- `timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml`
-- `bash tests/run-settings-smoke.sh`
-- `bash tests/run-ui-structure-smoke.sh`
-- `bash tests/run-super-island-smoke.sh`
-- `bash tests/run-media-control-smoke.sh`
 - `timeout 10 qs --path .`
 
 ## Affected Files
@@ -193,7 +187,6 @@ Then run:
 - `modules/bar/BarWidgetWrapper.qml`
 - `modules/bar/DragOverlay.qml`
 - `modules/bar/DropZone.qml`
-- `tests/qml/BarLayoutGeometrySmoke.qml`
 
 ## Non-Goals
 

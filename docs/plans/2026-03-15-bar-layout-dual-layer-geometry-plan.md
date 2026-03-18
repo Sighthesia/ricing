@@ -6,7 +6,6 @@
 
 **Architecture:** Keep `BarLayoutService` as the single geometry source of truth, but split each section into a full contiguous frame and an inner visual content band. `BarContent`, `BarSection`, `DragOverlay`, and `DropZone` consume frame geometry for outer layout and hit areas, while slot math and widget rendering continue to use visual geometry inside the frame.
 
-**Tech Stack:** QML, Quickshell, `ListModel`, smoke harnesses under `tests/qml/`
 
 **Design doc:** `docs/plans/2026-03-15-bar-layout-dual-layer-geometry-design.md`
 
@@ -15,7 +14,6 @@
 ### Task 1: Lock in full-width frame expectations
 
 **Files:**
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write the failing test**
 
@@ -41,7 +39,6 @@ root._assert(root._approxEqual(leftGeometry.right, centerGeometry.left, 0.5),
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because the current section geometry leaves frame gaps and the rendered `BarSection` items are still content-sized.
@@ -61,7 +58,6 @@ Use the same command and expect PASS once the service and section containers pub
 
 **Files:**
 - Modify: `services/BarLayoutService.qml`
-- Test: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Implement frame geometry separately from visual geometry**
 
@@ -82,12 +78,10 @@ while visual placement still comes from `_resolveVisualPlacement(...)`.
 Do not move `_slotGeometryOutput(...)` away from `visualLeft`.
 Slots should still represent where widgets actually line up inside the frame.
 
-**Step 3: Run the targeted smoke**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: still FAIL or partially pass until `BarContent` and `BarSection` consume the wider frame geometry.
@@ -108,11 +102,9 @@ Confirm these rules remain true:
 - Modify: `modules/bar/BarContent.qml`
 - Modify: `modules/bar/BarSection.qml`
 - Modify: `services/BarLayoutService.qml`
-- Test: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write or tighten the failing assertions**
 
-Extend the smoke if needed so it proves:
 
 - left, center, and right `BarSection` items use frame `x` and `width`
 - the internal widget row is offset by `visualLeft - left`
@@ -123,7 +115,6 @@ Extend the smoke if needed so it proves:
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL while `BarSection` still sizes itself from `widgetRow.implicitWidth` and insertion helpers still treat local coordinates as if the section starts at `visualLeft`.
@@ -147,7 +138,6 @@ In `BarLayoutService.qml`:
 
 **Step 4: Run test to verify it passes**
 
-Run the same geometry smoke again.
 Expected: PASS for frame coverage and insertion-alignment assertions.
 
 **Step 5: Quick self-review**
@@ -159,7 +149,6 @@ Confirm `modules/bar/` still consume service geometry rather than recomputing wi
 ### Task 4: Lock in stable arrival behavior for inserted widgets
 
 **Files:**
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 - Modify if needed: `modules/bar/BarWidgetWrapper.qml`
 - Modify if needed: `modules/bar/BarSection.qml`
 
@@ -185,7 +174,6 @@ root._assert(secondWrapper.x + 0.5 >= firstWrapper.x + firstWrapper.width,
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL if the arriving widget still expands from a centered docking point or from an ambiguous content-sized parent.
@@ -199,11 +187,9 @@ Preferred order:
 1. rely on the widened section frame and visual-row offset first
 2. if overlap still occurs, suppress only the first width animation for layout-mode arrivals so the delegate lands at its final slot width immediately while keeping enter opacity/scale motion
 
-Keep drag-time width collapse/expand behavior untouched unless the smoke proves it is the actual cause.
 
 **Step 4: Run test to verify it passes**
 
-Run the same geometry smoke again.
 Expected: PASS.
 
 **Step 5: Quick self-review**
@@ -215,26 +201,20 @@ Confirm the fix does not introduce a new private geometry cache or hardcoded tim
 ### Task 5: Run focused and broader verification
 
 **Files:**
-- Verify: `tests/qml/BarLayoutGeometrySmoke.qml`
 - Verify: `services/BarLayoutService.qml`
 - Verify: `modules/bar/BarContent.qml`
 - Verify: `modules/bar/BarSection.qml`
 - Verify: `modules/bar/BarWidgetWrapper.qml`
 - Verify: `modules/bar/DragOverlay.qml`
 
-**Step 1: Run targeted geometry smoke**
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: PASS.
 
-**Step 2: Run structural smoke suites**
 
 ```bash
-bash tests/run-settings-smoke.sh
-bash tests/run-ui-structure-smoke.sh
 ```
 
 Expected: PASS.
@@ -242,8 +222,6 @@ Expected: PASS.
 **Step 3: Run adjacent regression suites**
 
 ```bash
-bash tests/run-super-island-smoke.sh
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS.

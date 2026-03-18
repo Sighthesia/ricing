@@ -13,16 +13,13 @@ broader cleanup for a later iteration.
 
 The working tree already contains the main migration pieces:
 
-- repository-root `TestHarnessRunner.qml`
 - `tests/run-qml-harness.sh`
 - `modules/bar/widgetsettings/` rename
-- updated smoke scripts and selected harness imports
 
 What is still missing is a disciplined closeout pass. Until we run the narrow
 verification set, we do not know whether:
 
 - the old `widget-settings` warning is fully gone
-- the updated grouped smoke scripts still pass end-to-end
 - any remaining failures come from this migration or from unrelated warnings
 
 ## Chosen Approach
@@ -32,7 +29,6 @@ Use a minimal verification-first closeout.
 1. Run only the commands that directly prove the new harness path and renamed
    widget settings module.
 2. If a command fails, make the smallest possible repair in the root-runner,
-   `widgetsettings`, smoke-script, or directly related docs area.
 3. Re-run the same proof commands until they pass or expose a true architectural
    blocker.
 
@@ -47,9 +43,6 @@ Use a minimal verification-first closeout.
 
 ### In Scope
 
-- verifying `MediaControlSettingsSmoke` through the root runner
-- verifying `tests/run-media-control-smoke.sh`
-- verifying `tests/run-settings-smoke.sh`
 - verifying `timeout 10 qs --path .`
 - fixing only migration-adjacent issues uncovered by those commands
 - updating the relevant design and plan docs if the closeout findings change the
@@ -66,9 +59,6 @@ Use a minimal verification-first closeout.
 The proof commands are intentionally narrow:
 
 ```bash
-bash tests/run-qml-harness.sh MediaControlSettingsSmoke
-bash tests/run-media-control-smoke.sh
-bash tests/run-settings-smoke.sh
 timeout 10 qs --path .
 ```
 
@@ -79,8 +69,6 @@ participate in the root-runner or `widgetsettings` migration.
 
 After this closeout pass:
 
-- the root-runner-based widget settings smoke passes
-- grouped media and settings smoke scripts pass with the new entrypoint
 - root shell load no longer reports the `modules/bar/widget-settings` invalid
   module-name warning
 - the repository has a clear stopping point before any larger migration wave
@@ -90,9 +78,6 @@ After this closeout pass:
 The closeout proof was run with the exact commands in this document:
 
 ```bash
-bash tests/run-qml-harness.sh MediaControlSettingsSmoke
-bash tests/run-media-control-smoke.sh
-bash tests/run-settings-smoke.sh
 timeout 10 qs --path .
 ```
 

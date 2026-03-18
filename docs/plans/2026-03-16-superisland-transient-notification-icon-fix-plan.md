@@ -51,12 +51,10 @@ git commit -m "fix: reduce SuperIsland transient notification icon size to match
 ### Task 2: 运行SuperIsland服务烟雾测试
 
 **Files:**
-- Test: `tests/qml/SuperIslandServiceSmoke.qml`
 
 **Step 1: 运行烟雾测试**
 
 ```bash
-timeout 12 qs -p tests/qml/SuperIslandServiceSmoke.qml
 ```
 
 **Step 2: 检查测试结果**
@@ -72,7 +70,6 @@ timeout 12 qs -p tests/qml/SuperIslandServiceSmoke.qml
 如果测试通过，可以提交测试结果记录
 
 ```bash
-git add tests/qml/SuperIslandServiceSmoke.qml
 git commit -m "test: verify SuperIsland transient notification icon fix"
 ```
 
@@ -139,7 +136,6 @@ grep -n "primaryIconSize" modules/bar/superisland/IslandMediaCard.qml
 **Step 1: 运行SuperIsland烟雾测试套件**
 
 ```bash
-bash tests/run-super-island-smoke.sh
 ```
 
 **Step 2: 检查测试结果**

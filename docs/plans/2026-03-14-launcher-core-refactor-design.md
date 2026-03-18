@@ -12,7 +12,6 @@ This wave stays deliberately low-risk:
 - keep `LauncherPanel` as the public shell-facing entry
 - keep `LauncherService` and provider APIs unchanged
 - keep search behavior and keyboard interactions unchanged
-- keep verification anchored in structure smoke plus full-shell load checks
 
 ---
 
@@ -143,8 +142,6 @@ Verification stays focused on stable external behavior.
 
 ### Reused Guardrail
 
-Extend `tests/qml/LauncherStructureSmoke.qml` instead of creating a new complex
-integration harness. The smoke should continue proving that:
 
 - `LauncherPanel` loads successfully
 - `LauncherService.toggle()` still opens the launcher

@@ -384,7 +384,6 @@ cp config/settings-default.json ~/.config/dymicshell/settings.json
 
 ```bash
 git add -A
-git commit -m "feat(settings): complete settings system integration and smoke test"
 ```
 
 ---

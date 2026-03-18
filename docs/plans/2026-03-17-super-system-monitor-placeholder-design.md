@@ -66,7 +66,6 @@ abstraction during a debug-driven stopgap iteration.
 
 ### Validation Strategy
 
-Add a narrow smoke harness that proves three things:
 
 1. `BarContent.qml` exposes the runtime registry entry
 2. `WidgetPickerWindow.qml` exposes the mirrored picker entry
@@ -90,8 +89,6 @@ This is the smallest automated proof that turns “not in the library” into
 - create `modules/bar/widgets/SuperSystemMonitorWidget.qml`
 - register `superSystemMonitor` in `BarContent.qml`
 - register `superSystemMonitor` in `WidgetPickerWindow.qml`
-- add a smoke harness for placeholder availability and insertion
-- run the nearest widget/picker/settings smoke coverage needed to verify the change
 
 ### Out of Scope
 
@@ -109,7 +106,6 @@ the main failure modes are structural:
 - bad QML source path
 - widget loads in one place but not the other
 
-The smoke test should catch these by asserting both registries and the runtime
 layout insertion path.
 
 ## Verification Strategy
@@ -117,8 +113,6 @@ layout insertion path.
 The narrow proof should include:
 
 ```bash
-bash tests/run-qml-harness.sh SuperSystemMonitorAvailabilitySmoke
-bash tests/run-settings-smoke.sh
 timeout 10 qs --path .
 ```
 

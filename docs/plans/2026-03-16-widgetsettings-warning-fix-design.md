@@ -4,7 +4,6 @@
 
 This design removes the recurring Quickshell scanner warning caused by the
 `modules/bar/widget-settings` directory name and repairs the root-runner entry
-for widget-settings smoke coverage.
 
 ## Problem
 
@@ -15,7 +14,6 @@ Module path contains invalid characters for a module name: "/modules/bar/widget-
 ```
 
 That warning is not just cosmetic. The same hyphenated directory also makes the
-root-runner form of `MediaControlSettingsSmoke.qml` fail because the harness
 still enters through `tests/qml/modules/bar/widget-settings`, then resolves
 `../settings` relative to the mirrored test tree instead of the real source
 tree.
@@ -45,7 +43,6 @@ real import sites.
 ### Files Affected
 
 - `modules/bar/WidgetSettingsPanel.qml`
-- `tests/qml/MediaControlSettingsSmoke.qml`
 - all files physically moved from `modules/bar/widgetsettings/` to
   `modules/bar/widgetsettings/`
 - docs and plans that reference the old directory path
@@ -57,7 +54,6 @@ real import sites.
 - rename the directory
 - update imports and harness entrypoints that reference it
 - verify the warning disappears from root shell load
-- verify widget-settings smoke still passes
 
 ### Out of Scope
 
@@ -70,9 +66,6 @@ real import sites.
 The key proof commands are:
 
 ```bash
-bash tests/run-qml-harness.sh MediaControlSettingsSmoke
-bash tests/run-media-control-smoke.sh
-bash tests/run-settings-smoke.sh
 timeout 10 qs --path .
 ```
 
@@ -84,7 +77,6 @@ module-name warning.
 After this change:
 
 - the invalid module-name warning disappears
-- widget-settings smoke works through the root runner
 - imports point at a toolchain-friendly directory name
 
 ## Verification Status
@@ -92,9 +84,6 @@ After this change:
 Verified in the repository root with:
 
 ```bash
-bash tests/run-qml-harness.sh MediaControlSettingsSmoke
-bash tests/run-media-control-smoke.sh
-bash tests/run-settings-smoke.sh
 timeout 10 qs --path .
 ```
 

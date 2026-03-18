@@ -251,7 +251,6 @@ git commit -m "feat(clipboard): add ClipboardProvider for launcher integration"
 
 ---
 
-### Task 4: Manual smoke test
 
 **Step 1: Verify cliphist is available**
 

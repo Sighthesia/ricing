@@ -188,7 +188,6 @@ qs -p . 2>&1 | rg "error|Error|ReferenceError|TypeError|WARN scene" -n
 ```
 Expected: no new warnings/errors from modified files.
 
-**Step 3: Manual smoke checklist**
 - Settings panel (including About) full stagger.
 - Widget picker grid card stagger + viewport enter.
 - Context menu unchanged behavior with orchestrated stagger.

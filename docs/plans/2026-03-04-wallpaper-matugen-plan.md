@@ -628,7 +628,6 @@ git commit -m "feat(settings): add wallpaper and matugen UI to AppearancePage"
 
 ---
 
-## Task 6: Integration Smoke Test
 
 **Goal:** End-to-end test: set a real wallpaper path with matugen installed.
 

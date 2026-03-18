@@ -160,11 +160,9 @@ Implemented in:
 - `modules/bar/widgets/SuperIslandWidget.qml`
 - `services/MediaService.qml`
 - `modules/bar/superisland/*.qml`
-- `tests/qml/SuperIslandServiceSmoke.qml`
 
 Current implementation also includes:
 
-- a smoke harness for round-trip behavior
 - a latest-pending assertion for primary transients
 - a buffer to prevent pending start from racing the return animation
 - a widget-side baseline guard so pending transitions do not accidentally use the previous transient as flash source

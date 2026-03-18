@@ -6,16 +6,13 @@
 
 **Architecture:** Keep `services/BarLayoutService.qml` as the single source of truth for runtime slot geometry. Extend the existing transient arrival snapshot into an overlay-arrival actor contract, render that contract in `modules/bar/DragOverlay.qml`, and gate `modules/bar/BarWidgetWrapper.qml` until the overlay actor finishes and clears the snapshot.
 
-**Tech Stack:** QML, Quickshell, `ListModel`, smoke harnesses under `tests/qml/`
 
 **Design doc:** `docs/plans/2026-03-15-bar-layout-overlay-arrival-design.md`
 
 ---
 
-### Task 1: Replace the current arrival smoke with an overlay-handoff smoke
 
 **Files:**
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write the failing assertions for service actor state**
 
@@ -38,7 +35,6 @@ root._assert(firstArrivingWrapper.opacity <= 0.01,
 
 **Step 2: Write the failing assertions for overlay ownership**
 
-In the same smoke flow, locate the arrival actor item inside `DragOverlay` and assert:
 
 - an arrival actor item exists while the snapshot is active
 - the actor is visible
@@ -46,17 +42,14 @@ In the same smoke flow, locate the arrival actor item inside `DragOverlay` and a
 
 Do not assert exact animation curves or durations.
 
-**Step 3: Run the smoke and verify RED**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because `DragOverlay` does not yet render an arrival actor and the current code still clears arrival state from the real delegate path.
 
-**Step 4: Keep the smoke structural**
 
 Make the test prove only the contract:
 
@@ -74,7 +67,6 @@ Do not lock the test to a particular easing curve, scale value, or timer length.
 
 **Files:**
 - Modify: `services/BarLayoutService.qml`
-- Test: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Preserve the current public entry point unless a rename is intentional**
 
@@ -131,12 +123,10 @@ Also clear the arrival snapshot from:
 
 If the removed widget is the active actor instance, cleanup must happen in the same code path.
 
-**Step 5: Run the smoke and verify the failure moved forward**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: still FAIL, but now for missing overlay rendering or missing handoff behavior rather than missing service state.
@@ -147,23 +137,18 @@ Expected: still FAIL, but now for missing overlay rendering or missing handoff b
 
 **Files:**
 - Modify: `modules/bar/DragOverlay.qml`
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 
-**Step 1: Tighten the failing smoke around overlay rendering**
 
-Add or update assertions so the smoke proves:
 
 - the arrival actor is rendered from `DragOverlay`
 - it uses the inserted widget's source from `widgetRegistry`
 - it is positioned from `barLeft` and `barWidth`
 - it disappears after handoff
 
-**Step 2: Run the smoke and verify RED**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because the overlay actor item does not exist yet.
@@ -188,9 +173,7 @@ When the actor finishes its short reveal/settle:
 
 If the widget source fails to load, clear the snapshot and fall back to the real delegate path instead of leaving the widget hidden.
 
-**Step 5: Run the smoke and verify the failure moved again**
 
-Run the same smoke command.
 
 Expected: FAIL, but now because the real delegate still reveals too early or does not wait for overlay completion.
 
@@ -200,24 +183,20 @@ Expected: FAIL, but now because the real delegate still reveals too early or doe
 
 **Files:**
 - Modify: `modules/bar/BarWidgetWrapper.qml`
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 - Modify if needed: `modules/bar/BarSection.qml`
 
 **Step 1: Tighten the failing handoff assertions**
 
-Make `tests/qml/BarLayoutGeometrySmoke.qml` prove the full reveal order:
 
 - while `arrivalGeometry(instanceKey)` is active, the real wrapper is hidden
 - when the overlay actor completes, the snapshot is cleared or marked inactive
 - only after that does the wrapper run its normal reveal
 - the revealed wrapper does not overlap the previously placed left widget
 
-**Step 2: Run the smoke and verify RED**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because `BarWidgetWrapper.qml` still owns arrival clearing inside `tryStartEnterAnimation()`.
@@ -241,12 +220,10 @@ Once the arrival snapshot is gone or inactive:
 
 If `modules/bar/BarSection.qml` contains leftover transition work added only to fight `Row.add` timing, remove or simplify it in the same task.
 
-**Step 5: Run the smoke and verify GREEN**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: PASS.
@@ -256,25 +233,19 @@ Expected: PASS.
 ### Task 5: Verify teardown, reset, and adjacent regressions
 
 **Files:**
-- Verify: `tests/qml/BarLayoutGeometrySmoke.qml`
 - Verify: `services/BarLayoutService.qml`
 - Verify: `modules/bar/DragOverlay.qml`
 - Verify: `modules/bar/BarWidgetWrapper.qml`
 - Verify if touched: `modules/bar/BarSection.qml`
 
-**Step 1: Re-run the targeted geometry smoke**
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: PASS.
 
-**Step 2: Run structural smoke suites**
 
 ```bash
-bash tests/run-settings-smoke.sh
-bash tests/run-ui-structure-smoke.sh
 ```
 
 Expected: PASS.
@@ -282,8 +253,6 @@ Expected: PASS.
 **Step 3: Run adjacent regression suites**
 
 ```bash
-bash tests/run-super-island-smoke.sh
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS.

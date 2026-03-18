@@ -10,7 +10,6 @@ The current root guidance lists commands, but it does not tell an agent how to c
 
 That gap leads to an expensive failure mode:
 
-- agents jump straight to high-level smoke harnesses
 - failures mix together service-contract bugs, module wiring bugs, and test-observation bugs
 - TDD becomes slow because the first RED is too broad
 
@@ -46,7 +45,6 @@ It should not try to replace all existing development-process skills. It only an
 Add only:
 
 - a short note in the testing section that agents must load the repo-local QML testing skill for QML features, bugfixes, or behavior changes
-- a short note that agents should select the smallest harness that proves the change before escalating to broader smoke suites
 
 Do not duplicate the full decision tree in `AGENTS.md`.
 
@@ -105,12 +103,8 @@ This is the main section.
 
 Recommended ladder:
 
-1. service/contract harness or closest focused smoke
-2. module structure or wiring smoke
-3. feature smoke for the affected subsystem
 4. full-shell load check
 
-The key teaching point is that high-level smokes are acceptance checks, not the default development driver.
 
 #### Change Type Mapping
 
@@ -118,10 +112,6 @@ Map common change types to concrete repo commands.
 
 Examples:
 
-- geometry, slot ordering, drag/drop, arrival handoff -> `timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml`
-- settings or panel structure changes -> `bash tests/run-settings-smoke.sh` and/or `bash tests/run-ui-structure-smoke.sh`
-- super island changes -> `bash tests/run-super-island-smoke.sh`
-- media control changes -> `bash tests/run-media-control-smoke.sh`
 - repository-wide confidence check -> `timeout 10 qs --path .`
 
 #### Verification Before Claiming Success
@@ -138,13 +128,10 @@ Examples:
 
 Call out the failure modes this change is meant to prevent:
 
-- starting with an end-to-end smoke when a focused harness exists
 - asserting unstable local coordinates instead of service-owned contracts
-- treating a passing broad smoke as proof that the correct layer was tested
 
 ## Why This Design Fits The Repo
 
-This repository already centralizes runtime behavior in services and validates behavior through smoke harnesses.
 
 The missing piece is not more commands. It is a routing rule for those commands.
 
@@ -161,4 +148,3 @@ The change is successful when:
 - `AGENTS.md` stays concise and points to the skill instead of duplicating it
 - the new skill tells agents which test layer to use first
 - the skill maps common QML change types to repository commands
-- future QML work is less likely to default to the heaviest smoke first

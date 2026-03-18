@@ -114,7 +114,6 @@ No module under `modules/bar/` should add its own persistent geometry cache to c
 
 ## Testing Strategy
 
-Extend `tests/qml/BarLayoutGeometrySmoke.qml` with teardown-specific assertions that prove the dual-guard contract.
 
 Required coverage:
 
@@ -125,15 +124,9 @@ Required coverage:
 
 Verification order:
 
-1. `timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml`
-2. `bash tests/run-settings-smoke.sh`
-3. `bash tests/run-ui-structure-smoke.sh`
-4. `bash tests/run-super-island-smoke.sh`
-5. `bash tests/run-media-control-smoke.sh`
 6. `timeout 10 qs --path .`
 
 ## Affected Files
 
 - `services/BarLayoutService.qml`
 - `modules/bar/BarWidgetWrapper.qml`
-- `tests/qml/BarLayoutGeometrySmoke.qml`

@@ -816,7 +816,6 @@ git commit -m "feat(picker): persist last-browsed wallpaper directory to setting
 
 ---
 
-## Task 9: End-to-end Smoke Test
 
 **Goal:** Confirm all pieces work together with no regressions.
 

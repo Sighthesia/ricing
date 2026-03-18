@@ -6,7 +6,6 @@
 
 **Architecture:** Keep the approved dual-guard contract. `BarWidgetWrapper` eagerly clears the last width it reported when a delegate goes away or changes identity, while `BarLayoutService` reconciles all geometry-facing caches against the current `layoutModel` and clears active drag state when the dragged instance disappears.
 
-**Tech Stack:** QML, Quickshell, `ListModel`, smoke harnesses under `tests/qml/`
 
 **Design doc:** `docs/plans/2026-03-15-bar-layout-geometry-teardown-safety-design.md`
 
@@ -15,7 +14,6 @@
 ### Task 1: Lock in delegate-destruction cleanup
 
 **Files:**
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 - Modify if needed: `modules/bar/BarWidgetWrapper.qml`
 
 **Step 1: Write the failing test**
@@ -34,7 +32,6 @@ root._assert(BarLayoutService.measuredWidthForInstance(clockInstanceKey) === 0,
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because the destroyed delegate still leaves a cached width behind.
@@ -62,7 +59,6 @@ if (wrapper._reportedInstanceKey && wrapper._reportedInstanceKey !== wrapper.ins
 
 **Step 4: Run test to verify it passes**
 
-Run the same smoke again and expect PASS for the delegate-destruction assertion.
 
 **Step 5: Quick self-review**
 
@@ -73,12 +69,10 @@ Confirm `BarWidgetWrapper.qml` still only reports lifecycle events and does not 
 ### Task 2: Lock in model-removal and drag cleanup
 
 **Files:**
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 - Modify: `services/BarLayoutService.qml`
 
 **Step 1: Write the failing test**
 
-Add or tighten assertions around `removeWidget(instanceKey)` so the smoke proves all three outcomes:
 
 - `measuredWidthForInstance(instanceKey) === 0`
 - `sectionSlots(sectionName)` no longer contains the removed key
@@ -89,7 +83,6 @@ Add or tighten assertions around `removeWidget(instanceKey)` so the smoke proves
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because at least one stale cache entry or drag reference survives the removal.
@@ -115,7 +108,6 @@ Call that helper from the geometry recompute path so slot output is rebuilt from
 
 **Step 4: Run test to verify it passes**
 
-Run the geometry smoke again and expect PASS for removal and drag-cleanup assertions.
 
 **Step 5: Quick self-review**
 
@@ -126,7 +118,6 @@ Confirm `services/BarLayoutService.qml` is still the only long-lived owner of ge
 ### Task 3: Lock in hot-reload-style model replacement
 
 **Files:**
-- Modify: `tests/qml/BarLayoutGeometrySmoke.qml`
 - Modify if needed: `services/BarLayoutService.qml`
 
 **Step 1: Write the failing test**
@@ -144,7 +135,6 @@ Assert that the replaced-away key no longer exists in:
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because stale geometry survives model replacement.
@@ -166,7 +156,6 @@ Minimal implementation points:
 
 **Step 4: Run test to verify it passes**
 
-Run the geometry smoke again and expect PASS for the hot-reload replacement case.
 
 **Step 5: Quick self-review**
 
@@ -177,23 +166,17 @@ Confirm the hot-reload path does not add ad-hoc timers or UI-local recovery code
 ### Task 4: Run focused and broader verification
 
 **Files:**
-- Verify: `tests/qml/BarLayoutGeometrySmoke.qml`
 - Verify: `services/BarLayoutService.qml`
 - Verify: `modules/bar/BarWidgetWrapper.qml`
 
-**Step 1: Run targeted geometry smoke**
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: PASS.
 
-**Step 2: Run structural smoke suites**
 
 ```bash
-bash tests/run-settings-smoke.sh
-bash tests/run-ui-structure-smoke.sh
 ```
 
 Expected: PASS.
@@ -201,8 +184,6 @@ Expected: PASS.
 **Step 3: Run adjacent regression suites**
 
 ```bash
-bash tests/run-super-island-smoke.sh
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS.

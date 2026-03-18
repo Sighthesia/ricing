@@ -349,9 +349,7 @@ micro-pulse.
 - verify blank-space click opens panel
 - verify panel closes cleanly and preserves playback controls
 
-### Smoke Validation
 
-Add a focused QML smoke harness similar to the SuperIsland smoke harness for:
 
 - stable media render
 - new-media announcement lifecycle

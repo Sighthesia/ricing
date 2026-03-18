@@ -11,9 +11,6 @@ AnimatedPanelBase {
 
     readonly property var _closeButton: _closeButtonSurface
     readonly property bool _usesCenteredPlacement: true
-    readonly property bool _isWidgetPickerBareHarness:
-        Quickshell.env("DYMICSHELL_TEST_HARNESS") === "WidgetPickerWindowBareSmoke"
-
     // Position below the bar; without left/right anchoring, the compositor keeps the panel centered.
     anchors { top: true }
     margins { top: Theme.barHeight }
@@ -276,9 +273,7 @@ AnimatedPanelBase {
                                          Loader {
                                              id: widgetLoader
                                              anchors.centerIn: parent
-                                             source: root._isWidgetPickerBareHarness && modelData === "notificationBell"
-                                                 ? ""
-                                                 : (root.widgetRegistry[modelData] || "")
+                                              source: root.widgetRegistry[modelData] || ""
                                              transform: Scale {
                                                  xScale: 0.65
                                                  yScale: 0.65

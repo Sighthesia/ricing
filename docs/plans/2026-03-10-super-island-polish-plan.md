@@ -6,28 +6,21 @@
 
 **Architecture:** Keep event arbitration in `SuperIslandService.qml` and limit this work to rendering, widget settings UI, and regression coverage. The animation fix should move restore width changes onto the same explicit timeline as pill height collapse instead of relying on delayed layout behavior.
 
-**Tech Stack:** Quickshell QML, singleton settings, widget settings panel, smoke-harness regression tests
 
 ---
 
-### Task 1: Add failing smoke coverage for polish regressions
 
 **Files:**
-- Modify: `tests/qml/SuperIslandServiceSmoke.qml`
-- Modify: `tests/run-super-island-smoke.sh`
 
 **Step 1: Write failing assertions for media top padding and hint/source visibility toggles**
 
-Add smoke checks that prove:
 
 - media content in the main Pill keeps top padding from the widget edge
 - disabling `showMedia` suppresses media event rendering
 - disabling `showNotifications` suppresses notification event rendering
 - disabling `showWorkspaceEvents` suppresses window/workspace hint rendering
 
-**Step 2: Run smoke harness to verify failure**
 
-Run: `bash tests/run-super-island-smoke.sh`
 Expected: FAIL on the newly added assertions before implementation.
 
 ### Task 2: Fix media card geometry and artwork shape
@@ -49,9 +42,7 @@ Adjust the main Pill clip/container so media content no longer sits against the 
 
 Use a circular mask/container so album art is shown as a round crop instead of a rounded rectangle.
 
-**Step 4: Re-run smoke harness**
 
-Run: `bash tests/run-super-island-smoke.sh`
 Expected: media padding/artwork checks pass.
 
 ### Task 3: Synchronize restore width and height collapse
@@ -61,15 +52,12 @@ Expected: media padding/artwork checks pass.
 
 **Step 1: Add a failing regression assertion for restore timing**
 
-Expose or observe a render-state value in the smoke harness that can distinguish simultaneous width/height collapse from sequential collapse.
 
 **Step 2: Replace delayed width-only settle behavior with an explicit restore animation**
 
 Make the returning phase animate width on the same timeline as `_pillCollapseAnim` so both axes contract together.
 
-**Step 3: Re-run smoke harness**
 
-Run: `bash tests/run-super-island-smoke.sh`
 Expected: restore-timing assertion passes.
 
 ### Task 4: Add Super Island widget settings section
@@ -96,11 +84,8 @@ Show it when the active widget id is `superIsland`, matching the existing worksp
 
 Confirm the settings adapter and defaults still serialize correctly.
 
-**Step 4: Re-run smoke harness and error checks**
 
-Run: `bash tests/run-super-island-smoke.sh`
 Run: editor/QML error scan on touched files.
-Expected: no new QML errors and smoke passes.
 
 ### Task 5: Sync docs with the final behavior
 

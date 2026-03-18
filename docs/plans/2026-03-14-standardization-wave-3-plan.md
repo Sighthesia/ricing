@@ -1,27 +1,20 @@
-# UI Structure Smoke Wave 3 Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add low-risk structure smoke coverage for notifications and launcher UI surfaces, plus a grouped runner and agent guidance updates.
 
-**Architecture:** Keep this wave at the structure layer only: instantiate notification and launcher surfaces inside standalone smoke harnesses, assert their stable public geometry/state contracts, and avoid live DBus, app-launch, or clipboard integration. Reuse the existing `tests/qml/` harness pattern and add a dedicated runner so agents can validate these UI modules without loading the whole shell.
 
-**Tech Stack:** QML, Quickshell, `tests/qml/` smoke harnesses, `NotificationService`, `LauncherService`, `AnimatedPanelBase`, `AGENTS.md`.
 
 ---
 
 ### Task 1: Prove the new harnesses are missing
 
 **Files:**
-- Create: `tests/qml/NotificationStructureSmoke.qml`
-- Create: `tests/qml/LauncherStructureSmoke.qml`
 
 **Step 1: Run missing notification harness**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/NotificationStructureSmoke.qml
 ```
 
 Expected: FAIL because the file does not exist yet.
@@ -31,17 +24,14 @@ Expected: FAIL because the file does not exist yet.
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
 ```
 
 Expected: FAIL because the file does not exist yet.
 
 ---
 
-### Task 2: Add notification structure smoke coverage
 
 **Files:**
-- Create: `tests/qml/NotificationStructureSmoke.qml`
 
 **Step 1: Write the harness**
 
@@ -61,24 +51,19 @@ The harness should seed `NotificationService.activeList` and `NotificationServic
 - history panel `active` follows `BarLayoutService.notificationHistoryOpen`
 - `NotificationService.markAllSeen`, `clearHistory`, and `removeFromHistory` exist as functions
 
-Finish by logging `NotificationStructure smoke test passed` and quitting.
 
 **Step 2: Run the harness**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/NotificationStructureSmoke.qml
 ```
 
-Expected: PASS with `NotificationStructure smoke test passed`.
 
 ---
 
-### Task 3: Add launcher structure smoke coverage
 
 **Files:**
-- Create: `tests/qml/LauncherStructureSmoke.qml`
 
 **Step 1: Write the harness**
 
@@ -95,24 +80,20 @@ Assert only low-risk structure and API contracts:
 
 Avoid asserting live provider results because `DesktopEntries` and clipboard integration are environment-dependent.
 
-Finish by logging `LauncherStructure smoke test passed` and quitting.
 
 **Step 2: Run the harness**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
 ```
 
-Expected: PASS with `LauncherStructure smoke test passed`.
 
 ---
 
 ### Task 4: Add grouped UI structure runner
 
 **Files:**
-- Create: `tests/run-ui-structure-smoke.sh`
 
 **Step 1: Write the runner**
 
@@ -123,8 +104,6 @@ Create a Bash runner using the existing pattern:
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-timeout 12 qs -p tests/qml/NotificationStructureSmoke.qml
-timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
 ```
 
 **Step 2: Run the grouped runner**
@@ -132,29 +111,22 @@ timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
 Run:
 
 ```bash
-bash tests/run-ui-structure-smoke.sh
 ```
 
-Expected: PASS and print both smoke success messages.
 
 ---
 
-### Task 5: Update agent guidance for the new smoke path
 
 **Files:**
 - Modify: `AGENTS.md`
 
-**Step 1: Add grouped smoke command**
 
-Add `bash tests/run-ui-structure-smoke.sh` to the full smoke suite list.
 
 **Step 2: Add single harness commands**
 
 Add:
 
 ```bash
-timeout 12 qs -p tests/qml/NotificationStructureSmoke.qml
-timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
 ```
 
 Keep the existing `tests/qml/{config,services,modules}` prerequisite note intact.
@@ -165,24 +137,15 @@ Keep the existing `tests/qml/{config,services,modules}` prerequisite note intact
 
 **Files:**
 - Modify: `AGENTS.md`
-- Create: `tests/qml/NotificationStructureSmoke.qml`
-- Create: `tests/qml/LauncherStructureSmoke.qml`
-- Create: `tests/run-ui-structure-smoke.sh`
 
-**Step 1: Run grouped UI structure smoke**
 
 ```bash
-bash tests/run-ui-structure-smoke.sh
 ```
 
 Expected: PASS.
 
-**Step 2: Run existing smoke suites**
 
 ```bash
-bash tests/run-settings-smoke.sh
-bash tests/run-super-island-smoke.sh
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS.

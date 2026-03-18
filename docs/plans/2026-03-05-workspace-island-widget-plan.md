@@ -506,7 +506,6 @@ feat(widgets): WorkspaceWidget v2 — focus layer with icon and animated title p
 
 ---
 
-### Task 6: Smoke-test checklist
 
 Run `qs --path .` and manually verify each scenario:
 

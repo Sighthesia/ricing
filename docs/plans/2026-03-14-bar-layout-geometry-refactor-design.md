@@ -181,9 +181,7 @@ That keeps picker targeting aligned with what the user sees, especially when sec
 
 ## Testing Strategy
 
-This refactor needs smoke coverage focused on structure and geometry contracts rather than only visual intuition.
 
-Add or extend smoke tests to verify:
 
 - `BarLayoutService` exposes shared geometry state for section boundaries and slot metadata
 - center-region logic stays visually centered under asymmetric widths
@@ -193,10 +191,6 @@ Add or extend smoke tests to verify:
 
 Then run:
 
-- `bash tests/run-settings-smoke.sh`
-- `bash tests/run-ui-structure-smoke.sh`
-- `bash tests/run-super-island-smoke.sh`
-- `bash tests/run-media-control-smoke.sh`
 - `timeout 10 qs --path .`
 
 ## Affected Files
@@ -208,7 +202,6 @@ Then run:
 - `modules/bar/DragOverlay.qml`
 - `modules/bar/DropZone.qml`
 - `modules/bar/BarWindow.qml`
-- related smoke harnesses under `tests/qml/`
 - matching runner updates in `tests/run-*.sh` if new harnesses are introduced
 
 ## Non-Goals

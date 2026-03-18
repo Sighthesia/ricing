@@ -6,18 +6,15 @@
 
 **Architecture:** Keep `LauncherCore.qml` as the coordinator for provider routing, deferred result swapping, and selection state. Extract a search-header component and a results-list component so input rendering and row rendering stop living in the same file, while `LauncherPanel.qml`, `LauncherService.qml`, and provider interfaces stay unchanged.
 
-**Tech Stack:** QML, Quickshell, `LauncherService`, `ApplicationsProvider`, `ClipboardProvider`, `tests/qml/LauncherStructureSmoke.qml`.
 
 ---
 
 ### Task 1: Add a failing structural assertion for the refactored launcher internals
 
 **Files:**
-- Modify: `tests/qml/LauncherStructureSmoke.qml`
 
 **Step 1: Write the failing assertion**
 
-Extend `tests/qml/LauncherStructureSmoke.qml` so that after `LauncherPanel` loads it also asserts that the panel's core exposes dedicated child objects for the extracted header and results list. The assertion should target stable object names or ids that will exist after refactoring.
 
 Use a pattern like:
 
@@ -32,12 +29,10 @@ root._assert(core._resultsList !== null,
 
 Adjust the exact access path to match the real object tree once inspected, but keep the test focused on structural presence rather than behavior.
 
-**Step 2: Run the smoke to verify it fails**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
 ```
 
 Expected: FAIL because the extracted child components do not exist yet.
@@ -49,7 +44,6 @@ Expected: FAIL because the extracted child components do not exist yet.
 **Files:**
 - Create: `modules/launcher/LauncherSearchHeader.qml`
 - Modify: `modules/launcher/LauncherCore.qml`
-- Test: `tests/qml/LauncherStructureSmoke.qml`
 
 **Step 1: Create `LauncherSearchHeader.qml`**
 
@@ -84,12 +78,10 @@ Preserve these behaviors exactly:
 - return still activates the current item
 - escape still closes the launcher
 
-**Step 3: Run the smoke to verify the partial refactor**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
 ```
 
 Expected: still FAIL on the results-list assertion, but the search-header assertion should now pass.
@@ -101,7 +93,6 @@ Expected: still FAIL on the results-list assertion, but the search-header assert
 **Files:**
 - Create: `modules/launcher/LauncherResultsList.qml`
 - Modify: `modules/launcher/LauncherCore.qml`
-- Test: `tests/qml/LauncherStructureSmoke.qml`
 
 **Step 1: Create `LauncherResultsList.qml`**
 
@@ -131,15 +122,12 @@ Do not move these responsibilities out of the coordinator:
 
 Only update `LauncherCore.qml` so it renders `LauncherResultsList` instead of the inline list block and routes signals to the existing coordinator methods.
 
-**Step 3: Run the smoke to verify it passes**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
 ```
 
-Expected: PASS with `LauncherStructure smoke test passed`.
 
 ---
 
@@ -170,12 +158,10 @@ Keep private names prefixed with `_`.
 
 Ensure the extracted components stay presentation-focused and avoid duplicate coordinator logic.
 
-**Step 3: Re-run launcher smoke**
 
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/LauncherStructureSmoke.qml
 ```
 
 Expected: PASS.
@@ -188,22 +174,15 @@ Expected: PASS.
 - Verify: `modules/launcher/LauncherCore.qml`
 - Verify: `modules/launcher/LauncherSearchHeader.qml`
 - Verify: `modules/launcher/LauncherResultsList.qml`
-- Verify: `tests/qml/LauncherStructureSmoke.qml`
 
-**Step 1: Run grouped UI structure smoke**
 
 ```bash
-bash tests/run-ui-structure-smoke.sh
 ```
 
 Expected: PASS.
 
-**Step 2: Run existing smoke suites**
 
 ```bash
-bash tests/run-settings-smoke.sh
-bash tests/run-super-island-smoke.sh
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS.

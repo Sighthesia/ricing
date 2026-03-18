@@ -19,8 +19,6 @@ Singleton {
             : Quickshell.env("XDG_CONFIG_HOME"))
         + "/dymicshell/"
     readonly property string settingsFile: configDir + "settings.json"
-    readonly property bool _isHarnessRun: Quickshell.env("DYMICSHELL_TEST_HARNESS") !== ""
-
     property bool isLoaded: false
 
     // Emitted once on initial load, after each debounced write, and on hot-reload
@@ -192,7 +190,7 @@ Singleton {
     FileView {
         id: settingsFileView
         path: root.settingsFile
-        watchChanges: !root._isHarnessRun
+        watchChanges: true
         onFileChanged: reload()
         onLoaded: _loadFromText(text())
         onLoadFailed: _writeSettings

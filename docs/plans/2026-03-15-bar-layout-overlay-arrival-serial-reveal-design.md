@@ -134,7 +134,6 @@ At the end of the wrapper's normal enter animation:
 
 ## Testing Impact
 
-Update `tests/qml/BarLayoutGeometrySmoke.qml` to assert serial semantics explicitly:
 
 - both inserted instances can have active overlay actors initially
 - the later instance remains hidden while the earlier reveal token is still in flight
@@ -142,7 +141,6 @@ Update `tests/qml/BarLayoutGeometrySmoke.qml` to assert serial semantics explici
 - the second wrapper begins reveal only after the first wrapper completes and the baton advances
 - no first-visible overlap occurs between adjacent inserted widgets
 
-The smoke should stop assuming simultaneous handoff budgets.
 Its wait window should account for two serial delegate enters within the same section.
 
 ## Non-Goals

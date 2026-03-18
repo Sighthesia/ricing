@@ -387,7 +387,6 @@ feat(bar): show WorkspaceWidgetSection in WidgetSettingsPanel functional group
 
 ---
 
-### Task 5: Smoke-test checklist
 
 Run `qs --path .` and verify:
 

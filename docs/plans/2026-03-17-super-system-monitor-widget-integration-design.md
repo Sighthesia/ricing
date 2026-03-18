@@ -23,7 +23,6 @@ The dedicated branch/worktree already contains backend-oriented pieces:
 - `services/SystemMonitorService.qml`
 - `services/SettingsService.qml` schema additions
 - `config/settings-default.json` additions
-- service/settings smoke harnesses
 
 This side already models the monitoring domain:
 
@@ -41,7 +40,6 @@ The current workspace already contains the missing product entrypoints:
 - `modules/bar/widgets/SuperSystemMonitorWidget.qml`
 - registry wiring in `modules/bar/BarContent.qml`
 - picker wiring in `modules/bar/WidgetPickerWindow.qml`
-- `tests/qml/SuperSystemMonitorAvailabilitySmoke.qml`
 
 This side solves discoverability and insertion, but not real rendering.
 
@@ -148,18 +146,11 @@ BrightnessService    ┘
 - `services/SettingsService.qml`
 - `config/settings-default.json`
 - `null/dymicshell/settings.json`
-- `tests/qml/SystemMetricsServiceSmoke.qml`
-- `tests/qml/AudioDeviceServiceSmoke.qml`
-- `tests/qml/BrightnessServiceSmoke.qml`
-- `tests/qml/SystemMonitorServiceSmoke.qml`
-- `tests/qml/SystemMonitorSettingsSmoke.qml`
 
 ### Upgrade in Current Workspace
 
 - `modules/bar/widgets/SuperSystemMonitorWidget.qml`
-- `tests/qml/SuperSystemMonitorAvailabilitySmoke.qml` if needed for tighter
   registry-first assertions
-- a new widget integration smoke if the existing availability harness is not
   enough to prove real service consumption
 
 ## Verification Strategy
@@ -168,7 +159,6 @@ Verification should build from service contract to widget integration.
 
 ### Service-Level Proof
 
-Run the imported service smoke harnesses first.
 
 These prove the backend contract before the widget tries to consume it.
 
@@ -185,12 +175,9 @@ Add or extend a narrow harness that proves:
 The full proof set should include:
 
 ```bash
-bash tests/run-settings-smoke.sh
-<nearest system monitor widget smoke>
 timeout 10 qs --path .
 ```
 
-If additional service smokes are not yet part of a grouped script, run them
 explicitly before making completion claims.
 
 ## Expected Outcome

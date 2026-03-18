@@ -230,20 +230,16 @@ already understand they are in an editing context.
 
 ### UI Structure and Behavior
 
-Extend existing smoke coverage rather than creating a new broad integration test.
 
 Likely targets:
 
-- add or extend a settings/panel structure smoke to verify centered panel config
   and close affordances for settings and widget picker
 - add widget-settings session assertions to prove auto-entered layout mode is
   cleaned up on panel close
-- add wrapper-level assertions or focused smoke coverage to prove left-click
   business behavior is suppressed in layout mode while right-click remains usable
 
 ### Notification Diagnostics
 
-Do not attempt to force real DBus ownership changes inside smoke tests.
 
 Instead:
 
@@ -256,7 +252,6 @@ Instead:
 
 After implementation:
 
-- run the relevant smoke suites
 - run `timeout 10 qs --path .`
 - confirm diagnostics still report the external notification owner rather than
   failing silently

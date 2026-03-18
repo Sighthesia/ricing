@@ -1129,7 +1129,6 @@ git commit -m "feat(notifications): add NotificationBell widget and wire history
 
 ---
 
-## Task 9: Smoke Test
 
 **Goal:** Verify the notification system works end to end.
 

@@ -206,7 +206,6 @@ AnimatedPanelBase {
 
 ---
 
-### Task 4: Smoke Test
 
 1. Launch shell: `quickshell`
 2. Open settings panel — verify downward grow + fade-in animation

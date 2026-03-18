@@ -6,20 +6,14 @@
 
 **Architecture:** Promote `BarLayoutService` from persistence-only state into the runtime geometry source of truth. `BarWidgetWrapper` reports measurements into the service, the service derives section and slot geometry, and `BarContent`, `BarSection`, `DropZone`, and `DragOverlay` render from that shared model instead of reading `Row` positions or equal-third assumptions.
 
-**Tech Stack:** QML, Quickshell, `ListModel`, existing bar modules, smoke harnesses under `tests/qml/`
 
 ---
 
-### Task 1: Add geometry-facing smoke coverage
 
 **Files:**
-- Modify: `tests/qml/SettingsStructureSmoke.qml`
-- Create if needed: `tests/qml/BarLayoutGeometrySmoke.qml`
-- Modify if a new harness is added: `tests/run-ui-structure-smoke.sh`
 
 **Step 1: Write the failing test**
 
-Add a smoke harness that instantiates the bar layout stack and asserts the service exposes shared geometry contracts.
 
 Cover at least:
 - service exposes a section-geometry lookup API or property
@@ -39,13 +33,10 @@ root._assert(typeof BarLayoutService.sectionGeometry === "function"
 Run one of:
 
 ```bash
-timeout 12 qs -p tests/qml/SettingsStructureSmoke.qml
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because the shared geometry contract does not exist yet.
 
-**Step 3: Keep the new smoke narrow**
 
 Do not assert exact pixel values yet. Only assert presence of the new geometry contract and enough structure to guide the refactor.
 
@@ -59,7 +50,6 @@ Use the same command and expect PASS once the service exposes the first geometry
 
 **Files:**
 - Modify: `services/BarLayoutService.qml`
-- Test: `tests/qml/SettingsStructureSmoke.qml` or `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Add explicit geometry state**
 
@@ -97,15 +87,12 @@ Implement a first-pass recomputation pipeline that:
 
 Do not wire drag logic yet; just make the geometry derivation exist and be testable.
 
-**Step 4: Run the targeted smoke**
 
-Run the geometry smoke harness.
 Expected: PASS on new geometry structure assertions.
 
 **Step 5: Commit**
 
 ```bash
-git add services/BarLayoutService.qml tests/qml/SettingsStructureSmoke.qml tests/qml/BarLayoutGeometrySmoke.qml tests/run-ui-structure-smoke.sh
 git commit -m "refactor(bar): add shared layout geometry state"
 ```
 
@@ -118,7 +105,6 @@ Only commit if the user explicitly asks.
 **Files:**
 - Modify: `services/BarLayoutService.qml`
 - Modify: `modules/bar/BarContent.qml`
-- Test: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write the failing test**
 
@@ -133,7 +119,6 @@ The test should prove:
 Run:
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: FAIL because section geometry is still synthetic or incomplete.
@@ -153,7 +138,6 @@ In `BarContent.qml`:
 
 **Step 4: Run test to verify it passes**
 
-Run the geometry smoke again.
 Expected: PASS.
 
 ---
@@ -163,7 +147,6 @@ Expected: PASS.
 **Files:**
 - Modify: `services/BarLayoutService.qml`
 - Modify: `modules/bar/BarSection.qml`
-- Test: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write the failing test**
 
@@ -178,7 +161,6 @@ root._assert(indexBefore === indexAfter,
 
 **Step 2: Run test to verify it fails**
 
-Run the geometry smoke.
 Expected: FAIL while `BarSection` still reads transient `Row.children` positions.
 
 **Step 3: Implement minimal code**
@@ -194,7 +176,6 @@ In `BarSection.qml`:
 
 **Step 4: Run test to verify it passes**
 
-Run the geometry smoke.
 Expected: PASS.
 
 ---
@@ -205,7 +186,6 @@ Expected: PASS.
 - Modify: `services/BarLayoutService.qml`
 - Modify: `modules/bar/BarWidgetWrapper.qml`
 - Modify: `modules/bar/DragOverlay.qml`
-- Test: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write the failing test**
 
@@ -218,7 +198,6 @@ Cover at least:
 
 **Step 2: Run test to verify it fails**
 
-Run the geometry smoke.
 Expected: FAIL because drag geometry still comes partly from wrapper-local state.
 
 **Step 3: Implement minimal code**
@@ -239,13 +218,11 @@ In `DragOverlay.qml`:
 
 **Step 4: Run test to verify it passes**
 
-Run the geometry smoke.
 Expected: PASS.
 
 **Step 5: Commit**
 
 ```bash
-git add services/BarLayoutService.qml modules/bar/BarWidgetWrapper.qml modules/bar/DragOverlay.qml modules/bar/BarSection.qml tests/qml/BarLayoutGeometrySmoke.qml
 git commit -m "refactor(bar): unify drag and slot geometry"
 ```
 
@@ -260,7 +237,6 @@ Only commit if the user explicitly asks.
 - Modify: `modules/bar/DragOverlay.qml`
 - Modify: `modules/bar/BarContent.qml`
 - Modify: `services/BarLayoutService.qml`
-- Test: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write the failing test**
 
@@ -271,7 +247,6 @@ Add assertions that:
 
 **Step 2: Run test to verify it fails**
 
-Run the geometry smoke.
 Expected: FAIL while overlay geometry still uses equal widths.
 
 **Step 3: Implement minimal code**
@@ -284,7 +259,6 @@ Update the overlay stack so:
 
 **Step 4: Run test to verify it passes**
 
-Run the geometry smoke.
 Expected: PASS.
 
 ---
@@ -294,7 +268,6 @@ Expected: PASS.
 **Files:**
 - Modify: `services/BarLayoutService.qml`
 - Modify: `modules/bar/BarWidgetWrapper.qml`
-- Test: `tests/qml/BarLayoutGeometrySmoke.qml`
 
 **Step 1: Write the failing test**
 
@@ -302,7 +275,6 @@ Simulate widget removal or teardown and assert the service clears stale geometry
 
 **Step 2: Run test to verify it fails**
 
-Run the geometry smoke.
 Expected: FAIL if stale width or slot data survives widget removal.
 
 **Step 3: Implement minimal code**
@@ -316,7 +288,6 @@ Keep recovery graceful and log concise diagnostics only when needed.
 
 **Step 4: Run test to verify it passes**
 
-Run the geometry smoke.
 Expected: PASS.
 
 ---
@@ -326,10 +297,8 @@ Expected: PASS.
 **Files:**
 - Modify: none unless verification exposes a regression
 
-**Step 1: Run targeted geometry smoke**
 
 ```bash
-timeout 12 qs -p tests/qml/BarLayoutGeometrySmoke.qml
 ```
 
 Expected: PASS.
@@ -337,8 +306,6 @@ Expected: PASS.
 **Step 2: Run existing structural suites**
 
 ```bash
-bash tests/run-settings-smoke.sh
-bash tests/run-ui-structure-smoke.sh
 ```
 
 Expected: PASS.
@@ -346,8 +313,6 @@ Expected: PASS.
 **Step 3: Run adjacent regression suites**
 
 ```bash
-bash tests/run-super-island-smoke.sh
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS.

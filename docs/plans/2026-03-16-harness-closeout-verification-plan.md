@@ -6,7 +6,6 @@
 
 **Architecture:** Start from proof commands instead of more refactoring. Use the repository-root harness runner and the renamed `modules/bar/widgetsettings/` tree as the system under test, then patch only the files directly involved in failures that those commands reveal.
 
-**Tech Stack:** QML, Quickshell, repository-root smoke harness runner, shell smoke scripts, docs under `docs/plans/`.
 
 ---
 
@@ -14,15 +13,12 @@
 
 **Files:**
 - Verify: `tests/run-qml-harness.sh`
-- Verify: `TestHarnessRunner.qml`
-- Verify: `tests/qml/MediaControlSettingsSmoke.qml`
 
 **Step 1: Run the narrow harness proof**
 
 Run:
 
 ```bash
-bash tests/run-qml-harness.sh MediaControlSettingsSmoke
 ```
 
 Expected: PASS, or a failure that points directly at the root runner or the
@@ -33,8 +29,6 @@ Expected: PASS, or a failure that points directly at the root runner or the
 Touch only one of:
 
 - `tests/run-qml-harness.sh`
-- `TestHarnessRunner.qml`
-- `tests/qml/MediaControlSettingsSmoke.qml`
 - `modules/bar/WidgetSettingsPanel.qml`
 - `modules/bar/widgetsettings/*.qml`
 
@@ -45,31 +39,20 @@ Keep the change narrowly tied to the observed failure.
 Run:
 
 ```bash
-bash tests/run-qml-harness.sh MediaControlSettingsSmoke
 ```
 
 Expected: PASS.
 
 ---
 
-### Task 2: Prove the grouped media smoke entrypoint
 
 **Files:**
-- Verify: `tests/run-media-control-smoke.sh`
-- Verify: `tests/qml/MediaServiceSmoke.qml`
-- Verify: `tests/qml/CavaServiceSmoke.qml`
-- Verify: `tests/qml/MediaControlServiceSmoke.qml`
-- Verify: `tests/qml/MediaVisualPartsSmoke.qml`
-- Verify: `tests/qml/MediaControlWidgetSmoke.qml`
-- Verify: `tests/qml/MediaControlPanelSmoke.qml`
-- Verify: `tests/qml/MediaControlSettingsSmoke.qml`
 
 **Step 1: Run the grouped media suite**
 
 Run:
 
 ```bash
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS, or a failure isolated to a single harness now running through
@@ -85,25 +68,20 @@ by the failure.
 Run:
 
 ```bash
-bash tests/run-media-control-smoke.sh
 ```
 
 Expected: PASS.
 
 ---
 
-### Task 3: Prove the grouped settings smoke entrypoint
 
 **Files:**
-- Verify: `tests/run-settings-smoke.sh`
-- Verify: `tests/qml/SettingsStructureSmoke.qml`
 
 **Step 1: Run the settings suite**
 
 Run:
 
 ```bash
-bash tests/run-settings-smoke.sh
 ```
 
 Expected: PASS.
@@ -112,9 +90,6 @@ Expected: PASS.
 
 Limit edits to:
 
-- `tests/run-settings-smoke.sh`
-- `tests/qml/SettingsStructureSmoke.qml`
-- `TestHarnessRunner.qml`
 - directly related QML imports used by the settings harness
 
 **Step 3: Re-run the settings suite**
@@ -122,7 +97,6 @@ Limit edits to:
 Run:
 
 ```bash
-bash tests/run-settings-smoke.sh
 ```
 
 Expected: PASS.
@@ -209,9 +183,6 @@ blocker remains.
 
 The planned verification set was executed in the current workspace.
 
-- `bash tests/run-qml-harness.sh MediaControlSettingsSmoke` -> PASS
-- `bash tests/run-media-control-smoke.sh` -> PASS
-- `bash tests/run-settings-smoke.sh` -> PASS
 - `timeout 10 qs --path .` -> PASS
 
 Observed non-blocking warnings during verification:

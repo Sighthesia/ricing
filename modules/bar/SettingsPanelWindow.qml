@@ -12,9 +12,6 @@ AnimatedPanelBase {
     readonly property var _closeButton: _closeButtonSurface
     readonly property int _headerHeight: 32
     readonly property bool _usesCenteredPlacement: true
-    readonly property bool _isSettingsPanelBareHarness:
-        Quickshell.env("DYMICSHELL_TEST_HARNESS") === "SettingsPanelWindowBareSmoke"
-
     // Sit below the bar; without left/right anchoring, the compositor keeps the panel centered.
     anchors { top: true }
     margins { top: Theme.barHeight }
@@ -126,9 +123,7 @@ AnimatedPanelBase {
             rightMargin: 8
             bottomMargin: 10
         }
-        sourceComponent: panelWindow._isSettingsPanelBareHarness
-            ? settingsPanelStubComponent
-            : settingsPanelContentComponent
+        sourceComponent: settingsPanelContentComponent
     }
 
     readonly property Item content: contentLoader.item
@@ -137,17 +132,6 @@ AnimatedPanelBase {
         id: settingsPanelContentComponent
 
         SettingsPanelContent {}
-    }
-
-    Component {
-        id: settingsPanelStubComponent
-
-        Item {
-            function clearAllHighlights() {}
-            function dismissSearch() {}
-            function runEnterAnimation() {}
-            function runExitAnimation() {}
-        }
     }
 
     // Forward AnimatedPanelBase transition signals to content so it can run

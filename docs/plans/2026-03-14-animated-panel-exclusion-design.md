@@ -73,11 +73,9 @@ Cons:
 - `modules/background/WallpaperPickerWindow.qml`
 - `modules/launcher/LauncherPanel.qml`
 - `modules/bar/MediaControlPanel.qml`
-- `tests/qml/SettingsStructureSmoke.qml`
 
 ## Testing Strategy
 
-Add a structural smoke assertion proving the animated panel base exposes a non-reserving exclusion contract.
 
 Then verify:
 - settings panel opens without pushing tiled windows down
