@@ -9,95 +9,84 @@ import "../superisland" as IslandCards
 Item {
     id: root
 
-    property bool liveInstance: false
-    property string debugInstanceLabel: liveInstance ? "live" : "preview"
+property bool liveInstance: false
+property string debugInstanceLabel: liveInstance ? "live" : "preview"
 
-    readonly property bool _debugLogging: false
+readonly property bool _debugLogging: false
+property date currentTime
+Timer {
+    id: timeTimer
+    interval: 60 * 1000
+    running: true
+    repeat: true
+    onTriggered: currentTime = new Date()
+}
 
-    readonly property int _padV: Theme.iconPadding
-    readonly property int _padH: Theme.barWidget.contentPaddingH
-    readonly property int _pillH: Theme.barWidget.pillHeight
-    readonly property int _flashGap: Theme.barWidget.stackGap
-    readonly property int _flashRowH: Theme.barWidget.pillHeight
-    readonly property int _hintPulsePad: Theme.barWidget.focusPulsePadding
-    readonly property int _hintLift: Theme.barWidget.contentPaddingV
-    readonly property int _replaceOffset: Math.max(6, Theme.barWidget.contentPaddingV * 3)
-    readonly property int _replaceDelay: Math.max(50, Math.round(Theme.anim.highlightDuration / 2))
-    readonly property real _flashScale: 0.85
-    readonly property bool _listensToService: liveInstance
-    readonly property var _baselineEvent: root._displayEvent(root._listensToService ? SuperIslandService.mainState : root._idleSnapshot())
+readonly property int _padV: Theme.iconPadding
+readonly property int _padH: Theme.barWidget.contentPaddingH
+readonly property int _pillH: Theme.barWidget.pillHeight
+readonly property int _flashGap: Theme.barWidget.stackGap
+readonly property int _flashRowH: Theme.barWidget.pillHeight
+readonly property int _hintPulsePad: Theme.barWidget.focusPulsePadding
+readonly property int _hintLift: Theme.barWidget.contentPaddingV
+readonly property int _replaceOffset: Math.max(6, Theme.barWidget.contentPaddingV * 3)
+readonly property int _replaceDelay: Math.max(50, Math.round(Theme.anim.highlightDuration / 2))
+readonly property real _flashScale: 0.85
+property bool _initialized: false
+property string _phase: "idle"
+property var _mainDisplayEvent: _idleSnapshot()
+property var _flashSourceEvent: _idleSnapshot()
+property var _replaceOutgoingEvent: _idleSnapshot()
+property var _replaceIncomingEvent: _idleSnapshot()
+property var _lastActiveEvent: _idleSnapshot()
+property real _mainTrackY: 0
+property real _mainTrackScale: 1
+property real _mainTrackOpacity: 1
+property real _flashTrackY: 0
+property real _flashTrackScale: _flashScale
+property real _flashTrackOpacity: 0
+
+    // --- derived state (avoid undefined bindings + runtime crashes) ---
+    readonly property var _baselineEvent: root._displayEvent(SuperIslandService.mainState)
     readonly property var _currentEvent: root._mainDisplayEvent
-    readonly property bool _showEvent: root._currentEvent.type !== "idle"
-    readonly property int _mainContentWidth: _mainLoader.item ? _mainLoader.item.implicitWidth : 0
-    readonly property int _stripContentWidth: _stripLoader.item ? _stripLoader.item.implicitWidth : 0
-    readonly property int _idleOpticalOffset: Math.max(1, Math.round(Theme.uiScale))
-    readonly property int _collapsedWidth: root._mainContentWidth + root._padH * 2
-    readonly property int _expandedWidth:
-        Math.max(root._mainContentWidth, root._stripContentWidth) + root._padH * 2
-    readonly property int _returnWidth: root._stripContentWidth + root._padH * 2
-    readonly property real _mainTrackCenterY:
-        root._trackCenterY(_mainLoader.item, root._pillH, root._mainDisplayEvent, true)
-    readonly property real _mainTrackEnterY:
-        -Math.max(root._pillH, _mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH)
-    readonly property real _flashTrackCenterY:
-        root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
-    readonly property real _returnTrackCenterY:
-        root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
-    readonly property real _flashStripY:
-        root._pillH + root._flashGap + root._trackCenterY(_stripLoader.item, root._flashRowH, root._flashSourceEvent, false)
-    readonly property real _hintDividerY:
-        root._pillH + Math.max(0, (root._flashGap - 1) / 2) - root._hintLift
-    readonly property real _hintTrackY: root._flashStripY - root._hintLift
-    readonly property bool _transientPhase:
-        root._phase === "enter" || root._phase === "hold" || root._phase === "exit"
-    readonly property bool _hintPhase:
-        root._phase === "hint" || root._phase === "hint-exit"
-    readonly property real _transientAccentBaseOpacity: Colors.highlightAlpha * 0.4
-    readonly property real _hintBackgroundY:
-        root._hintPhase && _stripLoader.item
-            ? (root._hintTrackY - root._hintPulsePad)
-            : (root._pillH + root._flashGap)
-    readonly property real _hintBackgroundHeight:
-        root._hintPhase && _stripLoader.item
-            ? Math.min(root._flashRowH, _stripLoader.item.implicitHeight + root._hintPulsePad * 2)
-            : root._flashRowH
-    readonly property int pillTopPadding: root._padV
-    readonly property real hintFlashOpacity: root._sharedBackgroundPulseOpacity
-    readonly property real sharedBackgroundPulseOpacity: root._sharedBackgroundPulseOpacity
-    readonly property real hintContentGapTop:
-        root._hintTrackY - (root._hintDividerY + 1)
-    readonly property real hintContentGapBottom:
-        (root._pillH + root._flashGap + root._flashRowH)
-        - (root._hintTrackY + (_stripLoader.item ? _stripLoader.item.implicitHeight : root._flashRowH))
-    readonly property real hintBackgroundGapTop:
-        root._hintBackgroundY - (root._hintDividerY + 1)
-    readonly property real hintBackgroundGapBottom:
-        (root._pillH + root._flashGap + root._flashRowH)
-        - (root._hintBackgroundY + root._hintBackgroundHeight)
-    readonly property real hintRestingBackgroundOpacity:
-        root._hintPhase ? root._sharedBackgroundPulseOpacity : 0
-
     readonly property string transitionMode:
         root._phase === "exit" ? "exit-track"
-        : ((root._phase === "hint" || root._phase === "hint-exit") ? "hint-track"
-        : ((root._phase === "enter" || root._phase === "hold") ? "dual-track" : "single-track"))
-    readonly property bool mainTrackVisible: true
-    readonly property bool flashTrackVisible:
-        root._phase !== "idle" && (root._flashSourceEvent.id || "") !== ""
+        : (root._phase === "idle" ? "single-track" : "dual-track")
+    readonly property bool flashTrackVisible: root._phase !== "idle"
+    readonly property bool _transientPhase: root._phase !== "idle"
+    readonly property real pillTopPadding: root._padV
 
-    property bool _initialized: false
-    property string _phase: "idle"
-    property var _mainDisplayEvent: _idleSnapshot()
-    property var _flashSourceEvent: _idleSnapshot()
-    property var _replaceOutgoingEvent: _idleSnapshot()
-    property var _replaceIncomingEvent: _idleSnapshot()
-    property var _lastActiveEvent: _idleSnapshot()
-    property real _mainTrackY: 0
-    property real _mainTrackScale: 1
-    property real _mainTrackOpacity: 1
-    property real _flashTrackY: 0
-    property real _flashTrackScale: _flashScale
-    property real _flashTrackOpacity: 0
+    readonly property real _flashStripY: root._pillH + root._flashGap
+    readonly property real _mainTrackCenterY:
+        root._trackCenterY(_mainLoader, root._pillH, root._mainDisplayEvent, true)
+    readonly property real _flashTrackCenterY:
+        root._flashStripY + root._trackCenterY(_stripLoader, root._flashRowH, root._flashSourceEvent, false)
+    readonly property real _hintTrackY: root._mainTrackCenterY - root._hintLift
+    readonly property real _hintDividerY: root._pillH + Math.max(0, (root._flashGap - 1) / 2)
+    readonly property real _hintBackgroundY: root._flashStripY
+    readonly property real _hintBackgroundHeight: root._flashRowH
+    readonly property real _returnTrackCenterY: root._mainTrackCenterY
+
+    readonly property real _collapsedWidth:
+        _mainLoader.implicitWidth + root._padH * 2
+    readonly property real _expandedWidth:
+        Math.max(_collapsedWidth, _stripLoader.implicitWidth + root._padH * 2)
+
+    readonly property real _mainTrackEnterY: root._mainTrackCenterY
+    readonly property real _returnWidth: _collapsedWidth
+    readonly property real _idleOpticalOffset: 0
+    readonly property bool _hintPhase: root._phase === "hint" || root._phase === "hint-exit"
+    readonly property bool _listensToService: true
+    readonly property real _transientAccentBaseOpacity: 0
+
+Component.onCompleted: {
+    currentTime = new Date()
+    const initialActiveEvent = root._displayEvent(root._listensToService ? SuperIslandService.activeEvent : root._idleSnapshot())
+    root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
+    root._lastActiveEvent = initialActiveEvent
+    root._resetTracks()
+    Qt.callLater(() => { root._initialized = true })
+}
     property real _replaceOutgoingY: 0
     property real _replaceOutgoingOpacity: 0
     property real _replaceOutgoingTargetY: 0
@@ -172,7 +161,7 @@ Item {
             groupKey: "idle",
             priority: "passive",
             relayReplace: false,
-            title: Qt.formatDateTime(systemClock.date, "hh:mm"),
+            title: Qt.formatDateTime(currentTime, "hh:mm"),
             subtitle: "",
             icon: "",
             workspaceLabel: "",
@@ -414,14 +403,6 @@ Item {
         root._flashTrackOpacity = 0.6
 
         _returnAnim.start()
-    }
-
-    Component.onCompleted: {
-        const initialActiveEvent = root._displayEvent(root._listensToService ? SuperIslandService.activeEvent : root._idleSnapshot())
-        root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
-        root._lastActiveEvent = initialActiveEvent
-        root._resetTracks()
-        Qt.callLater(() => { root._initialized = true })
     }
 
     Connections {
@@ -898,24 +879,24 @@ Item {
     Component {
         id: _idleComponent
 
-        Item {
-            implicitWidth: _idleRow.implicitWidth
-            implicitHeight: root._pillH
+Item {
+    implicitWidth: _idleRow.implicitWidth
+    implicitHeight: root._pillH
 
-            RowLayout {
-                id: _idleRow
-                anchors.centerIn: parent
-                spacing: Theme.barWidget.iconLabelSpacing
+    RowLayout {
+        id: _idleRow
+        anchors.centerIn: parent
+        spacing: Theme.barWidget.iconLabelSpacing
 
-                Text {
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.fontSizeBody
-                    font.bold: true
-                    text: Qt.formatDateTime(systemClock.date, "hh:mm")
-                    color: Colors.text
-                }
+        Text {
+            font.family: Theme.fontMono
+            font.pixelSize: Theme.fontSizeBody
+            font.bold: true
+            text: Qt.formatDateTime(currentTime, "hh:mm")
+            color: Colors.text
+        }
 
-                Rectangle {
+        Rectangle {
                     visible: SuperIslandService.hasPendingEvents
                     implicitWidth: Theme.barWidget.indicatorDotSize
                     implicitHeight: Theme.barWidget.indicatorDotSize

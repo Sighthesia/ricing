@@ -12,9 +12,11 @@ Singleton {
 
     // Respect XDG_CONFIG_HOME; fall back to ~/.config/dymicshell/
     readonly property string configDir:
-        (Quickshell.env("XDG_CONFIG_HOME") !== ""
-            ? Quickshell.env("XDG_CONFIG_HOME")
-            : Quickshell.env("HOME") + "/.config")
+        ((!Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("XDG_CONFIG_HOME") === "null")
+            ? ((Quickshell.env("HOME") && Quickshell.env("HOME") !== "null")
+                ? Quickshell.env("HOME") + "/.config"
+                : "/tmp")
+            : Quickshell.env("XDG_CONFIG_HOME"))
         + "/dymicshell/"
     readonly property string settingsFile: configDir + "settings.json"
     readonly property bool _isHarnessRun: Quickshell.env("DYMICSHELL_TEST_HARNESS") !== ""
@@ -26,20 +28,165 @@ Singleton {
     signal settingsSaved
     signal settingsReloaded
 
+    function _mergeSettings(source, target) {
+        for (let key in source) {
+            if (!Object.prototype.hasOwnProperty.call(source, key))
+                continue
+
+            const value = source[key]
+            if (value === null || value === undefined)
+                continue
+
+            if (typeof value === "object" && !Array.isArray(value) && typeof target[key] === "object") {
+                _mergeSettings(value, target[key])
+                continue
+            }
+
+            // Only write to existing properties to avoid triggering QML engine bugs.
+            if (target[key] !== undefined) {
+                try {
+                    target[key] = value
+                } catch (_) {
+                    // Ignore non-writable or incompatible properties.
+                }
+            }
+        }
+    }
+
+    function _loadFromText(text) {
+        try {
+            const parsed = JSON.parse(text)
+            _mergeSettings(parsed, adapter)
+        } catch (e) {
+            // Keep defaults on parse failure.
+        }
+
+        if (!root.isLoaded) {
+            root.isLoaded = true
+            root.settingsLoaded()
+        } else {
+            root.settingsReloaded()
+        }
+    }
+
+    function _writeSettings() {
+        const settingsObject = {
+            appearance: {
+                accentColor: adapter.appearance.accentColor,
+                backgroundColor: adapter.appearance.backgroundColor,
+                surfaceColor: adapter.appearance.surfaceColor,
+                textColor: adapter.appearance.textColor,
+                textMutedColor: adapter.appearance.textMutedColor,
+                borderColor: adapter.appearance.borderColor,
+                cornerRadius: adapter.appearance.cornerRadius,
+                uiScale: adapter.appearance.uiScale,
+                fontFamily: adapter.appearance.fontFamily,
+                fontMono: adapter.appearance.fontMono,
+                fontSizeBody: adapter.appearance.fontSizeBody,
+                fontSizeSmall: adapter.appearance.fontSizeSmall,
+                fontSizeIcon: adapter.appearance.fontSizeIcon,
+                wallpaperPath: adapter.appearance.wallpaperPath,
+                wallpaperDirectory: adapter.appearance.wallpaperDirectory,
+                matugenEnabled: adapter.appearance.matugenEnabled,
+                matugenScheme: adapter.appearance.matugenScheme,
+                darkMode: adapter.appearance.darkMode
+            },
+            bar: {
+                height: adapter.bar.height,
+                position: adapter.bar.position,
+                backgroundOpacity: adapter.bar.backgroundOpacity,
+                padding: adapter.bar.padding,
+                widgetSpacing: adapter.bar.widgetSpacing
+            },
+            barBehavior: {
+                autoHide: adapter.barBehavior.autoHide,
+                autoHideDelay: adapter.barBehavior.autoHideDelay,
+                autoShowDelay: adapter.barBehavior.autoShowDelay
+            },
+            animation: {
+                speedFactor: adapter.animation.speedFactor,
+                staggerLevel1BaseDelay: adapter.animation.staggerLevel1BaseDelay,
+                staggerLevel1Step: adapter.animation.staggerLevel1Step,
+                staggerLevel2BaseDelay: adapter.animation.staggerLevel2BaseDelay,
+                staggerLevel2Step: adapter.animation.staggerLevel2Step,
+                staggerExitStep: adapter.animation.staggerExitStep,
+                staggerEnterDuration: adapter.animation.staggerEnterDuration,
+                staggerExitDuration: adapter.animation.staggerExitDuration,
+                staggerEnterOffsetY: adapter.animation.staggerEnterOffsetY,
+                staggerExitOffsetY: adapter.animation.staggerExitOffsetY
+            },
+            notifications: {
+                position: adapter.notifications.position,
+                maxVisible: adapter.notifications.maxVisible,
+                lowDuration: adapter.notifications.lowDuration,
+                normalDuration: adapter.notifications.normalDuration,
+                criticalDuration: adapter.notifications.criticalDuration,
+                persistHistory: adapter.notifications.persistHistory,
+                maxHistory: adapter.notifications.maxHistory
+            },
+            workspaceWidget: {
+                defaultMode: adapter.workspaceWidget.defaultMode,
+                titleMaxWidth: adapter.workspaceWidget.titleMaxWidth,
+                revertDelay: adapter.workspaceWidget.revertDelay,
+                hoverEnabled: adapter.workspaceWidget.hoverEnabled
+            },
+            superIsland: {
+                enabled: adapter.superIsland.enabled,
+                idleContent: adapter.superIsland.idleContent,
+                defaultTimeout: adapter.superIsland.defaultTimeout,
+                importantTimeout: adapter.superIsland.importantTimeout,
+                criticalTimeout: adapter.superIsland.criticalTimeout,
+                cooldownMs: adapter.superIsland.cooldownMs,
+                maxQueue: adapter.superIsland.maxQueue,
+                showMedia: adapter.superIsland.showMedia,
+                showNotifications: adapter.superIsland.showNotifications,
+                showWorkspaceEvents: adapter.superIsland.showWorkspaceEvents
+            },
+            mediaControl: {
+                enabled: adapter.mediaControl.enabled,
+                showWhenIdle: adapter.mediaControl.showWhenIdle,
+                announcementEnabled: adapter.mediaControl.announcementEnabled,
+                hoverRevealControls: adapter.mediaControl.hoverRevealControls,
+                announcementDuration: adapter.mediaControl.announcementDuration,
+                cavaEnabled: adapter.mediaControl.cavaEnabled,
+                cavaBars: adapter.mediaControl.cavaBars,
+                cavaAsciiMaxRange: adapter.mediaControl.cavaAsciiMaxRange,
+                cavaFramerate: adapter.mediaControl.cavaFramerate
+            },
+            systemMonitor: {
+                enabled: adapter.systemMonitor.enabled,
+                hoverReveal: adapter.systemMonitor.hoverReveal,
+                panelEnabled: adapter.systemMonitor.panelEnabled,
+                flashEnabled: adapter.systemMonitor.flashEnabled,
+                pinnedMetrics: adapter.systemMonitor.pinnedMetrics,
+                showVolume: adapter.systemMonitor.showVolume,
+                showBrightness: adapter.systemMonitor.showBrightness,
+                showMicrophone: adapter.systemMonitor.showMicrophone,
+                warningCpuPercent: adapter.systemMonitor.warningCpuPercent,
+                warningMemoryPercent: adapter.systemMonitor.warningMemoryPercent,
+                warningTempC: adapter.systemMonitor.warningTempC,
+                criticalTempC: adapter.systemMonitor.criticalTempC,
+                superIslandEscalation: adapter.systemMonitor.superIslandEscalation
+            }
+        }
+
+        fileWriter.running = false
+        fileWriter.running = true
+        fileWriter.write(JSON.stringify(settingsObject, null, 2) + "\n")
+        root.settingsSaved()
+    }
+
     Component.onCompleted: {
-        // Ensure config directory exists before FileView attempts to read
+        // Ensure config directory exists before attempting to read or write
         Quickshell.execDetached(["mkdir", "-p", configDir])
-        settingsFileView.adapter = adapter
+        settingsFileView.reload()
     }
 
     // Batch rapid property writes (e.g. slider drag) into a single disk flush
     Timer {
         id: saveTimer
         interval: 500
-        onTriggered: {
-            settingsFileView.writeAdapter()
-            root.settingsSaved()
-        }
+        onTriggered: _writeSettings()
     }
 
     FileView {
@@ -47,19 +194,14 @@ Singleton {
         path: root.settingsFile
         watchChanges: !root._isHarnessRun
         onFileChanged: reload()
-        onAdapterUpdated: saveTimer.restart()
-        onLoaded: {
-            if (!root.isLoaded) {
-                root.isLoaded = true
-                root.settingsLoaded()
-            } else {
-                root.settingsReloaded()
-            }
-        }
-        onLoadFailed: function(error) {
-            // First run: no settings.json found, write defaults from adapter
-            writeAdapter()
-        }
+        onLoaded: _loadFromText(text())
+        onLoadFailed: _writeSettings
+    }
+
+    Process {
+        id: fileWriter
+        stdinEnabled: true
+        command: ["sh", "-c", "mkdir -p '" + root.configDir + "' && cat > '" + root.settingsFile + "'"]
     }
 
     JsonAdapter {
