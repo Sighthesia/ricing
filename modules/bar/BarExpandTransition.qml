@@ -28,6 +28,7 @@ Item {
     property bool _ready: false
     property bool _suppressExpandedTimeline: false
     property bool _retargetPending: false
+    property bool _retargetActiveForCurrentRun: false
     property int _currentPreloadDuration: Theme.anim.barExpandPreloadDuration
     property real _animatedWidth: collapsedWidth
     property real _animatedHeight: collapsedHeight
@@ -94,8 +95,12 @@ Item {
                 property: "_animatedWidth"
                 to: root._phase2Width
                 duration: Theme.anim.barExpandOvershootDuration
-                easing.type: Theme.anim.springType
-                easing.overshoot: Theme.anim.springOvershoot
+                easing.type: root._retargetActiveForCurrentRun
+                    ? Theme.anim.pulseSpringType
+                    : Theme.anim.springType
+                easing.overshoot: root._retargetActiveForCurrentRun
+                    ? Theme.anim.pulseSpringOvershoot
+                    : Theme.anim.springOvershoot
             }
 
             NumberAnimation {
@@ -103,8 +108,12 @@ Item {
                 property: "_animatedHeight"
                 to: root._phase2Height
                 duration: Theme.anim.barExpandOvershootDuration
-                easing.type: Theme.anim.springType
-                easing.overshoot: Theme.anim.springOvershoot
+                easing.type: root._retargetActiveForCurrentRun
+                    ? Theme.anim.pulseSpringType
+                    : Theme.anim.springType
+                easing.overshoot: root._retargetActiveForCurrentRun
+                    ? Theme.anim.pulseSpringOvershoot
+                    : Theme.anim.springOvershoot
             }
 
             NumberAnimation {
@@ -170,17 +179,37 @@ Item {
         const collapsePreloadHeight = expandedHeight * (1 + Theme.anim.barExpandCollapsePreloadRatio)
         const collapseOvershootWidth = collapsedWidth * (1 - Theme.anim.barExpandCollapseOvershootRatio)
         const collapseOvershootHeight = collapsedHeight * (1 - Theme.anim.barExpandCollapseOvershootRatio)
+        const widthTarget = isExpanded ? expandedWidth : collapsedWidth
+        const heightTarget = isExpanded ? expandedHeight : collapsedHeight
+        const retargetWidthOvershoot = widthTarget
+            + (widthTarget - _animatedWidth)
+              * (isExpanded
+                  ? Theme.anim.barExpandExpandOvershootRatio
+                  : Theme.anim.barExpandCollapseOvershootRatio)
+        const retargetHeightOvershoot = heightTarget
+            + (heightTarget - _animatedHeight)
+              * (isExpanded
+                  ? Theme.anim.barExpandExpandOvershootRatio
+                  : Theme.anim.barExpandCollapseOvershootRatio)
 
         _phase1Width = retargetActive
             ? _animatedWidth
             : (animateWidth ? (isExpanded ? expandPreloadWidth : collapsePreloadWidth) : (isExpanded ? expandedWidth : collapsedWidth))
-        _phase2Width = animateWidth ? (isExpanded ? expandOvershootWidth : collapseOvershootWidth) : (isExpanded ? expandedWidth : collapsedWidth)
+        _phase2Width = animateWidth
+            ? (retargetActive
+                ? retargetWidthOvershoot
+                : (isExpanded ? expandOvershootWidth : collapseOvershootWidth))
+            : widthTarget
         _phase3Width = isExpanded ? expandedWidth : collapsedWidth
 
         _phase1Height = retargetActive
             ? _animatedHeight
             : (animateHeight ? (isExpanded ? expandPreloadHeight : collapsePreloadHeight) : (isExpanded ? expandedHeight : collapsedHeight))
-        _phase2Height = animateHeight ? (isExpanded ? expandOvershootHeight : collapseOvershootHeight) : (isExpanded ? expandedHeight : collapsedHeight)
+        _phase2Height = animateHeight
+            ? (retargetActive
+                ? retargetHeightOvershoot
+                : (isExpanded ? expandOvershootHeight : collapseOvershootHeight))
+            : heightTarget
         _phase3Height = isExpanded ? expandedHeight : collapsedHeight
 
         _currentPreloadDuration = retargetActive ? 1 : Theme.anim.barExpandPreloadDuration
@@ -216,6 +245,7 @@ Item {
             return
 
         _retargetPending = false
+        _retargetActiveForCurrentRun = !!retargetActive
         _applyPhaseTargets(expanded, !!retargetActive)
         _timeline.restart()
     }
@@ -223,6 +253,7 @@ Item {
     function _syncToCurrentTruth() {
         _timeline.stop()
         _retargetPending = false
+        _retargetActiveForCurrentRun = false
         _currentPreloadDuration = Theme.anim.barExpandPreloadDuration
         _animatedWidth = expanded ? expandedWidth : collapsedWidth
         _animatedHeight = expanded ? expandedHeight : collapsedHeight
@@ -230,12 +261,34 @@ Item {
         _pulseScale = 1
     }
 
+    function _targetWidth() {
+        return expanded ? expandedWidth : collapsedWidth
+    }
+
+    function _targetHeight() {
+        return expanded ? expandedHeight : collapsedHeight
+    }
+
+    function _targetDeltaExceedsThreshold(currentValue, targetValue) {
+        return Math.abs(currentValue - targetValue) > 0.5
+    }
+
     function _handleLiveGeometryChange() {
         if (!_ready)
             return
 
+        const widthChanged = _targetDeltaExceedsThreshold(_animatedWidth, _targetWidth())
+        const heightChanged = _targetDeltaExceedsThreshold(_animatedHeight, _targetHeight())
+        const hasGeometryDelta = widthChanged || heightChanged
+        const canAnimateDelta = (widthChanged && animateWidth) || (heightChanged && animateHeight)
+
         if (!_timeline.running) {
-            _syncToCurrentTruth()
+            if (!hasGeometryDelta || !canAnimateDelta) {
+                _syncToCurrentTruth()
+                return
+            }
+
+            _startTimeline(true)
             return
         }
 
