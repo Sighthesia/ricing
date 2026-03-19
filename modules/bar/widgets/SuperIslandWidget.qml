@@ -56,24 +56,32 @@ property real _flashTrackOpacity: 0
     readonly property bool _transientPhase: root._phase !== "idle"
     readonly property real pillTopPadding: root._padV
 
-    readonly property real _flashStripY: root._pillH + root._flashGap
     readonly property real _mainTrackCenterY:
-        root._trackCenterY(_mainLoader, root._pillH, root._mainDisplayEvent, true)
+        root._trackCenterY(_mainLoader.item, root._pillH, root._mainDisplayEvent, true)
     readonly property real _flashTrackCenterY:
-        root._flashStripY + root._trackCenterY(_stripLoader, root._flashRowH, root._flashSourceEvent, false)
+        root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
+    readonly property real _flashStripY:
+        root._pillH + root._flashGap
+        + root._trackCenterY(_stripLoader.item, root._flashRowH, root._flashSourceEvent, false)
     readonly property real _hintTrackY: root._mainTrackCenterY - root._hintLift
     readonly property real _hintDividerY: root._pillH + Math.max(0, (root._flashGap - 1) / 2)
     readonly property real _hintBackgroundY: root._flashStripY
     readonly property real _hintBackgroundHeight: root._flashRowH
-    readonly property real _returnTrackCenterY: root._mainTrackCenterY
+    readonly property real _returnTrackCenterY:
+        root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
 
     readonly property real _collapsedWidth:
-        _mainLoader.implicitWidth + root._padH * 2
+        (_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property real _expandedWidth:
-        Math.max(_collapsedWidth, _stripLoader.implicitWidth + root._padH * 2)
+        Math.max(
+            root._collapsedWidth,
+            (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
+        )
 
-    readonly property real _mainTrackEnterY: root._mainTrackCenterY
-    readonly property real _returnWidth: _collapsedWidth
+    readonly property real _mainTrackEnterY:
+        -Math.max(root._pillH, _mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH)
+    readonly property real _returnWidth:
+        (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property real _idleOpticalOffset: 0
     readonly property bool _hintPhase: root._phase === "hint" || root._phase === "hint-exit"
     readonly property bool _listensToService: true

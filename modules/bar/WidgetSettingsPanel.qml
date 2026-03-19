@@ -89,14 +89,12 @@ PopupWindow {
                 _stagger.clear();
                 _stagger.registerItem(_siHeader, 0, 1);
                 _stagger.registerItem(_siDivider, 1, 1);
-                _stagger.registerItem(_siAppearance, 2, 1);
-                _stagger.registerItem(_siFunctional, 3, 1);
-                _stagger.registerItem(_siDelete, 4, 1);
+                _stagger.registerItem(_siFunctional, 2, 1);
+                _stagger.registerItem(_siDelete, 3, 1);
                 _stagger.runExit();
                 // Defensive fallback: ensure panel sections always leave visible state
                 // even if orchestration timing is interrupted mid-transition.
                 _siHeader.runExit();
-                _siAppearance.runExit();
                 _siFunctional.runExit();
                 _siDelete.runExit();
                 _opacityCloseAnim.restart();
@@ -113,14 +111,12 @@ PopupWindow {
             _stagger.clear()
             _stagger.registerItem(_siHeader, 0, 1)
             _stagger.registerItem(_siDivider, 1, 1)
-            _stagger.registerItem(_siAppearance, 2, 1)
-            _stagger.registerItem(_siFunctional, 3, 1)
-            _stagger.registerItem(_siDelete, 4, 1)
+            _stagger.registerItem(_siFunctional, 2, 1)
+            _stagger.registerItem(_siDelete, 3, 1)
             _stagger.runEnter()
             // Defensive fallback: some compositor/lifecycle races can skip the
             // orchestrated callback on first open; explicitly trigger all groups.
             _siHeader.runEnter()
-            _siAppearance.runEnter()
             _siFunctional.runEnter()
             _siDelete.runEnter()
         }
@@ -270,28 +266,6 @@ PopupWindow {
                     opacity: 0.4
                 }
             }
-
-            // Appearance group
-            StaggerItem {
-                id: _siAppearance
-                Layout.fillWidth: true
-                height: _groupAppearance.implicitHeight
-                delay:        240
-                enterOffsetY: 20
-                exitOffsetY:  10
-                exitDelay: 0
-
-            ExpandableGroup {
-                id: _groupAppearance
-                width: parent.width
-                title: "外观"
-
-                AppearanceSection {
-                    width: parent.width
-                    instanceKey: BarLayoutService.activeWidgetInstanceKey
-                }
-            }
-            } // StaggerItem _siAppearance
 
             // Functional config group
             StaggerItem {

@@ -9,8 +9,6 @@ import ".."
 Item {
     id: root
 
-    readonly property bool _showsNotificationDiagnostics: true
-
     StaggerOrchestrator {
         id: _stagger
     }
@@ -22,10 +20,8 @@ Item {
         _stagger.registerItem(s_resetButton, 2, 1)
         _stagger.registerItem(s_resetHint, 3, 1)
         _stagger.registerItem(s_divider2, 4, 1)
-        _stagger.registerItem(s_notificationCard, 5, 1)
-        _stagger.registerItem(s_divider3, 6, 1)
-        _stagger.registerItem(s_ioRow, 7, 1)
-        _stagger.registerItem(s_ioHint, 8, 1)
+        _stagger.registerItem(s_ioRow, 5, 1)
+        _stagger.registerItem(s_ioHint, 6, 1)
         _stagger.runEnter()
     }
 
@@ -36,10 +32,8 @@ Item {
         _stagger.registerItem(s_resetButton, 2, 1)
         _stagger.registerItem(s_resetHint, 3, 1)
         _stagger.registerItem(s_divider2, 4, 1)
-        _stagger.registerItem(s_notificationCard, 5, 1)
-        _stagger.registerItem(s_divider3, 6, 1)
-        _stagger.registerItem(s_ioRow, 7, 1)
-        _stagger.registerItem(s_ioHint, 8, 1)
+        _stagger.registerItem(s_ioRow, 5, 1)
+        _stagger.registerItem(s_ioHint, 6, 1)
         _stagger.runExit()
     }
 
@@ -181,76 +175,6 @@ Item {
         // Divider
         StaggerItem {
             id: s_divider2
-            width: parent.width
-            height: 1
-
-            Rectangle {
-                anchors.fill: parent
-                color: Colors.border
-            }
-        }
-
-        StaggerItem {
-            id: s_notificationCard
-            width: parent.width
-            height: _notificationCard.implicitHeight
-
-            Rectangle {
-                id: _notificationCard
-                width: parent.width
-                implicitHeight: _notificationColumn.implicitHeight + 20
-                radius: Theme.cornerRadius - 2
-                color: Colors.surface
-                border.color: NotificationService.notificationsAvailable ? Colors.border : Colors.highlight
-                border.width: 1
-
-                Column {
-                    id: _notificationColumn
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 6
-
-                    Text {
-                        text: "通知接管状态"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.weight: Font.DemiBold
-                        color: Colors.text
-                    }
-
-                    Text {
-                        text: NotificationService.notificationsAvailable ? "DymicShell 已接管通知。" : "DymicShell 当前未接管通知。"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: NotificationService.notificationsAvailable ? Colors.text : Colors.highlight
-                        wrapMode: Text.WordWrap
-                        width: parent.width
-                    }
-
-                    Text {
-                        visible: NotificationService.notificationOwner !== ""
-                        text: "当前 owner: " + NotificationService.notificationOwner
-                        font.family: Theme.fontMono
-                        font.pixelSize: Theme.fontSizeSmall - 1
-                        color: Colors.textMuted
-                        wrapMode: Text.WordWrap
-                        width: parent.width
-                    }
-
-                    Text {
-                        text: NotificationService.notificationDiagnosticMessage
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall - 1
-                        color: Colors.textMuted
-                        wrapMode: Text.WordWrap
-                        width: parent.width
-                    }
-                }
-            }
-        }
-
-        StaggerItem {
-            id: s_divider3
             width: parent.width
             height: 1
 
