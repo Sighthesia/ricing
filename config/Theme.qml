@@ -9,6 +9,28 @@ Singleton {
 
     // Animation tokens — duration scaled by speedFactor (>1 = faster, <1 = slower)
     readonly property QtObject anim: QtObject {
+        readonly property string _barMotionPreset:
+            SettingsService.data.barMotion.preset === "soft"
+            || SettingsService.data.barMotion.preset === "balanced"
+            || SettingsService.data.barMotion.preset === "snappy"
+                ? SettingsService.data.barMotion.preset
+                : "balanced"
+        readonly property real _barMotionPresetSpeedFactor:
+            _barMotionPreset === "soft" ? 0.82 : (_barMotionPreset === "snappy" ? 1.24 : 1.0)
+        readonly property real _barMotionPresetTravelFactor:
+            _barMotionPreset === "soft" ? 0.78 : (_barMotionPreset === "snappy" ? 1.26 : 1.0)
+        readonly property real _barMotionPresetPulseFactor:
+            _barMotionPreset === "soft" ? 0.72 : (_barMotionPreset === "snappy" ? 1.18 : 1.0)
+        readonly property real _barMotionPresetRecoilFactor:
+            _barMotionPreset === "soft" ? 0.72 : (_barMotionPreset === "snappy" ? 1.26 : 1.0)
+        readonly property real _barMotionIntensity:
+            Math.max(SettingsService.barMotionIntensityMin,
+                Math.min(SettingsService.barMotionIntensityMax,
+                    SettingsService.data.barMotion.intensity))
+        readonly property real _barMotionEffectiveSpeedMultiplier:
+            Math.max(0.01,
+                SettingsService.data.barMotion.speedMultiplier * _barMotionPresetSpeedFactor)
+
         // Enter: elastic bounce-in for stage entrance, settings ON
         readonly property int enterDuration:
             Math.round(500 / SettingsService.data.animation.speedFactor)
@@ -42,6 +64,43 @@ Singleton {
             Math.round(180 / SettingsService.data.animation.speedFactor)
         readonly property int pulseSpringType: Easing.OutBack
         readonly property real pulseSpringOvershoot: 1.08
+
+        readonly property int barExpandPreloadDuration:
+            Math.max(1, Math.round(moveDuration * 0.28
+                / _barMotionEffectiveSpeedMultiplier))
+        readonly property int barExpandOvershootDuration:
+            Math.max(1, Math.round(springDuration * 0.52
+                / _barMotionEffectiveSpeedMultiplier))
+        readonly property int barExpandSettleDuration:
+            Math.max(1, Math.round(moveDuration * 0.36
+                / _barMotionEffectiveSpeedMultiplier))
+        readonly property real barExpandExpandPreloadRatio:
+            0.06 * _barMotionIntensity * _barMotionPresetTravelFactor
+        readonly property real barExpandExpandOvershootRatio:
+            0.12 * _barMotionIntensity * _barMotionPresetTravelFactor
+        readonly property real barExpandCollapsePreloadRatio:
+            0.05 * _barMotionIntensity * _barMotionPresetTravelFactor
+        readonly property real barExpandCollapseOvershootRatio:
+            0.08 * _barMotionIntensity * _barMotionPresetTravelFactor
+        readonly property real barExpandExpandPulsePreloadOpacity:
+            Math.max(0, 0.08 * _barMotionIntensity * _barMotionPresetPulseFactor)
+        readonly property real barExpandExpandPulseOvershootOpacity:
+            Math.max(0, 0.18 * _barMotionIntensity * _barMotionPresetPulseFactor)
+        readonly property real barExpandCollapsePulsePreloadOpacity:
+            Math.max(0, 0.10 * _barMotionIntensity * _barMotionPresetPulseFactor)
+        readonly property real barExpandCollapsePulseOvershootOpacity:
+            Math.max(0, 0.05 * _barMotionIntensity * _barMotionPresetPulseFactor)
+        readonly property real barExpandExpandPulsePreloadScale:
+            1 + 0.02 * _barMotionIntensity * _barMotionPresetPulseFactor
+        readonly property real barExpandExpandPulseOvershootScale:
+            1 + 0.08 * _barMotionIntensity * _barMotionPresetPulseFactor
+        readonly property real barExpandCollapsePulsePreloadScale:
+            1 + 0.03 * _barMotionIntensity * _barMotionPresetPulseFactor
+        readonly property real barExpandCollapsePulseOvershootScale:
+            Math.max(0, 1 - 0.03 * _barMotionIntensity * _barMotionPresetRecoilFactor)
+        readonly property bool barExpandPulseEnabled: SettingsService.data.barMotion.pulseEnabled
+        readonly property real barExpandPulseSettleOpacity: 0
+        readonly property real barExpandPulseSettleScale: 1
     }
 
     // Stagger delay per widget index (ms)

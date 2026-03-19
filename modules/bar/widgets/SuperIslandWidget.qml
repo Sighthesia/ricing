@@ -3,14 +3,15 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import ".." as BarComponents
 import "../superisland" as IslandCards
 
 // Dynamic Island-style bar widget for idle time, transient events, and hint playback.
 Item {
     id: root
 
-property bool liveInstance: false
-property string debugInstanceLabel: liveInstance ? "live" : "preview"
+    property bool liveInstance: false
+    property string debugInstanceLabel: liveInstance ? "live" : "preview"
 
 readonly property bool _debugLogging: false
 property date currentTime
@@ -32,19 +33,18 @@ readonly property int _hintLift: Theme.barWidget.contentPaddingV
 readonly property int _replaceOffset: Math.max(6, Theme.barWidget.contentPaddingV * 3)
 readonly property int _replaceDelay: Math.max(50, Math.round(Theme.anim.highlightDuration / 2))
 readonly property real _flashScale: 0.85
-property bool _initialized: false
-property string _phase: "idle"
-property var _mainDisplayEvent: _idleSnapshot()
-property var _flashSourceEvent: _idleSnapshot()
-property var _replaceOutgoingEvent: _idleSnapshot()
-property var _replaceIncomingEvent: _idleSnapshot()
-property var _lastActiveEvent: _idleSnapshot()
-property real _mainTrackY: 0
-property real _mainTrackScale: 1
-property real _mainTrackOpacity: 1
-property real _flashTrackY: 0
-property real _flashTrackScale: _flashScale
-property real _flashTrackOpacity: 0
+    property string _phase: "idle"
+    property var _mainDisplayEvent: _idleSnapshot()
+    property var _flashSourceEvent: _idleSnapshot()
+    property var _replaceOutgoingEvent: _idleSnapshot()
+    property var _replaceIncomingEvent: _idleSnapshot()
+    property var _lastActiveEvent: _idleSnapshot()
+    property real _mainTrackY: 0
+    property real _mainTrackScale: 1
+    property real _mainTrackOpacity: 1
+    property real _flashTrackY: 0
+    property real _flashTrackScale: _flashScale
+    property real _flashTrackOpacity: 0
 
     // --- derived state (avoid undefined bindings + runtime crashes) ---
     readonly property var _baselineEvent: root._displayEvent(SuperIslandService.mainState)
@@ -68,25 +68,35 @@ property real _flashTrackOpacity: 0
     readonly property real _returnTrackCenterY: root._mainTrackCenterY
 
     readonly property real _collapsedWidth:
-        _mainLoader.implicitWidth + root._padH * 2
+        (root._phase === "enter" || root._phase === "hold" || root._phase === "exit")
+            ? (_stripLoader.implicitWidth + root._padH * 2)
+            : (_mainLoader.implicitWidth + root._padH * 2)
     readonly property real _expandedWidth:
-        Math.max(_collapsedWidth, _stripLoader.implicitWidth + root._padH * 2)
+        (root._phase === "idle")
+            ? (_mainLoader.implicitWidth + root._padH * 2)
+            : Math.max(
+                _mainLoader.implicitWidth + root._padH * 2,
+                _stripLoader.implicitWidth + root._padH * 2
+            )
+    readonly property real _collapsedPillHeight: root._pillH
+    readonly property real _expandedPillHeight: root._pillH + root._flashGap + root._flashRowH
+    readonly property bool _pillExpanded: root._phase === "enter"
+        || root._phase === "hold"
+        || root._phase === "hint"
 
     readonly property real _mainTrackEnterY: root._mainTrackCenterY
-    readonly property real _returnWidth: _collapsedWidth
     readonly property real _idleOpticalOffset: 0
     readonly property bool _hintPhase: root._phase === "hint" || root._phase === "hint-exit"
     readonly property bool _listensToService: true
     readonly property real _transientAccentBaseOpacity: 0
 
-Component.onCompleted: {
-    currentTime = new Date()
-    const initialActiveEvent = root._displayEvent(root._listensToService ? SuperIslandService.activeEvent : root._idleSnapshot())
-    root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
-    root._lastActiveEvent = initialActiveEvent
-    root._resetTracks()
-    Qt.callLater(() => { root._initialized = true })
-}
+    Component.onCompleted: {
+        currentTime = new Date()
+        const initialActiveEvent = root._displayEvent(root._listensToService ? SuperIslandService.activeEvent : root._idleSnapshot())
+        root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
+        root._lastActiveEvent = initialActiveEvent
+        root._resetTracks()
+    }
     property real _replaceOutgoingY: 0
     property real _replaceOutgoingOpacity: 0
     property real _replaceOutgoingTargetY: 0
@@ -94,15 +104,11 @@ Component.onCompleted: {
     property real _replaceIncomingOpacity: 0
     property bool _replaceOutgoingVisible: false
     property bool _replaceIncomingVisible: false
-    property real _sharedBackgroundPulseOpacity: 0
-    property real _pulseScale: 1
+    readonly property real _sharedBackgroundPulseOpacity: _pillTransition.pulseOpacity
+    readonly property real _pulseScale: _pillTransition.pulseScale
 
     implicitHeight: Theme.barHeight
-    implicitWidth: root._phase === "hint-exit"
-        ? root._collapsedWidth
-        : (root._phase === "exit"
-            ? root._returnWidth
-            : (root.flashTrackVisible ? root._expandedWidth : root._collapsedWidth))
+    implicitWidth: _pillTransition.animatedWidth
 
     SystemClock {
         id: systemClock
@@ -116,6 +122,19 @@ Component.onCompleted: {
             ? (root._flashGap + root._flashRowH)
             : 0
         restoreMode: Binding.RestoreBindingOrValue
+    }
+
+    BarComponents.BarExpandTransition {
+        id: _pillTransition
+        objectName: "superIslandSharedTransition"
+
+        collapsedWidth: root._collapsedWidth
+        expandedWidth: root._expandedWidth
+        collapsedHeight: root._collapsedPillHeight
+        expandedHeight: root._expandedPillHeight
+        expanded: root._pillExpanded
+        animateWidth: true
+        animateHeight: true
     }
 
     function _log(message, event) {
@@ -222,7 +241,6 @@ Component.onCompleted: {
 
         root._log("startEnterTransition", event)
         if (root._hintPhase) {
-            _hintFlashDelayTimer.stop()
             _hintEnterAnim.stop()
             _hintExitAnim.stop()
             root._resetTracks()
@@ -240,9 +258,6 @@ Component.onCompleted: {
 
         _returnAnim.stop()
         _departAnim.stop()
-        _pillCollapseAnim.stop()
-        _pillExpandAnim.stop()
-        _pillExpandAnim.start()
 
         root._mainTrackY = root._mainTrackEnterY
         root._mainTrackScale = 0.92
@@ -251,7 +266,6 @@ Component.onCompleted: {
         root._flashTrackY = root._flashTrackCenterY
         root._flashTrackScale = 1
         root._flashTrackOpacity = 1
-        root._triggerSharedBackgroundPulse()
 
         Qt.callLater(function() {
             _departAnim.start()
@@ -267,36 +281,16 @@ Component.onCompleted: {
         _departAnim.stop()
         _returnAnim.stop()
         _hintExitAnim.stop()
-        _pillCollapseAnim.stop()
-        _pillExpandAnim.stop()
-        _pillExpandAnim.start()
 
         root._flashTrackY = root._hintTrackY - Theme.barWidget.contentPaddingV * 2
         root._flashTrackScale = 0.96
         root._flashTrackOpacity = 0
-        _hintFlashDelayTimer.restart()
 
         _hintEnterAnim.start()
     }
 
     function _updateWindowHint(event) {
         root._flashSourceEvent = root._displayEvent(event)
-        root._triggerSharedBackgroundPulse()
-    }
-
-    function _triggerSharedBackgroundPulse() {
-        _sharedBackgroundPulseAnim.stop()
-        _pulseScaleAnim.stop()
-        root._sharedBackgroundPulseOpacity = 0
-        root._pulseScale = 1
-        _sharedBackgroundPulseAnim.start()
-        _pulseScaleAnim.start()
-    }
-
-    function _triggerEdgeReboundScale() {
-        _pulseScaleAnim.stop()
-        root._pulseScale = 1
-        _pulseScaleAnim.start()
     }
 
     function _resetReplaceLayers() {
@@ -355,18 +349,6 @@ Component.onCompleted: {
             root._mainTrackOpacity = 1
         }
 
-        root._triggerSharedBackgroundPulse()
-    }
-
-    function _triggerHintFlash() {
-        root._triggerSharedBackgroundPulse()
-    }
-
-    Timer {
-        id: _hintFlashDelayTimer
-        interval: Theme.anim.moveDuration
-        repeat: false
-        onTriggered: root._triggerHintFlash()
     }
 
     function _finishWindowHint() {
@@ -375,10 +357,6 @@ Component.onCompleted: {
 
         root._phase = "hint-exit"
         _hintEnterAnim.stop()
-        _pillExpandAnim.stop()
-        _pillCollapseAnim.stop()
-        _pillCollapseAnim.start()
-        root._triggerEdgeReboundScale()
         _hintExitAnim.start()
     }
 
@@ -390,10 +368,6 @@ Component.onCompleted: {
         _returnAnim.stop()
         _hintEnterAnim.stop()
         _hintExitAnim.stop()
-        _pillExpandAnim.stop()
-        _pillCollapseAnim.stop()
-        _pillCollapseAnim.start()
-        root._triggerEdgeReboundScale()
 
         root._mainTrackY = root._mainTrackCenterY
         root._mainTrackScale = 1
@@ -442,68 +416,32 @@ Component.onCompleted: {
 
     Item {
         id: _pillClip
+        objectName: "superIslandPillClip"
         anchors.top: parent.top
         anchors.topMargin: root._padV
         anchors.horizontalCenter: parent.horizontalCenter
         clip: true
-        implicitWidth: root.implicitWidth
-        implicitHeight: root._phase !== "idle"
-            ? (root._pillH + root._flashGap + root._flashRowH)
-            : root._pillH
-        width: implicitWidth
-        height: implicitHeight
+        implicitWidth: _pillTransition.animatedWidth
+        implicitHeight: _pillTransition.animatedHeight
+        width: _pillTransition.animatedWidth
+        height: _pillTransition.animatedHeight
         scale: root._pulseScale
         transformOrigin: Item.Center
 
-        Behavior on implicitWidth {
-            enabled: root._initialized
-            NumberAnimation {
-                duration: Theme.anim.springDuration
-                easing.type: Theme.anim.springType
-                easing.overshoot: Theme.anim.springOvershoot
-            }
-        }
-
         Rectangle {
             id: _pillBg
+            objectName: "superIslandPillBackground"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: root._pillH
+            height: _pillTransition.animatedHeight
             radius: root._pillH / 2
             color: Colors.surface
             border.color: Colors.border
             border.width: 1
-
-            NumberAnimation {
-                id: _pillExpandAnim
-                target: _pillBg
-                property: "height"
-                to: root._pillH + root._flashGap + root._flashRowH
-                duration: Theme.anim.springDuration
-                easing.type: Theme.anim.springType
-                easing.overshoot: Theme.anim.springOvershoot
-            }
-
-            NumberAnimation {
-                id: _pillCollapseAnim
-                target: _pillBg
-                property: "height"
-                to: root._pillH
-                duration: Theme.anim.springDuration
-                easing.type: Theme.anim.springType
-                easing.overshoot: Theme.anim.springOvershoot
-            }
-
-            Behavior on width {
-                enabled: root._initialized
-                NumberAnimation {
-                    duration: Theme.anim.moveDuration
-                    easing.type: Theme.anim.moveType
-                }
-            }
         }
 
+        // Geometry and pulse are shared-transition owned; content track choreography stays local here.
         Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             y: (root._phase === "hint" || root._phase === "hint-exit")
@@ -828,51 +766,7 @@ Component.onCompleted: {
             root._phase = "idle"
             root._flashSourceEvent = root._idleSnapshot()
             root._mainDisplayEvent = root._baselineEvent
-            root._sharedBackgroundPulseOpacity = 0
             root._resetTracks()
-        }
-    }
-
-    SequentialAnimation {
-        id: _sharedBackgroundPulseAnim
-
-        NumberAnimation {
-            target: root
-            property: "_sharedBackgroundPulseOpacity"
-            from: 0
-            to: 0.16
-            duration: Theme.anim.highlightDuration
-            easing.type: Theme.anim.highlightType
-        }
-
-        NumberAnimation {
-            target: root
-            property: "_sharedBackgroundPulseOpacity"
-            to: 0
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
-        }
-    }
-
-    SequentialAnimation {
-        id: _pulseScaleAnim
-
-        NumberAnimation {
-            target: root
-            property: "_pulseScale"
-            from: 1
-            to: 1.018
-            duration: Theme.anim.pulseSpringDuration
-            easing.type: Theme.anim.pulseSpringType
-            easing.overshoot: Theme.anim.pulseSpringOvershoot
-        }
-
-        NumberAnimation {
-            target: root
-            property: "_pulseScale"
-            to: 1
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
         }
     }
 

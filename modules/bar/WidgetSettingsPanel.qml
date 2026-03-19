@@ -65,6 +65,11 @@ PopupWindow {
         BarLayoutService.widgetSettingsPanelOpen
         && BarLayoutService.activeWidgetInstanceKey !== ""
 
+    readonly property bool _hasWidgetSpecificSection:
+        _widgetId === "workspaceWidget"
+        || _widgetId === "superIsland"
+        || _widgetId === "mediaControl"
+
     on_ShouldBeOpenChanged: {
         if (_shouldBeOpen) {
             if (_state === "closed" || _state === "closing") {
@@ -293,7 +298,7 @@ PopupWindow {
             }
             } // StaggerItem _siAppearance
 
-            // Functional config group
+            // Widget-specific config group
             StaggerItem {
                 id: _siFunctional
                 Layout.fillWidth: true
@@ -306,38 +311,95 @@ PopupWindow {
             ExpandableGroup {
                 id: _groupFunctional
                 width: parent.width
-                title: "功能"
+                title: "组件功能"
                 expanded: false
 
-                Loader {
+                Column {
+                    objectName: "widgetSettingsWidgetSpecificGroup"
                     width: parent.width
-                    active: root._widgetId === "workspaceWidget"
-                    sourceComponent: WorkspaceWidgetSection { width: parent.width }
-                }
+                    spacing: 0
 
-                Loader {
-                    width: parent.width
-                    active: root._widgetId === "superIsland"
-                    sourceComponent: SuperIslandSection { width: parent.width }
-                }
+                    Item {
+                        objectName: "widgetSettingsSharedMotionGroup"
+                        width: parent.width
+                        height: _sharedMotionColumn.implicitHeight
 
-                Loader {
-                    width: parent.width
-                    active: root._widgetId === "mediaControl"
-                    sourceComponent: MediaControlSection { width: parent.width }
-                }
+                        Column {
+                            id: _sharedMotionColumn
+                            width: parent.width
+                            spacing: 0
 
-                Text {
-                    width: parent.width
-                    visible: root._widgetId !== "workspaceWidget"
-                        && root._widgetId !== "superIsland"
-                        && root._widgetId !== "mediaControl"
-                    height: visible ? Theme.settingsRowHeight : 0
-                    text: "暂无可用设置"
-                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
-                    color: Colors.textMuted; opacity: 0.5
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                            Text {
+                                width: parent.width
+                                height: Theme.settingsGroupHeaderHeight
+                                leftPadding: Theme.settingsPanelPadding
+                                rightPadding: Theme.settingsPanelPadding
+                                text: "跨组件动效"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Font.Medium
+                                color: Colors.textMuted
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            BarMotionSection {
+                                width: parent.width
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Colors.border
+                        opacity: 0.35
+                    }
+
+                    Text {
+                        width: parent.width
+                        height: Theme.settingsGroupHeaderHeight
+                        leftPadding: Theme.settingsPanelPadding
+                        rightPadding: Theme.settingsPanelPadding
+                        text: "当前组件"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.weight: Font.Medium
+                        color: Colors.textMuted
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    Loader {
+                        width: parent.width
+                        active: root._widgetId === "workspaceWidget"
+                        sourceComponent: WorkspaceWidgetSection {
+                            objectName: "workspaceWidgetSettingsSection"
+                            width: parent.width
+                        }
+                    }
+
+                    Loader {
+                        width: parent.width
+                        active: root._widgetId === "superIsland"
+                        sourceComponent: SuperIslandSection { width: parent.width }
+                    }
+
+                    Loader {
+                        width: parent.width
+                        active: root._widgetId === "mediaControl"
+                        sourceComponent: MediaControlSection { width: parent.width }
+                    }
+
+                    Text {
+                        objectName: "widgetSettingsWidgetSpecificEmptyState"
+                        width: parent.width
+                        visible: !root._hasWidgetSpecificSection
+                        height: visible ? Theme.settingsRowHeight : 0
+                        text: "当前组件暂无专属设置"
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
+                        color: Colors.textMuted; opacity: 0.5
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
                 }
             }
             } // StaggerItem _siFunctional

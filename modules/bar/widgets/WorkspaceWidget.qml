@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import qs.config
 import qs.services
+import ".." as BarComponents
 
 // Two-state workspace indicator ("Dynamic Island" morph style).
 //
@@ -37,6 +38,21 @@ Item {
     readonly property int _titleMaxW:    SettingsService.data.workspaceWidget.titleMaxWidth
     readonly property bool _hoverActive: SettingsService.data.workspaceWidget.hoverEnabled
     readonly property int _pillH:        Theme.barHeight - 2 * Theme.iconPadding
+    readonly property real _focusPillWidth: root._harnessFocusWidthOverride >= 0
+        ? root._harnessFocusWidthOverride
+        : (_focusRow.implicitWidth + root._padH * 2)
+    readonly property real _overviewPillWidth: root._harnessOverviewWidthOverride >= 0
+        ? root._harnessOverviewWidthOverride
+        : (_overviewRow.implicitWidth + root._padH * 2)
+    readonly property real _collapsedPillWidth: Math.min(root._focusPillWidth, root._overviewPillWidth)
+    readonly property real _expandedPillWidth: Math.max(root._focusPillWidth, root._overviewPillWidth)
+    readonly property real _flashPillWidth:
+        Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2
+    readonly property bool _showExpandedPillWidth: root._showOverview
+        ? root._overviewPillWidth >= root._focusPillWidth
+        : root._focusPillWidth >= root._overviewPillWidth
+    readonly property real _sharedBackgroundPulseOpacity: _pillTransition.pulseOpacity
+    readonly property real _sharedPulseScale: _pillTransition.pulseScale
 
     // --- state machine ---
     // _showOverview: render-driving boolean (step 6 — derived readonly before mutable state).
@@ -53,6 +69,8 @@ Item {
     // Suppresses all layout Behaviors during the first render cycle so the widget
     // doesn't animate from the default empty state to the real initial state.
     property bool _initialized: false
+    property real _harnessFocusWidthOverride: -1
+    property real _harnessOverviewWidthOverride: -1
 
     // ""         = natural (overview when no focused window, focus otherwise)
     // "overview" = temporarily forced overview (hover from focus, workspace switch)
@@ -191,6 +209,7 @@ Item {
 
         const shouldPulseFocusRow = !skipFlash
             && root._initialized
+            && !root._flashActive
             && prevWinId !== ""
             && newWinId !== ""
             && newWinId !== prevWinId
@@ -275,6 +294,19 @@ Item {
         restoreMode: Binding.RestoreBindingOrValue
     }
 
+    BarComponents.BarExpandTransition {
+        id: _pillTransition
+        objectName: "workspaceSharedTransition"
+
+        collapsedWidth: root._collapsedPillWidth
+        expandedWidth: root._expandedPillWidth
+        collapsedHeight: root._pillH
+        expandedHeight: root._pillH
+        expanded: root._showExpandedPillWidth
+        animateWidth: true
+        animateHeight: false
+    }
+
     Connections {
         target: NiriService
         function onWindowsUpdated()      { root._refreshFocus() }
@@ -325,12 +357,16 @@ Item {
     // The visual pill background lives inside and follows the elastic Behavior.
     Item {
         id: _pill
+        objectName: "workspacePillClip"
 
         anchors.top: parent.top
         anchors.topMargin: Theme.iconPadding
         anchors.horizontalCenter: parent.horizontalCenter
 
         clip: true
+        width: root._flashActive ? root._flashPillWidth : _pillTransition.animatedWidth
+        scale: root._sharedPulseScale
+        transformOrigin: Item.Center
 
         // Clip height: immediate during flash so rows are never clipped mid-travel.
         implicitHeight: root._flashActive || root._holdFlashExtension
@@ -342,23 +378,14 @@ Item {
         // strip (which may be wider than the pill row) doesn't cause overflow.
         // After flash, collapses smoothly to the active row's width.
         implicitWidth: root._flashActive
-            ? (Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2)
-            : (root._showOverview
-                ? (_overviewRow.implicitWidth + root._padH * 2)
-                : (_focusRow.implicitWidth   + root._padH * 2))
-
-        Behavior on implicitWidth {
-            enabled: root._initialized
-            NumberAnimation {
-                duration: Theme.anim.moveDuration
-                easing.type: Theme.anim.moveType
-            }
-        }
+            ? root._flashPillWidth
+            : _pillTransition.animatedWidth
 
         // Visual pill background: height follows explicit animation for bounce/collapse.
         // Separated from the clip wrapper so clipping doesn't cut travelling rows.
         Rectangle {
             id: _pillBg
+            objectName: "workspacePillBackground"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
@@ -403,6 +430,13 @@ Item {
                     easing.type: Theme.anim.moveType
                 }
             }
+        }
+
+        Rectangle {
+            anchors.fill: _pillBg
+            radius: _pillBg.radius
+            color: Colors.highlight
+            opacity: root._sharedBackgroundPulseOpacity
         }
 
         // Subtle hover tint for the entire pill
@@ -718,6 +752,7 @@ Item {
         // ── Focus content — app icon + window title ──────────────────────
         Item {
             id: _focusRow
+            objectName: "workspaceFocusRow"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: undefined
             implicitWidth: _focusContent.implicitWidth
