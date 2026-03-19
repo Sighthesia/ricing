@@ -32,7 +32,8 @@ AnimatedPanelBase {
         "clock":             Qt.resolvedUrl("widgets/Clock.qml"),
         "workspaceWidget":   Qt.resolvedUrl("widgets/WorkspaceWidget.qml"),
         "notificationBell":  Qt.resolvedUrl("widgets/NotificationBell.qml"),
-        "superSystemMonitor": Qt.resolvedUrl("widgets/SuperSystemMonitorWidget.qml")
+        "superSystemMonitor": Qt.resolvedUrl("widgets/SuperSystemMonitorWidget.qml"),
+        "systemTray":        Qt.resolvedUrl("widgets/SystemTrayWidget.qml")
     })
 
     // Human-readable display names for the picker cards
@@ -42,7 +43,8 @@ AnimatedPanelBase {
         "clock":             "\u65f6\u949f",
         "workspaceWidget":   "\u5de5\u4f5c\u533a",
         "notificationBell":  "\u901a\u77e5",
-        "superSystemMonitor": "\u7cfb\u7edf\u76d1\u63a7"
+        "superSystemMonitor": "\u7cfb\u7edf\u76d1\u63a7",
+        "systemTray":        "\u7cfb\u7edf\u6258\u76d8"
     })
 
     property string searchQuery: ""

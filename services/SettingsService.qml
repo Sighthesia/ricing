@@ -165,6 +165,12 @@ Singleton {
                 warningTempC: adapter.systemMonitor.warningTempC,
                 criticalTempC: adapter.systemMonitor.criticalTempC,
                 superIslandEscalation: adapter.systemMonitor.superIslandEscalation
+            },
+            systemTray: {
+                enabled: adapter.systemTray.enabled,
+                hoverReveal: adapter.systemTray.hoverReveal,
+                flashEnabled: adapter.systemTray.flashEnabled,
+                pinnedItems: adapter.systemTray.pinnedItems
             }
         }
 
@@ -309,6 +315,13 @@ Singleton {
             property int warningTempC: 75
             property int criticalTempC: 90
             property bool superIslandEscalation: true
+        }
+
+        property JsonObject systemTray: JsonObject {
+            property bool enabled: true
+            property bool hoverReveal: true
+            property bool flashEnabled: true
+            property var pinnedItems: []
         }
     }
 }

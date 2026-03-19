@@ -44,8 +44,14 @@ Singleton {
     property int workspaceFlashExtension: 0
     property int superIslandFlashExtension: 0
     property int mediaControlFlashExtension: 0
+    property int systemTrayFlashExtension: 0
     readonly property int barFlashExtension:
-        Math.max(workspaceFlashExtension, superIslandFlashExtension, mediaControlFlashExtension)
+        Math.max(
+            workspaceFlashExtension,
+            superIslandFlashExtension,
+            mediaControlFlashExtension,
+            systemTrayFlashExtension
+        )
 
     // Which bar section the picker should insert widgets into.
     // Updated whenever the user clicks a section in layout mode.
@@ -67,7 +73,7 @@ Singleton {
     readonly property var geometrySections: _sectionGeometries
     readonly property var geometrySlots: _slotGeometries
     readonly property var geometryPickerAnchors: _pickerAnchors
-    readonly property var geometryArrivals: _arrivalGeometries
+    property var geometryArrivals: ({})
     readonly property var dragSnapshot: ({
         active: isDragging,
         widgetId: draggedWidgetId,
@@ -1066,6 +1072,7 @@ Singleton {
         _slotGeometries = nextSlotGeometries
         _pickerAnchors = nextPickerAnchors
         _arrivalGeometries = nextArrivalGeometries
+        geometryArrivals = nextArrivalGeometries
     }
 
     function closeWidgetSettings() {
