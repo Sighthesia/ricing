@@ -66,13 +66,13 @@ Singleton {
         readonly property real pulseSpringOvershoot: 1.08
 
         readonly property int barExpandPreloadDuration:
-            Math.max(1, Math.round(moveDuration * 0.28
+            Math.max(1, Math.round(pulseSpringDuration
                 / _barMotionEffectiveSpeedMultiplier))
         readonly property int barExpandOvershootDuration:
-            Math.max(1, Math.round(springDuration * 0.52
+            Math.max(1, Math.round(springDuration
                 / _barMotionEffectiveSpeedMultiplier))
         readonly property int barExpandSettleDuration:
-            Math.max(1, Math.round(moveDuration * 0.36
+            Math.max(1, Math.round(moveDuration
                 / _barMotionEffectiveSpeedMultiplier))
         readonly property real barExpandExpandPreloadRatio:
             0.06 * _barMotionIntensity * _barMotionPresetTravelFactor

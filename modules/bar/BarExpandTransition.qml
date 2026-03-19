@@ -128,8 +128,8 @@ Item {
                 target: root
                 property: "_pulseScale"
                 to: root._phase2PulseScale
-                duration: Theme.anim.barExpandOvershootDuration
-                easing.type: Theme.anim.springType
+                duration: Theme.anim.pulseSpringDuration
+                easing.type: Theme.anim.pulseSpringType
                 easing.overshoot: Theme.anim.pulseSpringOvershoot
             }
         }
@@ -140,7 +140,8 @@ Item {
                 property: "_animatedWidth"
                 to: root._phase3Width
                 duration: Theme.anim.barExpandSettleDuration
-                easing.type: Theme.anim.moveType
+                easing.type: Theme.anim.springType
+                easing.overshoot: Theme.anim.springOvershoot
             }
 
             NumberAnimation {
@@ -148,7 +149,8 @@ Item {
                 property: "_animatedHeight"
                 to: root._phase3Height
                 duration: Theme.anim.barExpandSettleDuration
-                easing.type: Theme.anim.moveType
+                easing.type: Theme.anim.springType
+                easing.overshoot: Theme.anim.springOvershoot
             }
 
             NumberAnimation {
@@ -163,9 +165,9 @@ Item {
                 target: root
                 property: "_pulseScale"
                 to: root._phase3PulseScale
-                duration: Theme.anim.barExpandSettleDuration
-                easing.type: Theme.anim.pulseSpringType
-                easing.overshoot: Theme.anim.pulseSpringOvershoot
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.springType
+                easing.overshoot: Theme.anim.springOvershoot
             }
         }
     }

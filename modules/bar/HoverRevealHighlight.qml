@@ -39,6 +39,8 @@ Item {
     // Internal edge positions — do not bind externally.
     property real _rightEdge: 0
     property real _leftEdge: 0
+    // Fade follows the reveal/wipe timeline so exit can soften instead of snapping away.
+    property real _fadeOpacity: 0
     // Queued exit: set when mouse leaves while enter is still running.
     property bool _pendingExit: false
 
@@ -65,17 +67,19 @@ Item {
         height: parent.height
         radius: root.radius
         color: root._resolvedHighlightColor
-        opacity: root._resolvedHighlightOpacity
+        opacity: root._resolvedHighlightOpacity * root._fadeOpacity
     }
 
     onHoveredChanged: {
         if (hovered) {
             _pendingExit = false
             _leftEdgeAnim.stop()
+            _fadeAnim.stop()
             // If the bar was fully swept away, start from scratch.
             if (_rightEdge <= _leftEdge) {
                 _leftEdge = 0
                 _rightEdge = 0
+                _fadeOpacity = 0
             }
             // Advance right edge from its current position; scale duration to
             // remaining distance so speed feels uniform even after an interrupt.
@@ -85,6 +89,13 @@ Item {
                 ? Math.max(1, Math.round(root.enterDuration * (root.width - _rightEdge) / root.width))
                 : root.enterDuration
             _rightEdgeAnim.restart()
+
+            _fadeAnim.from = _fadeOpacity
+            _fadeAnim.to = 1
+            _fadeAnim.duration = root.width > 0
+                ? Math.max(1, Math.round(root.enterDuration * (root.width - _rightEdge) / root.width))
+                : root.enterDuration
+            _fadeAnim.restart()
         } else {
             if (_rightEdgeAnim.running) {
                 // Enter is still in flight — commit to finishing it, then auto-exit.
@@ -103,6 +114,13 @@ Item {
             ? Math.max(1, Math.round(root.exitDuration * (_rightEdge - _leftEdge) / root.width))
             : root.exitDuration
         _leftEdgeAnim.restart()
+
+        _fadeAnim.from = _fadeOpacity
+        _fadeAnim.to = 0
+        _fadeAnim.duration = root.width > 0
+            ? Math.max(1, Math.round(root.exitDuration * (_rightEdge - _leftEdge) / root.width))
+            : root.exitDuration
+        _fadeAnim.restart()
     }
 
     // Pushes the right (leading) edge rightward — the reveal stroke.
@@ -123,6 +141,14 @@ Item {
         onFinished: {
             root._leftEdge  = 0
             root._rightEdge = 0
+            root._fadeOpacity = 0
         }
+    }
+
+    NumberAnimation {
+        id: _fadeAnim
+        target: root
+        property: "_fadeOpacity"
+        easing.type: Easing.InOutCubic
     }
 }

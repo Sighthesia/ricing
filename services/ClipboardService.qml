@@ -15,6 +15,9 @@ Singleton {
     // Increments each time items is refreshed — lets providers react reactively.
     property int revision: 0
 
+    // True after the session clipboard watcher has been launched.
+    property bool watcherStarted: false
+
     // --- Private state ---
 
     // id → callback(text) waiting for a decode result
@@ -38,6 +41,12 @@ Singleton {
         _decodeCallbacks[id] = callback;
         _decodeProc.command = ["sh", "-c", "cliphist decode " + id];
         _decodeProc.running = true;
+    }
+
+    function _startWatcher(): void {
+        if (root.watcherStarted) return
+        Quickshell.execDetached(["sh", "-c", "wl-paste --watch cliphist store"])
+        root.watcherStarted = true
     }
 
     // --- Processes ---
@@ -107,5 +116,6 @@ Singleton {
 
     Component.onCompleted: {
         root.items = [];
+        root._startWatcher()
     }
 }

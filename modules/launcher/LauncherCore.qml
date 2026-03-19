@@ -217,4 +217,12 @@ Item {
             if (LauncherService.isOpen) _refreshResults()
         }
     }
+
+    Connections {
+        target: ClipboardService
+        function onRevisionChanged(): void {
+            if (LauncherService.isOpen && _activeProvider() === clipProvider)
+                _refreshResults()
+        }
+    }
 }

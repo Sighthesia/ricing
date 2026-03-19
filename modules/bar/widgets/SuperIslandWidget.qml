@@ -28,9 +28,9 @@ readonly property int _padH: Theme.barWidget.contentPaddingH
 readonly property int _pillH: Theme.barWidget.pillHeight
 readonly property int _flashGap: Theme.barWidget.stackGap
 readonly property int _flashRowH: Theme.barWidget.pillHeight
-readonly property int _hintPulsePad: Theme.barWidget.focusPulsePadding
-readonly property int _hintLift: Theme.barWidget.contentPaddingV
-readonly property int _replaceOffset: Math.max(6, Theme.barWidget.contentPaddingV * 3)
+    readonly property int _hintPulsePad: Theme.barWidget.focusPulsePadding
+    readonly property int _hintLift: Theme.barWidget.contentPaddingV
+    readonly property int _replaceOffset: Math.max(6, Theme.barWidget.contentPaddingV * 3)
 readonly property int _replaceDelay: Math.max(50, Math.round(Theme.anim.highlightDuration / 2))
 readonly property real _flashScale: 0.85
 property bool _initialized: false
@@ -261,11 +261,11 @@ Component.onCompleted: {
     }
 
     function _startEnterTransition(event) {
-        const outgoing = root._hintPhase
-            ? root._cloneEvent(root._flashSourceEvent)
-            : root._cloneEvent(root._mainDisplayEvent.type !== "idle"
+        const outgoing = root._cloneEvent(root._hintPhase
+            ? root._baselineEvent
+            : (root._mainDisplayEvent.type !== "idle"
                 ? root._mainDisplayEvent
-                : root._baselineEvent)
+                : root._baselineEvent))
 
         root._log("startEnterTransition", event)
         if (root._hintPhase) {
@@ -310,8 +310,10 @@ Component.onCompleted: {
 
         _departAnim.stop()
         _returnAnim.stop()
+        _hintEnterAnim.stop()
         _hintExitAnim.stop()
 
+        root._mainTrackY = root._mainTrackCenterY
         root._flashTrackY = root._hintTrackY - Theme.barWidget.contentPaddingV * 2
         root._flashTrackScale = 0.96
         root._flashTrackOpacity = 0
@@ -454,15 +456,21 @@ Component.onCompleted: {
             const previousEvent = root._cloneEvent(root._lastActiveEvent)
 
             if (nextEvent.relayReplace && previousEvent.type !== "idle") {
-                root._replaceActiveTransient(nextEvent)
+                if (previousEvent.type === "window")
+                    root._startEnterTransition(nextEvent)
+                else
+                    root._replaceActiveTransient(nextEvent)
             } else if (nextEvent.type === "window" && previousEvent.type === "idle") {
-                root._startEnterTransition(nextEvent)
+                root._startWindowHint(nextEvent)
             } else if (nextEvent.type === "window" && previousEvent.type === "window") {
-                root._replaceActiveTransient(nextEvent)
+                if (root._hintPhase)
+                    root._updateWindowHint(nextEvent)
+                else
+                    root._startWindowHint(nextEvent)
             } else if (nextEvent.type !== "idle" && previousEvent.type === "window") {
-                root._replaceActiveTransient(nextEvent)
+                root._startEnterTransition(nextEvent)
             } else if (nextEvent.type === "idle" && previousEvent.type === "window") {
-                root._startExitTransition()
+                root._finishWindowHint()
             } else if (nextEvent.type !== "idle" && previousEvent.type === "idle") {
                 root._startEnterTransition(nextEvent)
             } else if (nextEvent.type !== "idle" && previousEvent.type !== "idle") {
@@ -772,6 +780,14 @@ Component.onCompleted: {
 
         NumberAnimation {
             target: root
+            property: "_mainTrackY"
+            to: root._flashStripY
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        NumberAnimation {
+            target: root
             property: "_flashTrackY"
             to: root._hintTrackY
             duration: Theme.anim.moveDuration
@@ -797,6 +813,14 @@ Component.onCompleted: {
 
     ParallelAnimation {
         id: _hintExitAnim
+
+        NumberAnimation {
+            target: root
+            property: "_mainTrackY"
+            to: root._mainTrackCenterY
+            duration: Theme.anim.highlightDuration
+            easing.type: Theme.anim.moveType
+        }
 
         NumberAnimation {
             target: root
