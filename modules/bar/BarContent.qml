@@ -22,7 +22,8 @@ Item {
         "clock":              "widgets/Clock.qml",
         "workspaceWidget":    "widgets/WorkspaceWidget.qml",
         "notificationBell":   "widgets/NotificationBell.qml",
-        "superSystemMonitor": "widgets/SuperSystemMonitorWidget.qml"
+        "superSystemMonitor": "widgets/SuperSystemMonitorWidget.qml",
+        "systemTray":         "widgets/SystemTrayWidget.qml"
     })
 
     // Hit-test: map x in barContent coords to section name (accounts for padding)
@@ -45,7 +46,8 @@ Item {
         "clock":              "时钟",
         "workspaceWidget":    "工作区",
         "notificationBell":   "通知",
-        "superSystemMonitor": "系统监控"
+        "superSystemMonitor": "系统监控",
+        "systemTray":         "系统托盘"
     })
 
     // Left section: anchored left

@@ -95,5 +95,11 @@
         "warningTempC": 75,
         "criticalTempC": 90,
         "superIslandEscalation": true
+    },
+    "systemTray": {
+        "enabled": true,
+        "hoverReveal": true,
+        "flashEnabled": true,
+        "pinnedItems": []
     }
 }
