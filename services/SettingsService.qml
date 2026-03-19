@@ -19,7 +19,10 @@ Singleton {
             : Quickshell.env("XDG_CONFIG_HOME"))
         + "/dymicshell/"
     readonly property string settingsFile: configDir + "settings.json"
+    readonly property real barMotionIntensityMin: 0.0
+    readonly property real barMotionIntensityMax: 2.0
     property bool isLoaded: false
+    property bool _sanitizingBarMotion: false
 
     // Emitted once on initial load, after each debounced write, and on hot-reload
     signal settingsLoaded
@@ -55,6 +58,7 @@ Singleton {
         try {
             const parsed = JSON.parse(text)
             _mergeSettings(parsed, adapter)
+            _sanitizeBarMotion()
         } catch (e) {
             // Keep defaults on parse failure.
         }
@@ -68,6 +72,8 @@ Singleton {
     }
 
     function _writeSettings() {
+        _sanitizeBarMotion()
+
         const settingsObject = {
             appearance: {
                 accentColor: adapter.appearance.accentColor,
@@ -100,6 +106,12 @@ Singleton {
                 autoHide: adapter.barBehavior.autoHide,
                 autoHideDelay: adapter.barBehavior.autoHideDelay,
                 autoShowDelay: adapter.barBehavior.autoShowDelay
+            },
+            barMotion: {
+                preset: adapter.barMotion.preset,
+                intensity: adapter.barMotion.intensity,
+                speedMultiplier: adapter.barMotion.speedMultiplier,
+                pulseEnabled: adapter.barMotion.pulseEnabled
             },
             animation: {
                 speedFactor: adapter.animation.speedFactor,
@@ -180,6 +192,60 @@ Singleton {
         root.settingsSaved()
     }
 
+    function _sanitizeBarMotionReal(value, fallbackValue, minimumValue, maximumValue) {
+        const numericValue = Number(value)
+
+        if (!isFinite(numericValue))
+            return fallbackValue
+
+        return Math.min(maximumValue, Math.max(minimumValue, numericValue))
+    }
+
+    function _sanitizeBarMotionPreset(value) {
+        switch (value) {
+        case "soft":
+        case "gentle":
+            return "soft"
+        case "balanced":
+            return "balanced"
+        case "snappy":
+        case "expressive":
+            return "snappy"
+        default:
+            return "balanced"
+        }
+    }
+
+    function _sanitizeBarMotion() {
+        if (root._sanitizingBarMotion)
+            return
+
+        root._sanitizingBarMotion = true
+
+        const sanitizedPreset = _sanitizeBarMotionPreset(adapter.barMotion.preset)
+        const sanitizedIntensity = _sanitizeBarMotionReal(
+            adapter.barMotion.intensity,
+            1.0,
+            root.barMotionIntensityMin,
+            root.barMotionIntensityMax)
+        const sanitizedSpeedMultiplier = _sanitizeBarMotionReal(
+            adapter.barMotion.speedMultiplier,
+            1.0,
+            0.01,
+            Number.POSITIVE_INFINITY)
+
+        if (adapter.barMotion.preset !== sanitizedPreset)
+            adapter.barMotion.preset = sanitizedPreset
+
+        if (adapter.barMotion.intensity !== sanitizedIntensity)
+            adapter.barMotion.intensity = sanitizedIntensity
+
+        if (adapter.barMotion.speedMultiplier !== sanitizedSpeedMultiplier)
+            adapter.barMotion.speedMultiplier = sanitizedSpeedMultiplier
+
+        root._sanitizingBarMotion = false
+    }
+
     Component.onCompleted: {
         // Ensure config directory exists before attempting to read or write
         Quickshell.execDetached(["mkdir", "-p", configDir])
@@ -244,6 +310,17 @@ Singleton {
             property bool autoHide:      false
             property int  autoHideDelay: 500
             property int  autoShowDelay: 150
+        }
+
+        property JsonObject barMotion: JsonObject {
+            property string preset: "balanced"
+            property real intensity: 1.0
+            property real speedMultiplier: 1.0
+            property bool pulseEnabled: true
+
+            onPresetChanged: root._sanitizeBarMotion()
+            onIntensityChanged: root._sanitizeBarMotion()
+            onSpeedMultiplierChanged: root._sanitizeBarMotion()
         }
 
         property JsonObject animation: JsonObject {

@@ -65,6 +65,11 @@ PopupWindow {
         BarLayoutService.widgetSettingsPanelOpen
         && BarLayoutService.activeWidgetInstanceKey !== ""
 
+    readonly property bool _hasWidgetSpecificSection:
+        _widgetId === "workspaceWidget"
+        || _widgetId === "superIsland"
+        || _widgetId === "mediaControl"
+
     on_ShouldBeOpenChanged: {
         if (_shouldBeOpen) {
             if (_state === "closed" || _state === "closing") {
@@ -89,12 +94,14 @@ PopupWindow {
                 _stagger.clear();
                 _stagger.registerItem(_siHeader, 0, 1);
                 _stagger.registerItem(_siDivider, 1, 1);
-                _stagger.registerItem(_siFunctional, 2, 1);
-                _stagger.registerItem(_siDelete, 3, 1);
+                _stagger.registerItem(_siAppearance, 2, 1);
+                _stagger.registerItem(_siFunctional, 3, 1);
+                _stagger.registerItem(_siDelete, 4, 1);
                 _stagger.runExit();
                 // Defensive fallback: ensure panel sections always leave visible state
                 // even if orchestration timing is interrupted mid-transition.
                 _siHeader.runExit();
+                _siAppearance.runExit();
                 _siFunctional.runExit();
                 _siDelete.runExit();
                 _opacityCloseAnim.restart();
@@ -111,12 +118,14 @@ PopupWindow {
             _stagger.clear()
             _stagger.registerItem(_siHeader, 0, 1)
             _stagger.registerItem(_siDivider, 1, 1)
-            _stagger.registerItem(_siFunctional, 2, 1)
-            _stagger.registerItem(_siDelete, 3, 1)
+            _stagger.registerItem(_siAppearance, 2, 1)
+            _stagger.registerItem(_siFunctional, 3, 1)
+            _stagger.registerItem(_siDelete, 4, 1)
             _stagger.runEnter()
             // Defensive fallback: some compositor/lifecycle races can skip the
             // orchestrated callback on first open; explicitly trigger all groups.
             _siHeader.runEnter()
+            _siAppearance.runEnter()
             _siFunctional.runEnter()
             _siDelete.runEnter()
         }
@@ -267,7 +276,29 @@ PopupWindow {
                 }
             }
 
-            // Functional config group
+            // Appearance group
+            StaggerItem {
+                id: _siAppearance
+                Layout.fillWidth: true
+                height: _groupAppearance.implicitHeight
+                delay:        240
+                enterOffsetY: 20
+                exitOffsetY:  10
+                exitDelay: 0
+
+            ExpandableGroup {
+                id: _groupAppearance
+                width: parent.width
+                title: "外观"
+
+                AppearanceSection {
+                    width: parent.width
+                    instanceKey: BarLayoutService.activeWidgetInstanceKey
+                }
+            }
+            } // StaggerItem _siAppearance
+
+            // Widget-specific config group
             StaggerItem {
                 id: _siFunctional
                 Layout.fillWidth: true
@@ -283,35 +314,92 @@ PopupWindow {
                 title: "功能"
                 expanded: false
 
-                Loader {
+                Column {
+                    objectName: "widgetSettingsWidgetSpecificGroup"
                     width: parent.width
-                    active: root._widgetId === "workspaceWidget"
-                    sourceComponent: WorkspaceWidgetSection { width: parent.width }
-                }
+                    spacing: 0
 
-                Loader {
-                    width: parent.width
-                    active: root._widgetId === "superIsland"
-                    sourceComponent: SuperIslandSection { width: parent.width }
-                }
+                    Item {
+                        objectName: "widgetSettingsSharedMotionGroup"
+                        width: parent.width
+                        height: _sharedMotionColumn.implicitHeight
 
-                Loader {
-                    width: parent.width
-                    active: root._widgetId === "mediaControl"
-                    sourceComponent: MediaControlSection { width: parent.width }
-                }
+                        Column {
+                            id: _sharedMotionColumn
+                            width: parent.width
+                            spacing: 0
 
-                Text {
-                    width: parent.width
-                    visible: root._widgetId !== "workspaceWidget"
-                        && root._widgetId !== "superIsland"
-                        && root._widgetId !== "mediaControl"
-                    height: visible ? Theme.settingsRowHeight : 0
-                    text: "暂无可用设置"
-                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
-                    color: Colors.textMuted; opacity: 0.5
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                            Text {
+                                width: parent.width
+                                height: Theme.settingsGroupHeaderHeight
+                                leftPadding: Theme.settingsPanelPadding
+                                rightPadding: Theme.settingsPanelPadding
+                                text: "跨组件动效"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Font.Medium
+                                color: Colors.textMuted
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            BarMotionSection {
+                                width: parent.width
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Colors.border
+                        opacity: 0.35
+                    }
+
+                    Text {
+                        width: parent.width
+                        height: Theme.settingsGroupHeaderHeight
+                        leftPadding: Theme.settingsPanelPadding
+                        rightPadding: Theme.settingsPanelPadding
+                        text: "当前组件"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.weight: Font.Medium
+                        color: Colors.textMuted
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    Loader {
+                        width: parent.width
+                        active: root._widgetId === "workspaceWidget"
+                        sourceComponent: WorkspaceWidgetSection {
+                            objectName: "workspaceWidgetSettingsSection"
+                            width: parent.width
+                        }
+                    }
+
+                    Loader {
+                        width: parent.width
+                        active: root._widgetId === "superIsland"
+                        sourceComponent: SuperIslandSection { width: parent.width }
+                    }
+
+                    Loader {
+                        width: parent.width
+                        active: root._widgetId === "mediaControl"
+                        sourceComponent: MediaControlSection { width: parent.width }
+                    }
+
+                    Text {
+                        objectName: "widgetSettingsWidgetSpecificEmptyState"
+                        width: parent.width
+                        visible: !root._hasWidgetSpecificSection
+                        height: visible ? Theme.settingsRowHeight : 0
+                        text: "当前组件暂无专属设置"
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
+                        color: Colors.textMuted; opacity: 0.5
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
                 }
             }
             } // StaggerItem _siFunctional

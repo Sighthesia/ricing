@@ -31,6 +31,12 @@
         "autoHideDelay": 500,
         "autoShowDelay": 150
     },
+    "barMotion": {
+        "preset": "balanced",
+        "intensity": 1.0,
+        "speedMultiplier": 1.0,
+        "pulseEnabled": true
+    },
     "animation": {
         "speedFactor": 1.0,
         "staggerLevel1BaseDelay": 60,
