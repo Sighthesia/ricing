@@ -115,7 +115,5 @@ Keep each QML file ordered as:
 - Clamp untrusted numeric input and guard against missing object keys.
 
 ## Testing and Documentation Hygiene
-- Keep validation commands aligned with the current shell structure.
-- Update `tests/run-*.sh` when harness names or paths change.
 - Don't `docs/plans/` references even when files or commands move.
 - Use the full-shell load check before claiming the repo still loads cleanly.
