@@ -10,13 +10,11 @@ Singleton {
     // Public API: access settings via SettingsService.data.bar.height etc.
     readonly property alias data: adapter
 
-    // Respect XDG_CONFIG_HOME; fall back to ~/.config/dymicshell/
+    // Keep settings in the user's ~/.config/dymicshell/ directory.
     readonly property string configDir:
-        ((!Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("XDG_CONFIG_HOME") === "null")
-            ? ((Quickshell.env("HOME") && Quickshell.env("HOME") !== "null")
-                ? Quickshell.env("HOME") + "/.config"
-                : "/tmp")
-            : Quickshell.env("XDG_CONFIG_HOME"))
+        ((Quickshell.env("HOME") && Quickshell.env("HOME") !== "null")
+            ? Quickshell.env("HOME") + "/.config"
+            : "/tmp")
         + "/dymicshell/"
     readonly property string settingsFile: configDir + "settings.json"
     readonly property real barMotionIntensityMin: 0.0
@@ -28,6 +26,11 @@ Singleton {
     signal settingsLoaded
     signal settingsSaved
     signal settingsReloaded
+
+    function save() {
+        console.info("[DymicShell:SettingsService] Save requested", settingsFile)
+        saveTimer.restart()
+    }
 
     function _mergeSettings(source, target) {
         for (let key in source) {
@@ -59,8 +62,9 @@ Singleton {
             const parsed = JSON.parse(text)
             _mergeSettings(parsed, adapter)
             _sanitizeBarMotion()
+            console.info("[DymicShell:SettingsService] Settings loaded", settingsFile)
         } catch (e) {
-            // Keep defaults on parse failure.
+            console.warn("[DymicShell:SettingsService] Settings load failed", settingsFile, e)
         }
 
         if (!root.isLoaded) {
@@ -73,6 +77,8 @@ Singleton {
 
     function _writeSettings() {
         _sanitizeBarMotion()
+
+        console.info("[DymicShell:SettingsService] Writing settings", settingsFile)
 
         const settingsObject = {
             appearance: {
@@ -187,9 +193,10 @@ Singleton {
         }
 
         fileWriter.running = false
+        fileWriter.stdinEnabled = true
         fileWriter.running = true
         fileWriter.write(JSON.stringify(settingsObject, null, 2) + "\n")
-        root.settingsSaved()
+        fileWriter.stdinEnabled = false
     }
 
     function _sanitizeBarMotionReal(value, fallbackValue, minimumValue, maximumValue) {
@@ -247,6 +254,7 @@ Singleton {
     }
 
     Component.onCompleted: {
+        console.info("[DymicShell:SettingsService] Initializing", configDir, settingsFile)
         // Ensure config directory exists before attempting to read or write
         Quickshell.execDetached(["mkdir", "-p", configDir])
         settingsFileView.reload()
@@ -256,7 +264,10 @@ Singleton {
     Timer {
         id: saveTimer
         interval: 500
-        onTriggered: _writeSettings()
+        onTriggered: {
+            console.info("[DymicShell:SettingsService] Save debounce triggered", settingsFile)
+            _writeSettings()
+        }
     }
 
     FileView {
@@ -265,13 +276,25 @@ Singleton {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: _loadFromText(text())
-        onLoadFailed: _writeSettings
+        onLoadFailed: {
+            console.warn("[DymicShell:SettingsService] Settings file missing or invalid", settingsFile)
+            _writeSettings()
+        }
     }
 
     Process {
         id: fileWriter
         stdinEnabled: true
-        command: ["sh", "-c", "mkdir -p '" + root.configDir + "' && cat > '" + root.settingsFile + "'"]
+        command: ["sh", "-c", "mkdir -p '" + root.configDir + "' && tmp=$(mktemp \"" + root.settingsFile + ".XXXXXX\") && cat > \"$tmp\" && mv \"$tmp\" '" + root.settingsFile + "'"]
+
+        onExited: (exitCode) => {
+            if (exitCode === 0) {
+                console.info("[DymicShell:SettingsService] Settings write completed", settingsFile)
+                root.settingsSaved()
+            } else {
+                console.warn("[DymicShell:SettingsService] Settings write failed", settingsFile, "exitCode=", exitCode)
+            }
+        }
     }
 
     JsonAdapter {
@@ -286,8 +309,8 @@ Singleton {
             property string borderColor:     "#3b4261"
             property real   cornerRadius:    10
             property real   uiScale:         1.0
-            property string fontFamily:      "LXGW WenKai GB Screen"
-            property string fontMono:        "JetBrainsMono Nerd Font"
+            property string fontFamily:      "Noto Sans Black"
+            property string fontMono:        "JetBrains Mono ExtraBold"
             property int    fontSizeBody:    14
             property int    fontSizeSmall:   10
             property int    fontSizeIcon:    16

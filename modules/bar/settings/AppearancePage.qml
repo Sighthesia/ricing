@@ -239,6 +239,7 @@ Item {
                     value: SettingsService.data.appearance.matugenEnabled
                     onToggled: function(v) {
                         SettingsService.data.appearance.matugenEnabled = v
+                        SettingsService.save()
                         if (v) WallpaperService.triggerMatugen()
                     }
                 }
@@ -250,6 +251,7 @@ Item {
                     value: SettingsService.data.appearance.darkMode
                     onToggled: function(v) {
                         SettingsService.data.appearance.darkMode = v
+                        SettingsService.save()
                         if (SettingsService.data.appearance.matugenEnabled)
                             WallpaperService.triggerMatugen()
                     }
@@ -332,6 +334,7 @@ Item {
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 SettingsService.data.appearance.matugenScheme = parent.modelData
+                                                SettingsService.save()
                                                 WallpaperService.triggerMatugen()
                                             }
                                         }
@@ -368,37 +371,55 @@ Item {
                     label: "强调色"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.accentColor
-                    onValueCommitted: (v) => SettingsService.data.appearance.accentColor = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.accentColor = v
+                        SettingsService.save()
+                    }
                 }
                 ColorSection {
                     label: "背景色"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.backgroundColor
-                    onValueCommitted: (v) => SettingsService.data.appearance.backgroundColor = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.backgroundColor = v
+                        SettingsService.save()
+                    }
                 }
                 ColorSection {
                     label: "表面色"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.surfaceColor
-                    onValueCommitted: (v) => SettingsService.data.appearance.surfaceColor = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.surfaceColor = v
+                        SettingsService.save()
+                    }
                 }
                 ColorSection {
                     label: "文字色"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.textColor
-                    onValueCommitted: (v) => SettingsService.data.appearance.textColor = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.textColor = v
+                        SettingsService.save()
+                    }
                 }
                 ColorSection {
                     label: "次要文字"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.textMutedColor
-                    onValueCommitted: (v) => SettingsService.data.appearance.textMutedColor = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.textMutedColor = v
+                        SettingsService.save()
+                    }
                 }
                 ColorSection {
                     label: "边框色"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.borderColor
-                    onValueCommitted: (v) => SettingsService.data.appearance.borderColor = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.borderColor = v
+                        SettingsService.save()
+                    }
                 }
             }
             } // StaggerItem _siColors
@@ -425,35 +446,50 @@ Item {
                     label: "字体族"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.fontFamily
-                    onValueCommitted: (v) => SettingsService.data.appearance.fontFamily = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.fontFamily = v
+                        SettingsService.save()
+                    }
                 }
                 FontPickerSection {
                     label: "等宽字体"
                     isMonospace: true
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.fontMono
-                    onValueCommitted: (v) => SettingsService.data.appearance.fontMono = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.fontMono = v
+                        SettingsService.save()
+                    }
                 }
                 SliderSection {
                     label: "正文大小"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.fontSizeBody
                     from: 10; to: 24; stepSize: 1; unit: "px"
-                    onValueCommitted: (v) => SettingsService.data.appearance.fontSizeBody = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.fontSizeBody = v
+                        SettingsService.save()
+                    }
                 }
                 SliderSection {
                     label: "辅助大小"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.fontSizeSmall
                     from: 8; to: 18; stepSize: 1; unit: "px"
-                    onValueCommitted: (v) => SettingsService.data.appearance.fontSizeSmall = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.fontSizeSmall = v
+                        SettingsService.save()
+                    }
                 }
                 SliderSection {
                     label: "图标大小"
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.fontSizeIcon
                     from: 10; to: 28; stepSize: 1; unit: "px"
-                    onValueCommitted: (v) => SettingsService.data.appearance.fontSizeIcon = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.fontSizeIcon = v
+                        SettingsService.save()
+                    }
                 }
             }
             } // StaggerItem _siFont
@@ -481,7 +517,10 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.uiScale
                     from: 0.75; to: 1.5; stepSize: 0.05; unit: "×"
-                    onValueCommitted: (v) => SettingsService.data.appearance.uiScale = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.uiScale = v
+                        SettingsService.save()
+                    }
                 }
 
                 SliderSection {
@@ -489,7 +528,10 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.bar.height
                     from: 24; to: 60; stepSize: 1; unit: "px"
-                    onValueCommitted: (v) => SettingsService.data.bar.height = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.bar.height = v
+                        SettingsService.save()
+                    }
                 }
 
                 SliderSection {
@@ -497,7 +539,10 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.bar.backgroundOpacity
                     from: 0.0; to: 1.0; stepSize: 0.05
-                    onValueCommitted: (v) => SettingsService.data.bar.backgroundOpacity = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.bar.backgroundOpacity = v
+                        SettingsService.save()
+                    }
                 }
 
                 SliderSection {
@@ -505,7 +550,10 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.bar.padding
                     from: 0; to: 20; stepSize: 1; unit: "px"
-                    onValueCommitted: (v) => SettingsService.data.bar.padding = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.bar.padding = v
+                        SettingsService.save()
+                    }
                 }
 
                 SliderSection {
@@ -513,7 +561,10 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.bar.widgetSpacing
                     from: 0; to: 20; stepSize: 1; unit: "px"
-                    onValueCommitted: (v) => SettingsService.data.bar.widgetSpacing = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.bar.widgetSpacing = v
+                        SettingsService.save()
+                    }
                 }
 
                 SliderSection {
@@ -521,7 +572,10 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.appearance.cornerRadius
                     from: 0; to: 24; stepSize: 1; unit: "px"
-                    onValueCommitted: (v) => SettingsService.data.appearance.cornerRadius = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.cornerRadius = v
+                        SettingsService.save()
+                    }
                 }
 
                 // Position selector (reuses BehaviorSection position row directly)
@@ -579,7 +633,10 @@ Item {
                                     MouseArea {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: SettingsService.data.bar.position = parent.modelData.value
+                                        onClicked: {
+                                            SettingsService.data.bar.position = parent.modelData.value
+                                            SettingsService.save()
+                                        }
                                     }
                                 }
                             }
@@ -612,7 +669,10 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.animation.speedFactor
                     from: 0.2; to: 3.0; stepSize: 0.1; unit: "×"
-                    onValueCommitted: (v) => SettingsService.data.animation.speedFactor = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.animation.speedFactor = v
+                        SettingsService.save()
+                    }
                 }
 
                 SliderSection {
@@ -620,7 +680,10 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.animation.staggerEnterDuration
                     from: 60; to: 600; stepSize: 10; unit: "ms"
-                    onValueCommitted: (v) => SettingsService.data.animation.staggerEnterDuration = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.animation.staggerEnterDuration = v
+                        SettingsService.save()
+                    }
                 }
 
                 SliderSection {
@@ -628,7 +691,10 @@ Item {
                     filterQuery: root.searchQuery
                     value: SettingsService.data.animation.staggerExitDuration
                     from: 40; to: 400; stepSize: 10; unit: "ms"
-                    onValueCommitted: (v) => SettingsService.data.animation.staggerExitDuration = v
+                    onValueCommitted: (v) => {
+                        SettingsService.data.animation.staggerExitDuration = v
+                        SettingsService.save()
+                    }
                 }
             }
             } // StaggerItem _siAnimation
@@ -704,8 +770,11 @@ Item {
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: SettingsService.data.barBehavior.autoHide =
-                                    !SettingsService.data.barBehavior.autoHide
+                                onClicked: {
+                                    SettingsService.data.barBehavior.autoHide =
+                                        !SettingsService.data.barBehavior.autoHide
+                                    SettingsService.save()
+                                }
                             }
                         }
                     }

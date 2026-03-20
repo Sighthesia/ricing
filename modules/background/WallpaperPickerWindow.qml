@@ -156,6 +156,7 @@ AnimatedPanelBase {
                         if (dir) {
                             root.currentDirectory = path
                             SettingsService.data.appearance.wallpaperDirectory = path
+                            SettingsService.save()
                         } else {
                             WallpaperService.setWallpaper(path)
                             BarLayoutService.wallpaperPickerOpen = false

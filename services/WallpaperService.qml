@@ -48,6 +48,7 @@ Singleton {
     // Called by BackgroundWindow (and any other consumer) instead of invoking swww.
     function setWallpaper(path) {
         SettingsService.data.appearance.wallpaperPath = path
+        SettingsService.save()
         wallpaperChanged(path)
         debounceTimer.restart()
     }

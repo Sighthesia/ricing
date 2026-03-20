@@ -154,6 +154,7 @@ Item {
                         SettingsService.data.appearance.textColor       = modelData.text
                         SettingsService.data.appearance.textMutedColor  = modelData.textMuted
                         SettingsService.data.appearance.borderColor     = modelData.border
+                        SettingsService.save()
                     }
                 }
             }

@@ -76,7 +76,10 @@ Item {
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: SettingsService.data.barMotion.preset = parent.modelData.value
+                                onClicked: {
+                                    SettingsService.data.barMotion.preset = parent.modelData.value
+                                    SettingsService.save()
+                                }
                             }
                         }
                     }
@@ -93,7 +96,10 @@ Item {
             to: SettingsService.barMotionIntensityMax
             stepSize: 0.05
             unit: "×"
-            onValueCommitted: newValue => SettingsService.data.barMotion.intensity = newValue
+            onValueCommitted: newValue => {
+                SettingsService.data.barMotion.intensity = newValue
+                SettingsService.save()
+            }
         }
 
         SliderSection {
@@ -105,7 +111,10 @@ Item {
             to: 2.0
             stepSize: 0.05
             unit: "×"
-            onValueCommitted: newValue => SettingsService.data.barMotion.speedMultiplier = newValue
+            onValueCommitted: newValue => {
+                SettingsService.data.barMotion.speedMultiplier = newValue
+                SettingsService.save()
+            }
         }
 
         ToggleSection {
@@ -113,7 +122,10 @@ Item {
             width: parent.width
             label: "脉冲反馈"
             value: SettingsService.data.barMotion.pulseEnabled
-            onToggled: newValue => SettingsService.data.barMotion.pulseEnabled = newValue
+            onToggled: newValue => {
+                SettingsService.data.barMotion.pulseEnabled = newValue
+                SettingsService.save()
+            }
         }
     }
 }
