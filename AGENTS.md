@@ -1,7 +1,6 @@
 # DymicShell Agent Guide
+
 Wayland shell built with Quickshell. Keep the repo layered, token-driven, and safe for hot-reload.
-Repo-local editor rules: no `.cursor/rules/`, `.cursorrules`, or `.github/copilot-instructions.md` exist here as of 2026-03-14.
-No repo-local `.github/skills/` entries are checked in right now.
 
 ## Repository Layout
 ```text
@@ -16,8 +15,8 @@ null/dymicshell/          # Checked-in sample/runtime artifacts; not the canonic
 Key entry points: `shell.qml`, `config/Theme.qml`, `config/Colors.qml`, `services/SettingsService.qml`, `services/BarLayoutService.qml`, `modules/bar/BarContent.qml`.
 
 ## Build, Lint, and Test Commands
+
 Use `qs` unless the user explicitly asks for `quickshell`.
-The repo does not define `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmllint`, `qmlformat`, or CI workflow commands. Do not invent those commands unless you first verify local availability.
 
 ### Whole-Shell Validation
 ```bash
@@ -26,95 +25,17 @@ timeout 5 qs -p .
 ```
 Prefer `qs --path .` for a full-shell load check.
 
-## Architecture Rules
-- Preserve the three-layer flow: `services/` -> `config/` -> `modules/`.
-- `shell.qml` stays declarative and only wires top-level windows together.
-- `services/` own IO, persistence, timers, process integration, and shared state.
-- `config/` derives semantic tokens from settings and service-backed data.
-- `modules/` render UI and forward actions back into services instead of duplicating state.
-- Promote reused behavior into services or shared base components.
+## Skills
 
-## Token System
-### Colors: `Colors.*`
-- Never hardcode feature-level hex colors.
-- Prefer `Colors.background`, `Colors.surface`, `Colors.text`, `Colors.textMuted`, `Colors.border`, `Colors.highlight`, and `Colors.destructive`.
-- If a semantic color is missing, extend `config/Colors.qml` instead of adding a local literal.
+Load these for detailed context on specific topics:
 
-### Animation: `Theme.anim.*`
-- All duration and easing choices should derive from `Theme.anim.*`.
-- Prefer `Theme.anim.move*` for layout motion, `Theme.anim.highlight*` for emphasis, and `Theme.anim.spring*` / `Theme.anim.pulseSpring*` for expressive size changes.
-- Known legacy exceptions: `modules/bar/AnimatedPanelBase.qml` and `modules/bar/ClickRipple.qml` still hardcode some timings.
-- Any unavoidable new timing literal must be marked with `// FIXME: use Theme.anim.*`.
+| Skill | When to use |
+| --- | --- |
+| [qml-architecture](.github/skills/qml-architecture/SKILL.md) | QML architecture rules, file structure, naming conventions, and imports. |
+| [qml-components](.github/skills/qml-components/SKILL.md) | Token system, semantic colors, theme values, base components, and interactive surface patterns. |
+| [qml-state](.github/skills/qml-state/SKILL.md) | Guidelines for managing settings, state, persistence, and error handling. |
+| [qml-testing-strategy](.github/skills/qml-testing-strategy/SKILL.md) | QML bug fixes, behavioral testing, regressions, or behavior modifications. |
 
-### Sizes and Typography: `Theme.*`
-- Use `Theme.barHeight`, `Theme.cornerRadius`, `Theme.fontFamily`, `Theme.fontSizeBody`, etc.
-- For bar-internal micro-layout, prefer `Theme.barWidget.*`.
-- If a shared spacing or icon size token is missing, extend `Theme.barWidget.*` first.
-
-## Settings and Persistence
-- Read settings only through `SettingsService.data.<section>.<key>`.
-- Write settings by mutating `SettingsService.data.*`; persistence is already debounced.
-- Log all persistence lifecycle events at INFO level with a host prefix (e.g. `[DymicShell:SettingsService]`) for reliable production visibility.
-- Do not add ad-hoc save timers in UI code unless you are changing persistence semantics.
-- When adding a setting, update both `config/settings-default.json` and `services/SettingsService.qml` to keep the schema/defaults aligned.
-- Do not treat `null/dymicshell/*.json` as the live runtime source of truth.
-
-## Preferred Base Components
-- `modules/bar/AnimatedPanelBase.qml` - dropdown/panel base with safe surface lifecycle.
-- `modules/bar/StaggerItem.qml` - enter/exit stagger wrapper.
-- `modules/bar/HoverRevealHighlight.qml` - standard hover affordance.
-- `modules/bar/ClickRipple.qml` - standard click feedback.
-- `modules/bar/BarWidgetWrapper.qml` - bar widget container, drag support, shared animation contract.
-
-### Interactive Surface Pattern
-```qml
-HoverRevealHighlight { anchors.fill: parent; hovered: area.containsMouse }
-ClickRipple { id: ripple; anchors.fill: parent }
-MouseArea {
-    id: area
-    hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
-    onClicked: (mouse) => { ripple.triggerRipple(mouse.x, mouse.y); /* action */ }
-}
-```
-If the surface uses custom fills or highlights, enable adaptive contrast so hover feedback stays visible.
-
-## QML File Structure
-Keep each QML file ordered as:
-1. imports
-2. top-level English comment explaining purpose/usage
-3. root `id`
-4. `required property`
-5. public mutable `property`
-6. `readonly property`
-7. private `property _...`
-8. `signal`
-9. child declarations
-10. functions
-11. `Component.onCompleted`
-12. `Connections`
-
-## Import, Naming, and Formatting
-- Import order: `Quickshell*` -> `Qt*` -> `qs.config` -> `qs.services` -> `qs.modules` -> relative imports.
-- Use 4-space indentation and multiline bindings when one line becomes hard to scan.
-- Use typed properties (`bool`, `int`, `real`, `string`, `color`) when the type is known; reserve `var` for dynamic payloads.
-- Private members must start with `_`; public API must not.
-- Prefer descriptive domain names such as `MediaControlService`, `WidgetSettingsPanel`, or `NotificationHistoryPanel`.
-- Avoid grab-bag files named `utils`, `helpers`, `common`, or `shared`.
-- Add short English comments only where the role of a layout, visual, or input element is not obvious.
-
-## State Management
-- Shared cross-window state belongs in a singleton service.
-- Animated panels/windows should use `_state: "closed" | "opening" | "open" | "closing"` instead of toggling `visible` directly.
-- Use guard clauses and early returns in JS helpers.
-- Keep component-local JS small; move reusable behavior into services or base components.
-
-## Error Handling
-- Treat file IO, JSON parsing, compositor data, and external process output as recoverable failures.
-- Log concise diagnostics and fall back to default or empty state instead of breaking the UI.
-- Restore a consistent service state before returning from recoverable failures.
-- Clamp untrusted numeric input and guard against missing object keys.
-
-## Testing and Documentation Hygiene
-- Don't `docs/plans/` references even when files or commands move.
-- Use the full-shell load check before claiming the repo still loads cleanly.
+## Miscellaneous
+- The repo does not define `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmllint`, `qmlformat`, or CI workflow commands. Do not invent those commands unless you verify local availability.
+- Don't remove `docs/plans/` references even when files or commands move.
