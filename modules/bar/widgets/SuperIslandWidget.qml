@@ -78,10 +78,10 @@ property real _flashTrackOpacity: 0
             easingToken: root._notificationEntryMeta.outgoingBaseline.easingToken
         }),
         mainFlashLaneTargetY: root._mainFlashTrackY,
-        flashLaneTargetY: Theme.barWidget.contentPaddingV,
+        flashLaneTargetY: root._flashStripY + Theme.barWidget.contentPaddingV * 3,
         flashLaneCenterY: root._flashLaneCenterY,
         flashRole: ({
-            targetY: Theme.barWidget.contentPaddingV,
+            targetY: root._flashStripY + Theme.barWidget.contentPaddingV * 3,
             deltaY: root._notificationEntryMeta.incomingTransient.deltaY,
             targetCenterY: root._flashLaneCenterY,
             scale: root._notificationEntryMeta.incomingTransient.scale,
