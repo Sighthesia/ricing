@@ -50,6 +50,12 @@ Item {
         Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2
     readonly property real _transitionExpandedWidth:
         root._flashActive ? root._flashPillWidth : root._expandedPillWidth
+    readonly property real _transitionExpandedHeight:
+        root._flashActive
+            ? (root._pillH + root._flashGap + root._flashRowH)
+            : root._pillH
+    readonly property int _returnSyncDuration:
+        Theme.anim.moveDuration
     readonly property bool _showExpandedPillWidth: root._showOverview
         ? root._overviewPillWidth >= root._focusPillWidth
         : root._focusPillWidth >= root._overviewPillWidth
@@ -125,10 +131,11 @@ Item {
         root._flashSourceWasOverview = root._showOverview
         root._holdFlashExtension = true
         root._flashActive = true
-        // Start explicit pill background expand animation
-        _pillCollapseAnim.stop()
-        _pillExpandAnim.stop()
-        _pillExpandAnim.start()
+    }
+
+    function _releaseFlashExtensionIfReady() {
+        if (!root._flashActive)
+            root._holdFlashExtension = false
     }
 
     function _activeWorkspaceHasWindows() {
@@ -253,10 +260,7 @@ Item {
         id: _flashCollapseReleaseTimer
         interval: Theme.anim.moveDuration
         repeat: false
-        onTriggered: {
-            if (!root._flashActive)
-                root._holdFlashExtension = false
-        }
+        onTriggered: root._releaseFlashExtensionIfReady()
     }
 
     Timer {
@@ -303,10 +307,10 @@ Item {
         collapsedWidth: root._collapsedPillWidth
         expandedWidth: root._transitionExpandedWidth
         collapsedHeight: root._pillH
-        expandedHeight: root._pillH
+        expandedHeight: root._transitionExpandedHeight
         expanded: root._flashActive ? true : root._showExpandedPillWidth
         animateWidth: true
-        animateHeight: false
+        animateHeight: true
     }
 
     Connections {
@@ -374,7 +378,7 @@ Item {
         implicitHeight: root._flashActive || root._holdFlashExtension
             ? (root._pillH + root._flashGap + root._flashRowH)
             : root._pillH
-        height: implicitHeight
+        height: Math.max(implicitHeight, _pillTransition.animatedHeight)
 
         // During flash, hold the max of both rows' widths so the row in the flash
         // strip (which may be wider than the pill row) doesn't cause overflow.
@@ -390,26 +394,7 @@ Item {
             anchors.top: parent.top
 
             width: _pillTransition.animatedWidth
-            height: root._pillH
-
-            // Expand: elastic bounce-in
-            NumberAnimation {
-                id: _pillExpandAnim
-                target: _pillBg; property: "height"
-                to: root._pillH + root._flashGap + root._flashRowH
-                duration: Theme.anim.enterDuration
-                easing.type: Theme.anim.enterType
-                easing.amplitude: Theme.anim.enterAmplitude
-                easing.period: Theme.anim.enterPeriod
-            }
-            // Collapse: smooth settle synchronized with row return
-            NumberAnimation {
-                id: _pillCollapseAnim
-                target: _pillBg; property: "height"
-                to: root._pillH
-                duration: Theme.anim.moveDuration
-                easing.type: Theme.anim.moveType
-            }
+            height: _pillTransition.animatedHeight
 
             radius: root._pillH / 2
             color: Colors.surface
@@ -469,10 +454,10 @@ Item {
             // event loop tick, surviving transient _showOverview flips that occur when
             // the window model briefly reports no focused window mid-refresh.
             on_NormalYChanged: {
-                if (_isInFlashStrip || _departYAnim.running || _returnYAnim.running
+                if (_isInFlashStrip || _departYAnim.running || _overviewReturnAnim.running
                     || _overviewEnterAnim.running || _overviewExitAnim.running) return
                 Qt.callLater(() => {
-                    if (!_overviewRow._isInFlashStrip && !_departYAnim.running && !_returnYAnim.running
+                    if (!_overviewRow._isInFlashStrip && !_departYAnim.running && !_overviewReturnAnim.running
                         && !_overviewEnterAnim.running && !_overviewExitAnim.running)
                         _overviewRow.y = _overviewRow._normalY
                 })
@@ -502,9 +487,7 @@ Item {
 
             on_IsInFlashStripChanged: {
                 if (_isInFlashStrip) {
-                    _returnYAnim.stop()
-                    _returnScaleAnim.stop()
-                    _overviewEnterAnim.stop()
+                    _overviewReturnAnim.stop()
                     _departYAnim.from  = _overviewRow.y
                     _departYAnim.to    = _overviewRow._flashStripY
                     _departScaleAnim.from = _overviewRow.scale
@@ -526,16 +509,12 @@ Item {
                 } else if (root._initialized) {
                     _departYAnim.stop()
                     _departScaleAnim.stop()
-                    _returnYAnim.from  = _overviewRow.y
-                    _returnYAnim.to    = _normalY
-                    _returnScaleAnim.from = _overviewRow.scale
-                    _returnScaleAnim.to   = 1.0
-                    _returnYAnim.start()
-                    _returnScaleAnim.start()
-                    // Collapse pill background — synchronized with row return
-                    _pillExpandAnim.stop()
-                    _pillCollapseAnim.stop()
-                    _pillCollapseAnim.start()
+                    _overviewReturnAnim.stop()
+                    _overviewReturnAnim.fromY = _overviewRow.y
+                    _overviewReturnAnim.toY = _normalY
+                    _overviewReturnAnim.fromScale = _overviewRow.scale
+                    _overviewReturnAnim.toScale = 1.0
+                    _overviewReturnAnim.start()
                     // The other row (focus) exits the pill — slide up + scale down
                     _focusEnterAnim.stop()
                     _focusExitAnim.stop()
@@ -597,15 +576,27 @@ Item {
                 target: _overviewRow; property: "scale"
                 duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType
             }
-            NumberAnimation {
-                id: _returnYAnim
-                target: _overviewRow; property: "y"
-                duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType
-            }
-            NumberAnimation {
-                id: _returnScaleAnim
-                target: _overviewRow; property: "scale"
-                duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType
+            ParallelAnimation {
+                id: _overviewReturnAnim
+                property real fromY: _overviewRow.y
+                property real toY: _overviewRow._normalY
+                property real fromScale: _overviewRow.scale
+                property real toScale: 1.0
+
+                NumberAnimation {
+                    target: _overviewRow; property: "y"
+                    from: _overviewReturnAnim.fromY
+                    to: _overviewReturnAnim.toY
+                    duration: root._returnSyncDuration; easing.type: Theme.anim.moveType
+                }
+                NumberAnimation {
+                    target: _overviewRow; property: "scale"
+                    from: _overviewReturnAnim.fromScale
+                    to: _overviewReturnAnim.toScale
+                    duration: root._returnSyncDuration; easing.type: Theme.anim.moveType
+                }
+
+                onFinished: root._releaseFlashExtensionIfReady()
             }
 
             Component.onCompleted: {
@@ -784,10 +775,10 @@ Item {
             // event loop tick, surviving transient focusedAppId="" states that occur
             // when the window model briefly clears between workspace-switch events.
             on_NormalYChanged: {
-                if (_isInFlashStrip || _focusDepartYAnim.running || _focusReturnYAnim.running
+                if (_isInFlashStrip || _focusDepartYAnim.running || _focusReturnAnim.running
                     || _focusEnterAnim.running || _focusExitAnim.running) return
                 Qt.callLater(() => {
-                    if (!_focusRow._isInFlashStrip && !_focusDepartYAnim.running && !_focusReturnYAnim.running
+                    if (!_focusRow._isInFlashStrip && !_focusDepartYAnim.running && !_focusReturnAnim.running
                         && !_focusEnterAnim.running && !_focusExitAnim.running)
                         _focusRow.y = _focusRow._normalY
                 })
@@ -828,8 +819,7 @@ Item {
 
             on_IsInFlashStripChanged: {
                 if (_isInFlashStrip) {
-                    _focusReturnYAnim.stop()
-                    _focusReturnScaleAnim.stop()
+                    _focusReturnAnim.stop()
                     _focusEnterAnim.stop()
                     _focusDepartYAnim.from  = _focusRow.y
                     _focusDepartYAnim.to    = _focusRow._flashStripY
@@ -852,16 +842,12 @@ Item {
                 } else if (root._initialized) {
                     _focusDepartYAnim.stop()
                     _focusDepartScaleAnim.stop()
-                    _focusReturnYAnim.from  = _focusRow.y
-                    _focusReturnYAnim.to    = _normalY
-                    _focusReturnScaleAnim.from = _focusRow.scale
-                    _focusReturnScaleAnim.to   = 1.0
-                    _focusReturnYAnim.start()
-                    _focusReturnScaleAnim.start()
-                    // Collapse pill background — synchronized with row return
-                    _pillExpandAnim.stop()
-                    _pillCollapseAnim.stop()
-                    _pillCollapseAnim.start()
+                    _focusReturnAnim.stop()
+                    _focusReturnAnim.fromY = _focusRow.y
+                    _focusReturnAnim.toY = _normalY
+                    _focusReturnAnim.fromScale = _focusRow.scale
+                    _focusReturnAnim.toScale = 1.0
+                    _focusReturnAnim.start()
                     if (root._emptyWorkspaceSettling) {
                         _overviewExitAnim.stop()
                         _overviewEnterAnim.stop()
@@ -949,15 +935,27 @@ Item {
                 target: _focusRow; property: "scale"
                 duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType
             }
-            NumberAnimation {
-                id: _focusReturnYAnim
-                target: _focusRow; property: "y"
-                duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType
-            }
-            NumberAnimation {
-                id: _focusReturnScaleAnim
-                target: _focusRow; property: "scale"
-                duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType
+            ParallelAnimation {
+                id: _focusReturnAnim
+                property real fromY: _focusRow.y
+                property real toY: _focusRow._normalY
+                property real fromScale: _focusRow.scale
+                property real toScale: 1.0
+
+                NumberAnimation {
+                    target: _focusRow; property: "y"
+                    from: _focusReturnAnim.fromY
+                    to: _focusReturnAnim.toY
+                    duration: root._returnSyncDuration; easing.type: Theme.anim.moveType
+                }
+                NumberAnimation {
+                    target: _focusRow; property: "scale"
+                    from: _focusReturnAnim.fromScale
+                    to: _focusReturnAnim.toScale
+                    duration: root._returnSyncDuration; easing.type: Theme.anim.moveType
+                }
+
+                onFinished: root._releaseFlashExtensionIfReady()
             }
 
             Component.onCompleted: {
