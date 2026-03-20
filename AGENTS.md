@@ -54,6 +54,7 @@ Prefer `qs --path .` for a full-shell load check.
 ## Settings and Persistence
 - Read settings only through `SettingsService.data.<section>.<key>`.
 - Write settings by mutating `SettingsService.data.*`; persistence is already debounced.
+- Log all persistence lifecycle events at INFO level with a host prefix (e.g. `[DymicShell:SettingsService]`) for reliable production visibility.
 - Do not add ad-hoc save timers in UI code unless you are changing persistence semantics.
 - When adding a setting, update both `config/settings-default.json` and `services/SettingsService.qml` to keep the schema/defaults aligned.
 - Do not treat `null/dymicshell/*.json` as the live runtime source of truth.
