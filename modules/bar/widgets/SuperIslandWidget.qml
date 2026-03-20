@@ -46,6 +46,64 @@ property real _mainTrackOpacity: 1
 property real _flashTrackY: 0
 property real _flashTrackScale: _flashScale
 property real _flashTrackOpacity: 0
+    readonly property var _notificationEntryMeta: ({
+        outgoingBaseline: ({
+            targetY: root._flashStripY,
+            deltaY: root._flashStripY - root._flashTrackCenterY,
+            targetCenterY: root._flashLaneCenterY,
+            scale: root._flashScale,
+            opacity: 0.6,
+            durationToken: "moveDuration",
+            easingToken: "moveType"
+        }),
+        incomingTransient: ({
+            targetY: root._mainTrackCenterY,
+            deltaY: root._mainTrackCenterY - root._mainTrackEnterY,
+            targetCenterY: root._mainTrackCenterY
+                + ((_mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH) / 2),
+            scale: 1,
+            opacity: 1,
+            durationToken: "moveDuration",
+            easingToken: "moveType"
+        })
+    })
+    readonly property var _windowHintEntryMeta: ({
+        mainRole: ({
+            targetY: root._mainFlashTrackY,
+            deltaY: root._mainFlashTrackY - root._mainTrackCenterY,
+            targetCenterY: root._flashLaneCenterY,
+            scale: root._notificationEntryMeta.outgoingBaseline.scale,
+            opacity: root._notificationEntryMeta.outgoingBaseline.opacity,
+            durationToken: root._notificationEntryMeta.outgoingBaseline.durationToken,
+            easingToken: root._notificationEntryMeta.outgoingBaseline.easingToken
+        }),
+        mainFlashLaneTargetY: root._mainFlashTrackY,
+        flashLaneTargetY: Theme.barWidget.contentPaddingV,
+        flashLaneCenterY: root._flashLaneCenterY,
+        flashRole: ({
+            targetY: Theme.barWidget.contentPaddingV,
+            deltaY: root._notificationEntryMeta.incomingTransient.deltaY,
+            targetCenterY: root._flashLaneCenterY,
+            scale: root._notificationEntryMeta.incomingTransient.scale,
+            opacity: root._notificationEntryMeta.incomingTransient.opacity,
+            durationToken: root._notificationEntryMeta.incomingTransient.durationToken,
+            easingToken: root._notificationEntryMeta.incomingTransient.easingToken
+        })
+    })
+    readonly property var _idleMotionMeta: ({
+        mainOpacity: 1,
+        mainScale: 1,
+        flashOpacity: 0,
+        flashScale: root._flashScale
+    })
+    readonly property var _resolvedWindowHintState: ({
+        mainTargetY: root._mainTrackY,
+        mainScale: root._mainTrackScale,
+        mainOpacity: root._mainTrackOpacity,
+        flashTargetY: root._flashTrackY,
+        flashScale: root._flashTrackScale,
+        flashOpacity: root._flashTrackOpacity
+    })
 
     // --- derived state (avoid undefined bindings + runtime crashes) ---
     readonly property var _baselineEvent: root._displayEvent(SuperIslandService.mainState)
@@ -61,13 +119,22 @@ property real _flashTrackOpacity: 0
         root._trackCenterY(_mainLoader.item, root._pillH, root._mainDisplayEvent, true)
     readonly property real _flashTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
+    readonly property real _flashRowBaseY: root._pillH + root._flashGap
+    readonly property real _flashLaneCenterY: root._flashRowBaseY + root._flashRowH / 2
     readonly property real _flashStripY:
-        root._pillH + root._flashGap
+        root._flashRowBaseY
         + root._trackCenterY(_stripLoader.item, root._flashRowH, root._flashSourceEvent, false)
+    readonly property real _mainFlashTrackY:
+        root._flashRowBaseY
+        + root._trackCenterY(_mainLoader.item, root._flashRowH, root._mainDisplayEvent, true)
     readonly property real _hintTrackY: root._mainTrackCenterY - root._hintLift
     readonly property real _hintDividerY: root._pillH + Math.max(0, (root._flashGap - 1) / 2)
-    readonly property real _hintBackgroundY: root._flashStripY
+    readonly property real _hintBackgroundY: root._flashRowBaseY
     readonly property real _hintBackgroundHeight: root._flashRowH
+    readonly property real _hintBackgroundPulseOpacity:
+        root._hintPhase && root._flashSourceEvent.type !== "window"
+            ? root._sharedBackgroundPulseOpacity
+            : 0
     readonly property real _returnTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
     readonly property real _collapsedPillHeight: root._pillH
@@ -261,6 +328,7 @@ Component.onCompleted: {
     }
 
     function _startEnterTransition(event) {
+        const wasHintPhase = root._hintPhase
         const outgoing = root._cloneEvent(root._hintPhase
             ? root._baselineEvent
             : (root._mainDisplayEvent.type !== "idle"
@@ -282,7 +350,6 @@ Component.onCompleted: {
         }
 
         root._mainDisplayEvent = root._displayEvent(event)
-        root._flashSourceEvent = outgoing
         root._phase = "enter"
 
         _returnAnim.stop()
@@ -292,9 +359,17 @@ Component.onCompleted: {
         root._mainTrackScale = 0.92
         root._mainTrackOpacity = 0.15
 
-        root._flashTrackY = root._flashTrackCenterY
-        root._flashTrackScale = 1
-        root._flashTrackOpacity = 1
+        if (wasHintPhase) {
+            root._flashSourceEvent = root._cloneEvent(root._flashSourceEvent)
+            root._flashTrackY = root._windowHintEntryMeta.flashRole.targetY
+            root._flashTrackScale = root._windowHintEntryMeta.flashRole.scale
+            root._flashTrackOpacity = root._windowHintEntryMeta.flashRole.opacity
+        } else {
+            root._flashSourceEvent = outgoing
+            root._flashTrackY = root._flashTrackCenterY
+            root._flashTrackScale = 1
+            root._flashTrackOpacity = 1
+        }
         root._triggerSharedBackgroundPulse()
 
         Qt.callLater(function() {
@@ -314,12 +389,17 @@ Component.onCompleted: {
         _hintExitAnim.stop()
 
         root._mainTrackY = root._mainTrackCenterY
-        root._flashTrackY = root._hintTrackY - Theme.barWidget.contentPaddingV * 2
-        root._flashTrackScale = 0.96
+        root._mainTrackScale = 1
+        root._mainTrackOpacity = 1
+        root._flashTrackY = root._windowHintEntryMeta.flashRole.targetY
+            - root._windowHintEntryMeta.flashRole.deltaY
+        root._flashTrackScale = 0.92
         root._flashTrackOpacity = 0
         _hintFlashDelayTimer.restart()
 
-        _hintEnterAnim.start()
+        Qt.callLater(function() {
+            _hintEnterAnim.start()
+        })
     }
 
     function _updateWindowHint(event) {
@@ -363,7 +443,9 @@ Component.onCompleted: {
         const nextEvent = root._displayEvent(event)
 
         root._mainDisplayEvent = nextEvent
-        root._flashSourceEvent = root._cloneEvent(root._baselineEvent)
+        root._flashSourceEvent = root._hintPhase
+            ? root._cloneEvent(root._flashSourceEvent)
+            : root._cloneEvent(root._baselineEvent)
 
         _returnAnim.stop()
         _hintEnterAnim.stop()
@@ -543,7 +625,7 @@ Component.onCompleted: {
             height: root._hintBackgroundHeight
             radius: height / 2
             color: Colors.highlight
-            opacity: root._hintPhase ? root._sharedBackgroundPulseOpacity : 0
+            opacity: root._hintBackgroundPulseOpacity
             visible: root.flashTrackVisible
         }
 
@@ -759,14 +841,17 @@ Component.onCompleted: {
 
         onFinished: {
             const returningEvent = root._displayEvent(root._flashSourceEvent)
+            const returningFromWindowHint = returningEvent.type === "window"
             const handoffY = root._flashTrackY
             const handoffScale = root._flashTrackScale
             const handoffOpacity = root._flashTrackOpacity
 
-            root._mainDisplayEvent = returningEvent.type !== "idle" ? returningEvent : root._baselineEvent
-            root._mainTrackY = handoffY
-            root._mainTrackScale = handoffScale
-            root._mainTrackOpacity = handoffOpacity
+            root._mainDisplayEvent = returningFromWindowHint
+                ? root._baselineEvent
+                : (returningEvent.type !== "idle" ? returningEvent : root._baselineEvent)
+            root._mainTrackY = returningFromWindowHint ? root._mainTrackCenterY : handoffY
+            root._mainTrackScale = returningFromWindowHint ? 1 : handoffScale
+            root._mainTrackOpacity = returningFromWindowHint ? 1 : handoffOpacity
             root._phase = "idle"
             root._flashSourceEvent = root._idleSnapshot()
             root._flashTrackY = root._flashStripY
@@ -781,7 +866,23 @@ Component.onCompleted: {
         NumberAnimation {
             target: root
             property: "_mainTrackY"
-            to: root._flashStripY
+            to: root._windowHintEntryMeta.mainRole.targetY
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        NumberAnimation {
+            target: root
+            property: "_mainTrackScale"
+            to: root._flashScale
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        NumberAnimation {
+            target: root
+            property: "_mainTrackOpacity"
+            to: 0.6
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -789,7 +890,7 @@ Component.onCompleted: {
         NumberAnimation {
             target: root
             property: "_flashTrackY"
-            to: root._hintTrackY
+            to: root._windowHintEntryMeta.flashRole.targetY
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -805,7 +906,7 @@ Component.onCompleted: {
         NumberAnimation {
             target: root
             property: "_flashTrackOpacity"
-            to: 0.82
+            to: 1
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
