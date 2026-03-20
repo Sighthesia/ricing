@@ -48,6 +48,8 @@ Item {
     readonly property real _expandedPillWidth: Math.max(root._focusPillWidth, root._overviewPillWidth)
     readonly property real _flashPillWidth:
         Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2
+    readonly property real _transitionExpandedWidth:
+        root._flashActive ? root._flashPillWidth : root._expandedPillWidth
     readonly property bool _showExpandedPillWidth: root._showOverview
         ? root._overviewPillWidth >= root._focusPillWidth
         : root._focusPillWidth >= root._overviewPillWidth
@@ -299,10 +301,10 @@ Item {
         objectName: "workspaceSharedTransition"
 
         collapsedWidth: root._collapsedPillWidth
-        expandedWidth: root._expandedPillWidth
+        expandedWidth: root._transitionExpandedWidth
         collapsedHeight: root._pillH
         expandedHeight: root._pillH
-        expanded: root._showExpandedPillWidth
+        expanded: root._flashActive ? true : root._showExpandedPillWidth
         animateWidth: true
         animateHeight: false
     }
@@ -364,7 +366,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
 
         clip: true
-        width: root._flashActive ? root._flashPillWidth : _pillTransition.animatedWidth
+        width: _pillTransition.animatedWidth
         scale: root._sharedPulseScale
         transformOrigin: Item.Center
 
@@ -377,19 +379,17 @@ Item {
         // During flash, hold the max of both rows' widths so the row in the flash
         // strip (which may be wider than the pill row) doesn't cause overflow.
         // After flash, collapses smoothly to the active row's width.
-        implicitWidth: root._flashActive
-            ? root._flashPillWidth
-            : _pillTransition.animatedWidth
+        implicitWidth: _pillTransition.animatedWidth
 
         // Visual pill background: height follows explicit animation for bounce/collapse.
         // Separated from the clip wrapper so clipping doesn't cut travelling rows.
         Rectangle {
             id: _pillBg
             objectName: "workspacePillBackground"
-            anchors.left: parent.left
-            anchors.right: parent.right
+            anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
 
+            width: _pillTransition.animatedWidth
             height: root._pillH
 
             // Expand: elastic bounce-in
