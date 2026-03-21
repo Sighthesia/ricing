@@ -72,6 +72,14 @@ Singleton {
         return Math.max(0, Math.min(1, numericValue))
     }
 
+    function _stepDirection(value) {
+        const numericValue = Number(value)
+        if (!Number.isFinite(numericValue) || numericValue === 0)
+            return 0
+
+        return numericValue > 0 ? 1 : -1
+    }
+
     function _normalizeState(state) {
         const source = state || {}
 
@@ -109,8 +117,8 @@ Singleton {
             return null
 
         const currentValue = Number(fields[2])
-        const maxValue = Number(fields[3])
-        const percentField = fields.length > 4 ? fields[4].trim() : ""
+        const percentField = fields.length > 3 ? fields[3].trim() : ""
+        const maxValue = Number(fields.length > 4 ? fields[4] : "")
         let parsedLevel = null
 
         if (Number.isFinite(currentValue) && Number.isFinite(maxValue) && maxValue > 0)
