@@ -8,13 +8,24 @@ import qs.services
 Singleton {
     id: root
 
-    readonly property var _allMetricEntries: root._buildAllMetricEntries()
-    readonly property var metrics: root._buildPinnedMetrics()
-    readonly property string highestSeverity: root._deriveHighestSeverity(root.metrics)
+    readonly property real volumeBrightnessStep: 0.05
+    readonly property real temperatureProgressMinC: 30
+    readonly property real temperatureProgressMaxC: 100
+
+    readonly property var persistentMetrics: root._buildPersistentMetrics()
+    readonly property var expandedMetrics: root._buildExpandedMetrics()
+    readonly property var allMetrics: root.persistentMetrics.concat(root.expandedMetrics)
+    // Legacy alias for older widgets; new code should prefer persistentMetrics or allMetrics explicitly.
+    readonly property var metrics: root.persistentMetrics
+    readonly property string highestSeverity: root._deriveHighestSeverity(root.persistentMetrics)
     readonly property real volumeLevel: AudioDeviceService.volumeLevel
     readonly property bool volumeMuted: AudioDeviceService.volumeMuted
     readonly property bool microphoneMuted: AudioDeviceService.microphoneMuted
     readonly property real brightnessLevel: BrightnessService.level
+    readonly property var pinnedMetrics: root._settings() ? root._settings().pinnedMetrics : []
+    readonly property bool showVolume: !!(root._settings() && root._settings().showVolume)
+    readonly property bool showBrightness: !!(root._settings() && root._settings().showBrightness)
+    readonly property bool showMicrophone: !!(root._settings() && root._settings().showMicrophone)
     readonly property var flashEvent: root._flashOverride !== undefined
         ? (root._flashOverride || ({}))
         : (root.flashVisible ? root._activeFlashEvent : ({}))
@@ -77,13 +88,33 @@ Singleton {
         BrightnessService.setLevel(level)
     }
 
+    function adjustVolumeByStep(step) {
+        const direction = root._stepDirection(step)
+        if (direction === 0)
+            return
+
+        root.setVolumeLevel(root.volumeLevel + direction * root.volumeBrightnessStep)
+    }
+
+    function adjustBrightnessByStep(step) {
+        const direction = root._stepDirection(step)
+        if (direction === 0)
+            return
+
+        const currentLevel = BrightnessService.level
+        const targetLevel = Math.max(0, Math.min(1, currentLevel + direction * root.volumeBrightnessStep))
+
+        BrightnessService.setLevel(targetLevel)
+    }
+
     function toggleMicrophoneMute() {
         AudioDeviceService.toggleMicrophoneMute()
     }
 
     function acknowledgeFlash() {
         if (root._flashOverride !== undefined) {
-            root._flashOverride = null
+            // Exit override mode cleanly so normal flash lifecycle resumes.
+            root._clearFlashOverride()
             return
         }
 
@@ -99,96 +130,141 @@ Singleton {
         root._flashOverride = undefined
     }
 
-    function _canonicalMetricKeys() {
-        return ["cpu", "memory", "temperature"]
-    }
-
-    function _metricEntry(key, title, available, severity, value, displayValue) {
+    function _metricEntry(key, title, icon, value, normalizedProgress, displayText, severity, available, persistent, interactive) {
         return {
             key: key,
             title: title,
-            available: !!available,
-            severity: severity,
+            icon: icon,
             value: value,
-            displayValue: displayValue || ""
+            normalizedProgress: normalizedProgress,
+            displayText: displayText,
+            displayValue: displayText,
+            severity: severity,
+            available: !!available,
+            persistent: !!persistent,
+            interactive: !!interactive
         }
     }
 
-    function _buildAllMetricEntries() {
+    function _buildPersistentMetrics() {
         const snapshot = SystemMetricsService.metricsSnapshot || {}
 
         return [
             root._metricEntry(
                 "cpu",
                 "CPU",
-                snapshot.cpuAvailable,
-                root._severityForCpu(snapshot.cpuAvailable, snapshot.cpuUsage),
+                "cpu",
                 Number(snapshot.cpuUsage) || 0,
-                snapshot.cpuLabel || "CPU --"
+                root._normalizeProgress(snapshot.cpuUsage),
+                snapshot.cpuLabel || "CPU --",
+                root._severityForCpu(snapshot.cpuAvailable, snapshot.cpuUsage),
+                snapshot.cpuAvailable,
+                true,
+                false
             ),
             root._metricEntry(
                 "memory",
                 "Memory",
-                snapshot.memoryAvailable,
-                root._severityForMemory(snapshot.memoryAvailable, snapshot.memoryUsage),
+                "memory",
                 Number(snapshot.memoryUsage) || 0,
-                snapshot.memoryLabel || "MEM --"
+                root._normalizeProgress(snapshot.memoryUsage),
+                snapshot.memoryLabel || "MEM --",
+                root._severityForMemory(snapshot.memoryAvailable, snapshot.memoryUsage),
+                snapshot.memoryAvailable,
+                true,
+                false
             ),
             root._metricEntry(
                 "temperature",
                 "Temperature",
-                snapshot.temperatureAvailable,
-                root._severityForTemperature(snapshot.temperatureAvailable, snapshot.temperatureC),
+                "temperature",
                 Number(snapshot.temperatureC) || 0,
-                snapshot.temperatureLabel || "TEMP --"
+                root._temperatureProgress(snapshot.temperatureC),
+                snapshot.temperatureLabel || "TEMP --",
+                root._severityForTemperature(snapshot.temperatureAvailable, snapshot.temperatureC),
+                snapshot.temperatureAvailable,
+                true,
+                false
             )
         ]
     }
 
-    function _buildPinnedMetrics() {
-        const settings = root._settings()
-        const preferredKeys = []
-        const seen = {}
-        const pinned = settings && Array.isArray(settings.pinnedMetrics) ? settings.pinnedMetrics : []
-        const canonicalKeys = root._canonicalMetricKeys()
+    function _buildExpandedMetrics() {
+        const audio = AudioDeviceService.audioSnapshot || {}
+        const brightness = BrightnessService.brightnessSnapshot || {}
+        const battery = BatteryService.batterySnapshot || {}
 
-        for (let index = 0; index < pinned.length; index++) {
-            const key = pinned[index]
-            if (canonicalKeys.indexOf(key) === -1 || seen[key])
-                continue
-
-            seen[key] = true
-            preferredKeys.push(key)
-        }
-
-        for (let canonicalIndex = 0; canonicalIndex < canonicalKeys.length; canonicalIndex++) {
-            const fallbackKey = canonicalKeys[canonicalIndex]
-            if (seen[fallbackKey])
-                continue
-
-            preferredKeys.push(fallbackKey)
-        }
-
-        const orderedEntries = []
-        for (let preferredIndex = 0; preferredIndex < preferredKeys.length; preferredIndex++) {
-            const preferredKey = preferredKeys[preferredIndex]
-            const entry = root._metricByKey(root._allMetricEntries, preferredKey)
-            if (entry)
-                orderedEntries.push(entry)
-        }
-
-        const availableEntries = orderedEntries.filter((entry) => entry.available)
-        const unavailableEntries = orderedEntries.filter((entry) => !entry.available)
-        return availableEntries.concat(unavailableEntries).slice(0, 3)
+        return [
+            root._metricEntry(
+                "volume",
+                "Volume",
+                "volume",
+                Number(audio.volumeLevel) || 0,
+                root._normalizeProgress(audio.volumeLevel),
+                audio.volumeMuted ? "VOL MUTE" : "VOL " + Math.round((Number(audio.volumeLevel) || 0) * 100) + "%",
+                "normal",
+                !!audio.sinkAvailable,
+                false,
+                true
+            ),
+            root._metricEntry(
+                "brightness",
+                "Brightness",
+                "brightness",
+                Number(brightness.level) || 0,
+                root._normalizeProgress(brightness.level),
+                brightness.available ? "BRIGHT " + Math.round((Number(brightness.level) || 0) * 100) + "%" : "BRIGHT --",
+                "normal",
+                !!brightness.available,
+                false,
+                true
+            ),
+            root._metricEntry(
+                "battery",
+                "Battery",
+                "battery",
+                Number(battery.level) || 0,
+                root._normalizeProgress(battery.level),
+                battery.available ? "BAT " + Math.round((Number(battery.level) || 0) * 100) + "%" : "BAT --",
+                "normal",
+                !!battery.available,
+                false,
+                false
+            )
+        ]
     }
 
-    function _metricByKey(entries, key) {
-        for (let index = 0; index < entries.length; index++) {
-            if (entries[index].key === key)
-                return entries[index]
-        }
+    function _normalizeProgress(value) {
+        const numericValue = Number(value)
+        if (!Number.isFinite(numericValue))
+            return 0
 
-        return null
+        return Math.max(0, Math.min(1, numericValue))
+    }
+
+    function _clampRatio(value) {
+        const numericValue = Number(value)
+        if (!Number.isFinite(numericValue))
+            return 0
+
+        return Math.max(0, Math.min(1, numericValue))
+    }
+
+    function _stepDirection(value) {
+        const numericValue = Number(value)
+        if (!Number.isFinite(numericValue) || numericValue === 0)
+            return 0
+
+        return numericValue > 0 ? 1 : -1
+    }
+
+    function _temperatureProgress(temperatureC) {
+        const numericTemperature = Number(temperatureC)
+        if (!Number.isFinite(numericTemperature))
+            return 0
+
+        return Math.max(0, Math.min(1, (numericTemperature - root.temperatureProgressMinC)
+            / (root.temperatureProgressMaxC - root.temperatureProgressMinC)))
     }
 
     function _severityForCpu(available, usage) {
@@ -364,6 +440,24 @@ Singleton {
         function onMemoryUsageChanged() { root._reconcileAlerts() }
         function onTemperatureAvailableChanged() { root._reconcileAlerts() }
         function onTemperatureCChanged() { root._reconcileAlerts() }
+    }
+
+    Connections {
+        target: AudioDeviceService
+
+        function onAudioStateChanged() { root._reconcileAlerts() }
+    }
+
+    Connections {
+        target: BrightnessService
+
+        function onBrightnessStateChanged() { root._reconcileAlerts() }
+    }
+
+    Connections {
+        target: BatteryService
+
+        function onBatteryStateChanged() { root._reconcileAlerts() }
     }
 
     // Connections {
