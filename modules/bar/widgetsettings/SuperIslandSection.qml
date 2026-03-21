@@ -42,5 +42,38 @@ Item {
                 SettingsService.save()
             }
         }
+
+        SliderSection {
+            width: parent.width
+            label: "通知显示时长"
+            value: SettingsService.data.superIsland.notificationTimeout
+            from: 500; to: 10000; stepSize: 250; unit: "ms"
+            onValueCommitted: newValue => {
+                SettingsService.data.superIsland.notificationTimeout = newValue
+                SettingsService.save()
+            }
+        }
+
+        SliderSection {
+            width: parent.width
+            label: "媒体显示时长"
+            value: SettingsService.data.superIsland.mediaTimeout
+            from: 500; to: 10000; stepSize: 250; unit: "ms"
+            onValueCommitted: newValue => {
+                SettingsService.data.superIsland.mediaTimeout = newValue
+                SettingsService.save()
+            }
+        }
+
+        SliderSection {
+            width: parent.width
+            label: "工作区事件显示时长"
+            value: SettingsService.data.superIsland.workspaceTimeout
+            from: 500; to: 10000; stepSize: 250; unit: "ms"
+            onValueCommitted: newValue => {
+                SettingsService.data.superIsland.workspaceTimeout = newValue
+                SettingsService.save()
+            }
+        }
     }
 }

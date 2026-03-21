@@ -12,7 +12,7 @@ PanelWindow {
     color: "transparent"
 
     // Expand downward during WorkspaceWidget switch flashes (non-exclusive zone).
-    implicitHeight: Theme.barHeight + BarLayoutService.barFlashExtension
+    implicitHeight: Theme.barHeight + BarLayoutService.barTransientExtension
     exclusiveZone: Theme.barHeight
 
     WlrLayershell.layer: WlrLayer.Top

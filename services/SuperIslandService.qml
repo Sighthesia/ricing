@@ -75,6 +75,9 @@ Singleton {
             defaultTimeout: 1500,
             importantTimeout: 1500,
             criticalTimeout: 1500,
+            workspaceTimeout: 1500,
+            notificationTimeout: 1500,
+            mediaTimeout: 1500,
             maxQueue: 1,
             showMedia: true,
             showNotifications: true,
@@ -133,6 +136,39 @@ Singleton {
         return settings.defaultTimeout
     }
 
+    function _timeoutForNotification(urgency) {
+        const n = SettingsService.data.notifications || {}
+        const lowMs = n.lowDuration !== undefined ? n.lowDuration : 3000
+        const normalMs = n.normalDuration !== undefined ? n.normalDuration : 5000
+        const criticalMs = n.criticalDuration !== undefined ? n.criticalDuration : 0
+
+        if (urgency === 0) return lowMs
+        if (urgency === 2) return criticalMs
+        return normalMs
+    }
+
+    function _timeoutForEvent(event) {
+        const settings = root._settings()
+        if (!event || !event.type)
+            return settings.defaultTimeout
+
+        if (event.type === "notification") {
+            const urgency = event.urgency !== undefined ? event.urgency : 1
+            const result = root._timeoutForNotification(urgency)
+            if (result !== undefined && result !== null)
+                return result
+            return settings.notificationTimeout || settings.defaultTimeout
+        }
+
+        if (event.type === "media")
+            return settings.mediaTimeout || settings.defaultTimeout
+
+        if (event.type === "workspace" || event.type === "window")
+            return settings.workspaceTimeout || settings.defaultTimeout
+
+        return root._timeoutForPriority(event.priority)
+    }
+
     function _isEventEnabled(type) {
         const settings = root._settings()
         if (type === "media")
@@ -185,7 +221,7 @@ Singleton {
 
         const priority = event.priority || "important"
         const type = event.type || "notification"
-        return {
+        const normalized = {
             id: event.id || type + ":" + Date.now(),
             type: type,
             groupKey: event.groupKey || type,
@@ -195,9 +231,16 @@ Singleton {
             subtitle: event.subtitle || "",
             icon: event.icon || "",
             workspaceLabel: event.workspaceLabel || "",
-            timeoutMs: event.timeoutMs || root._timeoutForPriority(priority),
+            urgency: event.urgency,
             timestamp: Date.now()
         }
+
+        if (event.timeoutMs !== undefined && event.timeoutMs !== null)
+            normalized.timeoutMs = event.timeoutMs
+        else
+            normalized.timeoutMs = root._timeoutForEvent(normalized)
+
+        return normalized
     }
 
     function _routeEvent(event) {
@@ -347,7 +390,7 @@ Singleton {
             subtitle: window.appId || "Focused window",
             icon: root._iconPathForApp(window.appId),
             workspaceLabel: workspaceIndex > 0 ? workspaceIndex.toString() : "",
-            timeoutMs: root._settings().defaultTimeout
+            timeoutMs: root._settings().workspaceTimeout
         }
     }
 
@@ -377,11 +420,11 @@ Singleton {
                 id: "notification:" + item.id,
                 type: "notification",
                 groupKey: "notification",
-                priority: "important",
+                priority: item.urgency === 2 ? "critical" : "important",
+                urgency: item.urgency !== undefined ? item.urgency : 1,
                 title: (item.summary || item.appName || "Notification").replace(/\n/g, " "),
                 subtitle: (item.body || "").replace(/\n/g, " "),
-                icon: item.appIcon || "preferences-system-notifications",
-                timeoutMs: root._settings().defaultTimeout
+                icon: item.appIcon || "preferences-system-notifications"
             })
         }
     }
@@ -446,7 +489,7 @@ Singleton {
                 title: MediaService.title || MediaService.playerName || "Media",
                 subtitle: MediaService.artist || MediaService.playbackState,
                 icon: root._mediaIcon(),
-                timeoutMs: root._settings().defaultTimeout
+                urgency: 1
             })
         }
     }

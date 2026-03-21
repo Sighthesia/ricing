@@ -1,6 +1,7 @@
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 import qs.config
 import qs.services
 import "widgetsettings"
@@ -198,6 +199,9 @@ PopupWindow {
             contentHeight: panelLayout.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
 
         ColumnLayout {
             id: panelLayout

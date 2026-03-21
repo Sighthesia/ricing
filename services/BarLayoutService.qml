@@ -40,20 +40,21 @@ Singleton {
     // True while the notification history panel is visible.
     property bool notificationHistoryOpen: false
 
-    // Extra pixels the bar extends downward below exclusiveZone during widget flashes.
-    property int workspaceFlashExtension: 0
-    property int superIslandFlashExtension: 0
-    property int mediaControlFlashExtension: 0
-    property int systemTrayFlashExtension: 0
-    property int systemMonitorFlashExtension: 0
-    readonly property int barFlashExtension:
-        Math.max(
-            workspaceFlashExtension,
-            superIslandFlashExtension,
-            mediaControlFlashExtension,
-            systemTrayFlashExtension,
-            systemMonitorFlashExtension
-        )
+     // Extra pixels the bar extends downward below exclusiveZone during widget flashes.
+     property int mediaControlFlashExtension: 0
+     property int systemTrayFlashExtension: 0
+     property int systemMonitorFlashExtension: 0
+     property var _transientExtensions: ({})
+     readonly property var transientExtensions: _transientExtensions
+     readonly property int barFlashExtension:
+         Math.max(
+             workspaceFlashExtension,
+             superIslandFlashExtension,
+             mediaControlFlashExtension,
+             systemTrayFlashExtension,
+             systemMonitorFlashExtension,
+             Math.max(_maxRegisteredTransientExtension(), mediaControlFlashExtension)
+         )
 
     // Which bar section the picker should insert widgets into.
     // Updated whenever the user clicks a section in layout mode.
@@ -149,6 +150,32 @@ Singleton {
         _barContentWidth = nextContentWidth
         _barContentPadding = nextPadding
         _recomputeGeometryContracts()
+    }
+
+    function setTransientExtension(ownerKey, height) {
+        if (!ownerKey)
+            return false
+
+        let nextHeight = Math.max(0, Math.round(Number(height) || 0))
+        let nextRegistry = Object.assign({}, _transientExtensions)
+
+        if (nextHeight <= 0)
+            delete nextRegistry[ownerKey]
+        else
+            nextRegistry[ownerKey] = nextHeight
+
+        _transientExtensions = nextRegistry
+        return true
+    }
+
+    function clearTransientExtension(ownerKey) {
+        if (!ownerKey || _transientExtensions[ownerKey] === undefined)
+            return false
+
+        let nextRegistry = Object.assign({}, _transientExtensions)
+        delete nextRegistry[ownerKey]
+        _transientExtensions = nextRegistry
+        return true
     }
 
     function setWidgetMeasuredWidth(instanceKey, width, options) {
@@ -257,6 +284,19 @@ Singleton {
 
         let measuredWidth = _widgetMeasuredWidths[instanceKey]
         return typeof measuredWidth === "number" ? measuredWidth : 0
+    }
+
+    function _maxRegisteredTransientExtension() {
+        let maxExtension = 0
+
+        for (let ownerKey in _transientExtensions) {
+            let extension = _transientExtensions[ownerKey]
+
+            if (typeof extension === "number" && extension > maxExtension)
+                maxExtension = extension
+        }
+
+        return maxExtension
     }
 
     function sectionGeometry(sectionName) {

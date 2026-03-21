@@ -152,6 +152,9 @@ Singleton {
                 defaultTimeout: adapter.superIsland.defaultTimeout,
                 importantTimeout: adapter.superIsland.importantTimeout,
                 criticalTimeout: adapter.superIsland.criticalTimeout,
+                workspaceTimeout: adapter.superIsland.workspaceTimeout,
+                notificationTimeout: adapter.superIsland.notificationTimeout,
+                mediaTimeout: adapter.superIsland.mediaTimeout,
                 cooldownMs: adapter.superIsland.cooldownMs,
                 maxQueue: adapter.superIsland.maxQueue,
                 showMedia: adapter.superIsland.showMedia,
@@ -382,6 +385,9 @@ Singleton {
             property int defaultTimeout: 1500
             property int importantTimeout: 1500
             property int criticalTimeout: 1500
+            property int workspaceTimeout: 1500
+            property int notificationTimeout: 1500
+            property int mediaTimeout: 1500
             property int cooldownMs: 1800
             property int maxQueue: 5
             property bool showMedia: true
