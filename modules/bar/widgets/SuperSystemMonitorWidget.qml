@@ -123,10 +123,8 @@ Item {
     Binding {
         target: BarLayoutService
         property: "systemMonitorFlashExtension"
-        value: root._enabled
-            ? (root._flashExpanded
-                ? (root._flashGap + root._flashRowHeight)
-                : Math.max(0, Math.round(pill.height - root._pillHeight)))
+        value: root._enabled && root._flashVisualActive
+            ? (root._flashGap + root._flashRowHeight)
             : 0
         restoreMode: Binding.RestoreBindingOrValue
     }
