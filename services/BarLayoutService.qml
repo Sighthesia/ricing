@@ -40,21 +40,24 @@ Singleton {
     // True while the notification history panel is visible.
     property bool notificationHistoryOpen: false
 
-     // Extra pixels the bar extends downward below exclusiveZone during widget flashes.
-     property int mediaControlFlashExtension: 0
-     property int systemTrayFlashExtension: 0
-     property int systemMonitorFlashExtension: 0
-     property var _transientExtensions: ({})
-     readonly property var transientExtensions: _transientExtensions
-     readonly property int barFlashExtension:
-         Math.max(
-             workspaceFlashExtension,
-             superIslandFlashExtension,
-             mediaControlFlashExtension,
-             systemTrayFlashExtension,
-             systemMonitorFlashExtension,
-             Math.max(_maxRegisteredTransientExtension(), mediaControlFlashExtension)
-         )
+    // Extra pixels the bar extends downward below exclusiveZone during widget flashes.
+    property int workspaceFlashExtension: 0
+    property int superIslandFlashExtension: 0
+    property int mediaControlFlashExtension: 0
+    property int systemTrayFlashExtension: 0
+    property int systemMonitorFlashExtension: 0
+    property var _transientExtensions: ({})
+    readonly property var transientExtensions: _transientExtensions
+    readonly property int barTransientExtension:
+        Math.max(
+            workspaceFlashExtension,
+            superIslandFlashExtension,
+            mediaControlFlashExtension,
+            systemTrayFlashExtension,
+            systemMonitorFlashExtension,
+            _maxRegisteredTransientExtension()
+        )
+    readonly property int barFlashExtension: barTransientExtension
 
     // Which bar section the picker should insert widgets into.
     // Updated whenever the user clicks a section in layout mode.

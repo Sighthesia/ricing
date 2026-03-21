@@ -27,6 +27,9 @@ import qs.services
 Item {
     id: staggerItem
 
+    implicitWidth: width
+    implicitHeight: height
+
     // Delay (ms) before the ENTER animation begins after runEnter() is called.
     // Use: baseDelay + index * step for list delegates.
     property int delay: 0

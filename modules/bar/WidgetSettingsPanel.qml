@@ -194,13 +194,15 @@ PopupWindow {
             anchors {
                 top: parent.top; left: parent.left; right: parent.right
                 bottom: _siDelete.top
-                margins: 12; bottomMargin: 0
+                leftMargin: 12; rightMargin: 18; topMargin: 12; bottomMargin: 0
             }
             contentHeight: panelLayout.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
+                width: 6
+                anchors.rightMargin: 2
             }
 
         ColumnLayout {
