@@ -59,36 +59,6 @@ Singleton {
         _writeProcess.running = true
     }
 
-    function stepLevel(direction, stepSize) {
-        const normalizedDirection = root._stepDirection(direction)
-        const stepPercent = Math.max(1, Math.round(root._clampRatio(stepSize) * 100))
-
-        if (normalizedDirection === 0)
-            return
-
-        if (root._stateOverride !== null) {
-            root._stateOverride = root._normalizeState({
-                available: root._stateOverride.available,
-                level: root._stateOverride.level + normalizedDirection * (stepPercent / 100)
-            })
-            root._maybeEmitStateChanged()
-            return
-        }
-
-        if (!root.available) {
-            root.refresh()
-            return
-        }
-
-        root.brightnessCommandIssued("stepLevel", {
-            direction: normalizedDirection,
-            percent: stepPercent
-        })
-        _writeProcess.command = ["brightnessctl", "set", root._stepCommandToken(normalizedDirection, stepPercent)]
-        _writeProcess.running = false
-        _writeProcess.running = true
-    }
-
     function _setStateOverride(state) {
         root._stateOverride = state === null ? null : root._normalizeState(state)
         root._maybeEmitStateChanged()
@@ -108,18 +78,6 @@ Singleton {
             return 0
 
         return numericValue > 0 ? 1 : -1
-    }
-
-    function _stepCommandToken(direction, stepPercent) {
-        const normalizedDirection = root._stepDirection(direction)
-        const normalizedPercent = Math.max(1, Math.round(root._clampRatio(stepPercent) * 100))
-
-        if (normalizedDirection === 0)
-            return "0%"
-
-        return normalizedDirection > 0
-            ? "100%+"
-            : "1%-"
     }
 
     function _normalizeState(state) {

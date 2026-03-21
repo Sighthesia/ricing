@@ -45,12 +45,14 @@ Singleton {
     property int superIslandFlashExtension: 0
     property int mediaControlFlashExtension: 0
     property int systemTrayFlashExtension: 0
+    property int systemMonitorFlashExtension: 0
     readonly property int barFlashExtension:
         Math.max(
             workspaceFlashExtension,
             superIslandFlashExtension,
             mediaControlFlashExtension,
-            systemTrayFlashExtension
+            systemTrayFlashExtension,
+            systemMonitorFlashExtension
         )
 
     // Which bar section the picker should insert widgets into.

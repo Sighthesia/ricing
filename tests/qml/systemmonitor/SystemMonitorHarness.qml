@@ -27,8 +27,8 @@ Item {
 
     function createSizedGauge(metric) {
         const gauge = gaugeComponent.createObject(root, { metric: metric })
-        gauge.width = gauge.implicitWidth
-        gauge.height = gauge.implicitHeight
+        gauge.width = Qt.binding(() => gauge.implicitWidth)
+        gauge.height = Qt.binding(() => gauge.implicitHeight)
         return gauge
     }
 
@@ -265,9 +265,6 @@ Item {
             SystemMonitorService.adjustBrightnessByStep(-1)
             expect(SystemMonitorService.brightnessLevel, 0.6, "brightness should step down by 5 percent from a non-zero baseline")
 
-            expect(BrightnessService._stepCommandToken(1, 5), "100%+", "brightness step command should use brightnessctl's positive suffix")
-            expect(BrightnessService._stepCommandToken(-1, 5), "1%-", "brightness step command should use brightnessctl's negative suffix")
-
             const parsedBrightness = BrightnessService._parseBrightnessctl("amdgpu_bl1,backlight,25000,38%,65535")
             expect(parsedBrightness.available, true, "brightnessctl parse should mark parsed output available")
             expect(Math.abs(parsedBrightness.level - (25000 / 65535)) < 0.0001, true, "brightnessctl parse should read the current/max fields in machine output")
@@ -340,6 +337,22 @@ Item {
                 const unavailableGauge = createSizedGauge(unavailableMetric)
                 gauges.push(unavailableGauge)
 
+                const interactiveMetric = {
+                    key: "brightness",
+                    title: "Brightness",
+                    icon: "brightness",
+                    value: 0.63,
+                    normalizedProgress: 0.63,
+                    displayText: "BRIGHT 63%",
+                    severity: "normal",
+                    available: true,
+                    persistent: false,
+                    interactive: true
+                }
+                const interactiveGauge = createSizedGauge(interactiveMetric)
+                interactiveGauge.interactive = true
+                gauges.push(interactiveGauge)
+
                 expect(warningGauge !== null, true, "warning gauge should instantiate")
                 expect(warningGauge.normalizedProgress, 1, "warning metric should clamp progress to upper bound")
                 expect(warningGauge.semanticColor, Colors.highlight, "warning metric should use highlight color")
@@ -365,6 +378,13 @@ Item {
                 expect(unavailableIconOverlay !== null, true, "unavailable gauge should mount an icon overlay")
                 expect(unavailableIconOverlay.color, Colors.textMuted, "unavailable gauge icon should use the muted color")
 
+                const warningGlyph = _findByObjectName(warningGauge, "systemMonitorGaugeIconGlyph")
+                const interactiveGlyph = _findByObjectName(interactiveGauge, "systemMonitorGaugeIconGlyph")
+                expect(warningGlyph !== null, true, "warning gauge should mount a nerd font glyph when mapped")
+                expect(warningGlyph.text, "", "cpu metric should resolve to the microchip glyph")
+                expect(interactiveGlyph !== null, true, "interactive gauge should mount a glyph icon")
+                expect(interactiveGlyph.text, "", "brightness metric should resolve to the sun glyph")
+
                 let stepCount = 0
                 unavailableGauge.stepRequested.connect((direction) => {
                     stepCount += direction
@@ -385,6 +405,13 @@ Item {
 
                 expect(unavailableGauge._wheelStepAt(1, 1, 0, 120), 1, "wheel input inside gauge bounds should be accepted")
                 expect(stepCount, 2, "inside-bound wheel input should emit a step")
+
+                expect(interactiveGauge.implicitWidth, interactiveGauge.gaugeSize, "interactive gauge should stay compact by default")
+                expect(interactiveGauge.gaugeCursorShape, Qt.PointingHandCursor, "interactive gauge should advertise a clickable cursor")
+                expect(warningGauge.gaugeCursorShape, Qt.ArrowCursor, "non-interactive gauge should keep the default cursor")
+                interactiveGauge.detailPreview = true
+                expect(interactiveGauge.expandedGaugeWidth, interactiveGauge.gaugeSize, "hover detail should no longer widen the gauge inline")
+                expect(_findByObjectName(interactiveGauge, "systemMonitorGaugeDetailLabel") === null, true, "hover detail label should no longer render inline inside the gauge")
             } finally {
                 cleanupGauges(gauges)
             }
@@ -471,22 +498,41 @@ Item {
                     const collapsedWidth = widget.width
                     expect(collapsedWidth, widget.implicitWidth, "expanded widget should start with width bound to implicitWidth")
                     widget._hovered = true
-                    expect(widget.implicitWidth > 0, true, "expanded widget should reserve width")
-                    expect(widget.width, widget.implicitWidth, "expanded widget should keep width owned by the transition")
-                    expect(widget.width >= collapsedWidth, true, "hovering should not shrink the widget while it expands")
-                    expect(_collectVisibleByPrefix(widget, "systemMonitorGauge_").length, 6, "expanded widget should show persistent trio and appended gauges")
-                    const persistentRow = _findByObjectName(widget, "systemMonitorPersistentRow")
-                    const expandedRow = _findByObjectName(widget, "systemMonitorExpandedRow")
-                    expect(persistentRow !== null, true, "expanded widget should mount persistent row")
-                    expect(expandedRow !== null, true, "expanded widget should mount expanded row")
-                    expect(persistentRow.x < expandedRow.x, true, "expanded gauges should append to the right")
-                } finally {
+                    const expandSettleDelay = Theme.anim.barExpandPreloadDuration
+                        + Theme.anim.barExpandOvershootDuration
+                        + Theme.anim.barExpandSettleDuration
+                        + 40
+
+                    wait(expandSettleDelay, () => {
+                        try {
+                            expect(widget.implicitWidth > 0, true, "expanded widget should reserve width")
+                            expect(widget.width, widget.implicitWidth, "expanded widget should keep width owned by the transition")
+                            expect(widget.width >= collapsedWidth, true, "hovering should not shrink the widget while it expands")
+                            expect(_collectVisibleByPrefix(widget, "systemMonitorGauge_").length, 6, "expanded widget should show persistent trio and appended gauges")
+                            const content = _findByObjectName(widget, "systemMonitorContent")
+                            const mainRow = _findByObjectName(widget, "systemMonitorMainRow")
+                            const persistentRow = _findByObjectName(widget, "systemMonitorPersistentRow")
+                            const expandedRow = _findByObjectName(widget, "systemMonitorExpandedRow")
+                            expect(content !== null, true, "expanded widget should mount the shared content container")
+                            expect(mainRow !== null, true, "expanded widget should mount a shared main row container")
+                            expect(persistentRow !== null, true, "expanded widget should mount persistent row")
+                            expect(expandedRow !== null, true, "expanded widget should mount expanded row")
+                            expect(persistentRow.x < expandedRow.x, true, "expanded gauges should append to the right")
+                            expect(mainRow.x >= 0, true, "main row should not create left overflow")
+                            expect(mainRow.x + mainRow.width <= content.width, true, "main row should stay within available content width")
+                        } finally {
+                            destroyWidget(widget)
+                            Qt.quit()
+                        }
+                    })
+
+                    return
+                } catch (error) {
                     destroyWidget(widget)
+                    throw error
                 }
             })
         })
-
-        Qt.callLater(Qt.quit)
     }
 
     function runWidgetNoBattery() {
@@ -703,6 +749,134 @@ Item {
         })
     }
 
+    function runWidgetFlashDetail() {
+        withCleanOverrides(() => {
+            withSystemMonitorSettings({ enabled: true, hoverReveal: true }, () => {
+                SystemMetricsService._setSnapshotOverride({
+                    cpuAvailable: true,
+                    cpuUsage: 0.42,
+                    memoryAvailable: true,
+                    memoryUsage: 0.37,
+                    temperatureAvailable: true,
+                    temperatureC: 61
+                })
+                AudioDeviceService._setStateOverride({
+                    volumeLevel: 0.25,
+                    volumeMuted: false,
+                    microphoneMuted: false,
+                    sinkAvailable: true,
+                    sourceAvailable: true
+                })
+                BrightnessService._setStateOverride({
+                    available: true,
+                    level: 0.55
+                })
+                BatteryService._setStateOverride({
+                    available: true,
+                    level: 0.64,
+                    charging: false,
+                    status: "discharging"
+                })
+
+                const widget = createWidget()
+                widget._hoverExitHoldDuration = 40
+                try {
+                    const baselineHeight = widget.implicitHeight
+                    const cpuGauge = _findByObjectName(widget, "systemMonitorGauge_cpu")
+                    const content = _findByObjectName(widget, "systemMonitorContent")
+                    const pill = _findByObjectName(widget, "systemMonitorPill")
+                    const persistentRow = _findByObjectName(widget, "systemMonitorPersistentRow")
+                    expect(cpuGauge !== null, true, "flash-detail widget should mount the hovered gauge")
+                    expect(content !== null, true, "flash-detail widget should mount the content container")
+                    expect(pill !== null, true, "flash-detail widget should mount the pill container")
+                    expect(persistentRow !== null, true, "flash-detail widget should mount the persistent row")
+
+                    const baselinePersistentY = persistentRow.y
+                    const collapseDelay = Theme.anim.moveDuration + Theme.anim.highlightDuration + 160
+
+                    widget._hovered = true
+                    cpuGauge.detailPreview = true
+
+                    wait(20, () => {
+                        try {
+                            expect(widget._transitionRunning, true, "width expansion should still be running when flash detail starts")
+                            expect(BarLayoutService.systemMonitorFlashExtension > 0, true, "flash detail should start reserving downward space before width settles")
+                            expect(_findByObjectName(widget, "systemMonitorFlashRow").visible, true, "flash row should already be mounted during width expansion")
+                            expect(pill.clip, true, "pill should clip overflowing flash content")
+                            expect(content.clip, true, "content container should clip overflowing flash content")
+                        } catch (error) {
+                            destroyWidget(widget)
+                            throw error
+                        }
+                    })
+
+                    const flashRevealDelay = Theme.anim.barExpandPreloadDuration
+                        + Theme.anim.barExpandOvershootDuration
+                        + Theme.anim.barExpandSettleDuration
+                        + 40
+
+                    wait(flashRevealDelay, () => {
+                        try {
+                            const expectedHoverWidth = widget._mainRowRequiredWidth + Theme.barWidget.contentPaddingH * 2
+                            expect(Math.abs(widget.implicitWidth - expectedHoverWidth) < 0.5, true, "flash detail should not widen the widget beyond its normal hover width")
+                            expect(widget.implicitHeight, baselineHeight, "flash detail should not change the widget's own base height")
+                            expect(persistentRow.y, baselinePersistentY, "flash detail should not push the main pill upward or downward")
+                            expect(BarLayoutService.systemMonitorFlashExtension > 0, true, "flash detail should reserve downward flash extension space")
+                            expect(_findByObjectName(widget, "systemMonitorFlashRow") !== null, true, "flash detail should mount a dedicated flash row")
+                            expect(_findByObjectName(widget, "systemMonitorFlashRow").visible, true, "flash detail row should become visible while a metric is hovered")
+                            expect(_findByObjectName(widget, "systemMonitorFlashLabel").text, "CPU 42%", "flash detail should show the hovered metric title and value")
+                            expect(widget._flashHeightAnimated, false, "flash detail transition should disable springy height animation")
+
+                            widget._setFlashDetail("cpu", false, cpuGauge.flashDetailData)
+                            widget._hovered = false
+
+                            wait(20, () => {
+                                try {
+                                    expect(_findByObjectName(widget, "systemMonitorFlashRow").visible, true, "flash row should stay mounted while collapse clipping is in progress")
+                                    expect(_findByObjectName(widget, "systemMonitorFlashLabel").text, "CPU 42%", "flash label text should stay mounted until collapse finishes")
+                                    expect(BarLayoutService.systemMonitorFlashExtension > 0, true, "downward flash extension should stay reserved during collapse")
+                                    expect(widget._resolvedExpanded, true, "flash area should stay expanded during hover hold after pointer leaves")
+                                    expect(widget._flashExpanded, true, "flash area should remain expanded during the shared hover hold window")
+                                } catch (error) {
+                                    destroyWidget(widget)
+                                    throw error
+                                }
+                            })
+
+                            wait(70, () => {
+                                try {
+                                    expect(widget._resolvedExpanded, false, "shared hover hold should eventually finish")
+                                    expect(widget._flashExpanded, false, "flash area should start collapsing when the shared hold finishes")
+                                } catch (error) {
+                                    destroyWidget(widget)
+                                    throw error
+                                }
+                            })
+
+                            wait(collapseDelay, () => {
+                                try {
+                                    expect(BarLayoutService.systemMonitorFlashExtension, 0, "downward flash extension should clear after collapse finishes")
+                                    expect(pill.height <= widget._pillHeight + 0.5, true, "pill should collapse back to its base height after the flash finishes")
+                                } finally {
+                                    destroyWidget(widget)
+                                    Qt.quit()
+                                }
+                            })
+
+                            return
+                        } finally {
+                        }
+                    })
+
+                    return
+                } catch (error) {
+                    destroyWidget(widget)
+                    throw error
+                }
+            })
+        })
+    }
+
     function runMode() {
         const currentMode = mode()
 
@@ -749,6 +923,11 @@ Item {
 
             if (currentMode === "widget-hover-hold") {
                 runWidgetHoverHold()
+                return
+            }
+
+            if (currentMode === "widget-flash-detail") {
+                runWidgetFlashDetail()
                 return
             }
 
