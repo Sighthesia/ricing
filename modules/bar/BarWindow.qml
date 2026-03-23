@@ -11,7 +11,7 @@ PanelWindow {
     anchors { left: true; top: true; right: true }
     color: "transparent"
 
-    // Expand downward during WorkspaceWidget switch flashes (non-exclusive zone).
+    // Expand downward during widget flashes (non-exclusive zone).
     implicitHeight: Theme.barHeight + BarLayoutService.barTransientExtension
     exclusiveZone: Theme.barHeight
 

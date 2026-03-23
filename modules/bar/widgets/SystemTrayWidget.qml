@@ -1,6 +1,7 @@
 import QtQuick
 import qs.config
 import qs.services
+import ".." as BarComponents
 import "../tray" as TrayComponents
 
 // Bar system tray widget with pinned main row and flash-strip non-pinned reveal.
@@ -20,8 +21,9 @@ Item {
         Math.min(360, Math.floor(BarLayoutService.barContentWidth * 0.3))
     readonly property bool _hasPinnedItems: SystemTrayService.pinnedItems.length > 0
     readonly property bool _showEmptyAnchor:
-        !_hasPinnedItems && SystemTrayService.hasNonPinnedItems
+        !_hasPinnedItems && root._enabled
     readonly property bool _stripVisible: root._state !== "idle"
+    readonly property bool _widthExtensionActive: root._stripVisible && root._state !== "flash-exit"
     readonly property bool _barExtensionActive: root._stripVisible || root._holdFlashExtension
     readonly property int _collapsedWidth: {
         if (!root._enabled)
@@ -36,20 +38,40 @@ Item {
         return Math.max(pinnedRow.implicitWidth, flashRow.implicitWidth) + root._padH * 2
     }
     readonly property var _stripItems:
-        root._state === "hover-open" ? SystemTrayService.nonPinnedItems : SystemTrayService.flashItems
+        root._lockStripItemsDuringCollapse
+            ? root._lockedStripItems
+            : (root._state === "hover-open" ? SystemTrayService.nonPinnedItems : SystemTrayService.flashItems)
 
     property string _state: "idle"
     property bool _hovered: false
     property bool _holdFlashExtension: false
+    property bool _lockStripItemsDuringCollapse: false
+    property var _lockedStripItems: []
     readonly property int _flashHoldDuration: 1500 // FIXME: derive tray flash dwell from shared token once transient timing is centralized.
+    readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
+    readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
+    readonly property real _pillBackgroundHeight: _verticalReveal.surfaceHeight
+    readonly property string _verticalRevealState: _verticalReveal.state
+    readonly property bool _verticalRevealRunning: _verticalReveal.running
 
-    implicitWidth: root._barExtensionActive ? root._expandedWidth : root._collapsedWidth
-    implicitHeight: root._enabled && root._collapsedWidth > 0 ? (root._pillH + Theme.iconPadding) : 0
+    implicitWidth: _pillTransition.animatedWidth
+    implicitHeight: root._enabled ? (root._pillH + Theme.iconPadding) : 0
+
+    BarComponents.BarTransientRevealHost {
+        id: _verticalReveal
+
+        collapsedHeight: root._pillH
+        expandedHeight: root._pillH + root._flashGap + root._flashRowH
+        expanded: root._state !== "idle"
+        extensionOwnerKey: root.liveInstance ? "system-tray" : ""
+        animateSurface: false
+    }
 
     function _enterHoverOpen() {
-        if (!root._enabled || !root._hoverRevealEnabled || !SystemTrayService.hasNonPinnedItems)
+        if (!root._enabled || !root._hoverRevealEnabled)
             return
 
+        root._lockStripItemsDuringCollapse = false
         hoverExitTimer.stop()
         flashHoldTimer.stop()
         flashEnterTimer.stop()
@@ -62,6 +84,7 @@ Item {
         if (!root._enabled || !root._flashEnabled || !SystemTrayService.hasFlashItems || root._hovered)
             return
 
+        root._lockStripItemsDuringCollapse = false
         flashHoldTimer.stop()
         flashExitTimer.stop()
         root._holdFlashExtension = true
@@ -75,19 +98,15 @@ Item {
 
         if (root._state === "idle") {
             root._holdFlashExtension = false
+            root._lockStripItemsDuringCollapse = false
             return
         }
 
+        root._lockedStripItems = root._stripItems
+        root._lockStripItemsDuringCollapse = true
         root._state = "flash-exit"
         root._holdFlashExtension = true
         flashExitTimer.restart()
-    }
-
-    Binding {
-        target: BarLayoutService
-        property: "systemTrayFlashExtension"
-        value: root._barExtensionActive ? (root._flashGap + root._flashRowH) : 0
-        restoreMode: Binding.RestoreBindingOrValue
     }
 
     Timer {
@@ -139,6 +158,7 @@ Item {
             }
 
             root._state = "idle"
+            root._lockStripItemsDuringCollapse = false
             SystemTrayService.clearFlashItems()
         }
     }
@@ -157,6 +177,18 @@ Item {
         }
     }
 
+    BarComponents.BarExpandTransition {
+        id: _pillTransition
+
+        collapsedWidth: root._collapsedWidth
+        expandedWidth: root._expandedWidth
+        collapsedHeight: root._pillH
+        expandedHeight: root._pillH + root._flashGap + root._flashRowH
+        expanded: root._widthExtensionActive
+        animateWidth: true
+        animateHeight: false
+    }
+
     Item {
         id: pill
 
@@ -164,12 +196,12 @@ Item {
         anchors.topMargin: Theme.iconPadding
         anchors.horizontalCenter: parent.horizontalCenter
         clip: true
-        implicitWidth: root.implicitWidth
-        implicitHeight: root._barExtensionActive
-            ? (root._pillH + root._flashGap + root._flashRowH)
-            : root._pillH
+        implicitWidth: _pillTransition.animatedWidth
+        implicitHeight: root._verticalRevealClipHeight
         width: implicitWidth
         height: implicitHeight
+        scale: _pillTransition.pulseScale
+        transformOrigin: Item.Center
 
         HoverHandler {
             id: pillHover
@@ -186,38 +218,22 @@ Item {
             }
         }
 
-        Behavior on implicitWidth {
-            NumberAnimation {
-                duration: Theme.anim.moveDuration
-                easing.type: Theme.anim.moveType
-            }
-        }
-
-        Behavior on implicitHeight {
-            NumberAnimation {
-                duration: Theme.anim.moveDuration
-                easing.type: Theme.anim.moveType
-            }
-        }
-
         Rectangle {
             id: pillBackground
 
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: root._barExtensionActive
-                ? (root._pillH + root._flashGap + root._flashRowH)
-                : root._pillH
+            height: root._pillBackgroundHeight
             radius: root._pillH / 2
             color: Colors.surface
+        }
 
-            Behavior on height {
-                NumberAnimation {
-                    duration: root._state === "flash-enter" ? Theme.anim.enterDuration : Theme.anim.moveDuration
-                    easing.type: root._state === "flash-enter" ? Theme.anim.enterType : Theme.anim.moveType
-                }
-            }
+        Rectangle {
+            anchors.fill: pillBackground
+            radius: pillBackground.radius
+            color: Colors.highlight
+            opacity: _pillTransition.pulseOpacity
         }
 
         Rectangle {

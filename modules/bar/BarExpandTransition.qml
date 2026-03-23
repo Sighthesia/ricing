@@ -46,6 +46,56 @@ Item {
     property real _phase1PulseScale: 1
     property real _phase2PulseScale: 1
     property real _phase3PulseScale: 1
+    property bool _pendingStandalonePulse: false
+
+    SequentialAnimation {
+        id: _standalonePulse
+
+        onFinished: {
+            if (!root._pendingStandalonePulse)
+                return
+
+            root._pendingStandalonePulse = false
+            restart()
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: root
+                property: "_pulseOpacity"
+                to: Theme.anim.barExpandExpandPulseOvershootOpacity
+                duration: Theme.anim.highlightDuration
+                easing.type: Theme.anim.highlightType
+            }
+
+            NumberAnimation {
+                target: root
+                property: "_pulseScale"
+                to: 1.018
+                duration: Theme.anim.pulseSpringDuration
+                easing.type: Theme.anim.pulseSpringType
+                easing.overshoot: Theme.anim.pulseSpringOvershoot
+            }
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: root
+                property: "_pulseOpacity"
+                to: 0
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.highlightType
+            }
+
+            NumberAnimation {
+                target: root
+                property: "_pulseScale"
+                to: 1
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
+    }
 
     SequentialAnimation {
         id: _timeline
@@ -53,6 +103,10 @@ Item {
         onFinished: {
             if (root._retargetPending)
                 _retargetTimer.restart()
+            else if (root._pendingStandalonePulse) {
+                root._pendingStandalonePulse = false
+                _standalonePulse.restart()
+            }
         }
 
         ParallelAnimation {
@@ -177,8 +231,8 @@ Item {
         const expandPreloadHeight = collapsedHeight * (1 - Theme.anim.barExpandExpandPreloadRatio)
         const expandOvershootWidth = expandedWidth * (1 + Theme.anim.barExpandExpandOvershootRatio)
         const expandOvershootHeight = expandedHeight * (1 + Theme.anim.barExpandExpandOvershootRatio)
-        const collapsePreloadWidth = expandedWidth * (1 + Theme.anim.barExpandCollapsePreloadRatio)
-        const collapsePreloadHeight = expandedHeight * (1 + Theme.anim.barExpandCollapsePreloadRatio)
+        const collapsePreloadWidth = expandedWidth * (1 - Theme.anim.barExpandCollapsePreloadRatio)
+        const collapsePreloadHeight = expandedHeight * (1 - Theme.anim.barExpandCollapsePreloadRatio)
         const collapseOvershootWidth = collapsedWidth * (1 - Theme.anim.barExpandCollapseOvershootRatio)
         const collapseOvershootHeight = collapsedHeight * (1 - Theme.anim.barExpandCollapseOvershootRatio)
         const widthTarget = isExpanded ? expandedWidth : collapsedWidth
@@ -199,7 +253,7 @@ Item {
             : (animateWidth ? (isExpanded ? expandPreloadWidth : collapsePreloadWidth) : (isExpanded ? expandedWidth : collapsedWidth))
         _phase2Width = animateWidth
             ? (retargetActive
-                ? retargetWidthOvershoot
+                ? widthTarget
                 : (isExpanded ? expandOvershootWidth : collapseOvershootWidth))
             : widthTarget
         _phase3Width = isExpanded ? expandedWidth : collapsedWidth
@@ -209,12 +263,22 @@ Item {
             : (animateHeight ? (isExpanded ? expandPreloadHeight : collapsePreloadHeight) : (isExpanded ? expandedHeight : collapsedHeight))
         _phase2Height = animateHeight
             ? (retargetActive
-                ? retargetHeightOvershoot
+                ? heightTarget
                 : (isExpanded ? expandOvershootHeight : collapseOvershootHeight))
             : heightTarget
         _phase3Height = isExpanded ? expandedHeight : collapsedHeight
 
         _currentPreloadDuration = retargetActive ? 1 : Theme.anim.barExpandPreloadDuration
+
+        if (retargetActive) {
+            _phase1PulseOpacity = _pulseOpacity
+            _phase2PulseOpacity = _pulseOpacity
+            _phase3PulseOpacity = _pulseOpacity
+            _phase1PulseScale = _pulseScale
+            _phase2PulseScale = _pulseScale
+            _phase3PulseScale = _pulseScale
+            return
+        }
 
         if (isExpanded) {
             _phase1PulseOpacity = retargetActive
@@ -254,8 +318,10 @@ Item {
 
     function _syncToCurrentTruth() {
         _timeline.stop()
+        _standalonePulse.stop()
         _retargetPending = false
         _retargetActiveForCurrentRun = false
+        _pendingStandalonePulse = false
         _currentPreloadDuration = Theme.anim.barExpandPreloadDuration
         _animatedWidth = expanded ? expandedWidth : collapsedWidth
         _animatedHeight = expanded ? expandedHeight : collapsedHeight
@@ -319,7 +385,31 @@ Item {
         _syncToCurrentTruth()
     }
 
-    onExpandedChanged: _startTimeline(false)
+    function triggerPulse() {
+        if (!_ready || !pulseEnabled)
+            return
+
+        if (_timeline.running) {
+            _pendingStandalonePulse = true
+            return
+        }
+
+        if (_standalonePulse.running) {
+            _pendingStandalonePulse = false
+            _standalonePulse.restart()
+            return
+        }
+
+        _pendingStandalonePulse = false
+        _standalonePulse.restart()
+    }
+
+    onExpandedChanged: {
+        if (!_ready)
+            return
+
+        _startTimeline(_timeline.running)
+    }
     onCollapsedWidthChanged: _handleTargetChange(false)
     onExpandedWidthChanged: _handleTargetChange(true)
     onCollapsedHeightChanged: _handleTargetChange(false)
@@ -352,7 +442,10 @@ Item {
                 return
             }
 
+            const shouldRestartStandalonePulse = root._pendingStandalonePulse
             root._syncToCurrentTruth()
+            if (shouldRestartStandalonePulse)
+                _standalonePulse.restart()
         }
     }
 }
