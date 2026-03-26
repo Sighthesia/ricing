@@ -8,20 +8,18 @@ shell.qml                  # Entry point; instantiate top-level windows only
 config/                    # Semantic colors + structural theme tokens
 services/                  # Singleton state, persistence, compositor/process integration
 modules/                   # UI windows, panels, and reusable module-local components
-  tests/
-docs/plans/               # Design and implementation history
-null/dymicshell/          # Checked-in sample/runtime artifacts; not the canonical live config
+docs/plans/                # Design and implementation history
+null/dymicshell/           # Checked-in sample/runtime artifacts; not the canonical live config
 ```
 Key entry points: `shell.qml`, `config/Theme.qml`, `config/Colors.qml`, `services/SettingsService.qml`, `services/BarLayoutService.qml`, `modules/bar/BarContent.qml`.
 
-## Build, Lint, and Test Commands
+## Build and Validation
 
 Use `qs` unless the user explicitly asks for `quickshell`.
 
 ### Whole-Shell Validation
 ```bash
 timeout 5 qs --path .
-timeout 5 qs -p .
 ```
 Prefer `qs --path .` for a full-shell load check.
 
@@ -37,4 +35,5 @@ Load these for detailed context on specific topics:
 
 ## Miscellaneous
 - The repo does not define `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmllint`, `qmlformat`, or CI workflow commands. Do not invent those commands unless you verify local availability.
+- Do not proactively use harness, smoke, or other targeted test runners; keep validation to the whole-shell load check unless the user explicitly asks for a different approach.
 - Don't remove `docs/plans/` references even when files or commands move.

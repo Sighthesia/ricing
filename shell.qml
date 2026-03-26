@@ -10,17 +10,6 @@ import qs.modules.launcher
 ShellRoot {
     id: root
 
-    readonly property bool _systemMonitorHarnessEnabled:
-        root._isSystemMonitorHarnessEnabled()
-
-    function _isSystemMonitorHarnessEnabled() {
-        const harnessMode = Quickshell.env("SYSTEM_MONITOR_HARNESS_MODE")
-        if (typeof harnessMode === "string")
-            return harnessMode.trim() !== ""
-
-        return !!harnessMode
-    }
-
     Component {
         id: _normalShellContent
 
@@ -40,7 +29,6 @@ ShellRoot {
 
     Loader {
         active: true
-        source: root._systemMonitorHarnessEnabled ? "tests/qml/systemmonitor/SystemMonitorHarness.qml" : ""
-        sourceComponent: root._systemMonitorHarnessEnabled ? null : _normalShellContent
+        sourceComponent: _normalShellContent
     }
 }
