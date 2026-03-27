@@ -18,11 +18,12 @@ Item {
     property bool animateWidth: true
     property bool animateHeight: true
     property bool pulseEnabled: Theme.anim.barExpandPulseEnabled
+    property bool timelinePulseEnabled: pulseEnabled
 
     readonly property real animatedWidth: _animatedWidth
     readonly property real animatedHeight: _animatedHeight
-    readonly property real pulseOpacity: _pulseOpacity
-    readonly property real pulseScale: _pulseScale
+    readonly property real pulseOpacity: Math.max(_timelinePulseOpacity, _standalonePulseOpacity)
+    readonly property real pulseScale: Math.max(_timelinePulseScale, _standalonePulseScale)
     readonly property bool running: _timeline.running
 
     property bool _ready: false
@@ -32,8 +33,10 @@ Item {
     property int _currentPreloadDuration: Theme.anim.barExpandPreloadDuration
     property real _animatedWidth: collapsedWidth
     property real _animatedHeight: collapsedHeight
-    property real _pulseOpacity: 0
-    property real _pulseScale: 1
+    property real _timelinePulseOpacity: 0
+    property real _timelinePulseScale: 1
+    property real _standalonePulseOpacity: 0
+    property real _standalonePulseScale: 1
     property real _phase1Width: collapsedWidth
     property real _phase2Width: collapsedWidth
     property real _phase3Width: collapsedWidth
@@ -46,23 +49,14 @@ Item {
     property real _phase1PulseScale: 1
     property real _phase2PulseScale: 1
     property real _phase3PulseScale: 1
-    property bool _pendingStandalonePulse: false
 
     SequentialAnimation {
         id: _standalonePulse
 
-        onFinished: {
-            if (!root._pendingStandalonePulse)
-                return
-
-            root._pendingStandalonePulse = false
-            restart()
-        }
-
         ParallelAnimation {
             NumberAnimation {
                 target: root
-                property: "_pulseOpacity"
+                property: "_standalonePulseOpacity"
                 to: Theme.anim.barExpandExpandPulseOvershootOpacity
                 duration: Theme.anim.highlightDuration
                 easing.type: Theme.anim.highlightType
@@ -70,7 +64,7 @@ Item {
 
             NumberAnimation {
                 target: root
-                property: "_pulseScale"
+                property: "_standalonePulseScale"
                 to: 1.018
                 duration: Theme.anim.pulseSpringDuration
                 easing.type: Theme.anim.pulseSpringType
@@ -81,7 +75,7 @@ Item {
         ParallelAnimation {
             NumberAnimation {
                 target: root
-                property: "_pulseOpacity"
+                property: "_standalonePulseOpacity"
                 to: 0
                 duration: Theme.anim.moveDuration
                 easing.type: Theme.anim.highlightType
@@ -89,7 +83,7 @@ Item {
 
             NumberAnimation {
                 target: root
-                property: "_pulseScale"
+                property: "_standalonePulseScale"
                 to: 1
                 duration: Theme.anim.moveDuration
                 easing.type: Theme.anim.moveType
@@ -103,10 +97,6 @@ Item {
         onFinished: {
             if (root._retargetPending)
                 _retargetTimer.restart()
-            else if (root._pendingStandalonePulse) {
-                root._pendingStandalonePulse = false
-                _standalonePulse.restart()
-            }
         }
 
         ParallelAnimation {
@@ -128,7 +118,7 @@ Item {
 
             NumberAnimation {
                 target: root
-                property: "_pulseOpacity"
+                property: "_timelinePulseOpacity"
                 to: root._phase1PulseOpacity
                 duration: root._currentPreloadDuration
                 easing.type: Theme.anim.highlightType
@@ -136,7 +126,7 @@ Item {
 
             NumberAnimation {
                 target: root
-                property: "_pulseScale"
+                property: "_timelinePulseScale"
                 to: root._phase1PulseScale
                 duration: root._currentPreloadDuration
                 easing.type: Theme.anim.moveType
@@ -172,7 +162,7 @@ Item {
 
             NumberAnimation {
                 target: root
-                property: "_pulseOpacity"
+                property: "_timelinePulseOpacity"
                 to: root._phase2PulseOpacity
                 duration: Theme.anim.barExpandOvershootDuration
                 easing.type: Theme.anim.highlightType
@@ -180,7 +170,7 @@ Item {
 
             NumberAnimation {
                 target: root
-                property: "_pulseScale"
+                property: "_timelinePulseScale"
                 to: root._phase2PulseScale
                 duration: Theme.anim.pulseSpringDuration
                 easing.type: Theme.anim.pulseSpringType
@@ -209,7 +199,7 @@ Item {
 
             NumberAnimation {
                 target: root
-                property: "_pulseOpacity"
+                property: "_timelinePulseOpacity"
                 to: root._phase3PulseOpacity
                 duration: Theme.anim.barExpandSettleDuration
                 easing.type: Theme.anim.highlightType
@@ -217,7 +207,7 @@ Item {
 
             NumberAnimation {
                 target: root
-                property: "_pulseScale"
+                property: "_timelinePulseScale"
                 to: root._phase3PulseScale
                 duration: Theme.anim.moveDuration
                 easing.type: Theme.anim.springType
@@ -271,37 +261,39 @@ Item {
         _currentPreloadDuration = retargetActive ? 1 : Theme.anim.barExpandPreloadDuration
 
         if (retargetActive) {
-            _phase1PulseOpacity = _pulseOpacity
-            _phase2PulseOpacity = _pulseOpacity
-            _phase3PulseOpacity = _pulseOpacity
-            _phase1PulseScale = _pulseScale
-            _phase2PulseScale = _pulseScale
-            _phase3PulseScale = _pulseScale
+            _phase1PulseOpacity = _timelinePulseOpacity
+            _phase2PulseOpacity = _timelinePulseOpacity
+            _phase3PulseOpacity = _timelinePulseOpacity
+            _phase1PulseScale = _timelinePulseScale
+            _phase2PulseScale = _timelinePulseScale
+            _phase3PulseScale = _timelinePulseScale
+            return
+        }
+
+        if (!timelinePulseEnabled) {
+            _phase1PulseOpacity = _timelinePulseOpacity
+            _phase2PulseOpacity = _timelinePulseOpacity
+            _phase3PulseOpacity = _timelinePulseOpacity
+            _phase1PulseScale = _timelinePulseScale
+            _phase2PulseScale = _timelinePulseScale
+            _phase3PulseScale = _timelinePulseScale
             return
         }
 
         if (isExpanded) {
-            _phase1PulseOpacity = retargetActive
-                ? _pulseOpacity
-                : (pulseEnabled ? Theme.anim.barExpandExpandPulsePreloadOpacity : 0)
+            _phase1PulseOpacity = pulseEnabled ? Theme.anim.barExpandExpandPulsePreloadOpacity : 0
             _phase2PulseOpacity = pulseEnabled ? Theme.anim.barExpandExpandPulseOvershootOpacity : 0
             _phase3PulseOpacity = Theme.anim.barExpandPulseSettleOpacity
-            _phase1PulseScale = retargetActive
-                ? _pulseScale
-                : (pulseEnabled ? Theme.anim.barExpandExpandPulsePreloadScale : 1)
+            _phase1PulseScale = pulseEnabled ? Theme.anim.barExpandExpandPulsePreloadScale : 1
             _phase2PulseScale = pulseEnabled ? Theme.anim.barExpandExpandPulseOvershootScale : 1
             _phase3PulseScale = Theme.anim.barExpandPulseSettleScale
             return
         }
 
-        _phase1PulseOpacity = retargetActive
-            ? _pulseOpacity
-            : (pulseEnabled ? Theme.anim.barExpandCollapsePulsePreloadOpacity : 0)
+        _phase1PulseOpacity = pulseEnabled ? Theme.anim.barExpandCollapsePulsePreloadOpacity : 0
         _phase2PulseOpacity = pulseEnabled ? Theme.anim.barExpandCollapsePulseOvershootOpacity : 0
         _phase3PulseOpacity = Theme.anim.barExpandPulseSettleOpacity
-        _phase1PulseScale = retargetActive
-            ? _pulseScale
-            : (pulseEnabled ? Theme.anim.barExpandCollapsePulsePreloadScale : 1)
+        _phase1PulseScale = pulseEnabled ? Theme.anim.barExpandCollapsePulsePreloadScale : 1
         _phase2PulseScale = pulseEnabled ? Theme.anim.barExpandCollapsePulseOvershootScale : 1
         _phase3PulseScale = Theme.anim.barExpandPulseSettleScale
     }
@@ -321,12 +313,13 @@ Item {
         _standalonePulse.stop()
         _retargetPending = false
         _retargetActiveForCurrentRun = false
-        _pendingStandalonePulse = false
         _currentPreloadDuration = Theme.anim.barExpandPreloadDuration
         _animatedWidth = expanded ? expandedWidth : collapsedWidth
         _animatedHeight = expanded ? expandedHeight : collapsedHeight
-        _pulseOpacity = 0
-        _pulseScale = 1
+        _timelinePulseOpacity = 0
+        _timelinePulseScale = 1
+        _standalonePulseOpacity = 0
+        _standalonePulseScale = 1
     }
 
     function _targetWidth() {
@@ -389,18 +382,11 @@ Item {
         if (!_ready || !pulseEnabled)
             return
 
-        if (_timeline.running) {
-            _pendingStandalonePulse = true
-            return
-        }
-
         if (_standalonePulse.running) {
-            _pendingStandalonePulse = false
             _standalonePulse.restart()
             return
         }
 
-        _pendingStandalonePulse = false
         _standalonePulse.restart()
     }
 
@@ -417,6 +403,12 @@ Item {
     onAnimateWidthChanged: _handleLiveGeometryChange()
     onAnimateHeightChanged: _handleLiveGeometryChange()
     onPulseEnabledChanged: {
+        if (!_ready || _timeline.running)
+            return
+
+        _syncToCurrentTruth()
+    }
+    onTimelinePulseEnabledChanged: {
         if (!_ready || _timeline.running)
             return
 
@@ -442,7 +434,7 @@ Item {
                 return
             }
 
-            const shouldRestartStandalonePulse = root._pendingStandalonePulse
+            const shouldRestartStandalonePulse = _standalonePulse.running
             root._syncToCurrentTruth()
             if (shouldRestartStandalonePulse)
                 _standalonePulse.restart()

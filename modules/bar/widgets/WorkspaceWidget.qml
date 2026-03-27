@@ -166,8 +166,8 @@ Item {
         }
 
         root._flashSourceWasOverview = root._showOverview
-        root._flashActive = true
         _pillTransition.triggerPulse()
+        root._flashActive = true
     }
 
     function _activeWorkspaceHasWindows() {
@@ -255,6 +255,8 @@ Item {
             && newWinId !== prevWinId
         const focusPillWidthDelta = Math.abs(root._focusPillWidth - previousFocusPillWidth)
         const shouldTriggerSharedPulse = shouldPulseFocusRow
+            && !root._flashActive
+            && !_pillTransition.running
             && focusPillWidthDelta <= Math.max(root._pillH, previousFocusPillWidth * 0.12)
         if (shouldPulseFocusRow) {
             if (shouldTriggerSharedPulse)
@@ -330,6 +332,7 @@ Item {
         expanded: root._flashActive ? true : root._showExpandedPillWidth
         animateWidth: true
         animateHeight: false
+        timelinePulseEnabled: false
     }
 
     Connections {
