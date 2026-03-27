@@ -267,23 +267,25 @@ AnimatedPanelBase {
                                     spacing: 4
 
                                     // Live widget preview — scaled down to fit the card
-                                    Item {
+                                     Item {
+                                        id: previewViewport
                                         Layout.fillWidth: true
-                                        height: 60
-                                        clip: true
+                                        readonly property real previewScale: 0.65
+                                        height: 96
+                                        clip: false
 
-                                         Loader {
-                                             id: widgetLoader
-                                             anchors.centerIn: parent
-                                              source: root.widgetRegistry[modelData] || ""
-                                             transform: Scale {
-                                                 xScale: 0.65
-                                                 yScale: 0.65
-                                                origin.x: widgetLoader.width / 2
-                                                origin.y: widgetLoader.height / 2
-                                            }
-                                        }
-                                    }
+                                          Loader {
+                                              id: widgetLoader
+                                              anchors.centerIn: parent
+                                               source: root.widgetRegistry[modelData] || ""
+                                              transform: Scale {
+                                                  xScale: previewViewport.previewScale
+                                                  yScale: previewViewport.previewScale
+                                                  origin.x: widgetLoader.width / 2
+                                                  origin.y: widgetLoader.height / 2
+                                             }
+                                         }
+                                     }
 
                                     // Widget name label
                                     Text {

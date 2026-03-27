@@ -9,6 +9,8 @@ import "systemmonitor" as MonitorParts
 Item {
     id: root
 
+    property bool liveInstance: false
+
     readonly property var _settings: SettingsService.data ? SettingsService.data.systemMonitor : null
     readonly property bool _enabled: !!(_settings && _settings.enabled)
     readonly property bool _hoverReveal: !!(_settings && _settings.hoverReveal)
@@ -29,6 +31,8 @@ Item {
     property bool _flashExpanded: false
     readonly property bool _flashVisualActive: root._flashExpanded || _flashCollapseTimer.running
     property bool _flashClosePending: false
+    readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
+    readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
     readonly property var _persistentMetrics: SystemMonitorService.persistentMetrics
     readonly property var _expandedMetrics: root._visibleExpandedMetrics()
@@ -108,6 +112,16 @@ Item {
 
     Component.onCompleted: root._expandedVisualActive = root._resolvedExpanded
 
+    BarComponents.BarTransientRevealHost {
+        id: _verticalReveal
+
+        collapsedHeight: root._pillHeight
+        expandedHeight: root._pillHeight + root._flashGap + root._flashRowHeight
+        expanded: root._flashVisualActive
+        extensionOwnerKey: root.liveInstance ? "system-monitor" : ""
+        animateSurface: false
+    }
+
     BarComponents.BarExpandTransition {
         id: _transition
 
@@ -120,22 +134,13 @@ Item {
         animateHeight: false
     }
 
-    Binding {
-        target: BarLayoutService
-        property: "systemMonitorFlashExtension"
-        value: root._enabled && root._flashVisualActive
-            ? (root._flashGap + root._flashRowHeight)
-            : 0
-        restoreMode: Binding.RestoreBindingOrValue
-    }
-
     Rectangle {
         id: widgetBackground
 
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: pill.top
-        height: pill.height
+        height: root._verticalRevealSurfaceHeight
         radius: Theme.cornerRadius
         color: Colors.background
     }
@@ -191,9 +196,7 @@ Item {
         anchors.topMargin: Theme.iconPadding
         anchors.horizontalCenter: parent.horizontalCenter
         implicitWidth: root.implicitWidth
-        implicitHeight: root._flashExpanded
-            ? (root._pillHeight + root._flashGap + root._flashRowHeight)
-            : root._pillHeight
+        implicitHeight: root._verticalRevealClipHeight
         width: implicitWidth
         height: implicitHeight
         clip: true

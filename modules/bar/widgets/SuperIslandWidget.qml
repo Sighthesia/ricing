@@ -141,6 +141,8 @@ property real _flashTrackOpacity: 0
     readonly property real _expandedPillHeight: root._pillH + root._flashGap + root._flashRowH
     readonly property bool _pillExpanded:
         root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
+    readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
+    readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
     readonly property real _collapsedWidth:
         (_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2
@@ -161,14 +163,14 @@ property real _flashTrackOpacity: 0
     readonly property bool _listensToService: true
     readonly property real _transientAccentBaseOpacity: 0
 
-Component.onCompleted: {
-    currentTime = new Date()
-    const initialActiveEvent = root._displayEvent(root._listensToService ? SuperIslandService.activeEvent : root._idleSnapshot())
-    root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
-    root._lastActiveEvent = initialActiveEvent
-    root._resetTracks()
-    Qt.callLater(() => { root._initialized = true })
-}
+    Component.onCompleted: {
+        currentTime = new Date()
+        const initialActiveEvent = root._displayEvent(root._listensToService ? SuperIslandService.activeEvent : root._idleSnapshot())
+        root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
+        root._lastActiveEvent = initialActiveEvent
+        root._resetTracks()
+        Qt.callLater(() => { root._initialized = true })
+    }
     property real _replaceOutgoingY: 0
     property real _replaceOutgoingOpacity: 0
     property real _replaceOutgoingTargetY: 0
@@ -191,15 +193,6 @@ Component.onCompleted: {
         precision: SystemClock.Minutes
     }
 
-    Binding {
-        target: BarLayoutService
-        property: "superIslandFlashExtension"
-        value: root._listensToService && root._phase !== "idle"
-            ? (root._flashGap + root._flashRowH)
-            : 0
-        restoreMode: Binding.RestoreBindingOrValue
-    }
-
     BarComponents.BarExpandTransition {
         id: _pillTransition
 
@@ -209,7 +202,17 @@ Component.onCompleted: {
         expandedHeight: root._expandedPillHeight
         expanded: root._pillExpanded
         animateWidth: true
-        animateHeight: true
+        animateHeight: false
+    }
+
+    BarComponents.BarTransientRevealHost {
+        id: _verticalReveal
+
+        collapsedHeight: root._collapsedPillHeight
+        expandedHeight: root._expandedPillHeight
+        expanded: root._pillExpanded
+        extensionOwnerKey: root.liveInstance ? "super-island" : ""
+        animateSurface: false
     }
 
     function _log(message, event) {
@@ -572,9 +575,9 @@ Component.onCompleted: {
         anchors.horizontalCenter: parent.horizontalCenter
         clip: true
         implicitWidth: _pillTransition.animatedWidth
-        implicitHeight: _pillTransition.animatedHeight
+        implicitHeight: root._verticalRevealClipHeight
         width: _pillTransition.animatedWidth
-        height: _pillTransition.animatedHeight
+        height: root._verticalRevealClipHeight
         scale: root._pulseScale
         transformOrigin: Item.Center
 
@@ -583,7 +586,7 @@ Component.onCompleted: {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: _pillTransition.animatedHeight
+            height: root._verticalRevealSurfaceHeight
             radius: root._pillH / 2
             color: Colors.surface
             border.color: Colors.border
