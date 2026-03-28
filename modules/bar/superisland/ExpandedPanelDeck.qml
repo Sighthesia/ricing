@@ -91,27 +91,47 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: 0
 
-            SuperIslandParts.SuperIslandOverlayNavButton {
-                label: "启动器"
-                iconGlyph: "\uf002"
-                selected: root.currentPage === "launcher"
-                onPressed: root._retargetPage("launcher")
-            }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 30
+                radius: 11
+                color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.38)
+                border.color: Colors.border
+                border.width: 1
 
-            SuperIslandParts.SuperIslandOverlayNavButton {
-                label: "设置"
-                iconGlyph: "\uf013"
-                selected: root.currentPage === "settings"
-                onPressed: root._retargetPage("settings")
-            }
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 0
+                    spacing: 0
 
-            SuperIslandParts.SuperIslandOverlayNavButton {
-                label: "通知"
-                iconGlyph: "\uf0f3"
-                selected: root.currentPage === "notifications"
-                onPressed: root._retargetPage("notifications")
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
+                        label: "启动器"
+                        iconGlyph: "\uf002"
+                        selected: root.currentPage === "launcher"
+                        firstSegment: true
+                        onPressed: root._retargetPage("launcher")
+                    }
+
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
+                        label: "设置"
+                        iconGlyph: "\uf013"
+                        selected: root.currentPage === "settings"
+                        onPressed: root._retargetPage("settings")
+                    }
+
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
+                        label: "通知"
+                        iconGlyph: "\uf0f3"
+                        selected: root.currentPage === "notifications"
+                        lastSegment: true
+                        onPressed: root._retargetPage("notifications")
+                    }
+                }
             }
 
             Item { Layout.fillWidth: true }

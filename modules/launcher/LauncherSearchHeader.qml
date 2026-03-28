@@ -17,7 +17,7 @@ Item {
     signal closeRequested()
 
     Layout.fillWidth: true
-    height: 52
+    height: 44
 
     function runEnter(): void {
     }
@@ -35,8 +35,8 @@ Item {
             spacing: 8
 
             Rectangle {
-                implicitWidth: _modeBadgeText.implicitWidth + 16
-                height: 24
+                implicitWidth: _modeBadgeText.implicitWidth + 14
+                height: 22
                 radius: Theme.cornerRadius / 2
                 color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
 
@@ -53,9 +53,9 @@ Item {
             TextField {
                 id: searchField
                 Layout.fillWidth: true
-                placeholderText: "搜索应用… (>clip 切换剪切板)"
+                placeholderText: "搜索应用…"
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeBody
+                font.pixelSize: Theme.fontSizeBody - 1
                 color: Colors.text
                 background: null
                 selectionColor: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.3)

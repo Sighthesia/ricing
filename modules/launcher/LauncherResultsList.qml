@@ -37,7 +37,7 @@ Item {
             required property string icon
 
             width: resultList.width
-            height: 52
+            height: 46
 
             function runExit(): void {
             }
@@ -50,14 +50,14 @@ Item {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 10
+                    anchors.margins: 10
+                    spacing: 8
 
                     Image {
                         source: "image://icon/" + (_item.icon || "application-x-executable")
-                        width: 24
-                        height: 24
-                        sourceSize: Qt.size(24, 24)
+                        width: 20
+                        height: 20
+                        sourceSize: Qt.size(20, 20)
                     }
 
                     ColumnLayout {
@@ -68,7 +68,7 @@ Item {
                             text: _item.name
                             color: Colors.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeBody
+                            font.pixelSize: Theme.fontSizeSmall + 1
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
@@ -77,7 +77,7 @@ Item {
                             text: _item.description
                             color: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.55)
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSmall
+                            font.pixelSize: Theme.fontSizeSmall - 1
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                             visible: _item.description !== ""

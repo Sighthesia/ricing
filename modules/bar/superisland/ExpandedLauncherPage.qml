@@ -6,8 +6,6 @@ import qs.config
 Item {
     id: root
 
-    readonly property string _todayLabel: Qt.formatDateTime(new Date(), "M月d日 ddd")
-
     property bool _pageActive: false
     property string _pendingQueryText: ""
 
@@ -71,130 +69,67 @@ Item {
             _launcherCoreLoader.item.setQueryText(queryText)
     }
 
+    function _switchToAppSearch() {
+        root._activatePresetQuery("")
+    }
+
+    function _switchToClipboardSearch() {
+        root._activatePresetQuery(">clip ")
+    }
+
     ColumnLayout {
         anchors.fill: parent
-        spacing: 14
+        spacing: 10
 
-        Rectangle {
+        RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 126
-            radius: Theme.cornerRadius
-            gradient: Gradient {
-                GradientStop {
-                    position: 0.0
-                    color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.18)
+            spacing: 8
+
+            Item { Layout.fillWidth: true }
+
+            Rectangle {
+                implicitWidth: 92
+                implicitHeight: 30
+                radius: Theme.cornerRadius - 2
+                color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.30)
+                border.color: Colors.border
+                border.width: 1
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "应用"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall - 1
+                    color: Colors.text
                 }
-                GradientStop {
-                    position: 1.0
-                    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.92)
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root._switchToAppSearch()
                 }
             }
-            border.color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.24)
-            border.width: 1
 
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 18
-                spacing: 18
+            Rectangle {
+                implicitWidth: 92
+                implicitHeight: 30
+                radius: Theme.cornerRadius - 2
+                color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.30)
+                border.color: Colors.border
+                border.width: 1
 
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-
-                    Text {
-                        text: "启动器"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeBody + 10
-                        font.weight: Font.DemiBold
-                        color: Colors.text
-                    }
-
-                    Text {
-                        text: root._todayLabel
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Colors.highlight
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: "搜索应用、切换到剪贴板历史、直接回车启动。整个页面都围绕搜索主流程展开。"
-                        wrapMode: Text.WordWrap
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Colors.textMuted
-                    }
+                Text {
+                    anchors.centerIn: parent
+                    text: "剪贴板"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall - 1
+                    color: Colors.text
                 }
 
-                RowLayout {
-                    spacing: 10
-
-                    Repeater {
-                        model: [
-                            {
-                                label: "应用",
-                                subtitle: "桌面条目",
-                                query: ""
-                            },
-                            {
-                                label: "剪贴板",
-                                subtitle: "最近复制",
-                                query: ">clip "
-                            }
-                        ]
-
-                        delegate: Rectangle {
-                            required property var modelData
-
-                            readonly property bool _active: _chipArea.containsMouse
-
-                            implicitWidth: 118
-                            implicitHeight: 64
-                            radius: Theme.cornerRadius - 2
-                            color: _active
-                                ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
-                                : Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.26)
-                            border.color: _active ? Colors.highlight : Colors.border
-                            border.width: 1
-
-                            Behavior on color {
-                                ColorAnimation { duration: Theme.anim.highlightDuration }
-                            }
-
-                            Behavior on border.color {
-                                ColorAnimation { duration: Theme.anim.highlightDuration }
-                            }
-
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 12
-                                spacing: 2
-
-                                Text {
-                                    text: modelData.label
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    font.weight: Font.Medium
-                                    color: Colors.text
-                                }
-
-                                Text {
-                                    text: modelData.subtitle
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSmall - 1
-                                    color: Colors.textMuted
-                                }
-                            }
-
-                            MouseArea {
-                                id: _chipArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root._activatePresetQuery(parent.modelData.query)
-                            }
-                        }
-                    }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root._switchToClipboardSearch()
                 }
             }
         }
