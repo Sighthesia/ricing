@@ -16,10 +16,9 @@ Item {
     readonly property int _compactIcon: Math.max(10, Theme.barWidget.compactIconSize - 1)
     readonly property int _primaryIcon: Theme.barWidget.primaryIconSize
     readonly property int _pillHeight: Theme.barWidget.pillHeight
-    readonly property int _surfaceHeight: root._pillHeight * 3
+    readonly property int _mainIslandHeight: root._pillHeight * 3
     readonly property int _titleIslandHeight: Math.max(22, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 3)
     readonly property int _titleOverlap: Math.max(8, Math.round(root._titleIslandHeight * 0.45))
-    readonly property int _mainIslandHeight: root._surfaceHeight - root._titleIslandHeight + root._titleOverlap
     readonly property int _stripHeight: Math.max(12, Theme.barWidget.compactIconSize)
     readonly property int _windowRowHeight: Math.max(20, Theme.barWidget.primaryIconSize + Theme.barWidget.contentPaddingV * 3)
     readonly property int _previewWidth: Math.round(396 * Theme.uiScale)
@@ -28,7 +27,7 @@ Item {
         root._previewWidth,
         Math.max(_workspaceRow.implicitWidth, _titleRow.implicitWidth) + root._padH * 2 + Math.round(36 * Theme.uiScale)
     )
-    implicitHeight: root._surfaceHeight
+    implicitHeight: root._mainIslandHeight + root._titleIslandHeight - root._titleOverlap
 
     Item {
         id: _mainIsland
@@ -37,14 +36,6 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: parent.width
         height: root._mainIslandHeight
-
-        Rectangle {
-            anchors.fill: parent
-            radius: height / 2
-            color: Qt.rgba(1, 1, 1, 0.035)
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.04)
-        }
 
         Column {
             anchors.fill: parent
@@ -210,7 +201,7 @@ Item {
         }
     }
 
-    Rectangle {
+    Item {
         id: _titleIsland
 
         anchors.top: _mainIsland.bottom
@@ -218,10 +209,6 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.min(parent.width - root._padH * 2, Math.round(312 * Theme.uiScale))
         height: root._titleIslandHeight
-        radius: height / 2
-        color: Qt.rgba(1, 1, 1, 0.08)
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.05)
 
         RowLayout {
             id: _titleRow
