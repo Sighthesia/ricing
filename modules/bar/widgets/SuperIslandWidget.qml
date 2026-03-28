@@ -138,7 +138,13 @@ property real _flashTrackOpacity: 0
     readonly property real _returnTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
     readonly property real _collapsedPillHeight: root._pillH
-    readonly property real _expandedPillHeight: root._pillH + root._flashGap + root._flashRowH
+    readonly property real _standardExpandedPillHeight: root._pillH + root._flashGap + root._flashRowH
+    readonly property real _fullHintExpandedPillHeight: root._pillH * 3
+    readonly property bool _fullHintExpandedSurface:
+        root._isFullHintEventType(root._flashSourceEvent.type)
+        || (root._hintPhase && root._isFullHintEventType(SuperIslandService.activeEvent.type))
+    readonly property real _expandedPillHeight:
+        root._fullHintExpandedSurface ? root._fullHintExpandedPillHeight : root._standardExpandedPillHeight
     readonly property bool _pillExpanded:
         root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
