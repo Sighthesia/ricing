@@ -21,11 +21,16 @@ Item {
     readonly property int _titleOverlap: Math.max(8, Math.round(root._titleIslandHeight * 0.45))
     readonly property int _stripHeight: Math.max(12, Theme.barWidget.compactIconSize)
     readonly property int _windowRowHeight: Math.max(20, Theme.barWidget.primaryIconSize + Theme.barWidget.contentPaddingV * 3)
-    readonly property int _previewWidth: Math.round(396 * Theme.uiScale)
+    readonly property int _minPreviewWidth: Math.round(320 * Theme.uiScale)
+    readonly property int _maxPreviewWidth: Math.round(560 * Theme.uiScale)
 
     implicitWidth: Math.min(
-        root._previewWidth,
-        Math.max(_workspaceRow.implicitWidth, _titleRow.implicitWidth) + root._padH * 2 + Math.round(36 * Theme.uiScale)
+        root._maxPreviewWidth,
+        Math.max(
+            root._minPreviewWidth,
+            _workspaceRow.implicitWidth + root._padH * 2 + Math.round(36 * Theme.uiScale),
+            _titleIsland.implicitWidth + root._padH * 2 + Math.round(20 * Theme.uiScale)
+        )
     )
     implicitHeight: root._mainIslandHeight + root._titleIslandHeight - root._titleOverlap
 
@@ -207,77 +212,97 @@ Item {
         anchors.top: _mainIsland.bottom
         anchors.topMargin: -root._titleOverlap
         anchors.horizontalCenter: parent.horizontalCenter
-        width: Math.min(parent.width - root._padH * 2, Math.round(312 * Theme.uiScale))
+        width: Math.min(parent.width - root._padH * 2, implicitWidth)
         height: root._titleIslandHeight
 
-        RowLayout {
-            id: _titleRow
+        readonly property int _centerIslandWidth: Math.max(
+            Math.round(116 * Theme.uiScale),
+            Math.min(
+                Math.round(320 * Theme.uiScale),
+                _centerIslandContent.implicitWidth + Theme.barWidget.badgePaddingH * 4
+            )
+        )
+        readonly property int _titleContentWidth: Math.max(
+            _previousTitle.implicitWidth + _nextTitle.implicitWidth + _centerIslandWidth + Theme.barWidget.badgePaddingH * 4,
+            Math.round(260 * Theme.uiScale)
+        )
 
-            anchors.fill: parent
+        implicitWidth: Math.min(Math.round(460 * Theme.uiScale), _titleContentWidth)
+        implicitHeight: root._titleIslandHeight
+
+        Text {
+            id: _previousTitle
+            anchors.left: parent.left
             anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
+            anchors.right: _centerIsland.left
+            anchors.rightMargin: Theme.barWidget.iconSpacing * 2
+            anchors.verticalCenter: parent.verticalCenter
+            text: root._hint.previousWindow.title || ""
+            color: Colors.textMuted
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSmall
+            elide: Text.ElideRight
+            maximumLineCount: 1
+            verticalAlignment: Text.AlignVCenter
+            opacity: text.length > 0 ? 0.86 : 0
+        }
+
+        Text {
+            id: _nextTitle
+            anchors.left: _centerIsland.right
+            anchors.leftMargin: Theme.barWidget.iconSpacing * 2
+            anchors.right: parent.right
             anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
-            spacing: Theme.barWidget.iconSpacing
+            anchors.verticalCenter: parent.verticalCenter
+            text: root._hint.nextWindow.title || ""
+            color: Colors.textMuted
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSmall
+            elide: Text.ElideLeft
+            maximumLineCount: 1
+            horizontalAlignment: Text.AlignRight
+            verticalAlignment: Text.AlignVCenter
+            opacity: text.length > 0 ? 0.86 : 0
+        }
 
-            Text {
-                Layout.fillWidth: true
-                text: root._hint.previousWindow.title || ""
-                color: Colors.textMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSmall
-                elide: Text.ElideRight
-                maximumLineCount: 1
-                verticalAlignment: Text.AlignVCenter
-                opacity: text.length > 0 ? 0.86 : 0
-            }
+        Rectangle {
+            id: _centerIsland
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            width: _centerIslandWidth
+            height: parent.height - Theme.barWidget.contentPaddingV * 2
+            radius: height / 2
+            color: Qt.rgba(1, 1, 1, 0.06)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.04)
 
-            Rectangle {
-                Layout.minimumWidth: Math.round(116 * Theme.uiScale)
-                Layout.preferredWidth: Math.round(150 * Theme.uiScale)
-                Layout.maximumWidth: Math.round(176 * Theme.uiScale)
-                Layout.preferredHeight: parent.height - Theme.barWidget.contentPaddingV * 2
-                radius: height / 2
-                color: Qt.rgba(1, 1, 1, 0.06)
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.04)
+            Row {
+                id: _centerIslandContent
 
-                Row {
-                    anchors.centerIn: parent
-                    spacing: Theme.barWidget.badgePaddingH
+                anchors.centerIn: parent
+                spacing: Theme.barWidget.badgePaddingH
 
-                    Image {
-                        width: root._compactIcon
-                        height: width
-                        source: root._hint.currentWindowIcon || ""
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        visible: source !== ""
-                    }
-
-                    Text {
-                        width: Math.min(implicitWidth, Math.round(122 * Theme.uiScale))
-                        text: root._hint.currentWindowTitle || "Window hint"
-                        color: Colors.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.bold: true
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        verticalAlignment: Text.AlignVCenter
-                    }
+                Image {
+                    width: root._compactIcon
+                    height: width
+                    source: root._hint.currentWindowIcon || ""
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    visible: source !== ""
                 }
-            }
 
-            Text {
-                Layout.fillWidth: true
-                text: root._hint.nextWindow.title || ""
-                color: Colors.textMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSmall
-                elide: Text.ElideLeft
-                maximumLineCount: 1
-                horizontalAlignment: Text.AlignRight
-                verticalAlignment: Text.AlignVCenter
-                opacity: text.length > 0 ? 0.86 : 0
+                Text {
+                    width: Math.min(implicitWidth, Math.round(272 * Theme.uiScale))
+                    text: root._hint.currentWindowTitle || "Window hint"
+                    color: Colors.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.bold: true
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignHCenter
+                }
             }
         }
     }
