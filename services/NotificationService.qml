@@ -139,6 +139,30 @@ Singleton {
         dismissActive(id);
     }
 
+    function invokeDefaultAction(id) {
+        var entry = _activeNotifications[id]
+        if (!entry || !entry.notification)
+            return false
+
+        if (entry.notification.defaultAction) {
+            entry.notification.defaultAction.invoke()
+            dismissActive(id)
+            return true
+        }
+
+        if (entry.notification.actions) {
+            for (var index = 0; index < entry.notification.actions.length; index++) {
+                if (entry.notification.actions[index].identifier === "default") {
+                    entry.notification.actions[index].invoke()
+                    dismissActive(id)
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
     // Remove a single entry from the persisted history.
     function removeFromHistory(id) {
         for (var i = 0; i < historyList.count; i++) {

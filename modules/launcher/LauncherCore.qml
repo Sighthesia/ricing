@@ -60,7 +60,7 @@ Item {
                 _resultsList.positionSelection(root._selectedIndex);
             }
             onActivateRequested: root._activateCurrent()
-            onCloseRequested: LauncherService.isOpen = false
+            onCloseRequested: LauncherService.close()
         }
 
         // Divider
@@ -117,6 +117,16 @@ Item {
         _results.clear()
         root._resultData = []
         _suspendRefresh = false
+    }
+
+    function setQueryText(text): void {
+        _searchHeader.text = text
+        _searchHeader.focusInput()
+        _refreshResults()
+    }
+
+    function focusSearch(): void {
+        _searchHeader.focusInput()
     }
 
     function runStructuralEnter(): void {
@@ -204,7 +214,7 @@ Item {
         if (root._selectedIndex < 0 || root._selectedIndex >= root._resultData.length) return
 
         let item = root._resultData[root._selectedIndex]
-        LauncherService.isOpen = false
+        LauncherService.close()
         if (item && item.onActivate) item.onActivate()
     }
 

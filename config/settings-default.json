@@ -67,6 +67,7 @@
     "superIsland": {
         "enabled": true,
         "idleContent": "time",
+        "expandedDefaultPage": "launcher",
         "defaultTimeout": 1500,
         "importantTimeout": 1500,
         "criticalTimeout": 1500,
