@@ -24,7 +24,7 @@ Singleton {
     readonly property bool available: root._cavaBinary !== ""
     readonly property bool healthy: root.enabled && root.available && !root._degraded && root.bars.length > 0
     readonly property bool degraded: root._degraded
-    readonly property string cacheDir: root._cacheHome + "/dymicshell/"
+    readonly property string cacheDir: root._cacheHome + "/DymicShell/"
     readonly property string configFile: root.cacheDir + "cava-media-control.conf"
 
     property var bars: []

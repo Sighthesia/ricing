@@ -9,7 +9,7 @@ config/                    # Semantic colors + structural theme tokens
 services/                  # Singleton state, persistence, compositor/process integration
 modules/                   # UI windows, panels, and reusable module-local components
 docs/plans/                # Design and implementation history
-null/dymicshell/           # Checked-in sample/runtime artifacts; not the canonical live config
+.cache/DymicShell/         # Runtime artifacts and transient shell data; not checked in
 ```
 Key entry points: `shell.qml`, `config/Theme.qml`, `config/Colors.qml`, `services/SettingsService.qml`, `services/BarLayoutService.qml`, `modules/bar/BarContent.qml`.
 
@@ -37,6 +37,7 @@ Load these for detailed context on specific topics:
 - The repo does not define `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmllint`, `qmlformat`, or CI workflow commands. Do not invent those commands unless you verify local availability.
 - Do not proactively use harness, smoke, or other targeted test runners; keep validation to the whole-shell load check unless the user explicitly asks for a different approach.
 - Don't remove `docs/plans/` references even when files or commands move.
+- Keep runtime artifacts in `.cache/DymicShell/`; do not write new files under `null/dymicshell/`.
 - In QML files, precede each visual element declaration with a short English comment that names the element or explains its visual role/effect.
 - Keep those comments concise and local to the element they describe.
 <!-- TRELLIS:START -->

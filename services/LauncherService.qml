@@ -19,7 +19,7 @@ Singleton {
         (Quickshell.env("XDG_CACHE_HOME") !== ""
             ? Quickshell.env("XDG_CACHE_HOME")
             : Quickshell.env("HOME") + "/.cache")
-        + "/dymicshell"
+        + "/DymicShell"
     readonly property string _shellDirFile: _cacheDir + "/current-shell-dir"
 
     function _log(message) {
