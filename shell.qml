@@ -10,7 +10,9 @@ import qs.modules.notifications
 ShellRoot {
     id: root
 
-    readonly property bool _launcherServiceReady: LauncherService !== null
+    Component.onCompleted: {
+        LauncherService.ensureInitialized()
+    }
 
     Component {
         id: _normalShellContent

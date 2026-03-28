@@ -15,13 +15,6 @@ Singleton {
         && (IslandOverlayService.state === "opening" || IslandOverlayService.state === "open")
     // Text to prefill in the search box when opening via IPC.
     property string prefillText: ""
-    readonly property string _cacheDir:
-        (Quickshell.env("XDG_CACHE_HOME") !== ""
-            ? Quickshell.env("XDG_CACHE_HOME")
-            : Quickshell.env("HOME") + "/.cache")
-        + "/DymicShell"
-    readonly property string _shellDirFile: _cacheDir + "/current-shell-dir"
-
     function _log(message) {
         console.info("[DymicShell:LauncherService]", message,
             "mode=", IslandOverlayService.mode,
@@ -45,24 +38,14 @@ Singleton {
         }
     }
 
-    Timer {
-        id: _publishShellDirTimer
-        interval: 0
-        repeat: false
-        onTriggered: root._publishShellDir()
-    }
-
-    Process {
-        id: _shellDirWriter
-
-        stdinEnabled: true
-        command: ["sh", "-c", "mkdir -p '" + root._cacheDir + "' && cat > '" + root._shellDirFile + "'"]
+    function ensureInitialized() {
+        root._log("initialized")
     }
 
     function toggle() {
         root._log("toggle requested")
         root.prefillText = ""
-        IslandOverlayService.openOverlay("launcher", "")
+        IslandOverlayService.toggleOverlay("launcher", "launcher", "")
     }
 
     function close() {
@@ -76,15 +59,8 @@ Singleton {
         IslandOverlayService.openOverlay("launcher", ">clip ")
     }
 
-    function _publishShellDir(): void {
-        console.info("[DymicShell:LauncherService] Publishing shell directory", Quickshell.shellDir)
-        _shellDirWriter.running = false
-        _shellDirWriter.running = true
-        _shellDirWriter.write(Quickshell.shellDir + "\n")
-    }
-
     Component.onCompleted: {
-        _publishShellDirTimer.start()
+        root.ensureInitialized()
     }
 
     Connections {
