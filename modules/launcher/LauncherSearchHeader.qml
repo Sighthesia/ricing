@@ -2,10 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import qs.config
-import qs.modules.bar
 
 // Launcher search header with mode badge, input, and keyboard intent signals.
-StaggerItem {
+Item {
     id: root
 
     property alias text: searchField.text
@@ -19,7 +18,12 @@ StaggerItem {
 
     Layout.fillWidth: true
     height: 52
-    exitDelay: 0
+
+    function runEnter(): void {
+    }
+
+    function runExit(): void {
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -57,6 +61,7 @@ StaggerItem {
                 selectionColor: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.3)
 
                 onTextEdited: root.queryChanged(text)
+                onTextChanged: root.queryChanged(text)
 
                 Keys.onUpPressed: root.moveSelectionUp()
                 Keys.onDownPressed: root.moveSelectionDown()

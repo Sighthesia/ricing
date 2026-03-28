@@ -113,11 +113,8 @@ property real _flashTrackOpacity: 0
         : (root._phase === "idle" ? "single-track" : "dual-track")
     readonly property bool flashTrackVisible: root._phase !== "idle" && !root._overlaySessionActive
     readonly property bool _transientPhase: root._phase !== "idle"
-    readonly property bool _overlaySessionActive:
-        IslandOverlayService.mode !== "none" && IslandOverlayService.state !== "closed"
-    readonly property bool _overlayExpandedActive:
-        IslandOverlayService.mode !== "none"
-        && (IslandOverlayService.state === "opening" || IslandOverlayService.state === "open")
+    property bool _overlaySessionActive: false
+    property bool _overlayExpandedActive: false
     readonly property real pillTopPadding: root._padV
 
     readonly property real _mainTrackCenterY:
@@ -194,6 +191,7 @@ property real _flashTrackOpacity: 0
 
 Component.onCompleted: {
     currentTime = new Date()
+    root._syncOverlayFlags()
     const initialActiveEvent = root._displayEvent(root._listensToService ? SuperIslandService.activeEvent : root._idleSnapshot())
     root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
     root._lastActiveEvent = initialActiveEvent
@@ -232,7 +230,7 @@ Component.onCompleted: {
         expandedHeight: root._expandedPillHeight
         expanded: root._pillExpanded
         extensionOwnerKey: root.liveInstance ? "super-island" : ""
-        animateSurface: false
+        animateSurface: root._overlaySessionActive
     }
 
     SystemClock {
@@ -376,6 +374,13 @@ Component.onCompleted: {
         root._flashTrackY = root._flashStripY
         root._flashTrackScale = root._flashScale
         root._flashTrackOpacity = 0
+    }
+
+    function _syncOverlayFlags() {
+        root._overlaySessionActive = IslandOverlayService.mode !== "none"
+            && IslandOverlayService.state !== "closed"
+        root._overlayExpandedActive = IslandOverlayService.mode !== "none"
+            && (IslandOverlayService.state === "opening" || IslandOverlayService.state === "open")
     }
 
     function _syncOverlayExtensionReservation() {
@@ -664,6 +669,7 @@ Component.onCompleted: {
         target: IslandOverlayService
 
         function onStateChanged() {
+            root._syncOverlayFlags()
             root._syncOverlayExtensionReservation()
 
             if (IslandOverlayService.state === "opening") {
@@ -676,6 +682,7 @@ Component.onCompleted: {
         }
 
         function onModeChanged() {
+            root._syncOverlayFlags()
             root._syncOverlayExtensionReservation()
         }
     }

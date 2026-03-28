@@ -22,6 +22,29 @@ Singleton {
         + "/dymicshell"
     readonly property string _shellDirFile: _cacheDir + "/current-shell-dir"
 
+    function _log(message) {
+        console.info("[DymicShell:LauncherService]", message,
+            "mode=", IslandOverlayService.mode,
+            "state=", IslandOverlayService.state,
+            "payload=", IslandOverlayService.modePayload,
+            "prefill=", root.prefillText)
+    }
+
+    function _syncPrefillFromOverlay() {
+        if (IslandOverlayService.mode === "launcher") {
+            root.prefillText = typeof IslandOverlayService.modePayload === "string"
+                ? IslandOverlayService.modePayload
+                : ""
+            root._log("synced launcher prefill")
+            return
+        }
+
+        if (IslandOverlayService.mode === "none" || IslandOverlayService.state === "closing") {
+            root.prefillText = ""
+            root._log("cleared launcher prefill")
+        }
+    }
+
     Timer {
         id: _publishShellDirTimer
         interval: 0
@@ -37,14 +60,17 @@ Singleton {
     }
 
     function toggle() {
+        root._log("toggle requested")
         IslandOverlayService.toggleOverlay("launcher", "launcher", "");
     }
 
     function close() {
+        root._log("close requested")
         IslandOverlayService.closeOverlay("launcher")
     }
 
     function openClipboard() {
+        root._log("clipboard requested")
         IslandOverlayService.openOverlay("launcher", ">clip ");
     }
 
@@ -63,23 +89,15 @@ Singleton {
         target: IslandOverlayService
 
         function onModeChanged() {
-            if (IslandOverlayService.mode === "launcher" && IslandOverlayService.modePayload !== undefined) {
-                root.prefillText = typeof IslandOverlayService.modePayload === "string"
-                    ? IslandOverlayService.modePayload
-                    : ""
-                return
-            }
-
-            if (IslandOverlayService.mode !== "launcher")
-                root.prefillText = ""
+            root._syncPrefillFromOverlay()
         }
 
         function onStateChanged() {
-            if (IslandOverlayService.mode === "launcher" && IslandOverlayService.state === "closing")
-                root.prefillText = ""
+            root._syncPrefillFromOverlay()
+        }
 
-            if (IslandOverlayService.mode === "none")
-                root.prefillText = ""
+        function onModePayloadChanged() {
+            root._syncPrefillFromOverlay()
         }
     }
 

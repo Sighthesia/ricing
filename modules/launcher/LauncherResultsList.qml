@@ -2,10 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
-import qs.modules.bar
 
 // Launcher results viewport with delegate rendering and row interactions.
-StaggerItem {
+Item {
     id: root
 
     property alias model: resultList.model
@@ -16,7 +15,12 @@ StaggerItem {
 
     Layout.fillWidth: true
     Layout.fillHeight: true
-    exitDelay: 0
+
+    function runEnter(): void {
+    }
+
+    function runExit(): void {
+    }
 
     ListView {
         id: resultList
@@ -24,7 +28,7 @@ StaggerItem {
         clip: true
         cacheBuffer: 0
 
-        delegate: StaggerItem {
+        delegate: Item {
             id: _item
 
             required property int index
@@ -32,12 +36,11 @@ StaggerItem {
             required property string description
             required property string icon
 
-            delay:  SettingsService.data.animation.staggerLevel1BaseDelay
-                    + (index % 8) * 25
             width: resultList.width
             height: 52
 
-            Component.onCompleted: runEnter()
+            function runExit(): void {
+            }
 
             Rectangle {
                 anchors.fill: parent
