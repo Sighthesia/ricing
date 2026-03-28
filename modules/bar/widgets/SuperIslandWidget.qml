@@ -387,8 +387,12 @@ Component.onCompleted: {
         if (!root.liveInstance)
             return
 
-        if (root._overlayReservedExtension > 0) {
-            BarLayoutService.setTransientExtension("super-island-overlay", root._overlayReservedExtension)
+        let reservedHeight = root._overlaySessionActive
+            ? root._overlayReservedExtension
+            : 0
+
+        if (root._overlaySessionActive) {
+            BarLayoutService.setTransientExtension("super-island-overlay", reservedHeight)
             return
         }
 
@@ -667,6 +671,11 @@ Component.onCompleted: {
 
     Connections {
         target: IslandOverlayService
+
+        function onModePayloadChanged() {
+            root._syncOverlayFlags()
+            root._syncOverlayExtensionReservation()
+        }
 
         function onStateChanged() {
             root._syncOverlayFlags()
