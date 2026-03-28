@@ -14,6 +14,9 @@ Singleton {
     // Used as a cross-window signal for the click-away backdrop.
     property bool contextMenuOpen: false
 
+    // True while the tray's cascading QML menu is open.
+    property bool trayMenuOpen: false
+
     // True while the widget picker panel is visible.
     property bool widgetPickerOpen: false
 

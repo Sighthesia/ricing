@@ -9,6 +9,7 @@ Item {
 
     required property var items
     required property QtObject menuParent
+    required property var menuController
 
     property bool showEmptyAnchor: false
 
@@ -32,6 +33,7 @@ Item {
 
                 item: modelData
                 menuParent: root.menuParent
+                menuController: root.menuController
                 buttonSize: root._buttonSize
             }
         }

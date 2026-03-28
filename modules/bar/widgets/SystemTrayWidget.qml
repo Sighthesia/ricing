@@ -275,6 +275,7 @@ Item {
             y: (root._pillH - implicitHeight) / 2
             items: SystemTrayService.pinnedItems
             menuParent: root
+            menuController: trayContextMenu
             showEmptyAnchor: root._showEmptyAnchor
         }
 
@@ -286,6 +287,7 @@ Item {
             opacity: root._stripVisible ? 1 : 0
             items: root._stripItems
             menuParent: root
+            menuController: trayContextMenu
             maxStripWidth: root._stripWidthBudget
 
             Behavior on opacity {
@@ -294,6 +296,12 @@ Item {
                     easing.type: Theme.anim.moveType
                 }
             }
+        }
+
+        TrayComponents.TrayContextMenu {
+            id: trayContextMenu
+
+            anchorTarget: root
         }
     }
 

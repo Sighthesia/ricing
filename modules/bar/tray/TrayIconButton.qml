@@ -9,6 +9,7 @@ Item {
 
     required property var item
     required property QtObject menuParent
+    required property var menuController
 
     property bool middleClickEnabled: false
     property bool wheelEnabled: true
@@ -19,6 +20,14 @@ Item {
         if (root.item && root.item.icon)
             return root.item.icon
         return Quickshell.iconPath("application-x-executable")
+    }
+
+    function _requestTrayMenu(mouse) {
+        if (!root.item || !root.item.hasMenu || !root.menuController)
+            return
+
+        const anchorPoint = root.mapToItem(root.menuParent, mouse.x, mouse.y)
+        root.menuController.showForItem(root.item, Math.round(anchorPoint.x), Math.round(anchorPoint.y))
     }
 
     implicitWidth: root.buttonSize
@@ -69,8 +78,7 @@ Item {
             ripple.triggerRipple(mouse.x, mouse.y)
 
             if (mouse.button === Qt.RightButton) {
-                if (root.item && root.item.hasMenu && typeof root.item.display === "function")
-                    root.item.display(root.menuParent, mouse.x, mouse.y)
+                root._requestTrayMenu(mouse)
                 return
             }
 
@@ -83,8 +91,8 @@ Item {
             if (!root.item)
                 return
 
-            if (root.item.onlyMenu && root.item.hasMenu && typeof root.item.display === "function") {
-                root.item.display(root.menuParent, mouse.x, mouse.y)
+            if (root.item.onlyMenu && root.item.hasMenu && root.menuController) {
+                root._requestTrayMenu(mouse)
                 return
             }
 

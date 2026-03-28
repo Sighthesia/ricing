@@ -95,6 +95,7 @@ PopupWindow {
         _targetWidgetCenterX = widgetCenterX || 0;
         _targetWidgetLabel = widgetLabel || "";
         anchor.updateAnchor();
+        BarLayoutService.trayMenuOpen = false;
         BarLayoutService.contextMenuOpen = true;
         _active = true;
     }

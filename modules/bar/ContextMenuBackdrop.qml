@@ -15,11 +15,14 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    visible: BarLayoutService.contextMenuOpen
+    visible: BarLayoutService.contextMenuOpen || BarLayoutService.trayMenuOpen
 
     MouseArea {
         anchors.fill: parent
         // Any click outside the popup closes the menu.
-        onClicked: BarLayoutService.contextMenuOpen = false
+        onClicked: {
+            BarLayoutService.contextMenuOpen = false
+            BarLayoutService.trayMenuOpen = false
+        }
     }
 }

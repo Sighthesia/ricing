@@ -128,10 +128,14 @@ Item {
     // Global Esc: close any active panel, the context menu, and the widget picker.
     Shortcut {
         sequence: "Escape"
-        enabled: BarLayoutService.activePanel !== "none" || contextMenu.visible || BarLayoutService.widgetPickerOpen
+        enabled: BarLayoutService.activePanel !== "none"
+            || contextMenu.visible
+            || BarLayoutService.trayMenuOpen
+            || BarLayoutService.widgetPickerOpen
         onActivated: {
             BarLayoutService.activePanel = "none";
             BarLayoutService.contextMenuOpen = false;
+            BarLayoutService.trayMenuOpen = false;
             BarLayoutService.widgetPickerOpen = false;
         }
     }

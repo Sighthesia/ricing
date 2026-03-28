@@ -8,6 +8,7 @@ Item {
 
     required property var items
     required property QtObject menuParent
+    required property var menuController
 
     property int maxStripWidth: 0
 
@@ -43,6 +44,7 @@ Item {
 
                 item: modelData
                 menuParent: root.menuParent
+                menuController: root.menuController
                 buttonSize: root._buttonSize
             }
         }
