@@ -61,7 +61,8 @@ Singleton {
 
     function toggle() {
         root._log("toggle requested")
-        IslandOverlayService.toggleOverlay("launcher", "launcher", "");
+        root.prefillText = ""
+        IslandOverlayService.openOverlay("launcher", "")
     }
 
     function close() {
@@ -71,7 +72,8 @@ Singleton {
 
     function openClipboard() {
         root._log("clipboard requested")
-        IslandOverlayService.openOverlay("launcher", ">clip ");
+        root.prefillText = ">clip "
+        IslandOverlayService.openOverlay("launcher", ">clip ")
     }
 
     function _publishShellDir(): void {
@@ -93,10 +95,6 @@ Singleton {
         }
 
         function onStateChanged() {
-            root._syncPrefillFromOverlay()
-        }
-
-        function onModePayloadChanged() {
             root._syncPrefillFromOverlay()
         }
     }

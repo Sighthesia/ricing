@@ -150,9 +150,6 @@ property real _flashTrackOpacity: 0
         root._overlayExpandedActive
         || root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
 
-    readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
-    readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
-
     readonly property real _overlayExpandedWidth: {
         const availableWidth = Math.max(
             760,
@@ -160,6 +157,9 @@ property real _flashTrackOpacity: 0
         )
         return Math.max(root._collapsedWidth, Math.min(Math.round(980 * Theme.uiScale), availableWidth))
     }
+
+    readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
+    readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
     readonly property real _collapsedWidth:
         (_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2
@@ -185,8 +185,6 @@ property real _flashTrackOpacity: 0
     readonly property bool _hintPhase: root._phase === "hint" || root._phase === "hint-exit"
     readonly property bool _listensToService: true
     readonly property real _transientAccentBaseOpacity: 0
-    readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
-    readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
     readonly property real _overlayReservedExtension:
         root._overlaySessionActive
             ? Math.max(0, root._expandedPillHeight - root._collapsedPillHeight)
@@ -251,16 +249,6 @@ property real _flashTrackOpacity: 0
         expanded: root._pillExpanded
         animateWidth: true
         animateHeight: false
-    }
-
-    BarComponents.BarTransientRevealHost {
-        id: _verticalReveal
-
-        collapsedHeight: root._collapsedPillHeight
-        expandedHeight: root._expandedPillHeight
-        expanded: root._pillExpanded
-        extensionOwnerKey: root.liveInstance ? "super-island" : ""
-        animateSurface: false
     }
 
     function _log(message, event) {
@@ -745,7 +733,6 @@ property real _flashTrackOpacity: 0
             anchors.right: parent.right
             anchors.top: parent.top
             height: root._verticalRevealSurfaceHeight
-            radius: root._overlaySessionActive ? Theme.cornerRadius : (root._pillH / 2)
             radius: root._overlaySessionActive ? Theme.cornerRadius : (root._pillH / 2)
             color: Colors.surface
             border.color: Colors.border

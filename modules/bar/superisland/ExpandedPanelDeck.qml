@@ -74,6 +74,7 @@ Item {
                 root._activatePage(nextPage)
             })
         }
+
     }
 
     Rectangle {
