@@ -25,22 +25,6 @@ Item {
     property bool _suspendRefresh: false
     property bool panelActive: LauncherService.isOpen
 
-    function _log(message) {
-        console.info("[DymicShell:LauncherCore]", message,
-            "panelActive=", root.panelActive,
-            "serviceOpen=", LauncherService.isOpen,
-            "query=", _searchHeader ? _searchHeader.text : "",
-            "results=", root._resultData.length)
-    }
-
-    function _providerLabel(provider): string {
-        if (provider === clipProvider)
-            return "clipboard"
-        if (provider === appProvider)
-            return "applications"
-        return "unknown"
-    }
-
     // Parallel stores: ListModel holds display-only scalars; _resultData holds
     // the full result objects including onActivate functions (ListModel cannot
     // store JS functions — they are stripped on append).
@@ -111,11 +95,14 @@ Item {
 
     // Called by LauncherPanel after panel becomes active
     function openPanel(): void {
-        root._log("open panel")
         _results.clear()
         _searchHeader.text = LauncherService.prefillText
-        _searchHeader.focusInput()
         _refreshResults()
+
+        Qt.callLater(function() {
+            if (LauncherService.isOpen)
+                _searchHeader.focusInput()
+        })
 
         for (let i = 0; i < _providers.length; i++) {
             _providers[i].onOpened()
@@ -124,7 +111,6 @@ Item {
 
     // Called by LauncherPanel when closing
     function closePanel(): void {
-        root._log("close panel")
         _swapTimer.stop()
         _pendingDisplayItems = []
         _pendingResultData = []
@@ -136,14 +122,21 @@ Item {
     }
 
     function setQueryText(text): void {
-        root._log("set query text to '" + text + "'")
         _searchHeader.text = text
-        _searchHeader.focusInput()
         _refreshResults()
+
+        Qt.callLater(function() {
+            if (LauncherService.isOpen)
+                _searchHeader.focusInput()
+        })
+
     }
 
     function focusSearch(): void {
-        _searchHeader.focusInput()
+        Qt.callLater(function() {
+            if (LauncherService.isOpen)
+                _searchHeader.focusInput()
+        })
     }
 
     function runStructuralEnter(): void {
@@ -166,33 +159,24 @@ Item {
 
     function _activeProvider(): var {
         let text = _searchHeader.text
-        if (text.startsWith(">clip")) {
-            root._log("provider resolved to clipboard")
+        if (text.startsWith(">clip"))
             return clipProvider
-        }
-
-        root._log("provider resolved to applications")
         return appProvider
     }
 
     function _refreshResults(): void {
-        if (_suspendRefresh || !root.panelActive) {
-            root._log("refresh skipped")
+        if (_suspendRefresh || !root.panelActive)
             return
-        }
 
         let provider = _activeProvider()
-        if (!provider) {
-            root._log("refresh skipped: missing provider")
+        if (!provider)
             return
-        }
 
         let q = _searchHeader.text
         if (q.startsWith(">clip ")) q = q.substring(6)
         else if (q === ">clip") q = ""
 
         let items = provider.getResults(q)
-        root._log("provider=" + root._providerLabel(provider) + " query='" + q + "' items=" + items.length)
         let displayItems = []
         for (let i = 0; i < items.length; i++) {
             displayItems.push({
@@ -212,7 +196,6 @@ Item {
                 _results.append(displayItems[j])
             }
             _selectedIndex = items.length > 0 ? 0 : -1
-            root._log("applied immediate results")
             return
         }
 
@@ -240,17 +223,13 @@ Item {
         _pendingDisplayItems = []
         _pendingResultData = []
         _selectedIndex = root._resultData.length > 0 ? 0 : -1
-        root._log("applied pending results")
     }
 
     function _activateCurrent(): void {
-        if (root._selectedIndex < 0 || root._selectedIndex >= root._resultData.length) {
-            root._log("activate skipped")
+        if (root._selectedIndex < 0 || root._selectedIndex >= root._resultData.length)
             return
-        }
 
         let item = root._resultData[root._selectedIndex]
-        root._log("activating index=" + root._selectedIndex + " name='" + (item && item.name ? item.name : "") + "'")
         LauncherService.close()
         if (item && item.onActivate) item.onActivate()
     }
@@ -261,7 +240,6 @@ Item {
     Connections {
         target: DesktopEntries
         function onApplicationsChanged(): void {
-            root._log("desktop entries changed")
             if (root.panelActive) _refreshResults()
         }
     }
@@ -269,7 +247,6 @@ Item {
     Connections {
         target: ClipboardService
         function onRevisionChanged(): void {
-            root._log("clipboard revision changed")
             if (root.panelActive && _activeProvider() === clipProvider)
                 _refreshResults()
         }

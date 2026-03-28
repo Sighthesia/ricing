@@ -9,27 +9,17 @@ Item {
     // Provider interface
     property bool handleSearch: true
 
-    function _log(message) {
-        console.info("[DymicShell:ApplicationsProvider]", message)
-    }
-
     function _applicationEntries(): var {
         const applications = DesktopEntries.applications
 
-        if (!applications) {
-            root._log("applications model missing")
+        if (!applications)
             return []
-        }
 
-        if (applications.values !== undefined) {
-            root._log("using applications.values length=" + applications.values.length)
+        if (applications.values !== undefined)
             return applications.values
-        }
 
         const entries = []
         const count = Number(applications.count) || 0
-
-        root._log("falling back to count/get count=" + count + " hasGet=" + (typeof applications.get === "function"))
 
         for (let index = 0; index < count; index++) {
             const entry = typeof applications.get === "function"
@@ -43,7 +33,6 @@ Item {
     }
 
     function onOpened(): void {
-        root._log("opened")
     }
 
     // Returns [{name, description, icon, onActivate}] filtered by text.
@@ -51,7 +40,6 @@ Item {
         let results = [];
         let query = text.trim().toLowerCase();
         let apps = root._applicationEntries();
-        root._log("query='" + query + "' apps=" + apps.length)
 
         for (let i = 0; i < apps.length; i++) {
             let app = apps[i];
@@ -81,7 +69,6 @@ Item {
             return a.name.localeCompare(b.name);
         });
 
-        root._log("results=" + results.length)
         return results.slice(0, 50);
     }
 }

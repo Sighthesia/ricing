@@ -53,6 +53,7 @@ Item {
             TextField {
                 id: searchField
                 Layout.fillWidth: true
+                activeFocusOnTab: true
                 placeholderText: "搜索应用…"
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeBody - 1

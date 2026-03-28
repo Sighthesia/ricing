@@ -17,9 +17,12 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus:
-        (IslandOverlayService.mode === "launcher" || IslandOverlayService.mode === "settings")
-        && IslandOverlayService.state !== "closed"
-            ? WlrKeyboardFocus.OnDemand
+        IslandOverlayService.state !== "closed"
+            ? (IslandOverlayService.mode === "launcher"
+                ? WlrKeyboardFocus.Exclusive
+                : ((IslandOverlayService.mode === "settings" || IslandOverlayService.mode === "notifications")
+                    ? WlrKeyboardFocus.OnDemand
+                    : WlrKeyboardFocus.None))
             : WlrKeyboardFocus.None
 
     BarContent {

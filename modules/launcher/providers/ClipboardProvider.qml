@@ -11,13 +11,8 @@ Item {
     // Provider interface — not the default; activated by prefix matching only.
     property bool handleSearch: false
 
-    function _log(message) {
-        console.info("[DymicShell:ClipboardProvider]", message)
-    }
-
     // Called when the launcher opens; pre-fetches history so results appear immediately.
     function onOpened(): void {
-        root._log("opened itemsBefore=" + ClipboardService.items.length)
         ClipboardService.list(100);
     }
 
@@ -27,8 +22,6 @@ Item {
         let results = [];
         let query   = text.trim().toLowerCase();
         let items   = ClipboardService.items;
-
-        root._log("query='" + query + "' items=" + items.length)
 
         for (let i = 0; i < items.length; i++) {
             let item    = items[i];
@@ -51,7 +44,6 @@ Item {
             });
         }
 
-        root._log("results=" + results.length)
         return results.slice(0, 50);
     }
 }

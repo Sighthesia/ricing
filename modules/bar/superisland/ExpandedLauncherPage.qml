@@ -10,13 +10,6 @@ Item {
     property bool _pageActive: false
     property string _pendingQueryText: ""
 
-    function _log(message) {
-        console.info("[DymicShell:ExpandedLauncherPage]", message,
-            "pageActive=", root._pageActive,
-            "pendingQuery=", root._pendingQueryText,
-            "loaderReady=", !!_launcherCoreLoader.item)
-    }
-
     function _syncLauncherCoreState() {
         if (!_launcherCoreLoader.item)
             return
@@ -30,8 +23,6 @@ Item {
             return
 
         root._syncLauncherCoreState()
-        root._log("apply activation")
-
         if (_launcherCoreLoader.item.openPanel)
             _launcherCoreLoader.item.openPanel()
 
@@ -44,16 +35,22 @@ Item {
             _launcherCoreLoader.item.runStructuralEnter()
     }
 
+    function _focusLauncherSearch() {
+        if (!_launcherCoreLoader.item || !_pageActive)
+            return
+
+        if (_launcherCoreLoader.item.focusSearch)
+            _launcherCoreLoader.item.focusSearch()
+    }
+
     function pageActivated() {
         root._pageActive = true
-        root._log("page activated")
         root._applyLauncherActivation()
     }
 
     function pageDeactivated() {
         root._pageActive = false
         root._syncLauncherCoreState()
-        root._log("page deactivated")
 
         if (_launcherCoreLoader.item && _launcherCoreLoader.item.runStructuralExit)
             _launcherCoreLoader.item.runStructuralExit()
@@ -64,7 +61,6 @@ Item {
 
     function _activatePresetQuery(queryText) {
         root._pendingQueryText = queryText
-        root._log("preset query requested")
 
         if (_launcherCoreLoader.item && _launcherCoreLoader.item.setQueryText)
             _launcherCoreLoader.item.setQueryText(queryText)
@@ -142,7 +138,6 @@ Item {
                 source: "../../launcher/LauncherCore.qml"
 
                 onLoaded: {
-                    root._log("launcher core loaded")
                     root._syncLauncherCoreState()
 
                     if (!root._pageActive)
@@ -151,6 +146,22 @@ Item {
                     root._applyLauncherActivation()
                 }
             }
+        }
+    }
+
+    Connections {
+        target: IslandOverlayService
+
+        function onStateChanged() {
+            if (IslandOverlayService.mode !== "launcher" || IslandOverlayService.state !== "open")
+                return
+
+            Qt.callLater(function() {
+                root._focusLauncherSearch()
+            })
+            Qt.callLater(function() {
+                root._focusLauncherSearch()
+            })
         }
     }
 }
