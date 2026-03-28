@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.config
+import "." as SuperIslandParts
 
 // Expanded launcher page shown inside the larger SuperIsland overlay.
 Item {
@@ -83,53 +84,44 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: 0
 
             Item { Layout.fillWidth: true }
 
             Rectangle {
-                implicitWidth: 92
+                implicitWidth: 264
                 implicitHeight: 30
-                radius: Theme.cornerRadius - 2
-                color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.30)
+                radius: 11
+                color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.38)
                 border.color: Colors.border
                 border.width: 1
 
-                Text {
-                    anchors.centerIn: parent
-                    text: "应用"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall - 1
-                    color: Colors.text
-                }
-
-                MouseArea {
+                RowLayout {
                     anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root._switchToAppSearch()
-                }
-            }
+                    anchors.margins: 0
+                    spacing: 0
 
-            Rectangle {
-                implicitWidth: 92
-                implicitHeight: 30
-                radius: Theme.cornerRadius - 2
-                color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.30)
-                border.color: Colors.border
-                border.width: 1
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
+                        label: "应用"
+                        iconGlyph: "\uf002"
+                        selected: !_launcherCoreLoader.item || !_launcherCoreLoader.item._searchHeader
+                            ? true
+                            : !_launcherCoreLoader.item._searchHeader.text.startsWith(">clip")
+                        firstSegment: true
+                        onPressed: root._switchToAppSearch()
+                    }
 
-                Text {
-                    anchors.centerIn: parent
-                    text: "剪贴板"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall - 1
-                    color: Colors.text
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root._switchToClipboardSearch()
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
+                        label: "剪贴板"
+                        iconGlyph: "\uf0ea"
+                        selected: _launcherCoreLoader.item && _launcherCoreLoader.item._searchHeader
+                            ? _launcherCoreLoader.item._searchHeader.text.startsWith(">clip")
+                            : false
+                        lastSegment: true
+                        onPressed: root._switchToClipboardSearch()
+                    }
                 }
             }
         }
