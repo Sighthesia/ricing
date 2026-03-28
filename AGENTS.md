@@ -37,6 +37,8 @@ Load these for detailed context on specific topics:
 - The repo does not define `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmllint`, `qmlformat`, or CI workflow commands. Do not invent those commands unless you verify local availability.
 - Do not proactively use harness, smoke, or other targeted test runners; keep validation to the whole-shell load check unless the user explicitly asks for a different approach.
 - Don't remove `docs/plans/` references even when files or commands move.
+- In QML files, precede each visual element declaration with a short English comment that names the element or explains its visual role/effect.
+- Keep those comments concise and local to the element they describe.
 <!-- TRELLIS:START -->
 # Trellis Instructions
 
