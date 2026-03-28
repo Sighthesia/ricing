@@ -9,15 +9,49 @@ Item {
     // Provider interface
     property bool handleSearch: true
 
+    function _log(message) {
+        console.info("[DymicShell:ApplicationsProvider]", message)
+    }
+
+    function _applicationEntries(): var {
+        const applications = DesktopEntries.applications
+
+        if (!applications) {
+            root._log("applications model missing")
+            return []
+        }
+
+        if (applications.values !== undefined) {
+            root._log("using applications.values length=" + applications.values.length)
+            return applications.values
+        }
+
+        const entries = []
+        const count = Number(applications.count) || 0
+
+        root._log("falling back to count/get count=" + count + " hasGet=" + (typeof applications.get === "function"))
+
+        for (let index = 0; index < count; index++) {
+            const entry = typeof applications.get === "function"
+                ? applications.get(index)
+                : null
+            if (entry)
+                entries.push(entry)
+        }
+
+        return entries
+    }
+
     function onOpened(): void {
-        // DesktopEntries is always up-to-date; nothing to preload.
+        root._log("opened")
     }
 
     // Returns [{name, description, icon, onActivate}] filtered by text.
     function getResults(text: string): var {
         let results = [];
         let query = text.trim().toLowerCase();
-        let apps = DesktopEntries.applications.values;
+        let apps = root._applicationEntries();
+        root._log("query='" + query + "' apps=" + apps.length)
 
         for (let i = 0; i < apps.length; i++) {
             let app = apps[i];
@@ -25,7 +59,8 @@ Item {
 
             let nameMatch = app.name.toLowerCase().includes(query);
             let descMatch = app.comment ? app.comment.toLowerCase().includes(query) : false;
-            if (query !== "" && !nameMatch && !descMatch) continue;
+            let genericMatch = app.genericName ? app.genericName.toLowerCase().includes(query) : false;
+            if (query !== "" && !nameMatch && !descMatch && !genericMatch) continue;
 
             results.push({
                 name:        app.name,
@@ -46,6 +81,7 @@ Item {
             return a.name.localeCompare(b.name);
         });
 
+        root._log("results=" + results.length)
         return results.slice(0, 50);
     }
 }

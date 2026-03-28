@@ -2,10 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
-import qs.modules.bar
 
 // Launcher results viewport with delegate rendering and row interactions.
-StaggerItem {
+Item {
     id: root
 
     property alias model: resultList.model
@@ -16,7 +15,12 @@ StaggerItem {
 
     Layout.fillWidth: true
     Layout.fillHeight: true
-    exitDelay: 0
+
+    function runEnter(): void {
+    }
+
+    function runExit(): void {
+    }
 
     ListView {
         id: resultList
@@ -24,7 +28,7 @@ StaggerItem {
         clip: true
         cacheBuffer: 0
 
-        delegate: StaggerItem {
+        delegate: Item {
             id: _item
 
             required property int index
@@ -32,12 +36,11 @@ StaggerItem {
             required property string description
             required property string icon
 
-            delay:  SettingsService.data.animation.staggerLevel1BaseDelay
-                    + (index % 8) * 25
             width: resultList.width
-            height: 52
+            height: 46
 
-            Component.onCompleted: runEnter()
+            function runExit(): void {
+            }
 
             Rectangle {
                 anchors.fill: parent
@@ -47,14 +50,14 @@ StaggerItem {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 10
+                    anchors.margins: 10
+                    spacing: 8
 
                     Image {
                         source: "image://icon/" + (_item.icon || "application-x-executable")
-                        width: 24
-                        height: 24
-                        sourceSize: Qt.size(24, 24)
+                        width: 20
+                        height: 20
+                        sourceSize: Qt.size(20, 20)
                     }
 
                     ColumnLayout {
@@ -65,7 +68,7 @@ StaggerItem {
                             text: _item.name
                             color: Colors.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeBody
+                            font.pixelSize: Theme.fontSizeSmall + 1
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
@@ -74,7 +77,7 @@ StaggerItem {
                             text: _item.description
                             color: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.55)
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSmall
+                            font.pixelSize: Theme.fontSizeSmall - 1
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                             visible: _item.description !== ""

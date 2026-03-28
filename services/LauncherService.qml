@@ -3,13 +3,16 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.services
 
 // Central state for the launcher panel.
 // Opened/closed by external IPC or internal code — no bar widget.
 Singleton {
     id: root
 
-    property bool isOpen: false
+    readonly property bool isOpen:
+        IslandOverlayService.mode === "launcher"
+        && (IslandOverlayService.state === "opening" || IslandOverlayService.state === "open")
     // Text to prefill in the search box when opening via IPC.
     property string prefillText: ""
     readonly property string _cacheDir:
@@ -19,6 +22,29 @@ Singleton {
         + "/dymicshell"
     readonly property string _shellDirFile: _cacheDir + "/current-shell-dir"
 
+    function _log(message) {
+        console.info("[DymicShell:LauncherService]", message,
+            "mode=", IslandOverlayService.mode,
+            "state=", IslandOverlayService.state,
+            "payload=", IslandOverlayService.modePayload,
+            "prefill=", root.prefillText)
+    }
+
+    function _syncPrefillFromOverlay() {
+        if (IslandOverlayService.mode === "launcher") {
+            root.prefillText = typeof IslandOverlayService.modePayload === "string"
+                ? IslandOverlayService.modePayload
+                : ""
+            root._log("synced launcher prefill")
+            return
+        }
+
+        if (IslandOverlayService.mode === "none" || IslandOverlayService.state === "closing") {
+            root.prefillText = ""
+            root._log("cleared launcher prefill")
+        }
+    }
+
     Timer {
         id: _publishShellDirTimer
         interval: 0
@@ -26,40 +52,59 @@ Singleton {
         onTriggered: root._publishShellDir()
     }
 
-    FileView {
-        id: _shellDirFileView
-        path: root._shellDirFile
+    Process {
+        id: _shellDirWriter
+
+        stdinEnabled: true
+        command: ["sh", "-c", "mkdir -p '" + root._cacheDir + "' && cat > '" + root._shellDirFile + "'"]
     }
 
-    function toggle(): void {
-        if (root.isOpen) {
-            root.prefillText = "";
-            root.isOpen = false;
-        } else {
-            root.prefillText = "";
-            root.isOpen = true;
-        }
+    function toggle() {
+        root._log("toggle requested")
+        IslandOverlayService.toggleOverlay("launcher", "launcher", "");
     }
 
-    function openClipboard(): void {
-        root.prefillText = ">clip ";
-        root.isOpen = true;
+    function close() {
+        root._log("close requested")
+        IslandOverlayService.closeOverlay("launcher")
+    }
+
+    function openClipboard() {
+        root._log("clipboard requested")
+        IslandOverlayService.openOverlay("launcher", ">clip ");
     }
 
     function _publishShellDir(): void {
         console.info("[DymicShell:LauncherService] Publishing shell directory", Quickshell.shellDir)
-        _shellDirFileView.setText(Quickshell.shellDir)
+        _shellDirWriter.running = false
+        _shellDirWriter.running = true
+        _shellDirWriter.write(Quickshell.shellDir + "\n")
     }
 
     Component.onCompleted: {
-        Quickshell.execDetached(["mkdir", "-p", root._cacheDir])
         _publishShellDirTimer.start()
+    }
+
+    Connections {
+        target: IslandOverlayService
+
+        function onModeChanged() {
+            root._syncPrefillFromOverlay()
+        }
+
+        function onStateChanged() {
+            root._syncPrefillFromOverlay()
+        }
+
+        function onModePayloadChanged() {
+            root._syncPrefillFromOverlay()
+        }
     }
 
     IpcHandler {
         target: "launcher"
 
-        function toggle(): void { root.toggle(); }
-        function openClipboard(): void { root.openClipboard(); }
+        function toggle() { root.toggle(); }
+        function openClipboard() { root.openClipboard(); }
     }
 }

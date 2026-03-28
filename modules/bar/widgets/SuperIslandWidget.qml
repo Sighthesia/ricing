@@ -111,8 +111,10 @@ property real _flashTrackOpacity: 0
     readonly property string transitionMode:
         root._phase === "exit" ? "exit-track"
         : (root._phase === "idle" ? "single-track" : "dual-track")
-    readonly property bool flashTrackVisible: root._phase !== "idle"
+    readonly property bool flashTrackVisible: root._phase !== "idle" && !root._overlaySessionActive
     readonly property bool _transientPhase: root._phase !== "idle"
+    property bool _overlaySessionActive: false
+    property bool _overlayExpandedActive: false
     readonly property real pillTopPadding: root._padV
 
     readonly property real _mainTrackCenterY:
@@ -137,40 +139,76 @@ property real _flashTrackOpacity: 0
             : 0
     readonly property real _returnTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
+    readonly property real _overlayBodyHeight: Math.round(528 * Theme.uiScale)
+    readonly property real _transientExpandedHeight: root._pillH + root._flashGap + root._flashRowH
     readonly property real _collapsedPillHeight: root._pillH
-    readonly property real _expandedPillHeight: root._pillH + root._flashGap + root._flashRowH
+    readonly property real _expandedPillHeight:
+        root._overlaySessionActive
+            ? (root._pillH + root._flashGap + root._overlayBodyHeight)
+            : root._transientExpandedHeight
     readonly property bool _pillExpanded:
-        root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
+        root._overlayExpandedActive
+        || root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
+
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
+
+    readonly property real _overlayExpandedWidth: {
+        const availableWidth = Math.max(
+            760,
+            BarLayoutService.barContentWidth - Math.max(24, Theme.barPadding * 2)
+        )
+        return Math.max(root._collapsedWidth, Math.min(Math.round(980 * Theme.uiScale), availableWidth))
+    }
 
     readonly property real _collapsedWidth:
         (_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property real _expandedWidth:
-        Math.max(
-            root._collapsedWidth,
-            (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
-        )
+        root._overlayExpandedActive
+            ? root._overlayExpandedWidth
+            : Math.max(
+                root._collapsedWidth,
+                (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
+            )
 
     readonly property real _mainTrackEnterY:
         -Math.max(root._pillH, _mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH)
     readonly property real _returnWidth:
-        (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
+        root._overlayExpandedActive
+            ? root._collapsedWidth
+            : ((_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2)
     readonly property real _transitionCollapsedWidth:
-        root._phase === "exit" ? root._returnWidth : root._collapsedWidth
+        root._overlayExpandedActive
+            ? root._collapsedWidth
+            : (root._phase === "exit" ? root._returnWidth : root._collapsedWidth)
     readonly property real _idleOpticalOffset: 0
     readonly property bool _hintPhase: root._phase === "hint" || root._phase === "hint-exit"
     readonly property bool _listensToService: true
     readonly property real _transientAccentBaseOpacity: 0
+    readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
+    readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
+    readonly property real _overlayReservedExtension:
+        root._overlaySessionActive
+            ? Math.max(0, root._expandedPillHeight - root._collapsedPillHeight)
+            : 0
 
     Component.onCompleted: {
         currentTime = new Date()
+        root._syncOverlayFlags()
         const initialActiveEvent = root._displayEvent(root._listensToService ? SuperIslandService.activeEvent : root._idleSnapshot())
         root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
         root._lastActiveEvent = initialActiveEvent
         root._resetTracks()
+        root._syncOverlayExtensionReservation()
         Qt.callLater(() => { root._initialized = true })
     }
+
+    Component.onDestruction: {
+        if (root.liveInstance)
+            BarLayoutService.clearTransientExtension("super-island-overlay")
+    }
+
+    onLiveInstanceChanged: root._syncOverlayExtensionReservation()
     property real _replaceOutgoingY: 0
     property real _replaceOutgoingOpacity: 0
     property real _replaceOutgoingTargetY: 0
@@ -186,7 +224,17 @@ property real _flashTrackOpacity: 0
         ? root._collapsedWidth
         : (root._phase === "exit"
             ? root._returnWidth
-            : (root.flashTrackVisible ? root._expandedWidth : root._collapsedWidth))
+            : (root._pillExpanded ? root._expandedWidth : root._collapsedWidth))
+
+    BarComponents.BarTransientRevealHost {
+        id: _verticalReveal
+
+        collapsedHeight: root._collapsedPillHeight
+        expandedHeight: root._expandedPillHeight
+        expanded: root._pillExpanded
+        extensionOwnerKey: root.liveInstance ? "super-island" : ""
+        animateSurface: root._overlaySessionActive
+    }
 
     SystemClock {
         id: systemClock
@@ -313,6 +361,17 @@ property real _flashTrackOpacity: 0
         return NotificationService.invokeDefaultAction(notificationId)
     }
 
+    function _preferredOverlayPage() {
+        const configuredPage = SettingsService.data.superIsland
+            ? SettingsService.data.superIsland.expandedDefaultPage
+            : "launcher"
+
+        if (configuredPage === "settings" || configuredPage === "notifications")
+            return configuredPage
+
+        return "launcher"
+    }
+
     function _trackCenterY(item, zoneHeight, event, includeOpticalOffset) {
         const itemHeight = item ? item.implicitHeight : zoneHeight
         const opticalOffset = includeOpticalOffset && event && event.type === "idle"
@@ -328,6 +387,48 @@ property real _flashTrackOpacity: 0
         root._flashTrackY = root._flashStripY
         root._flashTrackScale = root._flashScale
         root._flashTrackOpacity = 0
+    }
+
+    function _syncOverlayFlags() {
+        root._overlaySessionActive = IslandOverlayService.mode !== "none"
+            && IslandOverlayService.state !== "closed"
+        root._overlayExpandedActive = IslandOverlayService.mode !== "none"
+            && (IslandOverlayService.state === "opening" || IslandOverlayService.state === "open")
+    }
+
+    function _syncOverlayExtensionReservation() {
+        if (!root.liveInstance)
+            return
+
+        let reservedHeight = root._overlaySessionActive
+            ? root._overlayReservedExtension
+            : 0
+
+        if (root._overlaySessionActive) {
+            BarLayoutService.setTransientExtension("super-island-overlay", reservedHeight)
+            return
+        }
+
+        BarLayoutService.clearTransientExtension("super-island-overlay")
+    }
+
+    function _resetOverlayDrivenState() {
+        _departAnim.stop()
+        _returnAnim.stop()
+        _hintEnterAnim.stop()
+        _hintExitAnim.stop()
+        _replaceAnim.stop()
+        _hintFlashDelayTimer.stop()
+        _sharedBackgroundPulseAnim.stop()
+        _pulseScaleAnim.stop()
+
+        root._phase = "idle"
+        root._flashSourceEvent = root._idleSnapshot()
+        root._mainDisplayEvent = root._baselineEvent
+        root._sharedBackgroundPulseOpacity = 0
+        root._pulseScale = 1
+        root._resetReplaceLayers()
+        root._resetTracks()
     }
 
     function _startEnterTransition(event) {
@@ -411,6 +512,9 @@ property real _flashTrackOpacity: 0
     }
 
     function _triggerSharedBackgroundPulse() {
+        if (root._overlaySessionActive)
+            return
+
         _sharedBackgroundPulseAnim.stop()
         _pulseScaleAnim.stop()
         root._sharedBackgroundPulseOpacity = 0
@@ -420,6 +524,9 @@ property real _flashTrackOpacity: 0
     }
 
     function _triggerEdgeReboundScale() {
+        if (root._overlaySessionActive)
+            return
+
         _pulseScaleAnim.stop()
         root._pulseScale = 1
         _pulseScaleAnim.start()
@@ -540,6 +647,13 @@ property real _flashTrackOpacity: 0
             const nextEvent = root._displayEvent(SuperIslandService.activeEvent)
             const previousEvent = root._cloneEvent(root._lastActiveEvent)
 
+            if (nextEvent.type === "overlay" || previousEvent.type === "overlay") {
+                root._lastActiveEvent = nextEvent.type === "overlay"
+                    ? root._idleSnapshot()
+                    : nextEvent
+                return
+            }
+
             if (nextEvent.relayReplace && previousEvent.type !== "idle") {
                 if (previousEvent.type === "window")
                     root._startEnterTransition(nextEvent)
@@ -568,6 +682,50 @@ property real _flashTrackOpacity: 0
         }
     }
 
+    Connections {
+        target: IslandOverlayService
+
+        function onModePayloadChanged() {
+            root._syncOverlayFlags()
+            root._syncOverlayExtensionReservation()
+        }
+
+        function onStateChanged() {
+            root._syncOverlayFlags()
+            root._syncOverlayExtensionReservation()
+
+            if (IslandOverlayService.state === "opening") {
+                root._resetOverlayDrivenState()
+                return
+            }
+
+            if (IslandOverlayService.state === "closed")
+                root._resetOverlayDrivenState()
+        }
+
+        function onModeChanged() {
+            root._syncOverlayFlags()
+            root._syncOverlayExtensionReservation()
+        }
+    }
+
+    Connections {
+        target: _verticalReveal
+
+        function onStateChanged() {
+            if (IslandOverlayService.mode === "none")
+                return
+
+            if (_verticalReveal.state === "open" && IslandOverlayService.state === "opening") {
+                IslandOverlayService.setSettledState(IslandOverlayService.mode, "open")
+                return
+            }
+
+            if (_verticalReveal.state === "closed" && IslandOverlayService.state === "closing")
+                IslandOverlayService.setSettledState(IslandOverlayService.mode, "closed")
+        }
+    }
+
     Item {
         id: _pillClip
         anchors.top: parent.top
@@ -587,7 +745,8 @@ property real _flashTrackOpacity: 0
             anchors.right: parent.right
             anchors.top: parent.top
             height: root._verticalRevealSurfaceHeight
-            radius: root._pillH / 2
+            radius: root._overlaySessionActive ? Theme.cornerRadius : (root._pillH / 2)
+            radius: root._overlaySessionActive ? Theme.cornerRadius : (root._pillH / 2)
             color: Colors.surface
             border.color: Colors.border
             border.width: 1
@@ -602,7 +761,7 @@ property real _flashTrackOpacity: 0
             height: 1
             radius: height / 2
             color: Colors.border
-            opacity: root._phase !== "idle" ? 0.35 : 0
+            opacity: root._phase !== "idle" && !root._overlaySessionActive ? 0.35 : 0
 
             Behavior on opacity {
                 NumberAnimation {
@@ -677,6 +836,23 @@ property real _flashTrackOpacity: 0
             height: root._flashRowH
             clip: true
             sourceComponent: root._componentForEvent(eventData, true)
+        }
+
+        Loader {
+            id: _overlayDeckLoader
+
+            active: root._overlaySessionActive
+            anchors {
+                top: parent.top
+                topMargin: root._flashRowBaseY
+                left: parent.left
+                right: parent.right
+                leftMargin: 10
+                rightMargin: 10
+            }
+            height: root._overlayBodyHeight
+            visible: active
+            sourceComponent: _overlayDeckComponent
         }
     }
 
@@ -1210,15 +1386,20 @@ Item {
         }
     }
 
+    Shortcut {
+        sequence: "Escape"
+        enabled: root._overlaySessionActive
+        onActivated: IslandOverlayService.closeOverlay("super-island-shortcut")
+    }
+
     MouseArea {
         anchors.fill: parent
         z: -1
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        enabled: !BarLayoutService.suppressWidgetPrimaryActions
+        enabled: !BarLayoutService.suppressWidgetPrimaryActions && !root._overlaySessionActive
         onClicked: {
-            // Toggle the notification history panel on repeated clicks.
-            BarLayoutService.notificationHistoryOpen = !BarLayoutService.notificationHistoryOpen
+            IslandOverlayService.toggleOverlay(root._preferredOverlayPage(), "super-island", "")
         }
     }
 
@@ -1239,5 +1420,11 @@ Item {
             event: eventData
             iconSource: resolvedIcon
         }
+    }
+
+    Component {
+        id: _overlayDeckComponent
+
+        IslandCards.ExpandedPanelDeck {}
     }
 }

@@ -27,11 +27,13 @@ Singleton {
 
     // Fetch clipboard history entries. Clears items first, then refills from cliphist.
     function list(limit: int): void {
+        console.info("[DymicShell:ClipboardService] list requested", "limit=", limit)
         _listProc.running = true;
     }
 
     // Copy the entry identified by `id` back to the clipboard (makes it the active clip).
     function copyToClipboard(id: string): void {
+        console.info("[DymicShell:ClipboardService] restoring item", "id=", id)
         _copyProc.command = ["sh", "-c", "cliphist decode " + id + " | wl-copy"];
         _copyProc.running = true;
     }
@@ -67,6 +69,7 @@ Singleton {
 
         onExited: (code, status) => {
             root.revision++;
+            console.info("[DymicShell:ClipboardService] list finished", "code=", code, "items=", root.items.length)
         }
     }
 

@@ -3,12 +3,15 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.services
 
 Singleton {
     id: root
 
     // Panel state: "none" | "layout" | "config"
     property string activePanel: "none"
+    property bool _suppressPanelMirror: false
+    property bool _suppressNotificationHistoryMirror: false
 
     // True while the right-click context menu is open.
     // Used as a cross-window signal for the click-away backdrop.
@@ -69,7 +72,13 @@ Singleton {
     readonly property var geometryMeasuredWidths: _widgetMeasuredWidths
     readonly property var geometrySections: _sectionGeometries
     readonly property var geometrySlots: _slotGeometries
+    readonly property var geometryWidgets: _widgetGeometries
     readonly property var geometryPickerAnchors: _pickerAnchors
+    readonly property string superIslandInstanceKey: _superIslandInstanceKey
+    readonly property var superIslandGeometry:
+        _superIslandInstanceKey && _widgetGeometries[_superIslandInstanceKey] !== undefined
+            ? _widgetGeometries[_superIslandInstanceKey]
+            : null
     property var geometryArrivals: ({})
     readonly property var dragSnapshot: ({
         active: isDragging,
@@ -97,10 +106,12 @@ Singleton {
     property var _widgetMeasurementMetadata: ({})
     property var _sectionGeometries: ({})
     property var _slotGeometries: ({})
+    property var _widgetGeometries: ({})
     property var _pickerAnchors: ({})
     property var _arrivalGeometries: ({})
     property var _arrivalRevealLocks: ({})
     property var _nextInstanceSerialByWidget: ({})
+    property string _superIslandInstanceKey: ""
 
     // FIXME: replace with service-backed shared width defaults once bar widget sizing is tokenized.
     readonly property real _fallbackMeasuredWidth: 48
@@ -116,6 +127,37 @@ Singleton {
             activeWidgetInstanceKey = "";
             widgetSettingsAutoEnteredLayout = false;
         }
+    }
+
+    onActivePanelChanged: {
+        if (_suppressPanelMirror)
+            return
+
+        if (activePanel === "config") {
+            IslandOverlayService.openOverlay("settings", {
+                source: "bar-panel"
+            })
+            return
+        }
+
+        if (activePanel !== "config" && IslandOverlayService.mode === "settings" && IslandOverlayService.state !== "closed") {
+            IslandOverlayService.closeOverlay("bar-panel")
+        }
+    }
+
+    onNotificationHistoryOpenChanged: {
+        if (_suppressNotificationHistoryMirror)
+            return
+
+        if (notificationHistoryOpen) {
+            IslandOverlayService.openOverlay("notifications", {
+                source: "notification-bell"
+            })
+            return
+        }
+
+        if (IslandOverlayService.mode === "notifications" && IslandOverlayService.state !== "closed")
+            IslandOverlayService.closeOverlay("notification-bell")
     }
 
     onWidgetPickerTargetSectionChanged: _recomputeGeometryContracts()
@@ -333,6 +375,16 @@ Singleton {
 
         return _arrivalGeometries[instanceKey] !== undefined
             ? _arrivalGeometries[instanceKey]
+            : null
+    }
+
+    function widgetGeometry(instanceKey) {
+        if (!instanceKey) {
+            return null
+        }
+
+        return _widgetGeometries[instanceKey] !== undefined
+            ? _widgetGeometries[instanceKey]
             : null
     }
 
@@ -1035,6 +1087,69 @@ Singleton {
         return nextSlotGeometries
     }
 
+    function _widgetGeometriesFromSlots(sectionNames, slotGeometries) {
+        let nextWidgetGeometries = ({})
+
+        for (let i = 0; i < sectionNames.length; i++) {
+            let sectionName = sectionNames[i]
+            let slots = slotGeometries[sectionName]
+
+            if (!Array.isArray(slots)) {
+                continue
+            }
+
+            for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+                let slot = slots[slotIndex]
+                nextWidgetGeometries[slot.instanceKey] = {
+                    widgetId: slot.id,
+                    instanceKey: slot.instanceKey,
+                    section: sectionName,
+                    left: slot.left,
+                    right: slot.right,
+                    width: slot.width,
+                    centerX: slot.centerX,
+                    slotIndex: slot.slotIndex,
+                    order: slot.order
+                }
+            }
+        }
+
+        return nextWidgetGeometries
+    }
+
+    function _primaryInstanceKeyForWidget(widgetId, slotGeometries, sectionNames) {
+        if (!widgetId) {
+            return ""
+        }
+
+        let preferredInstanceKey = ""
+        let closestDistance = Number.POSITIVE_INFINITY
+        let barMidpoint = _barContentWidth / 2
+
+        for (let i = 0; i < sectionNames.length; i++) {
+            let sectionName = sectionNames[i]
+            let slots = slotGeometries[sectionName]
+
+            if (!Array.isArray(slots)) {
+                continue
+            }
+
+            for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+                if (slots[slotIndex].id === widgetId) {
+                    let slotCenterX = Number(slots[slotIndex].centerX) || 0
+                    let distance = Math.abs(slotCenterX - barMidpoint)
+
+                    if (distance < closestDistance) {
+                        closestDistance = distance
+                        preferredInstanceKey = slots[slotIndex].instanceKey || ""
+                    }
+                }
+            }
+        }
+
+        return preferredInstanceKey
+    }
+
     function _clampPickerLeftMargin(centerX) {
         let minLeft = _barContentPadding
         let maxLeft = Math.max(minLeft, _barContentWidth - _pickerPanelWidth - _barContentPadding)
@@ -1082,6 +1197,8 @@ Singleton {
             nextSectionGeometries,
             orderedWidgetsBySection
         )
+        let nextWidgetGeometries = _widgetGeometriesFromSlots(sections, nextSlotGeometries)
+        let nextSuperIslandInstanceKey = _primaryInstanceKeyForWidget("superIsland", nextSlotGeometries, sections)
         let nextPickerAnchors = _pickerAnchorsFromSections(sections, nextSectionGeometries)
         let nextArrivalGeometries = Object.assign({}, _arrivalGeometries)
 
@@ -1113,6 +1230,8 @@ Singleton {
 
         _sectionGeometries = nextSectionGeometries
         _slotGeometries = nextSlotGeometries
+        _widgetGeometries = nextWidgetGeometries
+        _superIslandInstanceKey = nextSuperIslandInstanceKey
         _pickerAnchors = nextPickerAnchors
         _arrivalGeometries = nextArrivalGeometries
         geometryArrivals = nextArrivalGeometries
@@ -1127,6 +1246,57 @@ Singleton {
 
         if (shouldExitLayout) {
             activePanel = "none"
+        }
+    }
+
+    function _syncNotificationHistoryFromOverlay() {
+        let shouldShowNotifications = IslandOverlayService.mode === "notifications"
+            && IslandOverlayService.state !== "closed"
+
+        if (notificationHistoryOpen === shouldShowNotifications)
+            return
+
+        _suppressNotificationHistoryMirror = true
+        notificationHistoryOpen = shouldShowNotifications
+        _suppressNotificationHistoryMirror = false
+    }
+
+    Connections {
+        target: IslandOverlayService
+
+        function onStateChanged() {
+            root._syncNotificationHistoryFromOverlay()
+
+            if (IslandOverlayService.mode !== "settings")
+                return
+
+            if (IslandOverlayService.state !== "closed" || activePanel !== "config")
+                return
+
+            _suppressPanelMirror = true
+            activePanel = "none"
+            _suppressPanelMirror = false
+        }
+
+        function onModeChanged() {
+            root._syncNotificationHistoryFromOverlay()
+
+            if (IslandOverlayService.mode === "settings") {
+                if (activePanel === "config")
+                    return
+
+                _suppressPanelMirror = true
+                activePanel = "config"
+                _suppressPanelMirror = false
+                return
+            }
+
+            if (activePanel !== "config")
+                return
+
+            _suppressPanelMirror = true
+            activePanel = "none"
+            _suppressPanelMirror = false
         }
     }
 

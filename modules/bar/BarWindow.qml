@@ -16,7 +16,11 @@ PanelWindow {
     exclusiveZone: Theme.barHeight
 
     WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus:
+        (IslandOverlayService.mode === "launcher" || IslandOverlayService.mode === "settings")
+        && IslandOverlayService.state !== "closed"
+            ? WlrKeyboardFocus.OnDemand
+            : WlrKeyboardFocus.None
 
     BarContent {
         anchors.fill: parent

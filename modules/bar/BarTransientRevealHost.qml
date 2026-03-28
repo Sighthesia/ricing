@@ -216,9 +216,8 @@ Item {
         _closeAwaitingClipAnimation = false
         _transitionRunning = true
         _surfaceTransition.expanded = true
-        _clipBehaviorEnabled = false
-        _clipHeight = expandedHeight
         _clipBehaviorEnabled = true
+        _clipHeight = expandedHeight
     }
 
     function _beginClose() {

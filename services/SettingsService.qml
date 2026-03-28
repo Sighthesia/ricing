@@ -149,6 +149,7 @@ Singleton {
             superIsland: {
                 enabled: adapter.superIsland.enabled,
                 idleContent: adapter.superIsland.idleContent,
+                expandedDefaultPage: adapter.superIsland.expandedDefaultPage,
                 defaultTimeout: adapter.superIsland.defaultTimeout,
                 importantTimeout: adapter.superIsland.importantTimeout,
                 criticalTimeout: adapter.superIsland.criticalTimeout,
@@ -382,6 +383,7 @@ Singleton {
         property JsonObject superIsland: JsonObject {
             property bool enabled: true
             property string idleContent: "time"
+            property string expandedDefaultPage: "launcher"
             property int defaultTimeout: 1500
             property int importantTimeout: 1500
             property int criticalTimeout: 1500
