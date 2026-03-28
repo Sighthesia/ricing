@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import qs.config
 import ".." as BarComponents
 
-// Navigation button used by the expanded SuperIsland overlay rail.
+// Navigation button used by the expanded SuperIsland overlay top bar.
 Rectangle {
     id: root
 
@@ -13,9 +13,9 @@ Rectangle {
 
     signal pressed()
 
-    implicitWidth: 164
-    implicitHeight: 48
-    radius: Theme.cornerRadius
+    implicitWidth: 92
+    implicitHeight: 30
+    radius: Theme.cornerRadius - 2
     color: selected
         ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.18)
         : "transparent"
@@ -53,22 +53,21 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 14
-        anchors.rightMargin: 14
-        spacing: 10
+        anchors.leftMargin: 10
+        anchors.rightMargin: 10
+        spacing: 6
 
         Text {
             text: root.iconGlyph
             font.family: Theme.fontMono
-            font.pixelSize: Theme.fontSizeSmall + 2
+            font.pixelSize: Theme.fontSizeSmall
             color: root.selected ? Colors.highlight : Colors.textMuted
         }
 
         Text {
-            Layout.fillWidth: true
             text: root.label
             font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSmall
+            font.pixelSize: Theme.fontSizeSmall - 1
             font.weight: root.selected ? Font.Medium : Font.Normal
             color: root.selected ? Colors.text : Colors.textMuted
             elide: Text.ElideRight
