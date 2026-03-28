@@ -132,7 +132,7 @@ property real _flashTrackOpacity: 0
     readonly property real _hintBackgroundY: root._flashRowBaseY
     readonly property real _hintBackgroundHeight: root._flashRowH
     readonly property real _hintBackgroundPulseOpacity:
-        root._hintPhase && root._flashSourceEvent.type !== "window"
+        root._hintPhase && !root._isHintEventType(root._flashSourceEvent.type)
             ? root._sharedBackgroundPulseOpacity
             : 0
     readonly property real _returnTrackCenterY:
@@ -242,11 +242,13 @@ property real _flashTrackOpacity: 0
             groupKey: source.groupKey || "idle",
             priority: source.priority || "passive",
             relayReplace: !!source.relayReplace,
+            sticky: !!source.sticky,
             title: source.title || "",
             subtitle: source.subtitle || "",
             icon: source.icon || "",
             workspaceLabel: source.workspaceLabel || "",
             timeoutMs: source.timeoutMs || 0,
+            revision: source.revision || 0,
             timestamp: source.timestamp || 0
         }
     }
@@ -273,6 +275,14 @@ property real _flashTrackOpacity: 0
         return root._cloneEvent(event)
     }
 
+    function _isHintEventType(eventType) {
+        return eventType === "window" || eventType === "window-hint"
+    }
+
+    function _isFullHintEventType(eventType) {
+        return eventType === "window-hint"
+    }
+
     function _resolvedIconSource(iconName) {
         if (!iconName)
             return Quickshell.iconPath("dialog-information")
@@ -284,6 +294,8 @@ property real _flashTrackOpacity: 0
     function _componentForEvent(event, useStrip) {
         if (!event || event.type === "idle")
             return _idleComponent
+        if (event.type === "window-hint")
+            return _windowHintCardComponent
         if (event.type === "media")
             return useStrip ? _stripMediaCardComponent : _mainMediaCardComponent
         if (event.type === "workspace" || event.type === "window")
@@ -381,8 +393,10 @@ property real _flashTrackOpacity: 0
     }
 
     function _startWindowHint(event) {
+        const fullHint = root._isFullHintEventType(event.type)
+
         root._log("startWindowHint", event)
-        root._mainDisplayEvent = root._baselineEvent
+        root._mainDisplayEvent = fullHint ? root._idleSnapshot() : root._baselineEvent
         root._flashSourceEvent = root._displayEvent(event)
         root._phase = "hint"
 
@@ -393,7 +407,7 @@ property real _flashTrackOpacity: 0
 
         root._mainTrackY = root._mainTrackCenterY
         root._mainTrackScale = 1
-        root._mainTrackOpacity = 1
+        root._mainTrackOpacity = fullHint ? 0 : 1
         root._flashTrackY = root._windowHintEntryMeta.flashRole.targetY
             - root._windowHintEntryMeta.flashRole.deltaY
         root._flashTrackScale = 0.92
@@ -539,22 +553,24 @@ property real _flashTrackOpacity: 0
         function onActiveEventChanged() {
             const nextEvent = root._displayEvent(SuperIslandService.activeEvent)
             const previousEvent = root._cloneEvent(root._lastActiveEvent)
+            const nextIsHint = root._isHintEventType(nextEvent.type)
+            const previousIsHint = root._isHintEventType(previousEvent.type)
 
             if (nextEvent.relayReplace && previousEvent.type !== "idle") {
-                if (previousEvent.type === "window")
+                if (previousIsHint)
                     root._startEnterTransition(nextEvent)
                 else
                     root._replaceActiveTransient(nextEvent)
-            } else if (nextEvent.type === "window" && previousEvent.type === "idle") {
+            } else if (nextIsHint && previousEvent.type === "idle") {
                 root._startWindowHint(nextEvent)
-            } else if (nextEvent.type === "window" && previousEvent.type === "window") {
+            } else if (nextIsHint && previousIsHint) {
                 if (root._hintPhase)
                     root._updateWindowHint(nextEvent)
                 else
                     root._startWindowHint(nextEvent)
-            } else if (nextEvent.type !== "idle" && previousEvent.type === "window") {
+            } else if (nextEvent.type !== "idle" && previousIsHint) {
                 root._startEnterTransition(nextEvent)
-            } else if (nextEvent.type === "idle" && previousEvent.type === "window") {
+            } else if (nextEvent.type === "idle" && previousIsHint) {
                 root._finishWindowHint()
             } else if (nextEvent.type !== "idle" && previousEvent.type === "idle") {
                 root._startEnterTransition(nextEvent)
@@ -602,7 +618,7 @@ property real _flashTrackOpacity: 0
             height: 1
             radius: height / 2
             color: Colors.border
-            opacity: root._phase !== "idle" ? 0.35 : 0
+            opacity: root._phase !== "idle" && root._flashSourceEvent.type !== "window-hint" ? 0.35 : 0
 
             Behavior on opacity {
                 NumberAnimation {
@@ -629,7 +645,7 @@ property real _flashTrackOpacity: 0
             radius: height / 2
             color: Colors.highlight
             opacity: root._hintBackgroundPulseOpacity
-            visible: root.flashTrackVisible
+            visible: root.flashTrackVisible && root._flashSourceEvent.type !== "window-hint"
         }
 
         Loader {
@@ -674,8 +690,8 @@ property real _flashTrackOpacity: 0
             y: root._flashTrackY
             opacity: root._flashTrackOpacity
             scale: root._flashTrackScale
-            height: root._flashRowH
-            clip: true
+            height: root._isFullHintEventType(eventData.type) ? root._verticalRevealSurfaceHeight : root._flashRowH
+            clip: !root._isFullHintEventType(eventData.type)
             sourceComponent: root._componentForEvent(eventData, true)
         }
     }
@@ -869,7 +885,9 @@ property real _flashTrackOpacity: 0
         NumberAnimation {
             target: root
             property: "_mainTrackY"
-            to: root._windowHintEntryMeta.mainRole.targetY
+            to: root._isFullHintEventType(root._flashSourceEvent.type)
+                ? root._mainTrackCenterY
+                : root._windowHintEntryMeta.mainRole.targetY
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -877,7 +895,7 @@ property real _flashTrackOpacity: 0
         NumberAnimation {
             target: root
             property: "_mainTrackScale"
-            to: root._flashScale
+            to: root._isFullHintEventType(root._flashSourceEvent.type) ? 1 : root._flashScale
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -885,7 +903,7 @@ property real _flashTrackOpacity: 0
         NumberAnimation {
             target: root
             property: "_mainTrackOpacity"
-            to: 0.6
+            to: root._isFullHintEventType(root._flashSourceEvent.type) ? 0 : 0.6
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -1129,6 +1147,14 @@ Item {
         IslandCards.IslandWorkspaceCard {
             event: eventData
             iconSource: resolvedIcon
+        }
+    }
+
+    Component {
+        id: _windowHintCardComponent
+
+        IslandCards.IslandWindowHintCard {
+            event: eventData
         }
     }
 

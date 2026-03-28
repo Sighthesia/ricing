@@ -262,6 +262,7 @@ Suggested new files:
 Suggested touched files:
 
 - `services/SuperIslandService.qml`
+- `services/WindowHintTriggerService.qml`
 - `modules/bar/widgets/SuperIslandWidget.qml`
 - `modules/bar/widgets/WorkspaceWidget.qml`
 - `modules/bar/BarContent.qml`
@@ -292,6 +293,25 @@ Possible future trigger sources:
 - fallback composite shortcut flow such as `Mod+Tab` session preview
 
 This keeps UI architecture stable even if the input source changes.
+
+### Current bridge contract
+
+The current implementation adds `WindowHintTriggerService` as the trigger owner.
+
+- Default helper: `scripts/window_hint_trigger.py` launched through `python3`.
+- Set `DYMICSHELL_WINDOW_HINT_TRIGGER_CMD` to replace the bundled helper command.
+- Set `DYMICSHELL_WINDOW_HINT_TRIGGER_DISABLE=1` to disable the bundled helper entirely.
+- The command must emit line-based events on stdout.
+- Hold-on events: `mod-down`, `down`, `show`, `hold`, `1`, `true`
+- Hold-off events: `mod-up`, `up`, `hide`, `release`, `0`, `false`
+- Toggle event: `toggle`
+
+Bundled helper environment variables:
+
+- `DYMICSHELL_WINDOW_HINT_INPUT` for explicit keyboard event device paths.
+- `DYMICSHELL_WINDOW_HINT_META_KEYS` for overriding watched meta key codes or names.
+
+If the helper exits while the hold is active, the shell clears the hint state to avoid a stuck overlay.
 
 ## Failure and Edge Cases
 

@@ -10,6 +10,7 @@ Singleton {
     property ListModel workspaces: ListModel {}
     property ListModel windows: ListModel {}
 
+    signal workspacesUpdated()
     signal windowsUpdated()
     signal workspaceActivated()
 
@@ -28,6 +29,8 @@ Singleton {
                 output: ws.output || ""
             });
         }
+
+        workspacesUpdated();
     }
 
     function activateWorkspace(event) {

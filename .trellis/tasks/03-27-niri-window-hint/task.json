@@ -41,11 +41,15 @@
   "relatedFiles": [
     "services/NiriService.qml",
     "services/SuperIslandService.qml",
+    "services/WindowHintService.qml",
+    "services/WindowHintTriggerService.qml",
+    "scripts/window_hint_trigger.py",
     "modules/bar/widgets/WorkspaceWidget.qml",
     "modules/bar/widgets/SuperIslandWidget.qml",
+    "modules/bar/superisland/IslandWindowHintCard.qml",
     ".trellis/tasks/03-27-niri-window-hint/prd.md",
     ".trellis/tasks/03-27-niri-window-hint/info.md"
   ],
-  "notes": "Mixed design selected: derived data in a dedicated service, always-on summary in WorkspaceWidget, transient Mod-hold preview in SuperIsland.",
+  "notes": "Mixed design selected: derived data in WindowHintService, trigger bridge in WindowHintTriggerService, bundled keyboard helper in scripts/window_hint_trigger.py, always-on summary in WorkspaceWidget, transient Mod-hold preview in SuperIsland.",
   "meta": {}
 }
