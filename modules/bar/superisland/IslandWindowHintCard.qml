@@ -16,13 +16,15 @@ Item {
     readonly property int _compactIcon: Math.max(10, Theme.barWidget.compactIconSize - 1)
     readonly property int _primaryIcon: Theme.barWidget.primaryIconSize
     readonly property int _pillHeight: Theme.barWidget.pillHeight
-    readonly property int _mainIslandHeight: root._pillHeight * 3
     readonly property int _titleIslandHeight: Math.max(22, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 3)
     readonly property int _titleOverlap: Math.max(8, Math.round(root._titleIslandHeight * 0.45))
+    readonly property int _sideTitleMaxWidth: Math.round(132 * Theme.uiScale)
     readonly property int _stripHeight: Math.max(12, Theme.barWidget.compactIconSize)
     readonly property int _windowRowHeight: Math.max(20, Theme.barWidget.primaryIconSize + Theme.barWidget.contentPaddingV * 3)
     readonly property int _minPreviewWidth: Math.round(320 * Theme.uiScale)
     readonly property int _maxPreviewWidth: Math.round(560 * Theme.uiScale)
+    readonly property bool _hasPreviousStrip: root._hint.previousWorkspace.icons.length > 0
+    readonly property bool _hasNextStrip: root._hint.nextWorkspace.icons.length > 0
 
     implicitWidth: Math.min(
         root._maxPreviewWidth,
@@ -32,7 +34,7 @@ Item {
             _titleIsland.implicitWidth + root._padH * 2 + Math.round(20 * Theme.uiScale)
         )
     )
-    implicitHeight: root._mainIslandHeight + root._titleIslandHeight - root._titleOverlap
+    implicitHeight: _mainIsland.implicitHeight + root._titleIslandHeight - root._titleOverlap
 
     Item {
         id: _mainIsland
@@ -40,20 +42,23 @@ Item {
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         width: parent.width
-        height: root._mainIslandHeight
+        height: implicitHeight
+        implicitHeight: _mainIslandContent.implicitHeight + root._padV * 2 + root._titleOverlap
 
         Column {
+            id: _mainIslandContent
+
             anchors.fill: parent
             anchors.leftMargin: root._padH
             anchors.rightMargin: root._padH
             anchors.topMargin: root._padV
-            anchors.bottomMargin: root._titleIslandHeight - root._titleOverlap + root._padV
+            anchors.bottomMargin: root._padV + root._titleOverlap
             spacing: root._laneGap
 
             Item {
                 width: parent.width
                 height: visible ? root._stripHeight : 0
-                visible: root._hint.previousWorkspace.icons.length > 0
+                visible: root._hasPreviousStrip
 
                 Rectangle {
                     anchors.fill: parent
@@ -170,7 +175,7 @@ Item {
             Item {
                 width: parent.width
                 height: visible ? root._stripHeight : 0
-                visible: root._hint.nextWorkspace.icons.length > 0
+                visible: root._hasNextStrip
 
                 Rectangle {
                     anchors.fill: parent
@@ -215,6 +220,9 @@ Item {
         width: Math.min(parent.width - root._padH * 2, implicitWidth)
         height: root._titleIslandHeight
 
+        readonly property int _titleSidePadding: Theme.barWidget.badgePaddingH * 2
+        readonly property int _titleSlotGap: Theme.barWidget.iconSpacing * 2
+        readonly property int _titleContentWidth: Math.max(0, width - _titleSidePadding * 2)
         readonly property int _centerIslandWidth: Math.max(
             Math.round(116 * Theme.uiScale),
             Math.min(
@@ -222,86 +230,125 @@ Item {
                 _centerIslandContent.implicitWidth + Theme.barWidget.badgePaddingH * 4
             )
         )
-        readonly property int _titleContentWidth: Math.max(
-            _previousTitle.implicitWidth + _nextTitle.implicitWidth + _centerIslandWidth + Theme.barWidget.badgePaddingH * 4,
+        readonly property int _titlePreferredWidth: Math.max(
+            _centerIslandWidth + _sideTitleMaxWidth * 2 + Theme.barWidget.iconSpacing * 4,
             Math.round(260 * Theme.uiScale)
         )
+        readonly property int _resolvedCenterIslandWidth: Math.max(
+            0,
+            Math.min(_centerIslandWidth, _titleContentWidth)
+        )
+        readonly property int _sideSlotWidth: Math.max(
+            0,
+            Math.min(
+                root._sideTitleMaxWidth,
+                Math.floor((_titleContentWidth - _resolvedCenterIslandWidth - _titleSlotGap * 2) / 2)
+            )
+        )
+        readonly property int _leadingGapWidth: _sideSlotWidth > 0 ? _titleSlotGap : 0
+        readonly property int _trailingGapWidth: _sideSlotWidth > 0 ? _titleSlotGap : 0
 
-        implicitWidth: Math.min(Math.round(460 * Theme.uiScale), _titleContentWidth)
+        implicitWidth: Math.min(Math.round(460 * Theme.uiScale), _titlePreferredWidth)
         implicitHeight: root._titleIslandHeight
 
-        Text {
-            id: _previousTitle
-            anchors.left: parent.left
-            anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
-            anchors.right: _centerIsland.left
-            anchors.rightMargin: Theme.barWidget.iconSpacing * 2
-            anchors.verticalCenter: parent.verticalCenter
-            text: root._hint.previousWindow.title || ""
-            color: Colors.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSmall
-            elide: Text.ElideRight
-            maximumLineCount: 1
-            verticalAlignment: Text.AlignVCenter
-            opacity: text.length > 0 ? 0.86 : 0
-        }
+        // Title lanes keep previous/current/next widths stable.
+        Row {
+            anchors.fill: parent
+            anchors.leftMargin: _titleSidePadding
+            anchors.rightMargin: _titleSidePadding
+            spacing: 0
 
-        Text {
-            id: _nextTitle
-            anchors.left: _centerIsland.right
-            anchors.leftMargin: Theme.barWidget.iconSpacing * 2
-            anchors.right: parent.right
-            anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
-            anchors.verticalCenter: parent.verticalCenter
-            text: root._hint.nextWindow.title || ""
-            color: Colors.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSmall
-            elide: Text.ElideLeft
-            maximumLineCount: 1
-            horizontalAlignment: Text.AlignRight
-            verticalAlignment: Text.AlignVCenter
-            opacity: text.length > 0 ? 0.86 : 0
-        }
-
-        Rectangle {
-            id: _centerIsland
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
-            width: _centerIslandWidth
-            height: parent.height - Theme.barWidget.contentPaddingV * 2
-            radius: height / 2
-            color: Qt.rgba(1, 1, 1, 0.06)
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.04)
-
-            Row {
-                id: _centerIslandContent
-
-                anchors.centerIn: parent
-                spacing: Theme.barWidget.badgePaddingH
-
-                Image {
-                    width: root._compactIcon
-                    height: width
-                    source: root._hint.currentWindowIcon || ""
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    visible: source !== ""
-                }
+            // Previous title lane.
+            Item {
+                width: _titleIsland._sideSlotWidth
+                height: parent.height
 
                 Text {
-                    width: Math.min(implicitWidth, Math.round(272 * Theme.uiScale))
-                    text: root._hint.currentWindowTitle || "Window hint"
-                    color: Colors.text
+                    anchors.fill: parent
+                    text: root._hint.previousWindow.title || ""
+                    color: Colors.textMuted
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
-                    font.bold: true
                     elide: Text.ElideRight
                     maximumLineCount: 1
                     verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
+                    opacity: text.length > 0 ? 0.86 : 0
+                }
+            }
+
+            // Leading gap keeps breathing room around the center pill.
+            Item {
+                width: _titleIsland._leadingGapWidth
+                height: parent.height
+            }
+
+            // Current title pill.
+            Rectangle {
+                id: _centerIsland
+
+                width: _titleIsland._resolvedCenterIslandWidth
+                height: parent.height - Theme.barWidget.contentPaddingV * 2
+                anchors.verticalCenter: parent.verticalCenter
+                radius: height / 2
+                color: Qt.rgba(1, 1, 1, 0.06)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.04)
+
+                Row {
+                    id: _centerIslandContent
+
+                    anchors.centerIn: parent
+                    spacing: Theme.barWidget.badgePaddingH
+
+                    Image {
+                        width: root._compactIcon
+                        height: width
+                        source: root._hint.currentWindowIcon || ""
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        visible: source !== ""
+                    }
+
+                    Text {
+                        width: Math.min(
+                            implicitWidth,
+                            Math.max(0, _centerIsland.width - Theme.barWidget.badgePaddingH * 4 - (root._hint.currentWindowIcon ? root._compactIcon + _centerIslandContent.spacing : 0))
+                        )
+                        text: root._hint.currentWindowTitle || "Window hint"
+                        color: Colors.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.bold: true
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        verticalAlignment: Text.AlignVCenter
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                }
+            }
+
+            // Trailing gap keeps breathing room around the center pill.
+            Item {
+                width: _titleIsland._trailingGapWidth
+                height: parent.height
+            }
+
+            // Next title lane.
+            Item {
+                width: _titleIsland._sideSlotWidth
+                height: parent.height
+
+                Text {
+                    anchors.fill: parent
+                    text: root._hint.nextWindow.title || ""
+                    color: Colors.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    elide: Text.ElideLeft
+                    maximumLineCount: 1
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
+                    opacity: text.length > 0 ? 0.86 : 0
                 }
             }
         }
