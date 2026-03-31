@@ -24,6 +24,16 @@ Use this skill when animation state changes are correct but the user still does 
 - If the animation depends on users seeing a start pose, use `ParallelAnimation` or `SequentialAnimation`.
 - A property set to start state and reset in the same update path often collapses into an instant content swap.
 
+### 4. Follow-Up Snapshot Cancels Live Motion
+- If a service emits multiple snapshots for one user action, do not let a later neutral snapshot immediately clear an animation that just started.
+- Common symptom: the first diff computes a non-zero direction, but a second refresh computes `0` and clears the outgoing/incoming layers before the user sees any motion.
+- Prefer letting the active timeline finish, or coalesce service refreshes before deciding to cancel motion.
+
+### 5. Positioner Width Hides Real Alignment
+- `Column`, `Row`, and other positioners size themselves from the widest child.
+- A narrower stage inside that positioner can appear left-aligned even when its own internal items are centered.
+- When one animated lane is narrower than its siblings, wrap it in a full-width container and center the real stage inside the wrapper.
+
 ## Debugging Ladder
 
 Work from outermost cause to innermost rendering node.
@@ -62,6 +72,8 @@ Good log fields:
 - `direction`
 - current phase / loader state
 - travel distance for the animated property
+- whether a follow-up snapshot cleared the animation
+- parent stage width versus animated child width
 
 Remove all temporary logs before finishing.
 
@@ -113,12 +125,40 @@ Use when the old focus must visibly leave while the new focus arrives.
 - animate both layers independently
 - clear the outgoing layer on animation finish
 
+### Pattern D: Ignore Neutral Refresh While Motion Runs
+Use when one interaction causes multiple service refreshes.
+
+- start motion from the first meaningful diff
+- if a later refresh computes no direction, do not immediately clear the active motion
+- update the steady-state snapshot, but let the current timeline finish unless the data truly invalidates it
+
+### Pattern E: Center a Narrow Animated Stage Explicitly
+Use when a stage lives inside a wider `Column` or `Row`.
+
+```qml
+Column {
+    width: Math.max(workspaceStageWidth, titleStageWidth)
+
+    Item {
+        width: parent.width
+
+        Item {
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: workspaceStageWidth
+            height: parent.height
+        }
+    }
+}
+```
+
 ## DymicShell-Specific Notes
 
 - Check `services/WindowHintService.qml` first for live hint snapshots.
 - Check `modules/bar/widgets/SuperIslandWidget.qml` second for event propagation and loader behavior.
 - Check `modules/bar/superisland/*` last for real geometry ownership.
 - For hint-like transitions, prefer explicit timeline control over `Qt.callLater()` pulses.
+- For `window-hint` style previews, verify that repeated `activeHint` refreshes do not cancel a just-started slot motion.
+- For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 
 ## Validation
 
