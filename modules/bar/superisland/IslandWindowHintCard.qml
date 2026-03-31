@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import qs.config
 import qs.services
 
-// Renders the expanded workspace hint preview for the SuperIsland hold surface.
+// Renders a six-capsule workspace and title preview for the SuperIsland hold surface.
 Item {
     id: root
 
@@ -12,343 +12,820 @@ Item {
     readonly property var _hint: WindowHintService.activeHint
     readonly property int _padH: Theme.barWidget.contentPaddingH
     readonly property int _padV: Theme.barWidget.contentPaddingV
-    readonly property int _laneGap: Math.max(2, Math.round(4 * Theme.uiScale))
+    readonly property int _rowGap: Math.max(4, Math.round(5 * Theme.uiScale))
+    readonly property int _capsuleGap: Math.max(4, Math.round(5 * Theme.uiScale))
+    readonly property int _stagePadH: Math.max(10, Math.round(12 * Theme.uiScale))
+    readonly property int _stagePadV: Math.max(8, Math.round(9 * Theme.uiScale))
     readonly property int _compactIcon: Math.max(10, Theme.barWidget.compactIconSize - 1)
     readonly property int _primaryIcon: Theme.barWidget.primaryIconSize
-    readonly property int _pillHeight: Theme.barWidget.pillHeight
-    readonly property int _titleIslandHeight: Math.max(22, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 3)
-    readonly property int _titleOverlap: Math.max(8, Math.round(root._titleIslandHeight * 0.45))
-    readonly property int _sideTitleMaxWidth: Math.round(132 * Theme.uiScale)
-    readonly property int _stripHeight: Math.max(12, Theme.barWidget.compactIconSize)
-    readonly property int _windowRowHeight: Math.max(20, Theme.barWidget.primaryIconSize + Theme.barWidget.contentPaddingV * 3)
+    readonly property int _workspaceSideWidth: Math.round(84 * Theme.uiScale)
+    readonly property int _workspacePrimaryWidth: Math.round(232 * Theme.uiScale)
+    readonly property int _titleSideWidth: Math.round(116 * Theme.uiScale)
+    readonly property int _titlePrimaryWidth: Math.round(252 * Theme.uiScale)
+    readonly property int _workspaceCapsuleHeight: Math.max(30, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 2)
+    readonly property int _titleCapsuleHeight: Math.max(26, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 5)
     readonly property int _minPreviewWidth: Math.round(320 * Theme.uiScale)
     readonly property int _maxPreviewWidth: Math.round(560 * Theme.uiScale)
-    readonly property bool _hasPreviousStrip: root._hint.previousWorkspace.icons.length > 0
-    readonly property bool _hasNextStrip: root._hint.nextWorkspace.icons.length > 0
+    readonly property color _stageFill: Qt.rgba(1, 1, 1, 0.02)
+    readonly property color _stageBorder: Qt.rgba(1, 1, 1, 0.035)
+    readonly property color _primaryCapsuleFill: Qt.rgba(1, 1, 1, 0.09)
+    readonly property color _secondaryCapsuleFill: Qt.rgba(1, 1, 1, 0.04)
+    readonly property color _primaryCapsuleBorder: Qt.rgba(1, 1, 1, 0.08)
+    readonly property color _secondaryCapsuleBorder: Qt.rgba(1, 1, 1, 0.03)
+    readonly property var _previousWorkspaceCapsule: ({
+        key: "previous-workspace",
+        label: root._workspaceLabel(root._hint.previousWorkspace ? root._hint.previousWorkspace.workspaceIndex : -1),
+        icons: root._hint.previousWorkspace ? (root._hint.previousWorkspace.icons || []) : [],
+        emphasized: false,
+        visible: !!root._hint.previousWorkspace
+            && root._hint.previousWorkspace.workspaceIndex > 0
+            && (root._hint.previousWorkspace.icons || []).length > 0
+    })
+    readonly property var _currentWorkspaceCapsule: ({
+        key: "current-workspace",
+        label: root._workspaceLabel(root._hint.workspaceIndex),
+        icons: root._hint.windows || [],
+        emphasized: true,
+        visible: true
+    })
+    readonly property var _nextWorkspaceCapsule: ({
+        key: "next-workspace",
+        label: root._workspaceLabel(root._hint.nextWorkspace ? root._hint.nextWorkspace.workspaceIndex : -1),
+        icons: root._hint.nextWorkspace ? (root._hint.nextWorkspace.icons || []) : [],
+        emphasized: false,
+        visible: !!root._hint.nextWorkspace
+            && root._hint.nextWorkspace.workspaceIndex > 0
+            && (root._hint.nextWorkspace.icons || []).length > 0
+    })
+    readonly property var _previousTitleCapsule: ({
+        key: "previous-title",
+        title: root._hint.previousWindow ? (root._hint.previousWindow.title || "") : "",
+        icon: root._hint.previousWindow ? (root._hint.previousWindow.icon || "") : "",
+        emphasized: false,
+        visible: !!root._hint.previousWindow && (root._hint.previousWindow.title || "") !== ""
+    })
+    readonly property var _currentTitleCapsule: ({
+        key: "current-title",
+        title: root._hint.currentWindowTitle || "Window hint",
+        icon: root._hint.currentWindowIcon || "",
+        emphasized: true,
+        visible: true
+    })
+    readonly property var _nextTitleCapsule: ({
+        key: "next-title",
+        title: root._hint.nextWindow ? (root._hint.nextWindow.title || "") : "",
+        icon: root._hint.nextWindow ? (root._hint.nextWindow.icon || "") : "",
+        emphasized: false,
+        visible: !!root._hint.nextWindow && (root._hint.nextWindow.title || "") !== ""
+    })
+    property int _lastWorkspaceIndex: -1
+    property int _lastCurrentIndex: -1
+    property real _workspaceShiftOffset: 0
+    property real _titleShiftOffset: 0
 
     implicitWidth: Math.min(
         root._maxPreviewWidth,
         Math.max(
             root._minPreviewWidth,
-            _workspaceRow.implicitWidth + root._padH * 2 + Math.round(36 * Theme.uiScale),
-            _titleIsland.implicitWidth + root._padH * 2 + Math.round(20 * Theme.uiScale)
+            root._workspaceRowWidth() + root._padH * 2 + root._stagePadH * 2,
+            root._titleRowWidth() + root._padH * 2 + root._stagePadH * 2
         )
     )
-    implicitHeight: _mainIsland.implicitHeight + root._titleIslandHeight - root._titleOverlap
+    implicitHeight: _contentColumn.implicitHeight + root._padV * 2 + root._stagePadV * 2
 
-    Item {
-        id: _mainIsland
+    function _workspaceLabel(index) {
+        if (index <= 0)
+            return ""
 
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: parent.width
-        height: implicitHeight
-        implicitHeight: _mainIslandContent.implicitHeight + root._padV * 2 + root._titleOverlap
+        return "WS " + index
+    }
 
-        Column {
-            id: _mainIslandContent
+    function _workspaceCapsuleWidth(capsule) {
+        if (!capsule || !capsule.visible)
+            return 0
 
-            anchors.fill: parent
-            anchors.leftMargin: root._padH
-            anchors.rightMargin: root._padH
-            anchors.topMargin: root._padV
-            anchors.bottomMargin: root._padV + root._titleOverlap
-            spacing: root._laneGap
+        return capsule.emphasized ? root._workspacePrimaryWidth : root._workspaceSideWidth
+    }
 
+    function _titleCapsuleWidth(capsule) {
+        if (!capsule || !capsule.visible)
+            return 0
+
+        return capsule.emphasized ? root._titlePrimaryWidth : root._titleSideWidth
+    }
+
+    function _workspaceCapsuleOpacity(capsule) {
+        const width = root._workspaceCapsuleWidth(capsule)
+        if (width <= 0)
+            return 0
+
+        return capsule.emphasized ? 1 : 0.68
+    }
+
+    function _workspaceCapsuleScale(capsule) {
+        const width = root._workspaceCapsuleWidth(capsule)
+        if (width <= 0)
+            return 0.92
+
+        return capsule.emphasized ? 1 : 0.92
+    }
+
+    function _titleCapsuleOpacity(capsule) {
+        const width = root._titleCapsuleWidth(capsule)
+        if (width <= 0)
+            return 0
+
+        return capsule.emphasized ? 1 : 0.68
+    }
+
+    function _titleCapsuleScale(capsule) {
+        const width = root._titleCapsuleWidth(capsule)
+        if (width <= 0)
+            return 0.92
+
+        return capsule.emphasized ? 1 : 0.92
+    }
+
+    function _workspaceRowWidth() {
+        let total = 0
+        let visibleCount = 0
+        const capsules = [
+            root._previousWorkspaceCapsule,
+            root._currentWorkspaceCapsule,
+            root._nextWorkspaceCapsule
+        ]
+
+        for (let index = 0; index < capsules.length; index++) {
+            const capsule = capsules[index]
+            const capsuleWidth = root._workspaceCapsuleWidth(capsule)
+            if (capsuleWidth <= 0)
+                continue
+
+            total += capsuleWidth
+            visibleCount += 1
+        }
+
+        if (visibleCount > 1)
+            total += (visibleCount - 1) * root._capsuleGap
+
+        return total
+    }
+
+    function _titleRowWidth() {
+        let total = 0
+        let visibleCount = 0
+        const capsules = [
+            root._previousTitleCapsule,
+            root._currentTitleCapsule,
+            root._nextTitleCapsule
+        ]
+
+        for (let index = 0; index < capsules.length; index++) {
+            const capsule = capsules[index]
+            const capsuleWidth = root._titleCapsuleWidth(capsule)
+            if (capsuleWidth <= 0)
+                continue
+
+            total += capsuleWidth
+            visibleCount += 1
+        }
+
+        if (visibleCount > 1)
+            total += (visibleCount - 1) * root._capsuleGap
+
+        return total
+    }
+
+    function _visibleWorkspaceIcons(capsule) {
+        const icons = capsule && capsule.icons ? capsule.icons : []
+        const limit = capsule && capsule.emphasized ? 5 : 2
+        return icons.slice(0, limit)
+    }
+
+    function _kickShift(direction) {
+        if (direction === 0)
+            return
+
+        root._workspaceShiftOffset = direction * Math.round(16 * Theme.uiScale)
+        root._titleShiftOffset = direction * Math.round(22 * Theme.uiScale)
+        Qt.callLater(() => {
+            root._workspaceShiftOffset = 0
+            root._titleShiftOffset = 0
+        })
+    }
+
+    function _updateShiftPulse() {
+        if (!root._hint || !root._hint.visible)
+            return
+
+        let direction = 0
+        if (root._lastWorkspaceIndex >= 0 && root._hint.workspaceIndex !== root._lastWorkspaceIndex)
+            direction = root._hint.workspaceIndex > root._lastWorkspaceIndex ? 1 : -1
+        else if (root._lastCurrentIndex >= 0 && root._hint.currentIndex !== root._lastCurrentIndex)
+            direction = root._hint.currentIndex > root._lastCurrentIndex ? 1 : -1
+
+        root._lastWorkspaceIndex = root._hint.workspaceIndex
+        root._lastCurrentIndex = root._hint.currentIndex
+        root._kickShift(direction)
+    }
+
+    Behavior on _workspaceShiftOffset {
+        NumberAnimation {
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+    }
+
+    Behavior on _titleShiftOffset {
+        NumberAnimation {
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+    }
+
+    Connections {
+        target: WindowHintService
+
+        function onActiveHintChanged() {
+            root._updateShiftPulse()
+        }
+    }
+
+    // Shared stage ties both capsule rows together.
+    Rectangle {
+        anchors.centerIn: parent
+        z: -1
+        width: Math.max(root._workspaceRowWidth(), root._titleRowWidth()) + root._stagePadH * 2
+        height: _contentColumn.implicitHeight + root._stagePadV * 2
+        radius: Math.round(height / 2)
+        color: root._stageFill
+        border.width: 1
+        border.color: root._stageBorder
+    }
+
+    // Main capsule stack.
+    Column {
+        id: _contentColumn
+
+        anchors.centerIn: parent
+        spacing: root._rowGap
+
+        // Workspace capsule row.
+        Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: root._capsuleGap
+
+            // Previous workspace capsule.
             Item {
-                width: parent.width
-                height: visible ? root._stripHeight : 0
-                visible: root._hasPreviousStrip
+                id: _previousWorkspaceSlot
 
+                readonly property var _capsule: root._previousWorkspaceCapsule
+                readonly property bool _emphasized: _capsule.emphasized
+                width: root._workspaceCapsuleWidth(_capsule)
+                height: root._workspaceCapsuleHeight
+                opacity: root._workspaceCapsuleOpacity(_capsule)
+                scale: root._workspaceCapsuleScale(_capsule)
+                visible: opacity > 0
+
+                Behavior on x {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on width {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on opacity {
+                    NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType }
+                }
+
+                Behavior on scale {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                // Previous workspace surface.
                 Rectangle {
                     anchors.fill: parent
                     radius: height / 2
-                    color: Qt.rgba(1, 1, 1, 0.04)
-                    opacity: 0.75
+                    color: root._secondaryCapsuleFill
+                    border.width: 1
+                    border.color: root._secondaryCapsuleBorder
                 }
 
-                Row {
-                    anchors.centerIn: parent
-                    spacing: Theme.barWidget.iconSpacing
+                // Previous workspace content clip.
+                Item {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
+                    anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
+                    clip: true
+                    x: -root._workspaceShiftOffset * 0.35
 
-                    Repeater {
-                        model: root._hint.previousWorkspace.icons
+                    Behavior on x {
+                        NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                    }
 
-                        delegate: Item {
-                            required property var modelData
+                    // Previous workspace content.
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Theme.barWidget.badgePaddingH
 
-                            width: root._compactIcon
-                            height: root._compactIcon
-                            opacity: modelData.isFocused ? 0.52 : 0.28
+                        // Previous workspace label.
+                        Text {
+                            text: _previousWorkspaceSlot._capsule.label || ""
+                            color: Colors.textMuted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            verticalAlignment: Text.AlignVCenter
+                            visible: text !== ""
+                        }
 
-                            Image {
-                                anchors.fill: parent
-                                source: modelData.icon || ""
-                                fillMode: Image.PreserveAspectFit
-                                smooth: true
+                        // Previous workspace icons.
+                        Row {
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Math.max(2, Theme.barWidget.iconSpacing - 1)
+
+                            Repeater {
+                                model: root._visibleWorkspaceIcons(_previousWorkspaceSlot._capsule)
+
+                                delegate: Item {
+                                    required property var modelData
+
+                                    width: root._compactIcon
+                                    height: width
+                                    opacity: modelData.isFocused ? 0.68 : 0.4
+
+                                    // Previous workspace icon.
+                                    Image {
+                                        anchors.fill: parent
+                                        source: modelData.icon || ""
+                                        fillMode: Image.PreserveAspectFit
+                                        smooth: true
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            Rectangle {
-                width: parent.width
-                height: root._windowRowHeight
-                radius: height / 2
-                color: Qt.rgba(1, 1, 1, 0.05)
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.04)
-
-                Row {
-                    id: _workspaceRow
-
-                    anchors.centerIn: parent
-                    spacing: Theme.barWidget.iconSpacing + 1
-
-                    Repeater {
-                        model: root._hint.windows
-
-                        delegate: Rectangle {
-                            required property var modelData
-
-                            readonly property bool _focused: modelData.isFocused
-                            readonly property int _distance:
-                                root._hint.currentIndex >= 0
-                                    ? Math.abs(index - root._hint.currentIndex)
-                                    : 99
-
-                            width: _focused
-                                ? root._windowRowHeight + Theme.barWidget.badgePaddingH * 2
-                                : root._windowRowHeight - Theme.barWidget.contentPaddingV
-                            height: _focused ? root._windowRowHeight - 4 : root._windowRowHeight - 8
-                            radius: height / 2
-                            anchors.verticalCenter: parent ? parent.verticalCenter : undefined
-                            color: _focused ? Colors.highlight : Qt.rgba(1, 1, 1, 0.06)
-                            opacity: _focused ? 1 : (_distance === 1 ? 0.78 : 0.48)
-                            border.width: _focused ? 0 : 1
-                            border.color: Qt.rgba(1, 1, 1, 0.03)
-
-                            Behavior on width {
-                                NumberAnimation {
-                                    duration: Theme.anim.moveDuration
-                                    easing.type: Theme.anim.moveType
-                                }
-                            }
-
-                            Behavior on height {
-                                NumberAnimation {
-                                    duration: Theme.anim.moveDuration
-                                    easing.type: Theme.anim.moveType
-                                }
-                            }
-
-                            Image {
-                                anchors.centerIn: parent
-                                width: _focused ? root._primaryIcon : root._compactIcon
-                                height: width
-                                source: modelData.icon || ""
-                                fillMode: Image.PreserveAspectFit
-                                smooth: true
-                            }
-                        }
-                    }
-
-                    Text {
-                        visible: root._hint.windows.length === 0
-                        text: "No windows"
-                        color: Colors.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                    }
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                radius: height / 2
-                color: Colors.border
-                opacity: 0.35
-            }
-
+            // Current workspace capsule.
             Item {
-                width: parent.width
-                height: visible ? root._stripHeight : 0
-                visible: root._hasNextStrip
+                id: _currentWorkspaceSlot
 
+                readonly property var _capsule: root._currentWorkspaceCapsule
+                readonly property bool _emphasized: _capsule.emphasized
+                width: root._workspaceCapsuleWidth(_capsule)
+                height: root._workspaceCapsuleHeight
+                opacity: root._workspaceCapsuleOpacity(_capsule)
+                scale: root._workspaceCapsuleScale(_capsule)
+
+                Behavior on x {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on width {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on opacity {
+                    NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType }
+                }
+
+                Behavior on scale {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                // Current workspace surface.
                 Rectangle {
                     anchors.fill: parent
                     radius: height / 2
-                    color: Qt.rgba(1, 1, 1, 0.04)
-                    opacity: 0.75
+                    color: root._primaryCapsuleFill
+                    border.width: 1
+                    border.color: root._primaryCapsuleBorder
                 }
 
-                Row {
-                    anchors.centerIn: parent
-                    spacing: Theme.barWidget.iconSpacing
+                // Current workspace content clip.
+                Item {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
+                    anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
+                    clip: true
+                    x: -root._workspaceShiftOffset
 
-                    Repeater {
-                        model: root._hint.nextWorkspace.icons
+                    Behavior on x {
+                        NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                    }
 
-                        delegate: Item {
-                            required property var modelData
+                    // Current workspace content.
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Theme.barWidget.badgePaddingH
 
-                            width: root._compactIcon
-                            height: root._compactIcon
-                            opacity: modelData.isFocused ? 0.52 : 0.28
+                        // Current workspace label.
+                        Text {
+                            text: _currentWorkspaceSlot._capsule.label || ""
+                            color: Colors.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.bold: true
+                            verticalAlignment: Text.AlignVCenter
+                            visible: text !== ""
+                        }
 
-                            Image {
-                                anchors.fill: parent
-                                source: modelData.icon || ""
-                                fillMode: Image.PreserveAspectFit
-                                smooth: true
+                        // Current workspace icons.
+                        Row {
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Math.max(2, Theme.barWidget.iconSpacing - 1)
+
+                            Repeater {
+                                model: root._visibleWorkspaceIcons(_currentWorkspaceSlot._capsule)
+
+                                delegate: Item {
+                                    required property var modelData
+
+                                    width: root._primaryIcon
+                                    height: width
+                                    opacity: modelData.isFocused ? 1 : 0.76
+
+                                    // Current workspace icon.
+                                    Image {
+                                        anchors.fill: parent
+                                        source: modelData.icon || ""
+                                        fillMode: Image.PreserveAspectFit
+                                        smooth: true
+                                    }
+                                }
                             }
+
+                            // Current workspace empty label.
+                            Text {
+                                text: _currentWorkspaceSlot._capsule.icons.length === 0 ? "Empty" : ""
+                                color: Colors.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                verticalAlignment: Text.AlignVCenter
+                                visible: text !== ""
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Next workspace capsule.
+            Item {
+                id: _nextWorkspaceSlot
+
+                readonly property var _capsule: root._nextWorkspaceCapsule
+                readonly property bool _emphasized: _capsule.emphasized
+                width: root._workspaceCapsuleWidth(_capsule)
+                height: root._workspaceCapsuleHeight
+                opacity: root._workspaceCapsuleOpacity(_capsule)
+                scale: root._workspaceCapsuleScale(_capsule)
+                visible: opacity > 0
+
+                Behavior on x {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on width {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on opacity {
+                    NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType }
+                }
+
+                Behavior on scale {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                // Next workspace surface.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: height / 2
+                    color: root._secondaryCapsuleFill
+                    border.width: 1
+                    border.color: root._secondaryCapsuleBorder
+                }
+
+                // Next workspace content clip.
+                Item {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
+                    anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
+                    clip: true
+                    x: -root._workspaceShiftOffset * 0.35
+
+                    Behavior on x {
+                        NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                    }
+
+                    // Next workspace content.
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Theme.barWidget.badgePaddingH
+
+                        // Next workspace icons.
+                        Row {
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Math.max(2, Theme.barWidget.iconSpacing - 1)
+
+                            Repeater {
+                                model: root._visibleWorkspaceIcons(_nextWorkspaceSlot._capsule)
+
+                                delegate: Item {
+                                    required property var modelData
+
+                                    width: root._compactIcon
+                                    height: width
+                                    opacity: modelData.isFocused ? 0.68 : 0.4
+
+                                    // Next workspace icon.
+                                    Image {
+                                        anchors.fill: parent
+                                        source: modelData.icon || ""
+                                        fillMode: Image.PreserveAspectFit
+                                        smooth: true
+                                    }
+                                }
+                            }
+                        }
+
+                        // Next workspace label.
+                        Text {
+                            text: _nextWorkspaceSlot._capsule.label || ""
+                            color: Colors.textMuted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            verticalAlignment: Text.AlignVCenter
+                            visible: text !== ""
                         }
                     }
                 }
             }
         }
-    }
 
-    Item {
-        id: _titleIsland
-
-        anchors.top: _mainIsland.bottom
-        anchors.topMargin: -root._titleOverlap
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: Math.min(parent.width - root._padH * 2, implicitWidth)
-        height: root._titleIslandHeight
-
-        readonly property int _titleSidePadding: Theme.barWidget.badgePaddingH * 2
-        readonly property int _titleSlotGap: Theme.barWidget.iconSpacing * 2
-        readonly property int _titleContentWidth: Math.max(0, width - _titleSidePadding * 2)
-        readonly property int _centerIslandWidth: Math.max(
-            Math.round(116 * Theme.uiScale),
-            Math.min(
-                Math.round(320 * Theme.uiScale),
-                _centerIslandContent.implicitWidth + Theme.barWidget.badgePaddingH * 4
-            )
-        )
-        readonly property int _titlePreferredWidth: Math.max(
-            _centerIslandWidth + _sideTitleMaxWidth * 2 + Theme.barWidget.iconSpacing * 4,
-            Math.round(260 * Theme.uiScale)
-        )
-        readonly property int _resolvedCenterIslandWidth: Math.max(
-            0,
-            Math.min(_centerIslandWidth, _titleContentWidth)
-        )
-        readonly property int _sideSlotWidth: Math.max(
-            0,
-            Math.min(
-                root._sideTitleMaxWidth,
-                Math.floor((_titleContentWidth - _resolvedCenterIslandWidth - _titleSlotGap * 2) / 2)
-            )
-        )
-        readonly property int _leadingGapWidth: _sideSlotWidth > 0 ? _titleSlotGap : 0
-        readonly property int _trailingGapWidth: _sideSlotWidth > 0 ? _titleSlotGap : 0
-
-        implicitWidth: Math.min(Math.round(460 * Theme.uiScale), _titlePreferredWidth)
-        implicitHeight: root._titleIslandHeight
-
-        // Title lanes keep previous/current/next widths stable.
+        // Title capsule row.
         Row {
-            anchors.fill: parent
-            anchors.leftMargin: _titleSidePadding
-            anchors.rightMargin: _titleSidePadding
-            spacing: 0
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: root._capsuleGap
 
-            // Previous title lane.
+            // Previous title capsule.
             Item {
-                width: _titleIsland._sideSlotWidth
-                height: parent.height
+                id: _previousTitleSlot
 
-                Text {
+                readonly property var _capsule: root._previousTitleCapsule
+                readonly property bool _emphasized: _capsule.emphasized
+                width: root._titleCapsuleWidth(_capsule)
+                height: root._titleCapsuleHeight
+                opacity: root._titleCapsuleOpacity(_capsule)
+                scale: root._titleCapsuleScale(_capsule)
+                visible: opacity > 0
+
+                Behavior on x {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on width {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on opacity {
+                    NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType }
+                }
+
+                Behavior on scale {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                // Previous title surface.
+                Rectangle {
                     anchors.fill: parent
-                    text: root._hint.previousWindow.title || ""
-                    color: Colors.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                    verticalAlignment: Text.AlignVCenter
-                    opacity: text.length > 0 ? 0.86 : 0
+                    radius: height / 2
+                    color: root._secondaryCapsuleFill
+                    border.width: 1
+                    border.color: root._secondaryCapsuleBorder
+                }
+
+                // Previous title content clip.
+                Item {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
+                    anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
+                    clip: true
+                    x: -root._titleShiftOffset * 0.35
+
+                    Behavior on x {
+                        NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                    }
+
+                    // Previous title content.
+                    Row {
+                        id: _previousTitleContent
+
+                        anchors.fill: parent
+                        spacing: Theme.barWidget.badgePaddingH
+
+                        // Previous title icon.
+                        Image {
+                            id: _previousTitleIcon
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.max(10, root._compactIcon - 1)
+                            height: width
+                            source: _previousTitleSlot._capsule.icon || ""
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+                            visible: source !== ""
+                            opacity: 0.68
+                        }
+
+                        // Previous title text.
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.max(0, _previousTitleContent.width - (_previousTitleIcon.visible ? _previousTitleIcon.width + _previousTitleContent.spacing : 0))
+                            text: _previousTitleSlot._capsule.title || ""
+                            color: Colors.textMuted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
                 }
             }
 
-            // Leading gap keeps breathing room around the center pill.
+            // Current title capsule.
             Item {
-                width: _titleIsland._leadingGapWidth
-                height: parent.height
-            }
+                id: _currentTitleSlot
 
-            // Current title pill.
-            Rectangle {
-                id: _centerIsland
+                readonly property var _capsule: root._currentTitleCapsule
+                readonly property bool _emphasized: _capsule.emphasized
+                width: root._titleCapsuleWidth(_capsule)
+                height: root._titleCapsuleHeight
+                opacity: root._titleCapsuleOpacity(_capsule)
+                scale: root._titleCapsuleScale(_capsule)
 
-                width: _titleIsland._resolvedCenterIslandWidth
-                height: parent.height - Theme.barWidget.contentPaddingV * 2
-                anchors.verticalCenter: parent.verticalCenter
-                radius: height / 2
-                color: Qt.rgba(1, 1, 1, 0.06)
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.04)
+                Behavior on x {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
 
-                Row {
-                    id: _centerIslandContent
+                Behavior on width {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
 
-                    anchors.centerIn: parent
-                    spacing: Theme.barWidget.badgePaddingH
+                Behavior on opacity {
+                    NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType }
+                }
 
-                    Image {
-                        width: root._compactIcon
-                        height: width
-                        source: root._hint.currentWindowIcon || ""
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        visible: source !== ""
+                Behavior on scale {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                // Current title surface.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: height / 2
+                    color: root._primaryCapsuleFill
+                    border.width: 1
+                    border.color: root._primaryCapsuleBorder
+                }
+
+                // Current title content clip.
+                Item {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
+                    anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
+                    clip: true
+                    x: -root._titleShiftOffset
+
+                    Behavior on x {
+                        NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                     }
 
-                    Text {
-                        width: Math.min(
-                            implicitWidth,
-                            Math.max(0, _centerIsland.width - Theme.barWidget.badgePaddingH * 4 - (root._hint.currentWindowIcon ? root._compactIcon + _centerIslandContent.spacing : 0))
-                        )
-                        text: root._hint.currentWindowTitle || "Window hint"
-                        color: Colors.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.bold: true
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        verticalAlignment: Text.AlignVCenter
-                        horizontalAlignment: Text.AlignHCenter
+                    // Current title content.
+                    Row {
+                        id: _currentTitleContent
+
+                        anchors.fill: parent
+                        spacing: Theme.barWidget.badgePaddingH
+
+                        // Current title icon.
+                        Image {
+                            id: _currentTitleIcon
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: root._compactIcon
+                            height: width
+                            source: _currentTitleSlot._capsule.icon || ""
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+                            visible: source !== ""
+                            opacity: 0.92
+                        }
+
+                        // Current title text.
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.max(0, _currentTitleContent.width - (_currentTitleIcon.visible ? _currentTitleIcon.width + _currentTitleContent.spacing : 0))
+                            text: _currentTitleSlot._capsule.title || ""
+                            color: Colors.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.bold: true
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            verticalAlignment: Text.AlignVCenter
+                        }
                     }
                 }
             }
 
-            // Trailing gap keeps breathing room around the center pill.
+            // Next title capsule.
             Item {
-                width: _titleIsland._trailingGapWidth
-                height: parent.height
-            }
+                id: _nextTitleSlot
 
-            // Next title lane.
-            Item {
-                width: _titleIsland._sideSlotWidth
-                height: parent.height
+                readonly property var _capsule: root._nextTitleCapsule
+                readonly property bool _emphasized: _capsule.emphasized
+                width: root._titleCapsuleWidth(_capsule)
+                height: root._titleCapsuleHeight
+                opacity: root._titleCapsuleOpacity(_capsule)
+                scale: root._titleCapsuleScale(_capsule)
+                visible: opacity > 0
 
-                Text {
+                Behavior on x {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on width {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on opacity {
+                    NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType }
+                }
+
+                Behavior on scale {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                // Next title surface.
+                Rectangle {
                     anchors.fill: parent
-                    text: root._hint.nextWindow.title || ""
-                    color: Colors.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    elide: Text.ElideLeft
-                    maximumLineCount: 1
-                    horizontalAlignment: Text.AlignRight
-                    verticalAlignment: Text.AlignVCenter
-                    opacity: text.length > 0 ? 0.86 : 0
+                    radius: height / 2
+                    color: root._secondaryCapsuleFill
+                    border.width: 1
+                    border.color: root._secondaryCapsuleBorder
+                }
+
+                // Next title content clip.
+                Item {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
+                    anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
+                    clip: true
+                    x: -root._titleShiftOffset * 0.35
+
+                    Behavior on x {
+                        NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                    }
+
+                    // Next title content.
+                    Row {
+                        id: _nextTitleContent
+
+                        anchors.fill: parent
+                        spacing: Theme.barWidget.badgePaddingH
+
+                        // Next title icon.
+                        Image {
+                            id: _nextTitleIcon
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.max(10, root._compactIcon - 1)
+                            height: width
+                            source: _nextTitleSlot._capsule.icon || ""
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+                            visible: source !== ""
+                            opacity: 0.68
+                        }
+
+                        // Next title text.
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.max(0, _nextTitleContent.width - (_nextTitleIcon.visible ? _nextTitleIcon.width + _nextTitleContent.spacing : 0))
+                            text: _nextTitleSlot._capsule.title || ""
+                            color: Colors.textMuted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            elide: Text.ElideLeft
+                            maximumLineCount: 1
+                            horizontalAlignment: Text.AlignRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
                 }
             }
         }
