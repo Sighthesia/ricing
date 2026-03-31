@@ -13,7 +13,7 @@ Item {
 property bool liveInstance: false
 property string debugInstanceLabel: liveInstance ? "live" : "preview"
 
-readonly property bool _debugLogging: false
+    readonly property bool _debugLogging: false
 property date currentTime
 Timer {
     id: timeTimer
@@ -167,7 +167,7 @@ property real _flashTrackOpacity: 0
     readonly property bool _suppressHintTrailingFlash:
         root._isFullHintEventType(root._flashSourceEvent.type) && (root._phase === "hint-exit" || root._phase === "exit")
     readonly property bool _pillExpanded:
-        root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
+        root._phase === "enter" || root._phase === "hold" || root._phase === "hint" || root._phase === "hint-exit"
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
@@ -209,11 +209,9 @@ property real _flashTrackOpacity: 0
     property real _pulseScale: 1
 
     implicitHeight: Theme.barHeight
-    implicitWidth: root._phase === "hint-exit"
-        ? root._collapsedWidth
-        : (root._phase === "exit"
-            ? root._returnWidth
-            : (root.flashTrackVisible ? root._expandedWidth : root._collapsedWidth))
+    implicitWidth: root._phase === "exit"
+        ? root._returnWidth
+        : (root.flashTrackVisible ? root._expandedWidth : root._collapsedWidth)
 
     SystemClock {
         id: systemClock
@@ -713,7 +711,7 @@ property real _flashTrackOpacity: 0
             property var eventData: root._flashSourceEvent
             property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
             anchors.horizontalCenter: parent.horizontalCenter
-            active: root.flashTrackVisible && (!root._isFullHintEventType(eventData.type) || root._phase === "hint")
+            active: root.flashTrackVisible && (!root._isFullHintEventType(eventData.type) || root._hintPhase)
             y: root._flashTrackY
             opacity: root._flashTrackOpacity
             scale: root._flashTrackScale
