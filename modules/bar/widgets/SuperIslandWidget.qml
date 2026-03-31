@@ -127,6 +127,15 @@ property real _flashTrackOpacity: 0
     readonly property real _mainFlashTrackY:
         root._flashRowBaseY
         + root._trackCenterY(_mainLoader.item, root._flashRowH, root._mainDisplayEvent, true)
+    readonly property int _windowHintStagePadV: Math.max(14, Math.round(18 * Theme.uiScale))
+    readonly property int _windowHintRowGap: Math.max(10, Math.round(12 * Theme.uiScale))
+    readonly property int _windowHintWorkspaceColumnGap: Math.max(6, Math.round(8 * Theme.uiScale))
+    readonly property int _windowHintSideHeight:
+        Math.max(30, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 2)
+    readonly property int _windowHintPrimaryHeight:
+        Math.max(44, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 5)
+    readonly property int _windowHintTitleHeight:
+        Math.max(30, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 6)
     readonly property real _hintTrackY: root._mainTrackCenterY - root._hintLift
     readonly property real _hintDividerY: root._pillH + Math.max(0, (root._flashGap - 1) / 2)
     readonly property real _hintBackgroundY: root._flashRowBaseY
@@ -139,16 +148,24 @@ property real _flashTrackOpacity: 0
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
     readonly property real _collapsedPillHeight: root._pillH
     readonly property real _standardExpandedPillHeight: root._pillH + root._flashGap + root._flashRowH
+    // Reserve the full window-hint surface with a stable maximum height so the
+    // layer-shell bar window does not resize every animation frame while the
+    // hint capsules animate their own heights internally.
     readonly property real _fullHintExpandedPillHeight:
-        Math.max(
-            root._pillH * 3,
-            (_stripLoader.item ? _stripLoader.item.implicitHeight : root._pillH * 3)
-        )
+        root._windowHintSideHeight * 2
+        + root._windowHintPrimaryHeight
+        + root._windowHintWorkspaceColumnGap * 2
+        + root._windowHintRowGap
+        + root._windowHintTitleHeight
+        + Theme.barWidget.contentPaddingV * 2
+        + root._windowHintStagePadV * 2
     readonly property bool _fullHintExpandedSurface:
         root._isFullHintEventType(root._flashSourceEvent.type)
         || (root._hintPhase && root._isFullHintEventType(SuperIslandService.activeEvent.type))
     readonly property real _expandedPillHeight:
         root._fullHintExpandedSurface ? root._fullHintExpandedPillHeight : root._standardExpandedPillHeight
+    readonly property bool _suppressHintTrailingFlash:
+        root._isFullHintEventType(root._flashSourceEvent.type) && (root._phase === "hint-exit" || root._phase === "exit")
     readonly property bool _pillExpanded:
         root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
@@ -696,7 +713,7 @@ property real _flashTrackOpacity: 0
             property var eventData: root._flashSourceEvent
             property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
             anchors.horizontalCenter: parent.horizontalCenter
-            active: root.flashTrackVisible
+            active: root.flashTrackVisible && (!root._isFullHintEventType(eventData.type) || root._phase === "hint")
             y: root._flashTrackY
             opacity: root._flashTrackOpacity
             scale: root._flashTrackScale
@@ -979,6 +996,9 @@ property real _flashTrackOpacity: 0
         }
 
         onFinished: {
+            if (root._isFullHintEventType(root._flashSourceEvent.type)) {
+                root._flashSourceEvent = root._idleSnapshot()
+            }
             root._phase = "idle"
             root._flashSourceEvent = root._idleSnapshot()
             root._mainDisplayEvent = root._baselineEvent

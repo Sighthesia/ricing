@@ -24,7 +24,11 @@ Item {
     // shifts upward when the flash strip expands below — the pill overflows downward
     // visually without disturbing the parent Row's vertical-centre anchor.
     implicitHeight: _pillH + Theme.iconPadding
-    implicitWidth: _pill.implicitWidth
+    // Keep the outer layout contract stable so internal pill animations do not
+    // continuously retrigger bar-wide geometry recomputation.
+    implicitWidth: _layoutPillWidth
+    width: implicitWidth
+    height: implicitHeight
     opacity: _hintYield ? 0.42 : 1
     scale: _hintYield ? 0.96 : 1
 
@@ -51,6 +55,8 @@ Item {
         : (_overviewRow.implicitWidth + root._padH * 2)
     readonly property real _collapsedPillWidth: Math.min(root._focusPillWidth, root._overviewPillWidth)
     readonly property real _expandedPillWidth: Math.max(root._focusPillWidth, root._overviewPillWidth)
+    readonly property real _layoutPillWidth: Math.max(root._expandedPillWidth, root._flashPillWidth)
+    readonly property real layoutMeasurementWidth: _layoutPillWidth
     readonly property real _flashPillWidth:
         Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2
     readonly property real _transitionExpandedWidth:
@@ -162,6 +168,8 @@ Item {
     // would otherwise re-trigger a second flash on the new workspace).
     // Cleared on the first non-skip _refreshFocus() call, or on flash revert.
     property bool   _justSwitchedWorkspace: false
+    property var _iconPathCache: ({})
+    property var _workspaceAppIdsByWorkspace: ({})
 
     // --- focused window data ---
     property string _focusedWindowId: ""
@@ -284,10 +292,68 @@ Item {
     // --- icon resolution ---
     function _iconPath(appId) {
         if (!appId) return Quickshell.iconPath("application-x-executable")
+        if (root._iconPathCache[appId] !== undefined)
+            return root._iconPathCache[appId]
+
         const entry = DesktopEntries.heuristicLookup(appId)
-        if (entry && entry.icon)
-            return Quickshell.iconPath(entry.icon, "application-x-executable")
-        return Quickshell.iconPath("application-x-executable")
+        const resolvedPath = entry && entry.icon
+            ? Quickshell.iconPath(entry.icon, "application-x-executable")
+            : Quickshell.iconPath("application-x-executable")
+
+        root._iconPathCache[appId] = resolvedPath
+        return resolvedPath
+    }
+
+    function _refreshWorkspaceAppIds() {
+        let nextWorkspaceAppIds = ({})
+        const currentWorkspaceAppIds = root._workspaceAppIdsByWorkspace || ({})
+
+        for (let i = 0; i < NiriService.windows.count; i++) {
+            const window = NiriService.windows.get(i)
+            if (!window.workspaceId)
+                continue
+
+            if (nextWorkspaceAppIds[window.workspaceId] === undefined)
+                nextWorkspaceAppIds[window.workspaceId] = []
+
+            nextWorkspaceAppIds[window.workspaceId].push({
+                appId: window.appId,
+                winId: window.winId,
+                col: window.colIdx,
+                row: window.rowIdx,
+                icon: root._iconPath(window.appId)
+            })
+        }
+
+        for (const workspaceId in nextWorkspaceAppIds) {
+            nextWorkspaceAppIds[workspaceId].sort((left, right) => {
+                if (left.col !== right.col)
+                    return left.col - right.col
+                return left.row - right.row
+            })
+
+            const currentItems = currentWorkspaceAppIds[workspaceId]
+            let unchanged = Array.isArray(currentItems)
+                && currentItems.length === nextWorkspaceAppIds[workspaceId].length
+
+            if (unchanged) {
+                for (let itemIndex = 0; itemIndex < currentItems.length; itemIndex++) {
+                    const currentItem = currentItems[itemIndex]
+                    const nextItem = nextWorkspaceAppIds[workspaceId][itemIndex]
+                    if (currentItem.appId !== nextItem.appId
+                        || currentItem.winId !== nextItem.winId
+                        || currentItem.icon !== nextItem.icon) {
+                        unchanged = false
+                        break
+                    }
+                }
+            }
+
+            if (unchanged)
+                nextWorkspaceAppIds[workspaceId] = currentItems
+        }
+
+        root._workspaceAppIdsByWorkspace = nextWorkspaceAppIds
     }
 
     // --- revert timer: 1.5 s after overview trigger, return to focus ---
@@ -329,6 +395,7 @@ Item {
     }
 
     Component.onCompleted: {
+        root._refreshWorkspaceAppIds()
         _refreshFocus()
         // Defer enabling Behaviors to the next event loop iteration so the initial
         // state renders without any startup animation flash.
@@ -354,7 +421,10 @@ Item {
 
     Connections {
         target: NiriService
-        function onWindowsUpdated()      { root._refreshFocus() }
+        function onWindowsUpdated()      {
+            root._refreshWorkspaceAppIds()
+            root._refreshFocus()
+        }
         function onWorkspaceActivated()  {
             // Suppress the onWindowsUpdated that fires as a side-effect of this switch
             // to prevent a second flash from triggering on the already-cleared window state.
@@ -500,29 +570,8 @@ Item {
                             required property int idx
                             required property bool isActive
 
-                            property var _appIds: []
-
-                            function _refreshIcons() {
-                                let arr = []
-                                for (let i = 0; i < NiriService.windows.count; i++) {
-                                    const w = NiriService.windows.get(i)
-                                    if (w.workspaceId === _wsDelegate.wsId)
-                                        arr.push({ appId: w.appId, winId: w.winId, col: w.colIdx, row: w.rowIdx })
-                                }
-
-                                arr.sort((a, b) => a.col !== b.col ? a.col - b.col : a.row - b.row)
-                                _wsDelegate._appIds = arr.map(x => ({ appId: x.appId, winId: x.winId }))
-                            }
-
-                            Component.onCompleted: _refreshIcons()
-
-                            Connections {
-                                target: NiriService
-
-                                function onWindowsUpdated() {
-                                    _wsDelegate._refreshIcons()
-                                }
-                            }
+                            readonly property var _appIds:
+                                root._workspaceAppIdsByWorkspace[_wsDelegate.wsId] || []
 
                             visible: isActive || _appIds.length > 0
                             width: visible ? _wsPill.implicitWidth : 0
@@ -538,14 +587,6 @@ Item {
                                 )
                                 radius: implicitHeight / 2
                                 color: _wsDelegate.isActive ? Colors.highlight : Colors.surface
-
-                                Behavior on implicitWidth {
-                                    enabled: root._initialized
-                                    NumberAnimation {
-                                        duration: Theme.anim.moveDuration
-                                        easing.type: Theme.anim.moveType
-                                    }
-                                }
 
                                 Behavior on color {
                                     ColorAnimation { duration: Theme.anim.highlightDuration }
@@ -572,7 +613,8 @@ Item {
                                                 ? (_wsDelegate.isActive ? (_isFocused ? 1.0 : 0.5) : 0.75)
                                                 : 0
                                             scale: _isFocused ? 1.2 : 1.0
-                                            source: root._iconPath(modelData.appId)
+                                            source: modelData.icon || ""
+                                            asynchronous: true
                                             smooth: true
                                             fillMode: Image.PreserveAspectFit
 
@@ -744,9 +786,9 @@ Item {
     // so the expansion area doesn't accidentally trigger hover revert.
     MouseArea {
         id: _hoverArea
-        anchors.left:  parent.left
-        anchors.right: parent.right
+        anchors.horizontalCenter: parent.horizontalCenter
         anchors.top:   parent.top
+        width: _pill.width
         height: Theme.barHeight
         enabled: !root._hintYield
         hoverEnabled: true

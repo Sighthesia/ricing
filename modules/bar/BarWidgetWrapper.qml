@@ -17,6 +17,16 @@ Item {
     property bool _awaitingDelegateAlignment: false
     property real _naturalWidth: contentContainer.childrenRect.width
     property real _naturalHeight: contentContainer.childrenRect.height
+    readonly property var _measurementSource: {
+        if (contentContainer.children.length <= 0)
+            return null
+
+        const child = contentContainer.children[0]
+        if (child && child.item)
+            return child.item
+
+        return child
+    }
     property bool _enterStarted: false
     readonly property var _arrivalGeometry: {
         let arrivals = BarLayoutService.geometryArrivals || ({})
@@ -125,7 +135,13 @@ Item {
             return
         }
 
-        let nextWidth = Math.max(0, wrapper._naturalWidth)
+        let nextWidth = 0
+        if (wrapper._measurementSource && wrapper._measurementSource.layoutMeasurementWidth !== undefined)
+            nextWidth = Math.max(0, Number(wrapper._measurementSource.layoutMeasurementWidth) || 0)
+
+        if (nextWidth <= 0)
+            nextWidth = Math.max(0, wrapper._naturalWidth)
+
         if (nextWidth <= 0) {
             return
         }

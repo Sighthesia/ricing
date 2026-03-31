@@ -12,18 +12,20 @@ Item {
     readonly property var _hint: WindowHintService.activeHint
     readonly property int _padH: Theme.barWidget.contentPaddingH
     readonly property int _padV: Theme.barWidget.contentPaddingV
-    readonly property int _rowGap: Math.max(4, Math.round(5 * Theme.uiScale))
+    readonly property int _rowGap: Math.max(10, Math.round(12 * Theme.uiScale))
     readonly property int _capsuleGap: Math.max(4, Math.round(5 * Theme.uiScale))
-    readonly property int _stagePadH: Math.max(10, Math.round(12 * Theme.uiScale))
-    readonly property int _stagePadV: Math.max(8, Math.round(9 * Theme.uiScale))
+    readonly property int _workspaceColumnGap: Math.max(6, Math.round(8 * Theme.uiScale))
+    readonly property int _stagePadH: Math.max(14, Math.round(18 * Theme.uiScale))
+    readonly property int _stagePadV: Math.max(14, Math.round(18 * Theme.uiScale))
     readonly property int _compactIcon: Math.max(10, Theme.barWidget.compactIconSize - 1)
     readonly property int _primaryIcon: Theme.barWidget.primaryIconSize
-    readonly property int _workspaceSideWidth: Math.round(84 * Theme.uiScale)
-    readonly property int _workspacePrimaryWidth: Math.round(232 * Theme.uiScale)
-    readonly property int _titleSideWidth: Math.round(116 * Theme.uiScale)
-    readonly property int _titlePrimaryWidth: Math.round(252 * Theme.uiScale)
-    readonly property int _workspaceCapsuleHeight: Math.max(30, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 2)
-    readonly property int _titleCapsuleHeight: Math.max(26, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 5)
+    readonly property int _workspaceSideWidth: Math.round(188 * Theme.uiScale)
+    readonly property int _workspacePrimaryWidth: Math.round(286 * Theme.uiScale)
+    readonly property int _titleSideWidth: Math.round(132 * Theme.uiScale)
+    readonly property int _titlePrimaryWidth: Math.round(292 * Theme.uiScale)
+    readonly property int _workspaceSideHeight: Math.max(30, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 2)
+    readonly property int _workspacePrimaryHeight: Math.max(44, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 5)
+    readonly property int _titleCapsuleHeight: Math.max(30, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 6)
     readonly property int _minPreviewWidth: Math.round(320 * Theme.uiScale)
     readonly property int _maxPreviewWidth: Math.round(560 * Theme.uiScale)
     readonly property color _stageFill: Qt.rgba(1, 1, 1, 0.02)
@@ -87,7 +89,7 @@ Item {
         root._maxPreviewWidth,
         Math.max(
             root._minPreviewWidth,
-            root._workspaceRowWidth() + root._padH * 2 + root._stagePadH * 2,
+            root._workspaceColumnWidth() + root._padH * 2 + root._stagePadH * 2,
             root._titleRowWidth() + root._padH * 2 + root._stagePadH * 2
         )
     )
@@ -105,6 +107,13 @@ Item {
             return 0
 
         return capsule.emphasized ? root._workspacePrimaryWidth : root._workspaceSideWidth
+    }
+
+    function _workspaceCapsuleHeight(capsule) {
+        if (!capsule || !capsule.visible)
+            return 0
+
+        return capsule.emphasized ? root._workspacePrimaryHeight : root._workspaceSideHeight
     }
 
     function _titleCapsuleWidth(capsule) {
@@ -146,9 +155,8 @@ Item {
         return capsule.emphasized ? 1 : 0.92
     }
 
-    function _workspaceRowWidth() {
-        let total = 0
-        let visibleCount = 0
+    function _workspaceColumnWidth() {
+        let widest = 0
         const capsules = [
             root._previousWorkspaceCapsule,
             root._currentWorkspaceCapsule,
@@ -161,14 +169,10 @@ Item {
             if (capsuleWidth <= 0)
                 continue
 
-            total += capsuleWidth
-            visibleCount += 1
+            widest = Math.max(widest, capsuleWidth)
         }
 
-        if (visibleCount > 1)
-            total += (visibleCount - 1) * root._capsuleGap
-
-        return total
+        return widest
     }
 
     function _titleRowWidth() {
@@ -255,9 +259,9 @@ Item {
     Rectangle {
         anchors.centerIn: parent
         z: -1
-        width: Math.max(root._workspaceRowWidth(), root._titleRowWidth()) + root._stagePadH * 2
+        width: Math.max(root._workspaceColumnWidth(), root._titleRowWidth()) + root._stagePadH * 2
         height: _contentColumn.implicitHeight + root._stagePadV * 2
-        radius: Math.round(height / 2)
+        radius: Math.min(Math.round(height / 2), Math.round(Theme.cornerRadius * 3 * Theme.uiScale))
         color: root._stageFill
         border.width: 1
         border.color: root._stageBorder
@@ -270,10 +274,11 @@ Item {
         anchors.centerIn: parent
         spacing: root._rowGap
 
-        // Workspace capsule row.
-        Row {
+        // Workspace capsule column.
+        Column {
+            width: root._workspaceColumnWidth()
             anchors.horizontalCenter: parent.horizontalCenter
-            spacing: root._capsuleGap
+            spacing: root._workspaceColumnGap
 
             // Previous workspace capsule.
             Item {
@@ -281,8 +286,9 @@ Item {
 
                 readonly property var _capsule: root._previousWorkspaceCapsule
                 readonly property bool _emphasized: _capsule.emphasized
+                x: (parent.width - width) / 2
                 width: root._workspaceCapsuleWidth(_capsule)
-                height: root._workspaceCapsuleHeight
+                height: root._workspaceCapsuleHeight(_capsule)
                 opacity: root._workspaceCapsuleOpacity(_capsule)
                 scale: root._workspaceCapsuleScale(_capsule)
                 visible: opacity > 0
@@ -291,7 +297,15 @@ Item {
                     NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }
 
+                Behavior on y {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
                 Behavior on width {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on height {
                     NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }
 
@@ -318,9 +332,9 @@ Item {
                     anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
                     anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
                     clip: true
-                    x: -root._workspaceShiftOffset * 0.35
+                    y: -root._workspaceShiftOffset * 0.35
 
-                    Behavior on x {
+                    Behavior on y {
                         NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                     }
 
@@ -374,8 +388,9 @@ Item {
 
                 readonly property var _capsule: root._currentWorkspaceCapsule
                 readonly property bool _emphasized: _capsule.emphasized
+                x: (parent.width - width) / 2
                 width: root._workspaceCapsuleWidth(_capsule)
-                height: root._workspaceCapsuleHeight
+                height: root._workspaceCapsuleHeight(_capsule)
                 opacity: root._workspaceCapsuleOpacity(_capsule)
                 scale: root._workspaceCapsuleScale(_capsule)
 
@@ -383,7 +398,15 @@ Item {
                     NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }
 
+                Behavior on y {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
                 Behavior on width {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on height {
                     NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }
 
@@ -410,9 +433,9 @@ Item {
                     anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
                     anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
                     clip: true
-                    x: -root._workspaceShiftOffset
+                    y: -root._workspaceShiftOffset
 
-                    Behavior on x {
+                    Behavior on y {
                         NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                     }
 
@@ -477,8 +500,9 @@ Item {
 
                 readonly property var _capsule: root._nextWorkspaceCapsule
                 readonly property bool _emphasized: _capsule.emphasized
+                x: (parent.width - width) / 2
                 width: root._workspaceCapsuleWidth(_capsule)
-                height: root._workspaceCapsuleHeight
+                height: root._workspaceCapsuleHeight(_capsule)
                 opacity: root._workspaceCapsuleOpacity(_capsule)
                 scale: root._workspaceCapsuleScale(_capsule)
                 visible: opacity > 0
@@ -487,7 +511,15 @@ Item {
                     NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }
 
+                Behavior on y {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
                 Behavior on width {
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+
+                Behavior on height {
                     NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }
 
@@ -514,9 +546,9 @@ Item {
                     anchors.leftMargin: Theme.barWidget.badgePaddingH * 2
                     anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
                     clip: true
-                    x: -root._workspaceShiftOffset * 0.35
+                    y: -root._workspaceShiftOffset * 0.35
 
-                    Behavior on x {
+                    Behavior on y {
                         NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                     }
 
