@@ -41,13 +41,17 @@ Singleton {
     // id → { notification: NotificationObject, timer: Timer }
     property var _activeNotifications: ({})
 
-    readonly property string _cacheDir:
-        ((Quickshell.env("XDG_CACHE_HOME") !== "" && Quickshell.env("XDG_CACHE_HOME") !== "null" && Quickshell.env("XDG_CACHE_HOME") !== "/home/null")
-            ? Quickshell.env("XDG_CACHE_HOME")
-            : ((Quickshell.env("HOME") !== "" && Quickshell.env("HOME") !== "null" && Quickshell.env("HOME") !== "/home/null")
-                ? Quickshell.env("HOME") + "/.cache"
-                : "/tmp"))
-        + "/DymicShell/"
+    readonly property string _cacheDir: {
+        var cacheHome = Quickshell.env("XDG_CACHE_HOME")
+        var home = Quickshell.env("HOME")
+        if (cacheHome && cacheHome !== "null" && cacheHome !== "/home/null") {
+            return cacheHome + "/DymicShell/"
+        }
+        if (home && home !== "null" && home !== "/home/null") {
+            return home + "/.cache/DymicShell/"
+        }
+        return "/tmp/DymicShell/"
+    }
 
     readonly property string _historyFile: _cacheDir + "notifications.json"
     readonly property string _notificationOwnerCommand:
