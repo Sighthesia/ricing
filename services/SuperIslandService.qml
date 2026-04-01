@@ -99,6 +99,65 @@ Singleton {
         root._routeEvent(normalized)
     }
 
+    function showWindowHint(hint) {
+        if (!root._settings().enabled || !hint || !hint.visible)
+            return
+
+        const event = root._normalizeEvent({
+            id: "window-hint",
+            type: "window-hint",
+            groupKey: "window-hint",
+            priority: "important",
+            title: hint.currentWindowTitle || "Window hint",
+            subtitle: "",
+            icon: hint.currentWindowIcon || "",
+            workspaceLabel: hint.workspaceIndex > 0 ? hint.workspaceIndex.toString() : "",
+            timeoutMs: 0,
+            sticky: true,
+            revision: hint.revision || 0
+        })
+
+        if (!event)
+            return
+
+        if (root.activeEvent.type === "window-hint") {
+            root._log("updateWindowHint", event)
+            root.activeEvent = event
+            root.flashEvent = event
+            root.mode = "hint"
+            return
+        }
+
+        root._log("showWindowHint", event)
+        _activeTimer.stop()
+        _pendingStartTimer.stop()
+        root.activeEvent = event
+        root.flashEvent = event
+        root.mode = "hint"
+        root.mainState = root._resolveBaselineState()
+    }
+
+    function hideWindowHint() {
+        if (root.activeEvent.type !== "window-hint")
+            return
+
+        root._log("hideWindowHint", root.activeEvent)
+        _activeTimer.stop()
+        _pendingStartTimer.stop()
+
+        if (root._queue.length > 0) {
+            const next = root._queue[0]
+            root._queue = []
+            root._activateEvent(next)
+            return
+        }
+
+        root.activeEvent = root._idleEvent()
+        root.flashEvent = ({})
+        root.mode = "idle"
+        root.mainState = root._resolveBaselineState()
+    }
+
     function replaceEvent(groupKey, event) {
         const mergedEvent = {}
         for (let key in event)
@@ -258,6 +317,8 @@ Singleton {
             icon: event.icon || "",
             workspaceLabel: event.workspaceLabel || "",
             urgency: event.urgency,
+            sticky: !!event.sticky,
+            revision: event.revision || 0,
             timestamp: Date.now()
         }
 
@@ -271,6 +332,11 @@ Singleton {
 
     function _routeEvent(event) {
         root._log("routeEvent", event)
+
+        if (root.activeEvent.type === "window-hint" && event.type !== "window-hint") {
+            root._queue = [event]
+            return
+        }
 
         if (event.presentation === "baseline") {
             root._baselineState = event

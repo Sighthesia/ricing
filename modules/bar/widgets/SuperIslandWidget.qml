@@ -13,7 +13,7 @@ Item {
 property bool liveInstance: false
 property string debugInstanceLabel: liveInstance ? "live" : "preview"
 
-readonly property bool _debugLogging: false
+    readonly property bool _debugLogging: false
 property date currentTime
 Timer {
     id: timeTimer
@@ -129,12 +129,21 @@ property real _flashTrackOpacity: 0
     readonly property real _mainFlashTrackY:
         root._flashRowBaseY
         + root._trackCenterY(_mainLoader.item, root._flashRowH, root._mainDisplayEvent, true)
+    readonly property int _windowHintStagePadV: Math.max(14, Math.round(18 * Theme.uiScale))
+    readonly property int _windowHintRowGap: Math.max(10, Math.round(12 * Theme.uiScale))
+    readonly property int _windowHintWorkspaceColumnGap: Math.max(6, Math.round(8 * Theme.uiScale))
+    readonly property int _windowHintSideHeight:
+        Math.max(30, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 2)
+    readonly property int _windowHintPrimaryHeight:
+        Math.max(44, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 5)
+    readonly property int _windowHintTitleHeight:
+        Math.max(30, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 6)
     readonly property real _hintTrackY: root._mainTrackCenterY - root._hintLift
     readonly property real _hintDividerY: root._pillH + Math.max(0, (root._flashGap - 1) / 2)
     readonly property real _hintBackgroundY: root._flashRowBaseY
     readonly property real _hintBackgroundHeight: root._flashRowH
     readonly property real _hintBackgroundPulseOpacity:
-        root._hintPhase && root._flashSourceEvent.type !== "window"
+        root._hintPhase && !root._isHintEventType(root._flashSourceEvent.type)
             ? root._sharedBackgroundPulseOpacity
             : 0
     readonly property real _returnTrackCenterY:
@@ -158,6 +167,20 @@ property real _flashTrackOpacity: 0
         return Math.max(root._collapsedWidth, Math.min(Math.round(980 * Theme.uiScale), availableWidth))
     }
 
+    // Reserve the full window-hint surface with a stable maximum height so the
+    // layer-shell bar window does not resize every animation frame while the
+    // hint capsules animate their own heights internally.
+    readonly property real _fullHintExpandedPillHeight:
+        root._windowHintSideHeight * 2
+        + root._windowHintPrimaryHeight
+        + root._windowHintWorkspaceColumnGap * 2
+        + root._windowHintRowGap
+        + root._windowHintTitleHeight
+        + Theme.barWidget.contentPaddingV * 2
+        + root._windowHintStagePadV * 2
+    readonly property bool _fullHintExpandedSurface:
+        root._isFullHintEventType(root._flashSourceEvent.type)
+        || (root._hintPhase && root._isFullHintEventType(SuperIslandService.activeEvent.type))
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
@@ -278,11 +301,13 @@ property real _flashTrackOpacity: 0
             groupKey: source.groupKey || "idle",
             priority: source.priority || "passive",
             relayReplace: !!source.relayReplace,
+            sticky: !!source.sticky,
             title: source.title || "",
             subtitle: source.subtitle || "",
             icon: source.icon || "",
             workspaceLabel: source.workspaceLabel || "",
             timeoutMs: source.timeoutMs || 0,
+            revision: source.revision || 0,
             timestamp: source.timestamp || 0
         }
     }
@@ -309,6 +334,14 @@ property real _flashTrackOpacity: 0
         return root._cloneEvent(event)
     }
 
+    function _isHintEventType(eventType) {
+        return eventType === "window" || eventType === "window-hint"
+    }
+
+    function _isFullHintEventType(eventType) {
+        return eventType === "window-hint"
+    }
+
     function _resolvedIconSource(iconName) {
         if (!iconName)
             return Quickshell.iconPath("dialog-information")
@@ -320,6 +353,8 @@ property real _flashTrackOpacity: 0
     function _componentForEvent(event, useStrip) {
         if (!event || event.type === "idle")
             return _idleComponent
+        if (event.type === "window-hint")
+            return _windowHintCardComponent
         if (event.type === "media")
             return useStrip ? _stripMediaCardComponent : _mainMediaCardComponent
         if (event.type === "workspace" || event.type === "window")
@@ -470,8 +505,10 @@ property real _flashTrackOpacity: 0
     }
 
     function _startWindowHint(event) {
+        const fullHint = root._isFullHintEventType(event.type)
+
         root._log("startWindowHint", event)
-        root._mainDisplayEvent = root._baselineEvent
+        root._mainDisplayEvent = fullHint ? root._idleSnapshot() : root._baselineEvent
         root._flashSourceEvent = root._displayEvent(event)
         root._phase = "hint"
 
@@ -482,7 +519,7 @@ property real _flashTrackOpacity: 0
 
         root._mainTrackY = root._mainTrackCenterY
         root._mainTrackScale = 1
-        root._mainTrackOpacity = 1
+        root._mainTrackOpacity = fullHint ? 0 : 1
         root._flashTrackY = root._windowHintEntryMeta.flashRole.targetY
             - root._windowHintEntryMeta.flashRole.deltaY
         root._flashTrackScale = 0.92
@@ -634,6 +671,8 @@ property real _flashTrackOpacity: 0
         function onActiveEventChanged() {
             const nextEvent = root._displayEvent(SuperIslandService.activeEvent)
             const previousEvent = root._cloneEvent(root._lastActiveEvent)
+            const nextIsHint = root._isHintEventType(nextEvent.type)
+            const previousIsHint = root._isHintEventType(previousEvent.type)
 
             if (nextEvent.type === "overlay" || previousEvent.type === "overlay") {
                 root._lastActiveEvent = nextEvent.type === "overlay"
@@ -643,20 +682,20 @@ property real _flashTrackOpacity: 0
             }
 
             if (nextEvent.relayReplace && previousEvent.type !== "idle") {
-                if (previousEvent.type === "window")
+                if (previousIsHint)
                     root._startEnterTransition(nextEvent)
                 else
                     root._replaceActiveTransient(nextEvent)
-            } else if (nextEvent.type === "window" && previousEvent.type === "idle") {
+            } else if (nextIsHint && previousEvent.type === "idle") {
                 root._startWindowHint(nextEvent)
-            } else if (nextEvent.type === "window" && previousEvent.type === "window") {
+            } else if (nextIsHint && previousIsHint) {
                 if (root._hintPhase)
                     root._updateWindowHint(nextEvent)
                 else
                     root._startWindowHint(nextEvent)
-            } else if (nextEvent.type !== "idle" && previousEvent.type === "window") {
+            } else if (nextEvent.type !== "idle" && previousIsHint) {
                 root._startEnterTransition(nextEvent)
-            } else if (nextEvent.type === "idle" && previousEvent.type === "window") {
+            } else if (nextEvent.type === "idle" && previousIsHint) {
                 root._finishWindowHint()
             } else if (nextEvent.type !== "idle" && previousEvent.type === "idle") {
                 root._startEnterTransition(nextEvent)
@@ -775,7 +814,7 @@ property real _flashTrackOpacity: 0
             radius: height / 2
             color: Colors.highlight
             opacity: root._hintBackgroundPulseOpacity
-            visible: root.flashTrackVisible
+            visible: root.flashTrackVisible && root._flashSourceEvent.type !== "window-hint"
         }
 
         Loader {
@@ -816,12 +855,12 @@ property real _flashTrackOpacity: 0
             property var eventData: root._flashSourceEvent
             property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
             anchors.horizontalCenter: parent.horizontalCenter
-            active: root.flashTrackVisible
+            active: root.flashTrackVisible && (!root._isFullHintEventType(eventData.type) || root._hintPhase)
             y: root._flashTrackY
             opacity: root._flashTrackOpacity
             scale: root._flashTrackScale
-            height: root._flashRowH
-            clip: true
+            height: root._isFullHintEventType(eventData.type) ? root._verticalRevealSurfaceHeight : root._flashRowH
+            clip: !root._isFullHintEventType(eventData.type)
             sourceComponent: root._componentForEvent(eventData, true)
         }
 
@@ -1032,7 +1071,9 @@ property real _flashTrackOpacity: 0
         NumberAnimation {
             target: root
             property: "_mainTrackY"
-            to: root._windowHintEntryMeta.mainRole.targetY
+            to: root._isFullHintEventType(root._flashSourceEvent.type)
+                ? root._mainTrackCenterY
+                : root._windowHintEntryMeta.mainRole.targetY
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -1040,7 +1081,7 @@ property real _flashTrackOpacity: 0
         NumberAnimation {
             target: root
             property: "_mainTrackScale"
-            to: root._flashScale
+            to: root._isFullHintEventType(root._flashSourceEvent.type) ? 1 : root._flashScale
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -1048,7 +1089,7 @@ property real _flashTrackOpacity: 0
         NumberAnimation {
             target: root
             property: "_mainTrackOpacity"
-            to: 0.6
+            to: root._isFullHintEventType(root._flashSourceEvent.type) ? 0 : 0.6
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -1114,6 +1155,9 @@ property real _flashTrackOpacity: 0
         }
 
         onFinished: {
+            if (root._isFullHintEventType(root._flashSourceEvent.type)) {
+                root._flashSourceEvent = root._idleSnapshot()
+            }
             root._phase = "idle"
             root._flashSourceEvent = root._idleSnapshot()
             root._mainDisplayEvent = root._baselineEvent
@@ -1292,6 +1336,14 @@ Item {
         IslandCards.IslandWorkspaceCard {
             event: eventData
             iconSource: resolvedIcon
+        }
+    }
+
+    Component {
+        id: _windowHintCardComponent
+
+        IslandCards.IslandWindowHintCard {
+            event: eventData
         }
     }
 

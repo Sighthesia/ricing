@@ -9,25 +9,64 @@ Singleton {
 
     property ListModel workspaces: ListModel {}
     property ListModel windows: ListModel {}
+    property bool _windowsReloadQueued: false
 
+    signal workspacesUpdated()
     signal windowsUpdated()
     signal workspaceActivated()
 
     function updateWorkspaces(workspacesEvent) {
-        const list = workspacesEvent.workspaces;
+        const list = (workspacesEvent.workspaces || []).slice();
         list.sort((a, b) => a.idx - b.idx);
 
-        workspaces.clear();
-        for (let i = 0; i < list.length; i++) {
-            const ws = list[i];
-            workspaces.append({
-                wsId: String(ws.id),
-                idx: ws.idx,
-                isActive: ws.is_active,
-                name: ws.name || "",
-                output: ws.output || ""
-            });
+        const activeWorkspaceIds = ({})
+
+        for (let targetIndex = 0; targetIndex < list.length; targetIndex++) {
+            const ws = list[targetIndex];
+            const workspaceId = String(ws.id)
+            activeWorkspaceIds[workspaceId] = true
+
+            let currentIndex = -1
+            for (let scanIndex = 0; scanIndex < workspaces.count; scanIndex++) {
+                if (workspaces.get(scanIndex).wsId === workspaceId) {
+                    currentIndex = scanIndex
+                    break
+                }
+            }
+
+            if (currentIndex < 0) {
+                workspaces.insert(targetIndex, {
+                    wsId: workspaceId,
+                    idx: ws.idx,
+                    isActive: ws.is_active,
+                    name: ws.name || "",
+                    output: ws.output || ""
+                })
+                continue
+            }
+
+            if (currentIndex !== targetIndex)
+                workspaces.move(currentIndex, targetIndex, 1)
+
+            const currentItem = workspaces.get(targetIndex)
+            if (currentItem.idx !== ws.idx)
+                workspaces.setProperty(targetIndex, "idx", ws.idx)
+            if (currentItem.isActive !== ws.is_active)
+                workspaces.setProperty(targetIndex, "isActive", ws.is_active)
+            if (currentItem.name !== (ws.name || ""))
+                workspaces.setProperty(targetIndex, "name", ws.name || "")
+            if (currentItem.output !== (ws.output || ""))
+                workspaces.setProperty(targetIndex, "output", ws.output || "")
         }
+
+        for (let index = workspaces.count - 1; index >= 0; index--) {
+            if (activeWorkspaceIds[workspaces.get(index).wsId])
+                continue
+
+            workspaces.remove(index, 1)
+        }
+
+        workspacesUpdated();
     }
 
     function activateWorkspace(event) {
@@ -67,6 +106,11 @@ Singleton {
     }
 
     function reloadWindows() {
+        if (niriWindowsFetcher.running) {
+            root._windowsReloadQueued = true;
+            return;
+        }
+
         niriWindowsFetcher.running = true;
     }
 
@@ -81,6 +125,13 @@ Singleton {
                     root.updateWindows(JSON.parse(data.trim()));
                 } catch (e) {}
             }
+        }
+        onRunningChanged: {
+            if (running || !root._windowsReloadQueued)
+                return;
+
+            root._windowsReloadQueued = false;
+            running = true;
         }
     }
 

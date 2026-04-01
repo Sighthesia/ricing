@@ -33,6 +33,7 @@ Load these for detailed context on specific topics:
 | [qml-components](skills/qml-components/SKILL.md)     | Token system, semantic colors, theme values, base components, and interactive surface patterns. |
 | [qml-context-menu](skills/qml-context-menu/SKILL.md) | Build, refactor, or visually align bar-style context menus, tray menus, and submenus.          |
 | [qml-performance-debug](skills/qml-performance-debug/SKILL.md) | Debug jank, layout thrash, layer-shell resize churn, and expensive widget transitions. |
+| [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md) | Debug QML motion that updates state correctly but still looks static, wrong, or too subtle. |
 | [qml-state](skills/qml-state/SKILL.md)               | Guidelines for managing settings, state, persistence, and error handling.                       |
 
 ## Miscellaneous
@@ -40,8 +41,6 @@ Load these for detailed context on specific topics:
 - Do not proactively use harness, smoke, or other targeted test runners; keep validation to the whole-shell load check unless the user explicitly asks for a different approach.
 - Don't remove `docs/plans/` references even when files or commands move.
 - Keep runtime artifacts in `.cache/DymicShell/`; do not write new files under `null/dymicshell/`.
-- In QML files, precede each visual element declaration with a short English comment that names the element or explains its visual role/effect.
-- Keep those comments concise and local to the element they describe.
 <!-- TRELLIS:START -->
 # Trellis Instructions
 

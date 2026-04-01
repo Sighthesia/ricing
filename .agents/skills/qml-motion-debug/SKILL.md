@@ -1,0 +1,167 @@
+---
+name: qml-motion-debug
+description: Debug Quickshell or QML motion bugs when state updates happen but the visual transition looks static, too subtle, or wrong. Use for issues involving anchors, x/y offsets, Behavior conflicts, same-frame resets, or service-to-widget animation handoff.
+---
+
+# QML Motion Debug
+
+Use this skill when animation state changes are correct but the user still does not see the intended motion.
+
+## Primary Failure Modes
+
+### 1. Split Geometry Ownership
+- Do not mix `anchors.*` geometry with manual `x` / `y` animation on the same item.
+- If an item must move, give it explicit `width`, `height`, `x`, and `y` ownership.
+- If an item must stretch with anchors, animate a child wrapper instead of the anchored root.
+
+### 2. Double Animation Ownership
+- Do not stack `Behavior on x/y/scale/opacity` and imperative `NumberAnimation` / `ParallelAnimation` on the same property unless the ownership is deliberate.
+- Prefer one owner per animated property.
+- If motion feels like a faint ghost or residue, suspect competing animation systems first.
+
+### 3. Same-Frame Reset
+- Do not use `Qt.callLater()` to create visible motion when the intermediate state must survive across frames.
+- If the animation depends on users seeing a start pose, use `ParallelAnimation` or `SequentialAnimation`.
+- A property set to start state and reset in the same update path often collapses into an instant content swap.
+
+### 4. Follow-Up Snapshot Cancels Live Motion
+- If a service emits multiple snapshots for one user action, do not let a later neutral snapshot immediately clear an animation that just started.
+- Common symptom: the first diff computes a non-zero direction, but a second refresh computes `0` and clears the outgoing/incoming layers before the user sees any motion.
+- Prefer letting the active timeline finish, or coalesce service refreshes before deciding to cancel motion.
+
+### 5. Positioner Width Hides Real Alignment
+- `Column`, `Row`, and other positioners size themselves from the widest child.
+- A narrower stage inside that positioner can appear left-aligned even when its own internal items are centered.
+- When one animated lane is narrower than its siblings, wrap it in a full-width container and center the real stage inside the wrapper.
+
+## Debugging Ladder
+
+Work from outermost cause to innermost rendering node.
+
+1. **State layer**
+   - Confirm the service emits a new snapshot.
+   - Log IDs, indices, revisions, and directional context.
+   - Example: focused window ID, workspace ID, previous/next IDs.
+
+2. **Host layer**
+   - Confirm the parent widget receives the update.
+   - Check whether it replaces the subtree, updates a loader, or swaps event objects.
+   - Verify the animated component instance is not being recreated unexpectedly.
+
+3. **Leaf layer**
+   - Confirm the actual visual item owns the property being animated.
+   - Check `x`, `y`, `scale`, `opacity`, `width`, `height`, and `clip` boundaries.
+   - If the property changes in logs but not on screen, inspect anchors and competing bindings.
+
+Do not tune duration or easing before all three layers are verified.
+
+## Logging Pattern
+
+Use temporary logs in three places at once:
+
+- service snapshot refresh
+- host event/update handler
+- leaf animation trigger
+
+Good log fields:
+
+- `revision`
+- `workspaceId`
+- `currentWindowId`
+- `currentIndex`
+- `direction`
+- current phase / loader state
+- travel distance for the animated property
+- whether a follow-up snapshot cleared the animation
+- parent stage width versus animated child width
+
+Remove all temporary logs before finishing.
+
+## Motion Checklist
+
+Before shipping a motion fix:
+
+- [ ] The service update is visible in logs.
+- [ ] The host widget receives the new event without replacing the wrong subtree.
+- [ ] Each animated property has exactly one owner.
+- [ ] No animated property is both anchor-controlled and manually offset.
+- [ ] Intermediate animation states survive across frames.
+- [ ] `timeout 5 qs --path .` still passes.
+
+## Recommended Fix Patterns
+
+### Pattern A: Animate a Child Wrapper
+Use when the visible item must stay anchored.
+
+```qml
+Item {
+    anchors.fill: parent
+
+    Item {
+        width: parent.width
+        height: parent.height
+        x: animatedOffset
+        scale: animatedScale
+    }
+}
+```
+
+### Pattern B: Use Explicit Timeline
+Use when entry and exit states must be perceptible.
+
+```qml
+ParallelAnimation {
+    NumberAnimation { target: root; property: "_entryOffset"; to: 0 }
+    NumberAnimation { target: root; property: "_entryScale"; to: 1 }
+    NumberAnimation { target: root; property: "_entryOpacity"; to: 1 }
+}
+```
+
+### Pattern C: Keep Outgoing and Incoming Layers Separate
+Use when the old focus must visibly leave while the new focus arrives.
+
+- snapshot outgoing content
+- render incoming content in a separate layer
+- animate both layers independently
+- clear the outgoing layer on animation finish
+
+### Pattern D: Ignore Neutral Refresh While Motion Runs
+Use when one interaction causes multiple service refreshes.
+
+- start motion from the first meaningful diff
+- if a later refresh computes no direction, do not immediately clear the active motion
+- update the steady-state snapshot, but let the current timeline finish unless the data truly invalidates it
+
+### Pattern E: Center a Narrow Animated Stage Explicitly
+Use when a stage lives inside a wider `Column` or `Row`.
+
+```qml
+Column {
+    width: Math.max(workspaceStageWidth, titleStageWidth)
+
+    Item {
+        width: parent.width
+
+        Item {
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: workspaceStageWidth
+            height: parent.height
+        }
+    }
+}
+```
+
+## DymicShell-Specific Notes
+
+- Check `services/WindowHintService.qml` first for live hint snapshots.
+- Check `modules/bar/widgets/SuperIslandWidget.qml` second for event propagation and loader behavior.
+- Check `modules/bar/superisland/*` last for real geometry ownership.
+- For hint-like transitions, prefer explicit timeline control over `Qt.callLater()` pulses.
+- For `window-hint` style previews, verify that repeated `activeHint` refreshes do not cancel a just-started slot motion.
+- For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
+
+## Validation
+
+- Run `timeout 5 qs --path .`
+- Reproduce the motion change while the shell is live.
+- If needed, compare logs from service, host, and leaf in one reproduction pass.

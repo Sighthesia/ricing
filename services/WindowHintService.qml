@@ -1,0 +1,295 @@
+pragma Singleton
+
+import Quickshell
+import QtQuick
+import qs.services
+
+// Derives a live snapshot for the center-lane window hint preview.
+Singleton {
+    id: root
+
+    property bool hintHeld: false
+    property var activeHint: _emptyHint()
+
+    readonly property bool hintVisible: activeHint.visible === true
+    readonly property bool triggerBridgeAvailable: WindowHintTriggerService.available
+    readonly property bool triggerBridgeRunning: WindowHintTriggerService.running
+
+    property int _revision: 0
+
+    function setHintHeld(active) {
+        const nextHeld = !!active
+        if (root.hintHeld === nextHeld) {
+            if (nextHeld)
+                root._refreshHint()
+            return
+        }
+
+        root.hintHeld = nextHeld
+
+        if (root.hintHeld) {
+            root._refreshHint()
+            return
+        }
+
+        root.activeHint = root._emptyHint()
+        SuperIslandService.hideWindowHint()
+    }
+
+    function _refreshHint() {
+        const nextHint = root._buildHint(root.hintHeld)
+        root.activeHint = nextHint
+
+        if (!root.hintHeld)
+            return
+
+        if (nextHint.visible)
+            SuperIslandService.showWindowHint(nextHint)
+        else
+            SuperIslandService.hideWindowHint()
+    }
+
+    function _emptyWindow() {
+        return {
+            windowId: "",
+            title: "",
+            appId: "",
+            icon: "",
+            isFocused: false,
+            columnIndex: -1
+        }
+    }
+
+    function _emptyWorkspaceSummary() {
+        return {
+            workspaceId: "",
+            workspaceIndex: -1,
+            icons: []
+        }
+    }
+
+    function _emptyHint() {
+        return {
+            visible: false,
+            revision: root._revision,
+            workspaceId: "",
+            workspaceIndex: -1,
+            activeWorkspacePosition: -1,
+            currentWindowId: "",
+            currentWindowTitle: "",
+            currentWindowIcon: "",
+            currentIndex: -1,
+            windows: [],
+            workspaces: [],
+            previousWindow: root._emptyWindow(),
+            nextWindow: root._emptyWindow(),
+            previousWorkspace: root._emptyWorkspaceSummary(),
+            nextWorkspace: root._emptyWorkspaceSummary()
+        }
+    }
+
+    function _activeWorkspace() {
+        for (let index = 0; index < NiriService.workspaces.count; index++) {
+            const workspace = NiriService.workspaces.get(index)
+            if (workspace.isActive)
+                return workspace
+        }
+
+        return null
+    }
+
+    function _activeWorkspacePosition() {
+        for (let index = 0; index < NiriService.workspaces.count; index++) {
+            if (NiriService.workspaces.get(index).isActive)
+                return index
+        }
+
+        return -1
+    }
+
+    function _iconPathForApp(appId) {
+        if (!appId)
+            return Quickshell.iconPath("application-x-executable")
+
+        const entry = DesktopEntries.heuristicLookup(appId)
+        if (entry && entry.icon)
+            return Quickshell.iconPath(entry.icon, "application-x-executable")
+
+        return Quickshell.iconPath("application-x-executable")
+    }
+
+    function _workspaceWindows(workspaceId) {
+        const items = []
+
+        for (let index = 0; index < NiriService.windows.count; index++) {
+            const window = NiriService.windows.get(index)
+            if (window.workspaceId !== workspaceId)
+                continue
+
+            items.push({
+                windowId: window.winId,
+                title: window.title || window.appId || "Window",
+                appId: window.appId || "",
+                icon: root._iconPathForApp(window.appId || ""),
+                isFocused: !!window.isFocused,
+                columnIndex: window.colIdx,
+                rowIndex: window.rowIdx
+            })
+        }
+
+        items.sort((left, right) => {
+            if (left.columnIndex !== right.columnIndex)
+                return left.columnIndex - right.columnIndex
+            if (left.rowIndex !== right.rowIndex)
+                return left.rowIndex - right.rowIndex
+            return left.windowId.localeCompare(right.windowId)
+        })
+
+        return items.map(item => ({
+            windowId: item.windowId,
+            title: item.title,
+            appId: item.appId,
+            icon: item.icon,
+            isFocused: item.isFocused,
+            columnIndex: item.columnIndex
+        }))
+    }
+
+    function _workspaceIcons(workspaceId) {
+        const icons = []
+        const windows = root._workspaceWindows(workspaceId)
+
+        for (let index = 0; index < windows.length; index++) {
+            icons.push({
+                windowId: windows[index].windowId,
+                icon: windows[index].icon,
+                isFocused: windows[index].isFocused
+            })
+        }
+
+        return icons
+    }
+
+    function _currentIndex(windows) {
+        for (let index = 0; index < windows.length; index++) {
+            if (windows[index].isFocused)
+                return index
+        }
+
+        if (windows.length > 0)
+            return 0
+
+        return -1
+    }
+
+    function _windowAt(windows, index) {
+        if (index < 0 || index >= windows.length)
+            return root._emptyWindow()
+
+        return {
+            windowId: windows[index].windowId,
+            title: windows[index].title,
+            appId: windows[index].appId,
+            icon: windows[index].icon,
+            isFocused: windows[index].isFocused,
+            columnIndex: windows[index].columnIndex
+        }
+    }
+
+    function _workspaceSummaryAt(position) {
+        if (position < 0 || position >= NiriService.workspaces.count)
+            return root._emptyWorkspaceSummary()
+
+        const workspace = NiriService.workspaces.get(position)
+        return {
+            workspaceId: workspace.wsId,
+            workspaceIndex: workspace.idx,
+            icons: root._workspaceIcons(workspace.wsId)
+        }
+    }
+
+    function _workspaceSummaries() {
+        const items = []
+        let lastNonEmptyIndex = -1
+
+        for (let index = 0; index < NiriService.workspaces.count; index++) {
+            const summary = root._workspaceSummaryAt(index)
+            items.push(summary)
+
+            if ((summary.icons || []).length > 0)
+                lastNonEmptyIndex = index
+        }
+
+        if (items.length === 0)
+            return items
+
+        if (lastNonEmptyIndex === items.length - 1) {
+            items.push({
+                workspaceId: "",
+                workspaceIndex: (items[items.length - 1].workspaceIndex || 0) + 1,
+                icons: []
+            })
+        }
+
+        return items
+    }
+
+    function _buildHint(visible) {
+        const workspace = root._activeWorkspace()
+        if (!workspace)
+            return root._emptyHint()
+
+        const windows = root._workspaceWindows(workspace.wsId)
+        const currentIndex = root._currentIndex(windows)
+        const currentWindow = root._windowAt(windows, currentIndex)
+        const activePosition = root._activeWorkspacePosition()
+        const nextRevision = root._revision + 1
+
+        root._revision = nextRevision
+
+        return {
+            visible: !!visible,
+            revision: nextRevision,
+            workspaceId: workspace.wsId,
+            workspaceIndex: workspace.idx,
+            activeWorkspacePosition: activePosition,
+            currentWindowId: currentWindow.windowId,
+            currentWindowTitle: currentWindow.title || workspace.name || ("Workspace " + workspace.idx),
+            currentWindowIcon: currentWindow.icon,
+            currentIndex: currentIndex,
+            windows: windows,
+            workspaces: root._workspaceSummaries(),
+            previousWindow: root._windowAt(windows, currentIndex - 1),
+            nextWindow: root._windowAt(windows, currentIndex + 1),
+            previousWorkspace: root._workspaceSummaryAt(activePosition - 1),
+            nextWorkspace: root._workspaceSummaryAt(activePosition + 1)
+        }
+    }
+
+    Connections {
+        target: NiriService
+
+        function onWindowsUpdated() {
+            if (root.hintHeld)
+                root._refreshHint()
+        }
+
+        function onWorkspaceActivated() {
+            if (root.hintHeld)
+                root._refreshHint()
+        }
+
+        function onWorkspacesUpdated() {
+            if (root.hintHeld)
+                root._refreshHint()
+        }
+    }
+
+    Connections {
+        target: WindowHintTriggerService
+
+        function onHoldChanged(active) {
+            root.setHintHeld(active)
+        }
+    }
+}
