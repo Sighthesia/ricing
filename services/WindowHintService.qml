@@ -74,11 +74,13 @@ Singleton {
             revision: root._revision,
             workspaceId: "",
             workspaceIndex: -1,
+            activeWorkspacePosition: -1,
             currentWindowId: "",
             currentWindowTitle: "",
             currentWindowIcon: "",
             currentIndex: -1,
             windows: [],
+            workspaces: [],
             previousWindow: root._emptyWindow(),
             nextWindow: root._emptyWindow(),
             previousWorkspace: root._emptyWorkspaceSummary(),
@@ -206,6 +208,32 @@ Singleton {
         }
     }
 
+    function _workspaceSummaries() {
+        const items = []
+        let lastNonEmptyIndex = -1
+
+        for (let index = 0; index < NiriService.workspaces.count; index++) {
+            const summary = root._workspaceSummaryAt(index)
+            items.push(summary)
+
+            if ((summary.icons || []).length > 0)
+                lastNonEmptyIndex = index
+        }
+
+        if (items.length === 0)
+            return items
+
+        if (lastNonEmptyIndex === items.length - 1) {
+            items.push({
+                workspaceId: "",
+                workspaceIndex: (items[items.length - 1].workspaceIndex || 0) + 1,
+                icons: []
+            })
+        }
+
+        return items
+    }
+
     function _buildHint(visible) {
         const workspace = root._activeWorkspace()
         if (!workspace)
@@ -224,11 +252,13 @@ Singleton {
             revision: nextRevision,
             workspaceId: workspace.wsId,
             workspaceIndex: workspace.idx,
+            activeWorkspacePosition: activePosition,
             currentWindowId: currentWindow.windowId,
             currentWindowTitle: currentWindow.title || workspace.name || ("Workspace " + workspace.idx),
             currentWindowIcon: currentWindow.icon,
             currentIndex: currentIndex,
             windows: windows,
+            workspaces: root._workspaceSummaries(),
             previousWindow: root._windowAt(windows, currentIndex - 1),
             nextWindow: root._windowAt(windows, currentIndex + 1),
             previousWorkspace: root._workspaceSummaryAt(activePosition - 1),

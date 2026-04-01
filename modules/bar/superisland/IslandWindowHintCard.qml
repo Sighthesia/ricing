@@ -42,22 +42,16 @@ Item {
     readonly property int _workspaceStageHeight: root._workspaceSideHeight * 2 + root._workspacePrimaryHeight + root._workspaceColumnGap * 2
     readonly property int _titleStageWidth: root._titleSideWidth * 2 + root._titlePrimaryWidth + root._capsuleGap * 2
     readonly property int _titleStageHeight: root._titleCapsuleHeight
-    readonly property var _previousWorkspaceCapsule: root._workspaceCapsuleForRelative(-1, root._hint)
-    readonly property var _currentWorkspaceCapsule: root._workspaceCapsuleForRelative(0, root._hint)
-    readonly property var _nextWorkspaceCapsule: root._workspaceCapsuleForRelative(1, root._hint)
-    readonly property var _previousTitleCapsule: root._titleCapsuleForRelative(-1, root._hint)
-    readonly property var _currentTitleCapsule: root._titleCapsuleForRelative(0, root._hint)
-    readonly property var _nextTitleCapsule: root._titleCapsuleForRelative(1, root._hint)
+    readonly property var _workspaceStageCapsules: root._workspaceStageCapsulesForHint(root._hint)
+    readonly property var _titleStageCapsules: root._titleStageCapsulesForHint(root._hint)
+    readonly property real _workspaceAnchorVelocity: Math.max(18, 24 * Theme.uiScale)
+    readonly property real _titleAnchorVelocity: Math.max(22, 28 * Theme.uiScale)
+    readonly property int _anchorMaximumEasingTime: Math.max(70, Math.round(Theme.anim.moveDuration * 0.45))
 
-    property var _lastHintSnapshot: null
-
-    property bool _workspaceTransitionActive: false
-    property real _workspaceTransitionProgress: 0
-    property var _workspaceTransitionCapsules: []
-
-    property bool _titleTransitionActive: false
-    property real _titleTransitionProgress: 0
-    property var _titleTransitionCapsules: []
+    property real _animatedWorkspaceAnchor: -1
+    property real _animatedTitleAnchor: -1
+    property bool _workspaceAnchorMotionEnabled: true
+    property bool _titleAnchorMotionEnabled: true
 
     implicitWidth: Math.min(
         root._maxPreviewWidth,
@@ -113,11 +107,13 @@ Item {
             visible: hint.visible === true,
             workspaceId: hint.workspaceId || "",
             workspaceIndex: hint.workspaceIndex !== undefined ? hint.workspaceIndex : -1,
+            activeWorkspacePosition: hint.activeWorkspacePosition !== undefined ? hint.activeWorkspacePosition : -1,
             currentWindowId: hint.currentWindowId || "",
             currentWindowTitle: hint.currentWindowTitle || "",
             currentWindowIcon: hint.currentWindowIcon || "",
             currentIndex: hint.currentIndex !== undefined ? hint.currentIndex : -1,
             windows: hint.windows ? hint.windows.slice() : [],
+            workspaces: hint.workspaces ? hint.workspaces.map(workspace => root._cloneWorkspaceSummary(workspace)) : [],
             previousWindow: root._cloneWindowData(hint.previousWindow),
             nextWindow: root._cloneWindowData(hint.nextWindow),
             previousWorkspace: root._cloneWorkspaceSummary(hint.previousWorkspace),
@@ -211,6 +207,168 @@ Item {
             icon: safeHint.currentWindowIcon || "",
             visible: true
         }
+    }
+
+    function _workspaceAnchorForHint(hint) {
+        if (!hint || hint.visible !== true)
+            return -1
+
+        const position = hint.activeWorkspacePosition
+        return position !== undefined && position >= 0 ? position : -1
+    }
+
+    function _titleAnchorForHint(hint) {
+        if (!hint || hint.visible !== true)
+            return -1
+
+        const currentIndex = hint.currentIndex !== undefined ? hint.currentIndex : -1
+        if (currentIndex >= 0)
+            return currentIndex
+
+        return (hint.windows || []).length > 0 ? 0 : 0
+    }
+
+    function _workspaceCapsuleForAbsolute(absoluteIndex, hint) {
+        const safeHint = hint || {}
+        const summaries = safeHint.workspaces || []
+        const activePosition = root._workspaceAnchorForHint(safeHint)
+        const summary = absoluteIndex >= 0 && absoluteIndex < summaries.length ? summaries[absoluteIndex] : null
+        const isCurrent = absoluteIndex === activePosition
+        const workspaceIndex = isCurrent
+            ? (safeHint.workspaceIndex !== undefined ? safeHint.workspaceIndex : (summary ? summary.workspaceIndex : -1))
+            : (summary ? summary.workspaceIndex : -1)
+
+        return {
+            key: (summary ? (summary.workspaceId || "workspace") : "workspace") + "-" + absoluteIndex,
+            label: root._workspaceLabel(workspaceIndex),
+            icons: isCurrent ? (safeHint.windows || []) : (summary && summary.icons ? summary.icons.slice() : []),
+            visible: isCurrent || workspaceIndex > 0
+        }
+    }
+
+    function _titleCapsuleForAbsolute(absoluteIndex, hint) {
+        const safeHint = hint || {}
+        const windows = safeHint.windows || []
+
+        if (windows.length === 0 && absoluteIndex === 0) {
+            return {
+                key: "current-title-empty",
+                title: safeHint.currentWindowTitle || "Window hint",
+                icon: safeHint.currentWindowIcon || "",
+                visible: true
+            }
+        }
+
+        if (absoluteIndex < 0 || absoluteIndex >= windows.length) {
+            return {
+                key: "title-" + absoluteIndex,
+                title: "",
+                icon: "",
+                visible: false
+            }
+        }
+
+        const windowData = windows[absoluteIndex]
+        const title = windowData ? (windowData.title || "") : ""
+        return {
+            key: (windowData ? (windowData.windowId || "window") : "window") + "-" + absoluteIndex,
+            title: title,
+            icon: windowData ? (windowData.icon || "") : "",
+            visible: title !== "" || absoluteIndex === root._titleAnchorForHint(safeHint)
+        }
+    }
+
+    function _visibleAbsoluteRange(anchor, length) {
+        if (length <= 0)
+            return ({ from: 0, to: -1 })
+
+        const resolvedAnchor = anchor >= 0 ? anchor : 0
+        return {
+            from: Math.max(0, Math.floor(resolvedAnchor) - 2),
+            to: Math.min(length - 1, Math.ceil(resolvedAnchor) + 2)
+        }
+    }
+
+    function _workspaceStageCapsulesForHint(hint) {
+        const safeHint = hint || {}
+        const summaries = safeHint.workspaces || []
+        const anchor = root._animatedWorkspaceAnchor >= 0 ? root._animatedWorkspaceAnchor : root._workspaceAnchorForHint(safeHint)
+        const range = root._visibleAbsoluteRange(anchor, summaries.length)
+        const items = []
+
+        for (let index = range.from; index <= range.to; index++) {
+            const capsule = root._workspaceCapsuleForAbsolute(index, safeHint)
+            const slotPosition = index - anchor
+            if (!capsule.visible || Math.abs(slotPosition) > 2)
+                continue
+
+            items.push({
+                key: capsule.key,
+                capsule: capsule,
+                slotPosition: slotPosition
+            })
+        }
+
+        return items
+    }
+
+    function _titleStageCapsulesForHint(hint) {
+        const safeHint = hint || {}
+        const windows = safeHint.windows || []
+        const anchor = root._animatedTitleAnchor >= 0 ? root._animatedTitleAnchor : root._titleAnchorForHint(safeHint)
+        const items = []
+
+        if (windows.length === 0) {
+            items.push({
+                key: "current-title-empty",
+                capsule: root._titleCapsuleForAbsolute(0, safeHint),
+                slotPosition: 0
+            })
+            return items
+        }
+
+        const range = root._visibleAbsoluteRange(anchor, windows.length)
+        for (let index = range.from; index <= range.to; index++) {
+            const capsule = root._titleCapsuleForAbsolute(index, safeHint)
+            const slotPosition = index - anchor
+            if (!capsule.visible || Math.abs(slotPosition) > 2)
+                continue
+
+            items.push({
+                key: capsule.key,
+                capsule: capsule,
+                slotPosition: slotPosition
+            })
+        }
+
+        return items
+    }
+
+    function _retargetWorkspaceAnchor(target, immediate) {
+        if (immediate || target < 0 || root._animatedWorkspaceAnchor < 0) {
+            root._workspaceAnchorMotionEnabled = false
+            root._animatedWorkspaceAnchor = target
+            root._workspaceAnchorMotionEnabled = true
+            return
+        }
+
+        root._animatedWorkspaceAnchor = target
+    }
+
+    function _retargetTitleAnchor(target, immediate) {
+        if (immediate || target < 0 || root._animatedTitleAnchor < 0) {
+            root._titleAnchorMotionEnabled = false
+            root._animatedTitleAnchor = target
+            root._titleAnchorMotionEnabled = true
+            return
+        }
+
+        root._animatedTitleAnchor = target
+    }
+
+    function _retargetHintAnchors(hint, immediate) {
+        root._retargetWorkspaceAnchor(root._workspaceAnchorForHint(hint), immediate)
+        root._retargetTitleAnchor(root._titleAnchorForHint(hint), immediate)
     }
 
     function _visibleWorkspaceIcons(capsule, emphasis) {
@@ -321,315 +479,22 @@ Item {
         }
     }
 
-    function _workspaceDirection(previousHint, nextHint) {
-        if (!previousHint || !nextHint)
-            return 0
-
-        if ((previousHint.workspaceId || "") === (nextHint.workspaceId || "")) {
-            if (previousHint.workspaceIndex !== nextHint.workspaceIndex)
-                return nextHint.workspaceIndex > previousHint.workspaceIndex ? 1 : -1
-
-            return 0
-        }
-
-        if ((nextHint.workspaceId || "") !== "") {
-            if ((previousHint.nextWorkspace ? previousHint.nextWorkspace.workspaceId : "") === nextHint.workspaceId)
-                return 1
-            if ((previousHint.previousWorkspace ? previousHint.previousWorkspace.workspaceId : "") === nextHint.workspaceId)
-                return -1
-        }
-
-        if (previousHint.workspaceIndex !== nextHint.workspaceIndex)
-            return nextHint.workspaceIndex > previousHint.workspaceIndex ? 1 : -1
-
-        return 0
-    }
-
-    function _titleDirection(previousHint, nextHint) {
-        if (!previousHint || !nextHint)
-            return 0
-
-        if ((previousHint.workspaceId || "") !== (nextHint.workspaceId || ""))
-            return root._workspaceDirection(previousHint, nextHint)
-
-        if ((previousHint.currentWindowId || "") === (nextHint.currentWindowId || ""))
-            return 0
-
-        if ((nextHint.currentWindowId || "") !== "") {
-            if ((previousHint.nextWindow ? previousHint.nextWindow.windowId : "") === nextHint.currentWindowId)
-                return 1
-            if ((previousHint.previousWindow ? previousHint.previousWindow.windowId : "") === nextHint.currentWindowId)
-                return -1
-        }
-
-        if ((previousHint.workspaceId || "") === (nextHint.workspaceId || "")
-                && previousHint.currentIndex !== nextHint.currentIndex) {
-            return nextHint.currentIndex > previousHint.currentIndex ? 1 : -1
-        }
-
-        return 0
-    }
-
-    function _workspaceBaseSlotHidden(slot) {
-        return root._workspaceTransitionActive
-    }
-
-    function _titleBaseSlotHidden(slot) {
-        return root._titleTransitionActive
-    }
-
-    function _appendWorkspaceTransitionCapsule(items, capsule, fromSlot, toSlot, fromOpacity, toOpacity) {
-        if (!capsule || !capsule.visible)
-            return
-
-        items.push({
-            key: (capsule.key || "workspace") + "-" + items.length,
-            capsule: root._cloneWorkspaceCapsule(capsule),
-            fromSlotPosition: fromSlot,
-            toSlotPosition: toSlot,
-            fromOpacity: fromOpacity,
-            toOpacity: toOpacity
-        })
-    }
-
-    function _appendTitleTransitionCapsule(items, capsule, fromSlot, toSlot, fromOpacity, toOpacity) {
-        if (!capsule || !capsule.visible)
-            return
-
-        items.push({
-            key: (capsule.key || "title") + "-" + items.length,
-            capsule: root._cloneTitleCapsule(capsule),
-            fromSlotPosition: fromSlot,
-            toSlotPosition: toSlot,
-            fromOpacity: fromOpacity,
-            toOpacity: toOpacity
-        })
-    }
-
-    function _resolvedOverflowSlot(slot) {
-        if (slot < -1)
-            return -root._overflowSlotPosition
-
-        if (slot > 1)
-            return root._overflowSlotPosition
-
-        return slot
-    }
-
-    function _transitionCapsuleState(capsule, fromSlot, toSlot, fromOpacity, toOpacity, progress) {
-        return {
-            capsule: capsule,
-            currentSlot: root._lerp(fromSlot, toSlot, progress),
-            currentOpacity: root._lerp(fromOpacity, toOpacity, progress),
-            logicalSlot: toSlot
-        }
-    }
-
-    function _workspaceSourceCapsules(hint) {
-        if (root._workspaceTransitionActive) {
-            const animatedItems = []
-            for (let index = 0; index < root._workspaceTransitionCapsules.length; index++) {
-                const item = root._workspaceTransitionCapsules[index]
-                animatedItems.push(root._transitionCapsuleState(
-                    item.capsule,
-                    item.fromSlotPosition,
-                    item.toSlotPosition,
-                    item.fromOpacity,
-                    item.toOpacity,
-                    root._workspaceTransitionProgress
-                ))
-            }
-            return animatedItems
-        }
-
-        return [
-            root._transitionCapsuleState(root._workspaceCapsuleForRelative(-1, hint), -1, -1, 1, 1, 1),
-            root._transitionCapsuleState(root._workspaceCapsuleForRelative(0, hint), 0, 0, 1, 1, 1),
-            root._transitionCapsuleState(root._workspaceCapsuleForRelative(1, hint), 1, 1, 1, 1, 1)
-        ]
-    }
-
-    function _titleSourceCapsules(hint) {
-        if (root._titleTransitionActive) {
-            const animatedItems = []
-            for (let index = 0; index < root._titleTransitionCapsules.length; index++) {
-                const item = root._titleTransitionCapsules[index]
-                animatedItems.push(root._transitionCapsuleState(
-                    item.capsule,
-                    item.fromSlotPosition,
-                    item.toSlotPosition,
-                    item.fromOpacity,
-                    item.toOpacity,
-                    root._titleTransitionProgress
-                ))
-            }
-            return animatedItems
-        }
-
-        return [
-            root._transitionCapsuleState(root._titleCapsuleForRelative(-1, hint), -1, -1, 1, 1, 1),
-            root._transitionCapsuleState(root._titleCapsuleForRelative(0, hint), 0, 0, 1, 1, 1),
-            root._transitionCapsuleState(root._titleCapsuleForRelative(1, hint), 1, 1, 1, 1, 1)
-        ]
-    }
-
-    function _buildWorkspaceTransitionCapsules(previousHint, nextHint, direction) {
-        const items = []
-        const sourceCapsules = root._workspaceSourceCapsules(previousHint)
-
-        for (let index = 0; index < sourceCapsules.length; index++) {
-            const item = sourceCapsules[index]
-            const targetLogicalSlot = item.logicalSlot - direction
-            const targetSlot = root._resolvedOverflowSlot(targetLogicalSlot)
-            const targetOpacity = Math.abs(targetLogicalSlot) > 1 ? 0 : 1
-            root._appendWorkspaceTransitionCapsule(
-                items,
-                item.capsule,
-                item.currentSlot,
-                targetSlot,
-                item.currentOpacity,
-                targetOpacity
-            )
-        }
-
-        if (direction > 0)
-            root._appendWorkspaceTransitionCapsule(items, root._workspaceCapsuleForRelative(1, nextHint), root._overflowSlotPosition, 1, 0, 1)
-        else
-            root._appendWorkspaceTransitionCapsule(items, root._workspaceCapsuleForRelative(-1, nextHint), -root._overflowSlotPosition, -1, 0, 1)
-
-        return items
-    }
-
-    function _buildTitleTransitionCapsules(previousHint, nextHint, direction) {
-        const items = []
-        const sourceCapsules = root._titleSourceCapsules(previousHint)
-
-        for (let index = 0; index < sourceCapsules.length; index++) {
-            const item = sourceCapsules[index]
-            const targetLogicalSlot = item.logicalSlot - direction
-            const targetSlot = root._resolvedOverflowSlot(targetLogicalSlot)
-            const targetOpacity = Math.abs(targetLogicalSlot) > 1 ? 0 : 1
-            root._appendTitleTransitionCapsule(
-                items,
-                item.capsule,
-                item.currentSlot,
-                targetSlot,
-                item.currentOpacity,
-                targetOpacity
-            )
-        }
-
-        if (direction > 0)
-            root._appendTitleTransitionCapsule(items, root._titleCapsuleForRelative(1, nextHint), root._overflowSlotPosition, 1, 0, 1)
-        else
-            root._appendTitleTransitionCapsule(items, root._titleCapsuleForRelative(-1, nextHint), -root._overflowSlotPosition, -1, 0, 1)
-
-        return items
-    }
-
-    function _clearWorkspaceTransition() {
-        _workspaceTransition.stop()
-        root._workspaceTransitionActive = false
-        root._workspaceTransitionProgress = 0
-        root._workspaceTransitionCapsules = []
-    }
-
-    function _clearTitleTransition() {
-        _titleTransition.stop()
-        root._titleTransitionActive = false
-        root._titleTransitionProgress = 0
-        root._titleTransitionCapsules = []
-    }
-
-    function _startWorkspaceTransition(direction) {
-        const previousHint = root._lastHintSnapshot
-        const nextHint = root._hint
-
-        if (direction === 0 || !previousHint || !nextHint) {
-            return
-        }
-
-        const transitionCapsules = root._buildWorkspaceTransitionCapsules(previousHint, nextHint, direction)
-
-        if (transitionCapsules.length === 0) {
-            if (!root._workspaceTransitionActive)
-                root._clearWorkspaceTransition()
-            return
-        }
-
-        _workspaceTransition.stop()
-        root._workspaceTransitionActive = true
-        root._workspaceTransitionCapsules = transitionCapsules
-        root._workspaceTransitionProgress = 0
-        _workspaceTransitionProgressAnim.from = 0
-        _workspaceTransitionProgressAnim.to = 1
-        _workspaceTransition.start()
-    }
-
-    function _startTitleTransition(direction) {
-        const previousHint = root._lastHintSnapshot
-        const nextHint = root._hint
-
-        if (direction === 0 || !previousHint || !nextHint) {
-            root._clearTitleTransition()
-            return
-        }
-
-        const transitionCapsules = root._buildTitleTransitionCapsules(previousHint, nextHint, direction)
-
-        if (transitionCapsules.length === 0) {
-            if (!root._titleTransitionActive)
-                root._clearTitleTransition()
-            return
-        }
-
-        _titleTransition.stop()
-        root._titleTransitionActive = true
-        root._titleTransitionCapsules = transitionCapsules
-        root._titleTransitionProgress = 0
-        _titleTransitionProgressAnim.from = 0
-        _titleTransitionProgressAnim.to = 1
-        _titleTransition.start()
-    }
-
-    function _syncSnapshots(hint) {
-        root._lastHintSnapshot = root._cloneHint(hint || root._hint)
-    }
-
     function _handleHintChange() {
         const nextHint = root._cloneHint(root._liveHint)
 
         if (!nextHint || !nextHint.visible) {
             if (root._hostKeepsHintVisible && root._renderHint && root._renderHint.visible) {
-                root._clearWorkspaceTransition()
-                root._clearTitleTransition()
                 return
             }
 
             root._renderHint = nextHint
-            root._clearWorkspaceTransition()
-            root._clearTitleTransition()
-            root._syncSnapshots(nextHint)
+            root._retargetHintAnchors(nextHint, true)
             return
         }
 
+        const wasVisible = !!(root._renderHint && root._renderHint.visible)
         root._renderHint = nextHint
-
-        const previousHint = root._lastHintSnapshot
-        const workspaceDirection = root._workspaceDirection(previousHint, nextHint)
-        const titleDirection = root._titleDirection(previousHint, nextHint)
-
-        if (workspaceDirection !== 0)
-            root._startWorkspaceTransition(workspaceDirection)
-        else if (!root._workspaceTransitionActive)
-            root._clearWorkspaceTransition()
-
-        if (titleDirection !== 0)
-            root._startTitleTransition(titleDirection)
-        else if (!root._titleTransitionActive)
-            root._clearTitleTransition()
-
-        root._syncSnapshots(nextHint)
+        root._retargetHintAnchors(nextHint, !wasVisible)
     }
 
     // Workspace capsule visual.
@@ -830,37 +695,27 @@ Item {
         }
     }
 
-    ParallelAnimation {
-        id: _workspaceTransition
+    Behavior on _animatedWorkspaceAnchor {
+        enabled: root._workspaceAnchorMotionEnabled
 
-        NumberAnimation {
-            id: _workspaceTransitionProgressAnim
-            target: root
-            property: "_workspaceTransitionProgress"
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
+        SmoothedAnimation {
+            velocity: root._workspaceAnchorVelocity
+            maximumEasingTime: root._anchorMaximumEasingTime
         }
-
-        onFinished: root._clearWorkspaceTransition()
     }
 
-    ParallelAnimation {
-        id: _titleTransition
+    Behavior on _animatedTitleAnchor {
+        enabled: root._titleAnchorMotionEnabled
 
-        NumberAnimation {
-            id: _titleTransitionProgressAnim
-            target: root
-            property: "_titleTransitionProgress"
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
+        SmoothedAnimation {
+            velocity: root._titleAnchorVelocity
+            maximumEasingTime: root._anchorMaximumEasingTime
         }
-
-        onFinished: root._clearTitleTransition()
     }
 
     Component.onCompleted: {
         root._renderHint = root._cloneHint(root._liveHint)
-        root._syncSnapshots(root._renderHint)
+        root._retargetHintAnchors(root._renderHint, true)
     }
 
     // Shared stage ties both capsule rows together.
@@ -891,31 +746,17 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: root._workspaceStageWidth
                 height: parent.height
+                clip: true
 
                 Repeater {
-                    model: root._slotIndices
+                    model: root._workspaceStageCapsules
 
                     delegate: WorkspaceCapsule {
-                        required property var modelData
-
-                        capsule: root._workspaceCapsuleForRelative(modelData, root._hint)
-                        slotPosition: modelData
-                        hiddenForMotion: root._workspaceBaseSlotHidden(modelData)
-                    }
-                }
-
-                Repeater {
-                    model: root._workspaceTransitionCapsules
-
-                    delegate: WorkspaceCapsule {
-                        z: index + 1
-
                         required property var modelData
 
                         capsule: modelData.capsule
-                        slotPosition: root._lerp(modelData.fromSlotPosition, modelData.toSlotPosition, root._workspaceTransitionProgress)
+                        slotPosition: modelData.slotPosition
                         hiddenForMotion: false
-                        forcedOpacity: root._lerp(modelData.fromOpacity, modelData.toOpacity, root._workspaceTransitionProgress)
                     }
                 }
             }
@@ -933,29 +774,14 @@ Item {
                 height: parent.height
 
                 Repeater {
-                    model: root._slotIndices
+                    model: root._titleStageCapsules
 
                     delegate: TitleCapsule {
-                        required property var modelData
-
-                        capsule: root._titleCapsuleForRelative(modelData, root._hint)
-                        slotPosition: modelData
-                        hiddenForMotion: root._titleBaseSlotHidden(modelData)
-                    }
-                }
-
-                Repeater {
-                    model: root._titleTransitionCapsules
-
-                    delegate: TitleCapsule {
-                        z: index + 1
-
                         required property var modelData
 
                         capsule: modelData.capsule
-                        slotPosition: root._lerp(modelData.fromSlotPosition, modelData.toSlotPosition, root._titleTransitionProgress)
+                        slotPosition: modelData.slotPosition
                         hiddenForMotion: false
-                        forcedOpacity: root._lerp(modelData.fromOpacity, modelData.toOpacity, root._titleTransitionProgress)
                     }
                 }
             }
