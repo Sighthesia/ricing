@@ -8,6 +8,7 @@ Item {
 
     required property var event
 
+    readonly property bool _hostKeepsHintVisible: !!(root.event && root.event.type === "window-hint")
     readonly property var _liveHint: WindowHintService.activeHint
     property var _renderHint: null
     readonly property var _hint: root._renderHint || root._liveHint
@@ -36,6 +37,7 @@ Item {
     readonly property color _primaryCapsuleBorder: Qt.rgba(1, 1, 1, 0.08)
     readonly property color _secondaryCapsuleBorder: Qt.rgba(1, 1, 1, 0.03)
     readonly property var _slotIndices: [-1, 0, 1]
+    readonly property real _overflowSlotPosition: 1.18
     readonly property int _workspaceStageWidth: root._workspacePrimaryWidth
     readonly property int _workspaceStageHeight: root._workspaceSideHeight * 2 + root._workspacePrimaryHeight + root._workspaceColumnGap * 2
     readonly property int _titleStageWidth: root._titleSideWidth * 2 + root._titlePrimaryWidth + root._capsuleGap * 2
@@ -49,19 +51,13 @@ Item {
 
     property var _lastHintSnapshot: null
 
-    property bool _workspaceMotionActive: false
-    property int _workspaceMotionDirection: 0
-    property real _workspaceOutgoingSlotPosition: 0
-    property real _workspaceIncomingSlotPosition: 0
-    property var _workspaceOutgoingCapsule: null
-    property var _workspaceIncomingCapsule: null
+    property bool _workspaceTransitionActive: false
+    property real _workspaceTransitionProgress: 0
+    property var _workspaceTransitionCapsules: []
 
-    property bool _titleMotionActive: false
-    property int _titleMotionDirection: 0
-    property real _titleOutgoingSlotPosition: 0
-    property real _titleIncomingSlotPosition: 0
-    property var _titleOutgoingCapsule: null
-    property var _titleIncomingCapsule: null
+    property bool _titleTransitionActive: false
+    property real _titleTransitionProgress: 0
+    property var _titleTransitionCapsules: []
 
     implicitWidth: Math.min(
         root._maxPreviewWidth,
@@ -174,7 +170,7 @@ Item {
                 key: "next-workspace",
                 label: root._workspaceLabel(nextWorkspace ? nextWorkspace.workspaceIndex : -1),
                 icons: icons,
-                visible: !!nextWorkspace && nextWorkspace.workspaceIndex > 0 && icons.length > 0
+                visible: !!nextWorkspace && nextWorkspace.workspaceIndex > 0
             }
         }
 
@@ -224,10 +220,35 @@ Item {
     }
 
     function _workspaceMetrics(slotPosition) {
-        const clamped = Math.max(-1, Math.min(1, slotPosition))
         const topY = 0
         const centerY = root._workspaceSideHeight + root._workspaceColumnGap
         const bottomY = centerY + root._workspacePrimaryHeight + root._workspaceColumnGap
+
+        if (slotPosition < -1) {
+            const overflow = Math.min(1, -1 - slotPosition)
+            return {
+                x: (root._workspaceStageWidth - root._workspaceSideWidth) / 2,
+                y: topY - overflow * (root._workspaceSideHeight + root._workspaceColumnGap),
+                width: root._workspaceSideWidth,
+                height: root._workspaceSideHeight,
+                emphasis: 0,
+                opacity: 0.45
+            }
+        }
+
+        if (slotPosition > 1) {
+            const overflow = Math.min(1, slotPosition - 1)
+            return {
+                x: (root._workspaceStageWidth - root._workspaceSideWidth) / 2,
+                y: bottomY + overflow * (root._workspaceSideHeight + root._workspaceColumnGap),
+                width: root._workspaceSideWidth,
+                height: root._workspaceSideHeight,
+                emphasis: 0,
+                opacity: 0.45
+            }
+        }
+
+        const clamped = Math.max(-1, Math.min(1, slotPosition))
 
         if (clamped <= 0) {
             const progress = clamped + 1
@@ -255,10 +276,31 @@ Item {
     }
 
     function _titleMetrics(slotPosition) {
-        const clamped = Math.max(-1, Math.min(1, slotPosition))
         const leftX = 0
         const centerX = root._titleSideWidth + root._capsuleGap
         const rightX = centerX + root._titlePrimaryWidth + root._capsuleGap
+
+        if (slotPosition < -1) {
+            const overflow = Math.min(1, -1 - slotPosition)
+            return {
+                x: leftX - overflow * (root._titleSideWidth + root._capsuleGap),
+                width: root._titleSideWidth,
+                emphasis: 0,
+                opacity: 0.68
+            }
+        }
+
+        if (slotPosition > 1) {
+            const overflow = Math.min(1, slotPosition - 1)
+            return {
+                x: rightX + overflow * (root._titleSideWidth + root._capsuleGap),
+                width: root._titleSideWidth,
+                emphasis: 0,
+                opacity: 0.68
+            }
+        }
+
+        const clamped = Math.max(-1, Math.min(1, slotPosition))
 
         if (clamped <= 0) {
             const progress = clamped + 1
@@ -329,31 +371,174 @@ Item {
     }
 
     function _workspaceBaseSlotHidden(slot) {
-        return root._workspaceMotionActive && (slot === 0 || slot === -root._workspaceMotionDirection)
+        return root._workspaceTransitionActive
     }
 
     function _titleBaseSlotHidden(slot) {
-        return root._titleMotionActive && (slot === 0 || slot === -root._titleMotionDirection)
+        return root._titleTransitionActive
+    }
+
+    function _appendWorkspaceTransitionCapsule(items, capsule, fromSlot, toSlot, fromOpacity, toOpacity) {
+        if (!capsule || !capsule.visible)
+            return
+
+        items.push({
+            key: (capsule.key || "workspace") + "-" + items.length,
+            capsule: root._cloneWorkspaceCapsule(capsule),
+            fromSlotPosition: fromSlot,
+            toSlotPosition: toSlot,
+            fromOpacity: fromOpacity,
+            toOpacity: toOpacity
+        })
+    }
+
+    function _appendTitleTransitionCapsule(items, capsule, fromSlot, toSlot, fromOpacity, toOpacity) {
+        if (!capsule || !capsule.visible)
+            return
+
+        items.push({
+            key: (capsule.key || "title") + "-" + items.length,
+            capsule: root._cloneTitleCapsule(capsule),
+            fromSlotPosition: fromSlot,
+            toSlotPosition: toSlot,
+            fromOpacity: fromOpacity,
+            toOpacity: toOpacity
+        })
+    }
+
+    function _resolvedOverflowSlot(slot) {
+        if (slot < -1)
+            return -root._overflowSlotPosition
+
+        if (slot > 1)
+            return root._overflowSlotPosition
+
+        return slot
+    }
+
+    function _transitionCapsuleState(capsule, fromSlot, toSlot, fromOpacity, toOpacity, progress) {
+        return {
+            capsule: capsule,
+            currentSlot: root._lerp(fromSlot, toSlot, progress),
+            currentOpacity: root._lerp(fromOpacity, toOpacity, progress),
+            logicalSlot: toSlot
+        }
+    }
+
+    function _workspaceSourceCapsules(hint) {
+        if (root._workspaceTransitionActive) {
+            const animatedItems = []
+            for (let index = 0; index < root._workspaceTransitionCapsules.length; index++) {
+                const item = root._workspaceTransitionCapsules[index]
+                animatedItems.push(root._transitionCapsuleState(
+                    item.capsule,
+                    item.fromSlotPosition,
+                    item.toSlotPosition,
+                    item.fromOpacity,
+                    item.toOpacity,
+                    root._workspaceTransitionProgress
+                ))
+            }
+            return animatedItems
+        }
+
+        return [
+            root._transitionCapsuleState(root._workspaceCapsuleForRelative(-1, hint), -1, -1, 1, 1, 1),
+            root._transitionCapsuleState(root._workspaceCapsuleForRelative(0, hint), 0, 0, 1, 1, 1),
+            root._transitionCapsuleState(root._workspaceCapsuleForRelative(1, hint), 1, 1, 1, 1, 1)
+        ]
+    }
+
+    function _titleSourceCapsules(hint) {
+        if (root._titleTransitionActive) {
+            const animatedItems = []
+            for (let index = 0; index < root._titleTransitionCapsules.length; index++) {
+                const item = root._titleTransitionCapsules[index]
+                animatedItems.push(root._transitionCapsuleState(
+                    item.capsule,
+                    item.fromSlotPosition,
+                    item.toSlotPosition,
+                    item.fromOpacity,
+                    item.toOpacity,
+                    root._titleTransitionProgress
+                ))
+            }
+            return animatedItems
+        }
+
+        return [
+            root._transitionCapsuleState(root._titleCapsuleForRelative(-1, hint), -1, -1, 1, 1, 1),
+            root._transitionCapsuleState(root._titleCapsuleForRelative(0, hint), 0, 0, 1, 1, 1),
+            root._transitionCapsuleState(root._titleCapsuleForRelative(1, hint), 1, 1, 1, 1, 1)
+        ]
+    }
+
+    function _buildWorkspaceTransitionCapsules(previousHint, nextHint, direction) {
+        const items = []
+        const sourceCapsules = root._workspaceSourceCapsules(previousHint)
+
+        for (let index = 0; index < sourceCapsules.length; index++) {
+            const item = sourceCapsules[index]
+            const targetLogicalSlot = item.logicalSlot - direction
+            const targetSlot = root._resolvedOverflowSlot(targetLogicalSlot)
+            const targetOpacity = Math.abs(targetLogicalSlot) > 1 ? 0 : 1
+            root._appendWorkspaceTransitionCapsule(
+                items,
+                item.capsule,
+                item.currentSlot,
+                targetSlot,
+                item.currentOpacity,
+                targetOpacity
+            )
+        }
+
+        if (direction > 0)
+            root._appendWorkspaceTransitionCapsule(items, root._workspaceCapsuleForRelative(1, nextHint), root._overflowSlotPosition, 1, 0, 1)
+        else
+            root._appendWorkspaceTransitionCapsule(items, root._workspaceCapsuleForRelative(-1, nextHint), -root._overflowSlotPosition, -1, 0, 1)
+
+        return items
+    }
+
+    function _buildTitleTransitionCapsules(previousHint, nextHint, direction) {
+        const items = []
+        const sourceCapsules = root._titleSourceCapsules(previousHint)
+
+        for (let index = 0; index < sourceCapsules.length; index++) {
+            const item = sourceCapsules[index]
+            const targetLogicalSlot = item.logicalSlot - direction
+            const targetSlot = root._resolvedOverflowSlot(targetLogicalSlot)
+            const targetOpacity = Math.abs(targetLogicalSlot) > 1 ? 0 : 1
+            root._appendTitleTransitionCapsule(
+                items,
+                item.capsule,
+                item.currentSlot,
+                targetSlot,
+                item.currentOpacity,
+                targetOpacity
+            )
+        }
+
+        if (direction > 0)
+            root._appendTitleTransitionCapsule(items, root._titleCapsuleForRelative(1, nextHint), root._overflowSlotPosition, 1, 0, 1)
+        else
+            root._appendTitleTransitionCapsule(items, root._titleCapsuleForRelative(-1, nextHint), -root._overflowSlotPosition, -1, 0, 1)
+
+        return items
     }
 
     function _clearWorkspaceTransition() {
-        _workspaceMotion.stop()
-        root._workspaceMotionActive = false
-        root._workspaceMotionDirection = 0
-        root._workspaceOutgoingSlotPosition = 0
-        root._workspaceIncomingSlotPosition = 0
-        root._workspaceOutgoingCapsule = null
-        root._workspaceIncomingCapsule = null
+        _workspaceTransition.stop()
+        root._workspaceTransitionActive = false
+        root._workspaceTransitionProgress = 0
+        root._workspaceTransitionCapsules = []
     }
 
     function _clearTitleTransition() {
-        _titleMotion.stop()
-        root._titleMotionActive = false
-        root._titleMotionDirection = 0
-        root._titleOutgoingSlotPosition = 0
-        root._titleIncomingSlotPosition = 0
-        root._titleOutgoingCapsule = null
-        root._titleIncomingCapsule = null
+        _titleTransition.stop()
+        root._titleTransitionActive = false
+        root._titleTransitionProgress = 0
+        root._titleTransitionCapsules = []
     }
 
     function _startWorkspaceTransition(direction) {
@@ -364,26 +549,21 @@ Item {
             return
         }
 
-        const outgoingCapsule = root._cloneWorkspaceCapsule(root._workspaceCapsuleForRelative(0, previousHint))
-        const incomingCapsule = root._cloneWorkspaceCapsule(root._workspaceCapsuleForRelative(0, nextHint))
+        const transitionCapsules = root._buildWorkspaceTransitionCapsules(previousHint, nextHint, direction)
 
-        if (!outgoingCapsule || !outgoingCapsule.visible || !incomingCapsule || !incomingCapsule.visible) {
-            root._clearWorkspaceTransition()
+        if (transitionCapsules.length === 0) {
+            if (!root._workspaceTransitionActive)
+                root._clearWorkspaceTransition()
             return
         }
 
-        _workspaceMotion.stop()
-        root._workspaceMotionActive = true
-        root._workspaceMotionDirection = direction
-        root._workspaceOutgoingCapsule = outgoingCapsule
-        root._workspaceIncomingCapsule = incomingCapsule
-        root._workspaceOutgoingSlotPosition = 0
-        root._workspaceIncomingSlotPosition = direction
-        _workspaceOutgoingSlotAnim.from = 0
-        _workspaceOutgoingSlotAnim.to = -direction
-        _workspaceIncomingSlotAnim.from = direction
-        _workspaceIncomingSlotAnim.to = 0
-        _workspaceMotion.start()
+        _workspaceTransition.stop()
+        root._workspaceTransitionActive = true
+        root._workspaceTransitionCapsules = transitionCapsules
+        root._workspaceTransitionProgress = 0
+        _workspaceTransitionProgressAnim.from = 0
+        _workspaceTransitionProgressAnim.to = 1
+        _workspaceTransition.start()
     }
 
     function _startTitleTransition(direction) {
@@ -395,26 +575,21 @@ Item {
             return
         }
 
-        const outgoingCapsule = root._cloneTitleCapsule(root._titleCapsuleForRelative(0, previousHint))
-        const incomingCapsule = root._cloneTitleCapsule(root._titleCapsuleForRelative(0, nextHint))
+        const transitionCapsules = root._buildTitleTransitionCapsules(previousHint, nextHint, direction)
 
-        if (!outgoingCapsule || !outgoingCapsule.visible || !incomingCapsule || !incomingCapsule.visible) {
-            root._clearTitleTransition()
+        if (transitionCapsules.length === 0) {
+            if (!root._titleTransitionActive)
+                root._clearTitleTransition()
             return
         }
 
-        _titleMotion.stop()
-        root._titleMotionActive = true
-        root._titleMotionDirection = direction
-        root._titleOutgoingCapsule = outgoingCapsule
-        root._titleIncomingCapsule = incomingCapsule
-        root._titleOutgoingSlotPosition = 0
-        root._titleIncomingSlotPosition = direction
-        _titleOutgoingSlotAnim.from = 0
-        _titleOutgoingSlotAnim.to = -direction
-        _titleIncomingSlotAnim.from = direction
-        _titleIncomingSlotAnim.to = 0
-        _titleMotion.start()
+        _titleTransition.stop()
+        root._titleTransitionActive = true
+        root._titleTransitionCapsules = transitionCapsules
+        root._titleTransitionProgress = 0
+        _titleTransitionProgressAnim.from = 0
+        _titleTransitionProgressAnim.to = 1
+        _titleTransition.start()
     }
 
     function _syncSnapshots(hint) {
@@ -425,18 +600,35 @@ Item {
         const nextHint = root._cloneHint(root._liveHint)
 
         if (!nextHint || !nextHint.visible) {
+            if (root._hostKeepsHintVisible && root._renderHint && root._renderHint.visible) {
+                root._clearWorkspaceTransition()
+                root._clearTitleTransition()
+                return
+            }
+
+            root._renderHint = nextHint
             root._clearWorkspaceTransition()
             root._clearTitleTransition()
+            root._syncSnapshots(nextHint)
             return
         }
+
+        root._renderHint = nextHint
 
         const previousHint = root._lastHintSnapshot
         const workspaceDirection = root._workspaceDirection(previousHint, nextHint)
         const titleDirection = root._titleDirection(previousHint, nextHint)
 
-        root._renderHint = nextHint
-        root._startWorkspaceTransition(workspaceDirection)
-        root._startTitleTransition(titleDirection)
+        if (workspaceDirection !== 0)
+            root._startWorkspaceTransition(workspaceDirection)
+        else if (!root._workspaceTransitionActive)
+            root._clearWorkspaceTransition()
+
+        if (titleDirection !== 0)
+            root._startTitleTransition(titleDirection)
+        else if (!root._titleTransitionActive)
+            root._clearTitleTransition()
+
         root._syncSnapshots(nextHint)
     }
 
@@ -447,6 +639,7 @@ Item {
         required property var capsule
         required property real slotPosition
         property bool hiddenForMotion: false
+        property real forcedOpacity: -1
 
         readonly property var _metrics: root._workspaceMetrics(workspaceCapsule.slotPosition)
         readonly property real _emphasis: _metrics.emphasis
@@ -461,7 +654,7 @@ Item {
         y: _metrics.y
         width: _metrics.width
         height: _metrics.height
-        opacity: hiddenForMotion ? 0 : (capsule && capsule.visible ? _metrics.opacity : 0)
+        opacity: hiddenForMotion ? 0 : (forcedOpacity >= 0 ? forcedOpacity * _metrics.opacity : (capsule && capsule.visible ? _metrics.opacity : 0))
         visible: capsule !== null && opacity > 0
 
         // Capsule surface.
@@ -525,7 +718,7 @@ Item {
 
                     // Empty workspace label.
                     Text {
-                        text: workspaceCapsule.capsule && (workspaceCapsule.capsule.icons || []).length === 0 && workspaceCapsule._emphasis >= 0.5 ? "Empty" : ""
+                        text: workspaceCapsule.capsule && (workspaceCapsule.capsule.icons || []).length === 0 ? "Empty" : ""
                         color: Colors.textMuted
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSmall
@@ -555,6 +748,7 @@ Item {
         required property var capsule
         required property real slotPosition
         property bool hiddenForMotion: false
+        property real forcedOpacity: -1
 
         readonly property var _metrics: root._titleMetrics(titleCapsule.slotPosition)
         readonly property real _emphasis: _metrics.emphasis
@@ -570,7 +764,7 @@ Item {
         y: 0
         width: _metrics.width
         height: root._titleCapsuleHeight
-        opacity: hiddenForMotion ? 0 : (capsule && capsule.visible ? _metrics.opacity : 0)
+        opacity: hiddenForMotion ? 0 : (forcedOpacity >= 0 ? forcedOpacity * _metrics.opacity : (capsule && capsule.visible ? _metrics.opacity : 0))
         visible: capsule !== null && opacity > 0
 
         // Capsule surface.
@@ -637,20 +831,12 @@ Item {
     }
 
     ParallelAnimation {
-        id: _workspaceMotion
+        id: _workspaceTransition
 
         NumberAnimation {
-            id: _workspaceOutgoingSlotAnim
+            id: _workspaceTransitionProgressAnim
             target: root
-            property: "_workspaceOutgoingSlotPosition"
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
-        }
-
-        NumberAnimation {
-            id: _workspaceIncomingSlotAnim
-            target: root
-            property: "_workspaceIncomingSlotPosition"
+            property: "_workspaceTransitionProgress"
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -659,20 +845,12 @@ Item {
     }
 
     ParallelAnimation {
-        id: _titleMotion
+        id: _titleTransition
 
         NumberAnimation {
-            id: _titleOutgoingSlotAnim
+            id: _titleTransitionProgressAnim
             target: root
-            property: "_titleOutgoingSlotPosition"
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
-        }
-
-        NumberAnimation {
-            id: _titleIncomingSlotAnim
-            target: root
-            property: "_titleIncomingSlotPosition"
+            property: "_titleTransitionProgress"
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -726,20 +904,19 @@ Item {
                     }
                 }
 
-                // Outgoing workspace snapshot.
-                WorkspaceCapsule {
-                    z: 1
-                    capsule: root._workspaceOutgoingCapsule
-                    slotPosition: root._workspaceOutgoingSlotPosition
-                    hiddenForMotion: false
-                }
+                Repeater {
+                    model: root._workspaceTransitionCapsules
 
-                // Incoming workspace snapshot.
-                WorkspaceCapsule {
-                    z: 2
-                    capsule: root._workspaceIncomingCapsule
-                    slotPosition: root._workspaceIncomingSlotPosition
-                    hiddenForMotion: false
+                    delegate: WorkspaceCapsule {
+                        z: index + 1
+
+                        required property var modelData
+
+                        capsule: modelData.capsule
+                        slotPosition: root._lerp(modelData.fromSlotPosition, modelData.toSlotPosition, root._workspaceTransitionProgress)
+                        hiddenForMotion: false
+                        forcedOpacity: root._lerp(modelData.fromOpacity, modelData.toOpacity, root._workspaceTransitionProgress)
+                    }
                 }
             }
         }
@@ -767,20 +944,19 @@ Item {
                     }
                 }
 
-                // Outgoing title snapshot.
-                TitleCapsule {
-                    z: 1
-                    capsule: root._titleOutgoingCapsule
-                    slotPosition: root._titleOutgoingSlotPosition
-                    hiddenForMotion: false
-                }
+                Repeater {
+                    model: root._titleTransitionCapsules
 
-                // Incoming title snapshot.
-                TitleCapsule {
-                    z: 2
-                    capsule: root._titleIncomingCapsule
-                    slotPosition: root._titleIncomingSlotPosition
-                    hiddenForMotion: false
+                    delegate: TitleCapsule {
+                        z: index + 1
+
+                        required property var modelData
+
+                        capsule: modelData.capsule
+                        slotPosition: root._lerp(modelData.fromSlotPosition, modelData.toSlotPosition, root._titleTransitionProgress)
+                        hiddenForMotion: false
+                        forcedOpacity: root._lerp(modelData.fromOpacity, modelData.toOpacity, root._titleTransitionProgress)
+                    }
                 }
             }
         }
