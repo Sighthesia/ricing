@@ -44,14 +44,13 @@ Item {
     readonly property int _titleStageHeight: root._titleCapsuleHeight
     readonly property var _workspaceStageCapsules: root._workspaceStageCapsulesForHint(root._hint)
     readonly property var _titleStageCapsules: root._titleStageCapsulesForHint(root._hint)
-    readonly property real _workspaceAnchorVelocity: Math.max(18, 24 * Theme.uiScale)
-    readonly property real _titleAnchorVelocity: Math.max(22, 28 * Theme.uiScale)
-    readonly property int _anchorMaximumEasingTime: Math.max(70, Math.round(Theme.anim.moveDuration * 0.45))
+    readonly property int _workspaceAnchorBaseDuration: Math.max(150, Math.round(Theme.anim.moveDuration * 1.05))
+    readonly property int _titleAnchorBaseDuration: Math.max(140, Theme.anim.moveDuration)
+    readonly property int _anchorDurationStep: Math.max(16, Math.round(Theme.anim.moveDuration * 0.1))
+    readonly property int _anchorMaximumDuration: Math.max(190, Math.round(Theme.anim.moveDuration * 1.35))
 
     property real _animatedWorkspaceAnchor: -1
     property real _animatedTitleAnchor: -1
-    property bool _workspaceAnchorMotionEnabled: true
-    property bool _titleAnchorMotionEnabled: true
 
     implicitWidth: Math.min(
         root._maxPreviewWidth,
@@ -344,26 +343,57 @@ Item {
         return items
     }
 
+    function _anchorAnimationDuration(from, to, baseDuration) {
+        const distance = Math.abs(to - from)
+        if (distance <= 0.001)
+            return 0
+
+        return Math.min(
+            root._anchorMaximumDuration,
+            Math.round(baseDuration + Math.max(0, distance - 1) * root._anchorDurationStep)
+        )
+    }
+
     function _retargetWorkspaceAnchor(target, immediate) {
+        _workspaceAnchorAnimation.stop()
+
         if (immediate || target < 0 || root._animatedWorkspaceAnchor < 0) {
-            root._workspaceAnchorMotionEnabled = false
             root._animatedWorkspaceAnchor = target
-            root._workspaceAnchorMotionEnabled = true
             return
         }
 
-        root._animatedWorkspaceAnchor = target
+        const currentAnchor = root._animatedWorkspaceAnchor
+        const duration = root._anchorAnimationDuration(currentAnchor, target, root._workspaceAnchorBaseDuration)
+        if (duration === 0) {
+            root._animatedWorkspaceAnchor = target
+            return
+        }
+
+        _workspaceAnchorAnimation.from = currentAnchor
+        _workspaceAnchorAnimation.to = target
+        _workspaceAnchorAnimation.duration = duration
+        _workspaceAnchorAnimation.start()
     }
 
     function _retargetTitleAnchor(target, immediate) {
+        _titleAnchorAnimation.stop()
+
         if (immediate || target < 0 || root._animatedTitleAnchor < 0) {
-            root._titleAnchorMotionEnabled = false
             root._animatedTitleAnchor = target
-            root._titleAnchorMotionEnabled = true
             return
         }
 
-        root._animatedTitleAnchor = target
+        const currentAnchor = root._animatedTitleAnchor
+        const duration = root._anchorAnimationDuration(currentAnchor, target, root._titleAnchorBaseDuration)
+        if (duration === 0) {
+            root._animatedTitleAnchor = target
+            return
+        }
+
+        _titleAnchorAnimation.from = currentAnchor
+        _titleAnchorAnimation.to = target
+        _titleAnchorAnimation.duration = duration
+        _titleAnchorAnimation.start()
     }
 
     function _retargetHintAnchors(hint, immediate) {
@@ -695,22 +725,20 @@ Item {
         }
     }
 
-    Behavior on _animatedWorkspaceAnchor {
-        enabled: root._workspaceAnchorMotionEnabled
+    NumberAnimation {
+        id: _workspaceAnchorAnimation
 
-        SmoothedAnimation {
-            velocity: root._workspaceAnchorVelocity
-            maximumEasingTime: root._anchorMaximumEasingTime
-        }
+        target: root
+        property: "_animatedWorkspaceAnchor"
+        easing.type: Theme.anim.moveType
     }
 
-    Behavior on _animatedTitleAnchor {
-        enabled: root._titleAnchorMotionEnabled
+    NumberAnimation {
+        id: _titleAnchorAnimation
 
-        SmoothedAnimation {
-            velocity: root._titleAnchorVelocity
-            maximumEasingTime: root._anchorMaximumEasingTime
-        }
+        target: root
+        property: "_animatedTitleAnchor"
+        easing.type: Theme.anim.moveType
     }
 
     Component.onCompleted: {
