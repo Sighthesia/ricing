@@ -151,10 +151,6 @@ property real _flashTrackOpacity: 0
     readonly property real _overlayBodyHeight: Math.round(528 * Theme.uiScale)
     readonly property real _transientExpandedHeight: root._pillH + root._flashGap + root._flashRowH
     readonly property real _collapsedPillHeight: root._pillH
-    readonly property real _expandedPillHeight:
-        root._overlaySessionActive
-            ? (root._pillH + root._flashGap + root._overlayBodyHeight)
-            : root._transientExpandedHeight
     readonly property bool _pillExpanded:
         root._overlayExpandedActive
         || root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
@@ -181,6 +177,11 @@ property real _flashTrackOpacity: 0
     readonly property bool _fullHintExpandedSurface:
         root._isFullHintEventType(root._flashSourceEvent.type)
         || (root._hintPhase && root._isFullHintEventType(SuperIslandService.activeEvent.type))
+    readonly property real _expandedPillHeight:
+        root._fullHintExpandedSurface ? root._fullHintExpandedPillHeight :
+        (root._overlaySessionActive
+            ? (root._pillH + root._flashGap + root._overlayBodyHeight)
+            : root._transientExpandedHeight)
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
@@ -787,7 +788,7 @@ property real _flashTrackOpacity: 0
             height: 1
             radius: height / 2
             color: Colors.border
-            opacity: root._phase !== "idle" && !root._overlaySessionActive ? 0.35 : 0
+            opacity: root._phase !== "idle" && !root._overlaySessionActive && root._flashSourceEvent.type !== "window-hint" ? 0.35 : 0
 
             Behavior on opacity {
                 NumberAnimation {
