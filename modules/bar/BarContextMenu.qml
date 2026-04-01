@@ -5,14 +5,11 @@ import qs.services
 
 // Right-click context menu for the bar background.
 // Anchor to the BarContent item; positions itself below the bar at click X.
-PopupWindow {
+ContextMenuPopup {
     id: root
 
     // The BarContent Item — used to calculate the popup's on-screen position.
     required property Item anchorTarget
-
-    visible: false
-    color: "transparent"
 
     anchor.item: anchorTarget
     // Place anchor point at the bar's bottom edge, horizontally at click X.
@@ -24,7 +21,7 @@ PopupWindow {
     anchor.rect.height: 1
 
     implicitWidth: 160
-    implicitHeight: menuColumn.implicitHeight + 8
+    implicitHeight: menuColumn.implicitHeight + contentMargin * 2
 
     property real _clickX: 0
     property bool _active: false
@@ -36,14 +33,6 @@ PopupWindow {
     // Human-readable widget type label (currently unused in display, reserved for tooltip).
     property string _targetWidgetLabel: ""
     readonly property int _widgetActionCount: 1
-    // FIXME: lift these shared ratios into Theme.anim.* if more panels reuse them.
-    readonly property int _enterOpacityDuration:
-        Math.max(1, Math.round(Theme.anim.highlightDuration * 0.56))
-    readonly property int _enterScaleDuration:
-        Math.max(1, Math.round(Theme.anim.springDuration * 0.36))
-    readonly property int _exitDuration:
-        Math.max(1, Math.round(Theme.anim.highlightDuration * 0.44))
-
     StaggerOrchestrator {
         id: _stagger
     }
@@ -62,7 +51,7 @@ PopupWindow {
 
         if (_active) {
             visible = true;
-            enterAnim.restart();
+            playEnterAnimation();
             _stagger.runEnter();
         } else {
             _stagger.runExit();
@@ -100,51 +89,34 @@ PopupWindow {
         _active = true;
     }
 
-    Rectangle {
-        id: menuContent
-        anchors.fill: parent
-        color: Colors.surface
-        radius: Theme.cornerRadius
-        border.color: Colors.border
-        border.width: 1
+    surfaceTransformOrigin: Item.Top
 
-        opacity: 0
-        scale: 0.85
-        transformOrigin: Item.Top
+    // Bar menu entries.
+    Column {
+        id: menuColumn
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        spacing: 2
 
-        Column {
-            id: menuColumn
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.margins: 4
-            spacing: 2
+        // --- Layout mode item ---
+        StaggerItem {
+            id: s_layoutItem
+            delay: SettingsService.data.animation.staggerLevel1BaseDelay
+            exitDelay: 0
+            width: parent.width
+            height: Theme.barHeight - Theme.barPadding
 
-            // --- Layout mode item ---
-            StaggerItem {
-                id: s_layoutItem
-                delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                exitDelay: 0
-                width: parent.width
-                height: Theme.barHeight - Theme.barPadding
+            // Layout action row.
+            ContextMenuAction {
+                anchors.fill: parent
 
-                // Hover highlight overlay
-                HoverRevealHighlight {
-                    id: layoutHighlight
-                    anchors.fill: parent
-                    anchors.margins: 1
-                    radius: Theme.cornerRadius - 2
-                    hovered: layoutArea.containsMouse
-                    highlightColor: Colors.highlight
-                    highlightOpacity: 0.12
-                }
-
+                // Layout row content.
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.widgetPadding
                     spacing: 8
 
+                    // Layout icon.
                     Text {
                         text: "\uf0c9"
                         font.family: Theme.fontMono
@@ -153,6 +125,7 @@ PopupWindow {
                         opacity: BarLayoutService.settingsMode ? 1.0 : 0.7
                     }
 
+                    // Layout label.
                     Text {
                         text: BarLayoutService.settingsMode ? "退出布局模式" : "布局模式"
                         font.family: Theme.fontFamily
@@ -161,53 +134,33 @@ PopupWindow {
                     }
                 }
 
-                // Ripple above content, below mouse capture.
-                ClickRipple {
-                    id: layoutRipple
-                    anchors.fill: parent
-                    anchors.margins: 1
-                    rippleColor: Colors.highlight
-                }
-
-                MouseArea {
-                    id: layoutArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: (mouse) => {
-                        layoutRipple.triggerRipple(mouse.x, mouse.y)
-                        BarLayoutService.activePanel =
-                            BarLayoutService.settingsMode ? "none" : "layout";
-                        _dismissTimer.restart()
-                    }
+                onClicked: function(_mouse) {
+                    BarLayoutService.activePanel =
+                        BarLayoutService.settingsMode ? "none" : "layout"
+                    _dismissTimer.restart()
                 }
             }
+        }
 
-            // --- Settings item ---
-            StaggerItem {
-                id: s_settingsItem
-                delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                     + SettingsService.data.animation.staggerLevel1Step
-                exitDelay: 0
-                width: parent.width
-                height: Theme.barHeight - Theme.barPadding
+        // --- Settings item ---
+        StaggerItem {
+            id: s_settingsItem
+            delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                 + SettingsService.data.animation.staggerLevel1Step
+            exitDelay: 0
+            width: parent.width
+            height: Theme.barHeight - Theme.barPadding
 
-                HoverRevealHighlight {
-                    id: settingsHighlight
-                    anchors.fill: parent
-                    anchors.margins: 1
-                    radius: Theme.cornerRadius - 2
-                    hovered: settingsArea.containsMouse
-                    highlightColor: Colors.highlight
-                    highlightOpacity: 0.12
-                }
+            // Settings action row.
+            ContextMenuAction {
+                anchors.fill: parent
 
+                // Settings row content.
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.widgetPadding
                     spacing: 8
 
+                    // Settings icon.
                     Text {
                         text: "\uf013"
                         font.family: Theme.fontMono
@@ -216,6 +169,7 @@ PopupWindow {
                         opacity: 0.7
                     }
 
+                    // Settings label.
                     Text {
                         text: "设置"
                         font.family: Theme.fontFamily
@@ -224,102 +178,68 @@ PopupWindow {
                     }
                 }
 
-                // Ripple above content, below mouse capture.
-                ClickRipple {
-                    id: settingsRipple
-                    anchors.fill: parent
-                    anchors.margins: 1
-                    rippleColor: Colors.highlight
-                }
-
-                MouseArea {
-                    id: settingsArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: (mouse) => {
-                        settingsRipple.triggerRipple(mouse.x, mouse.y)
-                        BarLayoutService.activePanel = "config";
-                        _dismissTimer.restart()
-                    }
+                onClicked: function(_mouse) {
+                    BarLayoutService.activePanel = "config"
+                    _dismissTimer.restart()
                 }
             }
+        }
 
-            // --- Widget section separator (visible only on widget right-click) ---
-            StaggerItem {
-                id: s_widgetDivider
-                visible: root._targetWidgetKey !== ""
-                width: parent.width - 8
-                anchors.horizontalCenter: parent.horizontalCenter
-                height: visible ? 1 : 0
+        // --- Widget section separator (visible only on widget right-click) ---
+        StaggerItem {
+            id: s_widgetDivider
+            visible: root._targetWidgetKey !== ""
+            width: parent.width - 8
+            anchors.horizontalCenter: parent.horizontalCenter
+            height: visible ? 1 : 0
 
-                Rectangle {
-                    anchors.fill: parent
-                    color: Colors.border
-                    opacity: 0.5
-                }
+            ContextMenuDivider {
+                anchors.fill: parent
             }
+        }
 
-            // --- "组件设置" item ---
-            StaggerItem {
-                id: s_widgetSettings
-                visible: root._targetWidgetKey !== ""
-                delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                     + SettingsService.data.animation.staggerLevel1Step * 2
-                exitDelay: 0
-                width: parent.width
-                height: visible ? Theme.barHeight - Theme.barPadding : 0
+        // --- "组件设置" item ---
+        StaggerItem {
+            id: s_widgetSettings
+            visible: root._targetWidgetKey !== ""
+            delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                 + SettingsService.data.animation.staggerLevel1Step * 2
+            exitDelay: 0
+            width: parent.width
+            height: visible ? Theme.barHeight - Theme.barPadding : 0
 
-                HoverRevealHighlight {
-                    anchors.fill: parent; anchors.margins: 1
-                    radius: Theme.cornerRadius - 2
-                    hovered: widgetSettingsArea.containsMouse
-                    highlightColor: Colors.highlight; highlightOpacity: 0.12
-                }
+            // Widget settings action row.
+            ContextMenuAction {
+                anchors.fill: parent
+
+                // Widget settings row content.
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.left: parent.left; anchors.leftMargin: Theme.widgetPadding
                     spacing: 8
+
+                    // Widget settings icon.
                     Text {
                         text: "\uf085"
-                        font.family: Theme.fontMono; font.pixelSize: Theme.fontSizeIcon
-                        color: Colors.text; opacity: 0.7
+                        font.family: Theme.fontMono
+                        font.pixelSize: Theme.fontSizeIcon
+                        color: Colors.text
+                        opacity: 0.7
                     }
+
+                    // Widget settings label.
                     Text {
                         text: "组件设置"
-                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeBody
                         color: Colors.text
                     }
                 }
-                ClickRipple {
-                    id: widgetSettingsRipple
-                    anchors.fill: parent; anchors.margins: 1; rippleColor: Colors.highlight
-                }
-                MouseArea {
-                    id: widgetSettingsArea; anchors.fill: parent
-                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: (mouse) => {
-                        widgetSettingsRipple.triggerRipple(mouse.x, mouse.y)
-                        BarLayoutService.openWidgetSettings(root._targetWidgetKey, root._targetWidgetCenterX)
-                        _dismissTimer.restart()
-                    }
+
+                onClicked: function(_mouse) {
+                    BarLayoutService.openWidgetSettings(root._targetWidgetKey, root._targetWidgetCenterX)
+                    _dismissTimer.restart()
                 }
             }
-
-        }
-    }
-
-    ParallelAnimation {
-        id: enterAnim
-        NumberAnimation {
-            target: menuContent; property: "opacity"
-            from: 0; to: 1
-            duration: root._enterOpacityDuration; easing.type: Easing.OutQuad
-        }
-        NumberAnimation {
-            target: menuContent; property: "scale"
-            from: 0.85; to: 1.0
-            duration: root._enterScaleDuration; easing.type: Easing.OutBack; easing.overshoot: 0.4
         }
     }
 
@@ -327,14 +247,14 @@ PopupWindow {
         id: exitAnim
         ParallelAnimation {
             NumberAnimation {
-                target: menuContent; property: "opacity"
+                target: root.surface; property: "opacity"
                 from: 1; to: 0
-                duration: root._exitDuration; easing.type: Easing.InQuad
+                duration: root.exitDuration; easing.type: Easing.InQuad
             }
             NumberAnimation {
-                target: menuContent; property: "scale"
-                from: 1.0; to: 0.88
-                duration: root._exitDuration; easing.type: Easing.InQuad
+                target: root.surface; property: "scale"
+                from: 1.0; to: root.closedScale
+                duration: root.exitDuration; easing.type: Easing.InQuad
             }
         }
         ScriptAction {

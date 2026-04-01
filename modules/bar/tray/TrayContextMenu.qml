@@ -1,11 +1,12 @@
 import Quickshell
 import QtQuick
-import QtQuick.Layouts
 import qs.config
 import qs.services
+import ".." as BarComponents
+import "." as TrayComponents
 
 // Local QML-rendered tray menu that skips the DBusMenu root wrapper.
-PopupWindow {
+BarComponents.ContextMenuPopup {
     id: root
 
     required property Item anchorTarget
@@ -20,12 +21,15 @@ PopupWindow {
 
     readonly property var _entries: opener.children ? [...opener.children.values] : []
     readonly property real _screenWidth: Screen.width || 0
-    readonly property real _maxHeight: _screenWidth > 0 ? Math.max(180, Screen.height * 0.7) : 420
-
+    readonly property real _screenHeight: Screen.height || 0
+    readonly property real _maxHeight:
+        _screenHeight > 0 ? Math.max(180, root._screenHeight * 0.7) : 420
+    readonly property int _menuWidth: 160
     property var _submenuMenu: null
 
-    visible: false
-    color: "transparent"
+    BarComponents.StaggerOrchestrator {
+        id: _stagger
+    }
 
     Component.onCompleted: {
         if (!root.rootMenu)
@@ -44,12 +48,22 @@ PopupWindow {
     anchor.rect.width: 1
     anchor.rect.height: 1
 
-    implicitWidth: 220
-    implicitHeight: Math.min(root._maxHeight, contentColumn.implicitHeight + Theme.widgetPadding * 2)
+    implicitWidth: root._menuWidth
+    implicitHeight: Math.min(root._maxHeight, contentFlickable.contentHeight + contentMargin * 2)
 
     onVisibleChanged: {
-        if (!visible)
+        if (!visible) {
             root._closeSubmenu()
+        } else {
+            root.playEnterAnimation()
+            Qt.callLater(function() {
+                if (!root.visible)
+                    return
+
+                root._syncStaggerItems()
+                _stagger.runEnter()
+            })
+        }
 
         if (!visible && !root.isSubmenu)
             BarLayoutService.trayMenuOpen = false
@@ -77,12 +91,12 @@ PopupWindow {
 
     function closeRootMenu() {
         if (root.isSubmenu) {
-            root.visible = false
+            root._setClosedState()
             root.destroy()
             return
         }
 
-        root.visible = false
+        root._setClosedState()
     }
 
     function closeEntireTree() {
@@ -96,7 +110,11 @@ PopupWindow {
 
     function closeMenuTree() {
         root._closeSubmenu()
-        root.visible = false
+        root._setClosedState()
+    }
+
+    function _setClosedState() {
+        root.setClosedState()
     }
 
     function toggleSubmenu(menuEntry, itemDelegate) {
@@ -146,6 +164,18 @@ PopupWindow {
         return root.x + root.implicitWidth * 2 + 24 > root._screenWidth
     }
 
+    function _syncStaggerItems() {
+        _stagger.clear()
+
+        for (let index = 0; index < entryRepeater.count; index++) {
+            let item = entryRepeater.itemAt(index)
+            if (!item)
+                continue
+
+            _stagger.registerItem(item, index, 1)
+        }
+    }
+
     QsMenuOpener {
         id: opener
 
@@ -160,8 +190,11 @@ PopupWindow {
                 return
 
             Qt.callLater(function() {
-                if (root.visible)
+                if (root.visible) {
+                    root._syncStaggerItems()
+                    _stagger.runEnter()
                     root.anchor.updateAnchor()
+                }
             })
         }
     }
@@ -180,6 +213,7 @@ PopupWindow {
         }
     }
 
+    // Keyboard focus catcher.
     Item {
         anchors.fill: parent
         focus: root.visible
@@ -189,159 +223,19 @@ PopupWindow {
         }
     }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: Theme.cornerRadius
-        color: Colors.surface
-        border.color: Colors.border
-        border.width: 1
-    }
+    surfaceTransformOrigin: root.isSubmenu ? Item.TopLeft : Item.Top
 
-    Component {
-        id: menuEntryDelegate
-
-        Item {
-            id: menuEntryRoot
-
-            required property var modelData
-
-            readonly property var entry: modelData
-            readonly property bool isSeparator: entry?.isSeparator ?? false
-            readonly property bool enabledEntry: entry?.enabled ?? true
-            readonly property bool hasChildrenEntry: entry?.hasChildren ?? false
-            readonly property int buttonTypeEntry: entry?.buttonType ?? QsMenuButtonType.None
-            readonly property bool checkedEntry: entry?.checkState === Qt.Checked
-
-            width: parent ? parent.width : 220
-            implicitHeight: isSeparator
-                ? 9
-                : Math.max(Theme.barHeight - Theme.barPadding, label.implicitHeight + Theme.widgetPadding * 2)
-
-            Rectangle {
-                anchors.centerIn: parent
-                width: parent.width - Theme.widgetPadding
-                height: 1
-                radius: 1
-                color: Colors.border
-                opacity: menuEntryRoot.isSeparator ? 0.65 : 0
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: Theme.cornerRadius - 2
-                color: hoverArea.containsMouse && !menuEntryRoot.isSeparator ? Colors.highlight : "transparent"
-                opacity: hoverArea.containsMouse && !menuEntryRoot.isSeparator ? 0.12 : 0
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: Theme.anim.highlightDuration
-                        easing.type: Theme.anim.highlightType
-                    }
-                }
-            }
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: Theme.widgetPadding
-                anchors.rightMargin: Theme.widgetPadding
-                spacing: Theme.barWidget.iconSpacing
-                visible: !menuEntryRoot.isSeparator
-
-                Item {
-                    Layout.preferredWidth: Theme.fontSizeBody
-                    Layout.preferredHeight: Theme.fontSizeBody
-                    Layout.alignment: Qt.AlignVCenter
-                    visible: menuEntryRoot.buttonTypeEntry !== QsMenuButtonType.None
-
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: parent.width
-                        height: parent.height
-                        radius: menuEntryRoot.buttonTypeEntry === QsMenuButtonType.RadioButton ? width / 2 : 3
-                        color: "transparent"
-                        border.color: menuEntryRoot.checkedEntry ? Colors.highlight : Colors.textMuted
-                        border.width: 1
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: menuEntryRoot.buttonTypeEntry === QsMenuButtonType.RadioButton ? parent.width / 2 : parent.width - 4
-                            height: menuEntryRoot.buttonTypeEntry === QsMenuButtonType.RadioButton ? parent.height / 2 : parent.height - 4
-                            radius: menuEntryRoot.buttonTypeEntry === QsMenuButtonType.RadioButton ? width / 2 : 2
-                            color: Colors.highlight
-                            visible: menuEntryRoot.checkedEntry
-                        }
-                    }
-                }
-
-                Image {
-                    Layout.preferredWidth: Theme.barWidget.primaryIconSize
-                    Layout.preferredHeight: Theme.barWidget.primaryIconSize
-                    Layout.alignment: Qt.AlignVCenter
-                    source: menuEntryRoot.entry?.icon ?? ""
-                    sourceSize.width: width
-                    sourceSize.height: height
-                    smooth: true
-                    fillMode: Image.PreserveAspectFit
-                    visible: source !== ""
-                    opacity: menuEntryRoot.enabledEntry ? 1 : 0.45
-                }
-
-                Text {
-                    id: label
-
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignVCenter
-                    text: (menuEntryRoot.entry?.text ?? "").replace(/[\n\r]+/g, " ")
-                    color: menuEntryRoot.enabledEntry ? Colors.text : Colors.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeBody
-                    elide: Text.ElideRight
-                    wrapMode: Text.NoWrap
-                    maximumLineCount: 1
-                    opacity: menuEntryRoot.enabledEntry ? 1 : 0.7
-                }
-
-                Text {
-                    Layout.alignment: Qt.AlignVCenter
-                    text: ">"
-                    color: Colors.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeBody
-                    visible: menuEntryRoot.hasChildrenEntry
-                }
-            }
-
-            MouseArea {
-                id: hoverArea
-
-                anchors.fill: parent
-                enabled: !menuEntryRoot.isSeparator && menuEntryRoot.enabledEntry
-                hoverEnabled: true
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: function(_mouse) {
-                    if (menuEntryRoot.hasChildrenEntry) {
-                        root.toggleSubmenu(menuEntryRoot.entry, menuEntryRoot)
-                        return
-                    }
-
-                    if (menuEntryRoot.entry && typeof menuEntryRoot.entry.triggered === "function")
-                        menuEntryRoot.entry.triggered()
-
-                    root.closeEntireTree()
-                }
-            }
-        }
-    }
-
+    // Scrollable tray menu entries.
     Flickable {
+        id: contentFlickable
+
         anchors.fill: parent
-        anchors.margins: Theme.widgetPadding / 2
         contentHeight: contentColumn.implicitHeight
         clip: true
         interactive: contentHeight > height
         boundsBehavior: Flickable.StopAtBounds
 
+        // Tray entry column.
         Column {
             id: contentColumn
 
@@ -349,8 +243,22 @@ PopupWindow {
             spacing: 2
 
             Repeater {
+                id: entryRepeater
                 model: root._entries
-                delegate: menuEntryDelegate
+                delegate: BarComponents.StaggerItem {
+                    required property var modelData
+
+                    width: contentColumn.width
+                    height: itemDelegate.implicitHeight
+
+                    TrayComponents.TrayContextMenuItem {
+                        id: itemDelegate
+
+                        anchors.fill: parent
+                        entry: modelData
+                        menuRoot: root
+                    }
+                }
             }
         }
     }
