@@ -16,6 +16,9 @@ Item {
     readonly property bool _hasChildren: root.entry?.hasChildren ?? false
     readonly property int _buttonType: root.entry?.buttonType ?? QsMenuButtonType.None
     readonly property bool _checked: root.entry?.checkState === Qt.Checked
+    readonly property bool _showsCheckIndicator: root._buttonType !== QsMenuButtonType.None
+    readonly property string _iconSource: root.entry?.icon ?? ""
+    readonly property bool _hasIcon: root._iconSource !== ""
     readonly property int _rowHeight: Theme.barHeight - Theme.barPadding
 
     implicitWidth: parent ? parent.width : 160
@@ -42,9 +45,10 @@ Item {
 
             // Check state indicator.
             Item {
-                Layout.preferredWidth: Theme.fontSizeBody
-                Layout.preferredHeight: Theme.fontSizeBody
+                Layout.preferredWidth: root._showsCheckIndicator ? Theme.fontSizeBody : 0
+                Layout.preferredHeight: root._showsCheckIndicator ? Theme.fontSizeBody : 0
                 Layout.alignment: Qt.AlignVCenter
+                visible: root._showsCheckIndicator
 
                 // Check outline.
                 Rectangle {
@@ -55,7 +59,7 @@ Item {
                     color: "transparent"
                     border.color: root._checked ? Colors.highlight : Colors.textMuted
                     border.width: 1
-                    visible: root._buttonType !== QsMenuButtonType.None
+                    visible: root._showsCheckIndicator
 
                     // Check fill.
                     Rectangle {
@@ -71,15 +75,15 @@ Item {
 
             // Entry icon.
             Image {
-                Layout.preferredWidth: Theme.barWidget.primaryIconSize
-                Layout.preferredHeight: Theme.barWidget.primaryIconSize
+                Layout.preferredWidth: root._hasIcon ? Theme.barWidget.primaryIconSize : 0
+                Layout.preferredHeight: root._hasIcon ? Theme.barWidget.primaryIconSize : 0
                 Layout.alignment: Qt.AlignVCenter
-                source: root.entry?.icon ?? ""
+                source: root._iconSource
                 sourceSize.width: width
                 sourceSize.height: height
                 smooth: true
                 fillMode: Image.PreserveAspectFit
-                visible: source !== ""
+                visible: root._hasIcon
                 opacity: root._enabled ? 1 : 0.45
             }
 
