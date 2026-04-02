@@ -51,6 +51,10 @@ Item {
 
     property real _animatedWorkspaceAnchor: -1
     property real _animatedTitleAnchor: -1
+    // Inspired by end-4/dots-hyprland ("illogical impulse") workspace indicator motion.
+    // Reference: https://github.com/end-4/dots-hyprland/blob/main/dots/.config/quickshell/ii/modules/ii/bar/Workspaces.qml
+    property real _workspaceFocusLeadIndex: -1
+    property real _workspaceFocusTrailIndex: -1
 
     implicitWidth: Math.min(
         root._maxPreviewWidth,
@@ -399,12 +403,47 @@ Item {
     function _retargetHintAnchors(hint, immediate) {
         root._retargetWorkspaceAnchor(root._workspaceAnchorForHint(hint), immediate)
         root._retargetTitleAnchor(root._titleAnchorForHint(hint), immediate)
+        root._retargetWorkspaceFocusIndicator(hint, immediate)
     }
 
     function _visibleWorkspaceIcons(capsule, emphasis) {
         const icons = capsule && capsule.icons ? capsule.icons : []
-        const limit = emphasis >= 0.5 ? 5 : 2
-        return icons.slice(0, limit)
+        return icons
+    }
+
+    function _focusedWorkspaceIconIndex(capsule) {
+        const icons = capsule && capsule.icons ? capsule.icons : []
+
+        for (let index = 0; index < icons.length; index++) {
+            if (icons[index] && icons[index].isFocused)
+                return index
+        }
+
+        return -1
+    }
+
+    function _focusedWorkspaceIconIndexForHint(hint) {
+        const windows = hint && hint.windows ? hint.windows : []
+
+        for (let index = 0; index < windows.length; index++) {
+            if (windows[index] && windows[index].isFocused)
+                return index
+        }
+
+        return -1
+    }
+
+    function _retargetWorkspaceFocusIndicator(hint, immediate) {
+        const focusedIndex = root._focusedWorkspaceIconIndexForHint(hint)
+
+        if (immediate || focusedIndex < 0 || root._workspaceFocusLeadIndex < 0 || root._workspaceFocusTrailIndex < 0) {
+            root._workspaceFocusLeadIndex = focusedIndex
+            root._workspaceFocusTrailIndex = focusedIndex
+            return
+        }
+
+        root._workspaceFocusLeadIndex = focusedIndex
+        root._workspaceFocusTrailIndex = focusedIndex
     }
 
     function _workspaceMetrics(slotPosition) {
@@ -544,6 +583,21 @@ Item {
         readonly property int _iconSize: Math.round(root._lerp(root._compactIcon, root._primaryIcon, _emphasis))
         readonly property real _iconOpacity: root._lerp(0.4, 0.92, _emphasis)
         readonly property bool _trailingLabel: workspaceCapsule.slotPosition > 0.25
+        readonly property int _focusedIconIndex: root._focusedWorkspaceIconIndex(workspaceCapsule.capsule)
+        readonly property real _iconStripSpacing: Math.max(2, Theme.barWidget.iconSpacing - 1)
+        readonly property real _indicatorSize: workspaceCapsule._iconSize + Math.max(6, Math.round(8 * Theme.uiScale))
+        readonly property real _indicatorOffset: (workspaceCapsule._indicatorSize - workspaceCapsule._iconSize) / 2
+        readonly property real _indicatorStep: workspaceCapsule._iconSize + workspaceCapsule._iconStripSpacing
+        readonly property bool _showFocusIndicator: workspaceCapsule._focusedIconIndex >= 0
+            && workspaceCapsule._emphasis >= 0.45
+            && workspaceCapsule.capsule
+            && (workspaceCapsule.capsule.icons || []).length > 0
+        readonly property color _indicatorColor: Qt.rgba(
+            Colors.highlight.r,
+            Colors.highlight.g,
+            Colors.highlight.b,
+            root._lerp(0.18, 0.34, workspaceCapsule._emphasis)
+        )
 
         x: _metrics.x
         y: _metrics.y
@@ -588,25 +642,82 @@ Item {
                 // Workspace icon strip.
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: Math.max(2, Theme.barWidget.iconSpacing - 1)
+                    spacing: workspaceCapsule._iconStripSpacing
 
-                    Repeater {
-                        model: root._visibleWorkspaceIcons(workspaceCapsule.capsule, workspaceCapsule._emphasis)
+                    Item {
+                        implicitWidth: {
+                            const iconCount = workspaceCapsule.capsule && workspaceCapsule.capsule.icons
+                                ? workspaceCapsule.capsule.icons.length
+                                : 0
+                            if (iconCount <= 0)
+                                return 0
 
-                        // Workspace icon item.
-                        delegate: Item {
-                            required property var modelData
+                            return iconCount * workspaceCapsule._iconSize + Math.max(0, iconCount - 1) * workspaceCapsule._iconStripSpacing
+                        }
+                        implicitHeight: workspaceCapsule._indicatorSize
+                        width: implicitWidth
+                        height: implicitHeight
+                        visible: width > 0
 
-                            width: workspaceCapsule._iconSize
-                            height: width
-                            opacity: modelData.isFocused ? workspaceCapsule._iconOpacity : workspaceCapsule._iconOpacity * 0.78
+                        Rectangle {
+                            y: (parent.height - height) / 2
+                            width: workspaceCapsule._showFocusIndicator
+                                ? Math.abs(root._workspaceFocusLeadIndex - root._workspaceFocusTrailIndex) * workspaceCapsule._indicatorStep + workspaceCapsule._indicatorSize
+                                : workspaceCapsule._indicatorSize
+                            height: workspaceCapsule._indicatorSize
+                            radius: height / 2
+                            color: workspaceCapsule._indicatorColor
+                            opacity: workspaceCapsule._showFocusIndicator ? 1 : 0
+                            visible: opacity > 0
+                            x: workspaceCapsule._showFocusIndicator
+                                ? Math.min(root._workspaceFocusLeadIndex, root._workspaceFocusTrailIndex) * workspaceCapsule._indicatorStep - workspaceCapsule._indicatorOffset
+                                : 0
 
-                            // Workspace icon.
-                            Image {
-                                anchors.fill: parent
-                                source: modelData.icon || ""
-                                fillMode: Image.PreserveAspectFit
-                                smooth: true
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: Theme.anim.moveDuration
+                                    easing.type: Theme.anim.moveType
+                                }
+                            }
+
+                            Behavior on width {
+                                NumberAnimation {
+                                    duration: Math.max(170, Math.round(Theme.anim.moveDuration * 1.05))
+                                    easing.type: Easing.OutSine
+                                }
+                            }
+
+                            Behavior on height {
+                                NumberAnimation {
+                                    duration: Theme.anim.moveDuration
+                                    easing.type: Theme.anim.moveType
+                                }
+                            }
+                        }
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: workspaceCapsule._iconStripSpacing
+
+                            Repeater {
+                                model: root._visibleWorkspaceIcons(workspaceCapsule.capsule, workspaceCapsule._emphasis)
+
+                                // Workspace icon item.
+                                delegate: Item {
+                                    required property var modelData
+
+                                    width: workspaceCapsule._iconSize
+                                    height: width
+                                    opacity: modelData.isFocused ? workspaceCapsule._iconOpacity : workspaceCapsule._iconOpacity * 0.78
+
+                                    // Workspace icon.
+                                    Image {
+                                        anchors.fill: parent
+                                        source: modelData.icon || ""
+                                        fillMode: Image.PreserveAspectFit
+                                        smooth: true
+                                    }
+                                }
                             }
                         }
                     }
@@ -739,6 +850,20 @@ Item {
         target: root
         property: "_animatedTitleAnchor"
         easing.type: Theme.anim.moveType
+    }
+
+    Behavior on _workspaceFocusLeadIndex {
+        NumberAnimation {
+            duration: Math.max(90, Math.round(Theme.anim.moveDuration * 0.55))
+            easing.type: Easing.OutSine
+        }
+    }
+
+    Behavior on _workspaceFocusTrailIndex {
+        NumberAnimation {
+            duration: Math.max(170, Math.round(Theme.anim.moveDuration * 1.05))
+            easing.type: Easing.OutSine
+        }
     }
 
     Component.onCompleted: {
