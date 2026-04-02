@@ -42,19 +42,21 @@ Item {
     readonly property int _workspaceStageHeight: root._workspaceSideHeight * 2 + root._workspacePrimaryHeight + root._workspaceColumnGap * 2
     readonly property int _titleStageWidth: root._titleSideWidth * 2 + root._titlePrimaryWidth + root._capsuleGap * 2
     readonly property int _titleStageHeight: root._titleCapsuleHeight
-    readonly property var _workspaceStageCapsules: root._workspaceStageCapsulesForHint(root._hint)
-    readonly property var _titleStageCapsules: root._titleStageCapsulesForHint(root._hint)
+    readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4]
     readonly property int _workspaceAnchorBaseDuration: Math.max(150, Math.round(Theme.anim.moveDuration * 1.05))
     readonly property int _titleAnchorBaseDuration: Math.max(140, Theme.anim.moveDuration)
     readonly property int _anchorDurationStep: Math.max(16, Math.round(Theme.anim.moveDuration * 0.1))
     readonly property int _anchorMaximumDuration: Math.max(190, Math.round(Theme.anim.moveDuration * 1.35))
+    readonly property int _workspaceFocusLeadDuration: Math.max(70, Math.round(Theme.anim.moveDuration * 0.42))
+    readonly property int _workspaceFocusTrailDuration: Math.max(240, Math.round(Theme.anim.moveDuration * 1.45))
 
     property real _animatedWorkspaceAnchor: -1
     property real _animatedTitleAnchor: -1
     // Inspired by end-4/dots-hyprland ("illogical impulse") workspace indicator motion.
     // Reference: https://github.com/end-4/dots-hyprland/blob/main/dots/.config/quickshell/ii/modules/ii/bar/Workspaces.qml
-    property real _workspaceFocusLeadIndex: -1
-    property real _workspaceFocusTrailIndex: -1
+    property int _workspaceFocusIndex: -1
+    property var _workspaceStageSlots: root._emptyStageSlots("workspace-slot")
+    property var _titleStageSlots: root._emptyStageSlots("title-slot")
 
     implicitWidth: Math.min(
         root._maxPreviewWidth,
@@ -146,6 +148,35 @@ Item {
             icon: capsule.icon || "",
             visible: capsule.visible !== false
         }
+    }
+
+    function _emptyStageSlots(prefix) {
+        const slots = []
+
+        for (let index = 0; index < root._persistentStageSlotIndices.length; index++) {
+            slots.push({
+                slotId: prefix + "-" + index,
+                absoluteIndex: -1,
+                capsule: null
+            })
+        }
+
+        return slots
+    }
+
+    function _slotsForEntries(entries, cloneCapsule, prefix) {
+        const slots = root._emptyStageSlots(prefix)
+
+        for (let index = 0; index < Math.min(slots.length, entries.length); index++) {
+            const entry = entries[index]
+            slots[index] = {
+                slotId: slots[index].slotId,
+                absoluteIndex: entry.absoluteIndex,
+                capsule: cloneCapsule(entry.capsule)
+            }
+        }
+
+        return slots
     }
 
     function _workspaceCapsuleForRelative(relativeSlot, hint) {
@@ -295,20 +326,19 @@ Item {
     function _workspaceStageCapsulesForHint(hint) {
         const safeHint = hint || {}
         const summaries = safeHint.workspaces || []
-        const anchor = root._animatedWorkspaceAnchor >= 0 ? root._animatedWorkspaceAnchor : root._workspaceAnchorForHint(safeHint)
+        const anchor = root._workspaceAnchorForHint(safeHint)
         const range = root._visibleAbsoluteRange(anchor, summaries.length)
         const items = []
 
         for (let index = range.from; index <= range.to; index++) {
             const capsule = root._workspaceCapsuleForAbsolute(index, safeHint)
-            const slotPosition = index - anchor
-            if (!capsule.visible || Math.abs(slotPosition) > 2)
+            if (!capsule.visible || Math.abs(index - anchor) > 2)
                 continue
 
             items.push({
                 key: capsule.key,
                 capsule: capsule,
-                slotPosition: slotPosition
+                absoluteIndex: index
             })
         }
 
@@ -318,14 +348,14 @@ Item {
     function _titleStageCapsulesForHint(hint) {
         const safeHint = hint || {}
         const windows = safeHint.windows || []
-        const anchor = root._animatedTitleAnchor >= 0 ? root._animatedTitleAnchor : root._titleAnchorForHint(safeHint)
+        const anchor = root._titleAnchorForHint(safeHint)
         const items = []
 
         if (windows.length === 0) {
             items.push({
                 key: "current-title-empty",
                 capsule: root._titleCapsuleForAbsolute(0, safeHint),
-                slotPosition: 0
+                absoluteIndex: 0
             })
             return items
         }
@@ -333,18 +363,68 @@ Item {
         const range = root._visibleAbsoluteRange(anchor, windows.length)
         for (let index = range.from; index <= range.to; index++) {
             const capsule = root._titleCapsuleForAbsolute(index, safeHint)
-            const slotPosition = index - anchor
-            if (!capsule.visible || Math.abs(slotPosition) > 2)
+            if (!capsule.visible || Math.abs(index - anchor) > 2)
                 continue
 
             items.push({
                 key: capsule.key,
                 capsule: capsule,
-                slotPosition: slotPosition
+                absoluteIndex: index
             })
         }
 
         return items
+    }
+
+    function _workspaceStageSlotAt(slotIndex) {
+        return slotIndex >= 0 && slotIndex < root._workspaceStageSlots.length
+            ? root._workspaceStageSlots[slotIndex]
+            : null
+    }
+
+    function _titleStageSlotAt(slotIndex) {
+        return slotIndex >= 0 && slotIndex < root._titleStageSlots.length
+            ? root._titleStageSlots[slotIndex]
+            : null
+    }
+
+    function _workspaceStageCapsuleAt(slotIndex) {
+        const slot = root._workspaceStageSlotAt(slotIndex)
+        return slot ? slot.capsule : null
+    }
+
+    function _titleStageCapsuleAt(slotIndex) {
+        const slot = root._titleStageSlotAt(slotIndex)
+        return slot ? slot.capsule : null
+    }
+
+    function _workspaceStageSlotPositionAt(slotIndex) {
+        const slot = root._workspaceStageSlotAt(slotIndex)
+        if (!slot || slot.absoluteIndex < 0 || root._animatedWorkspaceAnchor < 0)
+            return root._overflowSlotPosition
+
+        return slot.absoluteIndex - root._animatedWorkspaceAnchor
+    }
+
+    function _titleStageSlotPositionAt(slotIndex) {
+        const slot = root._titleStageSlotAt(slotIndex)
+        if (!slot || slot.absoluteIndex < 0 || root._animatedTitleAnchor < 0)
+            return root._overflowSlotPosition
+
+        return slot.absoluteIndex - root._animatedTitleAnchor
+    }
+
+    function _refreshStageSlots(hint) {
+        root._workspaceStageSlots = root._slotsForEntries(
+            root._workspaceStageCapsulesForHint(hint),
+            root._cloneWorkspaceCapsule,
+            "workspace-slot"
+        )
+        root._titleStageSlots = root._slotsForEntries(
+            root._titleStageCapsulesForHint(hint),
+            root._cloneTitleCapsule,
+            "title-slot"
+        )
     }
 
     function _anchorAnimationDuration(from, to, baseDuration) {
@@ -435,15 +515,7 @@ Item {
 
     function _retargetWorkspaceFocusIndicator(hint, immediate) {
         const focusedIndex = root._focusedWorkspaceIconIndexForHint(hint)
-
-        if (immediate || focusedIndex < 0 || root._workspaceFocusLeadIndex < 0 || root._workspaceFocusTrailIndex < 0) {
-            root._workspaceFocusLeadIndex = focusedIndex
-            root._workspaceFocusTrailIndex = focusedIndex
-            return
-        }
-
-        root._workspaceFocusLeadIndex = focusedIndex
-        root._workspaceFocusTrailIndex = focusedIndex
+        root._workspaceFocusIndex = focusedIndex
     }
 
     function _workspaceMetrics(slotPosition) {
@@ -557,12 +629,14 @@ Item {
             }
 
             root._renderHint = nextHint
+            root._refreshStageSlots(nextHint)
             root._retargetHintAnchors(nextHint, true)
             return
         }
 
         const wasVisible = !!(root._renderHint && root._renderHint.visible)
         root._renderHint = nextHint
+        root._refreshStageSlots(nextHint)
         root._retargetHintAnchors(nextHint, !wasVisible)
     }
 
@@ -662,7 +736,7 @@ Item {
                         Rectangle {
                             y: (parent.height - height) / 2
                             width: workspaceCapsule._showFocusIndicator
-                                ? Math.abs(root._workspaceFocusLeadIndex - root._workspaceFocusTrailIndex) * workspaceCapsule._indicatorStep + workspaceCapsule._indicatorSize
+                                ? Math.abs(_workspaceFocusIndexPair.idx1 - _workspaceFocusIndexPair.idx2) * workspaceCapsule._indicatorStep + workspaceCapsule._indicatorSize
                                 : workspaceCapsule._indicatorSize
                             height: workspaceCapsule._indicatorSize
                             radius: height / 2
@@ -670,24 +744,10 @@ Item {
                             opacity: workspaceCapsule._showFocusIndicator ? 1 : 0
                             visible: opacity > 0
                             x: workspaceCapsule._showFocusIndicator
-                                ? Math.min(root._workspaceFocusLeadIndex, root._workspaceFocusTrailIndex) * workspaceCapsule._indicatorStep - workspaceCapsule._indicatorOffset
+                                ? Math.min(_workspaceFocusIndexPair.idx1, _workspaceFocusIndexPair.idx2) * workspaceCapsule._indicatorStep - workspaceCapsule._indicatorOffset
                                 : 0
 
                             Behavior on opacity {
-                                NumberAnimation {
-                                    duration: Theme.anim.moveDuration
-                                    easing.type: Theme.anim.moveType
-                                }
-                            }
-
-                            Behavior on width {
-                                NumberAnimation {
-                                    duration: Math.max(170, Math.round(Theme.anim.moveDuration * 1.05))
-                                    easing.type: Easing.OutSine
-                                }
-                            }
-
-                            Behavior on height {
                                 NumberAnimation {
                                     duration: Theme.anim.moveDuration
                                     easing.type: Theme.anim.moveType
@@ -852,22 +912,33 @@ Item {
         easing.type: Theme.anim.moveType
     }
 
-    Behavior on _workspaceFocusLeadIndex {
-        NumberAnimation {
-            duration: Math.max(90, Math.round(Theme.anim.moveDuration * 0.55))
-            easing.type: Easing.OutSine
-        }
-    }
+    QtObject {
+        id: _workspaceFocusIndexPair
 
-    Behavior on _workspaceFocusTrailIndex {
-        NumberAnimation {
-            duration: Math.max(170, Math.round(Theme.anim.moveDuration * 1.05))
-            easing.type: Easing.OutSine
+        property int index: root._workspaceFocusIndex
+        property real idx1: index
+        property real idx2: index
+        property int idx1Duration: root._workspaceFocusLeadDuration
+        property int idx2Duration: root._workspaceFocusTrailDuration
+
+        Behavior on idx1 {
+            NumberAnimation {
+                duration: _workspaceFocusIndexPair.idx1Duration
+                easing.type: Easing.OutSine
+            }
+        }
+
+        Behavior on idx2 {
+            NumberAnimation {
+                duration: _workspaceFocusIndexPair.idx2Duration
+                easing.type: Easing.OutSine
+            }
         }
     }
 
     Component.onCompleted: {
         root._renderHint = root._cloneHint(root._liveHint)
+        root._refreshStageSlots(root._renderHint)
         root._retargetHintAnchors(root._renderHint, true)
     }
 
@@ -902,13 +973,13 @@ Item {
                 clip: true
 
                 Repeater {
-                    model: root._workspaceStageCapsules
+                    model: root._persistentStageSlotIndices
 
                     delegate: WorkspaceCapsule {
-                        required property var modelData
+                        required property int modelData
 
-                        capsule: modelData.capsule
-                        slotPosition: modelData.slotPosition
+                        capsule: root._workspaceStageCapsuleAt(modelData)
+                        slotPosition: root._workspaceStageSlotPositionAt(modelData)
                         hiddenForMotion: false
                     }
                 }
@@ -927,13 +998,13 @@ Item {
                 height: parent.height
 
                 Repeater {
-                    model: root._titleStageCapsules
+                    model: root._persistentStageSlotIndices
 
                     delegate: TitleCapsule {
-                        required property var modelData
+                        required property int modelData
 
-                        capsule: modelData.capsule
-                        slotPosition: modelData.slotPosition
+                        capsule: root._titleStageCapsuleAt(modelData)
+                        slotPosition: root._titleStageSlotPositionAt(modelData)
                         hiddenForMotion: false
                     }
                 }

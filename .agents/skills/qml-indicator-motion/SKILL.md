@@ -63,6 +63,13 @@ Rectangle {
 - The indicator stretches during travel and settles back at the destination.
 - Because the state lives at the root, service refreshes do not reset the motion every time delegates rebuild.
 
+## Reference Integrity Rules
+
+- If you copy an `idx1` / `idx2` indicator model from another project, let those two indices be the only geometry drivers.
+- Do not add a second `Behavior on width` or `Behavior on x` to the same pill unless you intentionally want to diverge from the reference motion.
+- Do not imperatively assign to bound animated indices such as `idx1` / `idx2` just to handle an immediate state; that breaks the binding and can freeze later motion.
+- If the reference uses `x = min(idx1, idx2)` and `width = abs(idx1 - idx2) + baseSize`, keep that geometry direct and let the index pair own the motion.
+
 ## DymicShell Notes
 
 - In `modules/bar/superisland/IslandWindowHintCard.qml`, the workspace focus indicator should stay root-owned.
@@ -76,6 +83,7 @@ Rectangle {
 - Do not expect the same pattern alone to fix rapid-switch interruption for full capsules whose content, width, height, and emphasis all change together.
 - If capsule motion still gets interrupted, the likely cause is delegate/model rebuilds rather than easing choice.
 - For full capsule rows, prefer persistent root-owned slots with stable delegate identity, then retarget position separately from content refresh.
+- If a reference indicator still looks wrong after copy-paste, check for local divergences first: extra geometry `Behavior`s, broken bindings, or reversed visual ordering.
 
 ## Escalation Path
 
