@@ -136,7 +136,6 @@ main() {
     local kitty_include='include kitty-colors.conf'
     local mako_include='include=~/.config/mako/mako-colors'
     local niri_include='include "./colors.kdl"'
-    local firefox_import='@import url("file://'$home'/.cache/matugen/firefox/colors.css");'
     local qt5_scheme="$home/.config/qt5ct/colors/DymicShellMatugen.conf"
     local qt6_scheme="$home/.config/qt6ct/colors/DymicShellMatugen.conf"
     local rofi_import='@import "colors.rasi"'
@@ -152,13 +151,6 @@ main() {
     append_line_if_missing "$home/.config/kitty/kitty.conf" "$kitty_include"
 
     append_line_if_missing "$home/.config/mako/config" "$mako_include"
-
-    if [ -f "$home/.mozilla/firefox/profiles.ini" ]; then
-        for profile_dir in "$home"/.mozilla/firefox/*.default* "$home"/.mozilla/firefox/*.default-release*; do
-            [ -d "$profile_dir" ] || continue
-            prepend_line_if_missing "$profile_dir/chrome/userContent.css" "$firefox_import"
-        done
-    fi
 
     upsert_ini_key "$home/.config/qt5ct/qt5ct.conf" "Appearance" "color_scheme_path" "$qt5_scheme"
     upsert_ini_key "$home/.config/qt5ct/qt5ct.conf" "Appearance" "custom_palette" "true"

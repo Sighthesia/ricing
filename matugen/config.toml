@@ -166,10 +166,6 @@ output_path = "~/.config/yazi/theme.toml"
 input_path = "./templates/quickshell.qml"
 output_path = "~/.config/quickshell/Colors.qml"
 
-[templates.firefox]
-input_path = "./templates/firefox-colors.css"
-output_path = "~/.cache/matugen/firefox/colors.css"
-
 [templates.neovim]
 input_path = "./templates/neovim/nvim-colors.vim"
 output_path = "~/.config/nvim/colors/matugen.vim"
