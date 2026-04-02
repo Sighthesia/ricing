@@ -13,3 +13,4 @@ Load these for detailed context on specific topics:
 | [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md) | Debug QML motion that updates state correctly but still looks static, wrong, or too subtle. |
 | [qml-state](.github/skills/qml-state/SKILL.md) | Guidelines for managing settings, state, persistence, and error handling. |
 | [qml-testing-strategy](.github/skills/qml-testing-strategy/SKILL.md) | QML bug fixes, behavioral testing, regressions, or behavior modifications. |
+| [reference-attribution](.agents/skills/reference-attribution/SKILL.md) | Add consistent repository attribution comments when code or templates are adapted from external projects. |

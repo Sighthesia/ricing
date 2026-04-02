@@ -8,6 +8,9 @@ import qs.services
 Singleton {
     id: root
 
+    readonly property string matugenConfigPath: Quickshell.shellDir + "/matugen/config.toml"
+    readonly property string matugenApplyScriptPath: Quickshell.shellDir + "/scripts/apply-matugen-targets.sh"
+
     // Emitted after setWallpaper() is called — listeners (e.g., BackgroundWindow)
     // should react to this rather than polling swww.
     signal wallpaperChanged(string path)
@@ -19,7 +22,7 @@ Singleton {
     // Mirrors SettingsService so QML bindings can observe wallpaper changes.
     property string currentWallpaper: SettingsService.data.appearance.wallpaperPath
 
-    readonly property bool matugenRunning: matugenProcess.running
+    readonly property bool matugenRunning: matugenProcess.running || matugenApplyProcess.running
 
     // Debounce rapid setWallpaper() calls before invoking matugen.
     Timer {
@@ -30,8 +33,8 @@ Singleton {
     }
 
     // ── matugen invocation ───────────────────────────────────────────────────
-    // matugen uses ~/.config/matugen/config.toml to write output files — we do
-    // NOT capture stdout. Colors.qml watches the generated colors.json directly.
+    // Use the repo-owned matugen config so DymicShell controls all exported
+    // theme targets instead of depending on the user's global matugen setup.
     Process {
         id: matugenProcess
 
@@ -40,6 +43,21 @@ Singleton {
                 root.matugenFailed("matugen exited with code " + exitCode)
                 return
             }
+
+            matugenApplyProcess.command = ["bash", root.matugenApplyScriptPath]
+            matugenApplyProcess.running = true
+        }
+    }
+
+    Process {
+        id: matugenApplyProcess
+
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode !== 0) {
+                root.matugenFailed("matugen target wiring exited with code " + exitCode)
+                return
+            }
+
             root.matugenCompleted()
         }
     }
@@ -64,12 +82,12 @@ Singleton {
     function _runMatugen(wallpaperPath) {
         if (!SettingsService.data.appearance.matugenEnabled) return
         if (wallpaperPath === "") return
-        if (matugenProcess.running) {
+        if (root.matugenRunning) {
             // Still running — reschedule after current job finishes
             debounceTimer.restart()
             return
         }
-        // Let matugen use its own config.toml for template output.
+        // Let matugen render against the repo-owned config.toml template set.
         // -m dark/light controls which palette node the templates receive.
         // -t applies the selected MD3 scheme algorithm (tonal-spot, vibrant…).
         // --source-color-index 0 bypasses dialoguer's interactive TTY prompt
@@ -78,6 +96,7 @@ Singleton {
         const scheme = SettingsService.data.appearance.matugenScheme || "scheme-tonal-spot"
         matugenProcess.command = [
             "matugen", "image", wallpaperPath,
+            "-c", root.matugenConfigPath,
             "-m", mode,
             "-t", scheme,
             "--source-color-index", "0", "-q"

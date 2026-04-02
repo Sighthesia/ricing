@@ -36,6 +36,7 @@ Load these for detailed context on specific topics:
 | [qml-performance-debug](skills/qml-performance-debug/SKILL.md) | Debug jank, layout thrash, layer-shell resize churn, and expensive widget transitions. |
 | [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md) | Debug QML motion that updates state correctly but still looks static, wrong, or too subtle. |
 | [qml-state](skills/qml-state/SKILL.md)               | Guidelines for managing settings, state, persistence, and error handling.                       |
+| [reference-attribution](.agents/skills/reference-attribution/SKILL.md) | Add consistent repository attribution comments when code or templates are adapted from external projects. |
 
 ## Miscellaneous
 - The repo does not define `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmllint`, `qmlformat`, or CI workflow commands. Do not invent those commands unless you verify local availability.
