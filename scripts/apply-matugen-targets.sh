@@ -28,6 +28,20 @@ append_line_if_missing() {
     printf '%s\n' "$line" >> "$file"
 }
 
+remove_line_if_present() {
+    local file="$1"
+    local line="$2"
+    local tmp
+
+    if [ ! -f "$file" ]; then
+        return
+    fi
+
+    tmp=$(mktemp "${file}.XXXXXX")
+    grep -Fvx "$line" "$file" > "$tmp" || true
+    mv "$tmp" "$file"
+}
+
 prepend_line_if_missing() {
     local file="$1"
     local line="$2"
@@ -119,9 +133,10 @@ main() {
     local gtk_import='@import url("colors.css");'
     local fuzzel_include='~/.config/fuzzel/colors.ini'
     local ghostty_theme='theme = "DymicShellMatugen"'
-    local kitty_include='include dymicshell-matugen.conf'
+    local kitty_include='include kitty-colors.conf'
     local mako_include='include=~/.config/mako/mako-colors'
-    local niri_include='include "./dymicshell-matugen.kdl"'
+    local niri_include='include "./colors.kdl"'
+    local firefox_import='@import url("colors.css");'
     local qt5_scheme="$home/.config/qt5ct/colors/DymicShellMatugen.conf"
     local qt6_scheme="$home/.config/qt6ct/colors/DymicShellMatugen.conf"
     local rofi_import='@import "colors.rasi"'
@@ -133,9 +148,17 @@ main() {
 
     append_line_if_missing "$home/.config/ghostty/config" "$ghostty_theme"
 
+    remove_line_if_present "$home/.config/kitty/kitty.conf" 'include dymicshell-matugen.conf'
     append_line_if_missing "$home/.config/kitty/kitty.conf" "$kitty_include"
 
     append_line_if_missing "$home/.config/mako/config" "$mako_include"
+
+    if [ -f "$home/.mozilla/firefox/profiles.ini" ]; then
+        for profile_dir in "$home"/.mozilla/firefox/*.default* "$home"/.mozilla/firefox/*.default-release*; do
+            [ -d "$profile_dir" ] || continue
+            prepend_line_if_missing "$profile_dir/chrome/userContent.css" "$firefox_import"
+        done
+    fi
 
     upsert_ini_key "$home/.config/qt5ct/qt5ct.conf" "Appearance" "color_scheme_path" "$qt5_scheme"
     upsert_ini_key "$home/.config/qt5ct/qt5ct.conf" "Appearance" "custom_palette" "true"
@@ -145,6 +168,7 @@ main() {
     # Niri's main config should not be created from scratch because a standalone
     # include file is not a valid full config for fresh installs.
     if [ -f "$home/.config/niri/config.kdl" ]; then
+        remove_line_if_present "$home/.config/niri/config.kdl" 'include "./dymicshell-matugen.kdl"'
         append_line_if_missing "$home/.config/niri/config.kdl" "$niri_include"
     fi
 

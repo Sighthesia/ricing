@@ -9,6 +9,7 @@ Singleton {
     id: root
 
     readonly property string matugenConfigPath: Quickshell.shellDir + "/matugen/config.toml"
+    readonly property string matugenWorkingDir: Quickshell.shellDir + "/matugen"
     readonly property string matugenApplyScriptPath: Quickshell.shellDir + "/scripts/apply-matugen-targets.sh"
 
     // Emitted after setWallpaper() is called — listeners (e.g., BackgroundWindow)
@@ -95,11 +96,8 @@ Singleton {
         const mode = SettingsService.data.appearance.darkMode ? "dark" : "light"
         const scheme = SettingsService.data.appearance.matugenScheme || "scheme-tonal-spot"
         matugenProcess.command = [
-            "matugen", "image", wallpaperPath,
-            "-c", root.matugenConfigPath,
-            "-m", mode,
-            "-t", scheme,
-            "--source-color-index", "0", "-q"
+            "bash", "-lc",
+            "cd \"" + root.matugenWorkingDir + "\" && matugen image \"" + wallpaperPath + "\" -c \"" + root.matugenConfigPath + "\" -m \"" + mode + "\" -t \"" + scheme + "\" --source-color-index 0 -q"
         ]
         matugenProcess.running = true
     }

@@ -36,7 +36,7 @@ output_path = "~/.config/ghostty/themes/DymicShellMatugen"
 [templates.cosmic]
 input_path = "./templates/cosmic_theme.ron"
 output_path = "~/.config/matugen/themes/matugen_cosmic.theme.ron"
-post_hook = "./templates/cosmic_postprocess.py ~/.config/matugen/themes/matugen_cosmic.theme.ron"
+post_hook = "python3 ./templates/cosmic_postprocess.py ~/.config/matugen/themes/matugen_cosmic.theme.ron"
 
 [templates.helix]
 input_path = "./templates/helix.toml"
@@ -58,10 +58,6 @@ output_path = "~/.config/kitty/kitty-colors.conf"
 input_path = "./templates/kvantum-colors.kvconfig"
 output_path = "~/.config/Kvantum/matugen/matugen.kvconfig"
 
-[templates.kvantum_svg]
-input_path = "./templates/kvantum-colors.svg"
-output_path = "~/.config/Kvantum/matugen/matugen.svg"
-
 [templates.labwc]
 input_path = "./templates/labwc"
 output_path = "~/.config/labwc/themerc-override"
@@ -81,10 +77,6 @@ output_path = "~/.config/micro/colorschemes/matugen.micro"
 [templates.midnight-discord]
 input_path = "./templates/midnight-discord.css"
 output_path = "~/.config/matugen/midnight-discord.css"
-
-[templates.obsidian]
-input_path = "./templates/obsidian.css"
-output_path = "~/path/to/obsidianVault/.obsidian/snippets/matugen.css"
 
 [templates.opencode]
 input_path = "./templates/opencode-colors.json"
@@ -126,10 +118,6 @@ output_path = "~/.config/rmpc/themes/matugen.ron"
 input_path = "./templates/tmux-colors.conf"
 output_path = "~/.config/tmux/generated.conf"
 
-[templates.spicetify]
-input_path = "./templates/spicetify.ini"
-output_path = "~/.config/spicetify/Themes/Sleek/color.ini"
-
 [templates.steam]
 input_path = "./templates/steam.css"
 output_path = "~/.config/AdwSteamGtk/custom.css"
@@ -154,10 +142,6 @@ output_path = "~/.config/television/themes/matugen.toml"
 input_path = "./templates/terminal-sequences"
 output_path = "~/.cache/terminal-sequences"
 
-[templates.vivaldi]
-input_path = "./templates/vivaldi.css"
-output_path = "path/to/vivaldi_css/vivaldi.css"
-
 [templates.zed]
 input_path = "./templates/zed-colors.json"
 output_path = "~/.config/zed/themes/matugen.json"
@@ -170,15 +154,6 @@ output_path = "/tmp/wine.reg"
 input_path = "./templates/zathura-colors"
 output_path = "~/.config/zathura/zathurarc"
 
-[templates.windows-terminal]
-input_path = "./templates/windows_term.json"
-output_path = "C:\\Windows\\Temp\\matugen_windows_term.json"
-post_hook = "powershell ./templates/windows_term_post.ps1"
-
-[templates.wine]
-input_path = "./templates/wine.reg"
-output_path = "/tmp/wine.reg"
-
 [templates.wezterm]
 input_path = "./templates/wezterm_theme.toml"
 output_path = "~/.config/wezterm/colors/DymicShellMatugen.toml"
@@ -186,14 +161,6 @@ output_path = "~/.config/wezterm/colors/DymicShellMatugen.toml"
 [templates.yazi]
 input_path = "./templates/yazi-theme.toml"
 output_path = "~/.config/yazi/theme.toml"
-
-[templates.firefox]
-input_path = "./templates/firefox-colors.css"
-output_path = "~/path/to/profile/colors.css"
-
-[templates.quickshell]
-input_path = "./templates/quickshell.json"
-output_path = "~/.local/state/quickshell/generated/colors.json"
 
 [templates.quickshell_qml]
 input_path = "./templates/quickshell.qml"
