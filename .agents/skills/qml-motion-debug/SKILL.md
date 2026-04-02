@@ -29,7 +29,12 @@ Use this skill when animation state changes are correct but the user still does 
 - Common symptom: the first diff computes a non-zero direction, but a second refresh computes `0` and clears the outgoing/incoming layers before the user sees any motion.
 - Prefer letting the active timeline finish, or coalesce service refreshes before deciding to cancel motion.
 
-### 5. Positioner Width Hides Real Alignment
+### 5. Empty Snapshot Should Not Replace Visible Content
+- If the service can produce transient empty or partially-empty snapshots, do not publish them over the last visible frame unless the UI is truly closing.
+- When a hold-style preview is active, keep the last visible snapshot alive and treat the empty snapshot as a no-op until release.
+- This prevents high-frequency source updates from turning a live preview into a blank panel.
+
+### 6. Positioner Width Hides Real Alignment
 - `Column`, `Row`, and other positioners size themselves from the widest child.
 - A narrower stage inside that positioner can appear left-aligned even when its own internal items are centered.
 - When one animated lane is narrower than its siblings, wrap it in a full-width container and center the real stage inside the wrapper.
@@ -159,6 +164,7 @@ Column {
 - For hint-like transitions, prefer explicit timeline control over `Qt.callLater()` pulses.
 - For `window-hint` style previews, verify that repeated `activeHint` refreshes do not cancel a just-started slot motion.
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
+- For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.
 
 ## Validation
 

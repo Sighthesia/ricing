@@ -85,6 +85,18 @@ Rectangle {
 - For full capsule rows, prefer persistent root-owned slots with stable delegate identity, then retarget position separately from content refresh.
 - If a reference indicator still looks wrong after copy-paste, check for local divergences first: extra geometry `Behavior`s, broken bindings, or reversed visual ordering.
 
+## Stable Slot Continuity
+
+Use this when a full capsule row must keep scrolling smoothly while the data source updates rapidly.
+
+- Keep a fixed slot pool larger than the nominal visible range.
+- Reuse the same slot for the same `absoluteIndex` when possible.
+- Build the next frame from `current visible set ∪ target visible set` so the outgoing and incoming capsule sets overlap during motion.
+- Do not prune unmatched slots until the row's anchor animation has stopped.
+- If a later snapshot would remove all visible content, keep the previous visible slot state until the transition truly ends.
+
+This pattern is for full capsules, not only indicator pills.
+
 ## Escalation Path
 
 If an indicator fix works but a larger capsule still jumps:
