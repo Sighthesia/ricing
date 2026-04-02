@@ -17,9 +17,33 @@ output_path = "~/.config/gtk-3.0/colors.css"
 input_path = "./templates/gtk-colors.css"
 output_path = "~/.config/gtk-4.0/colors.css"
 
+[templates.alacritty]
+input_path = "./templates/alacritty.toml"
+output_path = "~/.config/alacritty/colors.toml"
+
+[templates.fuzzel]
+input_path = "./templates/fuzzel.ini"
+output_path = "~/.config/fuzzel/colors.ini"
+
+[templates.ghostty]
+input_path = "./templates/ghostty"
+output_path = "~/.config/ghostty/themes/DymicShellMatugen"
+
+[templates.btop]
+input_path = "./templates/btop.theme"
+output_path = "~/.config/btop/themes/DymicShell.theme"
+
 [templates.kitty]
 input_path = "./templates/kitty.conf"
 output_path = "~/.config/kitty/dymicshell-matugen.conf"
+
+[templates.mako]
+input_path = "./templates/mako"
+output_path = "~/.config/mako/mako-colors"
+
+[templates.starship]
+input_path = "./templates/starship-colors.toml"
+output_path = "~/.config/starship.toml"
 
 [templates.qt5ct]
 input_path = "./templates/qtct-colors.conf"
@@ -36,3 +60,27 @@ output_path = "~/.local/share/color-schemes/DymicShellMatugen.colors"
 [templates.niri]
 input_path = "./templates/niri.kdl"
 output_path = "~/.config/niri/dymicshell-matugen.kdl"
+
+[templates.rofi]
+input_path = "./templates/rofi-colors.rasi"
+output_path = "~/.config/rofi/colors.rasi"
+
+[templates.tmux]
+input_path = "./templates/tmux-colors.conf"
+output_path = "~/.config/tmux/generated.conf"
+
+[templates.dunst]
+input_path = "./templates/dunstrc-colors"
+output_path = "~/.config/dunst/dunstrc"
+
+[templates.zed]
+input_path = "./templates/zed-colors.json"
+output_path = "~/.config/zed/themes/matugen.json"
+
+[templates.wezterm]
+input_path = "./templates/wezterm_theme.toml"
+output_path = "~/.config/wezterm/colors/DymicShellMatugen.toml"
+
+[templates.yazi]
+input_path = "./templates/yazi-theme.toml"
+output_path = "~/.config/yazi/theme.toml"

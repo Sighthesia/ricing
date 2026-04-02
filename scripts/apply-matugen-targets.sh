@@ -44,37 +44,35 @@ prepend_line_if_missing() {
     mv "$tmp" "$file"
 }
 
-upsert_qt_appearance() {
+upsert_ini_key() {
     local file="$1"
-    local scheme_path="$2"
+    local section="$2"
+    local key="$3"
+    local value="$4"
     local tmp
 
     ensure_file "$file"
     tmp=$(mktemp "${file}.XXXXXX")
 
-    awk -v scheme_path="$scheme_path" '
+    awk -v section="$section" -v key="$key" -v value="$value" '
         BEGIN {
             in_section = 0
             saw_section = 0
-            wrote_scheme = 0
-            wrote_palette = 0
+            wrote_key = 0
         }
 
         function emit_missing() {
-            if (!wrote_scheme)
-                print "color_scheme_path=" scheme_path
-            if (!wrote_palette)
-                print "custom_palette=true"
+            if (!wrote_key)
+                print key "=" value
         }
 
-        /^\[Appearance\]$/ {
+        $0 == "[" section "]" {
             if (in_section)
                 emit_missing()
 
             in_section = 1
             saw_section = 1
-            wrote_scheme = 0
-            wrote_palette = 0
+            wrote_key = 0
             print
             next
         }
@@ -91,15 +89,9 @@ upsert_qt_appearance() {
 
         {
             if (in_section) {
-                if ($0 ~ /^color_scheme_path=/) {
-                    print "color_scheme_path=" scheme_path
-                    wrote_scheme = 1
-                    next
-                }
-
-                if ($0 ~ /^custom_palette=/) {
-                    print "custom_palette=true"
-                    wrote_palette = 1
+                if ($0 ~ ("^" key "=")) {
+                    print key "=" value
+                    wrote_key = 1
                     next
                 }
             }
@@ -111,9 +103,8 @@ upsert_qt_appearance() {
             if (!saw_section) {
                 if (NR > 0)
                     print ""
-                print "[Appearance]"
-                print "color_scheme_path=" scheme_path
-                print "custom_palette=true"
+                print "[" section "]"
+                print key "=" value
             } else if (in_section) {
                 emit_missing()
             }
@@ -126,18 +117,30 @@ upsert_qt_appearance() {
 main() {
     local home="${HOME:?}"
     local gtk_import='@import url("colors.css");'
+    local fuzzel_include='~/.config/fuzzel/colors.ini'
+    local ghostty_theme='theme = "DymicShellMatugen"'
     local kitty_include='include dymicshell-matugen.conf'
+    local mako_include='include=~/.config/mako/mako-colors'
     local niri_include='include "./dymicshell-matugen.kdl"'
     local qt5_scheme="$home/.config/qt5ct/colors/DymicShellMatugen.conf"
     local qt6_scheme="$home/.config/qt6ct/colors/DymicShellMatugen.conf"
+    local rofi_import='@import "colors.rasi"'
 
     prepend_line_if_missing "$home/.config/gtk-3.0/gtk.css" "$gtk_import"
     prepend_line_if_missing "$home/.config/gtk-4.0/gtk.css" "$gtk_import"
 
+    upsert_ini_key "$home/.config/fuzzel/fuzzel.ini" "main" "include" "$fuzzel_include"
+
+    append_line_if_missing "$home/.config/ghostty/config" "$ghostty_theme"
+
     append_line_if_missing "$home/.config/kitty/kitty.conf" "$kitty_include"
 
-    upsert_qt_appearance "$home/.config/qt5ct/qt5ct.conf" "$qt5_scheme"
-    upsert_qt_appearance "$home/.config/qt6ct/qt6ct.conf" "$qt6_scheme"
+    append_line_if_missing "$home/.config/mako/config" "$mako_include"
+
+    upsert_ini_key "$home/.config/qt5ct/qt5ct.conf" "Appearance" "color_scheme_path" "$qt5_scheme"
+    upsert_ini_key "$home/.config/qt5ct/qt5ct.conf" "Appearance" "custom_palette" "true"
+    upsert_ini_key "$home/.config/qt6ct/qt6ct.conf" "Appearance" "color_scheme_path" "$qt6_scheme"
+    upsert_ini_key "$home/.config/qt6ct/qt6ct.conf" "Appearance" "custom_palette" "true"
 
     # Niri's main config should not be created from scratch because a standalone
     # include file is not a valid full config for fresh installs.
@@ -145,8 +148,14 @@ main() {
         append_line_if_missing "$home/.config/niri/config.kdl" "$niri_include"
     fi
 
+    prepend_line_if_missing "$home/.config/rofi/config.rasi" "$rofi_import"
+
     if command -v kitty >/dev/null 2>&1; then
         pkill -SIGUSR1 kitty >/dev/null 2>&1 || true
+    fi
+
+    if command -v makoctl >/dev/null 2>&1; then
+        makoctl reload >/dev/null 2>&1 || true
     fi
 
     if command -v niri >/dev/null 2>&1; then
