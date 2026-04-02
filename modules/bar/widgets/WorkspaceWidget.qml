@@ -55,7 +55,10 @@ Item {
         : (_overviewRow.implicitWidth + root._padH * 2)
     readonly property real _collapsedPillWidth: Math.min(root._focusPillWidth, root._overviewPillWidth)
     readonly property real _expandedPillWidth: Math.max(root._focusPillWidth, root._overviewPillWidth)
-    readonly property real _layoutPillWidth: Math.max(root._expandedPillWidth, root._flashPillWidth)
+    readonly property real _layoutPillWidth:
+        root._flashActive
+            ? Math.max(root._expandedPillWidth, root._flashPillWidth)
+            : _pillTransition.animatedWidth
     readonly property real layoutMeasurementWidth: _layoutPillWidth
     readonly property real _flashPillWidth:
         Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2
