@@ -134,6 +134,7 @@ Item {
             key: capsule.key || "",
             label: capsule.label || "",
             icons: (capsule.icons || []).slice(),
+            workspaceIndex: capsule.workspaceIndex !== undefined ? capsule.workspaceIndex : -1,
             visible: capsule.visible !== false
         }
     }
@@ -157,6 +158,7 @@ Item {
             slots.push({
                 slotId: prefix + "-" + index,
                 absoluteIndex: -1,
+                workspaceIndex: -1,
                 capsule: null
             })
         }
@@ -172,6 +174,9 @@ Item {
             slots[index] = {
                 slotId: slots[index].slotId,
                 absoluteIndex: entry.absoluteIndex,
+                workspaceIndex: entry.capsule && entry.capsule.workspaceIndex !== undefined
+                    ? entry.capsule.workspaceIndex
+                    : entry.absoluteIndex,
                 capsule: cloneCapsule(entry.capsule)
             }
         }
@@ -276,6 +281,7 @@ Item {
             key: (summary ? (summary.workspaceId || "workspace") : "workspace") + "-" + absoluteIndex,
             label: root._workspaceLabel(workspaceIndex),
             icons: isCurrent ? (safeHint.windows || []) : (summary && summary.icons ? summary.icons.slice() : []),
+            workspaceIndex: workspaceIndex,
             visible: isCurrent || workspaceIndex > 0
         }
     }
@@ -696,15 +702,17 @@ Item {
             anchors.rightMargin: Theme.barWidget.badgePaddingH * 2
             clip: true
 
-            // Capsule content row.
+            // Workspace content row.
             Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.centerIn: parent
                 spacing: Theme.barWidget.badgePaddingH
 
-                // Leading workspace label.
+                // Workspace label.
                 Text {
-                    text: !workspaceCapsule._trailingLabel && workspaceCapsule.capsule ? (workspaceCapsule.capsule.label || "") : ""
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: workspaceCapsule.capsule && (workspaceCapsule.capsule.icons || []).length > 0
+                        ? (workspaceCapsule.capsule.label || "")
+                        : ""
                     color: workspaceCapsule._textColor
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
@@ -784,24 +792,15 @@ Item {
 
                     // Empty workspace label.
                     Text {
-                        text: workspaceCapsule.capsule && (workspaceCapsule.capsule.icons || []).length === 0 ? "Empty" : ""
+                        text: workspaceCapsule.capsule && (workspaceCapsule.capsule.icons || []).length === 0
+                            ? root._workspaceLabel(workspaceCapsule.capsule.workspaceIndex)
+                            : ""
                         color: Colors.textMuted
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSmall
                         verticalAlignment: Text.AlignVCenter
                         visible: text !== ""
                     }
-                }
-
-                // Trailing workspace label.
-                Text {
-                    text: workspaceCapsule._trailingLabel && workspaceCapsule.capsule ? (workspaceCapsule.capsule.label || "") : ""
-                    color: workspaceCapsule._textColor
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.bold: workspaceCapsule._emphasis >= 0.5
-                    verticalAlignment: Text.AlignVCenter
-                    visible: text !== ""
                 }
             }
         }
