@@ -1,6 +1,4 @@
 [ColorEffects:Disabled]
-; Reference: InioX/matugen-themes
-; https://github.com/InioX/matugen-themes
 Color={{colors.surface_dim.default.hex}}
 ColorAmount=0
 ColorEffect=0
@@ -133,11 +131,11 @@ ForegroundPositive={{colors.tertiary_fixed.default.hex}}
 ForegroundVisited={{colors.on_secondary_container.default.hex}}
 
 [General]
-ColorScheme=DymicShellMatugen
-Name=DymicShellMatugen
+ColorScheme=Matugen
+Name=Matugen
 
 [Appearance]
-color_scheme=DymicShellMatugen
+color_scheme=Matugen
 
 [KDE]
 contrast=4

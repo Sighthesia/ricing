@@ -1,0 +1,71 @@
+/*
+ * @name Steam
+ * @description A dynamic theme for Steam.
+ * @author InioX
+ * @source https://github.com/InioX/matugen-themes/blob/main/templates/steam.css
+ */
+
+#browser {
+--colorFg: {{colors.on_surface.default.rgb}} !important;
+--colorFgAlpha: {{colors.on_surface.default.rgba | set_alpha: 0.10}} !important;
+--colorFgIntense: {{colors.on_surface.default.rgb}} !important;
+--colorFgFaded: {{colors.on_surface.default.rgb | set_lightness: -10.0}} !important;
+--colorFgFadedMore: {{colors.on_surface.default.rgb | set_lightness: -15.0}} !important;
+--colorFgFadedMost: {{colors.on_surface.default.rgb | set_lightness: -25.0}} !important;
+--colorBg: {{colors.secondary_container.default.rgb}} !important;
+--colorBgAlpha: {{colors.secondary_container.default.rgba | set_alpha: 0.90}} !important;
+--colorBgAlphaHeavy: {{colors.secondary_container.default.rgba | set_alpha: 0.65}} !important;
+--colorBgAlphaHeavier: {{colors.secondary_container.default.rgba | set_alpha: 0.25}} !important;
+--colorBgAlphaBlur: {{colors.surface.default.rgb}} !important;
+--colorBgDark: {{colors.surface.default.rgb}} !important;
+--colorBgDarker: {{colors.surface.default.rgb | set_lightness: -10.0}} !important;
+--colorBgLight: {{colors.surface.default.rgb | set_lightness: 5.0}} !important;
+--colorBgLighter: {{colors.surface.default.rgb | set_lightness: 15.0}} !important;
+--colorBgLightIntense: {{colors.surface_dim.default.rgb | set_lightness: 15.0}} !important;
+--colorBgIntense: {{colors.surface_dim.default.rgb}} !important;
+--colorBgIntenser: {{colors.surface_dim.default.rgb | set_lightness: -5.0}} !important;
+--colorBgIntserAlpha: {{colors.surface_dim.default.rgba | set_lightness: -5.0 | set_alpha: 0.92}} !important;
+--colorBgInverse: {{colors.surface_variant.default.rgb}} !important;
+--colorBgInverser: {{colors.surface_variant.default.rgb | set_lightness: 10.0}} !important;
+--colorBgFaded: {{colors.primary.default.rgb}} !important;
+--colorHighlightBg: {{colors.primary.default.rgb}} !important;
+--colorHighlightBgFaded: {{colors.primary_fixed_dim.default.rgb | set_lightness: 10.0}} !important;
+--colorHighlightBgAlpha: {{colors.primary.default.rgba | set_alpha: 0.10}} !important;
+--colorHighlightBgDark: {{colors.inverse_primary .default.rgb | set_lightness: -10.0}} !important;
+--colorHighlightFg: {{colors.on_primary.default.rgb}} !important;
+--colorHighlightFgAlpha: {{colors.on_primary.default.rgba | set_alpha: 0.50}} !important;
+--colorHighlightFgAlphaHeavy: {{colors.on_primary.default.rgba | set_alpha: 0.25}} !important;
+--colorAccentBg: {{colors.surface.default.rgb}} !important;
+--colorAccentBgAlpha: {{colors.surface.default.rgba | set_alpha: 0.55}} !important;
+--colorAccentBgAlphaHeavy: {{colors.surface.default.rgba | set_alpha: 0.35}} !important;
+--colorAccentBgDark: {{colors.surface_container_low.default.rgb}} !important;
+--colorAccentBgDarker: {{colors.surface_container_lowest.default.rgb}} !important;
+--colorAccentBgFaded: {{colors.surface_dim.default.rgb}} !important;
+--colorAccentBgFadedMore: {{colors.surface_container_low.default.rgb}} !important;
+--colorAccentBgFadedMost: {{colors.surface_container_lowest.default.rgb}} !important;
+--colorAccentBorder: {{colors.outline_variant.default.rgb}} !important;
+--colorAccentBorderDark: {{colors.outline_variant.default.rgb | set_lightness: -10.0}} !important;
+--colorAccentFg: {{colors.on_surface.default.rgb}} !important;
+--colorAccentFgFaded: {{colors.on_surface_variant.default.rgb | set_lightness: -20.0}} !important;
+--colorAccentFgAlpha: {{colors.on_surface.default.rgba | set_alpha: 0.15}} !important;
+--colorAccentFgAlphaHeavy: {{colors.on_surface.default.rgba | set_alpha: 0.35}} !important;
+--colorBorder: {{colors.outline.default.rgb}} !important;
+--colorBorderDisabled: {{colors.surface_tint.default.rgb}} !important;
+--colorBorderSubtle: {{colors.outline.default.rgb | set_lightness: -5.0}} !important;
+--colorBorderIntense: {{colors.outline_variant.default.rgb}} !important;
+--colorSuccessBg: rgb(118 100.00% 32.75%);
+--colorSuccessBgAlpha: rgba(118 100.00% 32.75% / 0.10);
+--colorSuccessFg: rgb(0 0.00% 100.00%);
+--colorWarningBg: rgb(48 100.00% 50.00%);
+--colorWarningBgAlpha: rgba(48 100.00% 50.00% / 0.10);
+--colorWarningFg: rgb(0 0.00% 0.00%);
+--colorErrorBg: {{colors.error_container.default.rgb}} !important;
+--colorErrorBgAlpha: {{colors.error_container.default.rgba | set_alpha: 0.10}} !important;
+--colorErrorFg: {{colors.on_error.default.rgb}} !important;
+}
+
+.steam-settings,
+.settings-content,
+.settings-sidebar {
+  background-color: {{colors.surface.default.rgb}} !important;
+}
