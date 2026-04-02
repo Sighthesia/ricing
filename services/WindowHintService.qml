@@ -16,6 +16,15 @@ Singleton {
     readonly property bool triggerBridgeRunning: WindowHintTriggerService.running
 
     property int _revision: 0
+    property var _lastVisibleHint: _emptyHint()
+
+    Timer {
+        id: _hintRefreshCoalesceTimer
+
+        interval: 40
+        repeat: false
+        onTriggered: root._refreshHint()
+    }
 
     function setHintHeld(active) {
         const nextHeld = !!active
@@ -28,25 +37,54 @@ Singleton {
         root.hintHeld = nextHeld
 
         if (root.hintHeld) {
+            _hintRefreshCoalesceTimer.stop()
             root._refreshHint()
             return
         }
 
+        _hintRefreshCoalesceTimer.stop()
         root.activeHint = root._emptyHint()
+        root._lastVisibleHint = root._emptyHint()
         SuperIslandService.hideWindowHint()
+    }
+
+    function _scheduleHintRefresh(immediate) {
+        if (!root.hintHeld)
+            return
+
+        if (immediate) {
+            _hintRefreshCoalesceTimer.stop()
+            root._refreshHint()
+            return
+        }
+
+        _hintRefreshCoalesceTimer.restart()
+    }
+
+    function _publishHint(nextHint) {
+        if (!nextHint || !nextHint.visible)
+            return
+
+        root._lastVisibleHint = nextHint
+        root.activeHint = nextHint
+        SuperIslandService.showWindowHint(nextHint)
     }
 
     function _refreshHint() {
         const nextHint = root._buildHint(root.hintHeld)
-        root.activeHint = nextHint
 
         if (!root.hintHeld)
             return
 
-        if (nextHint.visible)
-            SuperIslandService.showWindowHint(nextHint)
-        else
-            SuperIslandService.hideWindowHint()
+        if (!nextHint.visible) {
+            if (root._lastVisibleHint.visible) {
+                root.activeHint = root._lastVisibleHint
+                SuperIslandService.showWindowHint(root._lastVisibleHint)
+            }
+            return
+        }
+
+        root._publishHint(nextHint)
     }
 
     function _emptyWindow() {
@@ -271,17 +309,17 @@ Singleton {
 
         function onWindowsUpdated() {
             if (root.hintHeld)
-                root._refreshHint()
+                root._scheduleHintRefresh(true)
         }
 
         function onWorkspaceActivated() {
             if (root.hintHeld)
-                root._refreshHint()
+                root._scheduleHintRefresh(false)
         }
 
         function onWorkspacesUpdated() {
             if (root.hintHeld)
-                root._refreshHint()
+                root._scheduleHintRefresh(false)
         }
     }
 

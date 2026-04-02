@@ -42,7 +42,7 @@ Item {
     readonly property int _workspaceStageHeight: root._workspaceSideHeight * 2 + root._workspacePrimaryHeight + root._workspaceColumnGap * 2
     readonly property int _titleStageWidth: root._titleSideWidth * 2 + root._titlePrimaryWidth + root._capsuleGap * 2
     readonly property int _titleStageHeight: root._titleCapsuleHeight
-    readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4]
+    readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     readonly property int _workspaceAnchorBaseDuration: Math.max(150, Math.round(Theme.anim.moveDuration * 1.05))
     readonly property int _titleAnchorBaseDuration: Math.max(140, Theme.anim.moveDuration)
     readonly property int _anchorDurationStep: Math.max(16, Math.round(Theme.anim.moveDuration * 0.1))
@@ -52,6 +52,8 @@ Item {
 
     property real _animatedWorkspaceAnchor: -1
     property real _animatedTitleAnchor: -1
+    property bool _workspaceSettlePending: false
+    property bool _titleSettlePending: false
     // Inspired by end-4/dots-hyprland ("illogical impulse") workspace indicator motion.
     // Reference: https://github.com/end-4/dots-hyprland/blob/main/dots/.config/quickshell/ii/modules/ii/bar/Workspaces.qml
     property int _workspaceFocusIndex: -1
@@ -166,18 +168,90 @@ Item {
         return slots
     }
 
-    function _slotsForEntries(entries, cloneCapsule, prefix) {
-        const slots = root._emptyStageSlots(prefix)
+    function _cloneStageSlot(slot, cloneCapsule, slotId) {
+        return {
+            slotId: slot ? (slot.slotId || slotId) : slotId,
+            absoluteIndex: slot && slot.absoluteIndex !== undefined ? slot.absoluteIndex : -1,
+            workspaceIndex: slot && slot.workspaceIndex !== undefined ? slot.workspaceIndex : -1,
+            capsule: cloneCapsule(slot ? slot.capsule : null)
+        }
+    }
 
-        for (let index = 0; index < Math.min(slots.length, entries.length); index++) {
-            const entry = entries[index]
-            slots[index] = {
-                slotId: slots[index].slotId,
+    function _stageSlotsFrom(currentSlots, cloneCapsule, prefix) {
+        const slots = []
+
+        for (let index = 0; index < root._persistentStageSlotIndices.length; index++) {
+            const slotId = prefix + "-" + index
+            const currentSlot = currentSlots && index < currentSlots.length ? currentSlots[index] : null
+            slots.push(root._cloneStageSlot(currentSlot, cloneCapsule, slotId))
+        }
+
+        return slots
+    }
+
+    function _slotsForEntries(currentSlots, entries, cloneCapsule, prefix, preserveUnassigned) {
+        const current = root._stageSlotsFrom(currentSlots, cloneCapsule, prefix)
+        const slots = root._emptyStageSlots(prefix)
+        const assignedSlots = ({})
+
+        for (let entryIndex = 0; entryIndex < Math.min(slots.length, entries.length); entryIndex++) {
+            const entry = entries[entryIndex]
+            let slotIndex = -1
+
+            for (let index = 0; index < current.length; index++) {
+                if (assignedSlots[index])
+                    continue
+                if (current[index].absoluteIndex !== entry.absoluteIndex)
+                    continue
+
+                slotIndex = index
+                break
+            }
+
+            if (slotIndex < 0) {
+                for (let index = 0; index < current.length; index++) {
+                    if (assignedSlots[index])
+                        continue
+                    if (current[index].absoluteIndex >= 0)
+                        continue
+
+                    slotIndex = index
+                    break
+                }
+            }
+
+            if (slotIndex < 0) {
+                for (let index = 0; index < current.length; index++) {
+                    if (assignedSlots[index])
+                        continue
+
+                    slotIndex = index
+                    break
+                }
+            }
+
+            if (slotIndex < 0)
+                break
+
+            assignedSlots[slotIndex] = true
+            slots[slotIndex] = {
+                slotId: current[slotIndex].slotId,
                 absoluteIndex: entry.absoluteIndex,
                 workspaceIndex: entry.capsule && entry.capsule.workspaceIndex !== undefined
                     ? entry.capsule.workspaceIndex
                     : entry.absoluteIndex,
                 capsule: cloneCapsule(entry.capsule)
+            }
+        }
+
+        if (preserveUnassigned) {
+            for (let index = 0; index < current.length; index++) {
+                if (assignedSlots[index])
+                    continue
+                if (current[index].absoluteIndex < 0 || !current[index].capsule)
+                    continue
+
+                slots[index] = root._cloneStageSlot(current[index], cloneCapsule, current[index].slotId)
             }
         }
 
@@ -329,16 +403,55 @@ Item {
         }
     }
 
-    function _workspaceStageCapsulesForHint(hint) {
+    function _visibleAbsoluteIndices(anchor, length) {
+        const range = root._visibleAbsoluteRange(anchor, length)
+        const items = []
+
+        for (let index = range.from; index <= range.to; index++)
+            items.push(index)
+
+        return items
+    }
+
+    function _mergedVisibleAbsoluteIndices(currentAnchor, targetAnchor, length) {
+        const items = []
+        const seen = ({})
+        const targetRange = root._visibleAbsoluteRange(targetAnchor, length)
+        const currentRange = root._visibleAbsoluteRange(currentAnchor, length)
+
+        for (let index = targetRange.from; index <= targetRange.to; index++) {
+            if (index < 0 || index >= length || seen[index])
+                continue
+
+            seen[index] = true
+            items.push(index)
+        }
+
+        for (let index = currentRange.from; index <= currentRange.to; index++) {
+            if (index < 0 || index >= length || seen[index])
+                continue
+
+            seen[index] = true
+            items.push(index)
+        }
+
+        items.sort((left, right) => left - right)
+        return items
+    }
+
+    function _workspaceStageCapsulesForHint(hint, includeCurrentAnchor) {
         const safeHint = hint || {}
         const summaries = safeHint.workspaces || []
         const anchor = root._workspaceAnchorForHint(safeHint)
-        const range = root._visibleAbsoluteRange(anchor, summaries.length)
+        const indices = includeCurrentAnchor
+            ? root._mergedVisibleAbsoluteIndices(root._animatedWorkspaceAnchor, anchor, summaries.length)
+            : root._visibleAbsoluteIndices(anchor, summaries.length)
         const items = []
 
-        for (let index = range.from; index <= range.to; index++) {
+        for (let listIndex = 0; listIndex < indices.length; listIndex++) {
+            const index = indices[listIndex]
             const capsule = root._workspaceCapsuleForAbsolute(index, safeHint)
-            if (!capsule.visible || Math.abs(index - anchor) > 2)
+            if (!capsule.visible)
                 continue
 
             items.push({
@@ -351,7 +464,7 @@ Item {
         return items
     }
 
-    function _titleStageCapsulesForHint(hint) {
+    function _titleStageCapsulesForHint(hint, includeCurrentAnchor) {
         const safeHint = hint || {}
         const windows = safeHint.windows || []
         const anchor = root._titleAnchorForHint(safeHint)
@@ -366,10 +479,13 @@ Item {
             return items
         }
 
-        const range = root._visibleAbsoluteRange(anchor, windows.length)
-        for (let index = range.from; index <= range.to; index++) {
+        const indices = includeCurrentAnchor
+            ? root._mergedVisibleAbsoluteIndices(root._animatedTitleAnchor, anchor, windows.length)
+            : root._visibleAbsoluteIndices(anchor, windows.length)
+        for (let listIndex = 0; listIndex < indices.length; listIndex++) {
+            const index = indices[listIndex]
             const capsule = root._titleCapsuleForAbsolute(index, safeHint)
-            if (!capsule.visible || Math.abs(index - anchor) > 2)
+            if (!capsule.visible)
                 continue
 
             items.push({
@@ -420,16 +536,40 @@ Item {
         return slot.absoluteIndex - root._animatedTitleAnchor
     }
 
-    function _refreshStageSlots(hint) {
+    function _refreshStageSlots(hint, includeCurrentAnchor, preserveUnassigned) {
         root._workspaceStageSlots = root._slotsForEntries(
-            root._workspaceStageCapsulesForHint(hint),
+            root._workspaceStageSlots,
+            root._workspaceStageCapsulesForHint(hint, includeCurrentAnchor),
             root._cloneWorkspaceCapsule,
-            "workspace-slot"
+            "workspace-slot",
+            preserveUnassigned
         )
         root._titleStageSlots = root._slotsForEntries(
-            root._titleStageCapsulesForHint(hint),
+            root._titleStageSlots,
+            root._titleStageCapsulesForHint(hint, includeCurrentAnchor),
             root._cloneTitleCapsule,
-            "title-slot"
+            "title-slot",
+            preserveUnassigned
+        )
+    }
+
+    function _settleWorkspaceStageSlots(hint) {
+        root._workspaceStageSlots = root._slotsForEntries(
+            root._workspaceStageSlots,
+            root._workspaceStageCapsulesForHint(hint, false),
+            root._cloneWorkspaceCapsule,
+            "workspace-slot",
+            false
+        )
+    }
+
+    function _settleTitleStageSlots(hint) {
+        root._titleStageSlots = root._slotsForEntries(
+            root._titleStageSlots,
+            root._titleStageCapsulesForHint(hint, false),
+            root._cloneTitleCapsule,
+            "title-slot",
+            false
         )
     }
 
@@ -445,6 +585,7 @@ Item {
     }
 
     function _retargetWorkspaceAnchor(target, immediate) {
+        root._workspaceSettlePending = false
         _workspaceAnchorAnimation.stop()
 
         if (immediate || target < 0 || root._animatedWorkspaceAnchor < 0) {
@@ -462,10 +603,12 @@ Item {
         _workspaceAnchorAnimation.from = currentAnchor
         _workspaceAnchorAnimation.to = target
         _workspaceAnchorAnimation.duration = duration
+        root._workspaceSettlePending = true
         _workspaceAnchorAnimation.start()
     }
 
     function _retargetTitleAnchor(target, immediate) {
+        root._titleSettlePending = false
         _titleAnchorAnimation.stop()
 
         if (immediate || target < 0 || root._animatedTitleAnchor < 0) {
@@ -483,6 +626,7 @@ Item {
         _titleAnchorAnimation.from = currentAnchor
         _titleAnchorAnimation.to = target
         _titleAnchorAnimation.duration = duration
+        root._titleSettlePending = true
         _titleAnchorAnimation.start()
     }
 
@@ -635,14 +779,14 @@ Item {
             }
 
             root._renderHint = nextHint
-            root._refreshStageSlots(nextHint)
+            root._refreshStageSlots(nextHint, false, false)
             root._retargetHintAnchors(nextHint, true)
             return
         }
 
         const wasVisible = !!(root._renderHint && root._renderHint.visible)
         root._renderHint = nextHint
-        root._refreshStageSlots(nextHint)
+        root._refreshStageSlots(nextHint, wasVisible, wasVisible)
         root._retargetHintAnchors(nextHint, !wasVisible)
     }
 
@@ -901,6 +1045,14 @@ Item {
         target: root
         property: "_animatedWorkspaceAnchor"
         easing.type: Theme.anim.moveType
+
+        onStopped: {
+            if (!root._workspaceSettlePending)
+                return
+
+            root._workspaceSettlePending = false
+            root._settleWorkspaceStageSlots(root._hint)
+        }
     }
 
     NumberAnimation {
@@ -909,6 +1061,14 @@ Item {
         target: root
         property: "_animatedTitleAnchor"
         easing.type: Theme.anim.moveType
+
+        onStopped: {
+            if (!root._titleSettlePending)
+                return
+
+            root._titleSettlePending = false
+            root._settleTitleStageSlots(root._hint)
+        }
     }
 
     QtObject {
@@ -937,7 +1097,7 @@ Item {
 
     Component.onCompleted: {
         root._renderHint = root._cloneHint(root._liveHint)
-        root._refreshStageSlots(root._renderHint)
+        root._refreshStageSlots(root._renderHint, false, false)
         root._retargetHintAnchors(root._renderHint, true)
     }
 
