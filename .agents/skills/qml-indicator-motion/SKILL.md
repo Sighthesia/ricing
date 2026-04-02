@@ -70,6 +70,22 @@ Rectangle {
 - If the indicator sits inside a clipped row, animate the overlay item and keep icon delegates simple.
 - If fast switching still looks jumpy, check whether the repeated capsules themselves are being recreated from fresh arrays.
 
+## Learned Limits
+
+- Root-owned lead/trail indicators work best for one continuous visual shape, such as a circle or pill behind icons.
+- Do not expect the same pattern alone to fix rapid-switch interruption for full capsules whose content, width, height, and emphasis all change together.
+- If capsule motion still gets interrupted, the likely cause is delegate/model rebuilds rather than easing choice.
+- For full capsule rows, prefer persistent root-owned slots with stable delegate identity, then retarget position separately from content refresh.
+
+## Escalation Path
+
+If an indicator fix works but a larger capsule still jumps:
+
+1. Keep the indicator root-owned.
+2. Stop rebuilding the capsule `Repeater` model from fresh arrays every update.
+3. Move to a persistent slot model such as 3-5 stable lanes.
+4. Refresh slot content separately from slot position.
+
 ## When Not To Use It
 
 - Do not use this pattern for full capsule enter/exit choreography where content identity changes mid-flight.
