@@ -136,7 +136,7 @@ main() {
     local kitty_include='include kitty-colors.conf'
     local mako_include='include=~/.config/mako/mako-colors'
     local niri_include='include "./colors.kdl"'
-    local firefox_import='@import url("colors.css");'
+    local firefox_import='@import url("file://'$home'/.cache/matugen/firefox/colors.css");'
     local qt5_scheme="$home/.config/qt5ct/colors/DymicShellMatugen.conf"
     local qt6_scheme="$home/.config/qt6ct/colors/DymicShellMatugen.conf"
     local rofi_import='@import "colors.rasi"'

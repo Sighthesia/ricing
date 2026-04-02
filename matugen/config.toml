@@ -48,7 +48,7 @@ output_path = "~/.config/hypr/colors.conf"
 
 [templates.btop]
 input_path = "./templates/btop.theme"
-output_path = "~/.config/btop/themes/DymicShell.theme"
+output_path = "~/.config/btop/themes/matugen.theme"
 
 [templates.kitty]
 input_path = "./templates/kitty-colors.conf"
@@ -165,6 +165,10 @@ output_path = "~/.config/yazi/theme.toml"
 [templates.quickshell_qml]
 input_path = "./templates/quickshell.qml"
 output_path = "~/.config/quickshell/Colors.qml"
+
+[templates.firefox]
+input_path = "./templates/firefox-colors.css"
+output_path = "~/.cache/matugen/firefox/colors.css"
 
 [templates.neovim]
 input_path = "./templates/neovim/nvim-colors.vim"
