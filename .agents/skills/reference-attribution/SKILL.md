@@ -1,6 +1,6 @@
 ---
 name: reference-attribution
-description: Use when adapting code, templates, config patterns, or architecture from another repository and you need to document attribution consistently in DymicShell.
+description: Use when adapting code, templates, config patterns, or architecture from another repository and you need to document attribution consistently in the target project.
 ---
 
 # Reference Attribution
@@ -53,8 +53,14 @@ Do not add attribution for broad ecosystem conventions that are not traceable to
 // https://github.com/example/upstream-project
 ```
 
-## DymicShell Rule
+## Project Rule
 
 - If a user explicitly asks for attribution, every adapted file in the change must carry it.
 - Prefer referencing the upstream repository once per adapted file instead of repeating many links inline.
 - Keep attribution comments valid for the target file format so generated configs remain loadable.
+
+## Portability
+
+- This skill is repository-agnostic and should work in any codebase.
+- If the target project already has its own attribution policy, follow that policy first.
+- If there is no local policy, use the conventions in this skill as the default baseline.
