@@ -94,6 +94,23 @@ update path and expect the user to see motion.
 **Good**: Use an explicit `SequentialAnimation` or `ParallelAnimation` when the visual
 result depends on intermediate states being observable across frames.
 
+### Mistake 6: Rebuilding Delegates During Motion
+
+**Bad**: A service refresh replaces the rendered array model while a motion effect is in
+flight, so repeated delegates are recreated and local animation state is lost.
+
+**Good**: Keep animation-driving state at the root, prefer stable delegate identity for
+animated rows, and update slot content separately from slot position.
+
+Typical symptom chain:
+
+- service snapshots are correct
+- focus/index values are correct
+- a highlight or capsule still appears to jump, restart, or always stretch from one side
+
+In those cases, inspect whether the animated subtree is being rebuilt before tuning
+durations.
+
 ---
 
 ## Checklist for Cross-Layer Features
@@ -127,8 +144,15 @@ For UI motion bugs, debug in this order:
 3. **Leaf layer**: confirm the actual animated item owns the geometry property being
    changed.
 
+4. **Identity layer**: confirm the animated delegate instance survives snapshot updates.
+   If the host rebuilds the `Repeater` model from fresh arrays, local animation state may
+   reset even when state and geometry are otherwise correct.
+
 Do not tune durations until all three layers are verified. Otherwise you only make a
 broken animation slower.
+
+For repeated animated rows, do not tune durations until the fourth identity step is also
+verified.
 
 ---
 

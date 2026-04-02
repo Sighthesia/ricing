@@ -23,6 +23,8 @@ considering a change done.
 - Mixing `anchors.*` geometry with manual `x`/`y` animation on the same item.
 - Stacking `Behavior` and imperative animation on the same property unless the shared
   ownership is intentional and documented.
+- Rebuilding `Repeater` or delegate models during active motion when the effect depends on
+  persistent local animation state.
 - Using `Qt.callLater()` to create user-visible motion when a real animation timeline
   is required.
 
@@ -39,6 +41,8 @@ considering a change done.
   single place.
 - Prefer explicit `ParallelAnimation` / `SequentialAnimation` when the transition must
   preserve intermediate visual states across frames.
+- For indicator or capsule motion inside repeated rows, keep the animated state root-owned
+  or keep delegate identity stable across service refreshes.
 
 ---
 
@@ -64,3 +68,4 @@ There is no project-local unit test suite defined in this repo.
 - Does each animated property have exactly one geometry owner?
 - If motion is driven by service updates, was the full service -> host -> leaf path
   checked?
+- If motion lives inside a `Repeater`, was delegate identity kept stable during updates?
