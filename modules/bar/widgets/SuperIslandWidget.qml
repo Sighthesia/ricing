@@ -258,6 +258,7 @@ property real _flashTrackOpacity: 0
         expanded: root._pillExpanded
         extensionOwnerKey: root.liveInstance ? "super-island" : ""
         animateSurface: root._overlaySessionActive
+        sharedTransition: _pillTransition
     }
 
     SystemClock {
@@ -274,7 +275,7 @@ property real _flashTrackOpacity: 0
         expandedHeight: root._expandedPillHeight
         expanded: root._pillExpanded
         animateWidth: true
-        animateHeight: false
+        animateHeight: true
     }
 
     function _log(message, event) {

@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import qs.config
@@ -92,66 +93,54 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 0
+            spacing: 10
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 30
-                radius: 11
-                color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.38)
-                border.color: Colors.border
-                border.width: 1
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 0
-                    spacing: 0
-
-                    SuperIslandParts.SuperIslandOverlayNavButton {
-                        Layout.fillWidth: true
-                        label: "启动器"
-                        iconGlyph: "\uf002"
-                        selected: root.currentPage === "launcher"
-                        firstSegment: true
-                        onPressed: root._retargetPage("launcher")
-                    }
-
-                    SuperIslandParts.SuperIslandOverlayNavButton {
-                        Layout.fillWidth: true
-                        label: "设置"
-                        iconGlyph: "\uf013"
-                        selected: root.currentPage === "settings"
-                        onPressed: root._retargetPage("settings")
-                    }
-
-                    SuperIslandParts.SuperIslandOverlayNavButton {
-                        Layout.fillWidth: true
-                        label: "通知"
-                        iconGlyph: "\uf0f3"
-                        selected: root.currentPage === "notifications"
-                        lastSegment: true
-                        onPressed: root._retargetPage("notifications")
-                    }
-                }
+            Text {
+                text: Qt.formatDateTime(_deckClock.date, "hh:mm")
+                font.family: Theme.fontMono
+                font.pixelSize: Theme.fontSizeBody
+                font.bold: true
+                color: Colors.text
+                Layout.alignment: Qt.AlignVCenter
             }
 
             Item { Layout.fillWidth: true }
 
-            Rectangle {
+            RowLayout {
+                Layout.preferredWidth: Math.round(320 * Theme.uiScale)
+                Layout.preferredHeight: 30
+                spacing: 0
+
+                SuperIslandParts.SuperIslandOverlayNavButton {
+                    Layout.fillWidth: true
+                    label: "启动器"
+                    iconGlyph: "\uf002"
+                    selected: root.currentPage === "launcher"
+                    firstSegment: true
+                    onPressed: root._retargetPage("launcher")
+                }
+
+                SuperIslandParts.SuperIslandOverlayNavButton {
+                    Layout.fillWidth: true
+                    label: "设置"
+                    iconGlyph: "\uf013"
+                    selected: root.currentPage === "settings"
+                    onPressed: root._retargetPage("settings")
+                }
+
+                SuperIslandParts.SuperIslandOverlayNavButton {
+                    Layout.fillWidth: true
+                    label: "通知"
+                    iconGlyph: "\uf0f3"
+                    selected: root.currentPage === "notifications"
+                    lastSegment: true
+                    onPressed: root._retargetPage("notifications")
+                }
+            }
+
+            Item {
                 width: 28
                 height: 28
-                radius: Theme.cornerRadius - 2
-                color: _closeArea.containsMouse ? Colors.surface : "transparent"
-                border.color: _closeArea.containsMouse ? Colors.border : "transparent"
-                border.width: 1
-
-                Behavior on color {
-                    ColorAnimation { duration: Theme.anim.highlightDuration }
-                }
-
-                Behavior on border.color {
-                    ColorAnimation { duration: Theme.anim.highlightDuration }
-                }
 
                 Text {
                     anchors.centerIn: parent
@@ -169,6 +158,13 @@ Item {
                     onClicked: IslandOverlayService.closeOverlay("deck-close")
                 }
             }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            radius: height / 2
+            color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.65)
         }
 
         Item {

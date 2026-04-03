@@ -13,10 +13,13 @@ Item {
     required property string extensionOwnerKey
 
     property bool animateSurface: true
+    property var sharedTransition: null
 
     readonly property string state: _state
-    readonly property real surfaceHeight: _surfaceTransition.animatedHeight
-    readonly property real clipHeight: _clipHeight
+    readonly property var _geometryTransition: sharedTransition || _surfaceTransition
+    readonly property bool _usesSharedTransition: !!sharedTransition
+    readonly property real surfaceHeight: _geometryTransition.animatedHeight
+    readonly property real clipHeight: _usesSharedTransition ? _geometryTransition.animatedHeight : _clipHeight
     readonly property real progress: {
         const revealRange = expandedHeight - collapsedHeight
         if (revealRange <= 0)
@@ -26,7 +29,9 @@ Item {
         return Math.max(0, Math.min(1, normalized))
     }
     readonly property real reservedExtension: _reservedExtension
-    readonly property bool running: _transitionRunning || _clipAnimation.running || _surfaceTransition.running
+    readonly property bool running: _transitionRunning
+        || (!_usesSharedTransition && (_clipAnimation.running || _surfaceTransition.running))
+        || (_usesSharedTransition && _geometryTransition && _geometryTransition.running)
 
     property string _state: "closed"
     property real _clipHeight: 0
@@ -63,7 +68,7 @@ Item {
     }
 
     Connections {
-        target: _surfaceTransition
+        target: root._geometryTransition
 
         function onRunningChanged() {
             if (!root._ready) {
@@ -75,7 +80,7 @@ Item {
                 return
             }
 
-            if (root._closeAwaitingClipAnimation) {
+            if (root._closeAwaitingClipAnimation && !root._usesSharedTransition) {
                 return
             }
 
@@ -178,12 +183,12 @@ Item {
             return
         }
 
-        if (_clipAnimation.running) {
+        if (!_usesSharedTransition && _clipAnimation.running) {
             return
         }
 
-        if (_surfaceTransition.running
-            && _surfaceTransition.animatedHeight > collapsedHeight + 0.5) {
+        if (_geometryTransition.running
+            && _geometryTransition.animatedHeight > collapsedHeight + 0.5) {
             return
         }
 
@@ -200,7 +205,8 @@ Item {
     }
 
     function _syncToTruthWithoutAnimation() {
-        _surfaceTransition.expanded = expanded
+        if (!_usesSharedTransition)
+            _surfaceTransition.expanded = expanded
         _clipBehaviorEnabled = false
         _clipHeight = expanded ? expandedHeight : collapsedHeight
         _clipBehaviorEnabled = true
@@ -215,18 +221,24 @@ Item {
         _state = "opening"
         _closeAwaitingClipAnimation = false
         _transitionRunning = true
-        _surfaceTransition.expanded = true
-        _clipBehaviorEnabled = true
-        _clipHeight = expandedHeight
+
+        if (!_usesSharedTransition) {
+            _surfaceTransition.expanded = true
+            _clipBehaviorEnabled = true
+            _clipHeight = expandedHeight
+        }
     }
 
     function _beginClose() {
         _registerReservedExtension(extensionOwnerKey, _targetReservedExtension())
         _state = "closing"
-        _closeAwaitingClipAnimation = true
+        _closeAwaitingClipAnimation = !_usesSharedTransition
         _transitionRunning = true
-        _surfaceTransition.expanded = false
-        _clipHeight = collapsedHeight
+
+        if (!_usesSharedTransition) {
+            _surfaceTransition.expanded = false
+            _clipHeight = collapsedHeight
+        }
     }
 
     onExpandedChanged: {
@@ -259,7 +271,9 @@ Item {
             return
 
         _registerReservedExtension(extensionOwnerKey, _targetReservedExtension())
-        _clipHeight = expandedHeight
+
+        if (!_usesSharedTransition)
+            _clipHeight = expandedHeight
 
         if (!_transitionRunning)
             _syncToTruthWithoutAnimation()
