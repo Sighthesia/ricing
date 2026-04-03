@@ -254,6 +254,8 @@ Item {
                         SettingsService.save()
                         if (SettingsService.data.appearance.matugenEnabled)
                             WallpaperService.triggerMatugen()
+                        else
+                            WallpaperService.syncAppearanceMode()
                     }
                 }
 

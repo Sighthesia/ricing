@@ -128,10 +128,69 @@ upsert_ini_key() {
     mv "$tmp" "$file"
 }
 
+apply_live_terminal_sequences() {
+    local sequences_file="$1"
+    local sequences_text
+    local tty
+
+    [ -f "$sequences_file" ] || return 0
+
+    sequences_text=$(<"$sequences_file")
+
+    shopt -s nullglob
+    for tty in /dev/pts/[0-9]*; do
+        [ -w "$tty" ] || continue
+        printf '%b' "$sequences_text" > "$tty" 2>/dev/null || true
+    done
+    shopt -u nullglob
+}
+
+reload_kitty() {
+    local kitty_colors_file="$1"
+    local kitty_remote_socket="$2"
+
+    if ! command -v kitty >/dev/null 2>&1; then
+        return 0
+    fi
+
+    kitty_reload_all() {
+        kitty +runpy "from kitty.utils import reload_conf_in_all_kitties; reload_conf_in_all_kitties()" >/dev/null 2>&1
+    }
+
+    if [ -S /tmp/kitty ]; then
+        printf '[matugen-apply] kitty branch=set-colors socket=%s\n' "$kitty_remote_socket"
+        if kitty @ --to "$kitty_remote_socket" set-colors --all --configured "$kitty_colors_file"; then
+            printf '[matugen-apply] kitty set-colors rc=0\n'
+        else
+            printf '[matugen-apply] kitty set-colors rc=%s\n' "$?"
+            printf '[matugen-apply] kitty falling back to reload_conf_in_all_kitties\n'
+            if kitty_reload_all; then
+                printf '[matugen-apply] kitty reload-conf rc=0\n'
+            else
+                printf '[matugen-apply] kitty reload-conf rc=1\n'
+            fi
+        fi
+    else
+        printf '[matugen-apply] kitty socket missing at %s; restart kitty once to enable live reload\n' "$kitty_remote_socket"
+        printf '[matugen-apply] kitty branch=reload-conf\n'
+        if kitty_reload_all; then
+            printf '[matugen-apply] kitty reload-conf rc=0\n'
+        else
+            printf '[matugen-apply] kitty reload-conf rc=1\n'
+        fi
+    fi
+}
+
 main() {
     local home="${HOME:?}"
+    local kitty_colors_file="$home/.config/kitty/kitty-colors.conf"
+    local kitty_remote_socket="unix:/tmp/kitty"
+    local mode="${1:-}"
+    local apply_scope="${2:-full}"
     local gtk_import='@import url("colors.css");'
+    local gtk_dark_preference
     local fuzzel_include='~/.config/fuzzel/colors.ini'
+    local gsettings_color_scheme
     local ghostty_theme='theme = "DymicShellMatugen"'
     local kitty_include='include kitty-colors.conf'
     local mako_include='include=~/.config/mako/mako-colors'
@@ -139,9 +198,51 @@ main() {
     local qt5_scheme="$home/.config/qt5ct/colors/DymicShellMatugen.conf"
     local qt6_scheme="$home/.config/qt6ct/colors/DymicShellMatugen.conf"
     local rofi_import='@import "colors.rasi"'
+    local terminal_sequences_file="$home/.cache/terminal-sequences"
+
+    case "$mode" in
+        dark)
+            gtk_dark_preference="1"
+            gsettings_color_scheme="prefer-dark"
+            ;;
+        light)
+            gtk_dark_preference="0"
+            gsettings_color_scheme="prefer-light"
+            ;;
+        *)
+            printf 'usage: %s <dark|light>\n' "${0##*/}" >&2
+            return 1
+            ;;
+    esac
+
+    case "$apply_scope" in
+        full|--full)
+            apply_scope="full"
+            ;;
+        --system-only)
+            apply_scope="system-only"
+            ;;
+        *)
+            printf 'usage: %s <dark|light> [--system-only]\n' "${0##*/}" >&2
+            return 1
+            ;;
+    esac
+
+    printf '[matugen-apply] mode=%s scope=%s\n' "$mode" "$apply_scope"
 
     prepend_line_if_missing "$home/.config/gtk-3.0/gtk.css" "$gtk_import"
     prepend_line_if_missing "$home/.config/gtk-4.0/gtk.css" "$gtk_import"
+    upsert_ini_key "$home/.config/gtk-3.0/settings.ini" "Settings" "gtk-application-prefer-dark-theme" "$gtk_dark_preference"
+    upsert_ini_key "$home/.config/gtk-4.0/settings.ini" "Settings" "gtk-application-prefer-dark-theme" "$gtk_dark_preference"
+
+    if command -v gsettings >/dev/null 2>&1; then
+        gsettings set org.gnome.desktop.interface color-scheme "$gsettings_color_scheme" >/dev/null 2>&1 || true
+    fi
+
+    if [ "$apply_scope" = "system-only" ]; then
+        reload_kitty "$kitty_colors_file" "$kitty_remote_socket"
+        return 0
+    fi
 
     upsert_ini_key "$home/.config/fuzzel/fuzzel.ini" "main" "include" "$fuzzel_include"
 
@@ -166,12 +267,18 @@ main() {
 
     prepend_line_if_missing "$home/.config/rofi/config.rasi" "$rofi_import"
 
-    if command -v kitty >/dev/null 2>&1; then
-        pkill -SIGUSR1 kitty >/dev/null 2>&1 || true
-    fi
+    reload_kitty "$kitty_colors_file" "$kitty_remote_socket"
 
     if command -v makoctl >/dev/null 2>&1; then
         makoctl reload >/dev/null 2>&1 || true
+    fi
+
+    if command -v btop >/dev/null 2>&1; then
+        if pkill -SIGUSR2 btop >/dev/null 2>&1; then
+            printf '[matugen-apply] btop sigusr2 rc=0\n'
+        else
+            printf '[matugen-apply] btop sigusr2 rc=1\n'
+        fi
     fi
 
     if command -v niri >/dev/null 2>&1; then
@@ -181,6 +288,7 @@ main() {
     if command -v plasma-apply-colorscheme >/dev/null 2>&1; then
         plasma-apply-colorscheme DymicShellMatugen >/dev/null 2>&1 || true
     fi
+
 }
 
 main "$@"

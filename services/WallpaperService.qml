@@ -11,6 +11,9 @@ Singleton {
     readonly property string matugenConfigPath: Quickshell.shellDir + "/matugen/config.toml"
     readonly property string matugenWorkingDir: Quickshell.shellDir + "/matugen"
     readonly property string matugenApplyScriptPath: Quickshell.shellDir + "/scripts/apply-matugen-targets.sh"
+    property string pendingTargetMode: SettingsService.data.appearance.darkMode ? "dark" : "light"
+    property bool applyQueued: false
+    property bool applyQueuedSystemOnly: false
 
     // Emitted after setWallpaper() is called — listeners (e.g., BackgroundWindow)
     // should react to this rather than polling swww.
@@ -45,21 +48,32 @@ Singleton {
                 return
             }
 
-            matugenApplyProcess.command = ["bash", root.matugenApplyScriptPath]
-            matugenApplyProcess.running = true
+            Qt.callLater(function() {
+                root._runMatugenApply(root.pendingTargetMode)
+            })
         }
     }
 
     Process {
         id: matugenApplyProcess
 
+        stdout: SplitParser {
+            onRead: data => console.log("[DymicShell:WallpaperService] matugen-apply stdout:", data.trim())
+        }
+
+        stderr: SplitParser {
+            onRead: data => console.warn("[DymicShell:WallpaperService] matugen-apply stderr:", data.trim())
+        }
+
         onExited: function(exitCode, exitStatus) {
+            console.log("[DymicShell:WallpaperService] matugen-apply exited", exitCode, exitStatus, "mode=", root.pendingTargetMode)
             if (exitCode !== 0) {
                 root.matugenFailed("matugen target wiring exited with code " + exitCode)
                 return
             }
 
             root.matugenCompleted()
+            Qt.callLater(root._flushQueuedApply)
         }
     }
 
@@ -76,15 +90,63 @@ Singleton {
     // (e.g., when the user toggles dark/light mode in the settings UI).
     function triggerMatugen() {
         const path = SettingsService.data.appearance.wallpaperPath
-        if (path === "") return
+        if (!SettingsService.data.appearance.matugenEnabled) return
+
+        const mode = SettingsService.data.appearance.darkMode ? "dark" : "light"
+        if (path === "") {
+            root._runMatugenApply(mode)
+            return
+        }
+
         debounceTimer.restart()
+    }
+
+    function syncAppearanceMode() {
+        if (SettingsService.data.appearance.matugenEnabled) return
+
+        const mode = SettingsService.data.appearance.darkMode ? "dark" : "light"
+        root._runMatugenApply(mode, true)
+    }
+
+    function _runMatugenApply(mode, systemOnly) {
+        root.pendingTargetMode = mode
+        if (root.matugenRunning) {
+            root.applyQueuedSystemOnly = root.applyQueued ? (root.applyQueuedSystemOnly && !!systemOnly) : !!systemOnly
+            root.applyQueued = true
+            console.log("[DymicShell:WallpaperService] matugen-apply queued", mode, systemOnly)
+            return
+        }
+
+        root.applyQueued = false
+        root.applyQueuedSystemOnly = false
+        console.log("[DymicShell:WallpaperService] starting matugen-apply", mode, systemOnly ? "system-only" : "full")
+        matugenApplyProcess.command = systemOnly
+            ? ["bash", root.matugenApplyScriptPath, mode, "--system-only"]
+            : ["bash", root.matugenApplyScriptPath, mode]
+        matugenApplyProcess.running = true
+    }
+
+    function _flushQueuedApply() {
+        if (!root.applyQueued || root.matugenRunning) return
+
+        const mode = root.pendingTargetMode
+        const systemOnly = root.applyQueuedSystemOnly
+        root.applyQueued = false
+        root.applyQueuedSystemOnly = false
+        root._runMatugenApply(mode, systemOnly)
     }
 
     function _runMatugen(wallpaperPath) {
         if (!SettingsService.data.appearance.matugenEnabled) return
-        if (wallpaperPath === "") return
+        const mode = SettingsService.data.appearance.darkMode ? "dark" : "light"
+        if (wallpaperPath === "") {
+            console.log("[DymicShell:WallpaperService] triggerMatugen with empty wallpaper path; applying targets only", mode)
+            root._runMatugenApply(mode)
+            return
+        }
         if (root.matugenRunning) {
             // Still running — reschedule after current job finishes
+            console.log("[DymicShell:WallpaperService] triggerMatugen deferred while matugen is already running")
             debounceTimer.restart()
             return
         }
@@ -93,7 +155,7 @@ Singleton {
         // -t applies the selected MD3 scheme algorithm (tonal-spot, vibrant…).
         // --source-color-index 0 bypasses dialoguer's interactive TTY prompt
         // that fails when matugen is invoked from a non-terminal context.
-        const mode = SettingsService.data.appearance.darkMode ? "dark" : "light"
+        root.pendingTargetMode = mode
         const scheme = SettingsService.data.appearance.matugenScheme || "scheme-tonal-spot"
         matugenProcess.command = [
             "bash", "-lc",
