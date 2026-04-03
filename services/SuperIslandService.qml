@@ -103,6 +103,10 @@ Singleton {
         if (!root._settings().enabled || !hint || !hint.visible)
             return
 
+        // Keep overlay sessions as the sole owner of SuperIsland geometry/state.
+        if (root.overlayVisible)
+            return
+
         const event = root._normalizeEvent({
             id: "window-hint",
             type: "window-hint",

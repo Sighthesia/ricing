@@ -243,15 +243,26 @@ Item {
     }
 
     onCollapsedHeightChanged: {
-        if (_ready && !expanded && !_transitionRunning) {
-            _syncToTruthWithoutAnimation()
+        if (!_ready || expanded)
+            return
+
+        if (_transitionRunning) {
+            _clipHeight = collapsedHeight
+            return
         }
+
+        _syncToTruthWithoutAnimation()
     }
 
     onExpandedHeightChanged: {
-        if (_ready && expanded && !_transitionRunning) {
+        if (!_ready || !expanded)
+            return
+
+        _registerReservedExtension(extensionOwnerKey, _targetReservedExtension())
+        _clipHeight = expandedHeight
+
+        if (!_transitionRunning)
             _syncToTruthWithoutAnimation()
-        }
     }
 
     onExtensionOwnerKeyChanged: {

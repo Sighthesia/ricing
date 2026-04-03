@@ -10,8 +10,11 @@ Singleton {
 
     property bool hintHeld: false
     property var activeHint: _emptyHint()
+    readonly property bool _overlayBlocked:
+        IslandOverlayService.mode !== "none"
+        && IslandOverlayService.state !== "closed"
 
-    readonly property bool hintVisible: activeHint.visible === true
+    readonly property bool hintVisible: activeHint.visible === true && !root._overlayBlocked
     readonly property bool triggerBridgeAvailable: WindowHintTriggerService.available
     readonly property bool triggerBridgeRunning: WindowHintTriggerService.running
 
@@ -67,6 +70,10 @@ Singleton {
 
         root._lastVisibleHint = nextHint
         root.activeHint = nextHint
+
+        if (root._overlayBlocked)
+            return
+
         SuperIslandService.showWindowHint(nextHint)
     }
 
@@ -328,6 +335,25 @@ Singleton {
 
         function onHoldChanged(active) {
             root.setHintHeld(active)
+        }
+    }
+
+    Connections {
+        target: IslandOverlayService
+
+        function _resumeHintIfNeeded() {
+            if (!root.hintHeld || root._overlayBlocked)
+                return
+
+            root._scheduleHintRefresh(true)
+        }
+
+        function onModeChanged() {
+            _resumeHintIfNeeded()
+        }
+
+        function onStateChanged() {
+            _resumeHintIfNeeded()
         }
     }
 }

@@ -178,10 +178,11 @@ property real _flashTrackOpacity: 0
         root._isFullHintEventType(root._flashSourceEvent.type)
         || (root._hintPhase && root._isFullHintEventType(SuperIslandService.activeEvent.type))
     readonly property real _expandedPillHeight:
-        root._fullHintExpandedSurface ? root._fullHintExpandedPillHeight :
-        (root._overlaySessionActive
+        root._overlaySessionActive
             ? (root._pillH + root._flashGap + root._overlayBodyHeight)
-            : root._transientExpandedHeight)
+            : (root._fullHintExpandedSurface
+                ? root._fullHintExpandedPillHeight
+                : root._transientExpandedHeight)
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
@@ -720,12 +721,14 @@ property real _flashTrackOpacity: 0
 
         function onStateChanged() {
             root._syncOverlayFlags()
-            root._syncOverlayExtensionReservation()
 
             if (IslandOverlayService.state === "opening") {
                 root._resetOverlayDrivenState()
+                root._syncOverlayExtensionReservation()
                 return
             }
+
+            root._syncOverlayExtensionReservation()
 
             if (IslandOverlayService.state === "closed")
                 root._resetOverlayDrivenState()
