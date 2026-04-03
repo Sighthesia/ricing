@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 import qs.config
 import qs.services
@@ -14,6 +15,7 @@ Item {
     readonly property var _hint: root._renderHint || root._liveHint
     readonly property int _padH: Theme.barWidget.contentPaddingH
     readonly property int _padV: Theme.barWidget.contentPaddingV
+    readonly property int _headerHeight: Theme.barWidget.pillHeight
     readonly property int _rowGap: Math.max(10, Math.round(12 * Theme.uiScale))
     readonly property int _capsuleGap: Math.max(4, Math.round(5 * Theme.uiScale))
     readonly property int _workspaceColumnGap: Math.max(10, Math.round(12 * Theme.uiScale))
@@ -67,7 +69,7 @@ Item {
             Math.max(root._workspaceStageWidth, root._titleStageWidth) + root._padH * 2 + root._stagePadH * 2
         )
     )
-    implicitHeight: root._workspaceStageHeight + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2
+    implicitHeight: root._headerHeight + root._workspaceStageHeight + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2
 
     function _lerp(from, to, progress) {
         return from + (to - from) * progress
@@ -1071,6 +1073,12 @@ Item {
         }
     }
 
+    SystemClock {
+        id: _hintClock
+
+        precision: SystemClock.Minutes
+    }
+
     QtObject {
         id: _workspaceFocusIndexPair
 
@@ -1101,70 +1109,90 @@ Item {
         root._retargetHintAnchors(root._renderHint, true)
     }
 
-    // Shared stage ties both capsule rows together.
-    Rectangle {
-        anchors.centerIn: parent
-        z: -1
-        width: Math.max(root._workspaceStageWidth, root._titleStageWidth) + root._stagePadH * 2
-        height: root._workspaceStageHeight + root._rowGap + root._titleStageHeight + root._stagePadV * 2
-        radius: Math.min(Math.round(height / 2), Math.round(Theme.cornerRadius * 3 * Theme.uiScale))
-        color: root._stageFill
-        border.width: 1
-        border.color: root._stageBorder
-    }
+    Item {
+        anchors.fill: parent
 
-    // Main capsule stack.
-    Column {
-        anchors.centerIn: parent
-        width: Math.max(root._workspaceStageWidth, root._titleStageWidth)
-        spacing: root._rowGap
-
-        // Workspace stage wrapper.
-        Item {
-            width: parent.width
-            height: root._workspaceStageHeight
-
-            // Workspace slot stage.
-            Item {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: root._workspaceStageWidth
-                height: parent.height
-                clip: true
-
-                Repeater {
-                    model: root._persistentStageSlotIndices
-
-                    delegate: WorkspaceCapsule {
-                        required property int modelData
-
-                        capsule: root._workspaceStageCapsuleAt(modelData)
-                        slotPosition: root._workspaceStageSlotPositionAt(modelData)
-                        hiddenForMotion: false
-                    }
-                }
-            }
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Math.max(0, (root._headerHeight - implicitHeight) / 2)
+            text: Qt.formatDateTime(_hintClock.date, "hh:mm")
+            color: Colors.text
+            font.family: Theme.fontMono
+            font.pixelSize: Theme.fontSizeBody
+            font.bold: true
         }
 
-        // Title stage wrapper.
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: root._headerHeight - 1
+            width: Math.max(0, parent.width - root._padH * 2)
+            height: 1
+            radius: height / 2
+            color: Colors.border
+            opacity: 0.42
+        }
+
         Item {
-            width: parent.width
-            height: root._titleStageHeight
+            id: _contentArea
 
-            // Title slot stage.
-            Item {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: root._titleStageWidth
-                height: parent.height
+            anchors {
+                top: parent.top
+                topMargin: root._headerHeight
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+            }
 
-                Repeater {
-                    model: root._persistentStageSlotIndices
+            // Main capsule stack.
+            Column {
+                anchors.centerIn: parent
+                width: Math.max(root._workspaceStageWidth, root._titleStageWidth)
+                spacing: root._rowGap
 
-                    delegate: TitleCapsule {
-                        required property int modelData
+                Item {
+                    width: parent.width
+                    height: root._workspaceStageHeight
 
-                        capsule: root._titleStageCapsuleAt(modelData)
-                        slotPosition: root._titleStageSlotPositionAt(modelData)
-                        hiddenForMotion: false
+                    Item {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: root._workspaceStageWidth
+                        height: parent.height
+                        clip: true
+
+                        Repeater {
+                            model: root._persistentStageSlotIndices
+
+                            delegate: WorkspaceCapsule {
+                                required property int modelData
+
+                                capsule: root._workspaceStageCapsuleAt(modelData)
+                                slotPosition: root._workspaceStageSlotPositionAt(modelData)
+                                hiddenForMotion: false
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    width: parent.width
+                    height: root._titleStageHeight
+
+                    Item {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: root._titleStageWidth
+                        height: parent.height
+
+                        Repeater {
+                            model: root._persistentStageSlotIndices
+
+                            delegate: TitleCapsule {
+                                required property int modelData
+
+                                capsule: root._titleStageCapsuleAt(modelData)
+                                slotPosition: root._titleStageSlotPositionAt(modelData)
+                                hiddenForMotion: false
+                            }
+                        }
                     }
                 }
             }

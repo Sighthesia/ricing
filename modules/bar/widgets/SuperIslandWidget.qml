@@ -167,7 +167,8 @@ property real _flashTrackOpacity: 0
     // layer-shell bar window does not resize every animation frame while the
     // hint capsules animate their own heights internally.
     readonly property real _fullHintExpandedPillHeight:
-        root._windowHintSideHeight * 2
+        root._pillH
+        + root._windowHintSideHeight * 2
         + root._windowHintPrimaryHeight
         + root._windowHintWorkspaceColumnGap * 2
         + root._windowHintRowGap
