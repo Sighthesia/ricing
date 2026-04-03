@@ -728,6 +728,12 @@ property real _flashTrackOpacity: 0
                 return
             }
 
+            if (IslandOverlayService.state === "closing") {
+                root._resetOverlayDrivenState()
+                root._syncOverlayExtensionReservation()
+                return
+            }
+
             root._syncOverlayExtensionReservation()
 
             if (IslandOverlayService.state === "closed")
@@ -881,7 +887,7 @@ property real _flashTrackOpacity: 0
                 rightMargin: 10
             }
             height: root._overlayBodyHeight
-            visible: active
+            visible: root._overlayExpandedActive
             sourceComponent: _overlayDeckComponent
         }
     }
