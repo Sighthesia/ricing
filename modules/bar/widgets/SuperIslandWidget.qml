@@ -449,7 +449,9 @@ property real _flashTrackOpacity: 0
 
         root._phase = "idle"
         root._flashSourceEvent = root._idleSnapshot()
-        root._mainDisplayEvent = root._baselineEvent
+        root._mainDisplayEvent = root._overlaySessionActive
+            ? root._idleSnapshot()
+            : root._baselineEvent
         root._sharedBackgroundPulseOpacity = 0
         root._pulseScale = 1
         root._resetReplaceLayers()
@@ -666,7 +668,7 @@ property real _flashTrackOpacity: 0
         target: SuperIslandService
 
         function onMainStateChanged() {
-            if (root._phase === "idle")
+            if (root._phase === "idle" && !root._overlaySessionActive)
                 root._mainDisplayEvent = root._baselineEvent
         }
 
