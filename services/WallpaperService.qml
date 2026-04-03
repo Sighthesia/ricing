@@ -42,9 +42,18 @@ Singleton {
     Process {
         id: matugenProcess
 
+        stdout: SplitParser {
+            onRead: data => console.log("[DymicShell:WallpaperService] matugen stdout:", data.trim())
+        }
+
+        stderr: SplitParser {
+            onRead: data => console.warn("[DymicShell:WallpaperService] matugen stderr:", data.trim())
+        }
+
         onExited: function(exitCode, exitStatus) {
             if (exitCode !== 0) {
                 root.matugenFailed("matugen exited with code " + exitCode)
+                Qt.callLater(root._flushQueuedApply)
                 return
             }
 
@@ -69,6 +78,7 @@ Singleton {
             console.log("[DymicShell:WallpaperService] matugen-apply exited", exitCode, exitStatus, "mode=", root.pendingTargetMode)
             if (exitCode !== 0) {
                 root.matugenFailed("matugen target wiring exited with code " + exitCode)
+                Qt.callLater(root._flushQueuedApply)
                 return
             }
 
@@ -94,7 +104,7 @@ Singleton {
 
         const mode = SettingsService.data.appearance.darkMode ? "dark" : "light"
         if (path === "") {
-            root._runMatugenApply(mode)
+            root.matugenFailed("matugen requires a wallpaper before dynamic theming can be applied")
             return
         }
 
@@ -140,8 +150,7 @@ Singleton {
         if (!SettingsService.data.appearance.matugenEnabled) return
         const mode = SettingsService.data.appearance.darkMode ? "dark" : "light"
         if (wallpaperPath === "") {
-            console.log("[DymicShell:WallpaperService] triggerMatugen with empty wallpaper path; applying targets only", mode)
-            root._runMatugenApply(mode)
+            root.matugenFailed("matugen requires a wallpaper before dynamic theming can be applied")
             return
         }
         if (root.matugenRunning) {
@@ -159,7 +168,7 @@ Singleton {
         const scheme = SettingsService.data.appearance.matugenScheme || "scheme-tonal-spot"
         matugenProcess.command = [
             "bash", "-lc",
-            "cd \"" + root.matugenWorkingDir + "\" && matugen image \"" + wallpaperPath + "\" -c \"" + root.matugenConfigPath + "\" -m \"" + mode + "\" -t \"" + scheme + "\" --source-color-index 0 -q"
+            "[ -r \"" + wallpaperPath + "\" ] || { printf '%s\\n' 'wallpaper path missing or unreadable: " + wallpaperPath + "' >&2; exit 2; }; cd \"" + root.matugenWorkingDir + "\" && matugen image \"" + wallpaperPath + "\" -c \"" + root.matugenConfigPath + "\" -m \"" + mode + "\" -t \"" + scheme + "\" --source-color-index 0 -q"
         ]
         matugenProcess.running = true
     }

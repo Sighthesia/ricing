@@ -148,6 +148,7 @@ apply_live_terminal_sequences() {
 reload_kitty() {
     local kitty_colors_file="$1"
     local kitty_remote_socket="$2"
+    local kitty_socket_path="${kitty_remote_socket#unix:}"
 
     if ! command -v kitty >/dev/null 2>&1; then
         return 0
@@ -157,7 +158,7 @@ reload_kitty() {
         kitty +runpy "from kitty.utils import reload_conf_in_all_kitties; reload_conf_in_all_kitties()" >/dev/null 2>&1
     }
 
-    if [ -S /tmp/kitty ]; then
+    if [ -S "$kitty_socket_path" ]; then
         printf '[matugen-apply] kitty branch=set-colors socket=%s\n' "$kitty_remote_socket"
         if kitty @ --to "$kitty_remote_socket" set-colors --all --configured "$kitty_colors_file"; then
             printf '[matugen-apply] kitty set-colors rc=0\n'
@@ -267,6 +268,8 @@ main() {
 
     prepend_line_if_missing "$home/.config/rofi/config.rasi" "$rofi_import"
 
+    apply_live_terminal_sequences "$terminal_sequences_file"
+
     reload_kitty "$kitty_colors_file" "$kitty_remote_socket"
 
     if command -v makoctl >/dev/null 2>&1; then
@@ -286,7 +289,7 @@ main() {
     fi
 
     if command -v plasma-apply-colorscheme >/dev/null 2>&1; then
-        plasma-apply-colorscheme DymicShellMatugen >/dev/null 2>&1 || true
+        plasma-apply-colorscheme Matugen >/dev/null 2>&1 || true
     fi
 
 }
