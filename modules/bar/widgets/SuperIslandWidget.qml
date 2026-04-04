@@ -308,6 +308,9 @@ property real _flashTrackOpacity: 0
     property real _attachedPanelRevealHeight: 0
     property real _attachedContentOpacity: 0
     property real _pillThrowOffsetY: 0
+    property bool _attachedRevealUseHandoffCurve: false
+    property var _overlayHandoffHintEvent: _idleSnapshot()
+    property bool _overlayHintHandoffActive: false
     readonly property real _attachedPanelVisibleWidth:
         root._attachedPanelActive
             ? Math.max(
@@ -356,6 +359,10 @@ property real _flashTrackOpacity: 0
         && root._attachedContentOpacity >= 0.99
         && root._attachedPanelVisibleWidth >= root._detachedHintWidth - 1
         && root._attachedPanelVisibleHeight >= root._detachedHintHeight - 1
+    readonly property bool _showOverlayHandoffHint:
+        root._overlayHintHandoffActive
+        && root._overlaySessionActive
+        && root._attachedRevealProgress < 0.78
 
     implicitHeight: Theme.barHeight
     implicitWidth: root._phase === "hint-exit"
@@ -564,6 +571,11 @@ property real _flashTrackOpacity: 0
         if (!root._overlaySessionActive)
             root._overlayPulsePending = false
 
+        if (!root._overlaySessionActive) {
+            root._overlayHintHandoffActive = false
+            root._overlayHandoffHintEvent = root._idleSnapshot()
+        }
+
         if (overlayModeActive)
             _hintFlashDelayTimer.stop()
     }
@@ -685,6 +697,8 @@ property real _flashTrackOpacity: 0
             && (root._attachedContentOpacity > 0 || _attachedRevealAnim.running)
         const immediateRevealWithThrow = shouldThrowKick
             && (root._attachedContentOpacity > 0 || _attachedRevealAnim.running)
+        const handoffReveal = root._overlaySessionActive
+            && (preserveVisibleContent || immediateRevealWithThrow)
         const resolvedFromWidth = fromWidth !== undefined
             ? fromWidth
             : root._attachedRevealSeedWidth
@@ -701,6 +715,7 @@ property real _flashTrackOpacity: 0
             Math.max(0, resolvedFromHeight),
             root._attachedPanelHeight
         )
+        root._attachedRevealUseHandoffCurve = handoffReveal
         _pillCatchAnim.stop()
 
         if (!shouldThrowKick) {
@@ -733,6 +748,8 @@ property real _flashTrackOpacity: 0
         if (!root._attachedPanelActive)
             return
 
+        root._overlayHintHandoffActive = false
+        root._overlayHandoffHintEvent = root._idleSnapshot()
         _attachedRevealDelayTimer.stop()
         _attachedRevealAnim.stop()
         _attachedCollapseAnim.stop()
@@ -1033,6 +1050,14 @@ property real _flashTrackOpacity: 0
             root._logPulse("overlayStateChanged")
 
             if (IslandOverlayService.state === "opening") {
+                if (wasDetachedHintActive) {
+                    root._overlayHandoffHintEvent = root._cloneEvent(root._flashSourceEvent)
+                    root._overlayHintHandoffActive = true
+                } else {
+                    root._overlayHintHandoffActive = false
+                    root._overlayHandoffHintEvent = root._idleSnapshot()
+                }
+
                 root._handoffFullHintToOverlay()
                 root._startAttachedReveal(
                     wasDetachedHintActive
@@ -1430,13 +1455,46 @@ property real _flashTrackOpacity: 0
             opacity: root._attachedContentOpacity
 
             Loader {
+                id: _overlayHintCardLoader
+                property var eventData: root._overlaySessionActive && root._overlayHintHandoffActive
+                    ? root._overlayHandoffHintEvent
+                    : root._flashSourceEvent
+
+                active: root._attachedPanelActive
+                    && (root._detachedHintActive || root._overlayHintHandoffActive)
+                anchors.fill: parent
+                anchors.margins: 1
+                opacity: root._overlaySessionActive
+                    ? (root._showOverlayHandoffHint ? 1 : 0)
+                    : 1
+                sourceComponent: _windowHintCardComponent
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Theme.anim.highlightDuration
+                        easing.type: Theme.anim.highlightType
+                    }
+                }
+            }
+
+            Loader {
                 id: _overlayDeckLoader
                 property var eventData: root._flashSourceEvent
 
-                active: root._attachedPanelActive
+                active: root._attachedPanelActive && root._overlaySessionActive
                 anchors.fill: parent
                 anchors.margins: 1
-                sourceComponent: root._overlaySessionActive ? _overlayDeckComponent : _windowHintCardComponent
+                opacity: root._overlaySessionActive
+                    ? (root._showOverlayHandoffHint ? 0 : 1)
+                    : 0
+                sourceComponent: _overlayDeckComponent
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Theme.anim.highlightDuration
+                        easing.type: Theme.anim.highlightType
+                    }
+                }
             }
         }
     }
@@ -1523,7 +1581,9 @@ property real _flashTrackOpacity: 0
             property: "_attachedPanelRevealWidth"
             to: root._attachedPanelWidth
             duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
+            easing.type: root._attachedRevealUseHandoffCurve
+                ? Theme.anim.moveType
+                : Theme.anim.moveType
         }
 
         NumberAnimation {
@@ -1531,7 +1591,9 @@ property real _flashTrackOpacity: 0
             property: "_attachedPanelRevealHeight"
             to: root._attachedPanelHeight
             duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
+            easing.type: root._attachedRevealUseHandoffCurve
+                ? Theme.anim.moveType
+                : Theme.anim.moveType
         }
 
         NumberAnimation {
@@ -1549,6 +1611,9 @@ property real _flashTrackOpacity: 0
             root._attachedPanelRevealWidth = root._attachedPanelWidth
             root._attachedPanelRevealHeight = root._attachedPanelHeight
             root._attachedContentOpacity = 1
+            root._attachedRevealUseHandoffCurve = false
+            root._overlayHintHandoffActive = false
+            root._overlayHandoffHintEvent = root._idleSnapshot()
         }
     }
 
