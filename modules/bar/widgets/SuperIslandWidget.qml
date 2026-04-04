@@ -1,6 +1,7 @@
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Shapes
 import qs.config
 import qs.services
 import ".." as BarComponents
@@ -111,7 +112,7 @@ property real _flashTrackOpacity: 0
     readonly property string transitionMode:
         root._phase === "exit" ? "exit-track"
         : (root._phase === "idle" ? "single-track" : "dual-track")
-    readonly property bool flashTrackVisible: root._phase !== "idle" && !root._overlaySessionActive
+    readonly property bool flashTrackVisible: root._phase !== "idle"
     readonly property bool _transientPhase: root._phase !== "idle"
     property bool _overlaySessionActive: false
     property bool _overlayExpandedActive: false
@@ -149,11 +150,23 @@ property real _flashTrackOpacity: 0
     readonly property real _returnTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
     readonly property real _overlayBodyHeight: Math.round(528 * Theme.uiScale)
+    readonly property real _overlayDetachedOffset: Theme.barHeight * 2
+    readonly property real _overlayDetachedY: Theme.barHeight + root._overlayDetachedOffset
+    readonly property real _overlayRevealLift:
+        Math.max(8, Theme.barWidget.contentPaddingV * 4)
+    readonly property real _overlayAttachmentOverlap: 1
+    readonly property real _overlayShellRadius: Theme.cornerRadius
+    readonly property real _overlayPillBackgroundWidth: _pillBg.width
+    readonly property real _overlayBridgeOutset:
+        root._overlayAttachmentOverlap
+    readonly property real _overlayInwardCornerRadius:
+        Math.max(10, Math.min(root._overlayShellRadius, Math.round(18 * Theme.uiScale)))
+    readonly property real _overlayInwardCornerDepth:
+        Math.max(root._overlayInwardCornerRadius, Math.round(28 * Theme.uiScale))
     readonly property real _transientExpandedHeight: root._pillH + root._flashGap + root._flashRowH
     readonly property real _collapsedPillHeight: root._pillH
     readonly property bool _pillExpanded:
-        root._overlayExpandedActive
-        || root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
+        root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
 
     readonly property real _overlayExpandedWidth: {
         const availableWidth = Math.max(
@@ -179,42 +192,37 @@ property real _flashTrackOpacity: 0
         root._isFullHintEventType(root._flashSourceEvent.type)
         || (root._hintPhase && root._isFullHintEventType(SuperIslandService.activeEvent.type))
     readonly property real _expandedPillHeight:
-        root._overlaySessionActive
-            ? (root._pillH + root._flashGap + root._overlayBodyHeight)
-            : (root._fullHintExpandedSurface
-                ? root._fullHintExpandedPillHeight
-                : root._transientExpandedHeight)
+        root._fullHintExpandedSurface
+            ? root._fullHintExpandedPillHeight
+            : root._transientExpandedHeight
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
     readonly property real _collapsedWidth:
         (_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property real _expandedWidth:
-        root._overlayExpandedActive
-            ? root._overlayExpandedWidth
-            : Math.max(
-                root._collapsedWidth,
-                (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
-            )
+        Math.max(
+            root._collapsedWidth,
+            (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
+        )
 
     readonly property real _mainTrackEnterY:
         -Math.max(root._pillH, _mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH)
     readonly property real _returnWidth:
-        root._overlayExpandedActive
-            ? root._collapsedWidth
-            : ((_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2)
+        (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property real _transitionCollapsedWidth:
-        root._overlayExpandedActive
-            ? root._collapsedWidth
-            : (root._phase === "exit" ? root._returnWidth : root._collapsedWidth)
+        root._phase === "exit" ? root._returnWidth : root._collapsedWidth
     readonly property real _idleOpticalOffset: 0
     readonly property bool _hintPhase: root._phase === "hint" || root._phase === "hint-exit"
     readonly property bool _listensToService: true
     readonly property real _transientAccentBaseOpacity: 0
     readonly property real _overlayReservedExtension:
         root._overlaySessionActive
-            ? Math.max(0, root._expandedPillHeight - root._collapsedPillHeight)
+            ? root._overlayDetachedOffset + root._overlayBodyHeight
             : 0
+    readonly property real _overlayShellY: _pillClip.y
+    readonly property real _overlayShellHeight:
+        Math.max(0, (_overlayPanelHost.y + root._overlayBodyHeight) - root._overlayShellY)
 
     Component.onCompleted: {
         currentTime = new Date()
@@ -257,7 +265,7 @@ property real _flashTrackOpacity: 0
         expandedHeight: root._expandedPillHeight
         expanded: root._pillExpanded
         extensionOwnerKey: root.liveInstance ? "super-island" : ""
-        animateSurface: root._overlaySessionActive
+        animateSurface: false
         sharedTransition: _pillTransition
     }
 
@@ -439,27 +447,6 @@ property real _flashTrackOpacity: 0
         BarLayoutService.clearTransientExtension("super-island-overlay")
     }
 
-    function _resetOverlayDrivenState() {
-        _departAnim.stop()
-        _returnAnim.stop()
-        _hintEnterAnim.stop()
-        _hintExitAnim.stop()
-        _replaceAnim.stop()
-        _hintFlashDelayTimer.stop()
-        _sharedBackgroundPulseAnim.stop()
-        _pulseScaleAnim.stop()
-
-        root._phase = "idle"
-        root._flashSourceEvent = root._idleSnapshot()
-        root._mainDisplayEvent = root._overlaySessionActive
-            ? root._idleSnapshot()
-            : root._baselineEvent
-        root._sharedBackgroundPulseOpacity = 0
-        root._pulseScale = 1
-        root._resetReplaceLayers()
-        root._resetTracks()
-    }
-
     function _startEnterTransition(event) {
         const wasHintPhase = root._hintPhase
         const outgoing = root._cloneEvent(root._hintPhase
@@ -543,9 +530,6 @@ property real _flashTrackOpacity: 0
     }
 
     function _triggerSharedBackgroundPulse() {
-        if (root._overlaySessionActive)
-            return
-
         _sharedBackgroundPulseAnim.stop()
         _pulseScaleAnim.stop()
         root._sharedBackgroundPulseOpacity = 0
@@ -555,9 +539,6 @@ property real _flashTrackOpacity: 0
     }
 
     function _triggerEdgeReboundScale() {
-        if (root._overlaySessionActive)
-            return
-
         _pulseScaleAnim.stop()
         root._pulseScale = 1
         _pulseScaleAnim.start()
@@ -635,6 +616,26 @@ property real _flashTrackOpacity: 0
         onTriggered: root._triggerHintFlash()
     }
 
+    Timer {
+        id: _overlayOpenSettleTimer
+        interval: Theme.anim.moveDuration
+        repeat: false
+        onTriggered: {
+            if (IslandOverlayService.mode !== "none" && IslandOverlayService.state === "opening")
+                IslandOverlayService.setSettledState(IslandOverlayService.mode, "open")
+        }
+    }
+
+    Timer {
+        id: _overlayCloseSettleTimer
+        interval: Theme.anim.moveDuration
+        repeat: false
+        onTriggered: {
+            if (IslandOverlayService.mode !== "none" && IslandOverlayService.state === "closing")
+                IslandOverlayService.setSettledState(IslandOverlayService.mode, "closed")
+        }
+    }
+
     function _finishWindowHint() {
         if (root._phase !== "hint")
             return
@@ -670,7 +671,7 @@ property real _flashTrackOpacity: 0
         target: SuperIslandService
 
         function onMainStateChanged() {
-            if (root._phase === "idle" && !root._overlaySessionActive)
+            if (root._phase === "idle")
                 root._mainDisplayEvent = root._baselineEvent
         }
 
@@ -726,44 +727,27 @@ property real _flashTrackOpacity: 0
         function onStateChanged() {
             root._syncOverlayFlags()
 
+            root._syncOverlayExtensionReservation()
+
             if (IslandOverlayService.state === "opening") {
-                root._resetOverlayDrivenState()
-                root._syncOverlayExtensionReservation()
+                _overlayCloseSettleTimer.stop()
+                _overlayOpenSettleTimer.restart()
                 return
             }
 
             if (IslandOverlayService.state === "closing") {
-                root._resetOverlayDrivenState()
-                root._syncOverlayExtensionReservation()
+                _overlayOpenSettleTimer.stop()
+                _overlayCloseSettleTimer.restart()
                 return
             }
 
-            root._syncOverlayExtensionReservation()
-
-            if (IslandOverlayService.state === "closed")
-                root._resetOverlayDrivenState()
+            _overlayOpenSettleTimer.stop()
+            _overlayCloseSettleTimer.stop()
         }
 
         function onModeChanged() {
             root._syncOverlayFlags()
             root._syncOverlayExtensionReservation()
-        }
-    }
-
-    Connections {
-        target: _verticalReveal
-
-        function onStateChanged() {
-            if (IslandOverlayService.mode === "none")
-                return
-
-            if (_verticalReveal.state === "open" && IslandOverlayService.state === "opening") {
-                IslandOverlayService.setSettledState(IslandOverlayService.mode, "open")
-                return
-            }
-
-            if (_verticalReveal.state === "closed" && IslandOverlayService.state === "closing")
-                IslandOverlayService.setSettledState(IslandOverlayService.mode, "closed")
         }
     }
 
@@ -786,10 +770,10 @@ property real _flashTrackOpacity: 0
             anchors.right: parent.right
             anchors.top: parent.top
             height: root._verticalRevealSurfaceHeight
-            radius: root._overlaySessionActive ? Theme.cornerRadius : (root._pillH / 2)
+            radius: root._pillH / 2
             color: Colors.surface
             border.color: Colors.border
-            border.width: 1
+            border.width: root._overlaySessionActive ? 0 : 1
         }
 
         Rectangle {
@@ -801,7 +785,7 @@ property real _flashTrackOpacity: 0
             height: 1
             radius: height / 2
             color: Colors.border
-            opacity: root._phase !== "idle" && !root._overlaySessionActive && root._flashSourceEvent.type !== "window-hint" ? 0.35 : 0
+            opacity: root._phase !== "idle" && root._flashSourceEvent.type !== "window-hint" ? 0.35 : 0
 
             Behavior on opacity {
                 NumberAnimation {
@@ -878,20 +862,273 @@ property real _flashTrackOpacity: 0
             sourceComponent: root._componentForEvent(eventData, true)
         }
 
+    }
+
+    // Draw one continuous shell behind the pill and the attached panel so the
+    // overlay reads as a single surface rather than stacked rectangles.
+    Item {
+        id: _overlayShellHost
+
+        visible: root._overlaySessionActive
+        width: root._overlayExpandedWidth
+        height: root._overlayShellHeight
+        y: root._overlayShellY
+        z: -1
+        opacity: root._overlayExpandedActive ? 1 : 0
+        anchors.horizontalCenter: _pillClip.horizontalCenter
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Theme.anim.highlightDuration
+                easing.type: Theme.anim.highlightType
+            }
+        }
+
+        Shape {
+            anchors.fill: parent
+            preferredRendererType: Shape.CurveRenderer
+            antialiasing: true
+
+            ShapePath {
+                id: _overlayShellPath
+
+                readonly property real _minR: 0.01
+                readonly property real _pillWidth: _pillClip.width
+                readonly property real _pillLeft: (_overlayShellHost.width - _pillWidth) / 2
+                readonly property real _pillRight: _pillLeft + _pillWidth
+                readonly property real _pillRadius: Math.max(_minR, root._pillH / 2)
+                readonly property real _panelLeft: 0.5
+                readonly property real _panelRight: _overlayShellHost.width - 0.5
+                readonly property real _panelTop:
+                    Math.max(root._pillH, _overlayPanelHost.y - _overlayShellHost.y + root._overlayAttachmentOverlap)
+                readonly property real _panelBottom: _overlayShellHost.height - 0.5
+                readonly property real _panelRadius:
+                    Math.max(_minR, Math.min(root._overlayShellRadius, Math.max(1, (_panelBottom - _panelTop) / 2)))
+                readonly property real _neckRight:
+                    Math.max(
+                        _pillRight,
+                        Math.min(_panelRight - _panelRadius - _minR, _pillRight + root._overlayBridgeOutset)
+                    )
+                readonly property real _neckLeft:
+                    Math.min(
+                        _pillLeft,
+                        Math.max(_panelLeft + _panelRadius + _minR, _pillLeft - root._overlayBridgeOutset)
+                    )
+                readonly property real _cornerStartY:
+                    Math.max(root._pillH, _panelTop - root._overlayInwardCornerDepth)
+                readonly property real _cornerVerticalSpan:
+                    Math.max(_minR, _panelTop - _cornerStartY)
+                readonly property real _cornerHorizontalSpan:
+                    Math.max(
+                        _minR,
+                        Math.min(
+                            _panelRight - _panelRadius - _neckRight,
+                            _neckLeft - (_panelLeft + _panelRadius)
+                        )
+                    )
+                readonly property real _inwardRadius:
+                    Math.max(
+                        _minR,
+                        Math.min(root._overlayInwardCornerRadius, _cornerVerticalSpan, _cornerHorizontalSpan)
+                    )
+                readonly property real _notchOutset:
+                    Math.max(
+                        _minR,
+                        Math.min(_inwardRadius * 0.9, root._overlayBridgeOutset * 0.28)
+                    )
+                readonly property real _rightShoulderX: _neckRight + _inwardRadius
+                readonly property real _leftShoulderX: _neckLeft - _inwardRadius
+                readonly property real _rightNotchX:
+                    Math.min(_rightShoulderX - _minR, _neckRight + _notchOutset)
+                readonly property real _leftNotchX:
+                    Math.max(_leftShoulderX + _minR, _neckLeft - _notchOutset)
+
+                strokeColor: Colors.border
+                strokeWidth: 1
+                fillColor: Colors.surface
+                startX: _pillLeft + _pillRadius
+                startY: 0
+
+                PathLine {
+                    x: _overlayShellPath._pillRight - _overlayShellPath._pillRadius
+                    y: 0
+                }
+
+                PathArc {
+                    x: _overlayShellPath._pillRight
+                    y: _overlayShellPath._pillRadius
+                    radiusX: _overlayShellPath._pillRadius
+                    radiusY: _overlayShellPath._pillRadius
+                    direction: PathArc.Clockwise
+                }
+
+                PathLine {
+                    x: _overlayShellPath._pillRight
+                    y: root._pillH
+                }
+
+                PathLine {
+                    x: _overlayShellPath._neckRight
+                    y: root._pillH
+                }
+
+                PathLine {
+                    x: _overlayShellPath._neckRight
+                    y: _overlayShellPath._cornerStartY
+                }
+
+                PathLine {
+                    x: _overlayShellPath._rightNotchX
+                    y: _overlayShellPath._cornerStartY
+                }
+
+                PathArc {
+                    x: _overlayShellPath._rightShoulderX
+                    y: _overlayShellPath._panelTop
+                    radiusX: _overlayShellPath._inwardRadius
+                    radiusY: _overlayShellPath._inwardRadius
+                    direction: PathArc.Counterclockwise
+                }
+
+                PathLine {
+                    x: _overlayShellPath._panelRight - _overlayShellPath._panelRadius
+                    y: _overlayShellPath._panelTop
+                }
+
+                PathArc {
+                    x: _overlayShellPath._panelRight
+                    y: _overlayShellPath._panelTop + _overlayShellPath._panelRadius
+                    radiusX: _overlayShellPath._panelRadius
+                    radiusY: _overlayShellPath._panelRadius
+                    direction: PathArc.Clockwise
+                }
+
+                PathLine {
+                    x: _overlayShellPath._panelRight
+                    y: _overlayShellPath._panelBottom - _overlayShellPath._panelRadius
+                }
+
+                PathArc {
+                    x: _overlayShellPath._panelRight - _overlayShellPath._panelRadius
+                    y: _overlayShellPath._panelBottom
+                    radiusX: _overlayShellPath._panelRadius
+                    radiusY: _overlayShellPath._panelRadius
+                    direction: PathArc.Clockwise
+                }
+
+                PathLine {
+                    x: _overlayShellPath._panelLeft + _overlayShellPath._panelRadius
+                    y: _overlayShellPath._panelBottom
+                }
+
+                PathArc {
+                    x: _overlayShellPath._panelLeft
+                    y: _overlayShellPath._panelBottom - _overlayShellPath._panelRadius
+                    radiusX: _overlayShellPath._panelRadius
+                    radiusY: _overlayShellPath._panelRadius
+                    direction: PathArc.Clockwise
+                }
+
+                PathLine {
+                    x: _overlayShellPath._panelLeft
+                    y: _overlayShellPath._panelTop + _overlayShellPath._panelRadius
+                }
+
+                PathArc {
+                    x: _overlayShellPath._panelLeft + _overlayShellPath._panelRadius
+                    y: _overlayShellPath._panelTop
+                    radiusX: _overlayShellPath._panelRadius
+                    radiusY: _overlayShellPath._panelRadius
+                    direction: PathArc.Clockwise
+                }
+
+                PathLine {
+                    x: _overlayShellPath._leftShoulderX
+                    y: _overlayShellPath._panelTop
+                }
+
+                PathArc {
+                    x: _overlayShellPath._leftNotchX
+                    y: _overlayShellPath._cornerStartY
+                    radiusX: _overlayShellPath._inwardRadius
+                    radiusY: _overlayShellPath._inwardRadius
+                    direction: PathArc.Counterclockwise
+                }
+
+                PathLine {
+                    x: _overlayShellPath._neckLeft
+                    y: _overlayShellPath._cornerStartY
+                }
+
+                PathLine {
+                    x: _overlayShellPath._neckLeft
+                    y: root._pillH
+                }
+
+                PathLine {
+                    x: _overlayShellPath._pillLeft
+                    y: root._pillH
+                }
+
+                PathLine {
+                    x: _overlayShellPath._pillLeft
+                    y: _overlayShellPath._pillRadius
+                }
+
+                PathArc {
+                    x: _overlayShellPath._pillLeft + _overlayShellPath._pillRadius
+                    y: 0
+                    radiusX: _overlayShellPath._pillRadius
+                    radiusY: _overlayShellPath._pillRadius
+                    direction: PathArc.Clockwise
+                }
+            }
+        }
+    }
+
+    // Keep the content host detached from layout, but let the shell overlap the
+    // connection seam by 1px to avoid fractional-scaling hairlines.
+    Item {
+        id: _overlayPanelHost
+
+        visible: root._overlaySessionActive
+        enabled: root._overlaySessionActive
+        width: root._overlayExpandedWidth
+        height: root._overlayBodyHeight
+        y: root._overlayDetachedY - root._overlayAttachmentOverlap
+            + (root._overlayExpandedActive ? 0 : -root._overlayRevealLift)
+        opacity: root._overlayExpandedActive ? 1 : 0
+        scale: root._overlayExpandedActive ? 1 : 0.985
+        anchors.horizontalCenter: _pillClip.horizontalCenter
+        transformOrigin: Item.Top
+
+        Behavior on y {
+            NumberAnimation {
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Theme.anim.highlightDuration
+                easing.type: Theme.anim.highlightType
+            }
+        }
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
+
         Loader {
             id: _overlayDeckLoader
 
             active: root._overlaySessionActive
-            anchors {
-                top: parent.top
-                topMargin: root._flashRowBaseY
-                left: parent.left
-                right: parent.right
-                leftMargin: 10
-                rightMargin: 10
-            }
-            height: root._overlayBodyHeight
-            visible: root._overlayExpandedActive
+            anchors.fill: parent
+            anchors.margins: 1
             sourceComponent: _overlayDeckComponent
         }
     }
@@ -1478,6 +1715,8 @@ Item {
     Component {
         id: _overlayDeckComponent
 
-        IslandCards.ExpandedPanelDeck {}
+        IslandCards.ExpandedPanelDeck {
+            drawSurface: false
+        }
     }
 }

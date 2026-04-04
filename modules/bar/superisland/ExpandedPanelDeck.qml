@@ -9,6 +9,8 @@ import "." as SuperIslandParts
 Item {
     id: root
 
+    property bool drawSurface: true
+
     readonly property string currentPage: IslandOverlayService.mode || "launcher"
     property string _presentedPage: root.currentPage
 
@@ -84,6 +86,7 @@ Item {
         color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.22)
         border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.5)
         border.width: 1
+        visible: root.drawSurface
     }
 
     ColumnLayout {

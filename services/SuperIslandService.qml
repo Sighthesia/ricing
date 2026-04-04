@@ -235,29 +235,6 @@ Singleton {
         return root._timeoutForPriority(event.priority)
     }
 
-    function _overlayEvent(mode) {
-        const overlayMode = mode === "settings"
-            ? "settings"
-            : (mode === "notifications" ? "notifications" : "launcher")
-
-        return {
-            id: "overlay:" + overlayMode,
-            type: "overlay",
-            groupKey: "overlay",
-            priority: "important",
-            title: overlayMode === "settings"
-                ? "设置"
-                : (overlayMode === "notifications" ? "通知中心" : "启动器"),
-            subtitle: "",
-            icon: overlayMode === "settings"
-                ? "preferences-system"
-                : (overlayMode === "notifications"
-                    ? "preferences-system-notifications"
-                    : "system-search"),
-            timeoutMs: 24 * 60 * 60 * 1000
-        }
-    }
-
     function _isEventEnabled(type) {
         const settings = root._settings()
         if (type === "media")
@@ -372,24 +349,6 @@ Singleton {
     }
 
     function _syncOverlayState() {
-        if (root.overlayVisible) {
-            const nextOverlayEvent = root._normalizeEvent(root._overlayEvent(IslandOverlayService.mode))
-            const currentIsOverlay = root.activeEvent.groupKey === "overlay"
-
-            root._suppressExternalSources = true
-
-            if (currentIsOverlay && root.activeEvent.id === nextOverlayEvent.id)
-                return
-
-            _activeTimer.stop()
-            _pendingStartTimer.stop()
-            root.activeEvent = nextOverlayEvent
-            root.flashEvent = nextOverlayEvent
-            root.mode = "hint"
-            root.mainState = root._resolveBaselineState()
-            return
-        }
-
         root._suppressExternalSources = false
 
         if (root.activeEvent.groupKey !== "overlay")
