@@ -7,6 +7,7 @@
         "textMutedColor": "#565f89",
         "borderColor": "#3b4261",
         "cornerRadius": 10,
+        "screenCornerRadius": 10,
         "uiScale": 1.0,
         "fontFamily": "LXGW WenKai GB Screen",
         "fontMono": "JetBrainsMono Nerd Font",

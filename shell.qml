@@ -19,6 +19,7 @@ ShellRoot {
 
         Item {
             BackgroundWindow {}
+            ScreenCornerWindow {}
             BarWindow {}
             ContextMenuBackdrop {}
             WidgetPickerWindow {}

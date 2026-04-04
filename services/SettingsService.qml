@@ -89,6 +89,7 @@ Singleton {
                 textMutedColor: adapter.appearance.textMutedColor,
                 borderColor: adapter.appearance.borderColor,
                 cornerRadius: adapter.appearance.cornerRadius,
+                screenCornerRadius: adapter.appearance.screenCornerRadius,
                 uiScale: adapter.appearance.uiScale,
                 fontFamily: adapter.appearance.fontFamily,
                 fontMono: adapter.appearance.fontMono,
@@ -312,6 +313,7 @@ Singleton {
             property string textMutedColor:  "#565f89"
             property string borderColor:     "#3b4261"
             property real   cornerRadius:    10
+            property real   screenCornerRadius: 10
             property real   uiScale:         1.0
             property string fontFamily:      "Noto Sans Black"
             property string fontMono:        "JetBrains Mono ExtraBold"

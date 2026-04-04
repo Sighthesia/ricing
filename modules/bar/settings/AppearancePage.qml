@@ -580,6 +580,17 @@ Item {
                     }
                 }
 
+                SliderSection {
+                    label: "伪屏幕圆角"
+                    filterQuery: root.searchQuery
+                    value: SettingsService.data.appearance.screenCornerRadius
+                    from: 0; to: 24; stepSize: 1; unit: "px"
+                    onValueCommitted: (v) => {
+                        SettingsService.data.appearance.screenCornerRadius = v
+                        SettingsService.save()
+                    }
+                }
+
                 // Position selector (reuses BehaviorSection position row directly)
                 Item {
                     width: parent ? parent.width : 296
