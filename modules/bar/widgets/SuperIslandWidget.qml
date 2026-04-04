@@ -168,12 +168,18 @@ property real _flashTrackOpacity: 0
             Theme.barWidget.contentPaddingV * 6,
             Math.round(root._pillH * 0.32)
         )
+    readonly property real _attachedRevealSeedWidth:
+        Math.max(root._overlayPillBackgroundWidth, root._collapsedWidth)
     readonly property bool _detachedHintActive:
         root._isFullHintEventType(root._flashSourceEvent.type) || root._phase === "hint-exit"
     readonly property bool _attachedPanelActive:
         root._overlaySessionActive || root._detachedHintActive
+    readonly property bool _overlayClosing:
+        root._overlaySessionActive && IslandOverlayService.state === "closing"
     readonly property bool _attachedPanelExpanded:
-        root._overlaySessionActive ? root._overlayExpandedActive : (root._phase === "hint")
+        root._overlaySessionActive
+            ? (root._overlayExpandedActive || root._overlayClosing)
+            : (root._phase === "hint")
     readonly property real _attachedPanelWidth:
         root._overlaySessionActive ? root._overlayExpandedWidth : root._detachedHintWidth
     readonly property real _attachedPanelHeight:
@@ -190,13 +196,13 @@ property real _flashTrackOpacity: 0
         )
     readonly property real _attachedPanelOpacity:
         root._overlaySessionActive
-            ? (root._overlayExpandedActive ? 1 : 0)
+            ? ((root._overlayExpandedActive || root._overlayClosing) ? 1 : 0)
             : (root._detachedHintActive
                 ? (root._phase === "hint-exit" ? root._flashTrackOpacity : 1)
                 : 0)
     readonly property real _attachedPanelScale:
         root._overlaySessionActive
-            ? (root._overlayExpandedActive ? 1 : 0.985)
+            ? ((root._overlayExpandedActive || root._overlayClosing) ? 1 : 0.985)
             : (root._detachedHintActive ? root._flashTrackScale : 1)
     readonly property real _attachedContentScale:
         root._overlaySessionActive ? 1 : root._attachedPanelScale
@@ -270,6 +276,7 @@ property real _flashTrackOpacity: 0
         root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
         root._lastActiveEvent = initialActiveEvent
         root._resetTracks()
+        root._attachedPanelRevealWidth = root._attachedPanelActive ? root._attachedPanelWidth : 0
         root._attachedPanelRevealHeight = root._attachedPanelActive ? root._attachedPanelHeight : 0
         root._attachedContentOpacity = root._attachedPanelActive ? 1 : 0
         root._syncOverlayExtensionReservation()
@@ -293,8 +300,16 @@ property real _flashTrackOpacity: 0
     property real _pulseScale: 1
     property bool _overlayPulsePending: false
     property string _pulseOwner: ""
+    property real _attachedPanelRevealWidth: 0
     property real _attachedPanelRevealHeight: 0
     property real _attachedContentOpacity: 0
+    readonly property real _attachedPanelVisibleWidth:
+        root._attachedPanelActive
+            ? Math.max(
+                root._attachedRevealSeedWidth,
+                Math.min(root._attachedPanelRevealWidth, root._attachedPanelWidth)
+            )
+            : 0
     readonly property real _attachedPanelVisibleHeight:
         root._attachedPanelActive
             ? Math.max(0, Math.min(root._attachedPanelRevealHeight, root._attachedPanelHeight))
@@ -618,21 +633,54 @@ property real _flashTrackOpacity: 0
         root._triggerSharedBackgroundPulse("replace")
     }
 
-    function _startAttachedReveal(fromHeight) {
+    function _startAttachedReveal(fromWidth, fromHeight) {
         if (!root._attachedPanelActive)
             return
 
+        const resolvedFromWidth = fromWidth !== undefined
+            ? fromWidth
+            : root._attachedRevealSeedWidth
         const resolvedFromHeight = fromHeight !== undefined
             ? fromHeight
             : root._attachedRevealSeedHeight
 
+        _attachedCollapseAnim.stop()
         _attachedRevealAnim.stop()
+        root._attachedPanelRevealWidth = Math.min(
+            Math.max(root._attachedRevealSeedWidth, resolvedFromWidth),
+            root._attachedPanelWidth
+        )
         root._attachedPanelRevealHeight = Math.min(
             Math.max(0, resolvedFromHeight),
             root._attachedPanelHeight
         )
         root._attachedContentOpacity = 0
         _attachedRevealAnim.start()
+    }
+
+    function _startAttachedCollapse(toWidth, toHeight) {
+        if (!root._attachedPanelActive)
+            return
+
+        _attachedRevealAnim.stop()
+        _attachedCollapseAnim.stop()
+
+        root._attachedPanelRevealWidth = Math.min(
+            Math.max(root._attachedRevealSeedWidth, root._attachedPanelVisibleWidth),
+            root._attachedPanelWidth
+        )
+        root._attachedPanelRevealHeight = Math.min(
+            Math.max(0, root._attachedPanelVisibleHeight),
+            root._attachedPanelHeight
+        )
+
+        _attachedCollapseAnim.targetWidth = toWidth !== undefined
+            ? toWidth
+            : root._attachedRevealSeedWidth
+        _attachedCollapseAnim.targetHeight = toHeight !== undefined
+            ? toHeight
+            : root._attachedRevealSeedHeight
+        _attachedCollapseAnim.start()
     }
 
     function _cancelSharedBackgroundPulse() {
@@ -804,6 +852,8 @@ property real _flashTrackOpacity: 0
         root._phase = "hint-exit"
         root._syncOverlayExtensionReservation()
         _hintEnterAnim.stop()
+        if (root._isFullHintEventType(root._flashSourceEvent.type))
+            root._startAttachedCollapse()
         if (!root._isFullHintEventType(root._flashSourceEvent.type))
             root._triggerEdgeReboundScale()
         _hintExitAnim.start()
@@ -895,6 +945,7 @@ property real _flashTrackOpacity: 0
         }
 
         function onStateChanged() {
+            const previousAttachedWidth = root._attachedPanelVisibleWidth
             const previousAttachedHeight = root._attachedPanelVisibleHeight
             const wasDetachedHintActive = root._detachedHintActive
 
@@ -908,6 +959,9 @@ property real _flashTrackOpacity: 0
                 root._handoffFullHintToOverlay()
                 root._startAttachedReveal(
                     wasDetachedHintActive
+                        ? Math.max(previousAttachedWidth, root._attachedRevealSeedWidth)
+                        : undefined,
+                    wasDetachedHintActive
                         ? Math.max(previousAttachedHeight, root._attachedRevealSeedHeight)
                         : undefined
                 )
@@ -918,6 +972,7 @@ property real _flashTrackOpacity: 0
             }
 
             if (IslandOverlayService.state === "closing") {
+                root._startAttachedCollapse()
                 _overlayOpenSettleTimer.stop()
                 _overlayCloseSettleTimer.restart()
                 return
@@ -1052,7 +1107,7 @@ property real _flashTrackOpacity: 0
         id: _overlayShellHost
 
         visible: root._attachedPanelActive
-        width: root._attachedPanelWidth
+        width: root._attachedPanelVisibleWidth
         height: root._overlayShellHeight
         y: root._overlayShellY
         z: -1
@@ -1274,7 +1329,7 @@ property real _flashTrackOpacity: 0
 
         visible: root._attachedPanelActive
         enabled: root._attachedPanelActive
-        width: root._attachedPanelWidth
+        width: root._attachedPanelVisibleWidth
         height: root._attachedPanelVisibleHeight
         y: root._overlayDetachedY - root._overlayAttachmentOverlap
             + (root._attachedPanelExpanded ? 0 : -root._overlayRevealLift)
@@ -1329,6 +1384,14 @@ property real _flashTrackOpacity: 0
 
         NumberAnimation {
             target: root
+            property: "_attachedPanelRevealWidth"
+            to: root._attachedPanelWidth
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        NumberAnimation {
+            target: root
             property: "_attachedPanelRevealHeight"
             to: root._attachedPanelHeight
             duration: Theme.anim.moveDuration
@@ -1347,8 +1410,40 @@ property real _flashTrackOpacity: 0
             if (!root._attachedPanelActive)
                 return
 
+            root._attachedPanelRevealWidth = root._attachedPanelWidth
             root._attachedPanelRevealHeight = root._attachedPanelHeight
             root._attachedContentOpacity = 1
+        }
+    }
+
+    ParallelAnimation {
+        id: _attachedCollapseAnim
+
+        property real targetWidth: root._attachedRevealSeedWidth
+        property real targetHeight: root._attachedRevealSeedHeight
+
+        NumberAnimation {
+            target: root
+            property: "_attachedPanelRevealWidth"
+            to: _attachedCollapseAnim.targetWidth
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        NumberAnimation {
+            target: root
+            property: "_attachedPanelRevealHeight"
+            to: _attachedCollapseAnim.targetHeight
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        NumberAnimation {
+            target: root
+            property: "_attachedContentOpacity"
+            to: 0
+            duration: Theme.anim.highlightDuration
+            easing.type: Theme.anim.highlightType
         }
     }
 
@@ -1632,6 +1727,7 @@ property real _flashTrackOpacity: 0
             root._flashSourceEvent = root._idleSnapshot()
             root._mainDisplayEvent = root._baselineEvent
             root._sharedBackgroundPulseOpacity = 0
+            root._attachedPanelRevealWidth = 0
             root._attachedPanelRevealHeight = 0
             root._attachedContentOpacity = 0
             root._resetTracks()
