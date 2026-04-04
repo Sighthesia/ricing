@@ -904,6 +904,8 @@ property real _flashTrackOpacity: 0
                 readonly property real _panelBottom: _overlayShellHost.height - 0.5
                 readonly property real _panelRadius:
                     Math.max(_minR, Math.min(root._overlayShellRadius, Math.max(1, (_panelBottom - _panelTop) / 2)))
+                readonly property real _availableCornerHeight:
+                    Math.max(_minR, _panelTop - root._pillH)
                 readonly property real _neckRight:
                     Math.max(
                         _pillRight,
@@ -915,9 +917,7 @@ property real _flashTrackOpacity: 0
                         Math.max(_panelLeft + _panelRadius + _minR, _pillLeft - root._overlayBridgeOutset)
                     )
                 readonly property real _cornerStartY:
-                    Math.max(root._pillH, _panelTop - root._overlayInwardCornerDepth)
-                readonly property real _cornerVerticalSpan:
-                    Math.max(_minR, _panelTop - _cornerStartY)
+                    _panelTop - _cutRadius
                 readonly property real _cornerHorizontalSpan:
                     Math.max(
                         _minR,
@@ -926,22 +926,13 @@ property real _flashTrackOpacity: 0
                             _neckLeft - (_panelLeft + _panelRadius)
                         )
                     )
-                readonly property real _inwardRadius:
+                readonly property real _cutRadius:
                     Math.max(
                         _minR,
-                        Math.min(root._overlayInwardCornerRadius, _cornerVerticalSpan, _cornerHorizontalSpan)
+                        Math.min(root._overlayInwardCornerRadius, _availableCornerHeight, _cornerHorizontalSpan)
                     )
-                readonly property real _notchOutset:
-                    Math.max(
-                        _minR,
-                        Math.min(_inwardRadius * 0.9, root._overlayBridgeOutset * 0.28)
-                    )
-                readonly property real _rightShoulderX: _neckRight + _inwardRadius
-                readonly property real _leftShoulderX: _neckLeft - _inwardRadius
-                readonly property real _rightNotchX:
-                    Math.min(_rightShoulderX - _minR, _neckRight + _notchOutset)
-                readonly property real _leftNotchX:
-                    Math.max(_leftShoulderX + _minR, _neckLeft - _notchOutset)
+                readonly property real _rightShoulderX: _neckRight + _cutRadius
+                readonly property real _leftShoulderX: _neckLeft - _cutRadius
 
                 strokeColor: Colors.border
                 strokeWidth: 1
@@ -978,15 +969,15 @@ property real _flashTrackOpacity: 0
                 }
 
                 PathLine {
-                    x: _overlayShellPath._rightNotchX
+                    x: _overlayShellPath._neckRight
                     y: _overlayShellPath._cornerStartY
                 }
 
                 PathArc {
                     x: _overlayShellPath._rightShoulderX
                     y: _overlayShellPath._panelTop
-                    radiusX: _overlayShellPath._inwardRadius
-                    radiusY: _overlayShellPath._inwardRadius
+                    radiusX: _overlayShellPath._cutRadius
+                    radiusY: _overlayShellPath._cutRadius
                     direction: PathArc.Counterclockwise
                 }
 
@@ -1048,10 +1039,10 @@ property real _flashTrackOpacity: 0
                 }
 
                 PathArc {
-                    x: _overlayShellPath._leftNotchX
+                    x: _overlayShellPath._neckLeft
                     y: _overlayShellPath._cornerStartY
-                    radiusX: _overlayShellPath._inwardRadius
-                    radiusY: _overlayShellPath._inwardRadius
+                    radiusX: _overlayShellPath._cutRadius
+                    radiusY: _overlayShellPath._cutRadius
                     direction: PathArc.Counterclockwise
                 }
 

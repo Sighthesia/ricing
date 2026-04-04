@@ -27,6 +27,17 @@ description: Token system, Semantic Colors, Theme values, Base components, and I
 - `modules/bar/ClickRipple.qml` - standard click feedback.
 - `modules/bar/BarWidgetWrapper.qml` - bar widget container, drag support, shared animation contract.
 
+## Attached Panel Geometry
+- When a floating panel must look attached to a pill or bar affordance, keep the main affordance, bridge, and panel body as separate geometric responsibilities even if one `ShapePath` renders the final shell.
+- Do not create the inner corner by cutting directly into the bridge or the panel top edge. That reads like a notch carved out of the main body.
+- Prefer this shape model for Noctalia-style attached corners:
+- bridge body stays rectilinear
+- add a dedicated right-triangle shoulder between bridge and panel
+- apply a single quarter-circle `PathArc.Counterclockwise` cut only inside that triangle shoulder
+- Clamp the cut radius to both available height and horizontal shoulder span so the arc removes the whole triangle tip instead of leaving a sharp remnant.
+- If a seam can appear under fractional scaling, use a small overlap like `1px`, but keep that overlap separate from the shoulder width or cut radius.
+- In `modules/bar/widgets/SuperIslandWidget.qml`, the stable pattern is: compute available corner height first, derive `cutRadius`, then set `cornerStartY = panelTop - cutRadius` so the cut fully covers the shoulder tip.
+
 ### Interactive Surface Pattern
 ```qml
 HoverRevealHighlight { anchors.fill: parent; hovered: area.containsMouse }
