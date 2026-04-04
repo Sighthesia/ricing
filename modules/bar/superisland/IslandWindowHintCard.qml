@@ -1153,6 +1153,7 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: root._titleStageWidth
                         height: parent.height
+                        clip: true
 
                         Repeater {
                             model: root._persistentStageSlotIndices

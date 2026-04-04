@@ -191,10 +191,13 @@ property real _flashTrackOpacity: 0
         root._overlaySessionActive
             ? (root._overlayExpandedActive ? 1 : 0.985)
             : (root._detachedHintActive ? root._flashTrackScale : 1)
+    readonly property real _attachedPulseOpacity:
+        root._attachedPanelActive ? root._sharedBackgroundPulseOpacity : 0
     readonly property real _transientExpandedHeight: root._pillH + root._flashGap + root._flashRowH
     readonly property real _collapsedPillHeight: root._pillH
     readonly property bool _pillExpanded:
-        root._phase === "enter" || root._phase === "hold" || root._phase === "hint"
+        !root._attachedPanelActive
+        && (root._phase === "enter" || root._phase === "hold" || root._phase === "hint")
 
     readonly property real _overlayExpandedWidth: {
         const availableWidth = Math.max(
@@ -904,7 +907,9 @@ property real _flashTrackOpacity: 0
         y: root._overlayShellY
         z: -1
         opacity: root._attachedPanelOpacity
+        scale: root._pulseScale
         anchors.horizontalCenter: _pillClip.horizontalCenter
+        transformOrigin: Item.Top
 
         Behavior on opacity {
             NumberAnimation {
@@ -965,7 +970,12 @@ property real _flashTrackOpacity: 0
 
                 strokeColor: Colors.border
                 strokeWidth: 1
-                fillColor: Colors.surface
+                fillColor: Qt.rgba(
+                    Colors.surface.r * (1 - root._attachedPulseOpacity) + Colors.highlight.r * root._attachedPulseOpacity,
+                    Colors.surface.g * (1 - root._attachedPulseOpacity) + Colors.highlight.g * root._attachedPulseOpacity,
+                    Colors.surface.b * (1 - root._attachedPulseOpacity) + Colors.highlight.b * root._attachedPulseOpacity,
+                    1
+                )
                 startX: _pillLeft + _pillRadius
                 startY: 0
 
@@ -1104,6 +1114,7 @@ property real _flashTrackOpacity: 0
                 }
             }
         }
+
     }
 
     // Keep the content host detached from layout, but let the shell overlap the
@@ -1118,7 +1129,7 @@ property real _flashTrackOpacity: 0
         y: root._overlayDetachedY - root._overlayAttachmentOverlap
             + (root._attachedPanelExpanded ? 0 : -root._overlayRevealLift)
         opacity: root._attachedPanelOpacity
-        scale: root._attachedPanelScale
+        scale: root._attachedPanelScale * root._pulseScale
         anchors.horizontalCenter: _pillClip.horizontalCenter
         transformOrigin: Item.Top
 
