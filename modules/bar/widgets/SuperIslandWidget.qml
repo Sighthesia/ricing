@@ -150,8 +150,8 @@ property real _flashTrackOpacity: 0
     readonly property real _returnTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
     readonly property real _overlayBodyHeight: Math.round(528 * Theme.uiScale)
-    readonly property real _overlayDetachedOffset: Theme.barHeight * 2
-    readonly property real _overlayDetachedY: Theme.barHeight + root._overlayDetachedOffset
+    readonly property real _overlayDetachedOffset: Theme.barHeight
+    readonly property real _overlayDetachedY: root._overlayDetachedOffset
     readonly property real _overlayRevealLift:
         Math.max(8, Theme.barWidget.contentPaddingV * 4)
     readonly property real _overlayAttachmentOverlap: 1
@@ -163,6 +163,34 @@ property real _flashTrackOpacity: 0
         Math.max(10, Math.min(root._overlayShellRadius, Math.round(18 * Theme.uiScale)))
     readonly property real _overlayInwardCornerDepth:
         Math.max(root._overlayInwardCornerRadius, Math.round(28 * Theme.uiScale))
+    readonly property bool _detachedHintActive:
+        root._isFullHintEventType(root._flashSourceEvent.type) || root._phase === "hint-exit"
+    readonly property bool _attachedPanelActive:
+        root._overlaySessionActive || root._detachedHintActive
+    readonly property bool _attachedPanelExpanded:
+        root._overlaySessionActive ? root._overlayExpandedActive : (root._phase === "hint")
+    readonly property real _attachedPanelWidth:
+        root._overlaySessionActive ? root._overlayExpandedWidth : root._detachedHintWidth
+    readonly property real _attachedPanelHeight:
+        root._overlaySessionActive ? root._overlayBodyHeight : root._detachedHintHeight
+    readonly property real _detachedHintWidth:
+        Math.max(
+            root._collapsedWidth,
+            (_detachedHintMeasureLoader.item ? _detachedHintMeasureLoader.item.implicitWidth : root._collapsedWidth) + 2
+        )
+    readonly property real _detachedHintHeight:
+        Math.max(
+            root._transientExpandedHeight,
+            (_detachedHintMeasureLoader.item ? _detachedHintMeasureLoader.item.implicitHeight : root._fullHintExpandedPillHeight) + 2
+        )
+    readonly property real _attachedPanelOpacity:
+        root._overlaySessionActive
+            ? (root._overlayExpandedActive ? 1 : 0)
+            : (root._detachedHintActive ? root._flashTrackOpacity : 0)
+    readonly property real _attachedPanelScale:
+        root._overlaySessionActive
+            ? (root._overlayExpandedActive ? 1 : 0.985)
+            : (root._detachedHintActive ? root._flashTrackScale : 1)
     readonly property real _transientExpandedHeight: root._pillH + root._flashGap + root._flashRowH
     readonly property real _collapsedPillHeight: root._pillH
     readonly property bool _pillExpanded:
@@ -191,10 +219,7 @@ property real _flashTrackOpacity: 0
     readonly property bool _fullHintExpandedSurface:
         root._isFullHintEventType(root._flashSourceEvent.type)
         || (root._hintPhase && root._isFullHintEventType(SuperIslandService.activeEvent.type))
-    readonly property real _expandedPillHeight:
-        root._fullHintExpandedSurface
-            ? root._fullHintExpandedPillHeight
-            : root._transientExpandedHeight
+    readonly property real _expandedPillHeight: root._transientExpandedHeight
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
@@ -217,12 +242,12 @@ property real _flashTrackOpacity: 0
     readonly property bool _listensToService: true
     readonly property real _transientAccentBaseOpacity: 0
     readonly property real _overlayReservedExtension:
-        root._overlaySessionActive
-            ? root._overlayDetachedOffset + root._overlayBodyHeight
+        root._attachedPanelActive
+            ? root._overlayDetachedOffset + root._attachedPanelHeight
             : 0
     readonly property real _overlayShellY: _pillClip.y
     readonly property real _overlayShellHeight:
-        Math.max(0, (_overlayPanelHost.y + root._overlayBodyHeight) - root._overlayShellY)
+        Math.max(0, (_overlayPanelHost.y + root._attachedPanelHeight) - root._overlayShellY)
 
     Component.onCompleted: {
         currentTime = new Date()
@@ -436,10 +461,11 @@ property real _flashTrackOpacity: 0
             return
 
         let reservedHeight = root._overlaySessionActive
+            || root._detachedHintActive
             ? root._overlayReservedExtension
             : 0
 
-        if (root._overlaySessionActive) {
+        if (root._attachedPanelActive) {
             BarLayoutService.setTransientExtension("super-island-overlay", reservedHeight)
             return
         }
@@ -501,9 +527,10 @@ property real _flashTrackOpacity: 0
         const fullHint = root._isFullHintEventType(event.type)
 
         root._log("startWindowHint", event)
-        root._mainDisplayEvent = fullHint ? root._idleSnapshot() : root._baselineEvent
+        root._mainDisplayEvent = root._baselineEvent
         root._flashSourceEvent = root._displayEvent(event)
         root._phase = "hint"
+        root._syncOverlayExtensionReservation()
 
         _departAnim.stop()
         _returnAnim.stop()
@@ -512,7 +539,7 @@ property real _flashTrackOpacity: 0
 
         root._mainTrackY = root._mainTrackCenterY
         root._mainTrackScale = 1
-        root._mainTrackOpacity = fullHint ? 0 : 1
+        root._mainTrackOpacity = 1
         root._flashTrackY = root._windowHintEntryMeta.flashRole.targetY
             - root._windowHintEntryMeta.flashRole.deltaY
         root._flashTrackScale = 0.92
@@ -526,6 +553,7 @@ property real _flashTrackOpacity: 0
 
     function _updateWindowHint(event) {
         root._flashSourceEvent = root._displayEvent(event)
+        root._syncOverlayExtensionReservation()
         root._triggerSharedBackgroundPulse()
     }
 
@@ -641,6 +669,7 @@ property real _flashTrackOpacity: 0
             return
 
         root._phase = "hint-exit"
+        root._syncOverlayExtensionReservation()
         _hintEnterAnim.stop()
         root._triggerEdgeReboundScale()
         _hintExitAnim.start()
@@ -773,7 +802,7 @@ property real _flashTrackOpacity: 0
             radius: root._pillH / 2
             color: Colors.surface
             border.color: Colors.border
-            border.width: root._overlaySessionActive ? 0 : 1
+            border.width: root._attachedPanelActive ? 0 : 1
         }
 
         Rectangle {
@@ -853,7 +882,7 @@ property real _flashTrackOpacity: 0
             property var eventData: root._flashSourceEvent
             property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
             anchors.horizontalCenter: parent.horizontalCenter
-            active: root.flashTrackVisible && (!root._isFullHintEventType(eventData.type) || root._hintPhase)
+            active: root.flashTrackVisible && !root._isFullHintEventType(eventData.type)
             y: root._flashTrackY
             opacity: root._flashTrackOpacity
             scale: root._flashTrackScale
@@ -869,12 +898,12 @@ property real _flashTrackOpacity: 0
     Item {
         id: _overlayShellHost
 
-        visible: root._overlaySessionActive
-        width: root._overlayExpandedWidth
+        visible: root._attachedPanelActive
+        width: root._attachedPanelWidth
         height: root._overlayShellHeight
         y: root._overlayShellY
         z: -1
-        opacity: root._overlayExpandedActive ? 1 : 0
+        opacity: root._attachedPanelOpacity
         anchors.horizontalCenter: _pillClip.horizontalCenter
 
         Behavior on opacity {
@@ -1082,14 +1111,14 @@ property real _flashTrackOpacity: 0
     Item {
         id: _overlayPanelHost
 
-        visible: root._overlaySessionActive
-        enabled: root._overlaySessionActive
-        width: root._overlayExpandedWidth
-        height: root._overlayBodyHeight
+        visible: root._attachedPanelActive
+        enabled: root._attachedPanelActive
+        width: root._attachedPanelWidth
+        height: root._attachedPanelHeight
         y: root._overlayDetachedY - root._overlayAttachmentOverlap
-            + (root._overlayExpandedActive ? 0 : -root._overlayRevealLift)
-        opacity: root._overlayExpandedActive ? 1 : 0
-        scale: root._overlayExpandedActive ? 1 : 0.985
+            + (root._attachedPanelExpanded ? 0 : -root._overlayRevealLift)
+        opacity: root._attachedPanelOpacity
+        scale: root._attachedPanelScale
         anchors.horizontalCenter: _pillClip.horizontalCenter
         transformOrigin: Item.Top
 
@@ -1116,12 +1145,23 @@ property real _flashTrackOpacity: 0
 
         Loader {
             id: _overlayDeckLoader
+            property var eventData: root._flashSourceEvent
 
-            active: root._overlaySessionActive
+            active: root._attachedPanelActive
             anchors.fill: parent
             anchors.margins: 1
-            sourceComponent: _overlayDeckComponent
+            sourceComponent: root._overlaySessionActive ? _overlayDeckComponent : _windowHintCardComponent
         }
+    }
+
+    Loader {
+        id: _detachedHintMeasureLoader
+        property var eventData: root._flashSourceEvent
+
+        active: root._detachedHintActive
+        visible: false
+        enabled: false
+        sourceComponent: _windowHintCardComponent
     }
 
     ParallelAnimation {
@@ -1331,7 +1371,7 @@ property real _flashTrackOpacity: 0
         NumberAnimation {
             target: root
             property: "_mainTrackOpacity"
-            to: root._isFullHintEventType(root._flashSourceEvent.type) ? 0 : 0.6
+            to: root._isFullHintEventType(root._flashSourceEvent.type) ? 1 : 0.6
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -1405,6 +1445,7 @@ property real _flashTrackOpacity: 0
             root._mainDisplayEvent = root._baselineEvent
             root._sharedBackgroundPulseOpacity = 0
             root._resetTracks()
+            root._syncOverlayExtensionReservation()
         }
     }
 
