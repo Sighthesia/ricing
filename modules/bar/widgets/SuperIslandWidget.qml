@@ -347,6 +347,15 @@ property real _flashTrackOpacity: 0
             : 0
     readonly property real _attachedRevealYOffset:
         (1 - root._attachedRevealProgress) * root._overlayRevealLift
+    readonly property bool _hintRevealSettled:
+        root._detachedHintActive
+        && !root._overlaySessionActive
+        && !_attachedRevealDelayTimer.running
+        && !_pillThrowOutAnim.running
+        && !_attachedRevealAnim.running
+        && root._attachedContentOpacity >= 0.99
+        && root._attachedPanelVisibleWidth >= root._detachedHintWidth - 1
+        && root._attachedPanelVisibleHeight >= root._detachedHintHeight - 1
 
     implicitHeight: Theme.barHeight
     implicitWidth: root._phase === "hint-exit"
@@ -1009,6 +1018,7 @@ property real _flashTrackOpacity: 0
             const previousAttachedWidth = root._attachedPanelVisibleWidth
             const previousAttachedHeight = root._attachedPanelVisibleHeight
             const wasDetachedHintActive = root._detachedHintActive
+            const wasHintRevealSettled = root._hintRevealSettled
 
             root._syncOverlayFlags()
 
@@ -1025,7 +1035,7 @@ property real _flashTrackOpacity: 0
                     wasDetachedHintActive
                         ? Math.max(previousAttachedHeight, root._attachedRevealSeedHeight)
                         : undefined,
-                    !wasDetachedHintActive
+                    !wasDetachedHintActive || wasHintRevealSettled
                 )
                 root._maybeTriggerOverlayOpenPulse()
                 _overlayCloseSettleTimer.stop()
@@ -1098,7 +1108,7 @@ property real _flashTrackOpacity: 0
             anchors.fill: _pillBg
             radius: _pillBg.radius
             color: Colors.highlight
-            opacity: root._transientPhase
+            opacity: (root._transientPhase || root._overlaySessionActive)
                 ? Math.min(1, root._transientAccentBaseOpacity + root._sharedBackgroundPulseOpacity)
                 : 0
         }
