@@ -314,6 +314,34 @@ property real _flashTrackOpacity: 0
         root._attachedPanelActive
             ? Math.max(0, Math.min(root._attachedPanelRevealHeight, root._attachedPanelHeight))
             : 0
+    readonly property real _attachedWidthRevealProgress:
+        root._attachedPanelWidth > root._attachedRevealSeedWidth
+            ? Math.max(
+                0,
+                Math.min(
+                    1,
+                    (root._attachedPanelVisibleWidth - root._attachedRevealSeedWidth)
+                        / (root._attachedPanelWidth - root._attachedRevealSeedWidth)
+                )
+            )
+            : 1
+    readonly property real _attachedHeightRevealProgress:
+        root._attachedPanelHeight > root._attachedRevealSeedHeight
+            ? Math.max(
+                0,
+                Math.min(
+                    1,
+                    (root._attachedPanelVisibleHeight - root._attachedRevealSeedHeight)
+                        / (root._attachedPanelHeight - root._attachedRevealSeedHeight)
+                )
+            )
+            : 1
+    readonly property real _attachedRevealProgress:
+        root._attachedPanelActive
+            ? Math.min(root._attachedWidthRevealProgress, root._attachedHeightRevealProgress)
+            : 0
+    readonly property real _attachedRevealYOffset:
+        (1 - root._attachedRevealProgress) * root._overlayRevealLift
 
     implicitHeight: Theme.barHeight
     implicitWidth: root._phase === "hint-exit"
@@ -1333,18 +1361,12 @@ property real _flashTrackOpacity: 0
         height: root._attachedPanelVisibleHeight
         y: root._overlayDetachedY - root._overlayAttachmentOverlap
             + (root._attachedPanelExpanded ? 0 : -root._overlayRevealLift)
+            - root._attachedRevealYOffset
         opacity: root._attachedPanelOpacity
         scale: root._attachedSurfaceScale
         clip: true
         anchors.horizontalCenter: _pillClip.horizontalCenter
         transformOrigin: Item.Top
-
-        Behavior on y {
-            NumberAnimation {
-                duration: Theme.anim.moveDuration
-                easing.type: Theme.anim.moveType
-            }
-        }
 
         Behavior on opacity {
             NumberAnimation {
