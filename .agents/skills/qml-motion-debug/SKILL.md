@@ -182,6 +182,14 @@ Use when an overlay opens while a hold preview still has delayed emphasis pendin
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.
 
+## Visual Language Reference
+
+The shared design language and cross-component consistency rules live in `qml-visual-language`.
+
+- Load `qml-visual-language` when a fix or feature needs visual-system decisions.
+- Keep this skill focused on diagnosing broken motion, race conditions, ownership conflicts, and handoff timing.
+- If a motion bug is actually a design-language mismatch, treat that as a separate concern and follow the visual-language skill.
+
 ## Validation
 
 - Run `timeout 5 qs --path .`

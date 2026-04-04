@@ -33,6 +33,7 @@ Load these for detailed context on specific topics:
 | [qml-components](.agents/skills/qml-components/SKILL.md)               | Token system, semantic colors, theme values, base components, and interactive surface patterns.                        |
 | [qml-context-menu](.agents/skills/qml-context-menu/SKILL.md)           | Build, refactor, or visually align bar-style context menus, tray menus, and submenus.                                  |
 | [qml-indicator-motion](.agents/skills/qml-indicator-motion/SKILL.md)   | Build or debug moving active indicators, sliding circles, and stretch-then-settle pills behind workspace or icon rows. |
+| [qml-visual-language](.agents/skills/qml-visual-language/SKILL.md)     | Define and enforce shared visual language, shell continuity, and cross-component motion consistency.                  |
 | [qml-performance-debug](.agents/skills/qml-performance-debug/SKILL.md) | Debug jank, layout thrash, layer-shell resize churn, and expensive widget transitions.                                 |
 | [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md)           | Debug QML motion that updates state correctly but still looks static, wrong, or too subtle.                            |
 | [qml-state](skills/qml-state/SKILL.md)                                 | Guidelines for managing settings, state, persistence, and error handling.                                              |
