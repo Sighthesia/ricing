@@ -163,13 +163,17 @@ property real _flashTrackOpacity: 0
         Math.max(10, Math.min(root._overlayShellRadius, Math.round(18 * Theme.uiScale)))
     readonly property real _overlayInwardCornerDepth:
         Math.max(root._overlayInwardCornerRadius, Math.round(28 * Theme.uiScale))
-    readonly property real _attachedRevealSeedHeight:
-        Math.max(
-            Theme.barWidget.contentPaddingV * 6,
-            Math.round(root._pillH * 0.32)
-        )
+    readonly property real _attachedRevealSeedHeight: 0
     readonly property real _attachedRevealSeedWidth:
         Math.max(root._overlayPillBackgroundWidth, root._collapsedWidth)
+    readonly property real _pillThrowLift:
+        Math.max(6, Math.round(root._pillH * 0.2))
+    readonly property real _pillThrowDrop:
+        Math.max(10, Math.round(root._pillH * 0.32))
+    readonly property int _pillThrowLeadDuration:
+        Math.max(1, Math.round(Theme.anim.highlightDuration * 0.5))
+    readonly property int _pillThrowDropDuration:
+        Math.max(1, Math.round(Theme.anim.highlightDuration * 0.7))
     readonly property bool _detachedHintActive:
         root._isFullHintEventType(root._flashSourceEvent.type) || root._phase === "hint-exit"
     readonly property bool _attachedPanelActive:
@@ -303,6 +307,7 @@ property real _flashTrackOpacity: 0
     property real _attachedPanelRevealWidth: 0
     property real _attachedPanelRevealHeight: 0
     property real _attachedContentOpacity: 0
+    property real _pillThrowOffsetY: 0
     readonly property real _attachedPanelVisibleWidth:
         root._attachedPanelActive
             ? Math.max(
@@ -661,10 +666,14 @@ property real _flashTrackOpacity: 0
         root._triggerSharedBackgroundPulse("replace")
     }
 
-    function _startAttachedReveal(fromWidth, fromHeight) {
+    function _startAttachedReveal(fromWidth, fromHeight, withThrowKick) {
         if (!root._attachedPanelActive)
             return
 
+        const shouldThrowKick = withThrowKick !== false
+        const preservingThrowMotion = !shouldThrowKick && _pillThrowOutAnim.running
+        const preserveVisibleContent = !shouldThrowKick
+            && (root._attachedContentOpacity > 0 || _attachedRevealAnim.running)
         const resolvedFromWidth = fromWidth !== undefined
             ? fromWidth
             : root._attachedRevealSeedWidth
@@ -673,7 +682,6 @@ property real _flashTrackOpacity: 0
             : root._attachedRevealSeedHeight
 
         _attachedCollapseAnim.stop()
-        _attachedRevealAnim.stop()
         root._attachedPanelRevealWidth = Math.min(
             Math.max(root._attachedRevealSeedWidth, resolvedFromWidth),
             root._attachedPanelWidth
@@ -682,16 +690,40 @@ property real _flashTrackOpacity: 0
             Math.max(0, resolvedFromHeight),
             root._attachedPanelHeight
         )
+        _pillCatchAnim.stop()
+
+        if (!shouldThrowKick) {
+            _attachedRevealAnim.stop()
+            if (!preserveVisibleContent)
+                root._attachedContentOpacity = 0
+            _attachedRevealDelayTimer.stop()
+            if (!preservingThrowMotion) {
+                _pillThrowOutAnim.stop()
+                root._pillThrowOffsetY = 0
+            }
+            _attachedRevealAnim.start()
+            return
+        }
+
+        _attachedRevealAnim.stop()
         root._attachedContentOpacity = 0
-        _attachedRevealAnim.start()
+        _attachedRevealDelayTimer.stop()
+        _pillThrowOutAnim.stop()
+        root._pillThrowOffsetY = 0
+        _pillThrowOutAnim.start()
+        _attachedRevealDelayTimer.restart()
     }
 
     function _startAttachedCollapse(toWidth, toHeight) {
         if (!root._attachedPanelActive)
             return
 
+        _attachedRevealDelayTimer.stop()
         _attachedRevealAnim.stop()
         _attachedCollapseAnim.stop()
+        _pillThrowOutAnim.stop()
+        _pillCatchAnim.stop()
+        root._pillThrowOffsetY = 0
 
         root._attachedPanelRevealWidth = Math.min(
             Math.max(root._attachedRevealSeedWidth, root._attachedPanelVisibleWidth),
@@ -708,6 +740,7 @@ property real _flashTrackOpacity: 0
         _attachedCollapseAnim.targetHeight = toHeight !== undefined
             ? toHeight
             : root._attachedRevealSeedHeight
+        _pillCatchAnim.start()
         _attachedCollapseAnim.start()
     }
 
@@ -991,7 +1024,8 @@ property real _flashTrackOpacity: 0
                         : undefined,
                     wasDetachedHintActive
                         ? Math.max(previousAttachedHeight, root._attachedRevealSeedHeight)
-                        : undefined
+                        : undefined,
+                    !wasDetachedHintActive
                 )
                 root._maybeTriggerOverlayOpenPulse()
                 _overlayCloseSettleTimer.stop()
@@ -1019,7 +1053,7 @@ property real _flashTrackOpacity: 0
     Item {
         id: _pillClip
         anchors.top: parent.top
-        anchors.topMargin: root._padV
+        anchors.topMargin: root._padV + root._pillThrowOffsetY
         anchors.horizontalCenter: parent.horizontalCenter
         clip: true
         implicitWidth: _pillTransition.animatedWidth
@@ -1399,6 +1433,70 @@ property real _flashTrackOpacity: 0
         visible: false
         enabled: false
         sourceComponent: _windowHintCardComponent
+    }
+
+    Timer {
+        id: _attachedRevealDelayTimer
+        interval: root._pillThrowLeadDuration + root._pillThrowDropDuration
+        repeat: false
+        onTriggered: {
+            if (root._attachedPanelActive)
+                _attachedRevealAnim.start()
+        }
+    }
+
+    SequentialAnimation {
+        id: _pillThrowOutAnim
+
+        NumberAnimation {
+            target: root
+            property: "_pillThrowOffsetY"
+            to: -root._pillThrowLift
+            duration: root._pillThrowLeadDuration
+            easing.type: Theme.anim.highlightType
+        }
+
+        NumberAnimation {
+            target: root
+            property: "_pillThrowOffsetY"
+            to: root._pillThrowDrop
+            duration: root._pillThrowDropDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        NumberAnimation {
+            target: root
+            property: "_pillThrowOffsetY"
+            to: 0
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        onStopped: root._pillThrowOffsetY = 0
+        onFinished: root._pillThrowOffsetY = 0
+    }
+
+    SequentialAnimation {
+        id: _pillCatchAnim
+
+        NumberAnimation {
+            target: root
+            property: "_pillThrowOffsetY"
+            to: -Math.max(3, Math.round(root._pillThrowLift * 1.05))
+            duration: Math.max(1, Math.round(Theme.anim.highlightDuration * 0.55))
+            easing.type: Theme.anim.highlightType
+        }
+
+        NumberAnimation {
+            target: root
+            property: "_pillThrowOffsetY"
+            to: 0
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        onStopped: root._pillThrowOffsetY = 0
+        onFinished: root._pillThrowOffsetY = 0
     }
 
     ParallelAnimation {
