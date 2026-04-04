@@ -39,6 +39,12 @@ Use this skill when animation state changes are correct but the user still does 
 - A narrower stage inside that positioner can appear left-aligned even when its own internal items are centered.
 - When one animated lane is narrower than its siblings, wrap it in a full-width container and center the real stage inside the wrapper.
 
+### 7. Mode Changes Before State Settles
+- Do not assume `state === opening/open` is the earliest reliable signal that an overlay handoff has started.
+- In DymicShell overlay flows, `mode !== none` can become true one step earlier than the final session state.
+- If a delayed hint pulse or flash timer should not survive overlay takeover, cancel it as soon as the mode becomes active, not only after the session is fully open.
+- Keep the suppression narrow: stop the stale delayed pulse, but do not also suppress legitimate live-update pulse or spring feedback for the underlying hint interaction.
+
 ## Debugging Ladder
 
 Work from outermost cause to innermost rendering node.
@@ -79,6 +85,7 @@ Good log fields:
 - travel distance for the animated property
 - whether a follow-up snapshot cleared the animation
 - parent stage width versus animated child width
+- overlay `mode` versus overlay `state`
 
 Remove all temporary logs before finishing.
 
@@ -156,6 +163,14 @@ Column {
 }
 ```
 
+### Pattern F: Cancel Delayed Pulse On Early Overlay Handoff
+Use when an overlay opens while a hold preview still has delayed emphasis pending.
+
+- detect the earliest overlay handoff signal, often `mode !== none`
+- cancel only the delayed timer or pending pulse flag tied to the old surface
+- keep steady-state hint replacement feedback enabled for real content changes
+- avoid broad guards that remove all pulse or spring feedback from the hint itself
+
 ## DymicShell-Specific Notes
 
 - Check `services/WindowHintService.qml` first for live hint snapshots.
@@ -163,6 +178,7 @@ Column {
 - Check `modules/bar/superisland/*` last for real geometry ownership.
 - For hint-like transitions, prefer explicit timeline control over `Qt.callLater()` pulses.
 - For `window-hint` style previews, verify that repeated `activeHint` refreshes do not cancel a just-started slot motion.
+- For `window-hint` to overlay handoff, compare `IslandOverlayService.mode` and `IslandOverlayService.state` separately before deciding a delayed pulse is still valid.
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.
 

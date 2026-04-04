@@ -14,7 +14,7 @@ Item {
 property bool liveInstance: false
 property string debugInstanceLabel: liveInstance ? "live" : "preview"
 
-    readonly property bool _debugLogging: false
+    readonly property bool _debugLogging: liveInstance
 property date currentTime
 Timer {
     id: timeTimer
@@ -191,6 +191,10 @@ property real _flashTrackOpacity: 0
         root._overlaySessionActive
             ? (root._overlayExpandedActive ? 1 : 0.985)
             : (root._detachedHintActive ? root._flashTrackScale : 1)
+    readonly property real _attachedContentScale:
+        root._overlaySessionActive ? 1 : root._attachedPanelScale
+    readonly property real _attachedSurfaceScale:
+        root._pulseScale * root._attachedContentScale
     readonly property real _attachedPulseOpacity:
         root._attachedPanelActive ? root._sharedBackgroundPulseOpacity : 0
     readonly property real _transientExpandedHeight: root._pillH + root._flashGap + root._flashRowH
@@ -278,6 +282,8 @@ property real _flashTrackOpacity: 0
     property bool _replaceIncomingVisible: false
     property real _sharedBackgroundPulseOpacity: 0
     property real _pulseScale: 1
+    property bool _overlayPulsePending: false
+    property string _pulseOwner: ""
 
     implicitHeight: Theme.barHeight
     implicitWidth: root._phase === "hint-exit"
@@ -330,6 +336,25 @@ property real _flashTrackOpacity: 0
             "priority=", event.priority || "",
             "title=", event.title || "",
             "subtitle=", event.subtitle || ""
+        )
+    }
+
+    function _logPulse(message) {
+        if (!root._debugLogging)
+            return
+
+        console.log(
+            "SuperIslandWidget[" + root.debugInstanceLabel + "]: pulse", message,
+            "owner=", root._pulseOwner,
+            "phase=", root._phase,
+            "flashType=", root._flashSourceEvent.type || "",
+            "overlayMode=", IslandOverlayService.mode,
+            "overlayState=", IslandOverlayService.state,
+            "overlaySessionActive=", root._overlaySessionActive,
+            "overlayExpandedActive=", root._overlayExpandedActive,
+            "overlayPulsePending=", root._overlayPulsePending,
+            "pulseAnimRunning=", _sharedBackgroundPulseAnim.running,
+            "scaleAnimRunning=", _pulseScaleAnim.running
         )
     }
 
@@ -453,10 +478,22 @@ property real _flashTrackOpacity: 0
     }
 
     function _syncOverlayFlags() {
-        root._overlaySessionActive = IslandOverlayService.mode !== "none"
+        const overlayModeActive = IslandOverlayService.mode !== "none"
+        const wasOverlaySessionActive = root._overlaySessionActive
+        const wasOverlayExpandedActive = root._overlayExpandedActive
+        root._overlaySessionActive = overlayModeActive
             && IslandOverlayService.state !== "closed"
-        root._overlayExpandedActive = IslandOverlayService.mode !== "none"
+        root._overlayExpandedActive = overlayModeActive
             && (IslandOverlayService.state === "opening" || IslandOverlayService.state === "open")
+
+        if (!wasOverlayExpandedActive && root._overlayExpandedActive)
+            root._overlayPulsePending = true
+
+        if (!root._overlaySessionActive)
+            root._overlayPulsePending = false
+
+        if (overlayModeActive)
+            _hintFlashDelayTimer.stop()
     }
 
     function _syncOverlayExtensionReservation() {
@@ -519,7 +556,7 @@ property real _flashTrackOpacity: 0
             root._flashTrackScale = 1
             root._flashTrackOpacity = 1
         }
-        root._triggerSharedBackgroundPulse()
+        root._triggerSharedBackgroundPulse("hint-update")
 
         Qt.callLater(function() {
             _departAnim.start()
@@ -557,16 +594,66 @@ property real _flashTrackOpacity: 0
     function _updateWindowHint(event) {
         root._flashSourceEvent = root._displayEvent(event)
         root._syncOverlayExtensionReservation()
-        root._triggerSharedBackgroundPulse()
+
+        if (root._overlaySessionActive || IslandOverlayService.mode !== "none")
+            return
+
+        root._triggerSharedBackgroundPulse("replace")
     }
 
-    function _triggerSharedBackgroundPulse() {
+    function _cancelSharedBackgroundPulse() {
+        root._logPulse("cancelSharedBackgroundPulse")
         _sharedBackgroundPulseAnim.stop()
         _pulseScaleAnim.stop()
         root._sharedBackgroundPulseOpacity = 0
         root._pulseScale = 1
+        root._pulseOwner = ""
+    }
+
+    function _triggerSharedBackgroundPulse(owner) {
+        const resolvedOwner = owner || "general"
+        root._logPulse("triggerSharedBackgroundPulse owner=" + resolvedOwner)
+        root._cancelSharedBackgroundPulse()
+        root._pulseOwner = resolvedOwner
         _sharedBackgroundPulseAnim.start()
         _pulseScaleAnim.start()
+    }
+
+    function _maybeTriggerOverlayOpenPulse() {
+        if (!root._overlayPulsePending)
+            return
+
+        root._overlayPulsePending = false
+
+        root._logPulse("maybeTriggerOverlayOpenPulse")
+
+        _hintFlashDelayTimer.stop()
+
+        if (_sharedBackgroundPulseAnim.running || _pulseScaleAnim.running) {
+            root._pulseOwner = "overlay"
+            return
+        }
+
+        root._triggerSharedBackgroundPulse("overlay")
+    }
+
+    function _handoffFullHintToOverlay() {
+        if (!root._hintPhase || !root._isFullHintEventType(root._flashSourceEvent.type))
+            return
+
+        _hintFlashDelayTimer.stop()
+        _hintEnterAnim.stop()
+        _hintExitAnim.stop()
+
+        root._phase = "idle"
+        root._flashSourceEvent = root._idleSnapshot()
+        root._flashTrackY = root._flashStripY
+        root._flashTrackScale = root._flashScale
+        root._flashTrackOpacity = 0
+        root._mainDisplayEvent = root._baselineEvent
+        root._mainTrackY = root._mainTrackCenterY
+        root._mainTrackScale = 1
+        root._mainTrackOpacity = 1
     }
 
     function _triggerEdgeReboundScale() {
@@ -637,14 +724,23 @@ property real _flashTrackOpacity: 0
     }
 
     function _triggerHintFlash() {
-        root._triggerSharedBackgroundPulse()
+        root._triggerSharedBackgroundPulse("hint-delay")
     }
 
     Timer {
         id: _hintFlashDelayTimer
         interval: Theme.anim.moveDuration
         repeat: false
-        onTriggered: root._triggerHintFlash()
+        onTriggered: {
+            root._logPulse("hintFlashDelayTimer")
+            if (root._overlaySessionActive || IslandOverlayService.mode !== "none")
+                return
+
+            if (!root._hintPhase || !root._isFullHintEventType(root._flashSourceEvent.type))
+                return
+
+            root._triggerHintFlash()
+        }
     }
 
     Timer {
@@ -674,7 +770,8 @@ property real _flashTrackOpacity: 0
         root._phase = "hint-exit"
         root._syncOverlayExtensionReservation()
         _hintEnterAnim.stop()
-        root._triggerEdgeReboundScale()
+        if (!root._isFullHintEventType(root._flashSourceEvent.type))
+            root._triggerEdgeReboundScale()
         _hintExitAnim.start()
     }
 
@@ -712,6 +809,13 @@ property real _flashTrackOpacity: 0
             const previousEvent = root._cloneEvent(root._lastActiveEvent)
             const nextIsHint = root._isHintEventType(nextEvent.type)
             const previousIsHint = root._isHintEventType(previousEvent.type)
+
+            root._log(
+                "activeEventChanged prev=" + previousEvent.type + " next=" + nextEvent.type
+                    + " phase=" + root._phase
+                    + " overlayMode=" + IslandOverlayService.mode
+                    + " overlayState=" + IslandOverlayService.state
+            )
 
             if (nextEvent.type === "overlay" || previousEvent.type === "overlay") {
                 root._lastActiveEvent = nextEvent.type === "overlay"
@@ -761,7 +865,11 @@ property real _flashTrackOpacity: 0
 
             root._syncOverlayExtensionReservation()
 
+            root._logPulse("overlayStateChanged")
+
             if (IslandOverlayService.state === "opening") {
+                root._handoffFullHintToOverlay()
+                root._maybeTriggerOverlayOpenPulse()
                 _overlayCloseSettleTimer.stop()
                 _overlayOpenSettleTimer.restart()
                 return
@@ -907,7 +1015,7 @@ property real _flashTrackOpacity: 0
         y: root._overlayShellY
         z: -1
         opacity: root._attachedPanelOpacity
-        scale: root._pulseScale
+        scale: root._attachedSurfaceScale
         anchors.horizontalCenter: _pillClip.horizontalCenter
         transformOrigin: Item.Top
 
@@ -1129,7 +1237,7 @@ property real _flashTrackOpacity: 0
         y: root._overlayDetachedY - root._overlayAttachmentOverlap
             + (root._attachedPanelExpanded ? 0 : -root._overlayRevealLift)
         opacity: root._attachedPanelOpacity
-        scale: root._attachedPanelScale * root._pulseScale
+        scale: root._attachedSurfaceScale
         anchors.horizontalCenter: _pillClip.horizontalCenter
         transformOrigin: Item.Top
 
@@ -1144,13 +1252,6 @@ property real _flashTrackOpacity: 0
             NumberAnimation {
                 duration: Theme.anim.highlightDuration
                 easing.type: Theme.anim.highlightType
-            }
-        }
-
-        Behavior on scale {
-            NumberAnimation {
-                duration: Theme.anim.moveDuration
-                easing.type: Theme.anim.moveType
             }
         }
 
@@ -1479,6 +1580,11 @@ property real _flashTrackOpacity: 0
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
+
+        onFinished: {
+            if (!_pulseScaleAnim.running)
+                root._pulseOwner = ""
+        }
     }
 
     SequentialAnimation {
@@ -1500,6 +1606,11 @@ property real _flashTrackOpacity: 0
             to: 1
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
+        }
+
+        onFinished: {
+            if (!_sharedBackgroundPulseAnim.running)
+                root._pulseOwner = ""
         }
     }
 

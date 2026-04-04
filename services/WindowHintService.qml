@@ -64,14 +64,65 @@ Singleton {
         _hintRefreshCoalesceTimer.restart()
     }
 
+    function _semanticWindow(windowData) {
+        return {
+            windowId: windowData ? (windowData.windowId || "") : "",
+            title: windowData ? (windowData.title || "") : "",
+            appId: windowData ? (windowData.appId || "") : "",
+            icon: windowData ? (windowData.icon || "") : "",
+            isFocused: windowData ? !!windowData.isFocused : false,
+            columnIndex: windowData && windowData.columnIndex !== undefined ? windowData.columnIndex : -1
+        }
+    }
+
+    function _semanticWorkspaceSummary(summary) {
+        return {
+            workspaceId: summary ? (summary.workspaceId || "") : "",
+            workspaceIndex: summary && summary.workspaceIndex !== undefined ? summary.workspaceIndex : -1,
+            icons: summary && summary.icons
+                ? summary.icons.map(iconData => ({
+                    windowId: iconData.windowId || "",
+                    icon: iconData.icon || "",
+                    isFocused: !!iconData.isFocused
+                }))
+                : []
+        }
+    }
+
+    function _semanticHintKey(hint) {
+        if (!hint)
+            return ""
+
+        return JSON.stringify({
+            visible: hint.visible === true,
+            workspaceId: hint.workspaceId || "",
+            workspaceIndex: hint.workspaceIndex !== undefined ? hint.workspaceIndex : -1,
+            activeWorkspacePosition: hint.activeWorkspacePosition !== undefined ? hint.activeWorkspacePosition : -1,
+            currentWindowId: hint.currentWindowId || "",
+            currentWindowTitle: hint.currentWindowTitle || "",
+            currentWindowIcon: hint.currentWindowIcon || "",
+            currentIndex: hint.currentIndex !== undefined ? hint.currentIndex : -1,
+            windows: hint.windows ? hint.windows.map(windowData => root._semanticWindow(windowData)) : [],
+            workspaces: hint.workspaces
+                ? hint.workspaces.map(summary => root._semanticWorkspaceSummary(summary))
+                : [],
+            previousWindow: root._semanticWindow(hint.previousWindow),
+            nextWindow: root._semanticWindow(hint.nextWindow),
+            previousWorkspace: root._semanticWorkspaceSummary(hint.previousWorkspace),
+            nextWorkspace: root._semanticWorkspaceSummary(hint.nextWorkspace)
+        })
+    }
+
     function _publishHint(nextHint) {
         if (!nextHint || !nextHint.visible)
             return
 
+        const repeatedHint = root._semanticHintKey(nextHint) === root._semanticHintKey(root._lastVisibleHint)
+
         root._lastVisibleHint = nextHint
         root.activeHint = nextHint
 
-        if (root._overlayBlocked)
+        if (root._overlayBlocked || repeatedHint)
             return
 
         SuperIslandService.showWindowHint(nextHint)
