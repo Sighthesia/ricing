@@ -683,6 +683,8 @@ property real _flashTrackOpacity: 0
         const preservingThrowMotion = !shouldThrowKick && _pillThrowOutAnim.running
         const preserveVisibleContent = !shouldThrowKick
             && (root._attachedContentOpacity > 0 || _attachedRevealAnim.running)
+        const immediateRevealWithThrow = shouldThrowKick
+            && (root._attachedContentOpacity > 0 || _attachedRevealAnim.running)
         const resolvedFromWidth = fromWidth !== undefined
             ? fromWidth
             : root._attachedRevealSeedWidth
@@ -715,12 +717,16 @@ property real _flashTrackOpacity: 0
         }
 
         _attachedRevealAnim.stop()
-        root._attachedContentOpacity = 0
         _attachedRevealDelayTimer.stop()
         _pillThrowOutAnim.stop()
         root._pillThrowOffsetY = 0
+        if (!immediateRevealWithThrow)
+            root._attachedContentOpacity = 0
         _pillThrowOutAnim.start()
-        _attachedRevealDelayTimer.restart()
+        if (immediateRevealWithThrow)
+            _attachedRevealAnim.start()
+        else
+            _attachedRevealDelayTimer.restart()
     }
 
     function _startAttachedCollapse(toWidth, toHeight) {
