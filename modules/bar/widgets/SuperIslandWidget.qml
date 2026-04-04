@@ -163,6 +163,11 @@ property real _flashTrackOpacity: 0
         Math.max(10, Math.min(root._overlayShellRadius, Math.round(18 * Theme.uiScale)))
     readonly property real _overlayInwardCornerDepth:
         Math.max(root._overlayInwardCornerRadius, Math.round(28 * Theme.uiScale))
+    readonly property real _attachedRevealSeedHeight:
+        Math.max(
+            Theme.barWidget.contentPaddingV * 6,
+            Math.round(root._pillH * 0.32)
+        )
     readonly property bool _detachedHintActive:
         root._isFullHintEventType(root._flashSourceEvent.type) || root._phase === "hint-exit"
     readonly property bool _attachedPanelActive:
@@ -186,7 +191,9 @@ property real _flashTrackOpacity: 0
     readonly property real _attachedPanelOpacity:
         root._overlaySessionActive
             ? (root._overlayExpandedActive ? 1 : 0)
-            : (root._detachedHintActive ? root._flashTrackOpacity : 0)
+            : (root._detachedHintActive
+                ? (root._phase === "hint-exit" ? root._flashTrackOpacity : 1)
+                : 0)
     readonly property real _attachedPanelScale:
         root._overlaySessionActive
             ? (root._overlayExpandedActive ? 1 : 0.985)
@@ -254,7 +261,7 @@ property real _flashTrackOpacity: 0
             : 0
     readonly property real _overlayShellY: _pillClip.y
     readonly property real _overlayShellHeight:
-        Math.max(0, (_overlayPanelHost.y + root._attachedPanelHeight) - root._overlayShellY)
+        Math.max(0, (_overlayPanelHost.y + root._attachedPanelVisibleHeight) - root._overlayShellY)
 
     Component.onCompleted: {
         currentTime = new Date()
@@ -263,6 +270,8 @@ property real _flashTrackOpacity: 0
         root._mainDisplayEvent = initialActiveEvent.type !== "idle" ? initialActiveEvent : root._baselineEvent
         root._lastActiveEvent = initialActiveEvent
         root._resetTracks()
+        root._attachedPanelRevealHeight = root._attachedPanelActive ? root._attachedPanelHeight : 0
+        root._attachedContentOpacity = root._attachedPanelActive ? 1 : 0
         root._syncOverlayExtensionReservation()
         Qt.callLater(() => { root._initialized = true })
     }
@@ -284,6 +293,12 @@ property real _flashTrackOpacity: 0
     property real _pulseScale: 1
     property bool _overlayPulsePending: false
     property string _pulseOwner: ""
+    property real _attachedPanelRevealHeight: 0
+    property real _attachedContentOpacity: 0
+    readonly property real _attachedPanelVisibleHeight:
+        root._attachedPanelActive
+            ? Math.max(0, Math.min(root._attachedPanelRevealHeight, root._attachedPanelHeight))
+            : 0
 
     implicitHeight: Theme.barHeight
     implicitWidth: root._phase === "hint-exit"
@@ -584,6 +599,8 @@ property real _flashTrackOpacity: 0
             - root._windowHintEntryMeta.flashRole.deltaY
         root._flashTrackScale = 0.92
         root._flashTrackOpacity = 0
+        if (fullHint)
+            root._startAttachedReveal()
         _hintFlashDelayTimer.restart()
 
         Qt.callLater(function() {
@@ -599,6 +616,23 @@ property real _flashTrackOpacity: 0
             return
 
         root._triggerSharedBackgroundPulse("replace")
+    }
+
+    function _startAttachedReveal(fromHeight) {
+        if (!root._attachedPanelActive)
+            return
+
+        const resolvedFromHeight = fromHeight !== undefined
+            ? fromHeight
+            : root._attachedRevealSeedHeight
+
+        _attachedRevealAnim.stop()
+        root._attachedPanelRevealHeight = Math.min(
+            Math.max(0, resolvedFromHeight),
+            root._attachedPanelHeight
+        )
+        root._attachedContentOpacity = 0
+        _attachedRevealAnim.start()
     }
 
     function _cancelSharedBackgroundPulse() {
@@ -861,6 +895,9 @@ property real _flashTrackOpacity: 0
         }
 
         function onStateChanged() {
+            const previousAttachedHeight = root._attachedPanelVisibleHeight
+            const wasDetachedHintActive = root._detachedHintActive
+
             root._syncOverlayFlags()
 
             root._syncOverlayExtensionReservation()
@@ -869,6 +906,11 @@ property real _flashTrackOpacity: 0
 
             if (IslandOverlayService.state === "opening") {
                 root._handoffFullHintToOverlay()
+                root._startAttachedReveal(
+                    wasDetachedHintActive
+                        ? Math.max(previousAttachedHeight, root._attachedRevealSeedHeight)
+                        : undefined
+                )
                 root._maybeTriggerOverlayOpenPulse()
                 _overlayCloseSettleTimer.stop()
                 _overlayOpenSettleTimer.restart()
@@ -1233,11 +1275,12 @@ property real _flashTrackOpacity: 0
         visible: root._attachedPanelActive
         enabled: root._attachedPanelActive
         width: root._attachedPanelWidth
-        height: root._attachedPanelHeight
+        height: root._attachedPanelVisibleHeight
         y: root._overlayDetachedY - root._overlayAttachmentOverlap
             + (root._attachedPanelExpanded ? 0 : -root._overlayRevealLift)
         opacity: root._attachedPanelOpacity
         scale: root._attachedSurfaceScale
+        clip: true
         anchors.horizontalCenter: _pillClip.horizontalCenter
         transformOrigin: Item.Top
 
@@ -1255,14 +1298,19 @@ property real _flashTrackOpacity: 0
             }
         }
 
-        Loader {
-            id: _overlayDeckLoader
-            property var eventData: root._flashSourceEvent
-
-            active: root._attachedPanelActive
+        Item {
             anchors.fill: parent
-            anchors.margins: 1
-            sourceComponent: root._overlaySessionActive ? _overlayDeckComponent : _windowHintCardComponent
+            opacity: root._attachedContentOpacity
+
+            Loader {
+                id: _overlayDeckLoader
+                property var eventData: root._flashSourceEvent
+
+                active: root._attachedPanelActive
+                anchors.fill: parent
+                anchors.margins: 1
+                sourceComponent: root._overlaySessionActive ? _overlayDeckComponent : _windowHintCardComponent
+            }
         }
     }
 
@@ -1274,6 +1322,34 @@ property real _flashTrackOpacity: 0
         visible: false
         enabled: false
         sourceComponent: _windowHintCardComponent
+    }
+
+    ParallelAnimation {
+        id: _attachedRevealAnim
+
+        NumberAnimation {
+            target: root
+            property: "_attachedPanelRevealHeight"
+            to: root._attachedPanelHeight
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+
+        NumberAnimation {
+            target: root
+            property: "_attachedContentOpacity"
+            to: 1
+            duration: Theme.anim.highlightDuration
+            easing.type: Theme.anim.highlightType
+        }
+
+        onFinished: {
+            if (!root._attachedPanelActive)
+                return
+
+            root._attachedPanelRevealHeight = root._attachedPanelHeight
+            root._attachedContentOpacity = 1
+        }
     }
 
     ParallelAnimation {
@@ -1556,6 +1632,8 @@ property real _flashTrackOpacity: 0
             root._flashSourceEvent = root._idleSnapshot()
             root._mainDisplayEvent = root._baselineEvent
             root._sharedBackgroundPulseOpacity = 0
+            root._attachedPanelRevealHeight = 0
+            root._attachedContentOpacity = 0
             root._resetTracks()
             root._syncOverlayExtensionReservation()
         }
