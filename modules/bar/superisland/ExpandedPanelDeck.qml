@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import ".." as BarComponents
 import "." as SuperIslandParts
 
 // Paged content deck rendered inside the expanded SuperIsland surface.
@@ -13,8 +14,41 @@ Item {
 
     readonly property string currentPage: IslandOverlayService.mode || "launcher"
     property string _presentedPage: root.currentPage
+    property string _pendingPage: ""
 
-    function _activatePage(pageName) {
+    function _pageItem(pageName) {
+        if (pageName === "launcher")
+            return launcherPageLoader.item
+        if (pageName === "settings")
+            return settingsPageLoader.item
+        if (pageName === "notifications")
+            return notificationsPageLoader.item
+        return null
+    }
+
+    function _pageExitDuration(pageName) {
+        let pageItem = root._pageItem(pageName)
+        if (pageItem && typeof pageItem.pageExitDuration === "function")
+            return Math.max(0, pageItem.pageExitDuration())
+
+        return SettingsService.data.animation.staggerExitDuration
+    }
+
+    function _runDeckEnter(includeHeader) {
+        _deckStagger.clear()
+        if (includeHeader) {
+            _deckStagger.registerItem(_clockItem, 0, 1)
+            _deckStagger.registerItem(_navItem, 1, 1)
+            _deckStagger.registerItem(_closeItem, 2, 1)
+            _deckStagger.registerItem(_dividerItem, 3, 1)
+        }
+        _deckStagger.registerItem(_contentItem, 0, 2)
+        _deckStagger.runEnter()
+    }
+
+    function _activatePage(pageName, includeHeader) {
+        root._runDeckEnter(includeHeader)
+
         if (pageName === "launcher" && launcherPageLoader.item) {
             launcherPageLoader.item.pageActivated()
             return
@@ -29,7 +63,10 @@ Item {
             notificationsPageLoader.item.pageActivated()
     }
 
-    function _deactivatePage(pageName) {
+    function _deactivatePage(pageName, includeHeader) {
+        if (includeHeader)
+            _deckStagger.runExit()
+
         if (pageName === "launcher" && launcherPageLoader.item) {
             launcherPageLoader.item.pageDeactivated()
             return
@@ -54,11 +91,11 @@ Item {
     Component.onCompleted: {
         root._presentedPage = root.currentPage
         Qt.callLater(function() {
-            root._activatePage(root._presentedPage)
+            root._activatePage(root._presentedPage, true)
         })
     }
 
-    Component.onDestruction: root._deactivatePage(root._presentedPage)
+    Component.onDestruction: root._deactivatePage(root._presentedPage, true)
 
     Connections {
         target: IslandOverlayService
@@ -70,14 +107,34 @@ Item {
             if (nextPage === previousPage)
                 return
 
-            root._deactivatePage(previousPage)
-            root._presentedPage = nextPage
-
-            Qt.callLater(function() {
-                root._activatePage(nextPage)
-            })
+            root._pendingPage = nextPage
+            root._deactivatePage(previousPage, false)
+            _pageSwitchDelay.interval = root._pageExitDuration(previousPage)
+            _pageSwitchDelay.restart()
         }
 
+    }
+
+    Timer {
+        id: _pageSwitchDelay
+        repeat: false
+        interval: SettingsService.data.animation.staggerExitDuration
+
+        onTriggered: {
+            if (!root._pendingPage)
+                return
+
+            root._presentedPage = root._pendingPage
+            root._pendingPage = ""
+
+            Qt.callLater(function() {
+                root._activatePage(root._presentedPage, false)
+            })
+        }
+    }
+
+    BarComponents.StaggerOrchestrator {
+        id: _deckStagger
     }
 
     Rectangle {
@@ -98,50 +155,66 @@ Item {
             Layout.fillWidth: true
             spacing: 10
 
-            Text {
-                text: Qt.formatDateTime(_deckClock.date, "hh:mm")
-                font.family: Theme.fontMono
-                font.pixelSize: Theme.fontSizeBody
-                font.bold: true
-                color: Colors.text
+            BarComponents.StaggerItem {
+                id: _clockItem
                 Layout.alignment: Qt.AlignVCenter
+                implicitWidth: _clockLabel.implicitWidth
+                implicitHeight: _clockLabel.implicitHeight
+
+                Text {
+                    id: _clockLabel
+                    text: Qt.formatDateTime(_deckClock.date, "hh:mm")
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeBody
+                    font.bold: true
+                    color: Colors.text
+                }
             }
 
             Item { Layout.fillWidth: true }
 
-            RowLayout {
+            BarComponents.StaggerItem {
+                id: _navItem
                 Layout.preferredWidth: Math.round(320 * Theme.uiScale)
                 Layout.preferredHeight: 30
-                spacing: 0
+                implicitWidth: _navRow.implicitWidth
+                implicitHeight: _navRow.implicitHeight
 
-                SuperIslandParts.SuperIslandOverlayNavButton {
-                    Layout.fillWidth: true
-                    label: "启动器"
-                    iconGlyph: "\uf002"
-                    selected: root.currentPage === "launcher"
-                    firstSegment: true
-                    onPressed: root._retargetPage("launcher")
-                }
+                RowLayout {
+                    id: _navRow
+                    anchors.fill: parent
+                    spacing: 0
 
-                SuperIslandParts.SuperIslandOverlayNavButton {
-                    Layout.fillWidth: true
-                    label: "设置"
-                    iconGlyph: "\uf013"
-                    selected: root.currentPage === "settings"
-                    onPressed: root._retargetPage("settings")
-                }
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
+                        label: "启动器"
+                        iconGlyph: "\uf002"
+                        selected: root.currentPage === "launcher"
+                        firstSegment: true
+                        onPressed: root._retargetPage("launcher")
+                    }
 
-                SuperIslandParts.SuperIslandOverlayNavButton {
-                    Layout.fillWidth: true
-                    label: "通知"
-                    iconGlyph: "\uf0f3"
-                    selected: root.currentPage === "notifications"
-                    lastSegment: true
-                    onPressed: root._retargetPage("notifications")
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
+                        label: "设置"
+                        iconGlyph: "\uf013"
+                        selected: root.currentPage === "settings"
+                        onPressed: root._retargetPage("settings")
+                    }
+
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
+                        label: "通知"
+                        iconGlyph: "\uf0f3"
+                        selected: root.currentPage === "notifications"
+                        lastSegment: true
+                        onPressed: root._retargetPage("notifications")
+                    }
                 }
             }
 
-            Item {
+            BarComponents.StaggerItem {
+                id: _closeItem
                 width: 28
                 height: 28
 
@@ -163,39 +236,49 @@ Item {
             }
         }
 
-        Rectangle {
+        BarComponents.StaggerItem {
+            id: _dividerItem
             Layout.fillWidth: true
             Layout.preferredHeight: 1
-            radius: height / 2
-            color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.65)
+
+            Rectangle {
+                anchors.fill: parent
+                radius: height / 2
+                color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.65)
+            }
         }
 
-        Item {
+        BarComponents.StaggerItem {
+            id: _contentItem
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            Loader {
-                id: launcherPageLoader
-                active: true
+            Item {
                 anchors.fill: parent
-                visible: root._presentedPage === "launcher"
-                source: "ExpandedLauncherPage.qml"
-            }
 
-            Loader {
-                id: settingsPageLoader
-                active: true
-                anchors.fill: parent
-                visible: root._presentedPage === "settings"
-                source: "ExpandedSettingsPage.qml"
-            }
+                Loader {
+                    id: launcherPageLoader
+                    active: true
+                    anchors.fill: parent
+                    visible: root._presentedPage === "launcher"
+                    source: "ExpandedLauncherPage.qml"
+                }
 
-            Loader {
-                id: notificationsPageLoader
-                active: true
-                anchors.fill: parent
-                visible: root._presentedPage === "notifications"
-                source: "ExpandedNotificationsPage.qml"
+                Loader {
+                    id: settingsPageLoader
+                    active: true
+                    anchors.fill: parent
+                    visible: root._presentedPage === "settings"
+                    source: "ExpandedSettingsPage.qml"
+                }
+
+                Loader {
+                    id: notificationsPageLoader
+                    active: true
+                    anchors.fill: parent
+                    visible: root._presentedPage === "notifications"
+                    source: "ExpandedNotificationsPage.qml"
+                }
             }
         }
     }

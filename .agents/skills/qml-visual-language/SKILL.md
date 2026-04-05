@@ -21,6 +21,32 @@ Define and enforce a consistent UI language across motion, structure, and surfac
 - Structural hierarchy, pulse, opacity, and spacing should reinforce the same intent.
 - A component can have local emphasis, but it must not break the shared identity.
 
+## Paged UI Language
+
+Any DymicShell UI that has a page concept must use one shared page-switch motion language instead of inventing page-local transitions.
+
+### Required Page-Switch Contract
+
+- Opening a paged panel may animate both header controls and page body as one staged reveal.
+- Switching between pages must not stagger the page-switch control itself if that would interfere with click timing or state readability.
+- Switching pages must animate in two phases: current page exits first, then the next page enters.
+- Page containers and page backgrounds must visibly fade during exit; do not leave the shell body static while only inner content moves.
+- Page exit timing must stay bounded. If a page contains many repeated delegates, compress all visible exits into one fixed switch window instead of letting the delay grow with item count.
+- Repeated page content such as notification cards, settings groups, or launcher results should stagger as a coordinated field, not as isolated one-off effects.
+
+### Use This For
+
+- SuperIsland expanded pages.
+- Settings panels with sidebar or tab navigation.
+- Launchers, notification centers, and any future deck, stack, or segmented page containers.
+
+### Review Checklist For Paged UI
+
+- Does the current page visibly exit before the next page appears?
+- Does the page-switch control remain stable and clickable during retargeting?
+- Does the page background participate in exit instead of lingering fully opaque?
+- If the page shows a list, do all visible items animate within the switch window rather than only the last few?
+
 ## SuperIsland Expanded Area Language
 
 The SuperIsland expanded area has a single design language that all components under `modules/bar/superisland/*` must follow.

@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.config
+import qs.services
+import ".." as BarComponents
 import "." as SuperIslandParts
 
 // Expanded launcher page shown inside the larger SuperIsland overlay.
@@ -9,6 +11,18 @@ Item {
 
     property bool _pageActive: false
     property string _pendingQueryText: ""
+
+    function _runPageEnter() {
+        _pageStagger.clear()
+        _pageStagger.registerItem(_modeSwitcherItem, 0, 1)
+        _pageStagger.registerItem(_launcherBodyItem, 0, 2)
+        _pageStagger.runEnter()
+    }
+
+    function pageExitDuration() {
+        return SettingsService.data.animation.staggerExitDuration
+            + SettingsService.data.animation.staggerExitStep
+    }
 
     function _syncLauncherCoreState() {
         if (!_launcherCoreLoader.item)
@@ -22,6 +36,7 @@ Item {
         if (!_launcherCoreLoader.item)
             return
 
+        root._runPageEnter()
         root._syncLauncherCoreState()
         if (_launcherCoreLoader.item.openPanel)
             _launcherCoreLoader.item.openPanel()
@@ -50,6 +65,7 @@ Item {
 
     function pageDeactivated() {
         root._pageActive = false
+        _pageStagger.runExit()
         root._syncLauncherCoreState()
 
         if (_launcherCoreLoader.item && _launcherCoreLoader.item.runStructuralExit)
@@ -74,6 +90,10 @@ Item {
         root._activatePresetQuery(">clip ")
     }
 
+    BarComponents.StaggerOrchestrator {
+        id: _pageStagger
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 10
@@ -84,66 +104,74 @@ Item {
 
             Item { Layout.fillWidth: true }
 
-            Rectangle {
+            BarComponents.StaggerItem {
+                id: _modeSwitcherItem
                 implicitWidth: 264
                 implicitHeight: 30
-                radius: 11
-                color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.38)
-                border.color: Colors.border
-                border.width: 1
-
-                RowLayout {
+                Rectangle {
                     anchors.fill: parent
-                    anchors.margins: 0
-                    spacing: 0
+                    radius: 11
+                    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.38)
+                    border.color: Colors.border
+                    border.width: 1
 
-                    SuperIslandParts.SuperIslandOverlayNavButton {
-                        Layout.fillWidth: true
-                        label: "应用"
-                        iconGlyph: "\uf002"
-                        selected: !_launcherCoreLoader.item || !_launcherCoreLoader.item._searchHeader
-                            ? true
-                            : !_launcherCoreLoader.item._searchHeader.text.startsWith(">clip")
-                        firstSegment: true
-                        onPressed: root._switchToAppSearch()
-                    }
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 0
+                        spacing: 0
 
-                    SuperIslandParts.SuperIslandOverlayNavButton {
-                        Layout.fillWidth: true
-                        label: "剪贴板"
-                        iconGlyph: "\uf0ea"
-                        selected: _launcherCoreLoader.item && _launcherCoreLoader.item._searchHeader
-                            ? _launcherCoreLoader.item._searchHeader.text.startsWith(">clip")
-                            : false
-                        lastSegment: true
-                        onPressed: root._switchToClipboardSearch()
+                        SuperIslandParts.SuperIslandOverlayNavButton {
+                            Layout.fillWidth: true
+                            label: "应用"
+                            iconGlyph: "\uf002"
+                            selected: !_launcherCoreLoader.item || !_launcherCoreLoader.item._searchHeader
+                                ? true
+                                : !_launcherCoreLoader.item._searchHeader.text.startsWith(">clip")
+                            firstSegment: true
+                            onPressed: root._switchToAppSearch()
+                        }
+
+                        SuperIslandParts.SuperIslandOverlayNavButton {
+                            Layout.fillWidth: true
+                            label: "剪贴板"
+                            iconGlyph: "\uf0ea"
+                            selected: _launcherCoreLoader.item && _launcherCoreLoader.item._searchHeader
+                                ? _launcherCoreLoader.item._searchHeader.text.startsWith(">clip")
+                                : false
+                            lastSegment: true
+                            onPressed: root._switchToClipboardSearch()
+                        }
                     }
                 }
             }
         }
 
-        Rectangle {
+        BarComponents.StaggerItem {
+            id: _launcherBodyItem
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: Theme.cornerRadius
-            color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.88)
-            border.color: Colors.border
-            border.width: 1
-
-            Loader {
-                id: _launcherCoreLoader
+            Rectangle {
                 anchors.fill: parent
-                anchors.margins: 8
-                active: true
-                source: "../../launcher/LauncherCore.qml"
+                radius: Theme.cornerRadius
+                color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.88)
+                border.color: Colors.border
+                border.width: 1
 
-                onLoaded: {
-                    root._syncLauncherCoreState()
+                Loader {
+                    id: _launcherCoreLoader
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    active: true
+                    source: "../../launcher/LauncherCore.qml"
 
-                    if (!root._pageActive)
-                        return
+                    onLoaded: {
+                        root._syncLauncherCoreState()
 
-                    root._applyLauncherActivation()
+                        if (!root._pageActive)
+                            return
+
+                        root._applyLauncherActivation()
+                    }
                 }
             }
         }

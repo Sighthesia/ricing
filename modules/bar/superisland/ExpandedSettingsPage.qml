@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import ".." as BarComponents
 import "../settings" as SettingsModule
 
 // Expanded settings page that keeps the full settings content inside SuperIsland.
@@ -9,11 +10,17 @@ Item {
     id: root
 
     function pageActivated() {
+        _contentShell.runEnter()
         _enterDelay.restart()
+    }
+
+    function pageExitDuration() {
+        return SettingsService.data.animation.staggerExitDuration
     }
 
     function pageDeactivated() {
         _enterDelay.stop()
+        _contentShell.runExit()
         if (_settingsContent && _settingsContent.runExitAnimation)
             _settingsContent.runExitAnimation()
     }
@@ -28,8 +35,13 @@ Item {
         }
     }
 
-    SettingsModule.SettingsPanelContent {
-        id: _settingsContent
+    BarComponents.StaggerItem {
+        id: _contentShell
         anchors.fill: parent
+
+        SettingsModule.SettingsPanelContent {
+            id: _settingsContent
+            anchors.fill: parent
+        }
     }
 }
