@@ -31,7 +31,7 @@ output_path = "~/.config/fuzzel/colors.ini"
 
 [templates.ghostty]
 input_path = "./templates/ghostty"
-output_path = "~/.config/ghostty/themes/DymicShellMatugen"
+output_path = "~/.config/ghostty/themes/Matugen"
 
 [templates.cosmic]
 input_path = "./templates/cosmic_theme.ron"
@@ -92,11 +92,11 @@ output_path = "~/.config/starship.toml"
 
 [templates.qt5ct]
 input_path = "./templates/qtct-colors.conf"
-output_path = "~/.config/qt5ct/colors/DymicShellMatugen.conf"
+output_path = "~/.config/qt5ct/colors/Matugen.conf"
 
 [templates.qt6ct]
 input_path = "./templates/qtct-colors.conf"
-output_path = "~/.config/qt6ct/colors/DymicShellMatugen.conf"
+output_path = "~/.config/qt6ct/colors/Matugen.conf"
 
 [templates.kde]
 input_path = "./templates/Matugen.colors"
@@ -156,7 +156,7 @@ output_path = "~/.config/zathura/zathurarc"
 
 [templates.wezterm]
 input_path = "./templates/wezterm_theme.toml"
-output_path = "~/.config/wezterm/colors/DymicShellMatugen.toml"
+output_path = "~/.config/wezterm/colors/Matugen.toml"
 
 [templates.yazi]
 input_path = "./templates/yazi-theme.toml"
