@@ -34,5 +34,7 @@ description: Guidelines for managing Settings, Shared State, Component States, E
 - For KDE Plasma, reapplying the same color-scheme name does not reliably hot-reload updated `.colors` contents. Force a visible refresh by applying a temporary clone scheme first, then switch back to the canonical scheme.
 - KDE reload fallbacks must be rollback-safe. Do not delete the temporary clone if Plasma is still using it because the switch back to the primary scheme failed.
 - Avoid adding unverified secondary theme selectors when a path-based setting already works. For `qt5ct` and `qt6ct`, prefer `color_scheme_path` plus `custom_palette=true` unless a named scheme key is confirmed to be required.
+- GTK theme switching can be silently overridden by stale generated CSS in `gtk.css`. Keep `gtk.css` as a minimal entrypoint that imports the generated `colors.css` and avoid leaving inline `@define-color` output in the entry file.
+- When a mode toggle only changes `gtk-theme-name` and `gtk-application-prefer-dark-theme`, verify the imported `colors.css` is regenerated for the active dark/light mode; otherwise the UI may keep showing the old palette even though the theme name changed.
 - Prefer application-native live reload commands over generic signals when updating external themes. For kitty, prefer remote control or `reload_conf_in_all_kitties()` before signal-based fallbacks.
 - Log stdout/stderr for theme generator and apply helper processes so template failures, bad paths, and permission issues are diagnosable from shell logs.

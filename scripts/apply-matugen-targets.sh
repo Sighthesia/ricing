@@ -58,6 +58,28 @@ prepend_line_if_missing() {
     mv "$tmp" "$file"
 }
 
+write_gtk_css_entrypoint() {
+    local file="$1"
+    local variant="$2"
+
+    ensure_parent "$file"
+
+    case "$variant" in
+        gtk3)
+            printf '%s\n' '@import url("colors.css");' > "$file"
+            ;;
+        gtk4)
+            printf '%s\n%s\n%s\n' \
+                '@import url("libadwaita.css");' \
+                '@import url("libadwaita-tweaks.css");' \
+                '@import url("colors.css");' > "$file"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 upsert_ini_key() {
     local file="$1"
     local section="$2"
@@ -416,7 +438,6 @@ main() {
     local kvantum_theme_name="DymicShell"
     local mode="${1:-}"
     local apply_scope="${2:-full}"
-    local gtk_import='@import url("colors.css");'
     local gtk_dark_preference
     local gtk_theme_name
     local fuzzel_include='~/.config/fuzzel/colors.ini'
@@ -462,8 +483,8 @@ main() {
 
     printf '[matugen-apply] mode=%s scope=%s\n' "$mode" "$apply_scope"
 
-    prepend_line_if_missing "$home/.config/gtk-3.0/gtk.css" "$gtk_import"
-    prepend_line_if_missing "$home/.config/gtk-4.0/gtk.css" "$gtk_import"
+    write_gtk_css_entrypoint "$home/.config/gtk-3.0/gtk.css" gtk3
+    write_gtk_css_entrypoint "$home/.config/gtk-4.0/gtk.css" gtk4
     upsert_ini_key "$home/.config/gtk-3.0/settings.ini" "Settings" "gtk-theme-name" "$gtk_theme_name"
     upsert_ini_key "$home/.config/gtk-4.0/settings.ini" "Settings" "gtk-theme-name" "$gtk_theme_name"
     upsert_ini_key "$home/.config/gtk-3.0/settings.ini" "Settings" "gtk-application-prefer-dark-theme" "$gtk_dark_preference"
