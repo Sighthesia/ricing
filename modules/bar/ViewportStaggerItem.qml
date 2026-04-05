@@ -14,6 +14,7 @@ StaggerItem {
     property bool managedEnterJitterEnabled: true
     property real managedEnterStartOpacity: managedEnterFadeEnabled ? 0.38 : 1.0
     property real managedEnterStartOffsetY: Math.round(enterOffsetY * 0.45)
+    property int managedEnterBaseDelay: 0
     property int viewportEnterBaseDelay: 0
     property int maxScrollSlots: 6
     property int scrollStep: SettingsService.data.animation.staggerExitStep
@@ -98,7 +99,7 @@ StaggerItem {
     }
 
     function _managedEnterDelay(order, total) {
-        let orderedDelay = _compressedDelay(order, total, managedEnterStep)
+        let orderedDelay = managedEnterBaseDelay + _compressedDelay(order, total, managedEnterStep)
         if (!managedEnterJitterEnabled)
             return orderedDelay
 
@@ -160,11 +161,6 @@ StaggerItem {
     onSuppressViewportTransitionsChanged: {
         if (suppressViewportTransitions)
             return
-
-        if (trackViewport && scrollAnimationsEnabled && viewportVisible && _awaitingManagedEnter()) {
-            queueManagedEnter(viewportOrder, maxScrollSlots)
-            return
-        }
 
         _viewportShown = viewportVisible
     }

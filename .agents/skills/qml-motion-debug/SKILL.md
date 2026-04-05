@@ -195,6 +195,22 @@ Use when a launcher, clipboard list, or similar `ListView` looks correct on firs
 - let incoming rows stagger from their own visible-order slots instead of from a one-shot batch owner flag
 - if later swaps look more synchronized than the first swap, suspect stale `contentY` / `viewportOrder` rather than easing
 
+### Pattern H: First Open Must Use One Entrance Path
+Use when a paged list is correct after the first reveal but flashes, double-enters, or comes up blank on the very first activation.
+
+- choose one owner for the first reveal, usually the page-level activation callback
+- keep late `countChanged` or model-refresh handlers from replaying enter while the first reveal is still pending
+- if delegates can instantiate before the page is active, keep them in the managed hidden state until the page releases them
+- when logs show two visible counts during the same open, verify whether the page activated twice or whether the list simply finished populating after the first stagger started
+
+### Pattern I: Page-Level Reveal Contract
+Use when a paged list or deck needs a stable first-open reveal across repeated opens and data churn.
+
+- page activation owns the first reveal window
+- delegates may instantiate early, but they stay hidden until the page releases the reveal
+- model refreshes may update state during the pending window, but they must not start a second enter path
+- once the first reveal completes, later refreshes may re-enter only if the page is still visible and the refresh is not part of the same activation sequence
+
 ## DymicShell-Specific Notes
 
 - Check `services/WindowHintService.qml` first for live hint snapshots.

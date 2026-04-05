@@ -17,11 +17,70 @@ AnimatedPanelBase {
 
     // Component-local layout constants; promote to Theme tokens in a future notification token pass.
     readonly property int _appBadgeSize: 28
+    readonly property int _staggerBaseDelay: 80
+    readonly property int _staggerStep: 60
 
     active: BarLayoutService.notificationHistoryOpen
 
-    // Mark all notifications as seen when the panel slides open
-    onPanelOpening: NotificationService.markAllSeen()
+    Timer {
+        id: _enterDelayTimer
+        interval: Theme.anim.highlightDuration
+        repeat: false
+        onTriggered: root._runHistoryEnter()
+    }
+
+    // Mark all notifications as seen when the panel slides open.
+    onPanelOpening: {
+        NotificationService.markAllSeen()
+        _enterDelayTimer.restart()
+    }
+
+    onPanelClosing: {
+        _enterDelayTimer.stop()
+        root._runHistoryExit()
+    }
+
+    function _visibleHistoryDelegates() {
+        let delegates = []
+
+        for (let index = 0; index < _list.count; index++) {
+            let delegate = _list.itemAtIndex(index)
+            if (delegate)
+                delegates.push(delegate)
+        }
+
+        return delegates
+    }
+
+    function _historyDelay(index) {
+        return root._staggerBaseDelay + index * root._staggerStep
+    }
+
+    function _runHistoryEnter() {
+        let delegates = root._visibleHistoryDelegates()
+
+        for (let index = 0; index < delegates.length; index++) {
+            let delegate = delegates[index]
+            if (!delegate || typeof delegate.runEnter !== "function")
+                continue
+
+            delegate.delay = root._historyDelay(index)
+            delegate.runEnter()
+        }
+    }
+
+    function _runHistoryExit() {
+        let delegates = root._visibleHistoryDelegates()
+
+        for (let index = 0; index < delegates.length; index++) {
+            let delegate = delegates[index]
+            if (!delegate || typeof delegate.runExit !== "function")
+                continue
+
+            delegate.exitDelay = index * SettingsService.data.animation.staggerExitStep
+            delegate.runExit()
+        }
+    }
 
     // Panel background
     Rectangle {
@@ -95,7 +154,27 @@ AnimatedPanelBase {
                 spacing: 6
                 model: NotificationService.historyList
 
-                delegate: HistoryItem { width: ListView.view.width }
+                delegate: StaggerItem {
+                    id: _historyStagger
+
+                    required property string appName
+                    required property string summary
+                    required property string body
+                    required property string id
+                    required property real timestamp
+
+                    width: _list.width
+                    height: _historyItem.implicitHeight
+                    delay: root._historyDelay(index)
+                    exitDelay: index * SettingsService.data.animation.staggerExitStep
+                    enterOffsetY: SettingsService.data.animation.staggerEnterOffsetY
+                    exitOffsetY: SettingsService.data.animation.staggerExitOffsetY
+
+                    HistoryItem {
+                        id: _historyItem
+                        width: parent.width
+                    }
+                }
 
                 // Empty state
                 Text {

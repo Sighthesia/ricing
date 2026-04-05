@@ -60,6 +60,9 @@ Any repeated list content with clear rows or cards must use one shared stagger l
 - If a fast model swap must keep visible exits while new content enters immediately, use a detached outgoing snapshot/layer for the retiring rows instead of relying on delegates that will be destroyed by `ListModel.clear()`.
 - If the first reveal looks correct but later swaps collapse into whole-list motion, reset the reused `ListView` state before the next stagger and verify the outgoing layer is still retiring independently.
 - When matching the pace of settings or launcher lists, reuse the same base delay and step cadence family rather than making one page feel noticeably faster than another.
+- For notification history and similar history panels, use the same open/switch stagger family as settings pages: panel shell opens first, then visible rows enter with a shared base delay and step cadence.
+- For first open of a paged list, keep the reveal on one owner path only; if the page-level enter already owns the reveal, model refreshes must not replay row stagger while the first reveal is still pending.
+- For paged list or deck surfaces, the page itself owns the first-open reveal contract: delegates may exist early, but they do not visually enter until the page releases the reveal window.
 - Scrolling a list must animate both directions: items entering the viewport stagger in, and items leaving the viewport stagger out.
 - Scroll-driven stagger must stay bounded to the visible window. Do not create unbounded delays from total model size.
 - Increase list-item travel and cadence enough that the stagger reads clearly at normal shell speeds; avoid effects so subtle they disappear during scroll.

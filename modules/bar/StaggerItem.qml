@@ -46,6 +46,8 @@ Item {
     // and slide DOWN from 0 to +exitOffsetY on exit.
     property real enterOffsetY: SettingsService.data.animation.staggerEnterOffsetY
     property real exitOffsetY:  SettingsService.data.animation.staggerExitOffsetY
+    property real enterStartOpacity: 0.0
+    property real enterStartOffsetY: enterOffsetY
 
     // Initial state: invisible and offset downward.
     // runEnter() snaps to this state before starting the timer, ensuring a
@@ -64,8 +66,8 @@ Item {
         _opacityExit.stop()
         _offsetExit.stop()
         // Snap to initial state (handles interrupted cycle gracefully)
-        staggerItem.opacity = 0.0
-        staggerItem._ty     = enterOffsetY
+        staggerItem.opacity = enterStartOpacity
+        staggerItem._ty     = enterStartOffsetY
         _enterTimer.interval = staggerItem.delay
         _enterTimer.restart()
     }

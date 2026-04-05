@@ -11,6 +11,22 @@ Item {
     readonly property int _appBadgeSize: 28
     readonly property int _maxExitSlots: 6
     property bool _pageActive: false
+    property bool _historyRevealPending: false
+
+    Timer {
+        id: _cardEnterDelayTimer
+        interval: Theme.anim.highlightDuration
+        repeat: false
+        onTriggered: {
+            console.log("ExpandedNotificationsPage: enterDelayTimer triggered",
+                "pageActive=", root._pageActive,
+                "historyRevealPending=", root._historyRevealPending,
+                "visibleDelegates=", root._visibleCardDelegates().length)
+            if (root._pageActive)
+                root._runCardEnter()
+            root._historyRevealPending = false
+        }
+    }
 
     function _visibleCardDelegates() {
         let delegates = []
@@ -28,14 +44,28 @@ Item {
         _pageStagger.clear()
         if (includeShell !== false)
             _pageStagger.registerItem(_listShell, 0, 1)
+    }
 
+    function _runCardEnter() {
         let delegates = root._visibleCardDelegates()
+
+        console.log("ExpandedNotificationsPage: runCardEnter",
+            "pageActive=", root._pageActive,
+            "historyRevealPending=", root._historyRevealPending,
+            "delegateCount=", delegates.length)
+
         for (let index = 0; index < delegates.length; index++) {
-            _pageStagger.registerItem(delegates[index], index, 2)
+            let delegate = delegates[index]
+            if (!delegate || typeof delegate.queueManagedEnter !== "function")
+                continue
+
+            delegate.queueManagedEnter(index, delegates.length)
         }
 
-        if (_emptyState.visible)
-            _pageStagger.registerItem(_emptyState, 0, 2)
+        if (_emptyState.visible) {
+            _emptyState.delay = 0
+            _emptyState.runEnter()
+        }
     }
 
     function _exitWindow(total) {
@@ -70,14 +100,23 @@ Item {
     }
 
     function pageActivated() {
+        root._historyRevealPending = true
         root._pageActive = true
+        console.log("ExpandedNotificationsPage: pageActivated",
+            "historyCount=", NotificationService.historyList.count,
+            "visibleDelegates=", root._visibleCardDelegates().length)
         NotificationService.markAllSeen()
         _syncStaggerItems(true)
         _pageStagger.runEnter()
+        _cardEnterDelayTimer.restart()
     }
 
     function pageDeactivated() {
+        console.log("ExpandedNotificationsPage: pageDeactivated",
+            "visibleDelegates=", root._visibleCardDelegates().length)
         root._pageActive = false
+        root._historyRevealPending = false
+        _cardEnterDelayTimer.stop()
         _listShell.exitDelay = 0
         _listShell.runExit()
         root._runCardExit()
@@ -149,10 +188,19 @@ Item {
 
                     listView: _list
                     scrollAnimationsEnabled: root._pageActive
-                    scrollStep: 22
+                    ownerManagedEntry: !root._pageActive || root._historyRevealPending
+                    managedEnterKey: notificationId
+                    managedEnterJitterEnabled: false
+                    managedEnterFadeEnabled: true
+                    managedEnterStartOpacity: 0.0
+                    managedEnterStartOffsetY: enterOffsetY
+                    viewportEnterBaseDelay: 80
+                    managedEnterBaseDelay: 80
+                    scrollStep: 60
+                    managedEnterStep: 60
                     viewportPadding: 36
-                    enterOffsetY: 34
-                    exitOffsetY: 14
+                    enterOffsetY: SettingsService.data.animation.staggerEnterOffsetY
+                    exitOffsetY: SettingsService.data.animation.staggerExitOffsetY
 
                     width: _list.width
                     height: _cardBody.implicitHeight
@@ -255,14 +303,24 @@ Item {
                             }
                         }
 
-                        MouseArea {
-                            id: _cardArea
-                            anchors.fill: _cardBody
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root._tryOpenNotification(_cardStagger.notificationId)
-                        }
+                    MouseArea {
+                        id: _cardArea
+                        anchors.fill: _cardBody
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root._tryOpenNotification(_cardStagger.notificationId)
                     }
+
+                    Component.onCompleted: {
+                        console.log("ExpandedNotificationsPage: delegate completed",
+                            "id=", _cardStagger.notificationId,
+                            "pageActive=", root._pageActive,
+                            "historyRevealPending=", root._historyRevealPending,
+                            "viewportVisible=", _cardStagger.viewportVisible,
+                            "opacity=", _cardStagger.opacity,
+                            "ty=", _cardStagger._ty)
+                    }
+                }
                 }
 
                 BarComponents.StaggerItem {
@@ -288,11 +346,18 @@ Item {
         target: NotificationService.historyList
 
         function onCountChanged() {
-            if (!root.visible)
+            console.log("ExpandedNotificationsPage: history count changed",
+                "count=", NotificationService.historyList.count,
+                "pageActive=", root._pageActive,
+                "historyRevealPending=", root._historyRevealPending,
+                "visible=", root.visible)
+            if (!root.visible || root._historyRevealPending)
                 return
 
             Qt.callLater(function() {
                 root._syncStaggerItems(true)
+                if (root._pageActive)
+                    root._runCardEnter()
             })
         }
     }
