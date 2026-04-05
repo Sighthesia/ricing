@@ -18,10 +18,6 @@ Item {
         interval: Theme.anim.highlightDuration
         repeat: false
         onTriggered: {
-            console.log("ExpandedNotificationsPage: enterDelayTimer triggered",
-                "pageActive=", root._pageActive,
-                "historyRevealPending=", root._historyRevealPending,
-                "visibleDelegates=", root._visibleCardDelegates().length)
             if (root._pageActive)
                 root._runCardEnter()
             root._historyRevealPending = false
@@ -48,11 +44,6 @@ Item {
 
     function _runCardEnter() {
         let delegates = root._visibleCardDelegates()
-
-        console.log("ExpandedNotificationsPage: runCardEnter",
-            "pageActive=", root._pageActive,
-            "historyRevealPending=", root._historyRevealPending,
-            "delegateCount=", delegates.length)
 
         for (let index = 0; index < delegates.length; index++) {
             let delegate = delegates[index]
@@ -100,11 +91,11 @@ Item {
     }
 
     function pageActivated() {
+        if (root._historyRevealPending)
+            return
+
         root._historyRevealPending = true
         root._pageActive = true
-        console.log("ExpandedNotificationsPage: pageActivated",
-            "historyCount=", NotificationService.historyList.count,
-            "visibleDelegates=", root._visibleCardDelegates().length)
         NotificationService.markAllSeen()
         _syncStaggerItems(true)
         _pageStagger.runEnter()
@@ -112,8 +103,6 @@ Item {
     }
 
     function pageDeactivated() {
-        console.log("ExpandedNotificationsPage: pageDeactivated",
-            "visibleDelegates=", root._visibleCardDelegates().length)
         root._pageActive = false
         root._historyRevealPending = false
         _cardEnterDelayTimer.stop()
@@ -311,15 +300,6 @@ Item {
                         onClicked: root._tryOpenNotification(_cardStagger.notificationId)
                     }
 
-                    Component.onCompleted: {
-                        console.log("ExpandedNotificationsPage: delegate completed",
-                            "id=", _cardStagger.notificationId,
-                            "pageActive=", root._pageActive,
-                            "historyRevealPending=", root._historyRevealPending,
-                            "viewportVisible=", _cardStagger.viewportVisible,
-                            "opacity=", _cardStagger.opacity,
-                            "ty=", _cardStagger._ty)
-                    }
                 }
                 }
 
@@ -346,11 +326,6 @@ Item {
         target: NotificationService.historyList
 
         function onCountChanged() {
-            console.log("ExpandedNotificationsPage: history count changed",
-                "count=", NotificationService.historyList.count,
-                "pageActive=", root._pageActive,
-                "historyRevealPending=", root._historyRevealPending,
-                "visible=", root.visible)
             if (!root.visible || root._historyRevealPending)
                 return
 
