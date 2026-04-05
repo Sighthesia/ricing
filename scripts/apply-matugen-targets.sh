@@ -273,28 +273,23 @@ EOF
     return "$btop_reloaded"
 }
 
-reload_yazi() {
-    if ! command -v ya >/dev/null 2>&1; then
-        return 0
-    fi
+ensure_yazi_flavor() {
+    local mode="$1"
+    local yazi_config_dir="$HOME/.config/yazi"
+    local yazi_theme_file="$yazi_config_dir/theme.toml"
+    local yazi_flavor_name="dymicshell"
 
-    if ! pgrep -x yazi >/dev/null 2>&1; then
-        return 0
-    fi
+    mkdir -p "$yazi_config_dir" "$yazi_config_dir/flavors/$yazi_flavor_name.yazi"
 
-    if ya emit-to 0 refresh >/dev/null 2>&1; then
-        printf '[matugen-apply] yazi refresh rc=0\n'
-    else
-        printf '[matugen-apply] yazi refresh rc=1\n'
-    fi
+    # Reference: Noctalia Shell
+    # https://github.com/noctalia-dev/noctalia-shell/blob/main/Scripts/bash/template-apply.sh
+    cat > "$yazi_theme_file" <<'EOF'
+[flavor]
+dark  = "dymicshell"
+light = "dymicshell"
+EOF
 
-    if ya emit-to 0 render >/dev/null 2>&1; then
-        printf '[matugen-apply] yazi render rc=0\n'
-    else
-        printf '[matugen-apply] yazi render rc=1\n'
-    fi
-
-    printf '[matugen-apply] yazi note=runtime theme file reload depends on upstream support\n'
+    printf '[matugen-apply] yazi flavor=%s theme=%s mode=%s\n' "$yazi_flavor_name" "$yazi_theme_file" "$mode"
 }
 
 cleanup_old_non_kde_theme_artifacts() {
@@ -479,6 +474,8 @@ main() {
         gsettings set org.gnome.desktop.interface color-scheme "$gsettings_color_scheme" >/dev/null 2>&1 || true
     fi
 
+    ensure_yazi_flavor "$mode"
+
     if [ "$apply_scope" = "system-only" ]; then
         reload_kitty "$kitty_colors_file" "$kitty_remote_socket"
         cleanup_old_non_kde_theme_artifacts
@@ -525,8 +522,6 @@ main() {
     fi
 
     reload_btop || true
-
-    reload_yazi
 
     if command -v niri >/dev/null 2>&1; then
         niri msg action load-config-file >/dev/null 2>&1 || true

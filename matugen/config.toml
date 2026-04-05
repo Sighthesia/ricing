@@ -158,9 +158,13 @@ output_path = "~/.config/zathura/zathurarc"
 input_path = "./templates/wezterm_theme.toml"
 output_path = "~/.config/wezterm/colors/DymicShell.toml"
 
-[templates.yazi]
-input_path = "./templates/yazi-theme.toml"
-output_path = "~/.config/yazi/theme.toml"
+[templates.yazi_flavor]
+input_path = "./templates/yazi-flavor.toml"
+output_path = "~/.config/yazi/flavors/dymicshell.yazi/flavor.toml"
+
+[templates.yazi_tmtheme]
+input_path = "./templates/yazi-tmtheme.xml"
+output_path = "~/.config/yazi/flavors/dymicshell.yazi/tmtheme.xml"
 
 [templates.quickshell_qml]
 input_path = "./templates/quickshell.qml"

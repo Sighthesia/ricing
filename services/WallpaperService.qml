@@ -168,7 +168,7 @@ Singleton {
         const scheme = SettingsService.data.appearance.matugenScheme || "scheme-tonal-spot"
         matugenProcess.command = [
             "bash", "-lc",
-            "[ -r \"" + wallpaperPath + "\" ] || { printf '%s\\n' 'wallpaper path missing or unreadable: " + wallpaperPath + "' >&2; exit 2; }; cd \"" + root.matugenWorkingDir + "\" && matugen image \"" + wallpaperPath + "\" -c \"" + root.matugenConfigPath + "\" -m \"" + mode + "\" -t \"" + scheme + "\" --source-color-index 0 -q"
+            "[ -r \"" + wallpaperPath + "\" ] || { printf '%s\\n' 'wallpaper path missing or unreadable: " + wallpaperPath + "' >&2; exit 2; }; mkdir -p \"$HOME/.config/yazi/flavors/dymicshell.yazi\"; cd \"" + root.matugenWorkingDir + "\" && matugen image \"" + wallpaperPath + "\" -c \"" + root.matugenConfigPath + "\" -m \"" + mode + "\" -t \"" + scheme + "\" --source-color-index 0 -q"
         ]
         matugenProcess.running = true
     }
