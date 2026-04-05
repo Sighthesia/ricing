@@ -10,6 +10,7 @@ Item {
 
     readonly property int _appBadgeSize: 28
     readonly property int _maxExitSlots: 6
+    property bool _pageActive: false
 
     function _visibleCardDelegates() {
         let delegates = []
@@ -69,12 +70,14 @@ Item {
     }
 
     function pageActivated() {
+        root._pageActive = true
         NotificationService.markAllSeen()
         _syncStaggerItems(true)
         _pageStagger.runEnter()
     }
 
     function pageDeactivated() {
+        root._pageActive = false
         _listShell.exitDelay = 0
         _listShell.runExit()
         root._runCardExit()
@@ -129,8 +132,10 @@ Item {
                 clip: true
                 spacing: 8
                 model: NotificationService.historyList
+                displayMarginBeginning: 120
+                displayMarginEnd: 120
 
-                delegate: BarComponents.StaggerItem {
+                delegate: BarComponents.ViewportStaggerItem {
                     id: _cardStagger
 
                     required property string appName
@@ -141,6 +146,13 @@ Item {
                     required property int index
 
                     readonly property string notificationId: id
+
+                    listView: _list
+                    scrollAnimationsEnabled: root._pageActive
+                    scrollStep: 22
+                    viewportPadding: 36
+                    enterOffsetY: 34
+                    exitOffsetY: 14
 
                     width: _list.width
                     height: _cardBody.implicitHeight

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import "../bar" as BarComponents
 
 // Launcher results viewport with delegate rendering and row interactions.
 Item {
@@ -9,6 +10,9 @@ Item {
 
     property alias model: resultList.model
     property int selectedIndex: -1
+    property bool scrollAnimationsEnabled: false
+    property bool ownerManagedEntry: false
+    readonly property int _maxViewportSlots: 6
 
     signal selectRequested(int index)
     signal activateRequested(int index)
@@ -17,9 +21,57 @@ Item {
     Layout.fillHeight: true
 
     function runEnter(): void {
+        root.scrollAnimationsEnabled = true
+
+        let delegates = root._visibleDelegates()
+        for (let index = 0; index < delegates.length; index++) {
+            delegates[index].delay = root._compressedDelay(index, delegates.length)
+            delegates[index].runEnter()
+        }
+
+        root.ownerManagedEntry = false
     }
 
     function runExit(): void {
+        let delegates = root._visibleDelegates()
+        for (let index = 0; index < delegates.length; index++) {
+            delegates[index].exitDelay = root._compressedDelay(index, delegates.length)
+            delegates[index].runExit()
+        }
+    }
+
+    function visibleExitDuration(): int {
+        return SettingsService.data.animation.staggerExitDuration
+            + root._windowForCount(root._visibleDelegates().length)
+    }
+
+    function _windowForCount(total): int {
+        let capped = Math.max(0, Math.min(total, root._maxViewportSlots))
+        return Math.max(0, capped - 1) * SettingsService.data.animation.staggerExitStep
+    }
+
+    function _compressedDelay(rank, total): int {
+        if (total <= 1)
+            return 0
+
+        let window = root._windowForCount(total)
+        return Math.round(window * (rank / Math.max(1, total - 1)))
+    }
+
+    function _visibleDelegates(): var {
+        let delegates = []
+
+        for (let index = 0; index < resultList.count; index++) {
+            let delegate = resultList.itemAtIndex(index)
+            if (delegate && delegate.viewportVisible)
+                delegates.push(delegate)
+        }
+
+        return delegates
+    }
+
+    function prepareManagedEntry(): void {
+        root.ownerManagedEntry = true
     }
 
     ListView {
@@ -27,8 +79,10 @@ Item {
         anchors.fill: parent
         clip: true
         cacheBuffer: 0
+        displayMarginBeginning: 92
+        displayMarginEnd: 92
 
-        delegate: Item {
+        delegate: BarComponents.ViewportStaggerItem {
             id: _item
 
             required property int index
@@ -36,11 +90,16 @@ Item {
             required property string description
             required property string icon
 
+            listView: resultList
+            scrollAnimationsEnabled: root.scrollAnimationsEnabled
+            ownerManagedEntry: root.ownerManagedEntry
+            viewportPadding: 28
+            scrollStep: 24
+            enterOffsetY: 42
+            exitOffsetY: 18
+
             width: resultList.width
             height: 46
-
-            function runExit(): void {
-            }
 
             Rectangle {
                 anchors.fill: parent

@@ -47,6 +47,32 @@ Any DymicShell UI that has a page concept must use one shared page-switch motion
 - Does the page background participate in exit instead of lingering fully opaque?
 - If the page shows a list, do all visible items animate within the switch window rather than only the last few?
 
+## List Motion Language
+
+Any repeated list content with clear rows or cards must use one shared stagger language for initial reveal, data refresh, and scroll-driven visibility changes.
+
+### Required List Contract
+
+- List items such as notification rows, launcher rows, clipboard rows, and similar repeated cards must reveal with stagger instead of all appearing at once.
+- When a list's dataset is replaced or filtered, the old visible items must exit first and the new visible items must enter after the swap.
+- The list owner must be able to take control of a batch enter animation so delegate-local viewport logic does not interrupt page-level or mode-switch choreography.
+- Scrolling a list must animate both directions: items entering the viewport stagger in, and items leaving the viewport stagger out.
+- Scroll-driven stagger must stay bounded to the visible window. Do not create unbounded delays from total model size.
+- Increase list-item travel and cadence enough that the stagger reads clearly at normal shell speeds; avoid effects so subtle they disappear during scroll.
+
+### Use This For
+
+- Notification history and notification centers.
+- Launcher application results and clipboard results.
+- Any `ListView`, `Flickable`, or repeated card stack where items visibly enter and leave the viewport.
+
+### Review Checklist For Lists
+
+- Do new items reveal with readable stagger on first open?
+- Does filtering or mode switching avoid cutting off the new batch animation midway?
+- Do both entering and leaving rows animate during scrolling?
+- Is the stagger window based on visible rows rather than the full model length?
+
 ## SuperIsland Expanded Area Language
 
 The SuperIsland expanded area has a single design language that all components under `modules/bar/superisland/*` must follow.

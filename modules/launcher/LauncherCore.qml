@@ -190,12 +190,17 @@ Item {
             _swapTimer.stop()
             _pendingDisplayItems = []
             _pendingResultData = []
+            _resultsList.prepareManagedEntry()
             _results.clear()
             root._resultData = items
             for (let j = 0; j < displayItems.length; j++) {
                 _results.append(displayItems[j])
             }
             _selectedIndex = items.length > 0 ? 0 : -1
+            Qt.callLater(function() {
+                if (root.panelActive)
+                    _resultsList.runEnter()
+            })
             return
         }
 
@@ -203,18 +208,17 @@ Item {
         _pendingResultData = items
         if (!_swapTimer.running) {
             _runVisibleExit()
+            _swapTimer.interval = _resultsList.visibleExitDuration() + 20
             _swapTimer.restart()
         }
     }
 
     function _runVisibleExit(): void {
-        for (let i = 0; i < _results.count; i++) {
-            let delegate = _resultsList.delegateAtIndex(i)
-            if (delegate && delegate.runExit) delegate.runExit()
-        }
+        _resultsList.runExit()
     }
 
     function _applyPendingResults(): void {
+        _resultsList.prepareManagedEntry()
         _results.clear()
         root._resultData = _pendingResultData
         for (let i = 0; i < _pendingDisplayItems.length; i++) {
@@ -223,6 +227,11 @@ Item {
         _pendingDisplayItems = []
         _pendingResultData = []
         _selectedIndex = root._resultData.length > 0 ? 0 : -1
+
+        Qt.callLater(function() {
+            if (root.panelActive)
+                _resultsList.runEnter()
+        })
     }
 
     function _activateCurrent(): void {
