@@ -52,6 +52,13 @@ Use this skill when animation state changes are correct but the user still does 
 - For detached `window-hint` flows, treat host collapse as the source of truth and defer final cleanup until that collapse animation finishes.
 - If needed, extract final reset into one helper such as `_completeWindowHintExit()` and call it only from the owning collapse timeline.
 
+### 9. Decorative Bridge Outlives Panel Body
+- If attached bridge geometry is computed from the same live path as the panel body, the bridge can survive a few frames after the body is too small to justify it.
+- Common symptom: during collapse tail, both bottom-side bridge shoulders become hairline arcs or tiny floating shards attached to the pill.
+- Inspect `panelTop`, `panelBottom`, available corner height, and visible panel height together. The bug is usually geometric, not opacity-related.
+- Prefer retiring the bridge for the final tail of collapse using a host-owned threshold on reveal progress or visible panel height.
+- Do not try to solve this only by shrinking `cutRadius`; that usually makes the artifact smaller, not cleaner.
+
 ## Debugging Ladder
 
 Work from outermost cause to innermost rendering node.
@@ -191,6 +198,7 @@ Use when an overlay opens while a hold preview still has delayed emphasis pendin
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.
 - For `window-hint` collapse, verify that `_hintExitAnim` does not reset phase or clear attached content before `_attachedCollapseAnim` finishes.
+- For attached shell collapse, verify that bridge shoulders disappear before visible height falls into the seam-sized range.
 
 ## Visual Language Reference
 

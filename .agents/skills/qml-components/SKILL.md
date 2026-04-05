@@ -38,6 +38,13 @@ description: Token system, Semantic Colors, Theme values, Base components, and I
 - If a seam can appear under fractional scaling, use a small overlap like `1px`, but keep that overlap separate from the shoulder width or cut radius.
 - In `modules/bar/widgets/SuperIslandWidget.qml`, the stable pattern is: compute available corner height first, derive `cutRadius`, then set `cornerStartY = panelTop - cutRadius` so the cut fully covers the shoulder tip.
 
+### Attached Panel Collapse Tail
+- When an attached panel collapses back into the pill, do not keep drawing bridge shoulders once the panel body is too small to visually support them.
+- If the remaining attached height approaches the seam overlap or a tiny visual sliver, hide or geometrically retire the bridge instead of letting it shrink into floating side needles.
+- Prefer a tail rule based on reveal progress or visible panel height, not on opacity alone.
+- The final collapse read should be: visible panel shrinks toward the pill, then only the pill remains. It should never read as two suspended arc fragments hanging under the bar.
+- In `modules/bar/widgets/SuperIslandWidget.qml`, a practical pattern is a host-owned flag such as `_attachedCollapseTailHidden` that disables both `_overlayShellHost` and `_overlayPanelHost` for the last small slice of collapse.
+
 ### Interactive Surface Pattern
 ```qml
 HoverRevealHighlight { anchors.fill: parent; hovered: area.containsMouse }

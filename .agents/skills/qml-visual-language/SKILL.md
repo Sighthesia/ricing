@@ -99,6 +99,8 @@ The SuperIsland expanded area has a single design language that all components u
 - Keep detached hint scale stable during collapse unless the host shell itself owns that scale curve for all expanded-area components.
 - If the shell is still shrinking toward the bar center, inner content should remain visible long enough for users to read the return path.
 - Clear detached hint content only after the attached collapse timeline completes, not when an earlier helper fade finishes.
+- During the last collapse tail, the bridge shoulders must retire before they degenerate into thin floating ornaments under the pill.
+- The last readable frame should simplify toward a clean pill silhouette, not preserve every decorative bridge detail to the mathematical end of the geometry animation.
 
 ### Visual Rules
 
@@ -114,6 +116,7 @@ The SuperIsland expanded area has a single design language that all components u
 - Does it preserve the shell's visual continuity during handoff?
 - Does it avoid inventing a new motion dialect for a single page?
 - On collapse, can the user still see the surface shrink and travel back toward the bar instead of disappearing halfway?
+- On collapse, do bridge decorations retire cleanly instead of turning into thin suspended shards near the pill?
 
 ## References
 

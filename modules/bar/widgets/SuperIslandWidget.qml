@@ -363,6 +363,11 @@ property real _flashTrackOpacity: 0
         root._overlayHintHandoffActive
         && root._overlaySessionActive
         && root._attachedRevealProgress < 0.78
+    readonly property bool _attachedCollapseTailHidden:
+        root._attachedPanelActive
+        && (root._phase === "hint-exit" || root._overlayClosing)
+        && (root._attachedRevealProgress <= 0.1
+            || root._attachedPanelVisibleHeight <= Math.max(6, root._overlayAttachmentOverlap + 4))
 
     implicitHeight: Theme.barHeight
     implicitWidth: root._phase === "hint-exit"
@@ -1218,7 +1223,7 @@ property real _flashTrackOpacity: 0
     Item {
         id: _overlayShellHost
 
-        visible: root._attachedPanelActive
+        visible: root._attachedPanelActive && !root._attachedCollapseTailHidden
         width: root._attachedPanelVisibleWidth
         height: root._overlayShellHeight
         y: root._overlayShellY
@@ -1439,8 +1444,8 @@ property real _flashTrackOpacity: 0
     Item {
         id: _overlayPanelHost
 
-        visible: root._attachedPanelActive
-        enabled: root._attachedPanelActive
+        visible: root._attachedPanelActive && !root._attachedCollapseTailHidden
+        enabled: root._attachedPanelActive && !root._attachedCollapseTailHidden
         width: root._attachedPanelVisibleWidth
         height: root._attachedPanelVisibleHeight
         y: root._overlayDetachedY - root._overlayAttachmentOverlap
