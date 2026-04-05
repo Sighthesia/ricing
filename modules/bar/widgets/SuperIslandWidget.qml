@@ -738,10 +738,7 @@ property real _flashTrackOpacity: 0
         if (!immediateRevealWithThrow)
             root._attachedContentOpacity = 0
         _pillThrowOutAnim.start()
-        if (immediateRevealWithThrow)
-            _attachedRevealAnim.start()
-        else
-            _attachedRevealDelayTimer.restart()
+        _attachedRevealAnim.start()
     }
 
     function _startAttachedCollapse(toWidth, toHeight) {
