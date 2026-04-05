@@ -335,6 +335,7 @@ main() {
     local apply_scope="${2:-full}"
     local gtk_import='@import url("colors.css");'
     local gtk_dark_preference
+    local gtk_theme_name
     local fuzzel_include='~/.config/fuzzel/colors.ini'
     local gsettings_color_scheme
     local ghostty_theme='theme = "Matugen"'
@@ -349,10 +350,12 @@ main() {
     case "$mode" in
         dark)
             gtk_dark_preference="1"
+            gtk_theme_name="adw-gtk3-dark"
             gsettings_color_scheme="prefer-dark"
             ;;
         light)
             gtk_dark_preference="0"
+            gtk_theme_name="adw-gtk3"
             gsettings_color_scheme="prefer-light"
             ;;
         *)
@@ -378,10 +381,13 @@ main() {
 
     prepend_line_if_missing "$home/.config/gtk-3.0/gtk.css" "$gtk_import"
     prepend_line_if_missing "$home/.config/gtk-4.0/gtk.css" "$gtk_import"
+    upsert_ini_key "$home/.config/gtk-3.0/settings.ini" "Settings" "gtk-theme-name" "$gtk_theme_name"
+    upsert_ini_key "$home/.config/gtk-4.0/settings.ini" "Settings" "gtk-theme-name" "$gtk_theme_name"
     upsert_ini_key "$home/.config/gtk-3.0/settings.ini" "Settings" "gtk-application-prefer-dark-theme" "$gtk_dark_preference"
     upsert_ini_key "$home/.config/gtk-4.0/settings.ini" "Settings" "gtk-application-prefer-dark-theme" "$gtk_dark_preference"
 
     if command -v gsettings >/dev/null 2>&1; then
+        gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme_name" >/dev/null 2>&1 || true
         gsettings set org.gnome.desktop.interface color-scheme "$gsettings_color_scheme" >/dev/null 2>&1 || true
     fi
 
