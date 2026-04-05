@@ -5,9 +5,11 @@ import Quickshell.Io
 import QtQuick
 import qs.services
 
+// Shared bar layout service for geometry contracts, picker state, and persisted layout.
 Singleton {
     id: root
 
+    // Panel and overlay coordination state.
     // Panel state: "none" | "layout" | "config"
     property string activePanel: "none"
     property bool _suppressPanelMirror: false
@@ -121,11 +123,10 @@ Singleton {
     // Computed alias — keeps all existing DragOverlay/BarSection bindings unchanged
     readonly property bool settingsMode: activePanel === "layout"
 
+    // Leaving layout mode must also close any widget-settings session that was opened from it.
     onSettingsModeChanged: {
         if (!settingsMode) {
-            widgetSettingsPanelOpen = false;
-            activeWidgetInstanceKey = "";
-            widgetSettingsAutoEnteredLayout = false;
+            _clearWidgetSettingsSession()
         }
     }
 
@@ -162,6 +163,7 @@ Singleton {
 
     onWidgetPickerTargetSectionChanged: _recomputeGeometryContracts()
 
+    // Widget settings and panel state.
     function openWidgetSettings(instanceKey, widgetCenterX) {
         let shouldAutoEnterLayout = !settingsMode
 
@@ -175,6 +177,13 @@ Singleton {
         widgetSettingsPanelOpen = true
     }
 
+    function _clearWidgetSettingsSession() {
+        widgetSettingsPanelOpen = false
+        activeWidgetInstanceKey = ""
+        widgetSettingsAutoEnteredLayout = false
+    }
+
+    // Shared bar metrics and transient vertical extension.
     function setBarMetrics(contentWidth, padding) {
         let nextContentWidth = Math.max(0, Number(contentWidth) || 0)
         let nextPadding = Math.max(0, Number(padding) || 0)
@@ -342,6 +351,7 @@ Singleton {
         return typeof measuredWidth === "number" ? measuredWidth : 0
     }
 
+    // Geometry contract accessors expose stable fallbacks for all bar sections.
     function sectionGeometry(sectionName) {
         if (_sectionGeometries[sectionName] !== undefined) {
             return _sectionGeometries[sectionName]
@@ -394,6 +404,12 @@ Singleton {
         }
 
         return _arrivalRevealLocks[sectionName] || ""
+    }
+
+    // Arrival reveal helpers keep overlay-to-delegate handoff serialized per section.
+    function _resetArrivalState() {
+        _arrivalGeometries = ({})
+        _arrivalRevealLocks = ({})
     }
 
     function clearArrivalGeometry(instanceKey) {
@@ -517,9 +533,9 @@ Singleton {
         openWidgetPickerForSection(sectionName)
     }
 
+    // Drag helpers work in bar coordinates so wrappers and overlays share one contract.
     function insertionIndexForSectionX(sectionName, localX, excludeInstanceKey) {
-        let geometry = sectionGeometry(sectionName)
-        let pointerX = geometry.left + Math.max(0, Number(localX) || 0)
+        let pointerX = _pointerBarXForSection(sectionName, localX)
         let slots = _insertionSlots(sectionName, excludeInstanceKey)
 
         for (let i = 0; i < slots.length; i++) {
@@ -535,17 +551,7 @@ Singleton {
         let geometry = sectionGeometry(sectionName)
         let slots = _insertionSlots(sectionName, excludeInstanceKey)
         let index = Math.max(0, Number(insertionIndex) || 0)
-        let boundaryX = geometry.visualLeft
-
-        if (slots.length > 0) {
-            if (index <= 0) {
-                boundaryX = slots[0].left
-            } else if (index >= slots.length) {
-                boundaryX = slots[slots.length - 1].right
-            } else {
-                boundaryX = slots[index].left
-            }
-        }
+        let boundaryX = _insertionBoundaryBarX(geometry, slots, index)
 
         return {
             section: sectionName,
@@ -705,6 +711,115 @@ Singleton {
         return _fallbackMeasuredWidth
     }
 
+    function _pointerBarXForSection(sectionName, localX) {
+        let geometry = sectionGeometry(sectionName)
+        return geometry.left + Math.max(0, Number(localX) || 0)
+    }
+
+    function _insertionBoundaryBarX(geometry, slots, insertionIndex) {
+        if (slots.length <= 0) {
+            return geometry.visualLeft
+        }
+
+        if (insertionIndex <= 0) {
+            return slots[0].left
+        }
+
+        if (insertionIndex >= slots.length) {
+            return slots[slots.length - 1].right
+        }
+
+        return slots[insertionIndex].left
+    }
+
+    function _slotGeometryRecord(sectionName, widget, slotIndex, left, width) {
+        return {
+            id: widget.id,
+            instanceKey: widget.instanceKey,
+            section: sectionName,
+            order: widget.order,
+            alignment: widget.alignment,
+            slotIndex: slotIndex,
+            measuredWidth: widget.measuredWidth,
+            left: left,
+            width: width,
+            right: left + width,
+            centerX: left + width / 2
+        }
+    }
+
+    function _widgetGeometryFromSlot(sectionName, slot) {
+        return {
+            widgetId: slot.id,
+            instanceKey: slot.instanceKey,
+            section: sectionName,
+            left: slot.left,
+            right: slot.right,
+            width: slot.width,
+            centerX: slot.centerX,
+            slotIndex: slot.slotIndex,
+            order: slot.order
+        }
+    }
+
+    function _slotForInstanceKey(slots, instanceKey) {
+        if (!Array.isArray(slots) || !instanceKey) {
+            return null
+        }
+
+        for (let i = 0; i < slots.length; i++) {
+            if (slots[i].instanceKey === instanceKey) {
+                return slots[i]
+            }
+        }
+
+        return null
+    }
+
+    function _arrivalGeometryForSlot(instanceKey, widgetId, sectionName, slot, phase, readyForDelegate) {
+        if (!slot) {
+            return null
+        }
+
+        return {
+            active: true,
+            instanceKey: instanceKey,
+            widgetId: widgetId,
+            section: sectionName,
+            barLeft: slot.left,
+            barWidth: slot.width,
+            barRight: slot.right,
+            barCenterX: slot.centerX,
+            phase: phase,
+            readyForDelegate: readyForDelegate === true
+        }
+    }
+
+    function _syncArrivalGeometriesWithSlots(arrivalGeometries, slotGeometries) {
+        let nextArrivalGeometries = Object.assign({}, arrivalGeometries)
+
+        for (let instanceKey in nextArrivalGeometries) {
+            let snapshot = nextArrivalGeometries[instanceKey]
+            if (!snapshot || snapshot.active !== true || !snapshot.section) {
+                continue
+            }
+
+            let slot = _slotForInstanceKey(slotGeometries[snapshot.section], instanceKey)
+            if (!slot) {
+                continue
+            }
+
+            nextArrivalGeometries[instanceKey] = Object.assign({}, snapshot, {
+                barLeft: slot.left,
+                barWidth: slot.width,
+                barRight: slot.right,
+                barCenterX: slot.centerX
+            })
+        }
+
+        return nextArrivalGeometries
+    }
+
     function _insertionSlots(sectionName, excludeInstanceKey) {
         let slots = sectionSlots(sectionName)
         let geometry = sectionGeometry(sectionName)
@@ -722,19 +837,13 @@ Singleton {
             }
 
             let slot = slots[i]
-            filteredSlots.push({
+            filteredSlots.push(_slotGeometryRecord(slot.section, {
                 id: slot.id,
                 instanceKey: slot.instanceKey,
-                section: slot.section,
                 order: slot.order,
                 alignment: slot.alignment,
-                slotIndex: filteredSlots.length,
-                measuredWidth: slot.measuredWidth,
-                left: currentLeft,
-                width: slot.width,
-                right: currentLeft + slot.width,
-                centerX: currentLeft + slot.width / 2
-            })
+                measuredWidth: slot.measuredWidth
+            }, filteredSlots.length, currentLeft, slot.width))
             currentLeft += slot.width
         }
 
@@ -836,19 +945,13 @@ Singleton {
             let widget = orderedWidgets[i]
             let measuredWidth = _effectiveMeasuredWidth(widget.instanceKey)
 
-            slots.push({
+            slots.push(_slotGeometryRecord(sectionName, {
                 id: widget.id,
                 instanceKey: widget.instanceKey,
-                section: sectionName,
                 order: widget.order,
                 alignment: widget.alignment,
-                slotIndex: i,
-                measuredWidth: measuredWidth,
-                left: currentLeft,
-                width: measuredWidth,
-                right: currentLeft + measuredWidth,
-                centerX: currentLeft + measuredWidth / 2
-            })
+                measuredWidth: measuredWidth
+            }, i, currentLeft, measuredWidth))
 
             currentLeft += measuredWidth
         }
@@ -1100,17 +1203,7 @@ Singleton {
 
             for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
                 let slot = slots[slotIndex]
-                nextWidgetGeometries[slot.instanceKey] = {
-                    widgetId: slot.id,
-                    instanceKey: slot.instanceKey,
-                    section: sectionName,
-                    left: slot.left,
-                    right: slot.right,
-                    width: slot.width,
-                    centerX: slot.centerX,
-                    slotIndex: slot.slotIndex,
-                    order: slot.order
-                }
+                nextWidgetGeometries[slot.instanceKey] = _widgetGeometryFromSlot(sectionName, slot)
             }
         }
 
@@ -1200,33 +1293,7 @@ Singleton {
         let nextWidgetGeometries = _widgetGeometriesFromSlots(sections, nextSlotGeometries)
         let nextSuperIslandInstanceKey = _primaryInstanceKeyForWidget("superIsland", nextSlotGeometries, sections)
         let nextPickerAnchors = _pickerAnchorsFromSections(sections, nextSectionGeometries)
-        let nextArrivalGeometries = Object.assign({}, _arrivalGeometries)
-
-        for (let instanceKey in nextArrivalGeometries) {
-            let snapshot = nextArrivalGeometries[instanceKey]
-            if (!snapshot || snapshot.active !== true || !snapshot.section) {
-                continue
-            }
-
-            let sectionSlots = nextSlotGeometries[snapshot.section]
-            if (!Array.isArray(sectionSlots)) {
-                continue
-            }
-
-            for (let i = 0; i < sectionSlots.length; i++) {
-                if (sectionSlots[i].instanceKey !== instanceKey) {
-                    continue
-                }
-
-                nextArrivalGeometries[instanceKey] = Object.assign({}, snapshot, {
-                    barLeft: sectionSlots[i].left,
-                    barWidth: sectionSlots[i].width,
-                    barRight: sectionSlots[i].right,
-                    barCenterX: sectionSlots[i].centerX
-                })
-                break
-            }
-        }
+        let nextArrivalGeometries = _syncArrivalGeometriesWithSlots(_arrivalGeometries, nextSlotGeometries)
 
         _sectionGeometries = nextSectionGeometries
         _slotGeometries = nextSlotGeometries
@@ -1240,9 +1307,7 @@ Singleton {
     function closeWidgetSettings() {
         let shouldExitLayout = widgetSettingsAutoEnteredLayout
 
-        widgetSettingsPanelOpen = false
-        activeWidgetInstanceKey = ""
-        widgetSettingsAutoEnteredLayout = false
+        _clearWidgetSettingsSession()
 
         if (shouldExitLayout) {
             activePanel = "none"
@@ -1315,6 +1380,7 @@ Singleton {
 
     signal layoutChanged()
 
+    // Persisted layout model and hot-reload snapshot.
     // Default layout descriptor (from bar-design.md §三)
     readonly property var defaultLayout: [
         { id: "workspaceWidget", section: "left",   alignment: "left", order: 0, enabled: true, instanceKey: "workspaceWidget_0" },
@@ -1366,38 +1432,63 @@ Singleton {
         command: ["sh", "-c", "mkdir -p '" + root._configDir + "' && cat > '" + root._configFile + "'"]
     }
 
-    function serializeLayout() {
-        let arr = [];
-        for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i);
-            arr.push({
-                id: item.id, section: item.section,
-                alignment: item.alignment, order: item.order,
-                enabled: item.enabled,
-                instanceKey: item.instanceKey || ""
-            });
+    function _serializeLayoutItem(item) {
+        return {
+            id: item.id,
+            section: item.section,
+            alignment: item.alignment,
+            order: item.order,
+            enabled: item.enabled,
+            instanceKey: item.instanceKey || ""
         }
-        return JSON.stringify(arr);
+    }
+
+    function serializeLayout() {
+        let arr = []
+        for (let i = 0; i < layoutModel.count; i++) {
+            arr.push(_serializeLayoutItem(layoutModel.get(i)))
+        }
+        return JSON.stringify(arr)
+    }
+
+    function _replaceLayout(entries) {
+        layoutModel.clear()
+
+        for (let i = 0; i < entries.length; i++) {
+            layoutModel.append(entries[i])
+        }
+
+        _ensureLayoutInstanceKeys()
+    }
+
+    function _layoutIndexForInstanceKey(instanceKey) {
+        if (!instanceKey) {
+            return -1
+        }
+
+        for (let i = 0; i < layoutModel.count; i++) {
+            if (root.instanceKeyAt(i) === instanceKey) {
+                return i
+            }
+        }
+
+        return -1
     }
 
     function applyJson(json) {
         try {
-            let arr = JSON.parse(json);
+            let arr = JSON.parse(json)
             if (!Array.isArray(arr) || arr.length === 0) {
-                resetLayout();
-                return;
+                resetLayout()
+                return
             }
-            _arrivalGeometries = ({})
-            _arrivalRevealLocks = ({})
-            layoutModel.clear();
-            for (let i = 0; i < arr.length; i++)
-                layoutModel.append(arr[i]);
-            _ensureLayoutInstanceKeys();
-            _recomputeGeometryContracts();
-            layoutChanged();
+            _resetArrivalState()
+            _replaceLayout(arr)
+            _recomputeGeometryContracts()
+            layoutChanged()
         } catch (e) {
-            console.log("BarLayoutService: failed to parse layout JSON:", e);
-            resetLayout();
+            console.log("BarLayoutService: failed to parse layout JSON:", e)
+            resetLayout()
         }
     }
 
@@ -1412,94 +1503,96 @@ Singleton {
 
     function moveWidget(instanceKey, toSection, toAlignment, toOrder) {
 
-        let currentSection = "";
-        let currentAlignment = "";
-        let currentOrder = -1;
+        let currentSection = ""
+        let currentAlignment = ""
+        let currentOrder = -1
         for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i);
+            let item = layoutModel.get(i)
             if (root.instanceKeyAt(i) === instanceKey) {
-                currentSection = item.section;
-                currentAlignment = item.alignment;
-                currentOrder = item.order;
-                break;
+                currentSection = item.section
+                currentAlignment = item.alignment
+                currentOrder = item.order
+                break
             }
         }
 
         if (currentOrder >= 0 && currentSection === toSection && currentOrder === toOrder) {
-            return;
+            return
         }
 
         // Collect all widgets in target section (excluding the moving one)
-        let others = [];
-        let movingIdx = -1;
+        let others = []
+        let movingIdx = -1
         for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i);
+            let item = layoutModel.get(i)
             if (root.instanceKeyAt(i) === instanceKey) {
-                movingIdx = i;
-                continue;
+                movingIdx = i
+                continue
             }
             if (item.section === toSection) {
-                others.push({ modelIndex: i, order: item.order });
+                others.push({ modelIndex: i, order: item.order })
             }
         }
-        if (movingIdx < 0) return;
+        if (movingIdx < 0)
+            return
 
         // Sort by current order
-        others.sort(function(a, b) { return a.order - b.order; });
+        others.sort(function(a, b) { return a.order - b.order })
 
         // Insert the moving widget at the desired position
-        let insertAt = Math.min(toOrder, others.length);
-        others.splice(insertAt, 0, { modelIndex: movingIdx, order: -1 });
+        let insertAt = Math.min(toOrder, others.length)
+        others.splice(insertAt, 0, { modelIndex: movingIdx, order: -1 })
 
         // Reassign sequential orders and update section/alignment
         for (let i = 0; i < others.length; i++) {
-            let mi = others[i].modelIndex;
-            layoutModel.setProperty(mi, "order", i);
+            let mi = others[i].modelIndex
+            layoutModel.setProperty(mi, "order", i)
             if (mi === movingIdx) {
-                layoutModel.setProperty(mi, "section", toSection);
-                layoutModel.setProperty(mi, "alignment", toAlignment);
+                layoutModel.setProperty(mi, "section", toSection)
+                layoutModel.setProperty(mi, "alignment", toAlignment)
             }
         }
-        _recomputeGeometryContracts();
-        layoutChanged();
-        saveLayout();
+        _recomputeGeometryContracts()
+        layoutChanged()
+        saveLayout()
     }
 
     // Returns true if the widget already occupies the given slot
     // including alignment. Used to suppress no-op reorders.
     function isSamePlacement(instanceKey, sectionName, order, alignment) {
-        for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i);
-            if (root.instanceKeyAt(i) === instanceKey)
-                return item.section === sectionName && item.order === order && item.alignment === alignment;
+        let modelIndex = _layoutIndexForInstanceKey(instanceKey)
+
+        if (modelIndex < 0) {
+            return false
         }
-        return false;
+
+        let item = layoutModel.get(modelIndex)
+        return item.section === sectionName && item.order === order && item.alignment === alignment
     }
 
     // Returns the stable instance key for the widget at layoutModel[modelIndex].
     // Key format: "{widgetId}_{n}" where n counts how many prior entries share the same widgetId.
     function instanceKeyAt(modelIndex) {
-        if (modelIndex < 0 || modelIndex >= layoutModel.count) return "";
-        let targetId = layoutModel.get(modelIndex).id;
-        let n = 0;
+        if (modelIndex < 0 || modelIndex >= layoutModel.count)
+            return ""
+
+        let targetId = layoutModel.get(modelIndex).id
+        let n = 0
         for (let i = 0; i < modelIndex; i++) {
-            if (layoutModel.get(i).id === targetId) n++;
+            if (layoutModel.get(i).id === targetId)
+                n++
         }
         let storedKey = layoutModel.get(modelIndex).instanceKey
         if (storedKey)
-            return storedKey;
-        return targetId + "_" + n;
+            return storedKey
+
+        return targetId + "_" + n
     }
 
     function resetLayout() {
-        _arrivalGeometries = ({})
-        _arrivalRevealLocks = ({})
-        layoutModel.clear();
-        for (let i = 0; i < defaultLayout.length; i++) {
-            layoutModel.append(defaultLayout[i]);
-        }
+        _resetArrivalState()
+        _replaceLayout(defaultLayout)
 
-        _ensureLayoutInstanceKeys()
         _recomputeGeometryContracts()
         layoutChanged()
     }
@@ -1526,26 +1619,18 @@ Singleton {
 
         if (settingsMode) {
             let slots = sectionSlots(section)
-            for (let i = 0; i < slots.length; i++) {
-                if (slots[i].instanceKey !== instanceKey) {
-                    continue
-                }
-
+            let slot = _slotForInstanceKey(slots, instanceKey)
+            if (slot) {
                 let nextArrivalGeometries = Object.assign({}, _arrivalGeometries)
-                nextArrivalGeometries[instanceKey] = {
-                    active: true,
-                    instanceKey: instanceKey,
-                    widgetId: widgetId,
-                    section: section,
-                    barLeft: slots[i].left,
-                    barWidth: slots[i].width,
-                    barRight: slots[i].right,
-                    barCenterX: slots[i].centerX,
-                    phase: "overlay",
-                    readyForDelegate: false
-                }
+                nextArrivalGeometries[instanceKey] = _arrivalGeometryForSlot(
+                    instanceKey,
+                    widgetId,
+                    section,
+                    slot,
+                    "overlay",
+                    false
+                )
                 _arrivalGeometries = nextArrivalGeometries
-                break
             }
         }
 
@@ -1556,19 +1641,22 @@ Singleton {
     // Removes the widget instance identified by instanceKey from the layout model.
     // instanceKey must match what instanceKeyAt() would return for that entry.
     function removeWidget(instanceKey) {
-        for (let i = 0; i < layoutModel.count; i++) {
-            if (instanceKeyAt(i) === instanceKey) {
-                clearArrivalGeometry(instanceKey)
-                layoutModel.remove(i);
-                if (activeWidgetInstanceKey === instanceKey) {
-                    closeWidgetSettings();
-                }
-                _recomputeGeometryContracts();
-                layoutChanged();
-                saveLayout();
-                return;
+        let modelIndex = _layoutIndexForInstanceKey(instanceKey)
+
+        if (modelIndex >= 0) {
+            clearArrivalGeometry(instanceKey)
+            layoutModel.remove(modelIndex)
+
+            if (activeWidgetInstanceKey === instanceKey) {
+                closeWidgetSettings()
             }
+
+            _recomputeGeometryContracts()
+            layoutChanged()
+            saveLayout()
+            return
         }
-        console.warn("BarLayoutService: removeWidget called with unknown key:", instanceKey);
+
+        console.warn("BarLayoutService: removeWidget called with unknown key:", instanceKey)
     }
 }

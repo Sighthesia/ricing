@@ -193,6 +193,13 @@ Item {
             / Theme.barWidget.mediaContentSwapIncomingRange))
     }
 
+    readonly property real _incomingContentOpacity:
+        root._contentSwapActive ? root._incomingSwapProgress(root._contentSwapProgress) : 0
+    readonly property real _incomingContentY:
+        root._contentSwapActive
+            ? ((root._incomingContentOpacity - 1) * root._contentSwapOffset)
+            : 0
+
     function _startContentSwap() {
         const nextContent = root._snapshotContent()
         const carryIncomingLayer = root._contentSwapActive
@@ -343,7 +350,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         implicitWidth: Math.max(
             _contentStage.implicitWidth + root._padH * 2,
-            _flashControls.implicitWidth + root._padH * 2
+            _flashStageClip.implicitWidth
         )
         implicitHeight: root._flashRenderVisible
             ? (root._pillH + root._flashGap + root._flashRowH)
@@ -405,7 +412,7 @@ Item {
         }
 
         // Flash stage clip.
-        Item {
+        MediaParts.MediaFlashStage {
             id: _flashStageClip
             anchors.left: _pillBackground.left
             anchors.right: _pillBackground.right
@@ -414,55 +421,21 @@ Item {
                 _pillBackground.height,
                 root._pillH + (root._flashGap + root._flashRowH) * root._flashStageProgress
             )
-            clip: true
-
-        // Divider lane.
-        Item {
-            id: _dividerLane
-            anchors.left: parent.left
-            anchors.right: parent.right
-            y: root._pillH
-            height: root._flashGap
-
-            Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: Math.max(0, _pillBackground.width - root._padH * 2)
-                height: 1
-                radius: height / 2
-                color: Colors.border
-                opacity: 0.35 * root._flashStageProgress
-            }
-
-        }
-
-        // Flash lane.
-        Item {
-            id: _flashLane
-            anchors.left: parent.left
-            anchors.right: parent.right
-            y: root._pillH + root._flashGap
-            height: root._flashRowH
-
-        // Flash controls.
-        MediaParts.MediaFlashControls {
-            id: _flashControls
-            visible: root._active
-            width: Math.max(0, _pillBackground.width - root._padH * 2)
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: (parent.height - implicitHeight) / 2
-                - root._flashRestLift
-                + (root._flashRestLift + root._flashStageVisibleOffset) * root._flashStageProgress
-            opacity: root._flashStageProgress
-            scale: Theme.barWidget.mediaFlashMinScale
-                + Theme.barWidget.mediaFlashScaleRange * root._flashStageProgress
+            active: root._active
+            stageProgress: root._flashStageProgress
+            pillWidth: _pillBackground.width
+            pillHeight: root._pillH
+            padH: root._padH
+            gap: root._flashGap
+            rowHeight: root._flashRowH
+            restLift: root._flashRestLift
+            visibleOffset: root._flashStageVisibleOffset
             leadingLabel: MediaControlService.positionLabel
             durationLabel: MediaControlService.durationLabel
             playbackState: MediaControlService.playbackState
             canGoPrevious: MediaControlService.canGoPrevious
             canTogglePlayback: MediaControlService.canTogglePlayback
             canGoNext: MediaControlService.canGoNext
-            showProgress: false
             secondaryButtonSize: Theme.barWidget.mediaFlashCompactSecondaryButtonSize
             primaryButtonSize: Theme.barWidget.mediaFlashCompactPrimaryButtonSize
             secondaryIconSize: Theme.barWidget.mediaFlashCompactSecondaryIconSize
@@ -470,8 +443,6 @@ Item {
             onPreviousRequested: MediaControlService.previous()
             onPlayPauseRequested: MediaControlService.playPause()
             onNextRequested: MediaControlService.next()
-        }
-        }
         }
 
         // Shared progress mask.
@@ -648,57 +619,27 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.leftMargin: root._padH
                 anchors.rightMargin: root._padH
-                implicitWidth: Math.max(_currentContentLayer.implicitWidth, _outgoingContentLayer.implicitWidth, _incomingContentLayer.implicitWidth)
-                implicitHeight: Math.max(_currentContentLayer.implicitHeight, _outgoingContentLayer.implicitHeight, _incomingContentLayer.implicitHeight)
+                implicitWidth: _contentLayers.implicitWidth
+                implicitHeight: _contentLayers.implicitHeight
 
-                // Current content layer.
-                MediaParts.MediaCompactContent {
-                    id: _currentContentLayer
+                // Swappable content layers.
+                MediaParts.MediaCompactContentStack {
+                    id: _contentLayers
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    visible: !root._contentSwapActive
-                    opacity: 1
-                    y: 0
-                    title: root._currentContent.title || ""
-                    artist: root._currentContent.artist || ""
-                    artUrl: root._currentContent.artUrl || ""
-                    artworkSize: root._contentArtworkSize
-                    textMaxWidth: Theme.barWidget.mediaCompactMaxTitleWidth
-                }
-
-                // Outgoing content layer.
-                MediaParts.MediaCompactContent {
-                    id: _outgoingContentLayer
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    visible: root._contentSwapActive
-                    opacity: root._contentSwapActive
+                    swapActive: root._contentSwapActive
+                    outgoingOpacity: root._contentSwapActive
                         ? (root._outgoingContentStartOpacity * (1 - root._contentSwapProgress))
                         : 0
-                    y: root._contentSwapActive
+                    outgoingY: root._contentSwapActive
                         ? (root._outgoingContentStartY
                             + (root._contentSwapOffset - root._outgoingContentStartY) * root._contentSwapProgress)
                         : 0
-                    title: root._outgoingContent.title || ""
-                    artist: root._outgoingContent.artist || ""
-                    artUrl: root._outgoingContent.artUrl || ""
-                    artworkSize: root._contentArtworkSize
-                    textMaxWidth: Theme.barWidget.mediaCompactMaxTitleWidth
-                }
-
-                // Incoming content layer.
-                MediaParts.MediaCompactContent {
-                    id: _incomingContentLayer
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    visible: root._contentSwapActive
-                    opacity: root._contentSwapActive ? root._incomingSwapProgress(root._contentSwapProgress) : 0
-                    y: root._contentSwapActive
-                        ? ((root._incomingSwapProgress(root._contentSwapProgress) - 1) * root._contentSwapOffset)
-                        : 0
-                    title: root._incomingContent.title || ""
-                    artist: root._incomingContent.artist || ""
-                    artUrl: root._incomingContent.artUrl || ""
+                    incomingOpacity: root._incomingContentOpacity
+                    incomingY: root._incomingContentY
+                    currentContent: root._currentContent
+                    outgoingContent: root._outgoingContent
+                    incomingContent: root._incomingContent
                     artworkSize: root._contentArtworkSize
                     textMaxWidth: Theme.barWidget.mediaCompactMaxTitleWidth
                 }

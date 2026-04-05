@@ -5,6 +5,7 @@ import qs.config
 import qs.services
 import qs.modules.bar
 
+// Top-level layer-shell bar window that hosts the composed bar content.
 PanelWindow {
     id: barWindow
 

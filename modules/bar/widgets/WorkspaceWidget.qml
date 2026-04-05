@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import qs.config
 import qs.services
+import "." as WorkspaceParts
 import ".." as BarComponents
 
 // Two-state workspace indicator ("Dynamic Island" morph style).
@@ -88,7 +89,7 @@ Item {
     readonly property real _contentColumnFocusY: _focusSlot.y
     readonly property real _focusRowY: _focusSlot.y
     readonly property real _overviewRowY: _overviewSlot.y
-    readonly property real _focusPulseOpacity: _focusRow._pulseOpacity
+    readonly property real _focusPulseOpacity: _focusRow.pulseOpacity
     readonly property real _focusRowScale: _focusRow.scale
     readonly property real _focusRowOpacity: _focusRow.opacity
 
@@ -547,7 +548,7 @@ Item {
                 height: root._pillH
                 y: 0
 
-                // ── Overview content — workspace pills row ───────────────────
+                // Overview content stays isolated in per-workspace pill components.
                 Row {
                     id: _overviewRow
 
@@ -567,104 +568,26 @@ Item {
                         model: NiriService.workspaces
 
                         delegate: Item {
-                            id: _wsDelegate
-
                             required property string wsId
                             required property int idx
                             required property bool isActive
 
-                            readonly property var _appIds:
-                                root._workspaceAppIdsByWorkspace[_wsDelegate.wsId] || []
+                            visible: _pill.visible
+                            width: _pill.width
+                            height: _pill.height
 
-                            visible: isActive || _appIds.length > 0
-                            width: visible ? _wsPill.implicitWidth : 0
-                            height: visible ? _wsPill.implicitHeight : 0
+                            WorkspaceParts.WorkspaceOverviewPill {
+                                id: _pill
 
-                            Rectangle {
-                                id: _wsPill
-
-                                implicitHeight: root._pillH
-                                implicitWidth: Math.max(
-                                    _iconsRow.implicitWidth + root._pillPadH * 2,
-                                    root._pillH
-                                )
-                                radius: implicitHeight / 2
-                                color: _wsDelegate.isActive ? Colors.highlight : Colors.surface
-
-                                Behavior on color {
-                                    ColorAnimation { duration: Theme.anim.highlightDuration }
-                                }
-
-                                Row {
-                                    id: _iconsRow
-
-                                    anchors.centerIn: parent
-                                    spacing: root._iconSpacing
-
-                                    Repeater {
-                                        model: _wsDelegate._appIds
-
-                                        delegate: Image {
-                                            required property var modelData
-
-                                            readonly property bool _isLoaded: status === Image.Ready
-                                            readonly property bool _isFocused: _wsDelegate.isActive && modelData.winId === root._focusedWindowId
-
-                                            width: root._smallIcon
-                                            height: root._smallIcon
-                                            opacity: _isLoaded
-                                                ? (_wsDelegate.isActive ? (_isFocused ? 1.0 : 0.5) : 0.75)
-                                                : 0
-                                            scale: _isFocused ? 1.2 : 1.0
-                                            source: modelData.icon || ""
-                                            asynchronous: true
-                                            smooth: true
-                                            fillMode: Image.PreserveAspectFit
-
-                                            Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
-                                            Behavior on scale { NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType } }
-                                        }
-                                    }
-
-                                    Text {
-                                        visible: _wsDelegate._appIds.length === 0
-                                        text: _wsDelegate.idx
-                                        font.family: Theme.fontMono
-                                        font.bold: true
-                                        font.pixelSize: Theme.fontSizeBody
-                                        color: _wsDelegate.isActive ? Colors.background : Colors.textMuted
-
-                                        Behavior on color {
-                                            ColorAnimation { duration: Theme.anim.highlightDuration }
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: parent.radius
-                                    color: Colors.highlight
-                                    opacity: _wsArea.containsMouse ? 0.15 : 0
-
-                                    Behavior on opacity {
-                                        NumberAnimation {
-                                            duration: Theme.anim.highlightDuration
-                                            easing.type: Theme.anim.highlightType
-                                        }
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: _wsArea
-
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: Quickshell.execDetached([
-                                        "niri", "msg", "action",
-                                        "focus-workspace", _wsDelegate.idx.toString()
-                                    ])
-                                }
+                                wsId: parent.wsId
+                                idx: parent.idx
+                                isActive: parent.isActive
+                                appItems: root._workspaceAppIdsByWorkspace[parent.wsId] || []
+                                focusedWindowId: root._focusedWindowId
+                                pillHeight: root._pillH
+                                pillPaddingH: root._pillPadH
+                                iconSpacing: root._iconSpacing
+                                smallIconSize: root._smallIcon
                             }
                         }
                     }
@@ -678,108 +601,22 @@ Item {
                 height: root._flashRowH
                 y: root._pillH + root._flashGap
 
-                // ── Focus content — app icon + window title ────────────────
-                Item {
+                // Focus summary is split out so this widget keeps ownership of state only.
+                WorkspaceParts.WorkspaceFocusSummary {
                     id: _focusRow
-                    objectName: "workspaceFocusRow"
 
                     anchors.centerIn: parent
-                    implicitWidth: _focusContent.implicitWidth
-                    implicitHeight: _focusContent.implicitHeight
-                    width: implicitWidth
-                    height: implicitHeight
-                    clip: false
-                    property real _pulseOpacity: 0
-
-                    function triggerFocusChangePulse() {
-                        if (root._focusedWindowId.length === 0 || root._focusedTitle.length === 0)
-                            return
-                        if (opacity <= 0)
-                            return
-                        _focusPulseAnim.stop()
-                        _pulseOpacity = 0
-                        _focusPulseAnim.start()
-                    }
-
-                    scale: root._flashActive ? root._flashScale : 1.0
-                    opacity: root._flashActive ? 0.6 : (root._showOverview ? 0 : 1)
-
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: Theme.anim.moveDuration
-                            easing.type: Theme.anim.moveType
-                        }
-                    }
-
-                    Rectangle {
-                        x: -root._focusPulsePad
-                        y: -root._focusPulsePad
-                        width: parent.width + root._focusPulsePad * 2
-                        height: parent.height + root._focusPulsePad * 2
-                        radius: height / 2
-                        color: Colors.highlight
-                        opacity: _focusRow._pulseOpacity
-                    }
-
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: Theme.anim.moveDuration
-                            easing.type: Theme.anim.moveType
-                        }
-                    }
-
-                    SequentialAnimation {
-                        id: _focusPulseAnim
-
-                        NumberAnimation {
-                            target: _focusRow
-                            property: "_pulseOpacity"
-                            from: 0
-                            to: 0.16
-                            duration: Theme.anim.highlightDuration
-                            easing.type: Theme.anim.highlightType
-                        }
-
-                        NumberAnimation {
-                            target: _focusRow
-                            property: "_pulseOpacity"
-                            to: 0
-                            duration: Theme.anim.moveDuration
-                            easing.type: Theme.anim.moveType
-                        }
-                    }
-
-                    Row {
-                        id: _focusContent
-
-                        anchors.centerIn: parent
-                        spacing: root._iconTitleGap
-
-                        Image {
-                            id: _focusIcon
-
-                            visible: root._focusedAppId.length > 0
-                            width: visible ? root._iconSize : 0
-                            height: root._iconSize
-                            anchors.verticalCenter: parent.verticalCenter
-                            source: root._iconPath(root._focusedAppId)
-                            smooth: true
-                            fillMode: Image.PreserveAspectFit
-                        }
-
-                        Text {
-                            id: _titleText
-
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: Math.min(implicitWidth, root._titleMaxW)
-                            text: root._focusedTitle
-                            elide: Text.ElideRight
-                            maximumLineCount: 1
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeBody
-                            color: Colors.text
-                        }
-                    }
+                    focusedWindowId: root._focusedWindowId
+                    focusedAppId: root._focusedAppId
+                    focusedTitle: root._focusedTitle
+                    iconSize: root._iconSize
+                    iconTitleGap: root._iconTitleGap
+                    focusPulsePad: root._focusPulsePad
+                    titleMaxWidth: root._titleMaxW
+                    flashScale: root._flashScale
+                    flashActive: root._flashActive
+                    showOverview: root._showOverview
+                    iconPathProvider: root._iconPath
                 }
             }
         }

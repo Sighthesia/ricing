@@ -2,6 +2,7 @@ import QtQuick
 import qs.config
 import qs.services
 
+// Main bar composition root that wires sections, overlays, and shared menus.
 Item {
     id: barContent
 

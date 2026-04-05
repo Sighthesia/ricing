@@ -1,0 +1,218 @@
+import QtQuick
+import qs.services
+
+// Encapsulates transient and window-hint transition strategies for the state machine.
+Item {
+    id: root
+
+    required property Item host
+    required property QtObject state
+    required property Item machine
+    required property Item timeline
+    required property Item bridge
+
+    visible: false
+    width: 0
+    height: 0
+
+    function startEnterTransition(event) {
+        const wasHintPhase = root.host._hintPhase
+        const outgoing = root.host._cloneEvent(root.host._hintPhase
+            ? root.host._baselineEvent
+            : (root.state._mainDisplayEvent.type !== "idle"
+                ? root.state._mainDisplayEvent
+                : root.host._baselineEvent))
+
+        root.machine.log("startEnterTransition", event)
+        if (root.host._hintPhase) {
+            root.bridge.hintFlashDelayTimer.stop()
+            root.timeline.hintEnterAnim.stop()
+            root.timeline.hintExitAnim.stop()
+            root.machine.resetTracks()
+        } else if (root.state._phase !== "idle") {
+            root.timeline.returnAnim.stop()
+            root.timeline.departAnim.stop()
+            root.state._phase = "idle"
+            root.state._mainDisplayEvent = root.host._baselineEvent
+            root.machine.resetTracks()
+        }
+
+        root.state._mainDisplayEvent = root.host._displayEvent(event)
+        root.state._phase = "enter"
+
+        root.timeline.returnAnim.stop()
+        root.timeline.departAnim.stop()
+
+        root.state._mainTrackY = root.host._mainTrackEnterY
+        root.state._mainTrackScale = 0.92
+        root.state._mainTrackOpacity = 0.15
+
+        if (wasHintPhase) {
+            root.state._flashSourceEvent = root.host._cloneEvent(root.state._flashSourceEvent)
+            root.state._flashTrackY = root.host._windowHintEntryMeta.flashRole.targetY
+            root.state._flashTrackScale = root.host._windowHintEntryMeta.flashRole.scale
+            root.state._flashTrackOpacity = root.host._windowHintEntryMeta.flashRole.opacity
+        } else {
+            root.state._flashSourceEvent = outgoing
+            root.state._flashTrackY = root.host._flashTrackCenterY
+            root.state._flashTrackScale = 1
+            root.state._flashTrackOpacity = 1
+        }
+        root.machine.triggerSharedBackgroundPulse("hint-update")
+
+        Qt.callLater(function() {
+            root.timeline.departAnim.start()
+        })
+    }
+
+    function startWindowHint(event) {
+        const fullHint = root.host._isFullHintEventType(event.type)
+
+        root.machine.log("startWindowHint", event)
+        root.state._mainDisplayEvent = root.host._baselineEvent
+        root.state._flashSourceEvent = root.host._displayEvent(event)
+        root.state._phase = "hint"
+        root.machine.syncOverlayExtensionReservation()
+
+        root.timeline.departAnim.stop()
+        root.timeline.returnAnim.stop()
+        root.timeline.hintEnterAnim.stop()
+        root.timeline.hintExitAnim.stop()
+
+        root.state._mainTrackY = root.host._mainTrackCenterY
+        root.state._mainTrackScale = 1
+        root.state._mainTrackOpacity = 1
+        root.state._flashTrackY = root.host._windowHintEntryMeta.flashRole.targetY
+            - root.host._windowHintEntryMeta.flashRole.deltaY
+        root.state._flashTrackScale = 0.92
+        root.state._flashTrackOpacity = 0
+        if (fullHint)
+            root.machine.startAttachedReveal()
+        root.bridge.hintFlashDelayTimer.restart()
+
+        Qt.callLater(function() {
+            root.timeline.hintEnterAnim.start()
+        })
+    }
+
+    function updateWindowHint(event) {
+        root.state._flashSourceEvent = root.host._displayEvent(event)
+        root.machine.syncOverlayExtensionReservation()
+
+        if (root.state._overlaySessionActive || IslandOverlayService.mode !== "none")
+            return
+
+        root.machine.triggerSharedBackgroundPulse("replace")
+    }
+
+    function resetReplaceLayers() {
+        root.state._replaceOutgoingVisible = false
+        root.state._replaceIncomingVisible = false
+        root.state._replaceOutgoingOpacity = 0
+        root.state._replaceIncomingOpacity = 0
+        root.state._replaceOutgoingTargetY = root.host._mainTrackCenterY + root.host._replaceOffset
+        root.state._replaceOutgoingEvent = root.host._idleSnapshot()
+        root.state._replaceIncomingEvent = root.host._idleSnapshot()
+    }
+
+    function replaceActiveTransient(event) {
+        const outgoingEvent = root.host._cloneEvent(
+            root.state._replaceIncomingVisible ? root.state._replaceIncomingEvent : root.state._mainDisplayEvent
+        )
+        const outgoingFromIncomingLayer = root.state._replaceIncomingVisible
+        const outgoingY = root.state._replaceIncomingVisible ? root.state._replaceIncomingY : root.state._mainTrackY
+        const outgoingOpacity = root.state._replaceIncomingVisible ? root.state._replaceIncomingOpacity : root.state._mainTrackOpacity
+        const shouldAnimateReplace = outgoingEvent.type !== "idle"
+        const nextEvent = root.host._displayEvent(event)
+
+        root.state._mainDisplayEvent = nextEvent
+        root.state._flashSourceEvent = root.host._hintPhase
+            ? root.host._cloneEvent(root.state._flashSourceEvent)
+            : root.host._cloneEvent(root.host._baselineEvent)
+
+        root.timeline.returnAnim.stop()
+        root.timeline.hintEnterAnim.stop()
+        root.timeline.hintExitAnim.stop()
+        root.timeline.replaceAnim.stop()
+        resetReplaceLayers()
+
+        if (!root.host._transientPhase)
+            root.state._phase = "hold"
+
+        if (shouldAnimateReplace) {
+            root.state._replaceOutgoingEvent = outgoingEvent
+            root.state._replaceIncomingEvent = nextEvent
+            root.state._replaceOutgoingY = outgoingY
+            root.state._replaceOutgoingOpacity = outgoingOpacity
+            root.state._replaceOutgoingTargetY = outgoingFromIncomingLayer
+                ? outgoingY
+                : (root.host._mainTrackCenterY + root.host._replaceOffset)
+            root.state._replaceIncomingY = root.host._mainTrackCenterY - root.host._replaceOffset
+            root.state._replaceIncomingOpacity = 0
+            root.state._replaceOutgoingVisible = true
+            root.state._replaceIncomingVisible = true
+
+            root.state._mainTrackScale = 1
+            root.state._mainTrackOpacity = 0
+            root.timeline.replaceAnim.start()
+        } else {
+            root.state._replaceOutgoingVisible = false
+            root.state._replaceIncomingVisible = false
+            root.state._mainTrackScale = 1
+            root.state._mainTrackY = root.host._mainTrackCenterY
+            root.state._mainTrackOpacity = 1
+        }
+
+        root.machine.triggerSharedBackgroundPulse()
+    }
+
+    function triggerHintFlash() {
+        root.machine.triggerSharedBackgroundPulse("hint-delay")
+    }
+
+    function finishWindowHint() {
+        if (root.state._phase !== "hint")
+            return
+
+        root.state._phase = "hint-exit"
+        root.machine.syncOverlayExtensionReservation()
+        root.timeline.hintEnterAnim.stop()
+        if (root.host._isFullHintEventType(root.state._flashSourceEvent.type))
+            root.machine.startAttachedCollapse()
+        if (!root.host._isFullHintEventType(root.state._flashSourceEvent.type))
+            root.machine.triggerEdgeReboundScale()
+        root.timeline.hintExitAnim.start()
+    }
+
+    function completeWindowHintExit() {
+        root.state._phase = "idle"
+        root.state._flashSourceEvent = root.host._idleSnapshot()
+        root.state._mainDisplayEvent = root.host._baselineEvent
+        root.state._sharedBackgroundPulseOpacity = 0
+        root.state._attachedPanelRevealWidth = 0
+        root.state._attachedPanelRevealHeight = 0
+        root.state._attachedContentOpacity = 0
+        root.machine.resetTracks()
+        root.machine.syncOverlayExtensionReservation()
+    }
+
+    function startExitTransition() {
+        root.machine.log("startExitTransition", root.state._mainDisplayEvent)
+        root.state._phase = "exit"
+
+        root.timeline.departAnim.stop()
+        root.timeline.returnAnim.stop()
+        root.timeline.hintEnterAnim.stop()
+        root.timeline.hintExitAnim.stop()
+        root.machine.triggerEdgeReboundScale()
+
+        root.state._mainTrackY = root.host._mainTrackCenterY
+        root.state._mainTrackScale = 1
+        root.state._mainTrackOpacity = 1
+        root.state._flashTrackY = root.host._flashStripY
+        root.state._flashTrackScale = root.host._flashScale
+        root.state._flashTrackOpacity = 0.6
+
+        root.timeline.returnAnim.start()
+    }
+}
