@@ -30,6 +30,9 @@ description: Guidelines for managing Settings, Shared State, Component States, E
 - When chaining `Process.onExited` into another `Process`, defer the follow-up with `Qt.callLater(...)` to avoid reading stale `running` state in the same event tick.
 - If a service queues follow-up reloads while a process is running, queue the exact pending scope (`full` vs `system-only`) instead of falling back to a generic timer that can rerun the wrong pipeline.
 - Validate wallpaper/theme source inputs before persisting them. Empty or missing source files must not silently reuse stale generated theme outputs.
-- Keep generated scheme names and activation commands identical across export and apply layers. A file named `Matugen.colors` must not be activated as `DymicShellMatugen`.
+- Keep generated scheme names and activation commands identical across export and apply layers. A file named `DymicShell.colors` must not be activated as some unrelated legacy or temporary scheme name unless that indirection is deliberate and rollback-safe.
+- For KDE Plasma, reapplying the same color-scheme name does not reliably hot-reload updated `.colors` contents. Force a visible refresh by applying a temporary clone scheme first, then switch back to the canonical scheme.
+- KDE reload fallbacks must be rollback-safe. Do not delete the temporary clone if Plasma is still using it because the switch back to the primary scheme failed.
+- Avoid adding unverified secondary theme selectors when a path-based setting already works. For `qt5ct` and `qt6ct`, prefer `color_scheme_path` plus `custom_palette=true` unless a named scheme key is confirmed to be required.
 - Prefer application-native live reload commands over generic signals when updating external themes. For kitty, prefer remote control or `reload_conf_in_all_kitties()` before signal-based fallbacks.
 - Log stdout/stderr for theme generator and apply helper processes so template failures, bad paths, and permission issues are diagnosable from shell logs.

@@ -297,35 +297,122 @@ reload_yazi() {
     printf '[matugen-apply] yazi note=runtime theme file reload depends on upstream support\n'
 }
 
-cleanup_old_theme_artifacts() {
-    rm -f \
-        "$HOME/.config/qt5ct/colors/DymicShell.conf" \
-        "$HOME/.config/qt6ct/colors/DymicShell.conf" \
-        "$HOME/.config/ghostty/themes/DymicShell" \
-        "$HOME/.config/wezterm/colors/DymicShell.toml" \
-        "$HOME/.config/Kvantum/DymicShell/DymicShell.kvconfig" \
-        "$HOME/.local/share/color-schemes/DymicShell.colors"
+cleanup_old_non_kde_theme_artifacts() {
+    [ -f "$HOME/.config/qt5ct/colors/DymicShell.conf" ] && rm -f "$HOME/.config/qt5ct/colors/Matugen.conf"
+    [ -f "$HOME/.config/qt6ct/colors/DymicShell.conf" ] && rm -f "$HOME/.config/qt6ct/colors/Matugen.conf"
+    [ -f "$HOME/.config/ghostty/themes/DymicShell" ] && rm -f "$HOME/.config/ghostty/themes/Matugen"
+    [ -f "$HOME/.config/wezterm/colors/DymicShell.toml" ] && rm -f "$HOME/.config/wezterm/colors/Matugen.toml"
+    [ -f "$HOME/.config/Kvantum/DymicShell/DymicShell.kvconfig" ] && rm -f "$HOME/.config/Kvantum/matugen/matugen.kvconfig"
+}
+
+read_current_kde_colorscheme() {
+    if command -v kreadconfig6 >/dev/null 2>&1; then
+        kreadconfig6 --file kdeglobals --group General --key ColorScheme 2>/dev/null || true
+        return 0
+    fi
+
+    if command -v kreadconfig5 >/dev/null 2>&1; then
+        kreadconfig5 --file kdeglobals --group General --key ColorScheme 2>/dev/null || true
+        return 0
+    fi
+
+    return 0
+}
+
+cleanup_old_kde_theme_artifacts() {
+    rm -f "$HOME/.local/share/color-schemes/Matugen.colors"
 }
 
 reload_kde_colorscheme() {
     local primary_scheme="$1"
     local state_file="$2"
+    local primary_file="$HOME/.local/share/color-schemes/${primary_scheme}.colors"
+    local reload_scheme="${primary_scheme}Reload"
+    local reload_file="$HOME/.local/share/color-schemes/${reload_scheme}.colors"
+    local color_scheme_hash
+    local current_scheme
+    local reload_applied=0
+    local reload_degraded=0
+
     if ! command -v plasma-apply-colorscheme >/dev/null 2>&1; then
         return 0
     fi
 
+    if [ ! -f "$primary_file" ]; then
+        printf '[matugen-apply] kde note=primary scheme file missing file=%s\n' "$primary_file"
+        return 1
+    fi
+
+    awk -v from="$primary_scheme" -v to="$reload_scheme" '
+        $0 == "ColorScheme=" from {
+            print "ColorScheme=" to
+            next
+        }
+        $0 == "Name=" from {
+            print "Name=" to
+            next
+        }
+        $0 == "color_scheme=" from {
+            print "color_scheme=" to
+            next
+        }
+        {
+            print
+        }
+    ' "$primary_file" > "$reload_file"
+
+        if grep -Fqx "ColorScheme=$reload_scheme" "$reload_file" \
+            && grep -Fqx "Name=$reload_scheme" "$reload_file" \
+            && grep -Fqx "color_scheme=$reload_scheme" "$reload_file"; then
+            if plasma-apply-colorscheme "$reload_scheme" >/dev/null 2>&1; then
+                reload_applied=1
+                printf '[matugen-apply] kde colorscheme=%s rc=0\n' "$reload_scheme"
+                current_scheme=$(read_current_kde_colorscheme)
+                if [ -n "$current_scheme" ] && [ "$current_scheme" != "$reload_scheme" ]; then
+                    reload_degraded=1
+                    printf '[matugen-apply] kde note=reload scheme did not become active current=%s expected=%s\n' "$current_scheme" "$reload_scheme"
+                fi
+            else
+                reload_degraded=1
+                printf '[matugen-apply] kde colorscheme=%s rc=1\n' "$reload_scheme"
+            fi
+    else
+        reload_degraded=1
+        printf '[matugen-apply] kde note=reload clone rename validation failed file=%s\n' "$reload_file"
+    fi
+
     if plasma-apply-colorscheme "$primary_scheme" >/dev/null 2>&1; then
+        if command -v sha1sum >/dev/null 2>&1 && [ -f "$primary_file" ]; then
+            color_scheme_hash=$(sha1sum "$primary_file" | cut -d' ' -f1)
+            if [ -n "$color_scheme_hash" ] && command -v kwriteconfig6 >/dev/null 2>&1; then
+                kwriteconfig6 --file kdeglobals --group General --key ColorSchemeHash "$color_scheme_hash" >/dev/null 2>&1 || true
+            elif [ -n "$color_scheme_hash" ] && command -v kwriteconfig5 >/dev/null 2>&1; then
+                kwriteconfig5 --file kdeglobals --group General --key ColorSchemeHash "$color_scheme_hash" >/dev/null 2>&1 || true
+            fi
+        fi
         ensure_parent "$state_file"
         printf '%s\n' "$primary_scheme" > "$state_file"
         printf '[matugen-apply] kde colorscheme=%s rc=0\n' "$primary_scheme"
+        if [ "$reload_degraded" -eq 1 ]; then
+            printf '[matugen-apply] kde note=primary apply succeeded without guaranteed forced reload\n'
+        fi
+        rm -f "$reload_file"
+        return 0
     else
         printf '[matugen-apply] kde colorscheme=%s rc=1\n' "$primary_scheme"
+        if [ "$reload_applied" -eq 1 ]; then
+            printf '[matugen-apply] kde note=kept reload fallback at %s after primary apply failure\n' "$reload_file"
+        else
+            rm -f "$reload_file"
+        fi
+        return 1
     fi
 }
 
 main() {
     local home="${HOME:?}"
     local btop_theme_name="DymicShell"
+    local kde_reload_failed=0
     local kde_primary_scheme="DymicShell"
     local kde_primary_scheme_file="$home/.local/share/color-schemes/${kde_primary_scheme}.colors"
     local kde_state_file="$home/.cache/DymicShell/plasma-colorscheme-name"
@@ -394,15 +481,18 @@ main() {
 
     if [ "$apply_scope" = "system-only" ]; then
         reload_kitty "$kitty_colors_file" "$kitty_remote_socket"
-        cleanup_old_theme_artifacts
+        cleanup_old_non_kde_theme_artifacts
         return 0
     fi
 
     upsert_ini_key "$home/.config/fuzzel/fuzzel.ini" "main" "include" "$fuzzel_include"
 
+    remove_line_if_present "$home/.config/ghostty/config" 'theme = "Matugen"'
     append_line_if_missing "$home/.config/ghostty/config" "$ghostty_theme"
 
+    remove_line_if_present "$home/.config/kitty/kitty.conf" 'include dymicshell-matugen.conf'
     remove_line_if_present "$home/.config/kitty/kitty.conf" 'include matugen.conf'
+    remove_line_if_present "$home/.config/kitty/kitty.conf" 'include DymicShell.conf'
     append_line_if_missing "$home/.config/kitty/kitty.conf" "$kitty_include"
 
     append_line_if_missing "$home/.config/mako/config" "$mako_include"
@@ -418,7 +508,9 @@ main() {
     # Niri's main config should not be created from scratch because a standalone
     # include file is not a valid full config for fresh installs.
     if [ -f "$home/.config/niri/config.kdl" ]; then
+        remove_line_if_present "$home/.config/niri/config.kdl" 'include "./dymicshell-matugen.kdl"'
         remove_line_if_present "$home/.config/niri/config.kdl" 'include "./matugen.kdl"'
+        remove_line_if_present "$home/.config/niri/config.kdl" 'include "./DymicShell.kdl"'
         append_line_if_missing "$home/.config/niri/config.kdl" "$niri_include"
     fi
 
@@ -440,9 +532,16 @@ main() {
         niri msg action load-config-file >/dev/null 2>&1 || true
     fi
 
-    reload_kde_colorscheme "$kde_primary_scheme" "$kde_state_file"
+    if ! reload_kde_colorscheme "$kde_primary_scheme" "$kde_state_file"; then
+        kde_reload_failed=1
+        printf '[matugen-apply] kde note=primary apply failed; keeping legacy artifacts for rollback\n'
+    fi
 
-    cleanup_old_theme_artifacts
+    cleanup_old_non_kde_theme_artifacts
+
+    if [ "$kde_reload_failed" -eq 0 ]; then
+        cleanup_old_kde_theme_artifacts
+    fi
 
 }
 
