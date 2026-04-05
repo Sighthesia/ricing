@@ -11,8 +11,16 @@ Item {
     property alias model: resultList.model
     property int selectedIndex: -1
     property bool scrollAnimationsEnabled: false
-    property bool ownerManagedEntry: false
+    property var _outgoingItems: []
     readonly property int _maxViewportSlots: 6
+    readonly property int _managedEnterStep: 30
+
+    Timer {
+        id: _outgoingClearTimer
+        interval: root.visibleExitDuration() + 20
+        repeat: false
+        onTriggered: root._outgoingItems = []
+    }
 
     signal selectRequested(int index)
     signal activateRequested(int index)
@@ -25,11 +33,9 @@ Item {
 
         let delegates = root._visibleDelegates()
         for (let index = 0; index < delegates.length; index++) {
-            delegates[index].delay = root._compressedDelay(index, delegates.length)
-            delegates[index].runEnter()
+            if (delegates[index].runViewportEnter)
+                delegates[index].runViewportEnter()
         }
-
-        root.ownerManagedEntry = false
     }
 
     function runExit(): void {
@@ -37,6 +43,31 @@ Item {
         for (let index = 0; index < delegates.length; index++) {
             delegates[index].exitDelay = root._compressedDelay(index, delegates.length)
             delegates[index].runExit()
+        }
+    }
+
+    function runSwapExit(): void {
+        let delegates = root._visibleDelegates()
+        let snapshots = []
+
+        for (let index = 0; index < delegates.length; index++) {
+            let delegate = delegates[index]
+            snapshots.push({
+                name: delegate.name,
+                description: delegate.description,
+                icon: delegate.icon,
+                selected: root.selectedIndex === delegate.index,
+                y: Math.round(delegate.y - resultList.contentY),
+                exitDelay: root._compressedDelay(index, delegates.length)
+            })
+        }
+
+        root._outgoingItems = snapshots
+        if (snapshots.length > 0) {
+            _outgoingClearTimer.interval = root.visibleExitDuration() + 20
+            _outgoingClearTimer.restart()
+        } else {
+            _outgoingClearTimer.stop()
         }
     }
 
@@ -71,7 +102,14 @@ Item {
     }
 
     function prepareManagedEntry(): void {
-        root.ownerManagedEntry = true
+        root.scrollAnimationsEnabled = true
+    }
+
+    function releaseManagedEntry(): void {
+        resultList.contentY = 0
+        if (resultList.forceLayout)
+            resultList.forceLayout()
+        root.runEnter()
     }
 
     ListView {
@@ -92,9 +130,14 @@ Item {
 
             listView: resultList
             scrollAnimationsEnabled: root.scrollAnimationsEnabled
-            ownerManagedEntry: root.ownerManagedEntry
+            managedEnterKey: _item.name + "|" + _item.description + "|" + _item.icon
+            managedEnterJitterEnabled: false
             viewportPadding: 28
             scrollStep: 24
+            managedEnterStep: root._managedEnterStep
+            managedEnterFadeEnabled: true
+            managedEnterStartOpacity: 0.0
+            managedEnterStartOffsetY: enterOffsetY
             enterOffsetY: 42
             exitOffsetY: 18
 
@@ -149,6 +192,82 @@ Item {
                     hoverEnabled: true
                     onEntered: root.selectRequested(_item.index)
                     onClicked: root.activateRequested(_item.index)
+                }
+            }
+        }
+    }
+
+    Item {
+        anchors.fill: parent
+        clip: true
+        visible: root._outgoingItems.length > 0
+        z: 1
+
+        Repeater {
+            model: root._outgoingItems
+
+            delegate: BarComponents.StaggerItem {
+                id: _outgoingItem
+
+                required property var modelData
+
+                x: 0
+                y: modelData.y
+                width: resultList.width
+                height: 46
+                exitDelay: modelData.exitDelay
+                exitOffsetY: 18
+                enterStartOpacity: 1.0
+                enterStartOffsetY: 0
+
+                Component.onCompleted: {
+                    _outgoingItem.opacity = 1.0
+                    _outgoingItem._ty = 0
+                    _outgoingItem.runExit()
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: modelData.selected
+                        ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
+                        : "transparent"
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+
+                        Image {
+                            source: "image://icon/" + (modelData.icon || "application-x-executable")
+                            width: 20
+                            height: 20
+                            sourceSize: Qt.size(20, 20)
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            Text {
+                                text: modelData.name
+                                color: Colors.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall + 1
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+
+                            Text {
+                                text: modelData.description
+                                color: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.55)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall - 1
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                visible: modelData.description !== ""
+                            }
+                        }
+                    }
                 }
             }
         }

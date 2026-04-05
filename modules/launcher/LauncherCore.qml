@@ -30,15 +30,6 @@ Item {
     // store JS functions — they are stripped on append).
     ListModel { id: _results }
 
-    Timer {
-        id: _swapTimer
-        // Wait for old items to finish short exit before model swap.
-        // FIXME: +20ms safety margin is empirical; expose as token if reused.
-        interval: SettingsService.data.animation.staggerExitDuration + 20
-        repeat: false
-        onTriggered: root._applyPendingResults()
-    }
-
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -111,7 +102,6 @@ Item {
 
     // Called by LauncherPanel when closing
     function closePanel(): void {
-        _swapTimer.stop()
         _pendingDisplayItems = []
         _pendingResultData = []
         _suspendRefresh = true
@@ -198,23 +188,19 @@ Item {
             }
             _selectedIndex = items.length > 0 ? 0 : -1
             Qt.callLater(function() {
-                if (root.panelActive)
-                    _resultsList.runEnter()
+                _resultsList.releaseManagedEntry()
             })
             return
         }
 
         _pendingDisplayItems = displayItems
         _pendingResultData = items
-        if (!_swapTimer.running) {
-            _runVisibleExit()
-            _swapTimer.interval = _resultsList.visibleExitDuration() + 20
-            _swapTimer.restart()
-        }
+        _runVisibleExit()
+        root._applyPendingResults()
     }
 
     function _runVisibleExit(): void {
-        _resultsList.runExit()
+        _resultsList.runSwapExit()
     }
 
     function _applyPendingResults(): void {
@@ -229,8 +215,7 @@ Item {
         _selectedIndex = root._resultData.length > 0 ? 0 : -1
 
         Qt.callLater(function() {
-            if (root.panelActive)
-                _resultsList.runEnter()
+            _resultsList.releaseManagedEntry()
         })
     }
 

@@ -56,6 +56,8 @@ Any repeated list content with clear rows or cards must use one shared stagger l
 - List items such as notification rows, launcher rows, clipboard rows, and similar repeated cards must reveal with stagger instead of all appearing at once.
 - When a list's dataset is replaced or filtered, the old visible items must exit first and the new visible items must enter after the swap.
 - The list owner must be able to take control of a batch enter animation so delegate-local viewport logic does not interrupt page-level or mode-switch choreography.
+- If repeated list content should read as per-row stagger, animate each visible row from its own visible-order slot; do not move the whole list as one batch and call that stagger.
+- If a fast model swap must keep visible exits while new content enters immediately, use a detached outgoing snapshot/layer for the retiring rows instead of relying on delegates that will be destroyed by `ListModel.clear()`.
 - Scrolling a list must animate both directions: items entering the viewport stagger in, and items leaving the viewport stagger out.
 - Scroll-driven stagger must stay bounded to the visible window. Do not create unbounded delays from total model size.
 - Increase list-item travel and cadence enough that the stagger reads clearly at normal shell speeds; avoid effects so subtle they disappear during scroll.
@@ -70,6 +72,7 @@ Any repeated list content with clear rows or cards must use one shared stagger l
 
 - Do new items reveal with readable stagger on first open?
 - Does filtering or mode switching avoid cutting off the new batch animation midway?
+- When a list swaps datasets repeatedly, do visible rows still stagger individually on the second and later swaps rather than collapsing into one whole-list motion?
 - Do both entering and leaving rows animate during scrolling?
 - Is the stagger window based on visible rows rather than the full model length?
 
