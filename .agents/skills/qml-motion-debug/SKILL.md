@@ -45,6 +45,13 @@ Use this skill when animation state changes are correct but the user still does 
 - If a delayed hint pulse or flash timer should not survive overlay takeover, cancel it as soon as the mode becomes active, not only after the session is fully open.
 - Keep the suppression narrow: stop the stale delayed pulse, but do not also suppress legitimate live-update pulse or spring feedback for the underlying hint interaction.
 
+### 8. Early Cleanup Beats Slow Collapse
+- If one timeline clears `visible`, opacity, or phase before the geometry collapse finishes, the user will perceive a disappearance instead of a shrink-back.
+- Common symptom: the panel starts collapsing correctly, reaches a medium size, then seems to turn transparent before arriving at the bar.
+- Compare all exit durations involved. In DymicShell, a quick `highlightDuration` helper can finish well before a `moveDuration` or `springDuration` host collapse.
+- For detached `window-hint` flows, treat host collapse as the source of truth and defer final cleanup until that collapse animation finishes.
+- If needed, extract final reset into one helper such as `_completeWindowHintExit()` and call it only from the owning collapse timeline.
+
 ## Debugging Ladder
 
 Work from outermost cause to innermost rendering node.
@@ -86,6 +93,8 @@ Good log fields:
 - whether a follow-up snapshot cleared the animation
 - parent stage width versus animated child width
 - overlay `mode` versus overlay `state`
+- which animation actually performs final cleanup
+- duration mismatch between helper fade and host collapse
 
 Remove all temporary logs before finishing.
 
@@ -181,6 +190,7 @@ Use when an overlay opens while a hold preview still has delayed emphasis pendin
 - For `window-hint` to overlay handoff, compare `IslandOverlayService.mode` and `IslandOverlayService.state` separately before deciding a delayed pulse is still valid.
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.
+- For `window-hint` collapse, verify that `_hintExitAnim` does not reset phase or clear attached content before `_attachedCollapseAnim` finishes.
 
 ## Visual Language Reference
 

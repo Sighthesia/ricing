@@ -183,7 +183,7 @@ property real _flashTrackOpacity: 0
     readonly property bool _attachedPanelExpanded:
         root._overlaySessionActive
             ? (root._overlayExpandedActive || root._overlayClosing)
-            : (root._phase === "hint")
+            : (root._phase === "hint" || root._phase === "hint-exit")
     readonly property real _attachedPanelWidth:
         root._overlaySessionActive ? root._overlayExpandedWidth : root._detachedHintWidth
     readonly property real _attachedPanelHeight:
@@ -202,12 +202,12 @@ property real _flashTrackOpacity: 0
         root._overlaySessionActive
             ? ((root._overlayExpandedActive || root._overlayClosing) ? 1 : 0)
             : (root._detachedHintActive
-                ? (root._phase === "hint-exit" ? root._flashTrackOpacity : 1)
+                ? 1
                 : 0)
     readonly property real _attachedPanelScale:
         root._overlaySessionActive
             ? ((root._overlayExpandedActive || root._overlayClosing) ? 1 : 0.985)
-            : (root._detachedHintActive ? root._flashTrackScale : 1)
+            : 1
     readonly property real _attachedContentScale:
         root._overlaySessionActive ? 1 : root._attachedPanelScale
     readonly property real _attachedSurfaceScale:
@@ -949,6 +949,18 @@ property real _flashTrackOpacity: 0
         _hintExitAnim.start()
     }
 
+    function _completeWindowHintExit() {
+        root._phase = "idle"
+        root._flashSourceEvent = root._idleSnapshot()
+        root._mainDisplayEvent = root._baselineEvent
+        root._sharedBackgroundPulseOpacity = 0
+        root._attachedPanelRevealWidth = 0
+        root._attachedPanelRevealHeight = 0
+        root._attachedContentOpacity = 0
+        root._resetTracks()
+        root._syncOverlayExtensionReservation()
+    }
+
     function _startExitTransition() {
         root._log("startExitTransition", root._mainDisplayEvent)
         root._phase = "exit"
@@ -1639,9 +1651,14 @@ property real _flashTrackOpacity: 0
         NumberAnimation {
             target: root
             property: "_attachedContentOpacity"
-            to: 0
+            to: root._overlaySessionActive ? 0 : 1
             duration: Theme.anim.highlightDuration
             easing.type: Theme.anim.highlightType
+        }
+
+        onFinished: {
+            if (root._phase === "hint-exit" && !root._overlaySessionActive)
+                root._completeWindowHintExit()
         }
     }
 
@@ -1918,18 +1935,10 @@ property real _flashTrackOpacity: 0
         }
 
         onFinished: {
-            if (root._isFullHintEventType(root._flashSourceEvent.type)) {
-                root._flashSourceEvent = root._idleSnapshot()
-            }
-            root._phase = "idle"
-            root._flashSourceEvent = root._idleSnapshot()
-            root._mainDisplayEvent = root._baselineEvent
-            root._sharedBackgroundPulseOpacity = 0
-            root._attachedPanelRevealWidth = 0
-            root._attachedPanelRevealHeight = 0
-            root._attachedContentOpacity = 0
-            root._resetTracks()
-            root._syncOverlayExtensionReservation()
+            if (root._isFullHintEventType(root._flashSourceEvent.type))
+                return
+
+            root._completeWindowHintExit()
         }
     }
 
