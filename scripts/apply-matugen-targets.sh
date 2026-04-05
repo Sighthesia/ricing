@@ -61,23 +61,29 @@ prepend_line_if_missing() {
 write_gtk_css_entrypoint() {
     local file="$1"
     local variant="$2"
+    local tmp
 
     ensure_parent "$file"
 
+    tmp=$(mktemp "${file}.XXXXXX")
+
     case "$variant" in
         gtk3)
-            printf '%s\n' '@import url("colors.css");' > "$file"
+            printf '%s\n' '@import url("colors.css");' > "$tmp"
             ;;
         gtk4)
             printf '%s\n%s\n%s\n' \
                 '@import url("libadwaita.css");' \
                 '@import url("libadwaita-tweaks.css");' \
-                '@import url("colors.css");' > "$file"
+                '@import url("colors.css");' > "$tmp"
             ;;
         *)
+            rm -f "$tmp"
             return 1
             ;;
     esac
+
+    mv "$tmp" "$file"
 }
 
 upsert_ini_key() {
