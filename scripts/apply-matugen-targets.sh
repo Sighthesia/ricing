@@ -299,11 +299,12 @@ reload_yazi() {
 
 cleanup_old_theme_artifacts() {
     rm -f \
-        "$HOME/.config/qt5ct/colors/DymicShellMatugen.conf" \
-        "$HOME/.config/qt6ct/colors/DymicShellMatugen.conf" \
-        "$HOME/.config/ghostty/themes/DymicShellMatugen" \
-        "$HOME/.config/wezterm/colors/DymicShellMatugen.toml" \
-        "$HOME/.local/share/color-schemes/MatugenAlt.colors"
+        "$HOME/.config/qt5ct/colors/DymicShell.conf" \
+        "$HOME/.config/qt6ct/colors/DymicShell.conf" \
+        "$HOME/.config/ghostty/themes/DymicShell" \
+        "$HOME/.config/wezterm/colors/DymicShell.toml" \
+        "$HOME/.config/Kvantum/DymicShell/DymicShell.kvconfig" \
+        "$HOME/.local/share/color-schemes/DymicShell.colors"
 }
 
 reload_kde_colorscheme() {
@@ -324,13 +325,13 @@ reload_kde_colorscheme() {
 
 main() {
     local home="${HOME:?}"
-    local btop_theme_name="matugen"
-    local kde_primary_scheme="Matugen"
+    local btop_theme_name="DymicShell"
+    local kde_primary_scheme="DymicShell"
     local kde_primary_scheme_file="$home/.local/share/color-schemes/${kde_primary_scheme}.colors"
     local kde_state_file="$home/.cache/DymicShell/plasma-colorscheme-name"
     local kitty_colors_file="$home/.config/kitty/kitty-colors.conf"
     local kitty_remote_socket="unix:/tmp/kitty"
-    local kvantum_theme_name="matugen"
+    local kvantum_theme_name="DymicShell"
     local mode="${1:-}"
     local apply_scope="${2:-full}"
     local gtk_import='@import url("colors.css");'
@@ -338,12 +339,12 @@ main() {
     local gtk_theme_name
     local fuzzel_include='~/.config/fuzzel/colors.ini'
     local gsettings_color_scheme
-    local ghostty_theme='theme = "Matugen"'
+    local ghostty_theme='theme = "DymicShell"'
     local kitty_include='include kitty-colors.conf'
     local mako_include='include=~/.config/mako/mako-colors'
     local niri_include='include "./colors.kdl"'
-    local qt5_scheme="$home/.config/qt5ct/colors/Matugen.conf"
-    local qt6_scheme="$home/.config/qt6ct/colors/Matugen.conf"
+    local qt5_scheme="$home/.config/qt5ct/colors/DymicShell.conf"
+    local qt6_scheme="$home/.config/qt6ct/colors/DymicShell.conf"
     local rofi_import='@import "colors.rasi"'
     local terminal_sequences_file="$home/.cache/terminal-sequences"
 
@@ -401,7 +402,7 @@ main() {
 
     append_line_if_missing "$home/.config/ghostty/config" "$ghostty_theme"
 
-    remove_line_if_present "$home/.config/kitty/kitty.conf" 'include dymicshell-matugen.conf'
+    remove_line_if_present "$home/.config/kitty/kitty.conf" 'include matugen.conf'
     append_line_if_missing "$home/.config/kitty/kitty.conf" "$kitty_include"
 
     append_line_if_missing "$home/.config/mako/config" "$mako_include"
@@ -417,7 +418,7 @@ main() {
     # Niri's main config should not be created from scratch because a standalone
     # include file is not a valid full config for fresh installs.
     if [ -f "$home/.config/niri/config.kdl" ]; then
-        remove_line_if_present "$home/.config/niri/config.kdl" 'include "./dymicshell-matugen.kdl"'
+        remove_line_if_present "$home/.config/niri/config.kdl" 'include "./matugen.kdl"'
         append_line_if_missing "$home/.config/niri/config.kdl" "$niri_include"
     fi
 

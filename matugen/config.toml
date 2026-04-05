@@ -31,7 +31,7 @@ output_path = "~/.config/fuzzel/colors.ini"
 
 [templates.ghostty]
 input_path = "./templates/ghostty"
-output_path = "~/.config/ghostty/themes/Matugen"
+output_path = "~/.config/ghostty/themes/DymicShell"
 
 [templates.cosmic]
 input_path = "./templates/cosmic_theme.ron"
@@ -48,7 +48,7 @@ output_path = "~/.config/hypr/colors.conf"
 
 [templates.btop]
 input_path = "./templates/btop.theme"
-output_path = "~/.config/btop/themes/matugen.theme"
+output_path = "~/.config/btop/themes/DymicShell.theme"
 
 [templates.kitty]
 input_path = "./templates/kitty-colors.conf"
@@ -56,7 +56,7 @@ output_path = "~/.config/kitty/kitty-colors.conf"
 
 [templates.kvantum_kvconfig]
 input_path = "./templates/kvantum-colors.kvconfig"
-output_path = "~/.config/Kvantum/matugen/matugen.kvconfig"
+output_path = "~/.config/Kvantum/DymicShell/DymicShell.kvconfig"
 
 [templates.labwc]
 input_path = "./templates/labwc"
@@ -92,15 +92,15 @@ output_path = "~/.config/starship.toml"
 
 [templates.qt5ct]
 input_path = "./templates/qtct-colors.conf"
-output_path = "~/.config/qt5ct/colors/Matugen.conf"
+output_path = "~/.config/qt5ct/colors/DymicShell.conf"
 
 [templates.qt6ct]
 input_path = "./templates/qtct-colors.conf"
-output_path = "~/.config/qt6ct/colors/Matugen.conf"
+output_path = "~/.config/qt6ct/colors/DymicShell.conf"
 
 [templates.kde]
-input_path = "./templates/Matugen.colors"
-output_path = "~/.local/share/color-schemes/Matugen.colors"
+input_path = "./templates/DymicShell.colors"
+output_path = "~/.local/share/color-schemes/DymicShell.colors"
 
 [templates.niri]
 input_path = "./templates/niri-colors.kdl"
@@ -156,7 +156,7 @@ output_path = "~/.config/zathura/zathurarc"
 
 [templates.wezterm]
 input_path = "./templates/wezterm_theme.toml"
-output_path = "~/.config/wezterm/colors/Matugen.toml"
+output_path = "~/.config/wezterm/colors/DymicShell.toml"
 
 [templates.yazi]
 input_path = "./templates/yazi-theme.toml"
