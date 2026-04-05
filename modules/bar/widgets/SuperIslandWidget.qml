@@ -150,7 +150,8 @@ property real _flashTrackOpacity: 0
     readonly property real _returnTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
     readonly property real _overlayBodyHeight: Math.round(528 * Theme.uiScale)
-    readonly property real _overlayDetachedOffset: Theme.barHeight
+    readonly property real _overlayDetachedOffset:
+        Math.max(Theme.barHeight, root._pillH + root._overlayInwardCornerDepth)
     readonly property real _overlayDetachedY: root._overlayDetachedOffset
     readonly property real _overlayRevealLift:
         Math.max(8, Theme.barWidget.contentPaddingV * 4)
@@ -158,11 +159,14 @@ property real _flashTrackOpacity: 0
     readonly property real _overlayShellRadius: Theme.cornerRadius
     readonly property real _overlayPillBackgroundWidth: _pillBg.width
     readonly property real _overlayBridgeOutset:
-        root._overlayAttachmentOverlap
+        Math.max(
+            root._overlayAttachmentOverlap,
+            root._overlayInwardCornerDepth - root._overlayInwardCornerRadius
+        )
     readonly property real _overlayInwardCornerRadius:
-        Math.max(10, Math.min(root._overlayShellRadius, Math.round(18 * Theme.uiScale)))
+        root._overlayShellRadius
     readonly property real _overlayInwardCornerDepth:
-        Math.max(root._overlayInwardCornerRadius, Math.round(28 * Theme.uiScale))
+        root._overlayInwardCornerRadius
     readonly property real _attachedRevealSeedHeight: 0
     readonly property real _attachedRevealSeedWidth:
         Math.max(root._overlayPillBackgroundWidth, root._collapsedWidth)
