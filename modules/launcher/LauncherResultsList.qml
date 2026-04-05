@@ -133,13 +133,14 @@ Item {
             managedEnterKey: _item.name + "|" + _item.description + "|" + _item.icon
             managedEnterJitterEnabled: false
             viewportPadding: 28
-            scrollStep: 24
+            scrollStep: 60
+            viewportEnterBaseDelay: 80
             managedEnterStep: root._managedEnterStep
             managedEnterFadeEnabled: true
             managedEnterStartOpacity: 0.0
             managedEnterStartOffsetY: enterOffsetY
-            enterOffsetY: 42
-            exitOffsetY: 18
+            enterOffsetY: 28
+            exitOffsetY: 14
 
             width: resultList.width
             height: 46

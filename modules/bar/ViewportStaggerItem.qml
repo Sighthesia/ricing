@@ -14,6 +14,7 @@ StaggerItem {
     property bool managedEnterJitterEnabled: true
     property real managedEnterStartOpacity: managedEnterFadeEnabled ? 0.38 : 1.0
     property real managedEnterStartOffsetY: Math.round(enterOffsetY * 0.45)
+    property int viewportEnterBaseDelay: 0
     property int maxScrollSlots: 6
     property int scrollStep: SettingsService.data.animation.staggerExitStep
     property int managedEnterStep: SettingsService.data.animation.staggerLevel2Step
@@ -117,7 +118,7 @@ StaggerItem {
     }
 
     function runViewportEnter() {
-        delay = _compressedDelay(viewportOrder, maxScrollSlots, scrollStep)
+        delay = viewportEnterBaseDelay + _compressedDelay(viewportOrder, maxScrollSlots, scrollStep)
         _viewportShown = true
         runEnter()
     }

@@ -58,6 +58,8 @@ Any repeated list content with clear rows or cards must use one shared stagger l
 - The list owner must be able to take control of a batch enter animation so delegate-local viewport logic does not interrupt page-level or mode-switch choreography.
 - If repeated list content should read as per-row stagger, animate each visible row from its own visible-order slot; do not move the whole list as one batch and call that stagger.
 - If a fast model swap must keep visible exits while new content enters immediately, use a detached outgoing snapshot/layer for the retiring rows instead of relying on delegates that will be destroyed by `ListModel.clear()`.
+- If the first reveal looks correct but later swaps collapse into whole-list motion, reset the reused `ListView` state before the next stagger and verify the outgoing layer is still retiring independently.
+- When matching the pace of settings or launcher lists, reuse the same base delay and step cadence family rather than making one page feel noticeably faster than another.
 - Scrolling a list must animate both directions: items entering the viewport stagger in, and items leaving the viewport stagger out.
 - Scroll-driven stagger must stay bounded to the visible window. Do not create unbounded delays from total model size.
 - Increase list-item travel and cadence enough that the stagger reads clearly at normal shell speeds; avoid effects so subtle they disappear during scroll.

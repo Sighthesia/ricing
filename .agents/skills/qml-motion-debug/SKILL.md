@@ -187,6 +187,14 @@ Use when an overlay opens while a hold preview still has delayed emphasis pendin
 - keep steady-state hint replacement feedback enabled for real content changes
 - avoid broad guards that remove all pulse or spring feedback from the hint itself
 
+### Pattern G: Reuse a View List Without Whole-List Motion
+Use when a launcher, clipboard list, or similar `ListView` looks correct on first open but later swaps collapse into a single batch motion or a blank pause.
+
+- snapshot retiring rows into a detached outgoing layer before clearing the backing model
+- reset the reused view's scroll position and layout before starting the next stagger
+- let incoming rows stagger from their own visible-order slots instead of from a one-shot batch owner flag
+- if later swaps look more synchronized than the first swap, suspect stale `contentY` / `viewportOrder` rather than easing
+
 ## DymicShell-Specific Notes
 
 - Check `services/WindowHintService.qml` first for live hint snapshots.
@@ -199,6 +207,8 @@ Use when an overlay opens while a hold preview still has delayed emphasis pendin
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.
 - For `window-hint` collapse, verify that `_hintExitAnim` does not reset phase or clear attached content before `_attachedCollapseAnim` finishes.
 - For attached shell collapse, verify that bridge shoulders disappear before visible height falls into the seam-sized range.
+- For launcher and clipboard result swaps, if the first open staggers correctly but later swaps drift into whole-list motion, reset the reused `ListView` state before re-entering and verify the outgoing snapshot layer is still retiring independently.
+- When one repeated list feels faster than a sibling list with the same visual role, compare the shared base delay, step cadence, travel distance, and exit window before changing easing.
 
 ## Visual Language Reference
 

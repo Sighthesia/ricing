@@ -177,7 +177,6 @@ Item {
         }
 
         if (_results.count === 0) {
-            _swapTimer.stop()
             _pendingDisplayItems = []
             _pendingResultData = []
             _resultsList.prepareManagedEntry()
