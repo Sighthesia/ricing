@@ -51,6 +51,7 @@ Item {
             if (query !== "" && !nameMatch && !descMatch && !genericMatch) continue;
 
             results.push({
+                key:         "app:" + String(app.desktopFilePath || app.desktopId || app.id || app.execString || (app.name + "|" + (app.comment || app.genericName || ""))),
                 name:        app.name,
                 description: app.comment || app.genericName || "",
                 icon:        app.icon    || "application-x-executable",

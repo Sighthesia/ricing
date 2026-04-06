@@ -26,7 +26,20 @@ Item {
     property string filterQuery: ""
     readonly property bool _matchesFilter: filterQuery === "" ||
         label.toLowerCase().indexOf(filterQuery.toLowerCase()) !== -1
-    visible: _matchesFilter
+    readonly property int _filterOrder: {
+        if (!parent || !parent.children)
+            return 0
+
+        for (let index = 0; index < parent.children.length; index++) {
+            if (parent.children[index] === root)
+                return index
+        }
+
+        return 0
+    }
+    readonly property int _filterDelay: _filterOrder * SettingsService.data.animation.staggerExitStep
+    visible: height > 0.5 || opacity > 0.01
+    opacity: _matchesFilter ? 1 : 0
     height: _matchesFilter ? implicitHeight : 0
 
     property bool _open: false   // dropdown expanded state
@@ -40,6 +53,20 @@ Item {
 
     Behavior on implicitHeight {
         NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+    }
+
+    Behavior on height {
+        SequentialAnimation {
+            PauseAnimation { duration: root._filterDelay }
+            NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+        }
+    }
+
+    Behavior on opacity {
+        SequentialAnimation {
+            PauseAnimation { duration: root._filterDelay }
+            NumberAnimation { duration: Theme.anim.highlightDuration }
+        }
     }
 
     clip: true

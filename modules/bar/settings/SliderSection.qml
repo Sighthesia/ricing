@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 
 // A labeled slider row bound to an external real value via signal.
 //
@@ -33,15 +34,43 @@ Item {
 
     readonly property bool _matchesFilter: filterQuery === "" ||
         label.toLowerCase().indexOf(filterQuery.toLowerCase()) !== -1
+    readonly property int _filterOrder: {
+        if (!parent || !parent.children)
+            return 0
+
+        for (let index = 0; index < parent.children.length; index++) {
+            if (parent.children[index] === root)
+                return index
+        }
+
+        return 0
+    }
+    readonly property int _filterDelay: _filterOrder * SettingsService.data.animation.staggerExitStep
 
     // Show a subtle accent tint when this item matches an active search.
     readonly property bool searchHighlight: filterQuery !== "" && _matchesFilter
 
-    visible: _matchesFilter
+    visible: height > 0.5 || opacity > 0.01
+    opacity: _matchesFilter ? 1 : 0
     height: _matchesFilter ? implicitHeight : 0
 
     implicitWidth: 296
     implicitHeight: Theme.settingsRowHeight
+    clip: true
+
+    Behavior on height {
+        SequentialAnimation {
+            PauseAnimation { duration: root._filterDelay }
+            NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+        }
+    }
+
+    Behavior on opacity {
+        SequentialAnimation {
+            PauseAnimation { duration: root._filterDelay }
+            NumberAnimation { duration: Theme.anim.highlightDuration }
+        }
+    }
 
     // Search match highlight background
     Rectangle {

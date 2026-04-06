@@ -34,6 +34,7 @@ Item {
                 : preview;
 
             results.push({
+                key:         "clip:" + String(item.id),
                 name:        item.isImage ? "[图片]" : displayName,
                 description: item.isImage ? preview : "",
                 icon:        item.isImage ? "image-x-generic" : "edit-paste",

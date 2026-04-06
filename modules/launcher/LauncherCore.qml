@@ -20,8 +20,6 @@ Item {
     property int _selectedIndex: -1
     property var _providers: [appProvider, clipProvider]
     property var _resultData: []
-    property var _pendingDisplayItems: []
-    property var _pendingResultData: []
     property bool _suspendRefresh: false
     property bool panelActive: LauncherService.isOpen
 
@@ -102,8 +100,6 @@ Item {
 
     // Called by LauncherPanel when closing
     function closePanel(): void {
-        _pendingDisplayItems = []
-        _pendingResultData = []
         _suspendRefresh = true
         _searchHeader.text = ""
         _results.clear()
@@ -170,6 +166,7 @@ Item {
         let displayItems = []
         for (let i = 0; i < items.length; i++) {
             displayItems.push({
+                key:         root._resultKeyForItem(items[i], i),
                 name:        items[i].name        || "",
                 description: items[i].description || "",
                 icon:        items[i].icon        || ""
@@ -177,8 +174,6 @@ Item {
         }
 
         if (_results.count === 0) {
-            _pendingDisplayItems = []
-            _pendingResultData = []
             _resultsList.prepareManagedEntry()
             _results.clear()
             root._resultData = items
@@ -192,30 +187,70 @@ Item {
             return
         }
 
-        _pendingDisplayItems = displayItems
-        _pendingResultData = items
-        _runVisibleExit()
-        root._applyPendingResults()
+        if (_resultsList && _resultsList.beginFilterTransition)
+            _resultsList.beginFilterTransition()
+        if (_resultsList && _resultsList.resetFilterViewport)
+            _resultsList.resetFilterViewport()
+
+        root._syncResults(displayItems, items)
+
+        if (_resultsList && _resultsList.endFilterTransition)
+            _resultsList.endFilterTransition()
     }
 
-    function _runVisibleExit(): void {
-        _resultsList.runSwapExit()
+    function _resultKeyForItem(item, index): string {
+        if (item && item.key !== undefined && item.key !== null && item.key !== "")
+            return String(item.key)
+
+        return String((item && item.name) || "")
+            + "|" + String((item && item.description) || "")
+            + "|" + String((item && item.icon) || "")
+            + "|" + String(index)
     }
 
-    function _applyPendingResults(): void {
-        _resultsList.prepareManagedEntry()
-        _results.clear()
-        root._resultData = _pendingResultData
-        for (let i = 0; i < _pendingDisplayItems.length; i++) {
-            _results.append(_pendingDisplayItems[i])
+    function _indexOfDisplayItem(key, startIndex): int {
+        for (let index = Math.max(0, startIndex); index < _results.count; index++) {
+            let existing = _results.get(index)
+            if (existing && String(existing.key || "") === key)
+                return index
         }
-        _pendingDisplayItems = []
-        _pendingResultData = []
-        _selectedIndex = root._resultData.length > 0 ? 0 : -1
 
-        Qt.callLater(function() {
-            _resultsList.releaseManagedEntry()
-        })
+        return -1
+    }
+
+    function _syncResults(displayItems, items): void {
+        let nextKeys = ({})
+
+        for (let index = 0; index < displayItems.length; index++)
+            nextKeys[displayItems[index].key] = true
+
+        for (let removeIndex = _results.count - 1; removeIndex >= 0; removeIndex--) {
+            let existing = _results.get(removeIndex)
+            let existingKey = existing ? String(existing.key || "") : ""
+            if (!nextKeys[existingKey])
+                _results.remove(removeIndex, 1)
+        }
+
+        for (let targetIndex = 0; targetIndex < displayItems.length; targetIndex++) {
+            let displayItem = displayItems[targetIndex]
+            let currentIndex = root._indexOfDisplayItem(displayItem.key, targetIndex)
+
+            if (currentIndex === -1) {
+                _results.insert(targetIndex, displayItem)
+                continue
+            }
+
+            if (currentIndex !== targetIndex)
+                _results.move(currentIndex, targetIndex, 1)
+
+            _results.set(targetIndex, displayItem)
+        }
+
+        while (_results.count > displayItems.length)
+            _results.remove(_results.count - 1, 1)
+
+        root._resultData = items
+        _selectedIndex = root._resultData.length > 0 ? 0 : -1
     }
 
     function _activateCurrent(): void {

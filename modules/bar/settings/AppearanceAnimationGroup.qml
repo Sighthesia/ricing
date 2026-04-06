@@ -33,8 +33,7 @@ StaggerItem {
         title: "动画"
         expanded: false
         forceExpand: root.groupMatches(["速度系数", "入场时长", "出场时长"])
-        visible: root.searchQuery === "" || root.groupMatches(["速度系数", "入场时长", "出场时长"])
-        height: visible ? implicitHeight : 0
+        filterVisible: root.searchQuery === "" || root.groupMatches(["速度系数", "入场时长", "出场时长"])
 
         SliderSection {
             label: "速度系数"

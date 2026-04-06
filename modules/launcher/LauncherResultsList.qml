@@ -11,6 +11,7 @@ Item {
     property alias model: resultList.model
     property int selectedIndex: -1
     property bool scrollAnimationsEnabled: false
+    property bool _filterTransitionActive: false
     property var _outgoingItems: []
     readonly property int _maxViewportSlots: 6
     readonly property int _managedEnterStep: 30
@@ -71,6 +72,22 @@ Item {
         }
     }
 
+    function resetFilterViewport(): void {
+        resultList.contentY = 0
+        if (resultList.forceLayout)
+            resultList.forceLayout()
+    }
+
+    function beginFilterTransition(): void {
+        root._filterTransitionActive = true
+    }
+
+    function endFilterTransition(): void {
+        Qt.callLater(function() {
+            root._filterTransitionActive = false
+        })
+    }
+
     function visibleExitDuration(): int {
         return SettingsService.data.animation.staggerExitDuration
             + root._windowForCount(root._visibleDelegates().length)
@@ -120,17 +137,88 @@ Item {
         displayMarginBeginning: 92
         displayMarginEnd: 92
 
+        move: Transition {
+            id: _moveTransition
+
+            SequentialAnimation {
+                PauseAnimation {
+                    duration: root._compressedDelay(
+                        (_moveTransition.ViewTransition.targetIndexes
+                            && _moveTransition.ViewTransition.targetIndexes.length > 0)
+                            ? _moveTransition.ViewTransition.targetIndexes[0]
+                            : _moveTransition.ViewTransition.index,
+                        Math.max(resultList.count, 1)
+                    )
+                }
+                NumberAnimation {
+                    properties: "x,y"
+                    duration: Theme.anim.moveDuration
+                    easing.type: Theme.anim.moveType
+                }
+            }
+        }
+
+        displaced: Transition {
+            id: _displacedTransition
+
+            SequentialAnimation {
+                PauseAnimation {
+                    duration: root._compressedDelay(
+                        (_displacedTransition.ViewTransition.targetIndexes
+                            && _displacedTransition.ViewTransition.targetIndexes.length > 0)
+                            ? _displacedTransition.ViewTransition.targetIndexes[0]
+                            : _displacedTransition.ViewTransition.index,
+                        Math.max(resultList.count, 1)
+                    )
+                }
+                NumberAnimation {
+                    properties: "x,y"
+                    duration: Theme.anim.moveDuration
+                    easing.type: Theme.anim.moveType
+                }
+            }
+        }
+
+        remove: Transition {
+            id: _removeTransition
+
+            SequentialAnimation {
+                PauseAnimation {
+                    duration: root._compressedDelay(
+                        _removeTransition.ViewTransition.index,
+                        Math.max(_removeTransition.ViewTransition.index + 1, 1)
+                    )
+                }
+                ParallelAnimation {
+                    NumberAnimation {
+                        property: "opacity"
+                        to: 0
+                        duration: SettingsService.data.animation.staggerExitDuration
+                        easing.type: Easing.InCubic
+                    }
+                    NumberAnimation {
+                        property: "_ty"
+                        to: 18
+                        duration: SettingsService.data.animation.staggerExitDuration
+                        easing.type: Easing.InCubic
+                    }
+                }
+            }
+        }
+
         delegate: BarComponents.ViewportStaggerItem {
             id: _item
 
             required property int index
+            required property string key
             required property string name
             required property string description
             required property string icon
 
             listView: resultList
             scrollAnimationsEnabled: root.scrollAnimationsEnabled
-            managedEnterKey: _item.name + "|" + _item.description + "|" + _item.icon
+            suppressViewportTransitions: ownerManagedEntry || root._filterTransitionActive
+            managedEnterKey: _item.key
             managedEnterJitterEnabled: false
             viewportPadding: 28
             scrollStep: 60

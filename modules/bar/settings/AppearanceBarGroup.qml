@@ -39,8 +39,7 @@ StaggerItem {
         title: "Bar"
         expanded: true
         forceExpand: root.groupMatches(["全局缩放", "高度", "透明度", "内边距", "小部件间距", "圆角", "位置", "伪屏幕圆角"])
-        visible: root.searchQuery === "" || root.groupMatches(["全局缩放", "高度", "透明度", "内边距", "小部件间距", "圆角", "位置", "伪屏幕圆角"])
-        height: visible ? implicitHeight : 0
+        filterVisible: root.searchQuery === "" || root.groupMatches(["全局缩放", "高度", "透明度", "内边距", "小部件间距", "圆角", "位置", "伪屏幕圆角"])
 
         SliderSection {
             label: "全局缩放"
@@ -140,9 +139,39 @@ StaggerItem {
         }
 
         Item {
+            id: positionRow
             width: parent ? parent.width : 296
-            visible: root.searchQuery === "" || root.matches("位置")
-            height: visible ? Theme.settingsRowHeight : 0
+            readonly property bool filterVisible: root.searchQuery === "" || root.matches("位置")
+            readonly property int filterOrder: {
+                if (!parent || !parent.children)
+                    return 0
+
+                for (let index = 0; index < parent.children.length; index++) {
+                    if (parent.children[index] === positionRow)
+                        return index
+                }
+
+                return 0
+            }
+
+            visible: height > 0.5 || opacity > 0.01
+            opacity: filterVisible ? 1 : 0
+            height: filterVisible ? Theme.settingsRowHeight : 0
+            clip: true
+
+            Behavior on height {
+                SequentialAnimation {
+                    PauseAnimation { duration: positionRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+            }
+
+            Behavior on opacity {
+                SequentialAnimation {
+                    PauseAnimation { duration: positionRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.highlightDuration }
+                }
+            }
 
             Row {
                 anchors.fill: parent

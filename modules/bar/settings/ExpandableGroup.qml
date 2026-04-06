@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 import ".."
 
 // A collapsible section with an animated expand/collapse toggle.
@@ -19,15 +20,37 @@ Item {
     // Override: set to true from outside (e.g., search) to force the group open
     // without permanently overwriting the user's manual expand/collapse preference.
     property bool forceExpand: false
+    property bool filterVisible: true
 
     readonly property bool _open: expanded || forceExpand
+    readonly property int _filterOrder: {
+        if (!parent || !parent.children)
+            return 0
+
+        for (let index = 0; index < parent.children.length; index++) {
+            if (parent.children[index] === root)
+                return index
+        }
+
+        return 0
+    }
+    readonly property int _filterDelay: _filterOrder * SettingsService.data.animation.staggerExitStep
 
     // Total height: header + (content if open)
     implicitWidth: parent ? parent.width : 296
     implicitHeight: header.height + (_open ? contentCol.implicitHeight : 0)
+    height: filterVisible ? implicitHeight : 0
+    visible: height > 0.5 || filterVisible
 
     Behavior on implicitHeight {
         NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+    }
+
+    Behavior on height {
+        SequentialAnimation {
+            PauseAnimation { duration: root._filterDelay }
+            NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+        }
     }
 
     clip: true
@@ -112,6 +135,14 @@ Item {
         anchors.top: header.bottom
         width: parent.width
         spacing: 0
+
+        move: Transition {
+            NumberAnimation {
+                properties: "x,y"
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
 
         // Children of ExpandableGroup are reparented here via default property
     }

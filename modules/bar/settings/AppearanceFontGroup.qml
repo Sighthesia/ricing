@@ -33,8 +33,7 @@ StaggerItem {
         title: "字体"
         expanded: false
         forceExpand: root.groupMatches(["字体族", "等宽字体", "正文大小", "辅助大小", "图标大小"])
-        visible: root.searchQuery === "" || root.groupMatches(["字体族", "等宽字体", "正文大小", "辅助大小", "图标大小"])
-        height: visible ? implicitHeight : 0
+        filterVisible: root.searchQuery === "" || root.groupMatches(["字体族", "等宽字体", "正文大小", "辅助大小", "图标大小"])
 
         FontPickerSection {
             label: "字体族"

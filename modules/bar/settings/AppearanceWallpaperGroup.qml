@@ -39,15 +39,43 @@ StaggerItem {
         title: "壁纸 & 动态主题色"
         expanded: false
         forceExpand: root.groupMatches(["壁纸路径", "动态主题色", "配色算法", "深色模式"])
-        visible: root.searchQuery === "" || root.groupMatches(["壁纸路径", "动态主题色", "配色算法", "深色模式"])
-        height: visible ? implicitHeight : 0
+        filterVisible: root.searchQuery === "" || root.groupMatches(["壁纸路径", "动态主题色", "配色算法", "深色模式"])
 
         Item {
             id: wallpaperPathRow
             width: parent ? parent.width : 296
             implicitHeight: Theme.settingsRowHeight
-            visible: root.searchQuery === "" || root.matches("壁纸路径")
-            height: visible ? implicitHeight : 0
+            readonly property bool filterVisible: root.searchQuery === "" || root.matches("壁纸路径")
+            readonly property int filterOrder: {
+                if (!parent || !parent.children)
+                    return 0
+
+                for (let index = 0; index < parent.children.length; index++) {
+                    if (parent.children[index] === wallpaperPathRow)
+                        return index
+                }
+
+                return 0
+            }
+
+            visible: height > 0.5 || opacity > 0.01
+            opacity: filterVisible ? 1 : 0
+            height: filterVisible ? implicitHeight : 0
+            clip: true
+
+            Behavior on height {
+                SequentialAnimation {
+                    PauseAnimation { duration: wallpaperPathRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+            }
+
+            Behavior on opacity {
+                SequentialAnimation {
+                    PauseAnimation { duration: wallpaperPathRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.highlightDuration }
+                }
+            }
 
             Rectangle {
                 anchors.fill: parent
@@ -188,11 +216,40 @@ StaggerItem {
         }
 
         Item {
-            visible: SettingsService.data.appearance.matugenEnabled
-            height: visible ? Theme.settingsRowHeight : 0
+            id: schemeRowShell
+            readonly property bool filterVisible: SettingsService.data.appearance.matugenEnabled
+            readonly property int filterOrder: {
+                if (!parent || !parent.children)
+                    return 0
+
+                for (let index = 0; index < parent.children.length; index++) {
+                    if (parent.children[index] === schemeRowShell)
+                        return index
+                }
+
+                return 0
+            }
+
+            visible: height > 0.5 || opacity > 0.01
+            opacity: filterVisible ? 1 : 0
+            height: filterVisible ? Theme.settingsRowHeight : 0
             width: parent ? parent.width : 296
 
-            Behavior on height { NumberAnimation { duration: Theme.anim.highlightDuration } }
+            clip: true
+
+            Behavior on height {
+                SequentialAnimation {
+                    PauseAnimation { duration: schemeRowShell.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.highlightDuration }
+                }
+            }
+
+            Behavior on opacity {
+                SequentialAnimation {
+                    PauseAnimation { duration: schemeRowShell.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.highlightDuration }
+                }
+            }
 
             Row {
                 anchors.fill: parent

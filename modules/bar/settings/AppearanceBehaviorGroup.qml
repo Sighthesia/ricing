@@ -34,13 +34,42 @@ StaggerItem {
         title: "行为"
         expanded: false
         forceExpand: root.groupMatches(["自动隐藏"])
-        visible: root.searchQuery === "" || root.groupMatches(["自动隐藏"])
-        height: visible ? implicitHeight : 0
+        filterVisible: root.searchQuery === "" || root.groupMatches(["自动隐藏"])
 
         Item {
+            id: autoHideRow
             width: parent ? parent.width : 296
-            visible: root.searchQuery === "" || root.groupMatches(["自动隐藏"])
-            height: visible ? Theme.settingsRowHeight : 0
+            readonly property bool filterVisible: root.searchQuery === "" || root.groupMatches(["自动隐藏"])
+            readonly property int filterOrder: {
+                if (!parent || !parent.children)
+                    return 0
+
+                for (let index = 0; index < parent.children.length; index++) {
+                    if (parent.children[index] === autoHideRow)
+                        return index
+                }
+
+                return 0
+            }
+
+            visible: height > 0.5 || opacity > 0.01
+            opacity: filterVisible ? 1 : 0
+            height: filterVisible ? Theme.settingsRowHeight : 0
+            clip: true
+
+            Behavior on height {
+                SequentialAnimation {
+                    PauseAnimation { duration: autoHideRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+            }
+
+            Behavior on opacity {
+                SequentialAnimation {
+                    PauseAnimation { duration: autoHideRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.highlightDuration }
+                }
+            }
 
             Row {
                 anchors.fill: parent

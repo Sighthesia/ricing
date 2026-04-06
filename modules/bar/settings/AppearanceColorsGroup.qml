@@ -36,8 +36,7 @@ StaggerItem {
         forceExpand: root.groupMatches(["强调色", "背景色", "表面色", "文字色", "次要文字", "边框色"])
         opacity: SettingsService.data.appearance.matugenEnabled ? 0.4 : 1.0
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
-        visible: root.searchQuery === "" || root.groupMatches(["强调色", "背景色", "表面色", "文字色", "次要文字", "边框色"])
-        height: visible ? implicitHeight : 0
+        filterVisible: root.searchQuery === "" || root.groupMatches(["强调色", "背景色", "表面色", "文字色", "次要文字", "边框色"])
 
         ColorSection {
             label: "强调色"
