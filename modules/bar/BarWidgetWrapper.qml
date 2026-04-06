@@ -2,6 +2,7 @@ import QtQuick
 import qs.config
 import qs.services
 
+// Wraps a bar widget with shared sizing, drag, and arrival animation behavior.
 Item {
     id: wrapper
 

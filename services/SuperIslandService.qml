@@ -5,6 +5,7 @@ import QtQuick
 import qs.config
 import qs.services
 
+// Coordinates the shared SuperIsland event queue, mode, and transient state.
 Singleton {
     id: root
 

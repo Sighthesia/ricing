@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 
+// Renders workspace or focused-window event content inside the SuperIsland lane.
 Item {
     id: root
 

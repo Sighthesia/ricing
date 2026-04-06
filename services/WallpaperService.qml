@@ -5,6 +5,7 @@ import Quickshell.Io
 import QtQuick
 import qs.services
 
+// Owns wallpaper changes and the repo-local matugen export/apply pipeline.
 Singleton {
     id: root
 

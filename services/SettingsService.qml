@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
+// Persists user settings and exposes the shared settings adapter to QML.
 Singleton {
     id: root
 

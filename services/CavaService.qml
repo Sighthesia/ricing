@@ -5,6 +5,7 @@ import Quickshell.Io
 import QtQuick
 import qs.services
 
+// Runs the Cava visualizer process and exposes normalized bar data to media UI.
 Singleton {
     id: root
 

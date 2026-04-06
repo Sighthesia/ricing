@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 
+// Renders notification event content for compact SuperIsland presentations.
 Item {
     id: root
 

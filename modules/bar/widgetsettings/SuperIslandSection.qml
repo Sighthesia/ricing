@@ -2,6 +2,7 @@ import QtQuick
 import qs.services
 import "../settings"
 
+// Widget-settings section for enabling SuperIsland event categories.
 Item {
     id: root
 

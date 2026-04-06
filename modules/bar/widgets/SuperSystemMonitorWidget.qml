@@ -6,6 +6,7 @@ import qs.services
 import ".." as BarComponents
 import "systemmonitor" as MonitorParts
 
+// Expanding system monitor pill that surfaces pinned metrics and quick status controls.
 Item {
     id: root
 

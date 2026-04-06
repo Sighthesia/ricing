@@ -2,6 +2,7 @@ import QtQuick
 import qs.services
 import "../settings"
 
+// Widget-settings section for media control behavior and visualizer options.
 Item {
     id: root
 

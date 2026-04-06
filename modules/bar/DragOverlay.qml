@@ -2,6 +2,7 @@ import QtQuick
 import qs.config
 import qs.services
 
+// Draws layout-mode drag feedback, ghost slots, and arrival overlays above the bar.
 Item {
     id: dragOverlay
 

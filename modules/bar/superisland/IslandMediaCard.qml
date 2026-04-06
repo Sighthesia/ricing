@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
 import qs.config
 
+// Renders media event content for compact and expanded SuperIsland lanes.
 Item {
     id: root
 

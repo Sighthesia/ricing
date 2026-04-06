@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
+// Bridges Niri workspace and window state into shared QML models.
 Singleton {
     id: root
 

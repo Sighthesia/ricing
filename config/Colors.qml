@@ -5,6 +5,7 @@ import Quickshell.Io
 import QtQuick
 import qs.services
 
+// Resolves semantic shell colors from settings and generated matugen output.
 Singleton {
     id: root
 

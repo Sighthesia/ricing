@@ -5,6 +5,7 @@ import QtQuick
 import qs.config
 import qs.services
 
+// Adapts media state into the compact and expanded control surfaces used by the bar.
 Singleton {
     id: root
 

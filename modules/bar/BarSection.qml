@@ -2,6 +2,7 @@ import QtQuick
 import qs.config
 import qs.services
 
+// Renders one measured bar section and hosts its ordered widget delegates.
 Item {
     id: section
 

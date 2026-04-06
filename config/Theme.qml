@@ -4,6 +4,7 @@ import Quickshell
 import QtQuick
 import qs.services
 
+// Derives shared animation, sizing, and typography tokens from settings.
 Singleton {
     id: root
 

@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Services.Mpris
 import QtQuick
 
+// Normalizes active MPRIS player state into one widget-friendly media source.
 Singleton {
     id: root
 
