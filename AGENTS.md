@@ -1,27 +1,34 @@
 # DymicShell Agent Guide
 
-Wayland shell built with Quickshell. Keep the repo layered, token-driven, and safe for hot-reload.
+Wayland shell built with Quickshell. Prefer small, layered changes that stay safe under hot reload.
 
-## Repository Layout
-```text
-shell.qml                  # Entry point; instantiate top-level windows only
-config/                    # Semantic colors + structural theme tokens
-services/                  # Singleton state, persistence, compositor/process integration
-modules/                   # UI windows, panels, and reusable module-local components
-docs/plans/                # Design and implementation history
-.cache/DymicShell/         # Runtime artifacts and transient shell data; not checked in
-```
-Key entry points: `shell.qml`, `config/Theme.qml`, `config/Colors.qml`, `services/SettingsService.qml`, `services/BarLayoutService.qml`, `modules/bar/BarContent.qml`.
+## Commands
 
-## Build and Validation
+- Use `qs`, not `quickshell`, unless the user explicitly asks otherwise.
+- Full-shell validation: `timeout 5 qs --path .`
+- There is no verified repo-local `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmllint`, `qmlformat`, or CI command. Do not invent them.
 
-Use `qs` unless the user explicitly asks for `quickshell`.
+## Structure
 
-### Whole-Shell Validation
-```bash
-timeout 5 qs --path .
-```
-Prefer `qs --path .` for a full-shell load check.
+- `shell.qml` is the entry point; keep it to top-level window instantiation only.
+- `services/` owns persistence, external processes, compositor integration, and shared cross-window state.
+- `config/Theme.qml` and `config/Colors.qml` are derived tokens; UI should consume these instead of hardcoding sizes, timing, or colors.
+- `modules/` renders UI and forwards behavior back into services.
+- `modules/bar/BarContent.qml` is the bar composition root.
+- `services/BarLayoutService.qml` is a facade; most bar layout logic lives in `services/barlayout/*.js`.
+
+## State And Generated Outputs
+
+- User settings live in `~/.config/dymicshell/settings.json`; defaults live in `config/settings-default.json`.
+- When adding or renaming a setting, update both `config/settings-default.json` and `services/SettingsService.qml`.
+- Dynamic theming is owned by `services/WallpaperService.qml` and the repo-local `matugen/config.toml`, not the user's global `matugen` config.
+- Matugen writes shell colors to `~/.local/state/quickshell/user/generated/colors.json`; `config/Colors.qml` watches that file.
+- Keep repo runtime artifacts in `.cache/DymicShell/`; do not introduce new writes under `null/dymicshell/`.
+
+## Workflow Notes
+
+- Do not remove `docs/plans/` references when files or commands move.
+- Do not proactively use ad-hoc smoke or harness runners; the verified validation path is the full-shell `qs --path .` load check.
 
 ## Skills
 
@@ -61,11 +68,6 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
 | [reference-attribution](.agents/skills/reference-attribution/SKILL.md) | Use when adapting code, templates, config patterns, or architecture from another repository and attribution must be documented consistently. |
 
-## Miscellaneous
-- The repo does not define `npm`, `pnpm`, `yarn`, `make`, `just`, `pytest`, `qmllint`, `qmlformat`, or CI workflow commands. Do not invent those commands unless you verify local availability.
-- Do not proactively use harness, smoke, or other targeted test runners; keep validation to the whole-shell load check unless the user explicitly asks for a different approach.
-- Don't remove `docs/plans/` references even when files or commands move.
-- Keep runtime artifacts in `.cache/DymicShell/`; do not write new files under `null/dymicshell/`.
 <!-- TRELLIS:START -->
 # Trellis Instructions
 
