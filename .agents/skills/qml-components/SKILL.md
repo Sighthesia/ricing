@@ -1,6 +1,6 @@
 ---
 name: qml-components
-description: Token system, Semantic Colors, Theme values, Base components, and Interactive Surface Patterns for DymicShell. Use when building UI elements.
+description: Use when building UI elements with DymicShell tokens, semantic colors, theme values, base components, or interactive surface patterns.
 ---
 
 # UI Components & Tokens

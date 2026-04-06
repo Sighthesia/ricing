@@ -1,6 +1,6 @@
 ---
 name: qml-state
-description: Guidelines for managing Settings, Shared State, Component States, Error Handling, and Logging in DymicShell. Use when modifying services or component behavior.
+description: Use when modifying settings, shared state, persistence, error handling, logging, or service-driven component behavior in DymicShell.
 ---
 
 # State, Persistence & Error Handling

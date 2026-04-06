@@ -1,6 +1,6 @@
 ---
 name: qml-motion-debug
-description: Debug Quickshell or QML motion bugs when state updates happen but the visual transition looks static, too subtle, or wrong. Use for issues involving anchors, x/y offsets, Behavior conflicts, same-frame resets, or service-to-widget animation handoff.
+description: Use when debugging Quickshell or QML motion bugs where state updates occur but the visual transition looks static, too subtle, or wrong.
 ---
 
 # QML Motion Debug

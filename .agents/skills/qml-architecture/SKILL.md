@@ -1,6 +1,6 @@
 ---
 name: qml-architecture
-description: QML architecture rules, file structure, naming conventions, and imports. Use when creating or modifying QML files and learning about module layout.
+description: Use when working on QML architecture, file structure, naming conventions, imports, or module layout in DymicShell.
 ---
 
 # QML Architecture Rules
