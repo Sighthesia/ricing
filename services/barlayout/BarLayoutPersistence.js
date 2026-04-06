@@ -26,12 +26,24 @@ function applyLayoutJson(json, currentCount, resetLayoutFn, onApplyEntriesFn, on
     }
 }
 
-function saveLayoutJson(layoutModel, persistStore, fileWriter) {
-    var json = LayoutModelUtils.serializeLayoutModel(layoutModel)
+function serializeLayoutJson(layoutModel) {
+    return LayoutModelUtils.serializeLayoutModel(layoutModel)
+}
+
+function persistLayoutJson(persistStore, json) {
     persistStore.layoutJson = json
+}
+
+function writeLayoutJson(fileWriter, json) {
     fileWriter.running = false
     fileWriter.running = true
     fileWriter.write(json + "\n")
+}
+
+function saveLayoutJson(layoutModel, persistStore, fileWriter) {
+    var json = serializeLayoutJson(layoutModel)
+    persistLayoutJson(persistStore, json)
+    writeLayoutJson(fileWriter, json)
     return json
 }
 
