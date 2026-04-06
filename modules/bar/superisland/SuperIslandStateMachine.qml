@@ -30,6 +30,25 @@ Item {
         state: controller.state
         machine: controller
         timeline: timeline
+        eventRouter: eventRouter
+        overlayEventRouter: overlayEventRouter
+    }
+
+    IslandParts.SuperIslandEventRouter {
+        id: eventRouter
+
+        host: controller.host
+        state: controller.state
+        machine: controller
+    }
+
+    IslandParts.SuperIslandOverlayEventRouter {
+        id: overlayEventRouter
+
+        host: controller.host
+        state: controller.state
+        machine: controller
+        bridge: bridge
     }
 
     IslandParts.SuperIslandStateMachineTransientPolicy {

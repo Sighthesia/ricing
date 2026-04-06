@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import qs.config
 import qs.services
 import ".." as BarComponents
+import "./ExpandedNotificationsPageLogic.js" as PageLogic
 
 // Expanded notification center page for the SuperIsland overlay.
 Item {
@@ -25,69 +26,33 @@ Item {
     }
 
     function _visibleCardDelegates() {
-        let delegates = []
-
-        for (let index = 0; index < NotificationService.historyList.count; index++) {
-            let delegate = _list.itemAtIndex(index)
-            if (delegate)
-                delegates.push(delegate)
-        }
-
-        return delegates
+        return PageLogic.visibleCardDelegates(_list, NotificationService.historyList.count)
     }
 
     function _syncStaggerItems(includeShell) {
-        _pageStagger.clear()
-        if (includeShell !== false)
-            _pageStagger.registerItem(_listShell, 0, 1)
+        PageLogic.syncStaggerItems(_pageStagger, _listShell, includeShell)
     }
 
     function _runCardEnter() {
         let delegates = root._visibleCardDelegates()
-
-        for (let index = 0; index < delegates.length; index++) {
-            let delegate = delegates[index]
-            if (!delegate || typeof delegate.queueManagedEnter !== "function")
-                continue
-
-            delegate.queueManagedEnter(index, delegates.length)
-        }
-
-        if (_emptyState.visible) {
+        PageLogic.runCardEnter(delegates, _emptyState.visible, function() {
             _emptyState.delay = 0
             _emptyState.runEnter()
-        }
-    }
-
-    function _exitWindow(total) {
-        let cappedTotal = Math.max(0, Math.min(total, root._maxExitSlots))
-        return Math.max(0, cappedTotal - 1) * SettingsService.data.animation.staggerExitStep
-    }
-
-    function _compressedExitDelay(rank, total) {
-        if (total <= 1)
-            return 0
-
-        let window = root._exitWindow(total)
-        return Math.round(window * (rank / Math.max(1, total - 1)))
+        })
     }
 
     function _runCardExit() {
         let delegates = root._visibleCardDelegates()
-
-        for (let index = 0; index < delegates.length; index++) {
-            let delegate = delegates[index]
-            if (!delegate || typeof delegate.runExit !== "function")
-                continue
-
-            delegate.exitDelay = root._compressedExitDelay(index, delegates.length)
-            delegate.runExit()
-        }
-
-        if (_emptyState.visible) {
-            _emptyState.exitDelay = 0
-            _emptyState.runExit()
-        }
+        PageLogic.runCardExit(
+            delegates,
+            _emptyState.visible,
+            root._maxExitSlots,
+            SettingsService.data.animation.staggerExitStep,
+            function() {
+                _emptyState.exitDelay = 0
+                _emptyState.runExit()
+            }
+        )
     }
 
     function pageActivated() {
@@ -118,18 +83,11 @@ Item {
             return SettingsService.data.animation.staggerExitDuration
 
         return SettingsService.data.animation.staggerExitDuration
-            + root._exitWindow(count)
+            + PageLogic.exitWindow(count, root._maxExitSlots, SettingsService.data.animation.staggerExitStep)
     }
 
     function _relativeTime(timestamp) {
-        let diff = Date.now() - Number(timestamp || 0)
-        if (diff < 60000)
-            return "刚刚"
-        if (diff < 3600000)
-            return Math.floor(diff / 60000) + " 分钟前"
-        if (diff < 86400000)
-            return Math.floor(diff / 3600000) + " 小时前"
-        return Math.floor(diff / 86400000) + " 天前"
+        return PageLogic.relativeTime(timestamp, Date.now())
     }
 
     function _tryOpenNotification(notificationId) {

@@ -4,6 +4,15 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import qs.services
+import "barlayout/BarLayoutGeometry.js" as GeometryUtils
+import "barlayout/BarLayoutLayoutModel.js" as LayoutModelUtils
+import "barlayout/BarLayoutMeasurement.js" as MeasurementUtils
+import "barlayout/BarLayoutOverlaySync.js" as OverlaySyncUtils
+import "barlayout/BarLayoutGeometryPipeline.js" as GeometryPipelineUtils
+import "barlayout/BarLayoutSession.js" as SessionUtils
+import "barlayout/BarLayoutPersistence.js" as PersistenceUtils
+import "barlayout/BarLayoutArrivalSession.js" as ArrivalSessionUtils
+import "barlayout/BarLayoutDragSession.js" as DragSessionUtils
 
 // Shared bar layout service for geometry contracts, picker state, and persisted layout.
 Singleton {
@@ -165,22 +174,23 @@ Singleton {
 
     // Widget settings and panel state.
     function openWidgetSettings(instanceKey, widgetCenterX) {
-        let shouldAutoEnterLayout = !settingsMode
+        let nextState = SessionUtils.openWidgetSettingsState(settingsMode, instanceKey, widgetCenterX)
 
-        if (shouldAutoEnterLayout) {
+        if (nextState.shouldAutoEnterLayout) {
             activePanel = "layout"
         }
 
-        widgetSettingsAutoEnteredLayout = shouldAutoEnterLayout
-        activeWidgetInstanceKey = instanceKey
-        widgetSettingsX = widgetCenterX
-        widgetSettingsPanelOpen = true
+        activeWidgetInstanceKey = nextState.activeWidgetInstanceKey
+        widgetSettingsX = nextState.widgetSettingsX
+        widgetSettingsPanelOpen = nextState.widgetSettingsPanelOpen
+        widgetSettingsAutoEnteredLayout = nextState.widgetSettingsAutoEnteredLayout
     }
 
     function _clearWidgetSettingsSession() {
-        widgetSettingsPanelOpen = false
-        activeWidgetInstanceKey = ""
-        widgetSettingsAutoEnteredLayout = false
+        let nextState = SessionUtils.clearWidgetSettingsSessionState()
+        widgetSettingsPanelOpen = nextState.widgetSettingsPanelOpen
+        activeWidgetInstanceKey = nextState.activeWidgetInstanceKey
+        widgetSettingsAutoEnteredLayout = nextState.widgetSettingsAutoEnteredLayout
     }
 
     // Shared bar metrics and transient vertical extension.
@@ -244,111 +254,54 @@ Singleton {
     }
 
     function setWidgetMeasuredWidth(instanceKey, width, options) {
-        if (!instanceKey) {
+        let result = MeasurementUtils.setWidgetMeasuredWidth(
+            _widgetMeasuredWidths,
+            _widgetMeasurementMetadata,
+            instanceKey,
+            width,
+            options
+        )
+
+        if (!result.accepted)
             return false
-        }
 
-        let nextWidth = Math.max(0, Number(width) || 0)
-        let updateOptions = options || {}
-        let source = updateOptions.source || "external"
-        let reporterId = updateOptions.reporterId || ""
-        let preserveExternalSnapshot = source === "runtime" && updateOptions.preserveExternalSnapshot === true
+        if (result.requestClear)
+            return clearWidgetMeasuredWidth(instanceKey, result.clearOptions)
 
-        if (nextWidth <= 0) {
-            return clearWidgetMeasuredWidth(instanceKey, {
-                reporterId: reporterId
-            })
-        }
-
-        let currentWidth = measuredWidthForInstance(instanceKey)
-        let currentMetadata = _widgetMeasurementMetadata[instanceKey] || null
-        let currentSource = currentMetadata && currentMetadata.source
-            ? currentMetadata.source
-            : "external"
-        let currentReporterId = currentMetadata && currentMetadata.reporterId
-            ? currentMetadata.reporterId
-            : ""
-
-        if (preserveExternalSnapshot && currentWidth > 0 && currentSource !== "runtime") {
-            return false
-        }
-
-        let nextMeasuredWidths = Object.assign({}, _widgetMeasuredWidths)
-        let nextMeasurementMetadata = Object.assign({}, _widgetMeasurementMetadata)
-        let widthChanged = nextMeasuredWidths[instanceKey] !== nextWidth
-        let metadataChanged = currentSource !== source || currentReporterId !== reporterId
-
-        if (!widthChanged && !metadataChanged) {
+        if (!result.changed)
             return true
-        }
 
-        nextMeasuredWidths[instanceKey] = nextWidth
-        nextMeasurementMetadata[instanceKey] = {
-            source: source,
-            reporterId: reporterId
-        }
+        _widgetMeasuredWidths = result.widgetMeasuredWidths
+        _widgetMeasurementMetadata = result.widgetMeasurementMetadata
 
-        _widgetMeasuredWidths = nextMeasuredWidths
-        _widgetMeasurementMetadata = nextMeasurementMetadata
-
-        if (widthChanged) {
+        if (result.widthChanged)
             _recomputeGeometryContracts()
-        }
 
         return true
     }
 
     function clearWidgetMeasuredWidth(instanceKey, options) {
-        let clearOptions = options || {}
-        let reporterId = clearOptions.reporterId || ""
-        let hasMeasuredWidth = _widgetMeasuredWidths[instanceKey] !== undefined
-        let hasMeasurementMetadata = _widgetMeasurementMetadata[instanceKey] !== undefined
+        let result = MeasurementUtils.clearWidgetMeasuredWidth(
+            _widgetMeasuredWidths,
+            _widgetMeasurementMetadata,
+            instanceKey,
+            options
+        )
 
-        if (!instanceKey || (!hasMeasuredWidth && !hasMeasurementMetadata)) {
+        if (!result.accepted)
             return false
-        }
 
-        let currentMetadata = _widgetMeasurementMetadata[instanceKey] || null
-        let currentSource = currentMetadata && currentMetadata.source
-            ? currentMetadata.source
-            : "external"
-        let currentReporterId = currentMetadata && currentMetadata.reporterId
-            ? currentMetadata.reporterId
-            : ""
+        _widgetMeasuredWidths = result.widgetMeasuredWidths
+        _widgetMeasurementMetadata = result.widgetMeasurementMetadata
 
-        if (reporterId) {
-            if (currentSource !== "runtime") {
-                return false
-            }
-
-            if (currentReporterId && currentReporterId !== reporterId) {
-                return false
-            }
-        }
-
-        let nextMeasuredWidths = Object.assign({}, _widgetMeasuredWidths)
-        let nextMeasurementMetadata = Object.assign({}, _widgetMeasurementMetadata)
-
-        delete nextMeasuredWidths[instanceKey]
-        delete nextMeasurementMetadata[instanceKey]
-
-        _widgetMeasuredWidths = nextMeasuredWidths
-        _widgetMeasurementMetadata = nextMeasurementMetadata
-
-        if (hasMeasuredWidth) {
+        if (result.hadMeasuredWidth)
             _recomputeGeometryContracts()
-        }
 
         return true
     }
 
     function measuredWidthForInstance(instanceKey) {
-        if (!instanceKey) {
-            return 0
-        }
-
-        let measuredWidth = _widgetMeasuredWidths[instanceKey]
-        return typeof measuredWidth === "number" ? measuredWidth : 0
+        return MeasurementUtils.measuredWidthForInstance(_widgetMeasuredWidths, instanceKey)
     }
 
     // Geometry contract accessors expose stable fallbacks for all bar sections.
@@ -357,7 +310,7 @@ Singleton {
             return _sectionGeometries[sectionName]
         }
 
-        return _emptySectionGeometry(sectionName)
+        return GeometryUtils.emptySectionGeometry(sectionName)
     }
 
     function sectionSlots(sectionName) {
@@ -375,7 +328,7 @@ Singleton {
             return _pickerAnchors[sectionName]
         }
 
-        return _emptyPickerAnchor(sectionName)
+        return GeometryUtils.emptyPickerAnchor(sectionName)
     }
 
     function arrivalGeometry(instanceKey) {
@@ -408,27 +361,24 @@ Singleton {
 
     // Arrival reveal helpers keep overlay-to-delegate handoff serialized per section.
     function _resetArrivalState() {
-        _arrivalGeometries = ({})
-        _arrivalRevealLocks = ({})
+        _applyArrivalState(ArrivalSessionUtils.resetState())
+    }
+
+    function _applyArrivalState(nextState) {
+        _arrivalGeometries = nextState.arrivalGeometries
+        _arrivalRevealLocks = nextState.arrivalRevealLocks
     }
 
     function clearArrivalGeometry(instanceKey) {
-        if (!instanceKey || _arrivalGeometries[instanceKey] === undefined) {
+        let result = ArrivalSessionUtils.clear({
+            arrivalGeometries: _arrivalGeometries,
+            arrivalRevealLocks: _arrivalRevealLocks
+        }, instanceKey)
+
+        if (!result.changed)
             return false
-        }
 
-        let nextArrivalGeometries = Object.assign({}, _arrivalGeometries)
-        let nextArrivalRevealLocks = Object.assign({}, _arrivalRevealLocks)
-        delete nextArrivalGeometries[instanceKey]
-
-        for (let sectionName in nextArrivalRevealLocks) {
-            if (nextArrivalRevealLocks[sectionName] === instanceKey) {
-                delete nextArrivalRevealLocks[sectionName]
-            }
-        }
-
-        _arrivalGeometries = nextArrivalGeometries
-        _arrivalRevealLocks = nextArrivalRevealLocks
+        _applyArrivalState(result.state)
         return true
     }
 
@@ -437,78 +387,29 @@ Singleton {
     }
 
     function requestArrivalReveal(instanceKey) {
-        let snapshot = arrivalGeometry(instanceKey)
-        if (!snapshot || snapshot.active !== true) {
+        let result = ArrivalSessionUtils.requestReveal({
+            arrivalGeometries: _arrivalGeometries,
+            arrivalRevealLocks: _arrivalRevealLocks
+        }, instanceKey, sectionSlots)
+
+        if (!result.changed)
             return false
-        }
 
-        let nextArrivalGeometries = Object.assign({}, _arrivalGeometries)
-        nextArrivalGeometries[instanceKey] = Object.assign({}, snapshot, {
-            readyForDelegate: true
-        })
-        _arrivalGeometries = nextArrivalGeometries
-
-        return _tryReleaseArrivalForSection(snapshot.section)
+        _applyArrivalState(result.state)
+        return true
     }
 
     function finishArrivalReveal(instanceKey) {
-        if (!instanceKey) {
+        let result = ArrivalSessionUtils.finishReveal({
+            arrivalGeometries: _arrivalGeometries,
+            arrivalRevealLocks: _arrivalRevealLocks
+        }, instanceKey, sectionSlots)
+
+        if (!result.changed)
             return false
-        }
 
-        let releaseSection = ""
-        for (let sectionName in _arrivalRevealLocks) {
-            if (_arrivalRevealLocks[sectionName] === instanceKey) {
-                releaseSection = sectionName
-                break
-            }
-        }
-
-        if (!releaseSection) {
-            return false
-        }
-
-        let nextArrivalRevealLocks = Object.assign({}, _arrivalRevealLocks)
-        delete nextArrivalRevealLocks[releaseSection]
-        _arrivalRevealLocks = nextArrivalRevealLocks
-
-        completeArrivalGeometry(instanceKey)
-
-        return _tryReleaseArrivalForSection(releaseSection)
-    }
-
-    function _tryReleaseArrivalForSection(sectionName) {
-        if (!sectionName || _arrivalRevealLocks[sectionName]) {
-            return false
-        }
-
-        let slots = sectionSlots(sectionName)
-        for (let i = 0; i < slots.length; i++) {
-            let snapshot = _arrivalGeometries[slots[i].instanceKey]
-            if (!snapshot || snapshot.active !== true) {
-                continue
-            }
-
-            if (snapshot.readyForDelegate !== true) {
-                return false
-            }
-
-            let releasedInstanceKey = snapshot.instanceKey
-            let nextArrivalGeometries = Object.assign({}, _arrivalGeometries)
-            let nextArrivalRevealLocks = Object.assign({}, _arrivalRevealLocks)
-
-            nextArrivalGeometries[releasedInstanceKey] = Object.assign({}, snapshot, {
-                phase: "delegate",
-                delegateReleased: true
-            })
-            nextArrivalRevealLocks[sectionName] = releasedInstanceKey
-
-            _arrivalGeometries = nextArrivalGeometries
-            _arrivalRevealLocks = nextArrivalRevealLocks
-            return true
-        }
-
-        return false
+        _applyArrivalState(result.state)
+        return true
     }
 
     function openWidgetPickerForSection(sectionName) {
@@ -521,184 +422,115 @@ Singleton {
     }
 
     function toggleWidgetPickerForSection(sectionName) {
-        if (!sectionName) {
+        let nextState = SessionUtils.toggleWidgetPickerState(widgetPickerOpen, widgetPickerTargetSection, sectionName)
+        if (!nextState.changed)
             return
-        }
 
-        if (widgetPickerOpen && widgetPickerTargetSection === sectionName) {
-            widgetPickerOpen = false
-            return
-        }
-
-        openWidgetPickerForSection(sectionName)
+        widgetPickerOpen = nextState.widgetPickerOpen
+        widgetPickerTargetSection = nextState.widgetPickerTargetSection
     }
 
     // Drag helpers work in bar coordinates so wrappers and overlays share one contract.
     function insertionIndexForSectionX(sectionName, localX, excludeInstanceKey) {
-        let pointerX = _pointerBarXForSection(sectionName, localX)
-        let slots = _insertionSlots(sectionName, excludeInstanceKey)
-
-        for (let i = 0; i < slots.length; i++) {
-            if (pointerX < slots[i].centerX) {
-                return i
-            }
-        }
-
-        return slots.length
+        return DragSessionUtils.insertionIndexForSectionX(
+            sectionName,
+            localX,
+            excludeInstanceKey,
+            sectionGeometry,
+            _insertionSlots
+        )
     }
 
     function insertionIndicatorGeometry(sectionName, insertionIndex, excludeInstanceKey) {
-        let geometry = sectionGeometry(sectionName)
-        let slots = _insertionSlots(sectionName, excludeInstanceKey)
-        let index = Math.max(0, Number(insertionIndex) || 0)
-        let boundaryX = _insertionBoundaryBarX(geometry, slots, index)
-
-        return {
-            section: sectionName,
-            index: index,
-            sectionLocalX: boundaryX - geometry.left,
-            barX: boundaryX,
-            visible: index >= 0
-        }
+        return DragSessionUtils.insertionIndicatorGeometry(
+            sectionName,
+            insertionIndex,
+            excludeInstanceKey,
+            sectionGeometry,
+            _insertionSlots
+        )
     }
 
     function dragTargetAtX(visualCenterX, excludeInstanceKey) {
-        let pointerX = Math.max(0, Number(visualCenterX) || 0)
-        let sectionName = sectionForBarX(pointerX)
-        let geometry = sectionGeometry(sectionName)
-        let localX = pointerX - geometry.left
-
-        return {
-            section: sectionName,
-            index: insertionIndexForSectionX(sectionName, localX, excludeInstanceKey)
-        }
+        return DragSessionUtils.dragTargetAtX(
+            visualCenterX,
+            excludeInstanceKey,
+            sectionGeometry,
+            _insertionSlots
+        )
     }
 
     function sectionForBarX(barX) {
-        return _sectionForBarX(barX)
+        return DragSessionUtils.sectionForBarX(barX, sectionGeometry)
+    }
+
+    function _dragState() {
+        return {
+            isDragging: isDragging,
+            dragHoverZone: dragHoverZone,
+            draggedWidgetId: draggedWidgetId,
+            draggedInstanceKey: draggedInstanceKey,
+            dragVisualX: dragVisualX,
+            dragVisualCenterX: dragVisualCenterX,
+            draggedWidth: draggedWidth,
+            ghostSection: ghostSection,
+            ghostIndex: ghostIndex
+        }
+    }
+
+    function _applyDragState(nextState) {
+        isDragging = nextState.isDragging
+        dragHoverZone = nextState.dragHoverZone
+        draggedWidgetId = nextState.draggedWidgetId
+        draggedInstanceKey = nextState.draggedInstanceKey
+        dragVisualX = nextState.dragVisualX
+        dragVisualCenterX = nextState.dragVisualCenterX
+        draggedWidth = nextState.draggedWidth
+        ghostSection = nextState.ghostSection
+        ghostIndex = nextState.ghostIndex
     }
 
     function beginDrag(instanceKey, widgetId, visualCenterX) {
-        if (!instanceKey || !widgetId) {
+        let beginResult = DragSessionUtils.beginDrag(
+            _dragState(),
+            instanceKey,
+            widgetId,
+            visualCenterX,
+            _effectiveMeasuredWidth
+        )
+
+        if (!beginResult.changed)
             return dragSnapshot
-        }
 
-        let frozenWidth = _effectiveMeasuredWidth(instanceKey)
-
-        draggedInstanceKey = instanceKey
-        draggedWidgetId = widgetId
-        draggedWidth = frozenWidth
-        isDragging = true
+        _applyDragState(beginResult.state)
 
         return updateDrag(visualCenterX)
     }
 
     function updateDrag(visualCenterX) {
-        if (!isDragging || !draggedInstanceKey) {
+        let updateResult = DragSessionUtils.updateDrag(_dragState(), visualCenterX, dragTargetAtX)
+        if (!updateResult.changed)
             return dragSnapshot
-        }
 
-        let nextCenterX = Math.max(0, Number(visualCenterX) || 0)
-        let dragTarget = dragTargetAtX(nextCenterX, draggedInstanceKey)
-
-        dragVisualCenterX = nextCenterX
-        dragVisualX = nextCenterX - draggedWidth / 2
-        dragHoverZone = dragTarget.section
-        ghostSection = dragTarget.section
-        ghostIndex = dragTarget.index
+        _applyDragState(updateResult.state)
 
         return dragSnapshot
     }
 
     function endDrag(alignment) {
-        let targetAlignment = alignment || "left"
-        let finalTarget = {
-            active: isDragging,
-            section: ghostSection,
-            index: ghostIndex,
-            instanceKey: draggedInstanceKey,
-            widgetId: draggedWidgetId,
-            draggedWidth: draggedWidth,
-            samePlacement: false,
-            moved: false
-        }
+        let result = DragSessionUtils.finalizeDrag(
+            _dragState(),
+            alignment,
+            isSamePlacement,
+            moveWidget
+        )
 
-        if (finalTarget.active && finalTarget.instanceKey) {
-            finalTarget.samePlacement = finalTarget.section !== ""
-                && isSamePlacement(
-                    finalTarget.instanceKey,
-                    finalTarget.section,
-                    finalTarget.index,
-                    targetAlignment
-                )
-
-            if (finalTarget.section !== "" && !finalTarget.samePlacement) {
-                moveWidget(
-                    finalTarget.instanceKey,
-                    finalTarget.section,
-                    targetAlignment,
-                    finalTarget.index
-                )
-                finalTarget.moved = true
-            }
-        }
-
-        _clearDragState()
-
-        return finalTarget
+        _applyDragState(result.state)
+        return result.finalTarget
     }
 
     function _clearDragState() {
-        isDragging = false
-        dragHoverZone = ""
-        draggedWidgetId = ""
-        draggedInstanceKey = ""
-        dragVisualX = 0
-        dragVisualCenterX = 0
-        draggedWidth = 0
-        ghostSection = ""
-        ghostIndex = -1
-    }
-
-    function _emptySectionGeometry(sectionName) {
-        return {
-            section: sectionName,
-            left: 0,
-            right: 0,
-            width: 0,
-            centerX: 0,
-            slotCount: 0,
-            contentWidth: 0
-        }
-    }
-
-    function _emptyPickerAnchor(sectionName) {
-        return {
-            section: sectionName,
-            centerX: 0,
-            leftMargin: 0,
-            active: false
-        }
-    }
-
-    function _sectionForBarX(barX) {
-        let leftGeometry = sectionGeometry("left")
-        let centerGeometry = sectionGeometry("center")
-        let rightGeometry = sectionGeometry("right")
-
-        if (barX < centerGeometry.left) {
-            return "left"
-        }
-
-        if (barX <= centerGeometry.right) {
-            return "center"
-        }
-
-        if (barX <= rightGeometry.right || rightGeometry.width <= 0) {
-            return "right"
-        }
-
-        return barX < leftGeometry.left ? "left" : "right"
+        _applyDragState(DragSessionUtils.defaultState())
     }
 
     function _effectiveMeasuredWidth(instanceKey) {
@@ -711,618 +543,97 @@ Singleton {
         return _fallbackMeasuredWidth
     }
 
-    function _pointerBarXForSection(sectionName, localX) {
-        let geometry = sectionGeometry(sectionName)
-        return geometry.left + Math.max(0, Number(localX) || 0)
-    }
-
-    function _insertionBoundaryBarX(geometry, slots, insertionIndex) {
-        if (slots.length <= 0) {
-            return geometry.visualLeft
-        }
-
-        if (insertionIndex <= 0) {
-            return slots[0].left
-        }
-
-        if (insertionIndex >= slots.length) {
-            return slots[slots.length - 1].right
-        }
-
-        return slots[insertionIndex].left
-    }
-
-    function _slotGeometryRecord(sectionName, widget, slotIndex, left, width) {
-        return {
-            id: widget.id,
-            instanceKey: widget.instanceKey,
-            section: sectionName,
-            order: widget.order,
-            alignment: widget.alignment,
-            slotIndex: slotIndex,
-            measuredWidth: widget.measuredWidth,
-            left: left,
-            width: width,
-            right: left + width,
-            centerX: left + width / 2
-        }
-    }
-
-    function _widgetGeometryFromSlot(sectionName, slot) {
-        return {
-            widgetId: slot.id,
-            instanceKey: slot.instanceKey,
-            section: sectionName,
-            left: slot.left,
-            right: slot.right,
-            width: slot.width,
-            centerX: slot.centerX,
-            slotIndex: slot.slotIndex,
-            order: slot.order
-        }
-    }
-
-    function _slotForInstanceKey(slots, instanceKey) {
-        if (!Array.isArray(slots) || !instanceKey) {
-            return null
-        }
-
-        for (let i = 0; i < slots.length; i++) {
-            if (slots[i].instanceKey === instanceKey) {
-                return slots[i]
-            }
-        }
-
-        return null
-    }
-
-    function _arrivalGeometryForSlot(instanceKey, widgetId, sectionName, slot, phase, readyForDelegate) {
-        if (!slot) {
-            return null
-        }
-
-        return {
-            active: true,
-            instanceKey: instanceKey,
-            widgetId: widgetId,
-            section: sectionName,
-            barLeft: slot.left,
-            barWidth: slot.width,
-            barRight: slot.right,
-            barCenterX: slot.centerX,
-            phase: phase,
-            readyForDelegate: readyForDelegate === true
-        }
-    }
-
-    function _syncArrivalGeometriesWithSlots(arrivalGeometries, slotGeometries) {
-        let nextArrivalGeometries = Object.assign({}, arrivalGeometries)
-
-        for (let instanceKey in nextArrivalGeometries) {
-            let snapshot = nextArrivalGeometries[instanceKey]
-            if (!snapshot || snapshot.active !== true || !snapshot.section) {
-                continue
-            }
-
-            let slot = _slotForInstanceKey(slotGeometries[snapshot.section], instanceKey)
-            if (!slot) {
-                continue
-            }
-
-            nextArrivalGeometries[instanceKey] = Object.assign({}, snapshot, {
-                barLeft: slot.left,
-                barWidth: slot.width,
-                barRight: slot.right,
-                barCenterX: slot.centerX
-            })
-        }
-
-        return nextArrivalGeometries
-    }
-
     function _insertionSlots(sectionName, excludeInstanceKey) {
-        let slots = sectionSlots(sectionName)
-        let geometry = sectionGeometry(sectionName)
-
-        if (!excludeInstanceKey) {
-            return slots
-        }
-
-        let filteredSlots = []
-        let currentLeft = geometry.visualLeft
-
-        for (let i = 0; i < slots.length; i++) {
-            if (slots[i].instanceKey === excludeInstanceKey) {
-                continue
-            }
-
-            let slot = slots[i]
-            filteredSlots.push(_slotGeometryRecord(slot.section, {
-                id: slot.id,
-                instanceKey: slot.instanceKey,
-                order: slot.order,
-                alignment: slot.alignment,
-                measuredWidth: slot.measuredWidth
-            }, filteredSlots.length, currentLeft, slot.width))
-            currentLeft += slot.width
-        }
-
-        return filteredSlots
-    }
-
-    function _parseInstanceSerial(widgetId, instanceKey) {
-        if (!widgetId || !instanceKey) {
-            return -1
-        }
-
-        let prefix = widgetId + "_"
-        if (!instanceKey.startsWith(prefix)) {
-            return -1
-        }
-
-        let serial = Number(instanceKey.slice(prefix.length))
-        if (!Number.isInteger(serial) || serial < 0) {
-            return -1
-        }
-
-        return serial
+        return GeometryPipelineUtils.insertionSlots(
+            sectionGeometry(sectionName),
+            sectionSlots(sectionName),
+            excludeInstanceKey
+        )
     }
 
     function _createInstanceKey(widgetId) {
-        let nextSerials = Object.assign({}, _nextInstanceSerialByWidget)
-        let serial = nextSerials[widgetId] || 0
-
-        nextSerials[widgetId] = serial + 1
-        _nextInstanceSerialByWidget = nextSerials
-
-        return widgetId + "_" + serial
+        let result = LayoutModelUtils.createInstanceKey(_nextInstanceSerialByWidget, widgetId)
+        _nextInstanceSerialByWidget = result.nextSerialByWidget
+        return result.instanceKey
     }
 
     function _ensureLayoutInstanceKeys() {
-        let nextSerials = Object.assign({}, _nextInstanceSerialByWidget)
-
-        for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i)
-            let serial = _parseInstanceSerial(item.id, item.instanceKey)
-
-            if (serial < 0) {
-                continue
-            }
-
-            nextSerials[item.id] = Math.max(nextSerials[item.id] || 0, serial + 1)
-        }
-
-        for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i)
-            if (_parseInstanceSerial(item.id, item.instanceKey) >= 0) {
-                continue
-            }
-
-            let serial = nextSerials[item.id] || 0
-            layoutModel.setProperty(i, "instanceKey", item.id + "_" + serial)
-            nextSerials[item.id] = serial + 1
-        }
-
-        _nextInstanceSerialByWidget = nextSerials
-    }
-
-    function _orderedEnabledWidgetsForSection(sectionName) {
-        let widgets = []
-
-        for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i)
-
-            if (!item.enabled || item.section !== sectionName) {
-                continue
-            }
-
-            widgets.push({
-                id: item.id,
-                section: item.section,
-                alignment: item.alignment,
-                order: item.order,
-                modelIndex: i,
-                instanceKey: instanceKeyAt(i)
-            })
-        }
-
-        widgets.sort((a, b) => {
-            if (a.order !== b.order) {
-                return a.order - b.order
-            }
-
-            return a.modelIndex - b.modelIndex
-        })
-
-        return widgets
-    }
-
-    function _slotGeometryOutput(sectionName, sectionLeft, orderedWidgets) {
-        let slots = []
-        let currentLeft = sectionLeft
-
-        for (let i = 0; i < orderedWidgets.length; i++) {
-            let widget = orderedWidgets[i]
-            let measuredWidth = _effectiveMeasuredWidth(widget.instanceKey)
-
-            slots.push(_slotGeometryRecord(sectionName, {
-                id: widget.id,
-                instanceKey: widget.instanceKey,
-                order: widget.order,
-                alignment: widget.alignment,
-                measuredWidth: measuredWidth
-            }, i, currentLeft, measuredWidth))
-
-            currentLeft += measuredWidth
-        }
-
-        return slots
-    }
-
-    function _measuredContentWidth(orderedWidgets) {
-        let totalWidth = 0
-
-        for (let i = 0; i < orderedWidgets.length; i++) {
-            totalWidth += _effectiveMeasuredWidth(orderedWidgets[i].instanceKey)
-        }
-
-        return Math.max(0, totalWidth)
-    }
-
-    function _layoutInstanceKeySet() {
-        let instanceKeys = ({})
-
-        for (let i = 0; i < layoutModel.count; i++) {
-            let instanceKey = instanceKeyAt(i)
-            if (!instanceKey) {
-                continue
-            }
-
-            instanceKeys[instanceKey] = true
-        }
-
-        return instanceKeys
+        _nextInstanceSerialByWidget = LayoutModelUtils.ensureLayoutInstanceKeys(layoutModel, _nextInstanceSerialByWidget)
     }
 
     function _cleanupStaleGeometryState() {
-        let activeInstanceKeys = _layoutInstanceKeySet()
-        let staleGeometryEntries = []
+        let cleanupResult = GeometryPipelineUtils.cleanupStaleGeometryState(
+            layoutModel,
+            instanceKeyAt,
+            _widgetMeasuredWidths,
+            _widgetMeasurementMetadata,
+            _arrivalGeometries,
+            _arrivalRevealLocks,
+            draggedInstanceKey
+        )
 
-        for (let instanceKey in _widgetMeasuredWidths) {
-            if (activeInstanceKeys[instanceKey]) {
-                continue
-            }
-
-            staleGeometryEntries.push(instanceKey)
+        if (cleanupResult.changed) {
+            _widgetMeasuredWidths = cleanupResult.widgetMeasuredWidths
+            _widgetMeasurementMetadata = cleanupResult.widgetMeasurementMetadata
+            _arrivalGeometries = cleanupResult.arrivalGeometries
+            _arrivalRevealLocks = cleanupResult.arrivalRevealLocks
         }
 
-        for (let instanceKey in _widgetMeasurementMetadata) {
-            if (activeInstanceKeys[instanceKey] || staleGeometryEntries.indexOf(instanceKey) >= 0) {
-                continue
-            }
-
-            staleGeometryEntries.push(instanceKey)
-        }
-
-        if (staleGeometryEntries.length > 0) {
-            let nextMeasuredWidths = Object.assign({}, _widgetMeasuredWidths)
-            let nextMeasurementMetadata = Object.assign({}, _widgetMeasurementMetadata)
-            let nextArrivalGeometries = Object.assign({}, _arrivalGeometries)
-            let nextArrivalRevealLocks = Object.assign({}, _arrivalRevealLocks)
-
-            for (let i = 0; i < staleGeometryEntries.length; i++) {
-                delete nextMeasuredWidths[staleGeometryEntries[i]]
-                delete nextMeasurementMetadata[staleGeometryEntries[i]]
-                delete nextArrivalGeometries[staleGeometryEntries[i]]
-
-                for (let sectionName in nextArrivalRevealLocks) {
-                    if (nextArrivalRevealLocks[sectionName] === staleGeometryEntries[i]) {
-                        delete nextArrivalRevealLocks[sectionName]
-                    }
-                }
-            }
-
-            _widgetMeasuredWidths = nextMeasuredWidths
-            _widgetMeasurementMetadata = nextMeasurementMetadata
-            _arrivalGeometries = nextArrivalGeometries
-            _arrivalRevealLocks = nextArrivalRevealLocks
-        }
-
-        if (draggedInstanceKey && !activeInstanceKeys[draggedInstanceKey]) {
+        if (cleanupResult.clearDragState) {
             _clearDragState()
         }
     }
 
-    function _clampedSectionGeometry(sectionName, left, right, contentWidth, slotCount) {
-        let nextLeft = Number(left) || 0
-        let nextRight = Number(right) || 0
-
-        if (nextRight < nextLeft) {
-            nextRight = nextLeft
-        }
-
-        let width = Math.max(0, nextRight - nextLeft)
-
-        return {
-            section: sectionName,
-            left: nextLeft,
-            right: nextRight,
-            width: width,
-            centerX: nextLeft + width / 2,
-            visualLeft: nextLeft,
-            visualWidth: Math.max(0, Number(contentWidth) || 0),
-            visualCenterX: nextLeft + Math.max(0, Number(contentWidth) || 0) / 2,
-            slotCount: slotCount,
-            contentWidth: Math.max(0, Number(contentWidth) || 0)
-        }
-    }
-
-    function _barUsableBounds() {
-        let usableLeft = _barContentPadding
-        let usableRight = Math.max(usableLeft, _barContentWidth - _barContentPadding)
-
-        return {
-            left: usableLeft,
-            right: usableRight,
-            width: Math.max(0, usableRight - usableLeft),
-            midpoint: _barContentWidth / 2
-        }
-    }
-
-    function _orderedWidgetsBySection(sectionNames) {
-        let orderedWidgets = {}
-
-        for (let i = 0; i < sectionNames.length; i++) {
-            let sectionName = sectionNames[i]
-            orderedWidgets[sectionName] = _orderedEnabledWidgetsForSection(sectionName)
-        }
-
-        return orderedWidgets
-    }
-
-    function _contentWidthsBySection(orderedWidgetsBySection, sectionNames) {
-        let contentWidths = {}
-
-        for (let i = 0; i < sectionNames.length; i++) {
-            let sectionName = sectionNames[i]
-            contentWidths[sectionName] = _measuredContentWidth(orderedWidgetsBySection[sectionName])
-        }
-
-        return contentWidths
-    }
-
-    function _resolveAdaptiveSectionBounds(usableBounds, contentWidths) {
-        let desiredLeftRight = Math.min(usableBounds.right, usableBounds.left + (contentWidths.left || 0))
-        let desiredRightLeft = Math.max(usableBounds.left, usableBounds.right - (contentWidths.right || 0))
-        let centerHalfRoom = Math.min(
-            Math.max(0, usableBounds.midpoint - desiredLeftRight),
-            Math.max(0, desiredRightLeft - usableBounds.midpoint)
-        )
-        let centerVisualWidth = contentWidths.center || 0
-        let desiredCenterWidth = Math.max(0, Math.min(centerVisualWidth, centerHalfRoom * 2))
-        let centerInteractionWidth = Math.max(
-            0,
-            Math.min(Math.max(centerVisualWidth, desiredCenterWidth), centerHalfRoom * 2)
-        )
-        let centerLeft = usableBounds.midpoint - centerInteractionWidth / 2
-        let centerRight = usableBounds.midpoint + centerInteractionWidth / 2
-
-        return {
-            leftRight: centerLeft,
-            centerLeft: centerLeft,
-            centerRight: centerRight,
-            rightLeft: centerRight,
-            leftVisualRight: Math.min(desiredLeftRight, centerLeft),
-            rightVisualLeft: Math.max(desiredRightLeft, centerRight)
-        }
-    }
-
-    function _resolveVisualPlacement(sectionName, usableBounds, contentWidths) {
-        let contentWidth = contentWidths[sectionName] || 0
-
-        if (sectionName === "center") {
-            let visualLeft = usableBounds.midpoint - contentWidth / 2
-
-            return {
-                left: Math.max(usableBounds.left, Math.min(usableBounds.right - contentWidth, visualLeft)),
-                width: contentWidth,
-                centerX: usableBounds.midpoint
-            }
-        }
-
-        if (sectionName === "right") {
-            let visualLeft = Math.max(usableBounds.left, usableBounds.right - contentWidth)
-
-            return {
-                left: visualLeft,
-                width: contentWidth,
-                centerX: visualLeft + contentWidth / 2
-            }
-        }
-
-        return {
-            left: usableBounds.left,
-            width: contentWidth,
-            centerX: usableBounds.left + contentWidth / 2
-        }
-    }
-
-    function _sectionGeometryWithVisual(sectionName, left, right, contentWidth, slotCount, visualPlacement) {
-        let geometry = _clampedSectionGeometry(sectionName, left, right, contentWidth, slotCount)
-
-        geometry.visualLeft = Math.max(0, Number(visualPlacement.left) || 0)
-        geometry.visualWidth = Math.max(0, Number(visualPlacement.width) || 0)
-        geometry.visualCenterX = Number(visualPlacement.centerX) || 0
-
-        return geometry
-    }
-
-    function _pickerAnchorsFromSections(sectionNames, sectionGeometries) {
-        let nextPickerAnchors = {}
-
-        for (let i = 0; i < sectionNames.length; i++) {
-            let sectionName = sectionNames[i]
-            let geometry = sectionGeometries[sectionName]
-
-            nextPickerAnchors[sectionName] = {
-                section: sectionName,
-                centerX: geometry.centerX,
-                leftMargin: _clampPickerLeftMargin(geometry.centerX),
-                active: sectionName === widgetPickerTargetSection
-            }
-        }
-
-        return nextPickerAnchors
-    }
-
-    function _slotGeometriesFromSections(sectionNames, sectionGeometries, orderedWidgetsBySection) {
-        let nextSlotGeometries = {}
-
-        for (let i = 0; i < sectionNames.length; i++) {
-            let sectionName = sectionNames[i]
-            nextSlotGeometries[sectionName] = _slotGeometryOutput(
-                sectionName,
-                sectionGeometries[sectionName].visualLeft,
-                orderedWidgetsBySection[sectionName]
-            )
-        }
-
-        return nextSlotGeometries
-    }
-
-    function _widgetGeometriesFromSlots(sectionNames, slotGeometries) {
-        let nextWidgetGeometries = ({})
-
-        for (let i = 0; i < sectionNames.length; i++) {
-            let sectionName = sectionNames[i]
-            let slots = slotGeometries[sectionName]
-
-            if (!Array.isArray(slots)) {
-                continue
-            }
-
-            for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
-                let slot = slots[slotIndex]
-                nextWidgetGeometries[slot.instanceKey] = _widgetGeometryFromSlot(sectionName, slot)
-            }
-        }
-
-        return nextWidgetGeometries
-    }
-
-    function _primaryInstanceKeyForWidget(widgetId, slotGeometries, sectionNames) {
-        if (!widgetId) {
-            return ""
-        }
-
-        let preferredInstanceKey = ""
-        let closestDistance = Number.POSITIVE_INFINITY
-        let barMidpoint = _barContentWidth / 2
-
-        for (let i = 0; i < sectionNames.length; i++) {
-            let sectionName = sectionNames[i]
-            let slots = slotGeometries[sectionName]
-
-            if (!Array.isArray(slots)) {
-                continue
-            }
-
-            for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
-                if (slots[slotIndex].id === widgetId) {
-                    let slotCenterX = Number(slots[slotIndex].centerX) || 0
-                    let distance = Math.abs(slotCenterX - barMidpoint)
-
-                    if (distance < closestDistance) {
-                        closestDistance = distance
-                        preferredInstanceKey = slots[slotIndex].instanceKey || ""
-                    }
-                }
-            }
-        }
-
-        return preferredInstanceKey
-    }
-
-    function _clampPickerLeftMargin(centerX) {
-        let minLeft = _barContentPadding
-        let maxLeft = Math.max(minLeft, _barContentWidth - _pickerPanelWidth - _barContentPadding)
-        let idealLeft = (Number(centerX) || 0) - _pickerPanelWidth / 2
-
-        return Math.max(minLeft, Math.min(maxLeft, idealLeft))
+    function _applyGeometrySnapshot(snapshot) {
+        _sectionGeometries = snapshot.sectionGeometries
+        _slotGeometries = snapshot.slotGeometries
+        _widgetGeometries = snapshot.widgetGeometries
+        _superIslandInstanceKey = snapshot.superIslandInstanceKey
+        _pickerAnchors = snapshot.pickerAnchors
+        _arrivalGeometries = snapshot.arrivalGeometries
+        geometryArrivals = snapshot.arrivalGeometries
     }
 
     function _recomputeGeometryContracts() {
         _cleanupStaleGeometryState()
 
-        let sections = ["left", "center", "right"]
-        let usableBounds = _barUsableBounds()
-        let orderedWidgetsBySection = _orderedWidgetsBySection(sections)
-        let contentWidths = _contentWidthsBySection(orderedWidgetsBySection, sections)
-        let adaptiveBounds = _resolveAdaptiveSectionBounds(usableBounds, contentWidths)
-        let nextSectionGeometries = {
-            left: _sectionGeometryWithVisual(
-                "left",
-                usableBounds.left,
-                adaptiveBounds.leftRight,
-                contentWidths.left || 0,
-                orderedWidgetsBySection.left.length,
-                _resolveVisualPlacement("left", usableBounds, contentWidths)
-            ),
-            center: _sectionGeometryWithVisual(
-                "center",
-                adaptiveBounds.centerLeft,
-                adaptiveBounds.centerRight,
-                contentWidths.center || 0,
-                orderedWidgetsBySection.center.length,
-                _resolveVisualPlacement("center", usableBounds, contentWidths)
-            ),
-            right: _sectionGeometryWithVisual(
-                "right",
-                adaptiveBounds.rightLeft,
-                usableBounds.right,
-                contentWidths.right || 0,
-                orderedWidgetsBySection.right.length,
-                _resolveVisualPlacement("right", usableBounds, contentWidths)
-            )
-        }
-        let nextSlotGeometries = _slotGeometriesFromSections(
-            sections,
-            nextSectionGeometries,
-            orderedWidgetsBySection
-        )
-        let nextWidgetGeometries = _widgetGeometriesFromSlots(sections, nextSlotGeometries)
-        let nextSuperIslandInstanceKey = _primaryInstanceKeyForWidget("superIsland", nextSlotGeometries, sections)
-        let nextPickerAnchors = _pickerAnchorsFromSections(sections, nextSectionGeometries)
-        let nextArrivalGeometries = _syncArrivalGeometriesWithSlots(_arrivalGeometries, nextSlotGeometries)
+        let snapshot = GeometryPipelineUtils.recomputeGeometryContracts({
+            layoutModel: layoutModel,
+            instanceKeyAtFn: instanceKeyAt,
+            effectiveMeasuredWidthFn: _effectiveMeasuredWidth,
+            arrivalGeometries: _arrivalGeometries,
+            widgetPickerTargetSection: widgetPickerTargetSection,
+            barContentWidth: _barContentWidth,
+            barContentPadding: _barContentPadding,
+            pickerPanelWidth: _pickerPanelWidth
+        })
 
-        _sectionGeometries = nextSectionGeometries
-        _slotGeometries = nextSlotGeometries
-        _widgetGeometries = nextWidgetGeometries
-        _superIslandInstanceKey = nextSuperIslandInstanceKey
-        _pickerAnchors = nextPickerAnchors
-        _arrivalGeometries = nextArrivalGeometries
-        geometryArrivals = nextArrivalGeometries
+        _applyGeometrySnapshot(snapshot)
     }
 
     function closeWidgetSettings() {
-        let shouldExitLayout = widgetSettingsAutoEnteredLayout
+        let nextState = SessionUtils.closeWidgetSettingsState(widgetSettingsAutoEnteredLayout)
 
-        _clearWidgetSettingsSession()
+        if (nextState.clearSession)
+            _clearWidgetSettingsSession()
 
-        if (shouldExitLayout) {
+        if (nextState.shouldExitLayout) {
             activePanel = "none"
         }
     }
 
     function _syncNotificationHistoryFromOverlay() {
-        let shouldShowNotifications = IslandOverlayService.mode === "notifications"
-            && IslandOverlayService.state !== "closed"
+        let result = OverlaySyncUtils.syncNotificationHistoryFromOverlay(
+            IslandOverlayService.mode,
+            IslandOverlayService.state,
+            notificationHistoryOpen
+        )
 
-        if (notificationHistoryOpen === shouldShowNotifications)
+        if (!result.changed)
             return
 
         _suppressNotificationHistoryMirror = true
-        notificationHistoryOpen = shouldShowNotifications
+        notificationHistoryOpen = result.notificationHistoryOpen
         _suppressNotificationHistoryMirror = false
     }
 
@@ -1332,35 +643,29 @@ Singleton {
         function onStateChanged() {
             root._syncNotificationHistoryFromOverlay()
 
-            if (IslandOverlayService.mode !== "settings")
-                return
+            let panelClose = OverlaySyncUtils.panelCloseFromOverlayState(
+                IslandOverlayService.mode,
+                IslandOverlayService.state,
+                activePanel
+            )
 
-            if (IslandOverlayService.state !== "closed" || activePanel !== "config")
+            if (!panelClose.shouldClosePanel)
                 return
 
             _suppressPanelMirror = true
-            activePanel = "none"
+            activePanel = panelClose.activePanel
             _suppressPanelMirror = false
         }
 
         function onModeChanged() {
             root._syncNotificationHistoryFromOverlay()
 
-            if (IslandOverlayService.mode === "settings") {
-                if (activePanel === "config")
-                    return
-
-                _suppressPanelMirror = true
-                activePanel = "config"
-                _suppressPanelMirror = false
-                return
-            }
-
-            if (activePanel !== "config")
+            let panelState = OverlaySyncUtils.panelStateFromOverlay(IslandOverlayService.mode, activePanel)
+            if (!panelState.changed)
                 return
 
             _suppressPanelMirror = true
-            activePanel = "none"
+            activePanel = panelState.activePanel
             _suppressPanelMirror = false
         }
     }
@@ -1398,12 +703,11 @@ Singleton {
     }
 
     Component.onCompleted: {
-        // Try loading from hot-reload state first, then from disk
-        if (persist.layoutJson !== "") {
-            applyJson(persist.layoutJson);
-        } else {
-            fileReader.running = true;
-        }
+        PersistenceUtils.loadFromPersistOrDisk(
+            persist.layoutJson,
+            applyJson,
+            function() { fileReader.running = true }
+        )
 
         _recomputeGeometryContracts()
     }
@@ -1432,23 +736,8 @@ Singleton {
         command: ["sh", "-c", "mkdir -p '" + root._configDir + "' && cat > '" + root._configFile + "'"]
     }
 
-    function _serializeLayoutItem(item) {
-        return {
-            id: item.id,
-            section: item.section,
-            alignment: item.alignment,
-            order: item.order,
-            enabled: item.enabled,
-            instanceKey: item.instanceKey || ""
-        }
-    }
-
     function serializeLayout() {
-        let arr = []
-        for (let i = 0; i < layoutModel.count; i++) {
-            arr.push(_serializeLayoutItem(layoutModel.get(i)))
-        }
-        return JSON.stringify(arr)
+        return LayoutModelUtils.serializeLayoutModel(layoutModel)
     }
 
     function _replaceLayout(entries) {
@@ -1462,96 +751,37 @@ Singleton {
     }
 
     function _layoutIndexForInstanceKey(instanceKey) {
-        if (!instanceKey) {
-            return -1
-        }
-
-        for (let i = 0; i < layoutModel.count; i++) {
-            if (root.instanceKeyAt(i) === instanceKey) {
-                return i
-            }
-        }
-
-        return -1
+        return LayoutModelUtils.layoutIndexForInstanceKey(layoutModel, instanceKey)
     }
 
     function applyJson(json) {
-        try {
-            let arr = JSON.parse(json)
-            if (!Array.isArray(arr) || arr.length === 0) {
-                resetLayout()
-                return
+        PersistenceUtils.applyLayoutJson(
+            json,
+            layoutModel.count,
+            resetLayout,
+            function(entries) {
+                _resetArrivalState()
+                _replaceLayout(entries)
+            },
+            function() {
+                _recomputeGeometryContracts()
+                layoutChanged()
+            },
+            function(error) {
+                console.log("BarLayoutService: failed to parse layout JSON:", error)
             }
-            _resetArrivalState()
-            _replaceLayout(arr)
-            _recomputeGeometryContracts()
-            layoutChanged()
-        } catch (e) {
-            console.log("BarLayoutService: failed to parse layout JSON:", e)
-            resetLayout()
-        }
+        )
     }
 
     function saveLayout() {
-        let json = serializeLayout();
-        persist.layoutJson = json;
-        // Write to disk
-        fileWriter.running = false;
-        fileWriter.running = true;
-        fileWriter.write(json + "\n");
+        PersistenceUtils.saveLayoutJson(layoutModel, persist, fileWriter)
     }
 
     function moveWidget(instanceKey, toSection, toAlignment, toOrder) {
-
-        let currentSection = ""
-        let currentAlignment = ""
-        let currentOrder = -1
-        for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i)
-            if (root.instanceKeyAt(i) === instanceKey) {
-                currentSection = item.section
-                currentAlignment = item.alignment
-                currentOrder = item.order
-                break
-            }
-        }
-
-        if (currentOrder >= 0 && currentSection === toSection && currentOrder === toOrder) {
-            return
-        }
-
-        // Collect all widgets in target section (excluding the moving one)
-        let others = []
-        let movingIdx = -1
-        for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i)
-            if (root.instanceKeyAt(i) === instanceKey) {
-                movingIdx = i
-                continue
-            }
-            if (item.section === toSection) {
-                others.push({ modelIndex: i, order: item.order })
-            }
-        }
-        if (movingIdx < 0)
+        let result = LayoutModelUtils.moveWidget(layoutModel, instanceKey, toSection, toAlignment, toOrder)
+        if (!result.changed)
             return
 
-        // Sort by current order
-        others.sort(function(a, b) { return a.order - b.order })
-
-        // Insert the moving widget at the desired position
-        let insertAt = Math.min(toOrder, others.length)
-        others.splice(insertAt, 0, { modelIndex: movingIdx, order: -1 })
-
-        // Reassign sequential orders and update section/alignment
-        for (let i = 0; i < others.length; i++) {
-            let mi = others[i].modelIndex
-            layoutModel.setProperty(mi, "order", i)
-            if (mi === movingIdx) {
-                layoutModel.setProperty(mi, "section", toSection)
-                layoutModel.setProperty(mi, "alignment", toAlignment)
-            }
-        }
         _recomputeGeometryContracts()
         layoutChanged()
         saveLayout()
@@ -1573,20 +803,7 @@ Singleton {
     // Returns the stable instance key for the widget at layoutModel[modelIndex].
     // Key format: "{widgetId}_{n}" where n counts how many prior entries share the same widgetId.
     function instanceKeyAt(modelIndex) {
-        if (modelIndex < 0 || modelIndex >= layoutModel.count)
-            return ""
-
-        let targetId = layoutModel.get(modelIndex).id
-        let n = 0
-        for (let i = 0; i < modelIndex; i++) {
-            if (layoutModel.get(i).id === targetId)
-                n++
-        }
-        let storedKey = layoutModel.get(modelIndex).instanceKey
-        if (storedKey)
-            return storedKey
-
-        return targetId + "_" + n
+        return LayoutModelUtils.instanceKeyAt(layoutModel, modelIndex)
     }
 
     function resetLayout() {
@@ -1599,12 +816,7 @@ Singleton {
 
     // Inserts a new widget instance at the end of the given section.
     function addWidget(widgetId, section) {
-        let maxOrder = -1;
-        for (let i = 0; i < layoutModel.count; i++) {
-            let item = layoutModel.get(i);
-            if (item.section === section && item.order > maxOrder)
-                maxOrder = item.order;
-        }
+        let maxOrder = LayoutModelUtils.maxOrderForSection(layoutModel, section)
         let instanceKey = _createInstanceKey(widgetId)
 
         layoutModel.append({
@@ -1618,20 +830,19 @@ Singleton {
         _recomputeGeometryContracts();
 
         if (settingsMode) {
-            let slots = sectionSlots(section)
-            let slot = _slotForInstanceKey(slots, instanceKey)
-            if (slot) {
-                let nextArrivalGeometries = Object.assign({}, _arrivalGeometries)
-                nextArrivalGeometries[instanceKey] = _arrivalGeometryForSlot(
-                    instanceKey,
-                    widgetId,
-                    section,
-                    slot,
-                    "overlay",
-                    false
-                )
-                _arrivalGeometries = nextArrivalGeometries
-            }
+            let addResult = ArrivalSessionUtils.addOverlayArrivalForWidget(
+                {
+                    arrivalGeometries: _arrivalGeometries,
+                    arrivalRevealLocks: _arrivalRevealLocks
+                },
+                sectionSlots(section),
+                instanceKey,
+                widgetId,
+                section
+            )
+
+            if (addResult.changed)
+                _applyArrivalState(addResult.state)
         }
 
         layoutChanged();
