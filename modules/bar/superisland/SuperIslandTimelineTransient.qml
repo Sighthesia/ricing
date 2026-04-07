@@ -185,7 +185,7 @@ Item {
         NumberAnimation {
             target: root.state
             property: "_mainTrackY"
-            to: root.host._isFullHintEventType(root.state._flashSourceEvent.type)
+            to: root.host._isFullHintEventType(root.state._attachedHintEvent.type)
                 ? root.host._mainTrackCenterY
                 : root.host._windowHintEntryMeta.mainRole.targetY
             duration: Theme.anim.moveDuration
@@ -195,7 +195,7 @@ Item {
         NumberAnimation {
             target: root.state
             property: "_mainTrackScale"
-            to: root.host._isFullHintEventType(root.state._flashSourceEvent.type) ? 1 : root.host._flashScale
+            to: root.host._isFullHintEventType(root.state._attachedHintEvent.type) ? 1 : root.host._flashScale
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
@@ -203,7 +203,7 @@ Item {
         NumberAnimation {
             target: root.state
             property: "_mainTrackOpacity"
-            to: root.host._isFullHintEventType(root.state._flashSourceEvent.type) ? 1 : 0.6
+            to: root.host._isFullHintEventType(root.state._attachedHintEvent.type) ? 1 : 0.6
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }

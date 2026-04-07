@@ -13,8 +13,16 @@ Item {
     property bool drawSurface: true
 
     readonly property string currentPage: IslandOverlayService.mode || "launcher"
+    readonly property bool _showChrome: root._presentedPage !== "break-reminder"
+    readonly property bool _fullScreenPage: root._presentedPage === "break-reminder"
+    readonly property real _deckMargins: root._fullScreenPage ? 0 : 12
+    readonly property real _deckSpacing: root._fullScreenPage ? 0 : 10
     property string _presentedPage: root.currentPage
     property string _pendingPage: ""
+
+    function _showHeaderForPage(pageName) {
+        return pageName !== "break-reminder"
+    }
 
     function _pageItem(pageName) {
         if (pageName === "launcher")
@@ -23,6 +31,8 @@ Item {
             return settingsPageLoader.item
         if (pageName === "notifications")
             return notificationsPageLoader.item
+        if (pageName === "break-reminder")
+            return breakReminderPageLoader.item
         return null
     }
 
@@ -39,8 +49,9 @@ Item {
         if (includeHeader) {
             _deckStagger.registerItem(_clockItem, 0, 1)
             _deckStagger.registerItem(_navItem, 1, 1)
-            _deckStagger.registerItem(_closeItem, 2, 1)
-            _deckStagger.registerItem(_dividerItem, 3, 1)
+            _deckStagger.registerItem(_sessionItem, 2, 1)
+            _deckStagger.registerItem(_closeItem, 3, 1)
+            _deckStagger.registerItem(_dividerItem, 4, 1)
         }
         _deckStagger.registerItem(_contentItem, 0, 2)
         _deckStagger.runEnter()
@@ -59,8 +70,13 @@ Item {
             return
         }
 
-        if (pageName === "notifications" && notificationsPageLoader.item)
+        if (pageName === "notifications" && notificationsPageLoader.item) {
             notificationsPageLoader.item.pageActivated()
+            return
+        }
+
+        if (pageName === "break-reminder" && breakReminderPageLoader.item)
+            breakReminderPageLoader.item.pageActivated()
     }
 
     function _deactivatePage(pageName, includeHeader) {
@@ -77,8 +93,13 @@ Item {
             return
         }
 
-        if (pageName === "notifications" && notificationsPageLoader.item)
+        if (pageName === "notifications" && notificationsPageLoader.item) {
             notificationsPageLoader.item.pageDeactivated()
+            return
+        }
+
+        if (pageName === "break-reminder" && breakReminderPageLoader.item)
+            breakReminderPageLoader.item.pageDeactivated()
     }
 
     function _retargetPage(pageName) {
@@ -91,11 +112,14 @@ Item {
     Component.onCompleted: {
         root._presentedPage = root.currentPage
         Qt.callLater(function() {
-            root._activatePage(root._presentedPage, true)
+            root._activatePage(root._presentedPage, root._showHeaderForPage(root._presentedPage))
         })
     }
 
-    Component.onDestruction: root._deactivatePage(root._presentedPage, true)
+    Component.onDestruction: root._deactivatePage(
+        root._presentedPage,
+        root._showHeaderForPage(root._presentedPage)
+    )
 
     Connections {
         target: IslandOverlayService
@@ -128,7 +152,7 @@ Item {
             root._pendingPage = ""
 
             Qt.callLater(function() {
-                root._activatePage(root._presentedPage, false)
+                root._activatePage(root._presentedPage, root._showHeaderForPage(root._presentedPage))
             })
         }
     }
@@ -148,11 +172,13 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 10
+        anchors.margins: root._deckMargins
+        spacing: root._deckSpacing
 
         RowLayout {
+            visible: root._showChrome
             Layout.fillWidth: true
+            Layout.preferredHeight: visible ? implicitHeight : 0
             spacing: 10
 
             BarComponents.StaggerItem {
@@ -163,7 +189,6 @@ Item {
 
                 Text {
                     id: _clockLabel
-                    text: Qt.formatDateTime(_deckClock.date, "hh:mm")
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeBody
                     font.bold: true
@@ -214,6 +239,27 @@ Item {
             }
 
             BarComponents.StaggerItem {
+                id: _sessionItem
+                Layout.preferredWidth: Math.round(102 * Theme.uiScale)
+                Layout.preferredHeight: 30
+                implicitWidth: _sessionButton.implicitWidth
+                implicitHeight: _sessionButton.implicitHeight
+
+                SuperIslandParts.SuperIslandOverlayNavButton {
+                    id: _sessionButton
+                    anchors.fill: parent
+                    label: "电源"
+                    iconGlyph: "\uf011"
+                    firstSegment: true
+                    lastSegment: true
+                    onPressed: {
+                        SessionControlService.openSessionControl("super-island")
+                        IslandOverlayService.closeOverlay("session-control")
+                    }
+                }
+            }
+
+            BarComponents.StaggerItem {
                 id: _closeItem
                 width: 28
                 height: 28
@@ -238,8 +284,9 @@ Item {
 
         BarComponents.StaggerItem {
             id: _dividerItem
+            visible: root._showChrome
             Layout.fillWidth: true
-            Layout.preferredHeight: 1
+            Layout.preferredHeight: visible ? 1 : 0
 
             Rectangle {
                 anchors.fill: parent
@@ -278,6 +325,14 @@ Item {
                     anchors.fill: parent
                     visible: root._presentedPage === "notifications"
                     source: "ExpandedNotificationsPage.qml"
+                }
+
+                Loader {
+                    id: breakReminderPageLoader
+                    active: true
+                    anchors.fill: parent
+                    visible: root._presentedPage === "break-reminder"
+                    source: "ExpandedBreakReminderPage.qml"
                 }
             }
         }

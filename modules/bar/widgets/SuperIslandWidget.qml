@@ -12,7 +12,7 @@ Item {
     property bool liveInstance: false
     property string debugInstanceLabel: liveInstance ? "live" : "preview"
 
-    readonly property bool _debugLogging: liveInstance
+    readonly property bool _debugLogging: false
 
     IslandCards.SuperIslandViewState {
         id: _viewState
@@ -94,7 +94,7 @@ Item {
     readonly property string transitionMode:
         root._phase === "exit" ? "exit-track"
         : (root._phase === "idle" ? "single-track" : "dual-track")
-    readonly property bool flashTrackVisible: root._phase !== "idle"
+    readonly property bool flashTrackVisible: root._phase !== "idle" && !root._detachedHintActive
     readonly property bool _transientPhase: root._phase !== "idle"
     property alias _overlaySessionActive: _viewState._overlaySessionActive
     property alias _overlayExpandedActive: _viewState._overlayExpandedActive
@@ -134,7 +134,14 @@ Item {
     readonly property real _returnTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
 
-    readonly property real _overlayBodyHeight: Math.round(528 * Theme.uiScale)
+    readonly property bool _fullScreenBreakOverlayMode:
+        IslandOverlayService.mode === "break-reminder"
+    readonly property real _screenWidth: Screen.width || BarLayoutService.barContentWidth
+    readonly property real _screenHeight: Screen.height || 0
+    readonly property real _overlayBodyHeight:
+        root._fullScreenBreakOverlayMode
+            ? Math.max(root._collapsedPillHeight, root._screenHeight - root._overlayDetachedOffset)
+            : Math.round(528 * Theme.uiScale)
     readonly property real _overlayDetachedOffset:
         Math.max(Theme.barHeight, root._pillH + root._overlayInwardCornerDepth)
     readonly property real _overlayDetachedY: root._overlayDetachedOffset
@@ -154,6 +161,8 @@ Item {
     readonly property real _attachedRevealSeedHeight: 0
     readonly property real _attachedRevealSeedWidth:
         Math.max(root._overlayPillBackgroundWidth, root._collapsedWidth)
+    readonly property real _attachedCollapseBaseWidthCandidate:
+        Math.max(root._collapsedWidthLive, _pillClip.width)
 
     readonly property real _pillThrowLift:
         Math.max(6, Math.round(root._pillH * 0.2))
@@ -165,15 +174,18 @@ Item {
         Math.max(1, Math.round(Theme.anim.highlightDuration * 0.7))
 
     readonly property bool _detachedHintActive:
-        root._isFullHintEventType(root._flashSourceEvent.type) || root._phase === "hint-exit"
+        root._isFullHintEventType(root._attachedHintEvent.type) && root._hintPhase
+    readonly property bool _attachedHintVisible:
+        root._isFullHintEventType(root._attachedHintEvent.type)
+        && (root._hintPhase || root._attachedCollapseAnimating)
     readonly property bool _attachedPanelActive:
-        root._overlaySessionActive || root._detachedHintActive
+        root._overlaySessionActive || root._attachedHintVisible
     readonly property bool _overlayClosing:
         root._overlaySessionActive && IslandOverlayService.state === "closing"
     readonly property bool _attachedPanelExpanded:
         root._overlaySessionActive
             ? (root._overlayExpandedActive || root._overlayClosing)
-            : (root._phase === "hint" || root._phase === "hint-exit")
+            : root._hintPhase
     readonly property real _attachedPanelWidth:
         root._overlaySessionActive ? root._overlayExpandedWidth : root._detachedHintWidth
     readonly property real _attachedPanelHeight:
@@ -195,7 +207,7 @@ Item {
     readonly property real _attachedPanelOpacity:
         root._overlaySessionActive
             ? ((root._overlayExpandedActive || root._overlayClosing) ? 1 : 0)
-            : (root._detachedHintActive ? 1 : 0)
+            : (root._attachedHintVisible ? 1 : 0)
     readonly property real _attachedPanelScale:
         root._overlaySessionActive
             ? ((root._overlayExpandedActive || root._overlayClosing) ? 1 : 0.985)
@@ -211,16 +223,21 @@ Item {
         root._pillH + root._flashGap + root._flashRowH
     readonly property real _collapsedPillHeight: root._pillH
     readonly property bool _pillExpanded:
-        !root._attachedPanelActive
+        !root._detachedHintActive
         && (root._phase === "enter" || root._phase === "hold" || root._phase === "hint")
 
     readonly property real _overlayExpandedWidth: {
+        if (root._fullScreenBreakOverlayMode)
+            return Math.max(root._collapsedWidth, root._screenWidth)
+
         const availableWidth = Math.max(
             760,
             BarLayoutService.barContentWidth - Math.max(24, Theme.barPadding * 2)
         )
         return Math.max(root._collapsedWidth, Math.min(Math.round(980 * Theme.uiScale), availableWidth))
     }
+    readonly property real _attachedShellFillOpacity:
+        root._fullScreenBreakOverlayMode ? 0.78 : 1
 
     readonly property real _fullHintExpandedPillHeight:
         root._pillH
@@ -236,8 +253,12 @@ Item {
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
-    readonly property real _collapsedWidth:
+    readonly property real _collapsedWidthLive:
         (_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2
+    readonly property real _idleCollapsedWidthLive:
+        (_idleMeasureLoader.item ? _idleMeasureLoader.item.implicitWidth : 0) + root._padH * 2
+    readonly property real _collapsedWidth:
+        root._attachedCollapseBaseWidth > 0 ? root._attachedCollapseBaseWidth : root._collapsedWidthLive
     readonly property real _expandedWidth:
         Math.max(
             root._collapsedWidth,
@@ -246,8 +267,12 @@ Item {
 
     readonly property real _mainTrackEnterY:
         -Math.max(root._pillH, _mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH)
+    readonly property real _returnWidthLive:
+        root._flashSourceEvent.type === "idle"
+            ? root._idleCollapsedWidthLive
+            : ((_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2)
     readonly property real _returnWidth:
-        (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
+        root._attachedCollapseBaseWidth > 0 ? root._attachedCollapseBaseWidth : root._returnWidthLive
     readonly property real _transitionCollapsedWidth:
         root._phase === "exit" ? root._returnWidth : root._collapsedWidth
     readonly property real _idleOpticalOffset: 0
@@ -276,10 +301,14 @@ Item {
     property alias _attachedPanelRevealWidth: _viewState._attachedPanelRevealWidth
     property alias _attachedPanelRevealHeight: _viewState._attachedPanelRevealHeight
     property alias _attachedContentOpacity: _viewState._attachedContentOpacity
+    property alias _attachedCollapseAnimating: _viewState._attachedCollapseAnimating
     property alias _pillThrowOffsetY: _viewState._pillThrowOffsetY
     property alias _attachedRevealUseHandoffCurve: _viewState._attachedRevealUseHandoffCurve
+    property alias _attachedCollapseBaseWidth: _viewState._attachedCollapseBaseWidth
     property alias _overlayHandoffHintEvent: _viewState._overlayHandoffHintEvent
     property alias _overlayHintHandoffActive: _viewState._overlayHintHandoffActive
+    property alias _attachedHintEvent: _viewState._attachedHintEvent
+    property alias _pillTransition: _pillTransitionControl
 
     readonly property real _attachedPanelVisibleWidth:
         root._attachedPanelActive
@@ -333,8 +362,8 @@ Item {
     readonly property bool _attachedCollapseTailHidden:
         root._attachedPanelActive
         && (root._phase === "hint-exit" || root._overlayClosing)
-        && (root._attachedRevealProgress <= 0.1
-            || root._attachedPanelVisibleHeight <= Math.max(6, root._overlayAttachmentOverlap + 4))
+        && (root._attachedRevealProgress <= 0.2
+            || root._attachedPanelVisibleHeight <= Math.max(8, root._overlayAttachmentOverlap + 6))
 
     implicitHeight: Theme.barHeight
     implicitWidth: root._phase === "hint-exit"
@@ -389,7 +418,7 @@ Item {
     }
 
     function _isHintEventType(eventType) {
-        return eventType === "window" || eventType === "window-hint"
+        return eventType === "window-hint"
     }
 
     function _isFullHintEventType(eventType) {
@@ -402,6 +431,20 @@ Item {
         if (iconName.indexOf("://") !== -1 || iconName.startsWith("/"))
             return iconName
         return Quickshell.iconPath(iconName, "dialog-information")
+    }
+
+    function _deferPillSnapToCollapsed() {
+        Qt.callLater(function() {
+            if (root._pillTransition && typeof root._pillTransition.snapToCollapsed === "function")
+                root._pillTransition.snapToCollapsed()
+        })
+    }
+
+    function _deferPillSnapToExpanded() {
+        Qt.callLater(function() {
+            if (root._pillTransition && typeof root._pillTransition.snapToExpanded === "function")
+                root._pillTransition.snapToExpanded()
+        })
     }
 
     function _componentForEvent(event, useStrip) {
@@ -464,11 +507,11 @@ Item {
         expanded: root._pillExpanded
         extensionOwnerKey: root.liveInstance ? "super-island" : ""
         animateSurface: false
-        sharedTransition: _pillTransition
+        sharedTransition: _pillTransitionControl
     }
 
     BarComponents.BarExpandTransition {
-        id: _pillTransition
+        id: _pillTransitionControl
 
         collapsedWidth: root._transitionCollapsedWidth
         expandedWidth: root._expandedWidth
@@ -485,9 +528,9 @@ Item {
         anchors.topMargin: root._padV + root._pillThrowOffsetY
         anchors.horizontalCenter: parent.horizontalCenter
         clip: true
-        implicitWidth: _pillTransition.animatedWidth
+        implicitWidth: _pillTransitionControl.animatedWidth
         implicitHeight: root._verticalRevealClipHeight
-        width: _pillTransition.animatedWidth
+        width: _pillTransitionControl.animatedWidth
         height: root._verticalRevealClipHeight
         scale: root._pulseScale
         transformOrigin: Item.Center
@@ -612,6 +655,7 @@ Item {
         bridgeOutset: root._overlayBridgeOutset
         inwardCornerRadius: root._overlayInwardCornerRadius
         pulseOpacity: root._attachedPulseOpacity
+        surfaceFillOpacity: root._attachedShellFillOpacity
     }
 
     IslandCards.SuperIslandAttachedPanelHost {
@@ -638,19 +682,28 @@ Item {
             overlayHintHandoffActive: root._overlayHintHandoffActive
             detachedHintActive: root._detachedHintActive
             showOverlayHandoffHint: root._showOverlayHandoffHint
-            hintEvent: root._flashSourceEvent
+            hintEvent: root._attachedHintEvent
             handoffHintEvent: root._overlayHandoffHintEvent
         }
     }
 
     Loader {
         id: _detachedHintMeasureLoader
-        property var eventData: root._flashSourceEvent
+        property var eventData: root._attachedHintEvent
 
-        active: root._detachedHintActive
+        active: root._attachedHintVisible
         visible: false
         enabled: false
         sourceComponent: _windowHintCardComponent
+    }
+
+    Loader {
+        id: _idleMeasureLoader
+
+        active: true
+        visible: false
+        enabled: false
+        sourceComponent: _idleComponent
     }
 
     Component {
@@ -758,7 +811,9 @@ Item {
         z: -1
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        enabled: !BarLayoutService.suppressWidgetPrimaryActions && !root._overlaySessionActive
+        enabled: !BarLayoutService.suppressWidgetPrimaryActions
+            && !root._overlaySessionActive
+            && !root._attachedPanelActive
         onClicked: {
             IslandOverlayService.toggleOverlay(root._preferredOverlayPage(), "super-island", "")
         }

@@ -26,7 +26,7 @@ Item {
 
         if (IslandOverlayService.state === "opening") {
             if (wasDetachedHintActive) {
-                root.state._overlayHandoffHintEvent = root.host._cloneEvent(root.state._flashSourceEvent)
+                root.state._overlayHandoffHintEvent = root.host._cloneEvent(root.state._attachedHintEvent)
                 root.state._overlayHintHandoffActive = true
             } else {
                 root.state._overlayHintHandoffActive = false
@@ -58,5 +58,8 @@ Item {
 
         root.bridge.overlayOpenSettleTimer.stop()
         root.bridge.overlayCloseSettleTimer.stop()
+
+        if (IslandOverlayService.state === "closed")
+            root.machine.restoreTransientAfterOverlayClose()
     }
 }

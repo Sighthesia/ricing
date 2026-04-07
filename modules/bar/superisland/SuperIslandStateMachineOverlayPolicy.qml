@@ -18,6 +18,7 @@ Item {
     function syncOverlayFlags() {
         const overlayModeActive = IslandOverlayService.mode !== "none"
         const wasOverlayExpandedActive = root.state._overlayExpandedActive
+        const retainDetachedHint = root.state._phase === "hint" || root.state._phase === "hint-exit"
         root.state._overlaySessionActive = overlayModeActive
             && IslandOverlayService.state !== "closed"
         root.state._overlayExpandedActive = overlayModeActive
@@ -32,6 +33,18 @@ Item {
         if (!root.state._overlaySessionActive) {
             root.state._overlayHintHandoffActive = false
             root.state._overlayHandoffHintEvent = root.host._idleSnapshot()
+
+            if (!retainDetachedHint) {
+                root.machine.logPulse(
+                    "syncOverlayFlags clearing attached overlay residue"
+                )
+                root.state._attachedHintEvent = root.host._idleSnapshot()
+                root.state._attachedCollapseBaseWidth = 0
+                root.state._attachedPanelRevealWidth = 0
+                root.state._attachedPanelRevealHeight = 0
+                root.state._attachedContentOpacity = 0
+                root.state._pillThrowOffsetY = 0
+            }
         }
 
         if (overlayModeActive)
@@ -72,6 +85,11 @@ Item {
         const resolvedFromHeight = fromHeight !== undefined
             ? fromHeight
             : root.host._attachedRevealSeedHeight
+
+        root.state._attachedCollapseBaseWidth = Math.max(
+            root.host._attachedRevealSeedWidth,
+            root.host._attachedCollapseBaseWidthCandidate
+        )
 
         root.timeline.attachedCollapseAnim.stop()
         root.state._attachedPanelRevealWidth = Math.min(
@@ -132,7 +150,9 @@ Item {
 
         root.timeline.attachedCollapseAnim.targetWidth = toWidth !== undefined
             ? toWidth
-            : root.host._attachedRevealSeedWidth
+            : (root.state._attachedCollapseBaseWidth > 0
+                ? root.state._attachedCollapseBaseWidth
+                : root.host._attachedRevealSeedWidth)
         root.timeline.attachedCollapseAnim.targetHeight = toHeight !== undefined
             ? toHeight
             : root.host._attachedRevealSeedHeight
@@ -159,21 +179,52 @@ Item {
     }
 
     function handoffFullHintToOverlay() {
-        if (!root.host._hintPhase || !root.host._isFullHintEventType(root.state._flashSourceEvent.type))
-            return
+        const activeEvent = root.host._displayEvent(SuperIslandService.activeEvent)
+        const currentMainEvent = root.host._displayEvent(root.state._mainDisplayEvent)
+        const overlayMainEvent = !root.host._isHintEventType(activeEvent.type) && activeEvent.type !== "idle"
+            ? activeEvent
+            : (!root.host._isHintEventType(currentMainEvent.type) && currentMainEvent.type !== "idle"
+                ? root.host._cloneEvent(currentMainEvent)
+                : root.host._baselineEvent)
 
         root.bridge.hintFlashDelayTimer.stop()
+        root.timeline.departAnim.stop()
+        root.timeline.returnAnim.stop()
         root.timeline.hintEnterAnim.stop()
         root.timeline.hintExitAnim.stop()
+        root.timeline.replaceAnim.stop()
 
         root.state._phase = "idle"
         root.state._flashSourceEvent = root.host._idleSnapshot()
         root.state._flashTrackY = root.host._flashStripY
         root.state._flashTrackScale = root.host._flashScale
         root.state._flashTrackOpacity = 0
-        root.state._mainDisplayEvent = root.host._baselineEvent
+        root.machine.resetReplaceLayers()
+        root.state._mainDisplayEvent = overlayMainEvent
         root.state._mainTrackY = root.host._mainTrackCenterY
         root.state._mainTrackScale = 1
         root.state._mainTrackOpacity = 1
+    }
+
+    function restoreTransientAfterOverlayClose() {
+        if (root.state._overlaySessionActive)
+            return
+
+        const activeEvent = root.host._displayEvent(SuperIslandService.activeEvent)
+        root.machine.log(
+            "restoreTransientAfterOverlayClose active=" + activeEvent.type,
+            activeEvent
+        )
+        root.state._attachedHintEvent = root.host._idleSnapshot()
+        root.state._attachedCollapseBaseWidth = 0
+        root.state._attachedPanelRevealWidth = 0
+        root.state._attachedPanelRevealHeight = 0
+        root.state._attachedContentOpacity = 0
+        root.state._pillThrowOffsetY = 0
+
+        if (activeEvent.type === "idle" || root.host._isHintEventType(activeEvent.type))
+            return
+
+        root.machine.startEnterTransition(activeEvent)
     }
 }

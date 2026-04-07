@@ -31,7 +31,7 @@ Item {
             if (root.state._overlaySessionActive || IslandOverlayService.mode !== "none")
                 return
 
-            if (!root.host._hintPhase || !root.host._isFullHintEventType(root.state._flashSourceEvent.type))
+            if (!root.host._hintPhase || !root.host._isFullHintEventType(root.state._attachedHintEvent.type))
                 return
 
             root.machine.triggerHintFlash()
@@ -73,7 +73,12 @@ Item {
         target: SuperIslandService
 
         function onMainStateChanged() {
-            if (root.state._phase === "idle")
+            const activeEvent = root.host._displayEvent(SuperIslandService.activeEvent)
+            const shouldKeepTransientMain = root.state._overlaySessionActive
+                && activeEvent.type !== "idle"
+                && !root.host._isHintEventType(activeEvent.type)
+
+            if (root.state._phase === "idle" && !shouldKeepTransientMain)
                 root.state._mainDisplayEvent = root.host._baselineEvent
         }
 

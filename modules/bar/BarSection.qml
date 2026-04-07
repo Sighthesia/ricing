@@ -24,8 +24,11 @@ Item {
         }
     }
 
+    // Keep live widget width changes from visually reversing their growth direction
+    // while still smoothing section moves during drag sessions.
     Behavior on x {
         enabled: BarLayoutService.settingsMode
+            && BarLayoutService.isDragging
         NumberAnimation {
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
@@ -136,6 +139,7 @@ Item {
             staggerIndex: modelData.index
             widgetId: modelData.widgetId
             instanceKey: BarLayoutService.instanceKeyAt(modelData.index)
+            sectionRole: section.role
 
             Loader {
                 source: section.widgetRegistry[modelData.widgetId] || ""

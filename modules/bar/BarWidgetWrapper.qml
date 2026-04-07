@@ -10,6 +10,7 @@ Item {
     property string widgetId: ""
     // Stable instance key in format "{widgetId}_{n}". Set by BarSection delegate.
     property string instanceKey: ""
+    property string sectionRole: ""
     default property alias content: contentContainer.data
 
     // Collapse layout space during drag; content stays visible (clip: false)
@@ -27,6 +28,25 @@ Item {
             return child.item
 
         return child
+    }
+    readonly property real _layoutMeasuredWidth: {
+        let source = wrapper._measurementSource
+
+        if (source && source.layoutMeasurementWidth !== undefined) {
+            return Math.max(0, Number(source.layoutMeasurementWidth) || 0)
+        }
+
+        if (source) {
+            let implicitWidth = Math.max(0, Number(source.implicitWidth) || 0)
+            if (implicitWidth > 0)
+                return implicitWidth
+
+            let sourceWidth = Math.max(0, Number(source.width) || 0)
+            if (sourceWidth > 0)
+                return sourceWidth
+        }
+
+        return Math.max(0, wrapper._naturalWidth)
     }
     property bool _enterStarted: false
     readonly property var _arrivalGeometry: {
@@ -57,7 +77,7 @@ Item {
     property bool _showSettingsOutline: BarLayoutService.settingsMode
         && wrapper._enterDone
         && !wrapper._isDragging
-        && wrapper.implicitWidth >= wrapper._naturalWidth - 0.5
+        && wrapper.implicitWidth >= wrapper._layoutMeasuredWidth - 0.5
     property string _reportedInstanceKey: ""
     // In-memory reporter token so only the active delegate instance can clear its runtime width.
     property string _measurementReporterId:
@@ -65,7 +85,7 @@ Item {
     readonly property bool _primaryActionsSuppressed:
         BarLayoutService.suppressWidgetPrimaryActions && !wrapper._isDragging
 
-    implicitWidth: _isDragging ? 0 : _naturalWidth
+    implicitWidth: _isDragging ? 0 : _layoutMeasuredWidth
     implicitHeight: _isDragging ? 0 : _naturalHeight
 
     Behavior on implicitWidth {
@@ -107,18 +127,48 @@ Item {
     scale: 0.8
     property bool _enterDone: false
 
+    function completeEnterImmediately() {
+        wrapper._awaitingDelegateAlignment = false
+        wrapper._enterStarted = true
+        wrapper.opacity = 1
+        wrapper.scale = 1
+        wrapper._enterDone = true
+    }
+
     function tryStartEnterAnimation() {
         if (wrapper._enterStarted || wrapper._enterDone)
             return;
         if (wrapper._naturalWidth <= 0 || wrapper._naturalHeight <= 0)
             return;
 
+        let arrival = wrapper._arrivalGeometry
+
+        if (BarLayoutService.settingsMode && wrapper.instanceKey && wrapper.sectionRole) {
+            let widgetGeometry = BarLayoutService.widgetGeometry(wrapper.instanceKey)
+            let sectionGeometry = BarLayoutService.sectionGeometry(wrapper.sectionRole)
+            let sectionVisualLeft = sectionGeometry && sectionGeometry.visualLeft !== undefined
+                ? Number(sectionGeometry.visualLeft) || 0
+                : 0
+            let expectedX = widgetGeometry && widgetGeometry.left !== undefined
+                ? (Number(widgetGeometry.left) || 0) - sectionVisualLeft
+                : wrapper.x
+
+            if (Math.abs(wrapper.x - expectedX) > 0.5) {
+                wrapper._awaitingDelegateAlignment = true
+                return
+            }
+        }
+
+        if (BarLayoutService.settingsMode && !arrival) {
+            wrapper.completeEnterImmediately()
+            return
+        }
+
         if (wrapper._overlayArrivalActive) {
             wrapper._awaitingDelegateAlignment = false
             return;
         }
 
-        let arrival = wrapper._arrivalGeometry
         if (arrival && arrival.section) {
             if (!wrapper._delegateArrivalReleased || !wrapper._batonReleasedForWrapper) {
                 wrapper._awaitingDelegateAlignment = false
@@ -136,12 +186,7 @@ Item {
             return
         }
 
-        let nextWidth = 0
-        if (wrapper._measurementSource && wrapper._measurementSource.layoutMeasurementWidth !== undefined)
-            nextWidth = Math.max(0, Number(wrapper._measurementSource.layoutMeasurementWidth) || 0)
-
-        if (nextWidth <= 0)
-            nextWidth = Math.max(0, wrapper._naturalWidth)
+        let nextWidth = Math.max(0, wrapper._layoutMeasuredWidth)
 
         if (nextWidth <= 0) {
             return
@@ -182,6 +227,11 @@ Item {
 
     on_NaturalHeightChanged: wrapper.tryStartEnterAnimation()
 
+    on_LayoutMeasuredWidthChanged: {
+        wrapper.tryStartEnterAnimation()
+        wrapper.reportMeasuredWidth()
+    }
+
     on_BatonReleasedForWrapperChanged: wrapper.tryStartEnterAnimation()
 
     on_DelegateArrivalReleasedChanged: wrapper.tryStartEnterAnimation()
@@ -202,7 +252,6 @@ Item {
 
     on_NaturalWidthChanged: {
         wrapper.tryStartEnterAnimation()
-        wrapper.reportMeasuredWidth()
     }
 
     Timer {
@@ -267,7 +316,7 @@ Item {
         onTapped: function(eventPoint) {
             let bc = wrapper.findBarContent();
             if (!bc) return;
-            let centreInBar = wrapper.mapToItem(bc, wrapper._naturalWidth / 2, 0);
+            let centreInBar = wrapper.mapToItem(bc, wrapper.implicitWidth / 2, 0);
             let clickInBar  = wrapper.mapToItem(bc, eventPoint.position.x, 0);
             bc.openWidgetContextMenu(
                 wrapper.instanceKey,
@@ -306,7 +355,7 @@ Item {
                 startSceneX = centroid.scenePosition.x;
                 let bc = wrapper.findBarContent();
                 if (bc) {
-                    let pt = wrapper.mapToItem(bc, wrapper._naturalWidth / 2, 0);
+                    let pt = wrapper.mapToItem(bc, wrapper.implicitWidth / 2, 0);
                     wrapper._dragStartContentX = pt.x;
                 }
                 wrapper._isDragging = true;

@@ -178,6 +178,7 @@ Item {
         }
 
         let insertedCount = 0
+        let insertedMaxIndex = -1
         for (let i = 0; i < items.length; i++) {
             let displayItem = {
                 key:         root._resultKeyForItem(items[i], i),
@@ -191,6 +192,8 @@ Item {
 
             if (!previousKeys[displayItem.key])
                 insertedCount += 1
+            if (!previousKeys[displayItem.key])
+                insertedMaxIndex = i
         }
 
         if (root._displayItemsMatch(displayItems)) {
@@ -215,6 +218,16 @@ Item {
         }
 
         let shrinkOnly = displayItems.length < _results.count && insertedCount === 0
+        let removedCount = 0
+
+        for (let existingKey in previousKeys) {
+            if (!nextKeys[existingKey])
+                removedCount += 1
+        }
+
+        let expandOnly = displayItems.length > _results.count
+            && removedCount === 0
+            && root._currentItemsAreStableSubsequence(displayItems)
 
         if (shrinkOnly) {
             if (_resultsList && _resultsList.beginFilterTransition)
@@ -228,6 +241,28 @@ Item {
 
             if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
                 _resultsList.scheduleFilterTransitionRelease(Theme.anim.moveDuration + 20)
+            else if (_resultsList && _resultsList.endFilterTransition)
+                Qt.callLater(function() { _resultsList.endFilterTransition() })
+
+            return
+        }
+
+        if (expandOnly) {
+            if (_resultsList && _resultsList.beginExpandTransition)
+                _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1)
+            else if (_resultsList && _resultsList.beginFilterTransition)
+                _resultsList.beginFilterTransition()
+            if (_resultsList && _resultsList.resetFilterViewport)
+                _resultsList.resetFilterViewport()
+
+            root._syncResults(displayItems, items)
+
+            if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
+                _resultsList.scheduleFilterTransitionRelease(
+                    _resultsList.expandTransitionDuration
+                        ? _resultsList.expandTransitionDuration()
+                        : Theme.anim.moveDuration + Theme.anim.highlightDuration
+                )
             else if (_resultsList && _resultsList.endFilterTransition)
                 Qt.callLater(function() { _resultsList.endFilterTransition() })
 
@@ -300,6 +335,42 @@ Item {
         }
 
         return -1
+    }
+
+    function _currentItemsAreStableSubsequence(displayItems): bool {
+        let displayIndex = 0
+
+        for (let resultIndex = 0; resultIndex < _results.count; resultIndex++) {
+            let existing = _results.get(resultIndex)
+            if (!existing)
+                return false
+
+            let existingKey = String(existing.key || "")
+            let matched = false
+
+            while (displayIndex < displayItems.length) {
+                let incoming = displayItems[displayIndex]
+                displayIndex += 1
+
+                if (String(incoming.key || "") !== existingKey)
+                    continue
+
+                if (String(existing.name || "") !== String(incoming.name || ""))
+                    return false
+                if (String(existing.description || "") !== String(incoming.description || ""))
+                    return false
+                if (String(existing.icon || "") !== String(incoming.icon || ""))
+                    return false
+
+                matched = true
+                break
+            }
+
+            if (!matched)
+                return false
+        }
+
+        return true
     }
 
     function _syncResults(displayItems, items): void {

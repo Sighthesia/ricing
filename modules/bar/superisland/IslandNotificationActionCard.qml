@@ -20,10 +20,10 @@ Item {
         anchors.fill: parent
     }
 
-    Connections {
-        target: card
-
-        function onActivated() {
+    MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: {
             const eventId = String(root.event && root.event.id ? root.event.id : "")
             const prefix = "notification:"
             if (eventId.startsWith(prefix) && NotificationService.invokeDefaultAction(eventId.slice(prefix.length)))

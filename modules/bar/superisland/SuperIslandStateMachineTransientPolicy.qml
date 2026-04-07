@@ -17,17 +17,20 @@ Item {
 
     function startEnterTransition(event) {
         const wasHintPhase = root.host._hintPhase
-        const outgoing = root.host._cloneEvent(root.host._hintPhase
-            ? root.host._baselineEvent
-            : (root.state._mainDisplayEvent.type !== "idle"
-                ? root.state._mainDisplayEvent
-                : root.host._baselineEvent))
+        const wasFullHintPhase = wasHintPhase
+            && root.host._isFullHintEventType(root.state._attachedHintEvent.type)
 
         root.machine.log("startEnterTransition", event)
         if (root.host._hintPhase) {
             root.bridge.hintFlashDelayTimer.stop()
             root.timeline.hintEnterAnim.stop()
             root.timeline.hintExitAnim.stop()
+            if (wasFullHintPhase) {
+                root.timeline.pillThrowOutAnim.stop()
+                root.timeline.pillCatchAnim.stop()
+                root.state._attachedCollapseAnimating = true
+                root.machine.startAttachedCollapse()
+            }
             root.machine.resetTracks()
         } else if (root.state._phase !== "idle") {
             root.timeline.returnAnim.stop()
@@ -47,17 +50,10 @@ Item {
         root.state._mainTrackScale = 0.92
         root.state._mainTrackOpacity = 0.15
 
-        if (wasHintPhase) {
-            root.state._flashSourceEvent = root.host._cloneEvent(root.state._flashSourceEvent)
-            root.state._flashTrackY = root.host._windowHintEntryMeta.flashRole.targetY
-            root.state._flashTrackScale = root.host._windowHintEntryMeta.flashRole.scale
-            root.state._flashTrackOpacity = root.host._windowHintEntryMeta.flashRole.opacity
-        } else {
-            root.state._flashSourceEvent = outgoing
-            root.state._flashTrackY = root.host._flashTrackCenterY
-            root.state._flashTrackScale = 1
-            root.state._flashTrackOpacity = 1
-        }
+        root.state._flashSourceEvent = root.host._idleSnapshot()
+        root.state._flashTrackY = root.host._flashStripY
+        root.state._flashTrackScale = root.host._flashScale
+        root.state._flashTrackOpacity = 1
         root.machine.triggerSharedBackgroundPulse("hint-update")
 
         Qt.callLater(function() {
@@ -65,12 +61,49 @@ Item {
         })
     }
 
+    function resumeTransient(event) {
+        const nextEvent = root.host._displayEvent(event)
+        const wasHintPhase = root.host._hintPhase
+        const wasFullHintPhase = wasHintPhase
+            && root.host._isFullHintEventType(root.state._attachedHintEvent.type)
+
+        root.machine.log("resumeTransient", nextEvent)
+
+        root.bridge.hintFlashDelayTimer.stop()
+        root.timeline.departAnim.stop()
+        root.timeline.returnAnim.stop()
+        root.timeline.hintEnterAnim.stop()
+        root.timeline.hintExitAnim.stop()
+        root.timeline.replaceAnim.stop()
+        resetReplaceLayers()
+
+        if (wasFullHintPhase) {
+            root.timeline.pillThrowOutAnim.stop()
+            root.timeline.pillCatchAnim.stop()
+            root.state._attachedCollapseAnimating = true
+            root.machine.startAttachedCollapse()
+        }
+
+        root.state._mainDisplayEvent = nextEvent
+        root.state._phase = "hold"
+        root.machine.resetTracks()
+        root.state._flashSourceEvent = root.host._idleSnapshot()
+        root.state._flashTrackY = root.host._flashStripY
+        root.state._flashTrackScale = root.host._flashScale
+        root.state._flashTrackOpacity = 0
+    }
+
     function startWindowHint(event) {
         const fullHint = root.host._isFullHintEventType(event.type)
+        const keepMainEvent = root.state._mainDisplayEvent.type !== "idle"
+            && !root.host._isHintEventType(root.state._mainDisplayEvent.type)
 
         root.machine.log("startWindowHint", event)
-        root.state._mainDisplayEvent = root.host._baselineEvent
-        root.state._flashSourceEvent = root.host._displayEvent(event)
+        root.state._mainDisplayEvent = keepMainEvent
+            ? root.host._cloneEvent(root.state._mainDisplayEvent)
+            : root.host._baselineEvent
+        root.state._attachedHintEvent = root.host._displayEvent(event)
+        root.state._flashSourceEvent = root.host._idleSnapshot()
         root.state._phase = "hint"
         root.machine.syncOverlayExtensionReservation()
 
@@ -96,7 +129,7 @@ Item {
     }
 
     function updateWindowHint(event) {
-        root.state._flashSourceEvent = root.host._displayEvent(event)
+        root.state._attachedHintEvent = root.host._displayEvent(event)
         root.machine.syncOverlayExtensionReservation()
 
         if (root.state._overlaySessionActive || IslandOverlayService.mode !== "none")
@@ -126,18 +159,19 @@ Item {
         const nextEvent = root.host._displayEvent(event)
 
         root.state._mainDisplayEvent = nextEvent
-        root.state._flashSourceEvent = root.host._hintPhase
-            ? root.host._cloneEvent(root.state._flashSourceEvent)
-            : root.host._cloneEvent(root.host._baselineEvent)
+        root.state._flashSourceEvent = root.host._idleSnapshot()
+        root.state._flashTrackY = root.host._flashStripY
+        root.state._flashTrackScale = root.host._flashScale
+        root.state._flashTrackOpacity = 1
 
+        root.timeline.departAnim.stop()
         root.timeline.returnAnim.stop()
         root.timeline.hintEnterAnim.stop()
         root.timeline.hintExitAnim.stop()
         root.timeline.replaceAnim.stop()
         resetReplaceLayers()
 
-        if (!root.host._transientPhase)
-            root.state._phase = "hold"
+        root.state._phase = "hold"
 
         if (shouldAnimateReplace) {
             root.state._replaceOutgoingEvent = outgoingEvent
@@ -177,27 +211,42 @@ Item {
         root.state._phase = "hint-exit"
         root.machine.syncOverlayExtensionReservation()
         root.timeline.hintEnterAnim.stop()
-        if (root.host._isFullHintEventType(root.state._flashSourceEvent.type))
+        if (root.host._isFullHintEventType(root.state._attachedHintEvent.type))
             root.machine.startAttachedCollapse()
-        if (!root.host._isFullHintEventType(root.state._flashSourceEvent.type))
+        if (!root.host._isFullHintEventType(root.state._attachedHintEvent.type))
             root.machine.triggerEdgeReboundScale()
         root.timeline.hintExitAnim.start()
     }
 
     function completeWindowHintExit() {
+        const pendingEvent = root.host._displayEvent(SuperIslandService.activeEvent)
+
         root.state._phase = "idle"
+        root.state._attachedCollapseAnimating = false
+        root.state._attachedHintEvent = root.host._idleSnapshot()
         root.state._flashSourceEvent = root.host._idleSnapshot()
         root.state._mainDisplayEvent = root.host._baselineEvent
         root.state._sharedBackgroundPulseOpacity = 0
         root.state._attachedPanelRevealWidth = 0
         root.state._attachedPanelRevealHeight = 0
         root.state._attachedContentOpacity = 0
+        root.state._attachedCollapseBaseWidth = 0
         root.machine.resetTracks()
         root.machine.syncOverlayExtensionReservation()
+
+        if (!root.state._overlaySessionActive
+                && pendingEvent.type !== "idle"
+                && !root.host._isHintEventType(pendingEvent.type))
+            root.machine.startEnterTransition(pendingEvent)
     }
 
     function startExitTransition() {
         root.machine.log("startExitTransition", root.state._mainDisplayEvent)
+        root.machine.logPulse(
+            "startExitTransition flash=" + root.state._flashSourceEvent.type
+                + " attachedHint=" + root.state._attachedHintEvent.type
+        )
+
         root.state._phase = "exit"
 
         root.timeline.departAnim.stop()

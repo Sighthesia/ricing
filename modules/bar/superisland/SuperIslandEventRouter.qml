@@ -17,6 +17,12 @@ Item {
         const previousEvent = root.host._cloneEvent(root.state._lastActiveEvent)
         const nextIsHint = root.host._isHintEventType(nextEvent.type)
         const previousIsHint = root.host._isHintEventType(previousEvent.type)
+        const interruptingDetachedHint = !nextIsHint
+            && nextEvent.type !== "idle"
+            && root.host._hintPhase
+            && root.host._isFullHintEventType(root.state._attachedHintEvent.type)
+        const overlayOwnsGeometry = IslandOverlayService.mode !== "none"
+            && IslandOverlayService.state !== "closed"
 
         root.machine.log(
             "activeEventChanged prev=" + previousEvent.type + " next=" + nextEvent.type
@@ -32,12 +38,27 @@ Item {
             return
         }
 
-        if (nextEvent.relayReplace && previousEvent.type !== "idle") {
+        if (overlayOwnsGeometry) {
+            root.machine.log(
+                "routeActiveEvent skipped while overlay owns geometry"
+                    + " next=" + nextEvent.type
+                    + " prev=" + previousEvent.type,
+                nextEvent
+            )
+            root.state._lastActiveEvent = nextEvent
+            return
+        }
+
+        if (interruptingDetachedHint) {
+            root.machine.finishWindowHint()
+        } else if (nextEvent.relayReplace && previousEvent.type !== "idle") {
             if (previousIsHint)
-                root.machine.startEnterTransition(nextEvent)
+                root.machine.resumeTransient(nextEvent)
             else
                 root.machine.replaceActiveTransient(nextEvent)
         } else if (nextIsHint && previousEvent.type === "idle") {
+            root.machine.startWindowHint(nextEvent)
+        } else if (nextIsHint && !previousIsHint) {
             root.machine.startWindowHint(nextEvent)
         } else if (nextIsHint && previousIsHint) {
             if (root.host._hintPhase)
@@ -45,7 +66,7 @@ Item {
             else
                 root.machine.startWindowHint(nextEvent)
         } else if (nextEvent.type !== "idle" && previousIsHint) {
-            root.machine.startEnterTransition(nextEvent)
+            root.machine.resumeTransient(nextEvent)
         } else if (nextEvent.type === "idle" && previousIsHint) {
             root.machine.finishWindowHint()
         } else if (nextEvent.type !== "idle" && previousEvent.type === "idle") {

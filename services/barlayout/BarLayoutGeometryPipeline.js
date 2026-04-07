@@ -37,7 +37,8 @@ function recomputeGeometryContracts(options) {
     var contentWidths = DeriveUtils.contentWidthsBySection(
         orderedWidgetsBySection,
         sectionNames,
-        options.effectiveMeasuredWidthFn
+        options.effectiveMeasuredWidthFn,
+        options.widgetSpacing
     )
     var adaptiveBounds = SectionsUtils.resolveAdaptiveSectionBounds(usableBounds, contentWidths)
 
@@ -78,7 +79,8 @@ function recomputeGeometryContracts(options) {
                 sectionLeft,
                 orderedWidgets,
                 options.effectiveMeasuredWidthFn,
-                GeometryUtils.slotGeometryRecord
+                GeometryUtils.slotGeometryRecord,
+                options.widgetSpacing
             )
         }
     )
@@ -146,12 +148,13 @@ function cleanupStaleGeometryState(
     )
 }
 
-function insertionSlots(sectionGeometry, slots, excludeInstanceKey) {
+function insertionSlots(sectionGeometry, slots, excludeInstanceKey, widgetSpacing) {
     if (!excludeInstanceKey)
         return slots
 
     var filteredSlots = []
     var currentLeft = sectionGeometry.visualLeft
+    var spacing = Math.max(0, Number(widgetSpacing) || 0)
 
     for (var i = 0; i < slots.length; i++) {
         if (slots[i].instanceKey === excludeInstanceKey)
@@ -166,6 +169,9 @@ function insertionSlots(sectionGeometry, slots, excludeInstanceKey) {
             measuredWidth: slot.measuredWidth
         }, filteredSlots.length, currentLeft, slot.width))
         currentLeft += slot.width
+
+        if (i < slots.length - 1)
+            currentLeft += spacing
     }
 
     return filteredSlots

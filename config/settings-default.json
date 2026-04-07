@@ -79,7 +79,12 @@
         "maxQueue": 5,
         "showMedia": true,
         "showNotifications": true,
-        "showWorkspaceEvents": true
+        "showWorkspaceEvents": true,
+        "breakReminderEnabled": true,
+        "breakReminderWorkMinutes": 20,
+        "breakReminderDurationSeconds": 20,
+        "breakReminderLeadSeconds": 20,
+        "breakReminderSnoozeMinutes": 5
     },
     "mediaControl": {
         "enabled": true,

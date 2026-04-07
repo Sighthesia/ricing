@@ -29,9 +29,10 @@ function orderedEnabledWidgetsForSection(layoutModel, sectionName, instanceKeyAt
     return widgets
 }
 
-function slotGeometryOutput(sectionName, sectionLeft, orderedWidgets, effectiveMeasuredWidthFn, slotGeometryRecordFn) {
+function slotGeometryOutput(sectionName, sectionLeft, orderedWidgets, effectiveMeasuredWidthFn, slotGeometryRecordFn, slotSpacing) {
     var slots = []
     var currentLeft = sectionLeft
+    var spacing = Math.max(0, Number(slotSpacing) || 0)
 
     for (var i = 0; i < orderedWidgets.length; i++) {
         var widget = orderedWidgets[i]
@@ -46,28 +47,36 @@ function slotGeometryOutput(sectionName, sectionLeft, orderedWidgets, effectiveM
         }, i, currentLeft, measuredWidth))
 
         currentLeft += measuredWidth
+
+        if (i < orderedWidgets.length - 1)
+            currentLeft += spacing
     }
 
     return slots
 }
 
-function measuredContentWidth(orderedWidgets, effectiveMeasuredWidthFn) {
+function measuredContentWidth(orderedWidgets, effectiveMeasuredWidthFn, slotSpacing) {
     var totalWidth = 0
+    var spacing = Math.max(0, Number(slotSpacing) || 0)
 
     for (var i = 0; i < orderedWidgets.length; i++)
         totalWidth += effectiveMeasuredWidthFn(orderedWidgets[i].instanceKey)
 
+    if (orderedWidgets.length > 1)
+        totalWidth += spacing * (orderedWidgets.length - 1)
+
     return Math.max(0, totalWidth)
 }
 
-function contentWidthsBySection(orderedWidgetsBySection, sectionNames, effectiveMeasuredWidthFn) {
+function contentWidthsBySection(orderedWidgetsBySection, sectionNames, effectiveMeasuredWidthFn, slotSpacing) {
     var contentWidths = {}
 
     for (var i = 0; i < sectionNames.length; i++) {
         var sectionName = sectionNames[i]
         contentWidths[sectionName] = measuredContentWidth(
             orderedWidgetsBySection[sectionName],
-            effectiveMeasuredWidthFn
+            effectiveMeasuredWidthFn,
+            slotSpacing
         )
     }
 

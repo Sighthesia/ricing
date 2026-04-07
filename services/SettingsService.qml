@@ -162,7 +162,12 @@ Singleton {
                 maxQueue: adapter.superIsland.maxQueue,
                 showMedia: adapter.superIsland.showMedia,
                 showNotifications: adapter.superIsland.showNotifications,
-                showWorkspaceEvents: adapter.superIsland.showWorkspaceEvents
+                showWorkspaceEvents: adapter.superIsland.showWorkspaceEvents,
+                breakReminderEnabled: adapter.superIsland.breakReminderEnabled,
+                breakReminderWorkMinutes: adapter.superIsland.breakReminderWorkMinutes,
+                breakReminderDurationSeconds: adapter.superIsland.breakReminderDurationSeconds,
+                breakReminderLeadSeconds: adapter.superIsland.breakReminderLeadSeconds,
+                breakReminderSnoozeMinutes: adapter.superIsland.breakReminderSnoozeMinutes
             },
             mediaControl: {
                 enabled: adapter.mediaControl.enabled,
@@ -398,6 +403,11 @@ Singleton {
             property bool showMedia: true
             property bool showNotifications: true
             property bool showWorkspaceEvents: true
+            property bool breakReminderEnabled: true
+            property int breakReminderWorkMinutes: 20
+            property int breakReminderDurationSeconds: 20
+            property int breakReminderLeadSeconds: 20
+            property int breakReminderSnoozeMinutes: 5
         }
 
         property JsonObject mediaControl: JsonObject {

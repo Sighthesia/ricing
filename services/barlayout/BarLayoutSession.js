@@ -14,6 +14,7 @@ function clearWidgetSettingsSessionState() {
     return {
         widgetSettingsPanelOpen: false,
         activeWidgetInstanceKey: "",
+        widgetSettingsX: 0,
         widgetSettingsAutoEnteredLayout: false
     }
 }

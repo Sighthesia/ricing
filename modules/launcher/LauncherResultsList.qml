@@ -13,6 +13,9 @@ Item {
     property bool scrollAnimationsEnabled: false
     property bool _filterTransitionActive: false
     property bool _managedEntryPending: false
+    property bool _expandTransitionActive: false
+    property int _expandInsertCount: 0
+    property int _expandDelaySlots: 0
     property int _activeSwapExitDuration: 0
     property var _outgoingItems: []
     readonly property int _maxViewportSlots: 6
@@ -116,12 +119,24 @@ Item {
         root._outgoingItems = []
         root._activeSwapExitDuration = 0
         root._managedEntryPending = false
+        root._expandTransitionActive = false
+        root._expandInsertCount = 0
         root._filterTransitionActive = true
+    }
+
+    function beginExpandTransition(insertCount, delaySlots): void {
+        beginFilterTransition()
+        root._expandTransitionActive = true
+        root._expandInsertCount = Math.max(0, Number(insertCount) || 0)
+        root._expandDelaySlots = Math.max(root._expandInsertCount, Math.max(0, Number(delaySlots) || 0))
     }
 
     function endFilterTransition(): void {
         _filterTransitionReleaseTimer.stop()
         root._filterTransitionActive = false
+        root._expandTransitionActive = false
+        root._expandInsertCount = 0
+        root._expandDelaySlots = 0
     }
 
     function scheduleFilterTransitionRelease(delayMs): void {
@@ -136,6 +151,9 @@ Item {
         root._outgoingItems = []
         root._filterTransitionActive = false
         root._managedEntryPending = false
+        root._expandTransitionActive = false
+        root._expandInsertCount = 0
+        root._expandDelaySlots = 0
         root._activeSwapExitDuration = 0
     }
 
@@ -146,6 +164,12 @@ Item {
 
     function activeSwapExitDuration(): int {
         return Math.max(0, root._activeSwapExitDuration)
+    }
+
+    function expandTransitionDuration(): int {
+        return Theme.anim.moveDuration
+            + root._windowForCount(root._expandDelaySlots)
+            + Theme.anim.highlightDuration
     }
 
     function _windowForCount(total): int {
@@ -222,6 +246,36 @@ Item {
                 properties: "x,y"
                 duration: Theme.anim.moveDuration
                 easing.type: Theme.anim.moveType
+            }
+        }
+
+        add: Transition {
+            id: _addTransition
+            enabled: root._expandTransitionActive
+
+            SequentialAnimation {
+                PropertyAction { property: "_filterAddOpacity"; value: 0 }
+                PropertyAction { property: "_filterAddOffsetY"; value: -18 }
+                PauseAnimation {
+                    duration: root._compressedDelay(
+                        _addTransition.ViewTransition.index,
+                        Math.max(root._expandDelaySlots, 1)
+                    )
+                }
+                ParallelAnimation {
+                    NumberAnimation {
+                        property: "_filterAddOpacity"
+                        to: 1
+                        duration: Theme.anim.highlightDuration
+                        easing.type: Easing.OutCubic
+                    }
+                    NumberAnimation {
+                        property: "_filterAddOffsetY"
+                        to: 0
+                        duration: Theme.anim.moveDuration
+                        easing.type: Theme.anim.moveType
+                    }
+                }
             }
         }
 
@@ -302,12 +356,18 @@ Item {
             managedEnterStartOffsetY: enterOffsetY
             enterOffsetY: 28
             exitOffsetY: 14
+            property real _filterAddOpacity: 1
+            property real _filterAddOffsetY: 0
 
             width: resultList.width
             height: 46
 
             Rectangle {
                 anchors.fill: parent
+                opacity: root._expandTransitionActive ? _item._filterAddOpacity : 1
+                transform: Translate {
+                    y: root._expandTransitionActive ? _item._filterAddOffsetY : 0
+                }
                 color: root.selectedIndex === _item.index
                     ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
                     : "transparent"

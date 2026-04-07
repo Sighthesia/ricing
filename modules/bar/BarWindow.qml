@@ -18,13 +18,17 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus:
-        IslandOverlayService.state !== "closed"
+        SessionControlService.visible
+            ? WlrKeyboardFocus.None
+            : (IslandOverlayService.state !== "closed"
             ? (IslandOverlayService.mode === "launcher"
                 ? WlrKeyboardFocus.Exclusive
-                : ((IslandOverlayService.mode === "settings" || IslandOverlayService.mode === "notifications")
+                : ((IslandOverlayService.mode === "settings"
+                    || IslandOverlayService.mode === "notifications"
+                    || IslandOverlayService.mode === "break-reminder")
                     ? WlrKeyboardFocus.OnDemand
                     : WlrKeyboardFocus.None))
-            : WlrKeyboardFocus.None
+            : WlrKeyboardFocus.None)
 
     BarContent {
         anchors.fill: parent

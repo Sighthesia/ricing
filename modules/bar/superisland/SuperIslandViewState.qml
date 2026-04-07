@@ -79,11 +79,14 @@ QtObject {
     property QtObject attached: QtObject {
         id: attached
 
+        property var hintEvent: root._idleEvent()
+        property bool collapseAnimating: false
         property real panelRevealWidth: 0
         property real panelRevealHeight: 0
         property real contentOpacity: 0
         property real pillThrowOffsetY: 0
         property bool revealUseHandoffCurve: false
+        property real collapseBaseWidth: 0
     }
 
     // Canonical aliases.
@@ -122,8 +125,11 @@ QtObject {
     property alias attachedPanelRevealWidth: attached.panelRevealWidth
     property alias attachedPanelRevealHeight: attached.panelRevealHeight
     property alias attachedContentOpacity: attached.contentOpacity
+    property alias attachedCollapseAnimating: attached.collapseAnimating
     property alias pillThrowOffsetY: attached.pillThrowOffsetY
     property alias attachedRevealUseHandoffCurve: attached.revealUseHandoffCurve
+    property alias attachedCollapseBaseWidth: attached.collapseBaseWidth
+    property alias attachedHintEvent: attached.hintEvent
 
     // Backward-compatibility aliases for existing `_` state references.
     property alias _phase: flow.phase
@@ -161,6 +167,9 @@ QtObject {
     property alias _attachedPanelRevealWidth: attached.panelRevealWidth
     property alias _attachedPanelRevealHeight: attached.panelRevealHeight
     property alias _attachedContentOpacity: attached.contentOpacity
+    property alias _attachedCollapseAnimating: attached.collapseAnimating
     property alias _pillThrowOffsetY: attached.pillThrowOffsetY
     property alias _attachedRevealUseHandoffCurve: attached.revealUseHandoffCurve
+    property alias _attachedCollapseBaseWidth: attached.collapseBaseWidth
+    property alias _attachedHintEvent: attached.hintEvent
 }

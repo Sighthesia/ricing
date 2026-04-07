@@ -133,6 +133,6 @@ Item {
             easing.type: Theme.anim.highlightType
         }
 
-        onFinished: TimelineCallbacks.maybeCompleteHintExitAfterCollapse(root.state, root.completeWindowHintExit)
+        onFinished: TimelineCallbacks.maybeCompleteHintExitAfterCollapse(root.state, root.host, root.completeWindowHintExit)
     }
 }

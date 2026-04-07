@@ -365,17 +365,31 @@ Item {
     }
 
     function snapToExpanded() {
-        _suppressExpandedTimeline = true
-        expanded = true
-        _suppressExpandedTimeline = false
-        _syncToCurrentTruth()
+        _timeline.stop()
+        _standalonePulse.stop()
+        _retargetPending = false
+        _retargetActiveForCurrentRun = false
+        _currentPreloadDuration = Theme.anim.barExpandPreloadDuration
+        _animatedWidth = expandedWidth
+        _animatedHeight = expandedHeight
+        _timelinePulseOpacity = 0
+        _timelinePulseScale = 1
+        _standalonePulseOpacity = 0
+        _standalonePulseScale = 1
     }
 
     function snapToCollapsed() {
-        _suppressExpandedTimeline = true
-        expanded = false
-        _suppressExpandedTimeline = false
-        _syncToCurrentTruth()
+        _timeline.stop()
+        _standalonePulse.stop()
+        _retargetPending = false
+        _retargetActiveForCurrentRun = false
+        _currentPreloadDuration = Theme.anim.barExpandPreloadDuration
+        _animatedWidth = collapsedWidth
+        _animatedHeight = collapsedHeight
+        _timelinePulseOpacity = 0
+        _timelinePulseScale = 1
+        _standalonePulseOpacity = 0
+        _standalonePulseScale = 1
     }
 
     function triggerPulse() {

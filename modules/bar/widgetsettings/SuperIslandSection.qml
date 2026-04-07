@@ -76,5 +76,59 @@ Item {
                 SettingsService.save()
             }
         }
+
+        ToggleSection {
+            width: parent.width
+            label: "20-20-20 提醒"
+            value: SettingsService.data.superIsland.breakReminderEnabled
+            onToggled: newValue => {
+                SettingsService.data.superIsland.breakReminderEnabled = newValue
+                SettingsService.save()
+            }
+        }
+
+        SliderSection {
+            width: parent.width
+            label: "工作时长"
+            value: SettingsService.data.superIsland.breakReminderWorkMinutes
+            from: 5; to: 60; stepSize: 5; unit: "m"
+            onValueCommitted: newValue => {
+                SettingsService.data.superIsland.breakReminderWorkMinutes = newValue
+                SettingsService.save()
+            }
+        }
+
+        SliderSection {
+            width: parent.width
+            label: "提醒提前量"
+            value: SettingsService.data.superIsland.breakReminderLeadSeconds
+            from: 5; to: 60; stepSize: 5; unit: "s"
+            onValueCommitted: newValue => {
+                SettingsService.data.superIsland.breakReminderLeadSeconds = newValue
+                SettingsService.save()
+            }
+        }
+
+        SliderSection {
+            width: parent.width
+            label: "休息倒计时"
+            value: SettingsService.data.superIsland.breakReminderDurationSeconds
+            from: 10; to: 120; stepSize: 5; unit: "s"
+            onValueCommitted: newValue => {
+                SettingsService.data.superIsland.breakReminderDurationSeconds = newValue
+                SettingsService.save()
+            }
+        }
+
+        SliderSection {
+            width: parent.width
+            label: "延后时长"
+            value: SettingsService.data.superIsland.breakReminderSnoozeMinutes
+            from: 1; to: 30; stepSize: 1; unit: "m"
+            onValueCommitted: newValue => {
+                SettingsService.data.superIsland.breakReminderSnoozeMinutes = newValue
+                SettingsService.save()
+            }
+        }
     }
 }

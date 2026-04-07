@@ -2,6 +2,7 @@ pragma Singleton
 
 import Quickshell
 import QtQuick
+import qs.config
 import qs.services
 import "barlayout" as BarLayoutComponents
 import "barlayout/BarLayoutAccessors.js" as AccessorUtils
@@ -126,6 +127,7 @@ Singleton {
 
     // FIXME: replace with service-backed shared width defaults once bar widget sizing is tokenized.
     readonly property real _fallbackMeasuredWidth: 48
+    readonly property real _widgetSpacing: Theme.widgetSpacing
     // FIXME: share picker width through a single geometry token once picker sizing is centralized.
     readonly property real _pickerPanelWidth: 480
 
@@ -339,7 +341,8 @@ Singleton {
         return GeometryPipelineUtils.insertionSlots(
             sectionGeometry(sectionName),
             sectionSlots(sectionName),
-            excludeInstanceKey
+            excludeInstanceKey,
+            _widgetSpacing
         )
     }
 
@@ -349,7 +352,8 @@ Singleton {
             instanceKeyAtFn: instanceKeyAt,
             effectiveMeasuredWidthFn: _effectiveMeasuredWidth,
             clearDragStateFn: _clearDragState,
-            pickerPanelWidth: _pickerPanelWidth
+            pickerPanelWidth: _pickerPanelWidth,
+            widgetSpacing: _widgetSpacing
         })
     }
 

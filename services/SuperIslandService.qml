@@ -20,6 +20,7 @@ Singleton {
 
     property string mode: "idle"
     property var activeEvent: _idleEvent()
+    property var _suspendedEvent: _idleEvent()
 
     readonly property int queueLength: _queue.length
     readonly property bool hasPendingEvents: queueLength > 0
@@ -28,6 +29,9 @@ Singleton {
     property var _baselineState: ({})
     property var _snoozedGroups: ({})
     property bool _suppressExternalSources: false
+    property int _activeDeadlineMs: 0
+    property int _pausedActiveRemainingMs: 0
+    property bool _activeTimerPausedForOverlay: false
     property string _lastNotificationId: ""
     property string _lastWorkspaceId: ""
     property string _lastFocusedWindowId: ""
@@ -68,6 +72,9 @@ Singleton {
             "type=", event.type || "",
             "priority=", event.priority || "",
             "groupKey=", event.groupKey || "",
+            "mode=", root.mode,
+            "overlayVisible=", root.overlayVisible,
+            "queueLength=", root._queue.length,
             "title=", event.title || "",
             "subtitle=", event.subtitle || ""
         )
@@ -87,6 +94,64 @@ Singleton {
             showNotifications: true,
             showWorkspaceEvents: true
         }
+    }
+
+    function _scheduleActiveTimer(ms) {
+        const duration = Math.max(1, Number(ms) || 0)
+
+        _activeTimer.stop()
+        _activeTimer.interval = duration
+        root._activeDeadlineMs = Date.now() + duration
+        root._pausedActiveRemainingMs = 0
+        root._activeTimerPausedForOverlay = false
+        _activeTimer.restart()
+    }
+
+    function _clearActiveTimerState() {
+        _activeTimer.stop()
+        root._activeDeadlineMs = 0
+        root._pausedActiveRemainingMs = 0
+        root._activeTimerPausedForOverlay = false
+    }
+
+    function _pauseActiveTimerForOverlay() {
+        if (root.activeEvent.type === "idle" || root.activeEvent.type === "window-hint")
+            return
+
+        if (_activeTimer.running) {
+            root._pausedActiveRemainingMs = Math.max(1, root._activeDeadlineMs - Date.now())
+            _activeTimer.stop()
+        } else if (root._pausedActiveRemainingMs <= 0) {
+            root._pausedActiveRemainingMs = root.activeEvent.timeoutMs > 0
+                ? root.activeEvent.timeoutMs
+                : root._settings().defaultTimeout
+        }
+
+        root._activeDeadlineMs = 0
+        root._activeTimerPausedForOverlay = true
+    }
+
+    function _resumeActiveTimerAfterOverlay() {
+        if (!root._activeTimerPausedForOverlay)
+            return
+
+        if (root.overlayVisible || root.activeEvent.type === "idle" || root.activeEvent.type === "window-hint") {
+            if (root.activeEvent.type === "idle" || root.activeEvent.type === "window-hint") {
+                root._pausedActiveRemainingMs = 0
+                root._activeTimerPausedForOverlay = false
+            }
+            return
+        }
+
+        const minimumResumeMs = Theme.anim.moveDuration + 80
+        root._scheduleActiveTimer(
+            Math.max(
+                minimumResumeMs,
+                root._pausedActiveRemainingMs > 0
+                ? root._pausedActiveRemainingMs
+                : (root.activeEvent.timeoutMs > 0 ? root.activeEvent.timeoutMs : root._settings().defaultTimeout)
+            )
+        )
     }
 
     function pushEvent(event) {
@@ -133,8 +198,17 @@ Singleton {
             return
         }
 
+        if (root.activeEvent.type !== "idle") {
+            const suspendedEvent = {}
+            for (let key in root.activeEvent)
+                suspendedEvent[key] = root.activeEvent[key]
+            root._suspendedEvent = suspendedEvent
+        } else {
+            root._suspendedEvent = root._idleEvent()
+        }
+
         root._log("showWindowHint", event)
-        _activeTimer.stop()
+        root._clearActiveTimerState()
         _pendingStartTimer.stop()
         root.activeEvent = event
         root.flashEvent = event
@@ -147,13 +221,23 @@ Singleton {
             return
 
         root._log("hideWindowHint", root.activeEvent)
-        _activeTimer.stop()
+        root._clearActiveTimerState()
         _pendingStartTimer.stop()
 
         if (root._queue.length > 0) {
             const next = root._queue[0]
             root._queue = []
+            root._suspendedEvent = root._idleEvent()
             root._activateEvent(next)
+            return
+        }
+
+        if (root._suspendedEvent.type && root._suspendedEvent.type !== "idle") {
+            const resumeEvent = {}
+            for (let key in root._suspendedEvent)
+                resumeEvent[key] = root._suspendedEvent[key]
+            root._suspendedEvent = root._idleEvent()
+            root._activateEvent(resumeEvent)
             return
         }
 
@@ -161,6 +245,7 @@ Singleton {
         root.flashEvent = ({})
         root.mode = "idle"
         root.mainState = root._resolveBaselineState()
+        root._clearActiveTimerState()
     }
 
     function replaceEvent(groupKey, event) {
@@ -352,14 +437,20 @@ Singleton {
     function _syncOverlayState() {
         root._suppressExternalSources = false
 
+        if (root.overlayVisible)
+            root._pauseActiveTimerForOverlay()
+        else
+            root._resumeActiveTimerAfterOverlay()
+
         if (root.activeEvent.groupKey !== "overlay")
             return
 
-        _activeTimer.stop()
+        root._clearActiveTimerState()
         root.activeEvent = root._idleEvent()
         root.flashEvent = ({})
         root.mode = "idle"
         root.mainState = root._resolveBaselineState()
+        root._suspendedEvent = root._idleEvent()
 
         if (root._queue.length > 0)
             _pendingStartTimer.restart()
@@ -379,9 +470,15 @@ Singleton {
         root.mainState = root._resolveBaselineState()
 
         _pendingStartTimer.stop()
-        _activeTimer.stop()
-        _activeTimer.interval = event.timeoutMs > 0 ? event.timeoutMs : root._settings().defaultTimeout
-        _activeTimer.restart()
+        if (root.overlayVisible) {
+            _activeTimer.stop()
+            root._activeDeadlineMs = 0
+            root._pausedActiveRemainingMs = event.timeoutMs > 0 ? event.timeoutMs : root._settings().defaultTimeout
+            root._activeTimerPausedForOverlay = true
+            return
+        }
+
+        root._scheduleActiveTimer(event.timeoutMs > 0 ? event.timeoutMs : root._settings().defaultTimeout)
     }
 
     function _finishTransient() {
@@ -398,7 +495,7 @@ Singleton {
             return
         }
 
-        _activeTimer.stop()
+        root._clearActiveTimerState()
         root.activeEvent = root._idleEvent()
         root.flashEvent = ({})
         root.mode = "idle"

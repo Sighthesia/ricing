@@ -22,6 +22,7 @@ Item {
     required property real bridgeOutset
     required property real inwardCornerRadius
     required property real pulseOpacity
+    required property real surfaceFillOpacity
 
     visible: root.active && !root.collapseTailHidden
     width: root.visibleWidth
@@ -79,7 +80,7 @@ Item {
                 Colors.surface.r * (1 - root.pulseOpacity) + Colors.highlight.r * root.pulseOpacity,
                 Colors.surface.g * (1 - root.pulseOpacity) + Colors.highlight.g * root.pulseOpacity,
                 Colors.surface.b * (1 - root.pulseOpacity) + Colors.highlight.b * root.pulseOpacity,
-                1
+                root.surfaceFillOpacity
             )
             startX: pillLeft + pillRadius
             startY: 0
