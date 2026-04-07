@@ -2,6 +2,7 @@ pragma Singleton
 
 import Quickshell
 import QtQuick
+import qs.config
 import qs.services
 
 // Coordinates the 20-20-20 break cycle, pre-break reminders, and the full-screen overlay session.
@@ -18,11 +19,14 @@ Singleton {
     readonly property int breakDurationMs: breakDurationSeconds * 1000
     readonly property int leadMs: leadSeconds * 1000
     readonly property int snoozeMs: snoozeMinutes * 60 * 1000
+    readonly property int outroMs: Math.max(700, Math.round(Theme.anim.moveDuration * 4))
     readonly property bool overlayVisible:
         IslandOverlayService.mode === "break-reminder"
         && IslandOverlayService.state !== "closed"
     readonly property bool preAlertActive: phase === "pre-alert"
     readonly property bool breakActive: phase === "break"
+    readonly property bool outroActive: phase === "outro"
+    readonly property int phaseElapsedMs: Math.max(0, _nowMs - _phaseStartedMs)
     readonly property int remainingMs: Math.max(0, _phaseDeadlineMs - _nowMs)
     readonly property int remainingWholeSeconds: Math.max(0, Math.ceil(remainingMs / 1000))
     readonly property real breakProgress:
@@ -36,14 +40,17 @@ Singleton {
         return minutes.toString().padStart(2, "0") + ":" + seconds.toString().padStart(2, "0")
     }
     readonly property string phaseTitle:
-        breakActive ? "20-20-20 休息时间"
-        : (preAlertActive ? "即将开始护眼休息" : "专注中")
+        outroActive ? "放松完成"
+        : (breakActive ? "20-20-20 休息时间"
+        : (preAlertActive ? "即将开始护眼休息" : "专注中"))
     readonly property string phaseSubtitle:
-        breakActive
+        outroActive
+            ? "让注意力缓慢回到当下，再继续专注。"
+            : (breakActive
             ? "看向 20 英尺外至少 20 秒，让眼睛重新对焦。"
             : (preAlertActive
                 ? leadSeconds.toString() + " 秒后进入护眼休息。"
-                : "每工作 20 分钟，提醒你远眺 20 秒。")
+                : "每工作 20 分钟，提醒你远眺 20 秒。"))
 
     property string phase: "work"
     property int _nowMs: Date.now()
@@ -98,6 +105,10 @@ Singleton {
         })
     }
 
+    function _enterOutroPhase() {
+        root._schedulePhase("outro", root.outroMs)
+    }
+
     function restartCycle() {
         root._enterWorkPhase(root.workIntervalMs)
     }
@@ -126,7 +137,7 @@ Singleton {
 
     Timer {
         id: _tickTimer
-        interval: 100
+        interval: 33
         repeat: true
         running: root.enabled
 
@@ -143,6 +154,11 @@ Singleton {
 
             if (root.phase === "pre-alert") {
                 root._enterBreakPhase()
+                return
+            }
+
+            if (root.phase === "break") {
+                root._enterOutroPhase()
                 return
             }
 
