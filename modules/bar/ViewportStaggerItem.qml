@@ -21,6 +21,7 @@ StaggerItem {
     property int managedEnterStep: SettingsService.data.animation.staggerLevel2Step
     property real viewportPadding: Math.max(8, enterOffsetY)
     property bool suppressViewportTransitions: ownerManagedEntry
+    property bool syncViewportStateWhenSuppressed: false
     property bool managedEnterFadeEnabled: false
 
     readonly property real _contentY:
@@ -135,7 +136,10 @@ StaggerItem {
             return
 
         if (suppressViewportTransitions) {
-            _viewportShown = viewportVisible
+            if (syncViewportStateWhenSuppressed)
+                syncViewportState()
+            else
+                _viewportShown = viewportVisible
             return
         }
 
@@ -168,6 +172,8 @@ StaggerItem {
     Component.onCompleted: {
         if (ownerManagedEntry) {
             prepareOwnedEnter()
+        } else if (suppressViewportTransitions && syncViewportStateWhenSuppressed) {
+            syncViewportState()
         } else if (trackViewport && scrollAnimationsEnabled && viewportVisible)
             runViewportEnter()
         else

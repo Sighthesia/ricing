@@ -84,6 +84,8 @@ Item {
 
     // Called by LauncherPanel after panel becomes active
     function openPanel(): void {
+        if (_resultsList && _resultsList.resetTransientState)
+            _resultsList.resetTransientState()
         _results.clear()
         _searchHeader.text = LauncherService.prefillText
         _refreshResults()
@@ -101,6 +103,8 @@ Item {
     // Called by LauncherPanel when closing
     function closePanel(): void {
         _suspendRefresh = true
+        if (_resultsList && _resultsList.resetTransientState)
+            _resultsList.resetTransientState()
         _searchHeader.text = ""
         _results.clear()
         root._resultData = []
@@ -164,13 +168,35 @@ Item {
 
         let items = provider.getResults(q)
         let displayItems = []
+        let previousKeys = ({})
+        let nextKeys = ({})
+
+        for (let existingIndex = 0; existingIndex < _results.count; existingIndex++) {
+            let existingItem = _results.get(existingIndex)
+            let existingKey = existingItem ? String(existingItem.key || "") : ""
+            previousKeys[existingKey] = true
+        }
+
+        let insertedCount = 0
         for (let i = 0; i < items.length; i++) {
-            displayItems.push({
+            let displayItem = {
                 key:         root._resultKeyForItem(items[i], i),
                 name:        items[i].name        || "",
                 description: items[i].description || "",
                 icon:        items[i].icon        || ""
-            })
+            }
+
+            displayItems.push(displayItem)
+            nextKeys[displayItem.key] = true
+
+            if (!previousKeys[displayItem.key])
+                insertedCount += 1
+        }
+
+        if (root._displayItemsMatch(displayItems)) {
+            root._resultData = items
+            _selectedIndex = root._resultData.length > 0 ? 0 : -1
+            return
         }
 
         if (_results.count === 0) {
@@ -181,21 +207,55 @@ Item {
                 _results.append(displayItems[j])
             }
             _selectedIndex = items.length > 0 ? 0 : -1
-            Qt.callLater(function() {
-                _resultsList.releaseManagedEntry()
-            })
+            if (_resultsList && _resultsList.scheduleManagedEntryRelease)
+                _resultsList.scheduleManagedEntryRelease(0)
+            else
+                Qt.callLater(function() { _resultsList.releaseManagedEntry() })
+            return
+        }
+
+        let shrinkOnly = displayItems.length < _results.count && insertedCount === 0
+
+        if (shrinkOnly) {
+            if (_resultsList && _resultsList.beginFilterTransition)
+                _resultsList.beginFilterTransition()
+            if (_resultsList && _resultsList.runSwapExit)
+                _resultsList.runSwapExit(nextKeys)
+            if (_resultsList && _resultsList.resetFilterViewport)
+                _resultsList.resetFilterViewport()
+
+            root._syncResults(displayItems, items)
+
+            if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
+                _resultsList.scheduleFilterTransitionRelease(Theme.anim.moveDuration + 20)
+            else if (_resultsList && _resultsList.endFilterTransition)
+                Qt.callLater(function() { _resultsList.endFilterTransition() })
+
             return
         }
 
         if (_resultsList && _resultsList.beginFilterTransition)
             _resultsList.beginFilterTransition()
-        if (_resultsList && _resultsList.resetFilterViewport)
-            _resultsList.resetFilterViewport()
+        if (_resultsList && _resultsList.runSwapExit)
+            _resultsList.runSwapExit()
+        if (_resultsList && _resultsList.prepareManagedEntry)
+            _resultsList.prepareManagedEntry()
 
-        root._syncResults(displayItems, items)
+        _results.clear()
+        root._resultData = items
+        for (let batchIndex = 0; batchIndex < displayItems.length; batchIndex++)
+            _results.append(displayItems[batchIndex])
 
-        if (_resultsList && _resultsList.endFilterTransition)
-            _resultsList.endFilterTransition()
+        _selectedIndex = root._resultData.length > 0 ? 0 : -1
+
+        if (_resultsList && _resultsList.scheduleManagedEntryRelease)
+            _resultsList.scheduleManagedEntryRelease(
+                _resultsList.activeSwapExitDuration
+                    ? _resultsList.activeSwapExitDuration()
+                    : 0
+            )
+        else if (_resultsList && _resultsList.releaseManagedEntry)
+            Qt.callLater(function() { _resultsList.releaseManagedEntry() })
     }
 
     function _resultKeyForItem(item, index): string {
@@ -206,6 +266,30 @@ Item {
             + "|" + String((item && item.description) || "")
             + "|" + String((item && item.icon) || "")
             + "|" + String(index)
+    }
+
+    function _displayItemsMatch(displayItems): bool {
+        if (_results.count !== displayItems.length)
+            return false
+
+        for (let index = 0; index < displayItems.length; index++) {
+            let existing = _results.get(index)
+            let incoming = displayItems[index]
+
+            if (!existing)
+                return false
+
+            if (String(existing.key || "") !== String(incoming.key || ""))
+                return false
+            if (String(existing.name || "") !== String(incoming.name || ""))
+                return false
+            if (String(existing.description || "") !== String(incoming.description || ""))
+                return false
+            if (String(existing.icon || "") !== String(incoming.icon || ""))
+                return false
+        }
+
+        return true
     }
 
     function _indexOfDisplayItem(key, startIndex): int {

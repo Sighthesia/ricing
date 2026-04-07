@@ -12,6 +12,8 @@ Item {
     property int selectedIndex: -1
     property bool scrollAnimationsEnabled: false
     property bool _filterTransitionActive: false
+    property bool _managedEntryPending: false
+    property int _activeSwapExitDuration: 0
     property var _outgoingItems: []
     readonly property int _maxViewportSlots: 6
     readonly property int _managedEnterStep: 30
@@ -20,7 +22,24 @@ Item {
         id: _outgoingClearTimer
         interval: root.visibleExitDuration() + 20
         repeat: false
-        onTriggered: root._outgoingItems = []
+        onTriggered: {
+            root._outgoingItems = []
+            root._activeSwapExitDuration = 0
+        }
+    }
+
+    Timer {
+        id: _managedEntryReleaseTimer
+        interval: 0
+        repeat: false
+        onTriggered: root.releaseManagedEntry()
+    }
+
+    Timer {
+        id: _filterTransitionReleaseTimer
+        interval: Theme.anim.moveDuration + 20
+        repeat: false
+        onTriggered: root.endFilterTransition()
     }
 
     signal selectRequested(int index)
@@ -31,6 +50,9 @@ Item {
 
     function runEnter(): void {
         root.scrollAnimationsEnabled = true
+
+        if (root._managedEntryPending)
+            return
 
         let delegates = root._visibleDelegates()
         for (let index = 0; index < delegates.length; index++) {
@@ -47,13 +69,19 @@ Item {
         }
     }
 
-    function runSwapExit(): void {
+    function runSwapExit(nextKeys): void {
         let delegates = root._visibleDelegates()
         let snapshots = []
 
         for (let index = 0; index < delegates.length; index++) {
             let delegate = delegates[index]
+            let delegateKey = String(delegate.key || "")
+
+            if (nextKeys && nextKeys[delegateKey])
+                continue
+
             snapshots.push({
+                key: delegateKey,
                 name: delegate.name,
                 description: delegate.description,
                 icon: delegate.icon,
@@ -64,8 +92,11 @@ Item {
         }
 
         root._outgoingItems = snapshots
+        root._activeSwapExitDuration = snapshots.length > 0
+            ? SettingsService.data.animation.staggerExitDuration + root._windowForCount(snapshots.length)
+            : 0
         if (snapshots.length > 0) {
-            _outgoingClearTimer.interval = root.visibleExitDuration() + 20
+            _outgoingClearTimer.interval = root._activeSwapExitDuration + 20
             _outgoingClearTimer.restart()
         } else {
             _outgoingClearTimer.stop()
@@ -79,18 +110,42 @@ Item {
     }
 
     function beginFilterTransition(): void {
+        _outgoingClearTimer.stop()
+        _managedEntryReleaseTimer.stop()
+        _filterTransitionReleaseTimer.stop()
+        root._outgoingItems = []
+        root._activeSwapExitDuration = 0
+        root._managedEntryPending = false
         root._filterTransitionActive = true
     }
 
     function endFilterTransition(): void {
-        Qt.callLater(function() {
-            root._filterTransitionActive = false
-        })
+        _filterTransitionReleaseTimer.stop()
+        root._filterTransitionActive = false
+    }
+
+    function scheduleFilterTransitionRelease(delayMs): void {
+        _filterTransitionReleaseTimer.interval = Math.max(0, Number(delayMs) || 0)
+        _filterTransitionReleaseTimer.restart()
+    }
+
+    function resetTransientState(): void {
+        _outgoingClearTimer.stop()
+        _managedEntryReleaseTimer.stop()
+        _filterTransitionReleaseTimer.stop()
+        root._outgoingItems = []
+        root._filterTransitionActive = false
+        root._managedEntryPending = false
+        root._activeSwapExitDuration = 0
     }
 
     function visibleExitDuration(): int {
         return SettingsService.data.animation.staggerExitDuration
             + root._windowForCount(root._visibleDelegates().length)
+    }
+
+    function activeSwapExitDuration(): int {
+        return Math.max(0, root._activeSwapExitDuration)
     }
 
     function _windowForCount(total): int {
@@ -120,13 +175,38 @@ Item {
 
     function prepareManagedEntry(): void {
         root.scrollAnimationsEnabled = true
+        root._managedEntryPending = true
+    }
+
+    function scheduleManagedEntryRelease(delayMs): void {
+        _managedEntryReleaseTimer.interval = Math.max(0, Number(delayMs) || 0)
+        _managedEntryReleaseTimer.restart()
+    }
+
+    function _queueManagedVisibleDelegates(): void {
+        let delegates = root._visibleDelegates()
+        for (let index = 0; index < delegates.length; index++) {
+            if (delegates[index].queueManagedEnter)
+                delegates[index].queueManagedEnter(index, delegates.length)
+        }
     }
 
     function releaseManagedEntry(): void {
         resultList.contentY = 0
         if (resultList.forceLayout)
             resultList.forceLayout()
-        root.runEnter()
+
+        Qt.callLater(function() {
+            if (!root._managedEntryPending)
+                return
+
+            if (resultList.forceLayout)
+                resultList.forceLayout()
+
+            root._queueManagedVisibleDelegates()
+            root._filterTransitionActive = false
+            root._managedEntryPending = false
+        })
     }
 
     ListView {
@@ -138,49 +218,40 @@ Item {
         displayMarginEnd: 92
 
         move: Transition {
-            id: _moveTransition
-
-            SequentialAnimation {
-                PauseAnimation {
-                    duration: root._compressedDelay(
-                        (_moveTransition.ViewTransition.targetIndexes
-                            && _moveTransition.ViewTransition.targetIndexes.length > 0)
-                            ? _moveTransition.ViewTransition.targetIndexes[0]
-                            : _moveTransition.ViewTransition.index,
-                        Math.max(resultList.count, 1)
-                    )
-                }
-                NumberAnimation {
-                    properties: "x,y"
-                    duration: Theme.anim.moveDuration
-                    easing.type: Theme.anim.moveType
-                }
+            NumberAnimation {
+                properties: "x,y"
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
             }
         }
 
-        displaced: Transition {
-            id: _displacedTransition
+        addDisplaced: Transition {
+            NumberAnimation {
+                properties: "x,y"
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
 
-            SequentialAnimation {
-                PauseAnimation {
-                    duration: root._compressedDelay(
-                        (_displacedTransition.ViewTransition.targetIndexes
-                            && _displacedTransition.ViewTransition.targetIndexes.length > 0)
-                            ? _displacedTransition.ViewTransition.targetIndexes[0]
-                            : _displacedTransition.ViewTransition.index,
-                        Math.max(resultList.count, 1)
-                    )
-                }
-                NumberAnimation {
-                    properties: "x,y"
-                    duration: Theme.anim.moveDuration
-                    easing.type: Theme.anim.moveType
-                }
+        removeDisplaced: Transition {
+            NumberAnimation {
+                properties: "x,y"
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
+
+        moveDisplaced: Transition {
+            NumberAnimation {
+                properties: "x,y"
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
             }
         }
 
         remove: Transition {
             id: _removeTransition
+            enabled: !root._filterTransitionActive
 
             SequentialAnimation {
                 PauseAnimation {
@@ -216,8 +287,10 @@ Item {
             required property string icon
 
             listView: resultList
+            ownerManagedEntry: root._managedEntryPending
             scrollAnimationsEnabled: root.scrollAnimationsEnabled
             suppressViewportTransitions: ownerManagedEntry || root._filterTransitionActive
+            syncViewportStateWhenSuppressed: root._filterTransitionActive && !root._managedEntryPending
             managedEnterKey: _item.key
             managedEnterJitterEnabled: false
             viewportPadding: 28
