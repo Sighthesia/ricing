@@ -25,6 +25,8 @@ Item {
     }
 
     function _pageItem(pageName) {
+        if (pageName === "control-center")
+            return controlCenterPageLoader.item
         if (pageName === "launcher")
             return launcherPageLoader.item
         if (pageName === "settings")
@@ -60,6 +62,11 @@ Item {
     function _activatePage(pageName, includeHeader) {
         root._runDeckEnter(includeHeader)
 
+        if (pageName === "control-center" && controlCenterPageLoader.item) {
+            controlCenterPageLoader.item.pageActivated()
+            return
+        }
+
         if (pageName === "launcher" && launcherPageLoader.item) {
             launcherPageLoader.item.pageActivated()
             return
@@ -82,6 +89,11 @@ Item {
     function _deactivatePage(pageName, includeHeader) {
         if (includeHeader)
             _deckStagger.runExit()
+
+        if (pageName === "control-center" && controlCenterPageLoader.item) {
+            controlCenterPageLoader.item.pageDeactivated()
+            return
+        }
 
         if (pageName === "launcher" && launcherPageLoader.item) {
             launcherPageLoader.item.pageDeactivated()
@@ -200,7 +212,7 @@ Item {
 
             BarComponents.StaggerItem {
                 id: _navItem
-                Layout.preferredWidth: Math.round(320 * Theme.uiScale)
+                Layout.preferredWidth: Math.round(420 * Theme.uiScale)
                 Layout.preferredHeight: 30
                 implicitWidth: _navRow.implicitWidth
                 implicitHeight: _navRow.implicitHeight
@@ -212,10 +224,18 @@ Item {
 
                     SuperIslandParts.SuperIslandOverlayNavButton {
                         Layout.fillWidth: true
+                        label: "中控"
+                        iconGlyph: "\uf085"
+                        selected: root.currentPage === "control-center"
+                        firstSegment: true
+                        onPressed: root._retargetPage("control-center")
+                    }
+
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
                         label: "启动器"
                         iconGlyph: "\uf002"
                         selected: root.currentPage === "launcher"
-                        firstSegment: true
                         onPressed: root._retargetPage("launcher")
                     }
 
@@ -302,6 +322,14 @@ Item {
 
             Item {
                 anchors.fill: parent
+
+                Loader {
+                    id: controlCenterPageLoader
+                    active: true
+                    anchors.fill: parent
+                    visible: root._presentedPage === "control-center"
+                    source: "ExpandedControlCenterPage.qml"
+                }
 
                 Loader {
                     id: launcherPageLoader

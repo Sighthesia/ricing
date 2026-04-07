@@ -119,10 +119,11 @@ Singleton {
     }
 
     function _normalizeMode(mode) {
-        if (mode === "launcher"
-                || mode === "settings"
-                || mode === "notifications"
-                || mode === "break-reminder")
+        if (mode === "control-center"
+            || mode === "launcher"
+            || mode === "settings"
+            || mode === "notifications"
+            || mode === "break-reminder")
             return mode
 
         return ""
