@@ -423,7 +423,10 @@ Item {
             ? SettingsService.data.superIsland.expandedDefaultPage
             : "launcher"
 
-        if (configuredPage === "settings" || configuredPage === "notifications")
+        if (configuredPage === "control-center"
+            || configuredPage === "settings"
+            || configuredPage === "notifications"
+            || configuredPage === "launcher")
             return configuredPage
 
         return "launcher"
