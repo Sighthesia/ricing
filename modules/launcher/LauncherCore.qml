@@ -229,7 +229,12 @@ Item {
             && removedCount === 0
             && root._currentItemsAreStableSubsequence(displayItems)
 
-        if (shrinkOnly) {
+        let currentVisibleKeys = _resultsList && _resultsList.strictVisibleDelegateKeys
+            ? _resultsList.strictVisibleDelegateKeys()
+            : []
+        let shrinkVisibleStable = root._nextTopKeysStayWithinVisibleWindow(displayItems, currentVisibleKeys)
+
+        if (shrinkOnly && shrinkVisibleStable) {
             if (_resultsList && _resultsList.beginFilterTransition)
                 _resultsList.beginFilterTransition()
             if (_resultsList && _resultsList.runSwapExit)
@@ -238,6 +243,9 @@ Item {
                 _resultsList.resetFilterViewport()
 
             root._syncResults(displayItems, items)
+
+            if (_resultsList && _resultsList.syncVisibleDelegateState)
+                _resultsList.syncVisibleDelegateState()
 
             if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
                 _resultsList.scheduleFilterTransitionRelease(Theme.anim.moveDuration + 20)
@@ -364,6 +372,34 @@ Item {
 
                 matched = true
                 break
+            }
+
+            if (!matched)
+                return false
+        }
+
+        return true
+    }
+
+    function _nextTopKeysStayWithinVisibleWindow(displayItems, currentVisibleKeys): bool {
+        if (!currentVisibleKeys || currentVisibleKeys.length === 0)
+            return false
+
+        let topCount = Math.min(displayItems.length, currentVisibleKeys.length)
+        let currentVisibleIndex = 0
+
+        for (let displayIndex = 0; displayIndex < topCount; displayIndex++) {
+            let targetKey = String(displayItems[displayIndex].key || "")
+            let matched = false
+
+            while (currentVisibleIndex < currentVisibleKeys.length) {
+                if (String(currentVisibleKeys[currentVisibleIndex]) === targetKey) {
+                    matched = true
+                    currentVisibleIndex += 1
+                    break
+                }
+
+                currentVisibleIndex += 1
             }
 
             if (!matched)

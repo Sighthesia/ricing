@@ -197,6 +197,37 @@ Item {
         return delegates
     }
 
+    function visibleDelegateKeys(): var {
+        let delegates = root._visibleDelegates()
+        let keys = []
+
+        for (let index = 0; index < delegates.length; index++)
+            keys.push(String(delegates[index].key || ""))
+
+        return keys
+    }
+
+    function strictVisibleDelegateKeys(): var {
+        let keys = []
+        let topBoundary = Number(resultList.contentY || 0)
+        let bottomBoundary = topBoundary + Number(resultList.height || 0)
+
+        for (let index = 0; index < resultList.count; index++) {
+            let delegate = resultList.itemAtIndex(index)
+            if (!delegate)
+                continue
+
+            let itemTop = Number(delegate.y || 0)
+            let itemBottom = itemTop + Number(delegate.height || 0)
+            if (itemBottom <= topBoundary || itemTop >= bottomBoundary)
+                continue
+
+            keys.push(String(delegate.key || ""))
+        }
+
+        return keys
+    }
+
     function prepareManagedEntry(): void {
         root.scrollAnimationsEnabled = true
         root._managedEntryPending = true
@@ -212,6 +243,17 @@ Item {
         for (let index = 0; index < delegates.length; index++) {
             if (delegates[index].queueManagedEnter)
                 delegates[index].queueManagedEnter(index, delegates.length)
+        }
+    }
+
+    function syncVisibleDelegateState(): void {
+        if (resultList.forceLayout)
+            resultList.forceLayout()
+
+        let delegates = root._visibleDelegates()
+        for (let index = 0; index < delegates.length; index++) {
+            if (delegates[index].syncViewportState)
+                delegates[index].syncViewportState()
         }
     }
 
