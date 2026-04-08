@@ -14,6 +14,26 @@ Item {
     width: 0
     height: 0
 
+    function routeOverlayModeChange() {
+        const previousAttachedWidth = root.host._attachedPanelVisibleWidth
+        const previousAttachedHeight = root.host._attachedPanelVisibleHeight
+
+        root.machine.syncOverlayFlags()
+        root.machine.syncOverlayExtensionReservation()
+
+        if (!root.state._overlaySessionActive)
+            return
+
+        if (IslandOverlayService.state !== "open")
+            return
+
+        root.machine.startAttachedReveal(
+            Math.max(previousAttachedWidth, root.host._attachedRevealSeedWidth),
+            Math.max(previousAttachedHeight, root.host._attachedRevealSeedHeight),
+            false
+        )
+    }
+
     function routeOverlayStateChange() {
         const previousAttachedWidth = root.host._attachedPanelVisibleWidth
         const previousAttachedHeight = root.host._attachedPanelVisibleHeight

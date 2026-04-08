@@ -11,17 +11,51 @@ Item {
     id: root
 
     property bool drawSurface: true
+    property bool measurementMode: false
 
     readonly property string currentPage: IslandOverlayService.mode || "launcher"
-    readonly property bool _showChrome: root._presentedPage !== "break-reminder"
-    readonly property bool _fullScreenPage: root._presentedPage === "break-reminder"
+    readonly property bool _showChrome:
+        root._presentedPage !== "break-reminder"
+        && root._presentedPage !== "session-control"
+    readonly property bool _fullScreenPage:
+        root._presentedPage === "break-reminder"
+        || root._presentedPage === "session-control"
     readonly property real _deckMargins: root._fullScreenPage ? 0 : 12
     readonly property real _deckSpacing: root._fullScreenPage ? 0 : 10
+    readonly property real _headerHeight:
+        root._showChrome
+            ? Math.max(
+                _clockItem.implicitHeight,
+                _navItem.implicitHeight,
+                _sessionItem.implicitHeight,
+                _closeItem.height
+            )
+            : 0
+    readonly property real _contentHeight: {
+        return root.measurementMode
+            ? root._measurePageHeight(root._presentedPage)
+            : root._targetContentHeight
+    }
     property string _presentedPage: root.currentPage
     property string _pendingPage: ""
+    property real _targetContentHeight: root._measurePageHeight(root._presentedPage)
+
+    implicitHeight:
+        root._deckMargins * 2
+        + root._contentHeight
+        + (root._showChrome
+            ? (root._headerHeight + root._deckSpacing + 1 + root._deckSpacing)
+            : 0)
+
+    Behavior on _targetContentHeight {
+        NumberAnimation {
+            duration: Math.max(1, SettingsService.effectiveAnimation.staggerExitDuration)
+            easing.type: Theme.anim.moveType
+        }
+    }
 
     function _showHeaderForPage(pageName) {
-        return pageName !== "break-reminder"
+        return pageName !== "break-reminder" && pageName !== "session-control"
     }
 
     function _pageItem(pageName) {
@@ -31,11 +65,18 @@ Item {
             return settingsPageLoader.item
         if (pageName === "control-center")
             return controlCenterPageLoader.item
+        if (pageName === "session-control")
+            return sessionControlPageLoader.item
         if (pageName === "notifications")
             return notificationsPageLoader.item
         if (pageName === "break-reminder")
             return breakReminderPageLoader.item
         return null
+    }
+
+    function _measurePageHeight(pageName) {
+        let pageItem = root._pageItem(pageName)
+        return pageItem ? pageItem.implicitHeight : 0
     }
 
     function _pageExitDuration(pageName) {
@@ -47,6 +88,9 @@ Item {
     }
 
     function _runDeckEnter(includeHeader) {
+        if (root.measurementMode)
+            return
+
         _deckStagger.clear()
         if (includeHeader) {
             _deckStagger.registerItem(_clockItem, 0, 1)
@@ -61,6 +105,9 @@ Item {
 
     function _activatePage(pageName, includeHeader) {
         root._runDeckEnter(includeHeader)
+
+        if (root.measurementMode)
+            return
 
         if (pageName === "launcher" && launcherPageLoader.item) {
             launcherPageLoader.item.pageActivated()
@@ -77,6 +124,11 @@ Item {
             return
         }
 
+        if (pageName === "session-control" && sessionControlPageLoader.item) {
+            sessionControlPageLoader.item.pageActivated()
+            return
+        }
+
         if (pageName === "notifications" && notificationsPageLoader.item) {
             notificationsPageLoader.item.pageActivated()
             return
@@ -90,6 +142,9 @@ Item {
         if (includeHeader)
             _deckStagger.runExit()
 
+        if (root.measurementMode)
+            return
+
         if (pageName === "launcher" && launcherPageLoader.item) {
             launcherPageLoader.item.pageDeactivated()
             return
@@ -102,6 +157,11 @@ Item {
 
         if (pageName === "control-center" && controlCenterPageLoader.item) {
             controlCenterPageLoader.item.pageDeactivated()
+            return
+        }
+
+        if (pageName === "session-control" && sessionControlPageLoader.item) {
+            sessionControlPageLoader.item.pageDeactivated()
             return
         }
 
@@ -123,27 +183,43 @@ Item {
 
     Component.onCompleted: {
         root._presentedPage = root.currentPage
+        if (root.measurementMode)
+            return
+
         Qt.callLater(function() {
             root._activatePage(root._presentedPage, root._showHeaderForPage(root._presentedPage))
         })
     }
 
-    Component.onDestruction: root._deactivatePage(
-        root._presentedPage,
-        root._showHeaderForPage(root._presentedPage)
-    )
+    Component.onDestruction: {
+        if (root.measurementMode)
+            return
+
+        root._deactivatePage(
+            root._presentedPage,
+            root._showHeaderForPage(root._presentedPage)
+        )
+    }
 
     Connections {
         target: IslandOverlayService
 
         function onModeChanged() {
-            let nextPage = IslandOverlayService.mode || "launcher"
-            let previousPage = root._presentedPage
+        if (root.measurementMode) {
+            root._presentedPage = IslandOverlayService.mode || "launcher"
+            root._pendingPage = ""
+            root._targetContentHeight = root._measurePageHeight(root._presentedPage)
+            return
+        }
+
+        let nextPage = IslandOverlayService.mode || "launcher"
+        let previousPage = root._presentedPage
 
             if (nextPage === previousPage)
                 return
 
             root._pendingPage = nextPage
+            root._targetContentHeight = root._measurePageHeight(nextPage)
             root._deactivatePage(previousPage, false)
             _pageSwitchDelay.interval = root._pageExitDuration(previousPage)
             _pageSwitchDelay.restart()
@@ -274,7 +350,6 @@ Item {
                     lastSegment: true
                     onPressed: {
                         SessionControlService.openSessionControl("super-island")
-                        IslandOverlayService.closeOverlay("session-control")
                     }
                 }
             }
@@ -353,6 +428,14 @@ Item {
                     anchors.fill: parent
                     visible: root._presentedPage === "notifications"
                     source: "ExpandedNotificationsPage.qml"
+                }
+
+                Loader {
+                    id: sessionControlPageLoader
+                    active: true
+                    anchors.fill: parent
+                    visible: root._presentedPage === "session-control"
+                    source: "ExpandedSessionControlPage.qml"
                 }
 
                 Loader {

@@ -123,6 +123,7 @@ Singleton {
                 || mode === "settings"
                 || mode === "control-center"
                 || mode === "notifications"
+                || mode === "session-control"
                 || mode === "break-reminder")
             return mode
 

@@ -134,16 +134,46 @@ Item {
     readonly property real _returnTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
 
-    readonly property bool _fullScreenBreakOverlayMode:
+    readonly property bool _fullScreenOverlayMode:
         IslandOverlayService.mode === "break-reminder"
+        || IslandOverlayService.mode === "session-control"
+    readonly property bool _fullScreenSessionOverlayMode:
+        IslandOverlayService.mode === "session-control"
+    readonly property bool _controlCenterOverlayMode:
+        IslandOverlayService.mode === "control-center"
     readonly property real _screenWidth: Screen.width || BarLayoutService.barContentWidth
     readonly property real _screenHeight: Screen.height || 0
-    readonly property real _overlayBodyHeight:
-        root._fullScreenBreakOverlayMode
+    readonly property real _overlayAvailableBodyHeight:
+        root._screenHeight > 0
             ? Math.max(root._collapsedPillHeight, root._screenHeight - root._overlayDetachedOffset)
+            : Math.round(900 * Theme.uiScale)
+    readonly property real _controlCenterMeasuredBodyHeight:
+        _overlayDeckMeasureLoader.item
+            ? _overlayDeckMeasureLoader.item.implicitHeight
             : Math.round(528 * Theme.uiScale)
+    readonly property real _controlCenterAnimatedBodyHeight:
+        _overlayDeckHost.implicitHeight > 0
+            ? _overlayDeckHost.implicitHeight
+            : root._controlCenterMeasuredBodyHeight
+    property real _overlayBodyHeight:
+        root._fullScreenOverlayMode
+            ? root._overlayAvailableBodyHeight
+            : (root._controlCenterOverlayMode
+                ? Math.min(
+                    root._overlayAvailableBodyHeight,
+                    Math.max(Math.round(528 * Theme.uiScale), root._controlCenterAnimatedBodyHeight)
+                )
+                : Math.round(528 * Theme.uiScale))
+    Behavior on _overlayBodyHeight {
+        NumberAnimation {
+            duration: Math.max(1, SettingsService.effectiveAnimation.staggerExitDuration)
+            easing.type: Theme.anim.moveType
+        }
+    }
     readonly property real _overlayDetachedOffset:
-        Math.max(Theme.barHeight, root._pillH + root._overlayInwardCornerDepth)
+        root._fullScreenSessionOverlayMode
+            ? Theme.barHeight
+            : Math.max(Theme.barHeight, root._pillH + root._overlayInwardCornerDepth)
     readonly property real _overlayDetachedY: root._overlayDetachedOffset
     readonly property real _overlayRevealLift:
         Math.max(8, Theme.barWidget.contentPaddingV * 4)
@@ -227,7 +257,7 @@ Item {
         && (root._phase === "enter" || root._phase === "hold" || root._phase === "hint")
 
     readonly property real _overlayExpandedWidth: {
-        if (root._fullScreenBreakOverlayMode)
+        if (root._fullScreenOverlayMode)
             return Math.max(root._collapsedWidth, root._screenWidth)
 
         const availableWidth = Math.max(
@@ -237,7 +267,7 @@ Item {
         return Math.max(root._collapsedWidth, Math.min(Math.round(980 * Theme.uiScale), availableWidth))
     }
     readonly property real _attachedShellFillOpacity:
-        root._fullScreenBreakOverlayMode ? 0.78 : 1
+        root._fullScreenOverlayMode ? 0.78 : 1
 
     readonly property real _fullHintExpandedPillHeight:
         root._pillH
@@ -690,6 +720,16 @@ Item {
         }
     }
 
+    IslandCards.ExpandedPanelDeck {
+        id: _overlayDeckHost
+
+        width: root._overlayExpandedWidth
+        visible: false
+        enabled: false
+        drawSurface: false
+        measurementMode: false
+    }
+
     Loader {
         id: _detachedHintMeasureLoader
         property var eventData: root._attachedHintEvent
@@ -709,6 +749,16 @@ Item {
         sourceComponent: _idleComponent
     }
 
+    Loader {
+        id: _overlayDeckMeasureLoader
+
+        width: root._overlayExpandedWidth
+        active: root._controlCenterOverlayMode
+        visible: false
+        enabled: false
+        sourceComponent: _overlayDeckMeasureComponent
+    }
+
     Component {
         id: _idleComponent
 
@@ -716,6 +766,16 @@ Item {
             currentTime: root.currentTime
             hasPendingEvents: SuperIslandService.hasPendingEvents
             cardHeight: root._pillH
+        }
+    }
+
+    Component {
+        id: _overlayDeckMeasureComponent
+
+        IslandCards.ExpandedPanelDeck {
+            width: root._overlayExpandedWidth
+            drawSurface: false
+            measurementMode: true
         }
     }
 
@@ -806,7 +866,14 @@ Item {
     Shortcut {
         sequence: "Escape"
         enabled: root._overlaySessionActive
-        onActivated: IslandOverlayService.closeOverlay("super-island-shortcut")
+        onActivated: {
+            if (IslandOverlayService.mode === "session-control") {
+                SessionControlService.handleEscape()
+                return
+            }
+
+            IslandOverlayService.closeOverlay("super-island-shortcut")
+        }
     }
 
     MouseArea {

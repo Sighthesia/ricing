@@ -40,6 +40,8 @@ Item {
 
     property real _overlayProgress: active ? 1 : 0
     property real _maskRadius: active ? _maskTargetRadius : _maskMaxRadius
+    readonly property real _promptFollowScale:
+        Math.max(0.72, Math.min(1, _focusCard.width / Math.max(1, root._cardWidth)))
 
     visible: active || _overlayProgress > 0.01
     z: 20
@@ -159,19 +161,13 @@ Item {
         id: _promptBlock
 
         width: root._promptWidth
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: _focusCard.y + _focusCard.height + root._groupGap
+        x: _focusCard.x + (_focusCard.width - width * scale) / 2
+        y: _focusCard.y + _focusCard.height + root._groupGap * scale
         spacing: Math.round(12 * Theme.uiScale)
-        opacity: root._overlayProgress
-        visible: root.visible
-
-        Behavior on y {
-            NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
-        }
-
-        Behavior on opacity {
-            NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Easing.InOutCubic }
-        }
+        opacity: _focusCard.opacity
+        scale: root._promptFollowScale
+        transformOrigin: Item.Top
+        visible: root.visible && opacity > 0.01
 
         Text {
             Layout.alignment: Qt.AlignHCenter

@@ -3,12 +3,12 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.services
 
 // Shared state and command execution for the fullscreen session control surface.
 Singleton {
     id: root
 
-    property bool visible: false
     property string source: ""
     property string phase: "closed"
     property string selectedAction: "logout"
@@ -20,6 +20,9 @@ Singleton {
     property string _stdoutBuffer: ""
     property string _stderrBuffer: ""
 
+    readonly property bool overlayVisible:
+        IslandOverlayService.mode === "session-control"
+        && IslandOverlayService.state !== "closed"
     readonly property bool busy: _actionProcess.running || root.phase === "executing"
 
     function openSessionControl(source) {
@@ -29,7 +32,9 @@ Singleton {
         root.confirmingAction = ""
         root.executingAction = ""
         root.lastError = ""
-        root.visible = true
+        IslandOverlayService.openOverlay("session-control", {
+            source: root.source
+        })
         return true
     }
 
@@ -37,18 +42,15 @@ Singleton {
         if (root.busy)
             return false
 
-        root.visible = false
-        root.source = ""
-        root.phase = "closed"
-        root.selectedAction = "logout"
-        root.confirmingAction = ""
-        root.executingAction = ""
-        root.lastError = ""
+        if (root.overlayVisible)
+            IslandOverlayService.closeOverlay(reason || "session-control")
+        else
+            root._resetState()
         return true
     }
 
     function toggleSessionControl(source) {
-        if (root.visible)
+        if (root.overlayVisible)
             return root.closeSessionControl("toggle")
 
         return root.openSessionControl(source)
@@ -85,7 +87,7 @@ Singleton {
         root.confirmingAction = ""
         root.executingAction = ""
         root.lastError = ""
-        if (root.visible)
+        if (root.overlayVisible)
             root.phase = "browse"
         return true
     }
@@ -169,6 +171,15 @@ Singleton {
         root.executingAction = ""
     }
 
+    function _resetState() {
+        root.source = ""
+        root.phase = "closed"
+        root.selectedAction = "logout"
+        root.confirmingAction = ""
+        root.executingAction = ""
+        root.lastError = ""
+    }
+
     Process {
         id: _actionProcess
 
@@ -188,6 +199,28 @@ Singleton {
             root._pendingCommand = []
             root._stdoutBuffer = ""
             root._stderrBuffer = ""
+        }
+    }
+
+    Connections {
+        target: IslandOverlayService
+
+        function onModeChanged() {
+            if (IslandOverlayService.mode === "session-control") {
+                if (root.phase === "closed")
+                    root.phase = "browse"
+                return
+            }
+
+            root._resetState()
+        }
+
+        function onStateChanged() {
+            if (IslandOverlayService.mode === "session-control")
+                return
+
+            if (IslandOverlayService.state === "closed")
+                root._resetState()
         }
     }
 }

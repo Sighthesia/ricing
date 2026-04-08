@@ -111,8 +111,7 @@ Item {
         }
 
         function onModeChanged() {
-            root.machine.syncOverlayFlags()
-            root.machine.syncOverlayExtensionReservation()
+            root.overlayEventRouter.routeOverlayModeChange()
         }
     }
 }

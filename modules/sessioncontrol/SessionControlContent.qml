@@ -9,9 +9,19 @@ Rectangle {
     id: root
 
     readonly property int _gridColumns:
-        width >= Math.round(1320 * Theme.uiScale)
-            ? 4
-            : (width >= Math.round(880 * Theme.uiScale) ? 2 : 1)
+        width >= Math.round(760 * Theme.uiScale) ? 2 : 1
+    readonly property real _stageMaxWidth:
+        width >= Math.round(760 * Theme.uiScale)
+            ? Math.round(760 * Theme.uiScale)
+            : Math.min(width - Math.round(56 * Theme.uiScale), Math.round(360 * Theme.uiScale))
+    readonly property real _cardHeight: Math.round(212 * Theme.uiScale)
+    readonly property real _gridWidth:
+        root._gridColumns === 2
+            ? root._stageMaxWidth
+            : Math.min(root._stageMaxWidth, Math.round(360 * Theme.uiScale))
+    readonly property real _gridHeight:
+        Math.ceil(root._actions.length / root._gridColumns) * root._cardHeight
+        + Math.max(0, Math.ceil(root._actions.length / root._gridColumns) - 1) * Math.round(16 * Theme.uiScale)
     readonly property var _actions: [
         { id: "logout", label: "注销", iconGlyph: "\uf2f5", accentColor: Colors.highlight, destructive: true },
         { id: "shutdown", label: "关机", iconGlyph: "\uf011", accentColor: Colors.destructive, destructive: true },
@@ -34,11 +44,7 @@ Rectangle {
     property real _confirmStartWidth: 0
     property real _confirmStartHeight: 0
 
-    radius: Theme.cornerRadius + 12
-    color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.62)
-    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.78)
-    border.width: 1
-    clip: true
+    color: "transparent"
 
     function _actionById(actionId) {
         for (let actionIndex = 0; actionIndex < root._actions.length; actionIndex++) {
@@ -74,15 +80,6 @@ Rectangle {
         }
 
         SessionControlService.executeAction(actionId)
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        anchors.margins: 1
-        radius: parent.radius - 1
-        color: "transparent"
-        border.color: Qt.rgba(1, 1, 1, 0.05)
-        border.width: 1
     }
 
     Item {
@@ -169,142 +166,58 @@ Rectangle {
                 }
             }
 
-            GridLayout {
+            Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                columns: root._gridColumns
-                columnSpacing: Math.round(16 * Theme.uiScale)
-                rowSpacing: Math.round(16 * Theme.uiScale)
+                Item {
+                    width: root._gridWidth
+                    height: root._gridHeight
+                    anchors.centerIn: parent
 
-                Repeater {
-                    model: root._actions
+                    GridLayout {
+                        anchors.fill: parent
+                        columns: root._gridColumns
+                        columnSpacing: Math.round(16 * Theme.uiScale)
+                        rowSpacing: Math.round(16 * Theme.uiScale)
 
-                    delegate: Item {
-                        id: _actionShell
+                        Repeater {
+                            model: root._actions
 
-                        required property var modelData
+                            delegate: Item {
+                                id: _actionShell
 
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        Layout.minimumHeight: Math.round(188 * Theme.uiScale)
-                        Layout.preferredHeight: Math.round(212 * Theme.uiScale)
+                                required property var modelData
 
-                        opacity: root._confirmVisualActive ? 0 : 1
-                        scale: root._confirmVisualActive ? 0.94 : 1
+                                Layout.fillWidth: true
+                                Layout.preferredWidth:
+                                    root._gridColumns === 2
+                                        ? Math.round((root._gridWidth - Math.round(16 * Theme.uiScale)) / 2)
+                                        : root._gridWidth
+                                Layout.preferredHeight: root._cardHeight
 
-                        Behavior on opacity {
-                            NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Easing.InOutCubic }
-                        }
+                                opacity: root._confirmVisualActive ? 0 : 1
+                                scale: root._confirmVisualActive ? 0.94 : 1
 
-                        Behavior on scale {
-                            NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
-                        }
+                                Behavior on opacity {
+                                    NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Easing.InOutCubic }
+                                }
 
-                        SessionControlParts.SessionActionCard {
-                            anchors.fill: parent
-                            label: modelData.label
-                            iconGlyph: modelData.iconGlyph
-                            accentColor: modelData.accentColor
-                            destructive: modelData.destructive
-                            selected:
-                                !root._confirmVisualActive
-                                && SessionControlService.selectedAction === modelData.id
-                            onPressed: root._handleActionPressed(modelData.id, _actionShell)
-                        }
-                    }
-                }
-            }
+                                Behavior on scale {
+                                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                                }
 
-            Rectangle {
-                id: _footerBar
-                Layout.fillWidth: true
-                Layout.preferredHeight: _footerRow.implicitHeight + 24
-                radius: Theme.cornerRadius + 4
-                color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.44)
-                border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.64)
-                border.width: 1
-                opacity: root._confirmVisualActive ? 0 : 1
-
-                Behavior on opacity {
-                    NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Easing.InOutCubic }
-                }
-
-                RowLayout {
-                    id: _footerRow
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 12
-
-                    Rectangle {
-                        Layout.preferredWidth: 34
-                        Layout.preferredHeight: 34
-                        radius: 17
-                        color: Qt.rgba(
-                            SessionControlService.lastError !== "" ? Colors.destructive.r : Colors.highlight.r,
-                            SessionControlService.lastError !== "" ? Colors.destructive.g : Colors.highlight.g,
-                            SessionControlService.lastError !== "" ? Colors.destructive.b : Colors.highlight.b,
-                            0.16
-                        )
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: SessionControlService.lastError !== ""
-                                ? "!"
-                                : (_actionById(SessionControlService.selectedAction) ? _actionById(SessionControlService.selectedAction).iconGlyph : "\uf05a")
-                            font.family: Theme.fontMono
-                            font.pixelSize: Theme.fontSizeBody + 2
-                            color: SessionControlService.lastError !== "" ? Colors.destructive : Colors.highlight
-                        }
-                    }
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 2
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: SessionControlService.lastError !== ""
-                                ? "执行失败"
-                                : (_actionById(SessionControlService.selectedAction) ? _actionById(SessionControlService.selectedAction).label : "Session")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeBody + 1
-                            font.weight: Font.Medium
-                            color: Colors.text
-                            elide: Text.ElideRight
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: SessionControlService.lastError !== "" ? "检查 systemctl / loginctl 权限" : "危险操作需要二次确认"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSmall + 1
-                            color: Colors.textMuted
-                            elide: Text.ElideRight
-                        }
-                    }
-
-                    Rectangle {
-                        radius: Theme.cornerRadius
-                        color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.54)
-                        border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.74)
-                        border.width: 1
-                        Layout.preferredWidth: Math.round(116 * Theme.uiScale)
-                        Layout.preferredHeight: Math.round(42 * Theme.uiScale)
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "关闭页面"
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeBody
-                            font.weight: Font.Medium
-                            color: Colors.text
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: SessionControlService.closeSessionControl("footer-close")
+                                SessionControlParts.SessionActionCard {
+                                    anchors.fill: parent
+                                    label: modelData.label
+                                    iconGlyph: modelData.iconGlyph
+                                    accentColor: modelData.accentColor
+                                    destructive: modelData.destructive
+                                    selected:
+                                        !root._confirmVisualActive
+                                        && SessionControlService.selectedAction === modelData.id
+                                    onPressed: root._handleActionPressed(modelData.id, _actionShell)
+                                }
+                            }
                         }
                     }
                 }
