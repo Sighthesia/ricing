@@ -19,7 +19,7 @@ Item {
     property int _activeSwapExitDuration: 0
     property var _outgoingItems: []
     readonly property int _maxViewportSlots: 6
-    readonly property int _managedEnterStep: 30
+    readonly property int _managedEnterStep: SettingsService.effectiveAnimation.staggerLevel2Step
 
     Timer {
         id: _outgoingClearTimer
@@ -96,7 +96,7 @@ Item {
 
         root._outgoingItems = snapshots
         root._activeSwapExitDuration = snapshots.length > 0
-            ? SettingsService.data.animation.staggerExitDuration + root._windowForCount(snapshots.length)
+            ? SettingsService.effectiveAnimation.staggerExitDuration + root._windowForCount(snapshots.length)
             : 0
         if (snapshots.length > 0) {
             _outgoingClearTimer.interval = root._activeSwapExitDuration + 20
@@ -158,7 +158,7 @@ Item {
     }
 
     function visibleExitDuration(): int {
-        return SettingsService.data.animation.staggerExitDuration
+        return SettingsService.effectiveAnimation.staggerExitDuration
             + root._windowForCount(root._visibleDelegates().length)
     }
 
@@ -174,7 +174,7 @@ Item {
 
     function _windowForCount(total): int {
         let capped = Math.max(0, Math.min(total, root._maxViewportSlots))
-        return Math.max(0, capped - 1) * SettingsService.data.animation.staggerExitStep
+        return Math.max(0, capped - 1) * SettingsService.effectiveAnimation.staggerExitStep
     }
 
     function _compressedDelay(rank, total): int {
@@ -220,6 +220,23 @@ Item {
             let itemTop = Number(delegate.y || 0)
             let itemBottom = itemTop + Number(delegate.height || 0)
             if (itemBottom <= topBoundary || itemTop >= bottomBoundary)
+                continue
+
+            keys.push(String(delegate.key || ""))
+        }
+
+        return keys
+    }
+
+    function instantiatedDelegateKeys(): var {
+        let keys = []
+
+        if (resultList.forceLayout)
+            resultList.forceLayout()
+
+        for (let index = 0; index < resultList.count; index++) {
+            let delegate = resultList.itemAtIndex(index)
+            if (!delegate)
                 continue
 
             keys.push(String(delegate.key || ""))
@@ -360,13 +377,13 @@ Item {
                     NumberAnimation {
                         property: "opacity"
                         to: 0
-                        duration: SettingsService.data.animation.staggerExitDuration
+                        duration: SettingsService.effectiveAnimation.staggerExitDuration
                         easing.type: Easing.InCubic
                     }
                     NumberAnimation {
                         property: "_ty"
                         to: 18
-                        duration: SettingsService.data.animation.staggerExitDuration
+                        duration: SettingsService.effectiveAnimation.staggerExitDuration
                         easing.type: Easing.InCubic
                     }
                 }
@@ -390,14 +407,14 @@ Item {
             managedEnterKey: _item.key
             managedEnterJitterEnabled: false
             viewportPadding: 28
-            scrollStep: 60
-            viewportEnterBaseDelay: 80
+            scrollStep: SettingsService.effectiveAnimation.staggerExitStep
+            viewportEnterBaseDelay: SettingsService.effectiveAnimation.staggerLevel2BaseDelay
             managedEnterStep: root._managedEnterStep
             managedEnterFadeEnabled: true
             managedEnterStartOpacity: 0.0
             managedEnterStartOffsetY: enterOffsetY
-            enterOffsetY: 28
-            exitOffsetY: 14
+            enterOffsetY: SettingsService.effectiveAnimation.staggerEnterOffsetY
+            exitOffsetY: SettingsService.effectiveAnimation.staggerExitOffsetY
             property real _filterAddOpacity: 1
             property real _filterAddOffsetY: 0
 

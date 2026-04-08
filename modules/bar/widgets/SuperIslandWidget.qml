@@ -466,11 +466,11 @@ Item {
             ? SettingsService.data.superIsland.expandedDefaultPage
             : "launcher"
 
-        if (configuredPage === "control-center"
-            || configuredPage === "settings"
-            || configuredPage === "notifications"
-            || configuredPage === "launcher")
+        if (configuredPage === "settings" || configuredPage === "control-center")
             return configuredPage
+
+        if (configuredPage === "notifications")
+            return "notifications"
 
         return "launcher"
     }

@@ -1,6 +1,7 @@
 import QtQuick
 import Qt5Compat.GraphicalEffects
 import qs.config
+import qs.services
 
 // Click ripple overlay — renders an expanding circle from the click point.
 //
@@ -35,6 +36,9 @@ Item {
     readonly property real _maxSize: 2 * Math.sqrt(width * width + height * height)
 
     function triggerRipple(clickX, clickY) {
+        if (SettingsService.powerSaveEnabled)
+            return
+
         _rx = clickX
         _ry = clickY
         _anim.restart()

@@ -61,8 +61,13 @@ Item {
                 background: null
                 selectionColor: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.3)
 
-                onTextEdited: root.queryChanged(text)
-                onTextChanged: root.queryChanged(text)
+                onTextEdited: {
+                    console.log("[LauncherSearchHeader]", "textEdited", JSON.stringify(text))
+                    root.queryChanged(text)
+                }
+                onTextChanged: {
+                    console.log("[LauncherSearchHeader]", "textChanged", JSON.stringify(text))
+                }
 
                 Keys.onUpPressed: root.moveSelectionUp()
                 Keys.onDownPressed: root.moveSelectionDown()

@@ -8,8 +8,13 @@ import qs.services
 Singleton {
     id: root
 
+    readonly property bool powerSaveEnabled: SettingsService.powerSaveEnabled
+    readonly property bool graphicalEffectsEnabled: !root.powerSaveEnabled
+
     // Animation tokens — duration scaled by speedFactor (>1 = faster, <1 = slower)
     readonly property QtObject anim: QtObject {
+        readonly property real _animationSpeedFactor:
+            Math.max(0.01, SettingsService.effectiveAnimation.speedFactor)
         readonly property string _barMotionPreset:
             SettingsService.data.barMotion.preset === "soft"
             || SettingsService.data.barMotion.preset === "balanced"
@@ -25,88 +30,93 @@ Singleton {
         readonly property real _barMotionPresetRecoilFactor:
             _barMotionPreset === "soft" ? 0.72 : (_barMotionPreset === "snappy" ? 1.26 : 1.0)
         readonly property real _barMotionIntensity:
-            Math.max(SettingsService.barMotionIntensityMin,
+            root.powerSaveEnabled
+                ? 0
+                : Math.max(SettingsService.barMotionIntensityMin,
                 Math.min(SettingsService.barMotionIntensityMax,
                     SettingsService.data.barMotion.intensity))
         readonly property real _barMotionEffectiveSpeedMultiplier:
-            Math.max(0.01,
+            root.powerSaveEnabled
+                ? 1
+                : Math.max(0.01,
                 SettingsService.data.barMotion.speedMultiplier * _barMotionPresetSpeedFactor)
 
         // Enter: elastic bounce-in for stage entrance, settings ON
         readonly property int enterDuration:
-            Math.round(500 / SettingsService.data.animation.speedFactor)
+            root.powerSaveEnabled ? 1 : Math.round(500 / _animationSpeedFactor)
         readonly property int enterType: Easing.OutElastic
         readonly property real enterAmplitude: 0.8
         readonly property real enterPeriod: 0.4
 
         // Exit: exponential snap-out for departure, settings OFF
         readonly property int exitDuration:
-            Math.round(220 / SettingsService.data.animation.speedFactor)
+            root.powerSaveEnabled ? 1 : Math.round(220 / _animationSpeedFactor)
         readonly property int exitType: Easing.InExpo
 
         // Move: smooth cubic for position shifts, drag fly-back
         readonly property int moveDuration:
-            Math.round(320 / SettingsService.data.animation.speedFactor)
+            root.powerSaveEnabled ? 1 : Math.round(320 / _animationSpeedFactor)
         readonly property int moveType: Easing.InOutCubic
 
         // Highlight: quick pulse for attention flash
         readonly property int highlightDuration:
-            Math.round(180 / SettingsService.data.animation.speedFactor)
+            root.powerSaveEnabled ? 1 : Math.round(180 / _animationSpeedFactor)
         readonly property int highlightType: Easing.OutQuad
 
         // Spring: elastic-feel settle for expressive Super Island expansion/collapse
         readonly property int springDuration:
-            Math.round(360 / SettingsService.data.animation.speedFactor)
+            root.powerSaveEnabled ? 1 : Math.round(360 / _animationSpeedFactor)
         readonly property int springType: Easing.OutBack
         readonly property real springOvershoot: 1.18
 
         // Pulse spring: subtle rebound so attention flashes feel lively without wobble
         readonly property int pulseSpringDuration:
-            Math.round(180 / SettingsService.data.animation.speedFactor)
+            root.powerSaveEnabled ? 1 : Math.round(180 / _animationSpeedFactor)
         readonly property int pulseSpringType: Easing.OutBack
         readonly property real pulseSpringOvershoot: 1.08
 
         readonly property int barExpandPreloadDuration:
-            Math.max(1, Math.round(pulseSpringDuration
+            root.powerSaveEnabled ? 1 : Math.max(1, Math.round(pulseSpringDuration
                 / _barMotionEffectiveSpeedMultiplier))
         readonly property int barExpandOvershootDuration:
-            Math.max(1, Math.round(springDuration
+            root.powerSaveEnabled ? 1 : Math.max(1, Math.round(springDuration
                 / _barMotionEffectiveSpeedMultiplier))
         readonly property int barExpandSettleDuration:
-            Math.max(1, Math.round(moveDuration
+            root.powerSaveEnabled ? 1 : Math.max(1, Math.round(moveDuration
                 / _barMotionEffectiveSpeedMultiplier))
         readonly property real barExpandExpandPreloadRatio:
-            0.06 * _barMotionIntensity * _barMotionPresetTravelFactor
+            root.powerSaveEnabled ? 0 : 0.06 * _barMotionIntensity * _barMotionPresetTravelFactor
         readonly property real barExpandExpandOvershootRatio:
-            0.12 * _barMotionIntensity * _barMotionPresetTravelFactor
+            root.powerSaveEnabled ? 0 : 0.12 * _barMotionIntensity * _barMotionPresetTravelFactor
         readonly property real barExpandCollapsePreloadRatio:
-            0.05 * _barMotionIntensity * _barMotionPresetTravelFactor
+            root.powerSaveEnabled ? 0 : 0.05 * _barMotionIntensity * _barMotionPresetTravelFactor
         readonly property real barExpandCollapseOvershootRatio:
-            0.08 * _barMotionIntensity * _barMotionPresetTravelFactor
+            root.powerSaveEnabled ? 0 : 0.08 * _barMotionIntensity * _barMotionPresetTravelFactor
         readonly property real barExpandExpandPulsePreloadOpacity:
-            Math.max(0, 0.08 * _barMotionIntensity * _barMotionPresetPulseFactor)
+            root.powerSaveEnabled ? 0 : Math.max(0, 0.08 * _barMotionIntensity * _barMotionPresetPulseFactor)
         readonly property real barExpandExpandPulseOvershootOpacity:
-            Math.max(0, 0.18 * _barMotionIntensity * _barMotionPresetPulseFactor)
+            root.powerSaveEnabled ? 0 : Math.max(0, 0.18 * _barMotionIntensity * _barMotionPresetPulseFactor)
         readonly property real barExpandCollapsePulsePreloadOpacity:
-            Math.max(0, 0.10 * _barMotionIntensity * _barMotionPresetPulseFactor)
+            root.powerSaveEnabled ? 0 : Math.max(0, 0.10 * _barMotionIntensity * _barMotionPresetPulseFactor)
         readonly property real barExpandCollapsePulseOvershootOpacity:
-            Math.max(0, 0.05 * _barMotionIntensity * _barMotionPresetPulseFactor)
+            root.powerSaveEnabled ? 0 : Math.max(0, 0.05 * _barMotionIntensity * _barMotionPresetPulseFactor)
         readonly property real barExpandExpandPulsePreloadScale:
-            1 + 0.02 * _barMotionIntensity * _barMotionPresetPulseFactor
+            root.powerSaveEnabled ? 1 : 1 + 0.02 * _barMotionIntensity * _barMotionPresetPulseFactor
         readonly property real barExpandExpandPulseOvershootScale:
-            1 + 0.08 * _barMotionIntensity * _barMotionPresetPulseFactor
+            root.powerSaveEnabled ? 1 : 1 + 0.08 * _barMotionIntensity * _barMotionPresetPulseFactor
         readonly property real barExpandCollapsePulsePreloadScale:
-            1 + 0.03 * _barMotionIntensity * _barMotionPresetPulseFactor
+            root.powerSaveEnabled ? 1 : 1 + 0.03 * _barMotionIntensity * _barMotionPresetPulseFactor
         readonly property real barExpandCollapsePulseOvershootScale:
-            Math.max(0, 1 - 0.03 * _barMotionIntensity * _barMotionPresetRecoilFactor)
-        readonly property bool barExpandPulseEnabled: SettingsService.data.barMotion.pulseEnabled
+            root.powerSaveEnabled ? 1 : Math.max(0, 1 - 0.03 * _barMotionIntensity * _barMotionPresetRecoilFactor)
+        readonly property bool barExpandPulseEnabled:
+            !root.powerSaveEnabled && SettingsService.data.barMotion.pulseEnabled
         readonly property real barExpandPulseSettleOpacity: 0
         readonly property real barExpandPulseSettleScale: 1
     }
 
     // Stagger delay per widget index (ms)
     readonly property int staggerDelay:
-        Math.round(40 / SettingsService.data.animation.speedFactor)
+        root.powerSaveEnabled ? 0 : Math.round(40 / Math.max(0.01, SettingsService.effectiveAnimation.speedFactor))
 
     // UI scale multiplier — changes all structural element sizes uniformly
     readonly property real uiScale: SettingsService.data.appearance.uiScale
@@ -176,10 +186,10 @@ Singleton {
         readonly property int mediaStaggerHeroExitDelay: 0
         readonly property int mediaVisualizerBarWidth: Math.max(2, Math.round(3 * uiScale))
         readonly property int mediaVisualizerBarGap: Math.max(1, Math.round(2 * uiScale))
-        readonly property real mediaVisualizerBarOpacity: 0.42
+        readonly property real mediaVisualizerBarOpacity: root.powerSaveEnabled ? 0 : 0.42
         readonly property real mediaSurfaceOverlayOpacity: 0.5
         readonly property real mediaFallbackIconOpacity: 0.82
-        readonly property real mediaTransientAccentOpacityMultiplier: 0.4
+        readonly property real mediaTransientAccentOpacityMultiplier: root.powerSaveEnabled ? 0 : 0.4
         readonly property real mediaFlashMinScale: 0.96
         readonly property real mediaFlashScaleRange: 0.04
         readonly property real mediaFlashButtonRadiusRatio: 0.38

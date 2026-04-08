@@ -3,6 +3,7 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.services
 
 // Bridges Niri workspace and window state into shared QML models.
 Singleton {
@@ -11,10 +12,47 @@ Singleton {
     property ListModel workspaces: ListModel {}
     property ListModel windows: ListModel {}
     property bool _windowsReloadQueued: false
+    readonly property string _homeDir: {
+        const home = Quickshell.env("HOME")
+        return home ? home : Quickshell.workingDirectory
+    }
+    readonly property string _configDir: root._homeDir + "/.config/niri"
+    readonly property string _configFile: root._configDir + "/config.kdl"
+    readonly property string _powerSaveIncludeFile: root._configDir + "/dymicshell-power-save.kdl"
+    readonly property string _powerSaveIncludeLine: 'include "./dymicshell-power-save.kdl"'
 
     signal workspacesUpdated()
     signal windowsUpdated()
     signal workspaceActivated()
+
+    function _powerSaveConfigText() {
+        if (!SettingsService.powerSaveEnabled)
+            return "// Managed by DymicShell. Power save mode is currently disabled.\n"
+
+        return [
+            "// Managed by DymicShell.",
+            "animations {",
+            "    off",
+            "}"
+        ].join("\n") + "\n"
+    }
+
+    function syncPowerSaveConfig() {
+        console.info("[DymicShell:NiriService] Syncing power save config", root._powerSaveIncludeFile, "enabled=", SettingsService.powerSaveEnabled)
+        _powerSaveConfigWriter.command = [
+            "sh",
+            "-c",
+            "mkdir -p \"$1\"; if [ -f \"$2\" ] && ! grep -Fqx \"$4\" \"$2\"; then printf '\\n%s\\n' \"$4\" >> \"$2\"; fi; tmp=$(mktemp \"$3.XXXXXX\") || exit 1; printf '%s' \"$5\" > \"$tmp\" && mv \"$tmp\" \"$3\"",
+            "sh",
+            root._configDir,
+            root._configFile,
+            root._powerSaveIncludeFile,
+            root._powerSaveIncludeLine,
+            root._powerSaveConfigText()
+        ]
+        _powerSaveConfigWriter.running = false
+        _powerSaveConfigWriter.running = true
+    }
 
     function updateWorkspaces(workspacesEvent) {
         const list = (workspacesEvent.workspaces || []).slice();
@@ -115,6 +153,8 @@ Singleton {
         niriWindowsFetcher.running = true;
     }
 
+    Component.onCompleted: root.syncPowerSaveConfig()
+
     // Initial window fetch
     Process {
         id: niriWindowsFetcher
@@ -155,6 +195,43 @@ Singleton {
                     console.log("NiriService event parse error:", e);
                 }
             }
+        }
+    }
+
+    Process {
+        id: _powerSaveConfigWriter
+
+        onExited: (exitCode) => {
+            if (exitCode !== 0) {
+                console.warn("[DymicShell:NiriService] Power save config write failed", root._powerSaveIncludeFile, "exitCode=", exitCode)
+                return
+            }
+
+            console.info("[DymicShell:NiriService] Power save config written", root._powerSaveIncludeFile)
+            Qt.callLater(() => _niriConfigReloader.running = true)
+        }
+    }
+
+    Process {
+        id: _niriConfigReloader
+        command: [
+            "sh",
+            "-c",
+            "if command -v niri >/dev/null 2>&1 && [ -f \"$1\" ]; then niri msg action load-config-file >/dev/null 2>&1 || true; fi",
+            "sh",
+            root._configFile
+        ]
+
+        onExited: () => {
+            console.info("[DymicShell:NiriService] Requested niri config reload", root._configFile)
+        }
+    }
+
+    Connections {
+        target: SettingsService.data.power
+
+        function onPowerSaveEnabledChanged() {
+            root.syncPowerSaveConfig()
         }
     }
 }

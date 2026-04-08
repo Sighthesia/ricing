@@ -51,10 +51,25 @@ Item {
         smooth: true
     }
 
+    Rectangle {
+        anchors.fill: parent
+        radius: root.cornerRadius
+        color: "transparent"
+        clip: true
+        visible: root.source !== "" && !Theme.graphicalEffectsEnabled
+
+        Image {
+            anchors.fill: parent
+            source: root.source
+            fillMode: Image.PreserveAspectCrop
+            smooth: true
+        }
+    }
+
     // Artwork masked output.
     OpacityMask {
         anchors.fill: parent
-        visible: root.source !== ""
+        visible: root.source !== "" && Theme.graphicalEffectsEnabled
         source: _artSource
         maskSource: _maskContainer
     }

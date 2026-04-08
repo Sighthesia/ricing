@@ -20,6 +20,8 @@ Item {
     property int _selectedIndex: -1
     property var _providers: [appProvider, clipProvider]
     property var _resultData: []
+    property string _lastNormalizedQuery: ""
+    property var _lastProvider: null
     property bool _suspendRefresh: false
     property bool panelActive: LauncherService.isOpen
 
@@ -84,6 +86,8 @@ Item {
 
     // Called by LauncherPanel after panel becomes active
     function openPanel(): void {
+        root._lastNormalizedQuery = ""
+        root._lastProvider = null
         if (_resultsList && _resultsList.resetTransientState)
             _resultsList.resetTransientState()
         _results.clear()
@@ -103,6 +107,8 @@ Item {
     // Called by LauncherPanel when closing
     function closePanel(): void {
         _suspendRefresh = true
+        root._lastNormalizedQuery = ""
+        root._lastProvider = null
         if (_resultsList && _resultsList.resetTransientState)
             _resultsList.resetTransientState()
         _searchHeader.text = ""
@@ -154,6 +160,46 @@ Item {
         return appProvider
     }
 
+    function _providerDebugName(provider): string {
+        if (provider === appProvider)
+            return "applications"
+        if (provider === clipProvider)
+            return "clipboard"
+        return "unknown"
+    }
+
+    function _debugKeySample(keys, limit): string {
+        let sample = []
+        let capped = Math.min(Number(limit) || 0, keys ? keys.length : 0)
+
+        for (let index = 0; index < capped; index++)
+            sample.push(String(keys[index] || ""))
+
+        return "[" + sample.join(", ") + "]"
+    }
+
+    function _debugCurrentModelKeys(limit): string {
+        let keys = []
+        let capped = Math.min(Math.max(0, Number(limit) || 0), _results.count)
+
+        for (let index = 0; index < capped; index++) {
+            let existing = _results.get(index)
+            keys.push(existing ? String(existing.key || "") : "")
+        }
+
+        return root._debugKeySample(keys, capped)
+    }
+
+    function _debugDisplayItemKeys(displayItems, limit): string {
+        let keys = []
+        let capped = Math.min(Number(limit) || 0, displayItems.length)
+
+        for (let index = 0; index < capped; index++)
+            keys.push(String(displayItems[index].key || ""))
+
+        return root._debugKeySample(keys, capped)
+    }
+
     function _refreshResults(): void {
         if (_suspendRefresh || !root.panelActive)
             return
@@ -165,6 +211,11 @@ Item {
         let q = _searchHeader.text
         if (q.startsWith(">clip ")) q = q.substring(6)
         else if (q === ">clip") q = ""
+
+        let sameProvider = provider === root._lastProvider
+        let refiningQuery = sameProvider
+            && q.length > root._lastNormalizedQuery.length
+            && q.startsWith(root._lastNormalizedQuery)
 
         let items = provider.getResults(q)
         let displayItems = []
@@ -196,13 +247,30 @@ Item {
                 insertedMaxIndex = i
         }
 
+        if (refiningQuery) {
+            let stabilized = root._stabilizeRefinedResults(displayItems, items)
+            displayItems = stabilized.displayItems
+            items = stabilized.items
+
+            console.log(
+                "[LauncherSearch]",
+                "stabilizedRefine",
+                "provider=", root._providerDebugName(provider),
+                "query=", JSON.stringify(q),
+                "nextTop=", root._debugDisplayItemKeys(displayItems, 6)
+            )
+        }
+
         if (root._displayItemsMatch(displayItems)) {
+            console.log("[LauncherSearch]", "branch=no-op")
             root._resultData = items
             _selectedIndex = root._resultData.length > 0 ? 0 : -1
+            root._rememberSearchState(provider, q)
             return
         }
 
         if (_results.count === 0) {
+            console.log("[LauncherSearch]", "branch=initial-entry")
             _resultsList.prepareManagedEntry()
             _results.clear()
             root._resultData = items
@@ -210,6 +278,7 @@ Item {
                 _results.append(displayItems[j])
             }
             _selectedIndex = items.length > 0 ? 0 : -1
+            root._rememberSearchState(provider, q)
             if (_resultsList && _resultsList.scheduleManagedEntryRelease)
                 _resultsList.scheduleManagedEntryRelease(0)
             else
@@ -229,12 +298,36 @@ Item {
             && removedCount === 0
             && root._currentItemsAreStableSubsequence(displayItems)
 
-        let currentVisibleKeys = _resultsList && _resultsList.strictVisibleDelegateKeys
-            ? _resultsList.strictVisibleDelegateKeys()
+        let currentInstantiatedKeys = _resultsList && _resultsList.instantiatedDelegateKeys
+            ? _resultsList.instantiatedDelegateKeys()
             : []
-        let shrinkVisibleStable = root._nextTopKeysStayWithinVisibleWindow(displayItems, currentVisibleKeys)
+        let shrinkVisibleStable = root._nextTopKeysStayWithinVisibleWindow(displayItems, currentInstantiatedKeys)
+        let allowStableShrink = shrinkOnly && (shrinkVisibleStable || refiningQuery)
 
-        if (shrinkOnly && shrinkVisibleStable) {
+        console.log(
+            "[LauncherSearch]",
+            "refresh",
+            "provider=", root._providerDebugName(provider),
+            "rawQuery=", JSON.stringify(_searchHeader.text),
+            "normalizedQuery=", JSON.stringify(q),
+            "lastQuery=", JSON.stringify(root._lastNormalizedQuery),
+            "sameProvider=", sameProvider,
+            "refiningQuery=", refiningQuery,
+            "previousCount=", _results.count,
+            "nextCount=", displayItems.length,
+            "insertedCount=", insertedCount,
+            "removedCount=", removedCount,
+            "shrinkOnly=", shrinkOnly,
+            "expandOnly=", expandOnly,
+            "shrinkVisibleStable=", shrinkVisibleStable,
+            "allowStableShrink=", allowStableShrink,
+            "currentTop=", root._debugCurrentModelKeys(6),
+            "nextTop=", root._debugDisplayItemKeys(displayItems, 6),
+            "instantiated=", root._debugKeySample(currentInstantiatedKeys, 6)
+        )
+
+        if (allowStableShrink) {
+            console.log("[LauncherSearch]", "branch=shrink-stable")
             if (_resultsList && _resultsList.beginFilterTransition)
                 _resultsList.beginFilterTransition()
             if (_resultsList && _resultsList.runSwapExit)
@@ -252,10 +345,12 @@ Item {
             else if (_resultsList && _resultsList.endFilterTransition)
                 Qt.callLater(function() { _resultsList.endFilterTransition() })
 
+            root._rememberSearchState(provider, q)
             return
         }
 
         if (expandOnly) {
+            console.log("[LauncherSearch]", "branch=expand-stable")
             if (_resultsList && _resultsList.beginExpandTransition)
                 _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1)
             else if (_resultsList && _resultsList.beginFilterTransition)
@@ -274,6 +369,7 @@ Item {
             else if (_resultsList && _resultsList.endFilterTransition)
                 Qt.callLater(function() { _resultsList.endFilterTransition() })
 
+            root._rememberSearchState(provider, q)
             return
         }
 
@@ -283,6 +379,8 @@ Item {
             _resultsList.runSwapExit()
         if (_resultsList && _resultsList.prepareManagedEntry)
             _resultsList.prepareManagedEntry()
+
+        console.log("[LauncherSearch]", "branch=full-replace")
 
         _results.clear()
         root._resultData = items
@@ -299,6 +397,13 @@ Item {
             )
         else if (_resultsList && _resultsList.releaseManagedEntry)
             Qt.callLater(function() { _resultsList.releaseManagedEntry() })
+
+        root._rememberSearchState(provider, q)
+    }
+
+    function _rememberSearchState(provider, normalizedQuery): void {
+        root._lastProvider = provider
+        root._lastNormalizedQuery = String(normalizedQuery || "")
     }
 
     function _resultKeyForItem(item, index): string {
@@ -407,6 +512,47 @@ Item {
         }
 
         return true
+    }
+
+    function _stabilizeRefinedResults(displayItems, items): var {
+        let keyedItems = ({})
+        let keyedDisplayItems = ({})
+        let stabilizedItems = []
+        let stabilizedDisplayItems = []
+
+        for (let index = 0; index < displayItems.length; index++) {
+            let displayItem = displayItems[index]
+            let key = String(displayItem.key || "")
+            keyedDisplayItems[key] = displayItem
+            keyedItems[key] = items[index]
+        }
+
+        for (let resultIndex = 0; resultIndex < _results.count; resultIndex++) {
+            let existing = _results.get(resultIndex)
+            let existingKey = existing ? String(existing.key || "") : ""
+            if (!keyedDisplayItems[existingKey])
+                continue
+
+            stabilizedDisplayItems.push(keyedDisplayItems[existingKey])
+            stabilizedItems.push(keyedItems[existingKey])
+            delete keyedDisplayItems[existingKey]
+            delete keyedItems[existingKey]
+        }
+
+        for (let nextIndex = 0; nextIndex < displayItems.length; nextIndex++) {
+            let nextDisplayItem = displayItems[nextIndex]
+            let nextKey = String(nextDisplayItem.key || "")
+            if (!keyedDisplayItems[nextKey])
+                continue
+
+            stabilizedDisplayItems.push(nextDisplayItem)
+            stabilizedItems.push(keyedItems[nextKey])
+        }
+
+        return {
+            displayItems: stabilizedDisplayItems,
+            items: stabilizedItems
+        }
     }
 
     function _syncResults(displayItems, items): void {

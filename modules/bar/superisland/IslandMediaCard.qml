@@ -60,8 +60,24 @@ Item {
                 smooth: true
             }
 
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: "transparent"
+                clip: true
+                visible: root.iconSource !== "" && !Theme.graphicalEffectsEnabled
+
+                Image {
+                    anchors.fill: parent
+                    source: root.iconSource
+                    fillMode: Image.PreserveAspectCrop
+                    smooth: true
+                }
+            }
+
             OpacityMask {
                 anchors.fill: parent
+                visible: root.iconSource !== "" && Theme.graphicalEffectsEnabled
                 source: compactArtSource
                 maskSource: compactMaskContainer
             }
@@ -136,8 +152,24 @@ Item {
                 smooth: true
             }
 
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: "transparent"
+                clip: true
+                visible: root.iconSource !== "" && !Theme.graphicalEffectsEnabled
+
+                Image {
+                    anchors.fill: parent
+                    source: root.iconSource
+                    fillMode: Image.PreserveAspectCrop
+                    smooth: true
+                }
+            }
+
             OpacityMask {
                 anchors.fill: parent
+                visible: root.iconSource !== "" && Theme.graphicalEffectsEnabled
                 source: fullArtSource
                 maskSource: fullMaskContainer
             }

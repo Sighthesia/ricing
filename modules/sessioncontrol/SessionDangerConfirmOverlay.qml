@@ -62,7 +62,7 @@ Item {
         id: _blurSource
         anchors.fill: parent
         source: root.stageSource
-        radius: Math.round(36 * root._overlayProgress)
+        radius: Theme.graphicalEffectsEnabled ? Math.round(36 * root._overlayProgress) : 0
         visible: false
     }
 
@@ -93,7 +93,7 @@ Item {
         source: _blurSource
         maskSource: _blurMaskSource
         opacity: root._overlayProgress
-        visible: root.visible
+        visible: Theme.graphicalEffectsEnabled && root.visible
     }
 
     Item {
@@ -112,7 +112,14 @@ Item {
         source: _dimSource
         maskSource: _blurMaskSource
         opacity: root._overlayProgress
-        visible: root.visible
+        visible: Theme.graphicalEffectsEnabled && root.visible
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.42)
+        opacity: Theme.graphicalEffectsEnabled ? 0 : root._overlayProgress
+        visible: !Theme.graphicalEffectsEnabled && root.visible
     }
 
     SessionControlParts.SessionActionCard {

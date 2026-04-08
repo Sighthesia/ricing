@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import Qt5Compat.GraphicalEffects
+import qs.config
 import qs.services
 
 // Per-screen wallpaper window rendered at the background layer.
@@ -76,6 +77,7 @@ Variants {
         // ── Masked new-wallpaper layer ────────────────────────────────
         OpacityMask {
             anchors.fill: parent
+            visible: Theme.graphicalEffectsEnabled
             source:     nextWallpaper
             maskSource: discMaskContainer
         }
@@ -87,7 +89,7 @@ Variants {
             property: "transitionProgress"
             from:  0.0
             to:    1.0
-            duration: Math.round(3000 / SettingsService.data.animation.speedFactor)
+            duration: Math.round(3000 / SettingsService.effectiveAnimation.speedFactor)
             easing.type: Easing.InOutSine
             onFinished: _swapAndReset()
         }
@@ -99,6 +101,13 @@ Variants {
         }
 
         function startTransition(path) {
+            if (Theme.powerSaveEnabled) {
+                currentWallpaper.source = "file://" + path
+                nextWallpaper.source = ""
+                transitionProgress = 0.0
+                return
+            }
+
             if (transitionAnim.running) {
                 transitionAnim.stop()
                 _swapAndReset()
@@ -126,6 +135,13 @@ Variants {
             onTriggered: {
                 let path = SettingsService.data.appearance.wallpaperPath
                 if (path !== "") {
+                    if (Theme.powerSaveEnabled) {
+                        currentWallpaper.source = "file://" + path
+                        nextWallpaper.source = ""
+                        bgRoot.transitionProgress = 0.0
+                        return
+                    }
+
                     bgRoot.discCenterX = 0.5
                     bgRoot.discCenterY = 0.5
                     nextWallpaper.source   = "file://" + path

@@ -36,7 +36,7 @@ Item {
 
         return 0
     }
-    readonly property int _filterDelay: _filterOrder * SettingsService.data.animation.staggerExitStep
+    readonly property int _filterDelay: _filterOrder * SettingsService.effectiveAnimation.staggerExitStep
 
     // Show a subtle accent tint when this item matches an active search.
     readonly property bool searchHighlight: filterQuery !== "" && _matchesFilter

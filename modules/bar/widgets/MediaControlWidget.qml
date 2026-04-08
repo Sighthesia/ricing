@@ -517,8 +517,21 @@ Item {
         OpacityMask {
             z: 1
             anchors.fill: parent
+            visible: Theme.graphicalEffectsEnabled
             source: _sharedProgressSource
             maskSource: _sharedProgressMask
+        }
+
+        MediaParts.MediaProgressStrip {
+            z: 1
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: root._flashProgressInset
+            anchors.rightMargin: root._flashProgressInset
+            y: root._sharedProgressY
+            visible: !Theme.graphicalEffectsEnabled
+            progress: root._displayProgress
+            expanded: root.flashVisible
         }
 
         // Seek hit target.
@@ -592,6 +605,7 @@ Item {
                 anchors.rightMargin: root._padH
                 anchors.topMargin: root._contentInsetV
                 anchors.bottomMargin: Theme.barWidget.mediaProgressThickness
+                visible: !Theme.powerSaveEnabled
                 bars: MediaControlService.visualizerHealthy ? MediaControlService.visualizerBars : []
                 barOpacity: Theme.barWidget.mediaVisualizerBarOpacity * 1.1
             }

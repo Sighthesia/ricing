@@ -102,7 +102,7 @@ ContextMenuPopup {
         // --- Layout mode item ---
         StaggerItem {
             id: s_layoutItem
-            delay: SettingsService.data.animation.staggerLevel1BaseDelay
+            delay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
             exitDelay: 0
             width: parent.width
             height: Theme.barHeight - Theme.barPadding
@@ -145,8 +145,8 @@ ContextMenuPopup {
         // --- Settings item ---
         StaggerItem {
             id: s_settingsItem
-            delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                 + SettingsService.data.animation.staggerLevel1Step
+            delay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
+                 + SettingsService.effectiveAnimation.staggerLevel1Step
             exitDelay: 0
             width: parent.width
             height: Theme.barHeight - Theme.barPadding
@@ -202,8 +202,8 @@ ContextMenuPopup {
         StaggerItem {
             id: s_widgetSettings
             visible: root._targetWidgetKey !== ""
-            delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                 + SettingsService.data.animation.staggerLevel1Step * 2
+            delay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
+                 + SettingsService.effectiveAnimation.staggerLevel1Step * 2
             exitDelay: 0
             width: parent.width
             height: visible ? Theme.barHeight - Theme.barPadding : 0

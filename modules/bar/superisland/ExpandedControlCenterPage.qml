@@ -5,7 +5,7 @@ import qs.services
 import ".." as BarComponents
 import "." as SuperIslandParts
 
-// SuperIsland control center page with calendar, live system metrics, and media controls.
+// SuperIsland control center page with calendar, system resources, and media controls.
 Item {
     id: root
 
@@ -24,8 +24,8 @@ Item {
     }
 
     function pageExitDuration() {
-        return SettingsService.data.animation.staggerExitDuration
-            + SettingsService.data.animation.staggerExitStep * 2
+        return SettingsService.effectiveAnimation.staggerExitDuration
+            + SettingsService.effectiveAnimation.staggerExitStep * 2
     }
 
     BarComponents.StaggerOrchestrator {
@@ -35,8 +35,8 @@ Item {
     GridLayout {
         anchors.fill: parent
         columns: 3
-        columnSpacing: 12
-        rowSpacing: 12
+        columnSpacing: Math.round(12 * Theme.uiScale)
+        rowSpacing: Math.round(12 * Theme.uiScale)
 
         BarComponents.StaggerItem {
             id: _calendarCard
@@ -44,6 +44,7 @@ Item {
             Layout.rowSpan: 2
             Layout.fillWidth: true
             Layout.fillHeight: true
+            implicitWidth: _calendarContent.implicitWidth
             implicitHeight: _calendarContent.implicitHeight
 
             SuperIslandParts.ExpandedControlCenterCalendarCard {
@@ -56,6 +57,7 @@ Item {
             id: _resourceCard
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignTop
+            implicitWidth: _resourceContent.implicitWidth
             implicitHeight: _resourceContent.implicitHeight
 
             SuperIslandParts.ExpandedControlCenterResourceCard {
@@ -68,6 +70,7 @@ Item {
             id: _mediaCard
             Layout.fillWidth: true
             Layout.fillHeight: true
+            implicitWidth: _mediaContent.implicitWidth
             implicitHeight: _mediaContent.implicitHeight
 
             SuperIslandParts.ExpandedControlCenterMediaCard {

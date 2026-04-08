@@ -18,7 +18,8 @@ Singleton {
         return cacheHome ? cacheHome : root._homeDir + "/.cache"
     }
 
-    readonly property bool enabled: SettingsService.data.mediaControl.cavaEnabled
+    readonly property bool enabled:
+        SettingsService.data.mediaControl.cavaEnabled && !SettingsService.powerSaveEnabled
     readonly property int barCount: Math.max(1, SettingsService.data.mediaControl.cavaBars)
     readonly property int asciiMaxRange: Math.max(1, SettingsService.data.mediaControl.cavaAsciiMaxRange)
     readonly property int framerate: Math.max(1, SettingsService.data.mediaControl.cavaFramerate)

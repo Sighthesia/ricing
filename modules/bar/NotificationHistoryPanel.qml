@@ -17,8 +17,8 @@ AnimatedPanelBase {
 
     // Component-local layout constants; promote to Theme tokens in a future notification token pass.
     readonly property int _appBadgeSize: 28
-    readonly property int _staggerBaseDelay: 80
-    readonly property int _staggerStep: 60
+    readonly property int _staggerBaseDelay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
+    readonly property int _staggerStep: SettingsService.effectiveAnimation.staggerLevel1Step
 
     active: BarLayoutService.notificationHistoryOpen
 
@@ -77,7 +77,7 @@ AnimatedPanelBase {
             if (!delegate || typeof delegate.runExit !== "function")
                 continue
 
-            delegate.exitDelay = index * SettingsService.data.animation.staggerExitStep
+            delegate.exitDelay = index * SettingsService.effectiveAnimation.staggerExitStep
             delegate.runExit()
         }
     }
@@ -166,9 +166,9 @@ AnimatedPanelBase {
                     width: _list.width
                     height: _historyItem.implicitHeight
                     delay: root._historyDelay(index)
-                    exitDelay: index * SettingsService.data.animation.staggerExitStep
-                    enterOffsetY: SettingsService.data.animation.staggerEnterOffsetY
-                    exitOffsetY: SettingsService.data.animation.staggerExitOffsetY
+                    exitDelay: index * SettingsService.effectiveAnimation.staggerExitStep
+                    enterOffsetY: SettingsService.effectiveAnimation.staggerEnterOffsetY
+                    exitOffsetY: SettingsService.effectiveAnimation.staggerExitOffsetY
 
                     HistoryItem {
                         id: _historyItem

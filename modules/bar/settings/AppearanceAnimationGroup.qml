@@ -12,9 +12,9 @@ StaggerItem {
 
     width: parent ? parent.width : 0
     height: group.height
-    delay: 300
-    enterOffsetY: 22
-    exitOffsetY: 10
+    delay: SettingsService.powerSaveEnabled ? 0 : 300
+    enterOffsetY: SettingsService.powerSaveEnabled ? 0 : 22
+    exitOffsetY: SettingsService.powerSaveEnabled ? 0 : 10
     exitDelay: 0
 
     function groupMatches(labels) {
@@ -32,8 +32,22 @@ StaggerItem {
         width: parent.width
         title: "动画"
         expanded: false
-        forceExpand: root.groupMatches(["速度系数", "入场时长", "出场时长"])
-        filterVisible: root.searchQuery === "" || root.groupMatches(["速度系数", "入场时长", "出场时长"])
+        forceExpand: root.groupMatches(["省电模式", "速度系数", "入场时长", "出场时长"])
+        filterVisible: root.searchQuery === "" || root.groupMatches(["省电模式", "速度系数", "入场时长", "出场时长"])
+
+        SegmentedSection {
+            label: "功耗模式"
+            filterQuery: root.searchQuery
+            currentValue: SettingsService.data.power.powerSaveEnabled ? "power-save" : "standard"
+            options: [
+                { value: "standard", label: "标准" },
+                { value: "power-save", label: "省电" }
+            ]
+            onOptionSelected: mode => {
+                SettingsService.data.power.powerSaveEnabled = mode === "power-save"
+                SettingsService.save()
+            }
+        }
 
         SliderSection {
             label: "速度系数"

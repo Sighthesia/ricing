@@ -65,14 +65,14 @@ StaggerItem {
 
             Behavior on height {
                 SequentialAnimation {
-                    PauseAnimation { duration: wallpaperPathRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    PauseAnimation { duration: wallpaperPathRow.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
                     NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }
             }
 
             Behavior on opacity {
                 SequentialAnimation {
-                    PauseAnimation { duration: wallpaperPathRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    PauseAnimation { duration: wallpaperPathRow.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
                     NumberAnimation { duration: Theme.anim.highlightDuration }
                 }
             }
@@ -239,14 +239,14 @@ StaggerItem {
 
             Behavior on height {
                 SequentialAnimation {
-                    PauseAnimation { duration: schemeRowShell.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    PauseAnimation { duration: schemeRowShell.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
                     NumberAnimation { duration: Theme.anim.highlightDuration }
                 }
             }
 
             Behavior on opacity {
                 SequentialAnimation {
-                    PauseAnimation { duration: schemeRowShell.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    PauseAnimation { duration: schemeRowShell.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
                     NumberAnimation { duration: Theme.anim.highlightDuration }
                 }
             }

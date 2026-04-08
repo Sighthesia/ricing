@@ -39,13 +39,13 @@ Item {
     property int exitDelay: 0
 
     // Duration for enter/exit animations.
-    property int enterDuration: SettingsService.data.animation.staggerEnterDuration
-    property int exitDuration:  SettingsService.data.animation.staggerExitDuration
+    property int enterDuration: SettingsService.effectiveAnimation.staggerEnterDuration
+    property int exitDuration:  SettingsService.effectiveAnimation.staggerExitDuration
 
     // Y translation distance: items slide UP from +enterOffsetY to 0 on enter,
     // and slide DOWN from 0 to +exitOffsetY on exit.
-    property real enterOffsetY: SettingsService.data.animation.staggerEnterOffsetY
-    property real exitOffsetY:  SettingsService.data.animation.staggerExitOffsetY
+    property real enterOffsetY: SettingsService.effectiveAnimation.staggerEnterOffsetY
+    property real exitOffsetY:  SettingsService.effectiveAnimation.staggerExitOffsetY
     property real enterStartOpacity: 0.0
     property real enterStartOffsetY: enterOffsetY
 

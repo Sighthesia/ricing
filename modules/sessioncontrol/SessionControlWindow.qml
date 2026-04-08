@@ -139,7 +139,14 @@ Variants {
             source: _focusDimSource
             maskSource: _focusMaskSource
             opacity: window._focusOverlayOpacity
-            visible: window._confirmVisualActive || window._focusOverlayOpacity > 0.01
+            visible: Theme.graphicalEffectsEnabled && (window._confirmVisualActive || window._focusOverlayOpacity > 0.01)
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.24)
+            opacity: Theme.graphicalEffectsEnabled ? 0 : window._focusOverlayOpacity
+            visible: !Theme.graphicalEffectsEnabled && (window._confirmVisualActive || window._focusOverlayOpacity > 0.01)
         }
 
         SessionControlParts.SessionControlContent {

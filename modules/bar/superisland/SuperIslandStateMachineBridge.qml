@@ -86,6 +86,16 @@ Item {
             const nextEvent = root.host._displayEvent(SuperIslandService.activeEvent)
             root.eventRouter.routeActiveEvent(nextEvent)
         }
+
+        function onHiddenPreviewEventChanged() {
+            const previewEvent = root.host._displayEvent(SuperIslandService.hiddenPreviewEvent)
+
+            if (previewEvent.type === "idle" || root.host._isHintEventType(previewEvent.type))
+                return
+
+            if (root.state._overlaySessionActive || root.host._hintPhase)
+                root.state._mainDisplayEvent = previewEvent
+        }
     }
 
     Connections {

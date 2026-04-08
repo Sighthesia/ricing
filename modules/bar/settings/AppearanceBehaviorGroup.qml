@@ -59,14 +59,14 @@ StaggerItem {
 
             Behavior on height {
                 SequentialAnimation {
-                    PauseAnimation { duration: autoHideRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    PauseAnimation { duration: autoHideRow.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
                     NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }
             }
 
             Behavior on opacity {
                 SequentialAnimation {
-                    PauseAnimation { duration: autoHideRow.filterOrder * SettingsService.data.animation.staggerExitStep }
+                    PauseAnimation { duration: autoHideRow.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
                     NumberAnimation { duration: Theme.anim.highlightDuration }
                 }
             }

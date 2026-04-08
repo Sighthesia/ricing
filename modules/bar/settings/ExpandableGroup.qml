@@ -34,7 +34,7 @@ Item {
 
         return 0
     }
-    readonly property int _filterDelay: _filterOrder * SettingsService.data.animation.staggerExitStep
+    readonly property int _filterDelay: _filterOrder * SettingsService.effectiveAnimation.staggerExitStep
 
     // Total height: header + (content if open)
     implicitWidth: parent ? parent.width : 296

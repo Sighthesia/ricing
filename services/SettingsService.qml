@@ -20,6 +20,19 @@ Singleton {
     readonly property string settingsFile: configDir + "settings.json"
     readonly property real barMotionIntensityMin: 0.0
     readonly property real barMotionIntensityMax: 2.0
+    readonly property bool powerSaveEnabled: adapter.power.powerSaveEnabled
+    readonly property QtObject effectiveAnimation: QtObject {
+        readonly property real speedFactor: root.powerSaveEnabled ? 1.0 : adapter.animation.speedFactor
+        readonly property int staggerLevel1BaseDelay: root.powerSaveEnabled ? 0 : adapter.animation.staggerLevel1BaseDelay
+        readonly property int staggerLevel1Step: root.powerSaveEnabled ? 0 : adapter.animation.staggerLevel1Step
+        readonly property int staggerLevel2BaseDelay: root.powerSaveEnabled ? 0 : adapter.animation.staggerLevel2BaseDelay
+        readonly property int staggerLevel2Step: root.powerSaveEnabled ? 0 : adapter.animation.staggerLevel2Step
+        readonly property int staggerExitStep: root.powerSaveEnabled ? 0 : adapter.animation.staggerExitStep
+        readonly property int staggerEnterDuration: root.powerSaveEnabled ? 1 : adapter.animation.staggerEnterDuration
+        readonly property int staggerExitDuration: root.powerSaveEnabled ? 1 : adapter.animation.staggerExitDuration
+        readonly property real staggerEnterOffsetY: root.powerSaveEnabled ? 0 : adapter.animation.staggerEnterOffsetY
+        readonly property real staggerExitOffsetY: root.powerSaveEnabled ? 0 : adapter.animation.staggerExitOffsetY
+    }
     property bool isLoaded: false
     property bool _sanitizingBarMotion: false
 
@@ -132,6 +145,9 @@ Singleton {
                 staggerExitDuration: adapter.animation.staggerExitDuration,
                 staggerEnterOffsetY: adapter.animation.staggerEnterOffsetY,
                 staggerExitOffsetY: adapter.animation.staggerExitOffsetY
+            },
+            power: {
+                powerSaveEnabled: adapter.power.powerSaveEnabled
             },
             notifications: {
                 position: adapter.notifications.position,
@@ -369,6 +385,10 @@ Singleton {
             property int  staggerExitDuration:    100
             property real staggerEnterOffsetY:    30
             property real staggerExitOffsetY:     10
+        }
+
+        property JsonObject power: JsonObject {
+            property bool powerSaveEnabled: false
         }
 
         property JsonObject notifications: JsonObject {

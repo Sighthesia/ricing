@@ -24,6 +24,7 @@ PanelWindow {
             ? (IslandOverlayService.mode === "launcher"
                 ? WlrKeyboardFocus.Exclusive
                 : ((IslandOverlayService.mode === "settings"
+                    || IslandOverlayService.mode === "control-center"
                     || IslandOverlayService.mode === "notifications"
                     || IslandOverlayService.mode === "break-reminder")
                     ? WlrKeyboardFocus.OnDemand

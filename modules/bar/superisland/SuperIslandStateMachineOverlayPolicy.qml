@@ -225,6 +225,6 @@ Item {
         if (activeEvent.type === "idle" || root.host._isHintEventType(activeEvent.type))
             return
 
-        root.machine.startEnterTransition(activeEvent)
+        root.machine.resumeTransient(activeEvent)
     }
 }

@@ -1,15 +1,14 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.config
-import qs.services
 import "./ExpandedControlCenterCalendar.js" as CalendarLogic
 
-// Calendar-focused card for the SuperIsland control center page.
+// Calendar surface for the SuperIsland control center page.
 Rectangle {
     id: root
 
     readonly property var _dayLabels: ["一", "二", "三", "四", "五", "六", "日"]
-    property var _now: new Date()
+    readonly property var _now: new Date()
     readonly property var _monthAnchor: new Date(root._now.getFullYear(), root._now.getMonth(), 1)
     readonly property var _calendarCells: CalendarLogic.buildMonthCells(root._monthAnchor, root._now)
 
@@ -17,18 +16,12 @@ Rectangle {
     color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.68)
     border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.72)
     border.width: 1
+    implicitWidth: Math.round(640 * Theme.uiScale)
     implicitHeight: Math.round(392 * Theme.uiScale)
-
-    Timer {
-        interval: 60000
-        repeat: true
-        running: true
-        onTriggered: root._now = new Date()
-    }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: Theme.settingsPanelPadding + 2
+        anchors.margins: Theme.settingsPanelPadding
         spacing: 12
 
         RowLayout {
@@ -105,8 +98,7 @@ Rectangle {
                     }
                 }
 
-                Row {
-                    id: _weekdayRow
+                RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
 
@@ -115,7 +107,7 @@ Rectangle {
 
                         delegate: Text {
                             required property string modelData
-                            width: Math.max(0, (_weekdayRow.width - _weekdayRow.spacing * 6) / 7)
+                            Layout.fillWidth: true
                             horizontalAlignment: Text.AlignHCenter
                             text: modelData
                             font.family: Theme.fontMono

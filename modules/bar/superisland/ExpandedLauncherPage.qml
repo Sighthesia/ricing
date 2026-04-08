@@ -20,8 +20,8 @@ Item {
     }
 
     function pageExitDuration() {
-        return SettingsService.data.animation.staggerExitDuration
-            + SettingsService.data.animation.staggerExitStep
+        return SettingsService.effectiveAnimation.staggerExitDuration
+            + SettingsService.effectiveAnimation.staggerExitStep
     }
 
     function _syncLauncherCoreState() {

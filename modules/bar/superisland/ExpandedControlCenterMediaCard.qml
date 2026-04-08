@@ -4,7 +4,7 @@ import qs.config
 import qs.services
 import "../media" as MediaParts
 
-// Media control card for the SuperIsland control center page.
+// Media surface for the SuperIsland control center page.
 Rectangle {
     id: root
 
@@ -22,6 +22,7 @@ Rectangle {
     color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.68)
     border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.72)
     border.width: 1
+    implicitWidth: Math.round(360 * Theme.uiScale)
     implicitHeight: _contentColumn.implicitHeight + Theme.settingsPanelPadding * 2
 
     Timer {

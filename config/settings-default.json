@@ -50,6 +50,9 @@
         "staggerEnterOffsetY": 30,
         "staggerExitOffsetY": 10
     },
+    "power": {
+        "powerSaveEnabled": false
+    },
     "notifications": {
         "position": "top_right",
         "maxVisible": 5,

@@ -37,7 +37,7 @@ Item {
 
         return 0
     }
-    readonly property int _filterDelay: _filterOrder * SettingsService.data.animation.staggerExitStep
+    readonly property int _filterDelay: _filterOrder * SettingsService.effectiveAnimation.staggerExitStep
     visible: height > 0.5 || opacity > 0.01
     opacity: _matchesFilter ? 1 : 0
     height: _matchesFilter ? implicitHeight : 0

@@ -90,7 +90,7 @@ Item {
         root.state._flashSourceEvent = root.host._idleSnapshot()
         root.state._flashTrackY = root.host._flashStripY
         root.state._flashTrackScale = root.host._flashScale
-        root.state._flashTrackOpacity = 0
+        root.state._flashTrackOpacity = 1
     }
 
     function startWindowHint(event) {
@@ -237,7 +237,7 @@ Item {
         if (!root.state._overlaySessionActive
                 && pendingEvent.type !== "idle"
                 && !root.host._isHintEventType(pendingEvent.type))
-            root.machine.startEnterTransition(pendingEvent)
+            root.machine.resumeTransient(pendingEvent)
     }
 
     function startExitTransition() {

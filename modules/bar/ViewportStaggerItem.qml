@@ -17,8 +17,8 @@ StaggerItem {
     property int managedEnterBaseDelay: 0
     property int viewportEnterBaseDelay: 0
     property int maxScrollSlots: 6
-    property int scrollStep: SettingsService.data.animation.staggerExitStep
-    property int managedEnterStep: SettingsService.data.animation.staggerLevel2Step
+    property int scrollStep: SettingsService.effectiveAnimation.staggerExitStep
+    property int managedEnterStep: SettingsService.effectiveAnimation.staggerLevel2Step
     property real viewportPadding: Math.max(8, enterOffsetY)
     property bool suppressViewportTransitions: ownerManagedEntry
     property bool syncViewportStateWhenSuppressed: false

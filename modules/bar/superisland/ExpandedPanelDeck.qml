@@ -25,12 +25,12 @@ Item {
     }
 
     function _pageItem(pageName) {
-        if (pageName === "control-center")
-            return controlCenterPageLoader.item
         if (pageName === "launcher")
             return launcherPageLoader.item
         if (pageName === "settings")
             return settingsPageLoader.item
+        if (pageName === "control-center")
+            return controlCenterPageLoader.item
         if (pageName === "notifications")
             return notificationsPageLoader.item
         if (pageName === "break-reminder")
@@ -43,7 +43,7 @@ Item {
         if (pageItem && typeof pageItem.pageExitDuration === "function")
             return Math.max(0, pageItem.pageExitDuration())
 
-        return SettingsService.data.animation.staggerExitDuration
+        return SettingsService.effectiveAnimation.staggerExitDuration
     }
 
     function _runDeckEnter(includeHeader) {
@@ -62,11 +62,6 @@ Item {
     function _activatePage(pageName, includeHeader) {
         root._runDeckEnter(includeHeader)
 
-        if (pageName === "control-center" && controlCenterPageLoader.item) {
-            controlCenterPageLoader.item.pageActivated()
-            return
-        }
-
         if (pageName === "launcher" && launcherPageLoader.item) {
             launcherPageLoader.item.pageActivated()
             return
@@ -74,6 +69,11 @@ Item {
 
         if (pageName === "settings" && settingsPageLoader.item) {
             settingsPageLoader.item.pageActivated()
+            return
+        }
+
+        if (pageName === "control-center" && controlCenterPageLoader.item) {
+            controlCenterPageLoader.item.pageActivated()
             return
         }
 
@@ -90,11 +90,6 @@ Item {
         if (includeHeader)
             _deckStagger.runExit()
 
-        if (pageName === "control-center" && controlCenterPageLoader.item) {
-            controlCenterPageLoader.item.pageDeactivated()
-            return
-        }
-
         if (pageName === "launcher" && launcherPageLoader.item) {
             launcherPageLoader.item.pageDeactivated()
             return
@@ -102,6 +97,11 @@ Item {
 
         if (pageName === "settings" && settingsPageLoader.item) {
             settingsPageLoader.item.pageDeactivated()
+            return
+        }
+
+        if (pageName === "control-center" && controlCenterPageLoader.item) {
+            controlCenterPageLoader.item.pageDeactivated()
             return
         }
 
@@ -154,7 +154,7 @@ Item {
     Timer {
         id: _pageSwitchDelay
         repeat: false
-        interval: SettingsService.data.animation.staggerExitDuration
+        interval: SettingsService.effectiveAnimation.staggerExitDuration
 
         onTriggered: {
             if (!root._pendingPage)
@@ -224,25 +224,25 @@ Item {
 
                     SuperIslandParts.SuperIslandOverlayNavButton {
                         Layout.fillWidth: true
-                        label: "中控"
-                        iconGlyph: "\uf085"
-                        selected: root.currentPage === "control-center"
-                        firstSegment: true
-                        onPressed: root._retargetPage("control-center")
-                    }
-
-                    SuperIslandParts.SuperIslandOverlayNavButton {
-                        Layout.fillWidth: true
                         label: "启动器"
                         iconGlyph: "\uf002"
                         selected: root.currentPage === "launcher"
+                        firstSegment: true
                         onPressed: root._retargetPage("launcher")
                     }
 
                     SuperIslandParts.SuperIslandOverlayNavButton {
                         Layout.fillWidth: true
-                        label: "设置"
+                        label: "控制中心"
                         iconGlyph: "\uf013"
+                        selected: root.currentPage === "control-center"
+                        onPressed: root._retargetPage("control-center")
+                    }
+
+                    SuperIslandParts.SuperIslandOverlayNavButton {
+                        Layout.fillWidth: true
+                        label: "设置"
+                        iconGlyph: "\uf085"
                         selected: root.currentPage === "settings"
                         onPressed: root._retargetPage("settings")
                     }
@@ -324,14 +324,6 @@ Item {
                 anchors.fill: parent
 
                 Loader {
-                    id: controlCenterPageLoader
-                    active: true
-                    anchors.fill: parent
-                    visible: root._presentedPage === "control-center"
-                    source: "ExpandedControlCenterPage.qml"
-                }
-
-                Loader {
                     id: launcherPageLoader
                     active: true
                     anchors.fill: parent
@@ -345,6 +337,14 @@ Item {
                     anchors.fill: parent
                     visible: root._presentedPage === "settings"
                     source: "ExpandedSettingsPage.qml"
+                }
+
+                Loader {
+                    id: controlCenterPageLoader
+                    active: true
+                    anchors.fill: parent
+                    visible: root._presentedPage === "control-center"
+                    source: "ExpandedControlCenterPage.qml"
                 }
 
                 Loader {

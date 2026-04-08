@@ -15,7 +15,7 @@ Item {
     }
 
     function pageExitDuration() {
-        return SettingsService.data.animation.staggerExitDuration
+        return SettingsService.effectiveAnimation.staggerExitDuration
     }
 
     function pageDeactivated() {
@@ -27,7 +27,7 @@ Item {
 
     Timer {
         id: _enterDelay
-        interval: 180
+        interval: SettingsService.powerSaveEnabled ? 0 : 180
         repeat: false
         onTriggered: {
             if (_settingsContent && _settingsContent.runEnterAnimation)

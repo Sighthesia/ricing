@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 
 // Interruption-safe, committed wipe-reveal highlight.
 //
@@ -71,6 +72,17 @@ Item {
     }
 
     onHoveredChanged: {
+        if (SettingsService.powerSaveEnabled) {
+            _pendingExit = false
+            _rightEdgeAnim.stop()
+            _leftEdgeAnim.stop()
+            _fadeAnim.stop()
+            _leftEdge = 0
+            _rightEdge = hovered ? root.width : 0
+            _fadeOpacity = hovered ? 1 : 0
+            return
+        }
+
         if (hovered) {
             _pendingExit = false
             _leftEdgeAnim.stop()

@@ -98,7 +98,7 @@ AnimatedPanelBase {
             // Panel title
             StaggerItem {
                 id: s_wpTitle
-                delay: SettingsService.data.animation.staggerLevel1BaseDelay
+                delay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
                 Layout.fillWidth: true
                 implicitHeight: _titleText.implicitHeight
 
@@ -154,8 +154,8 @@ AnimatedPanelBase {
             // Search bar
             StaggerItem {
                 id: s_wpSearch
-                delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                     + SettingsService.data.animation.staggerLevel1Step
+                delay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
+                     + SettingsService.effectiveAnimation.staggerLevel1Step
                 Layout.fillWidth: true
                 height: Theme.barHeight - Theme.barPadding
 
@@ -203,8 +203,8 @@ AnimatedPanelBase {
             // Widget card grid
             StaggerItem {
                 id: s_wpGrid
-                delay: SettingsService.data.animation.staggerLevel1BaseDelay
-                     + SettingsService.data.animation.staggerLevel1Step * 2
+                delay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
+                     + SettingsService.effectiveAnimation.staggerLevel1Step * 2
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
@@ -226,7 +226,7 @@ AnimatedPanelBase {
                             anchors.fill: parent
 
                             // FIXME: 8-slot/25ms cycle is a tuned picker UX constant; promote to settings tokens if reused.
-                            delay: SettingsService.data.animation.staggerLevel2BaseDelay
+                            delay: SettingsService.effectiveAnimation.staggerLevel2BaseDelay
                                  + (index % 8) * 25
                             exitDelay: 0
 

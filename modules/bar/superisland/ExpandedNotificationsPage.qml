@@ -47,7 +47,7 @@ Item {
             delegates,
             _emptyState.visible,
             root._maxExitSlots,
-            SettingsService.data.animation.staggerExitStep,
+            SettingsService.effectiveAnimation.staggerExitStep,
             function() {
                 _emptyState.exitDelay = 0
                 _emptyState.runExit()
@@ -80,10 +80,10 @@ Item {
         let count = root._visibleCardDelegates().length
 
         if (count === 0 && _emptyState.visible)
-            return SettingsService.data.animation.staggerExitDuration
+            return SettingsService.effectiveAnimation.staggerExitDuration
 
-        return SettingsService.data.animation.staggerExitDuration
-            + PageLogic.exitWindow(count, root._maxExitSlots, SettingsService.data.animation.staggerExitStep)
+        return SettingsService.effectiveAnimation.staggerExitDuration
+            + PageLogic.exitWindow(count, root._maxExitSlots, SettingsService.effectiveAnimation.staggerExitStep)
     }
 
     function _relativeTime(timestamp) {
@@ -141,13 +141,13 @@ Item {
                     managedEnterFadeEnabled: true
                     managedEnterStartOpacity: 0.0
                     managedEnterStartOffsetY: enterOffsetY
-                    viewportEnterBaseDelay: 80
-                    managedEnterBaseDelay: 80
-                    scrollStep: 60
-                    managedEnterStep: 60
+                    viewportEnterBaseDelay: SettingsService.effectiveAnimation.staggerLevel2BaseDelay
+                    managedEnterBaseDelay: SettingsService.effectiveAnimation.staggerLevel2BaseDelay
+                    scrollStep: SettingsService.effectiveAnimation.staggerExitStep
+                    managedEnterStep: SettingsService.effectiveAnimation.staggerLevel2Step
                     viewportPadding: 36
-                    enterOffsetY: SettingsService.data.animation.staggerEnterOffsetY
-                    exitOffsetY: SettingsService.data.animation.staggerExitOffsetY
+                    enterOffsetY: SettingsService.effectiveAnimation.staggerEnterOffsetY
+                    exitOffsetY: SettingsService.effectiveAnimation.staggerExitOffsetY
 
                     width: _list.width
                     height: _cardBody.implicitHeight
