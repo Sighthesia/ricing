@@ -26,7 +26,7 @@ Item {
 
         ToggleSection {
             width: parent.width
-            label: "通知"
+            label: "SuperIsland 通知接管"
             value: SettingsService.data.superIsland.showNotifications
             onToggled: newValue => {
                 SettingsService.data.superIsland.showNotifications = newValue

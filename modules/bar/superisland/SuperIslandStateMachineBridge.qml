@@ -85,6 +85,7 @@ Item {
         function onActiveEventChanged() {
             const nextEvent = root.host._displayEvent(SuperIslandService.activeEvent)
             root.eventRouter.routeActiveEvent(nextEvent)
+            SuperIslandService.syncNotificationPopupVisibility()
         }
 
         function onHiddenPreviewEventChanged() {
@@ -95,6 +96,8 @@ Item {
 
             if (root.state._overlaySessionActive || root.host._hintPhase)
                 root.machine.replacePreviewTransient(previewEvent)
+
+            SuperIslandService.syncNotificationPopupVisibility()
         }
     }
 

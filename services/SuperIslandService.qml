@@ -52,6 +52,17 @@ Singleton {
         return root._hintPhase && preview.type === "notification"
     }
 
+    function syncNotificationPopupVisibility() {
+        const shouldEnablePopups = !root._notificationTakeoverActive()
+
+        if (NotificationService.popupsEnabled === shouldEnablePopups)
+            return
+
+        NotificationService.popupsEnabled = shouldEnablePopups
+        if (!shouldEnablePopups)
+            NotificationService.dismissAllActive()
+    }
+
     readonly property int queueLength: _queue.length
     readonly property bool hasPendingEvents: queueLength > 0
 
@@ -599,6 +610,8 @@ Singleton {
 
         if (root._queue.length > 0)
             _pendingStartTimer.restart()
+
+        root.syncNotificationPopupVisibility()
     }
 
     function _resolveBaselineState() {
@@ -631,6 +644,7 @@ Singleton {
 
         root._scheduleActiveTimer(event.timeoutMs > 0 ? event.timeoutMs : root._settings().defaultTimeout)
         root._scheduleHiddenPreviewExpiry()
+        root.syncNotificationPopupVisibility()
     }
 
     function _finishTransient() {
@@ -653,9 +667,12 @@ Singleton {
         root.mode = "idle"
         root.mainState = root._resolveBaselineState()
         root._scheduleHiddenPreviewExpiry()
+        root.syncNotificationPopupVisibility()
 
         if (root._queue.length > 0)
             _pendingStartTimer.restart()
+
+        root.syncNotificationPopupVisibility()
     }
 
     function _isSnoozed(groupKey) {
@@ -738,7 +755,10 @@ Singleton {
         target: SettingsService.data.superIsland
 
         function onShowMediaChanged() { root._reconcileVisibilitySettings() }
-        function onShowNotificationsChanged() { root._reconcileVisibilitySettings() }
+        function onShowNotificationsChanged() {
+            root._reconcileVisibilitySettings()
+            root.syncNotificationPopupVisibility()
+        }
         function onShowWorkspaceEventsChanged() { root._reconcileVisibilitySettings() }
     }
 

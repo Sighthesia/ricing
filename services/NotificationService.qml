@@ -24,6 +24,9 @@ Singleton {
     // When true, new notifications are only appended to history — no popups shown.
     property bool doNotDisturb: false
 
+    // Runtime gate for popup presentation. SuperIsland turns this off while it owns notification display.
+    property bool popupsEnabled: true
+
     // Count of items added since markAllSeen() was last called.
     readonly property int unreadCount: _unreadCount
     readonly property bool notificationsAvailable: _notificationsAvailable
@@ -129,6 +132,11 @@ Singleton {
         activeList.remove(idx);
     }
 
+    function dismissAllActive() {
+        while (activeList.count > 0)
+            _stopTimer(activeList.get(0).id)
+    }
+
     // Invoke a notification action then dismiss the popup.
     function invokeAction(id, identifier) {
         var entry = _activeNotifications[id];
@@ -212,6 +220,8 @@ Singleton {
         }
 
         if (root.doNotDisturb) return;
+
+        if (!root.popupsEnabled) return;
 
         // Store the live notification object so invokeAction() can reach its actions.
         if (!_activeNotifications[data.id]) _activeNotifications[data.id] = {};
