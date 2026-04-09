@@ -141,8 +141,16 @@ Item {
         IslandOverlayService.mode === "session-control"
     readonly property bool _controlCenterOverlayMode:
         IslandOverlayService.mode === "control-center"
-    readonly property real _screenWidth: Screen.width || BarLayoutService.barContentWidth
-    readonly property real _screenHeight: Screen.height || 0
+    readonly property var _primaryScreen:
+        Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
+    readonly property real _screenWidth:
+        (_primaryScreen && _primaryScreen.width ? _primaryScreen.width : 0)
+            || Screen.width
+            || BarLayoutService.barContentWidth
+    readonly property real _screenHeight:
+        (_primaryScreen && _primaryScreen.height ? _primaryScreen.height : 0)
+            || Screen.height
+            || 0
     readonly property real _overlayAvailableBodyHeight:
         root._screenHeight > 0
             ? Math.max(root._collapsedPillHeight, root._screenHeight - root._overlayDetachedOffset)
@@ -165,6 +173,8 @@ Item {
                 )
                 : Math.round(528 * Theme.uiScale))
     Behavior on _overlayBodyHeight {
+        enabled: !root._fullScreenOverlayMode
+
         NumberAnimation {
             duration: Math.max(1, SettingsService.effectiveAnimation.staggerExitDuration)
             easing.type: Theme.anim.moveType
@@ -405,6 +415,10 @@ Item {
     Component.onCompleted: _stateMachine.initialize()
     Component.onDestruction: _stateMachine.teardown()
     onLiveInstanceChanged: _stateMachine.syncOverlayExtensionReservation()
+    on_OverlayBodyHeightChanged: _stateMachine.syncOverlayExtensionReservation()
+    on_OverlayDetachedOffsetChanged: _stateMachine.syncOverlayExtensionReservation()
+    on_AttachedPanelHeightChanged: _stateMachine.syncOverlayExtensionReservation()
+    on_AttachedPanelVisibleHeightChanged: _stateMachine.syncOverlayExtensionReservation()
 
     function _cloneEvent(event) {
         const source = event || root._idleSnapshot()
