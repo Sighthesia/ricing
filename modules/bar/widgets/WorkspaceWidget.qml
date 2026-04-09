@@ -27,7 +27,7 @@ Item {
     implicitHeight: _pillH + Theme.iconPadding
     // Keep the outer layout contract stable so internal pill animations do not
     // continuously retrigger bar-wide geometry recomputation.
-    implicitWidth: _layoutPillWidth
+    implicitWidth: _pillTransition.animatedWidth
     width: implicitWidth
     height: implicitHeight
     opacity: _hintYield ? 0.42 : 1
@@ -56,11 +56,7 @@ Item {
         : (_overviewRow.implicitWidth + root._padH * 2)
     readonly property real _collapsedPillWidth: Math.min(root._focusPillWidth, root._overviewPillWidth)
     readonly property real _expandedPillWidth: Math.max(root._focusPillWidth, root._overviewPillWidth)
-    readonly property real _layoutPillWidth:
-        root._flashActive
-            ? Math.max(root._expandedPillWidth, root._flashPillWidth)
-            : _pillTransition.animatedWidth
-    readonly property real layoutMeasurementWidth: _layoutPillWidth
+    readonly property real layoutMeasurementWidth: _pillTransition.animatedWidth
     readonly property real _flashPillWidth:
         Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2
     readonly property real _transitionExpandedWidth:
@@ -173,7 +169,7 @@ Item {
     // Cleared on the first non-skip _refreshFocus() call, or on flash revert.
     property bool   _justSwitchedWorkspace: false
     property var _iconPathCache: ({})
-    property var _workspaceAppIdsByWorkspace: ({})
+    property var _workspaceWindowItemsByWorkspace: ({})
 
     // --- focused window data ---
     property string _focusedWindowId: ""
@@ -308,19 +304,29 @@ Item {
         return resolvedPath
     }
 
-    function _refreshWorkspaceAppIds() {
-        let nextWorkspaceAppIds = ({})
-        const currentWorkspaceAppIds = root._workspaceAppIdsByWorkspace || ({})
+    function _workspaceWindowItems(workspaceId) {
+        const workspaceItems = root._workspaceWindowItemsByWorkspace || ({})
+        return workspaceItems[workspaceId] || []
+    }
+
+    function _refreshWorkspaceWindowItems() {
+        let nextWorkspaceWindowItems = ({})
+        const currentWorkspaceWindowItems = root._workspaceWindowItemsByWorkspace || ({})
+
+        for (let workspaceIndex = 0; workspaceIndex < NiriService.workspaces.count; workspaceIndex++) {
+            const workspace = NiriService.workspaces.get(workspaceIndex)
+            nextWorkspaceWindowItems[workspace.wsId] = []
+        }
 
         for (let i = 0; i < NiriService.windows.count; i++) {
             const window = NiriService.windows.get(i)
             if (!window.workspaceId)
                 continue
 
-            if (nextWorkspaceAppIds[window.workspaceId] === undefined)
-                nextWorkspaceAppIds[window.workspaceId] = []
+            if (nextWorkspaceWindowItems[window.workspaceId] === undefined)
+                nextWorkspaceWindowItems[window.workspaceId] = []
 
-            nextWorkspaceAppIds[window.workspaceId].push({
+            nextWorkspaceWindowItems[window.workspaceId].push({
                 appId: window.appId,
                 winId: window.winId,
                 col: window.colIdx,
@@ -329,23 +335,25 @@ Item {
             })
         }
 
-        for (const workspaceId in nextWorkspaceAppIds) {
-            nextWorkspaceAppIds[workspaceId].sort((left, right) => {
+        for (const workspaceId in nextWorkspaceWindowItems) {
+            nextWorkspaceWindowItems[workspaceId].sort((left, right) => {
                 if (left.col !== right.col)
                     return left.col - right.col
                 return left.row - right.row
             })
 
-            const currentItems = currentWorkspaceAppIds[workspaceId]
+            const currentItems = currentWorkspaceWindowItems[workspaceId]
             let unchanged = Array.isArray(currentItems)
-                && currentItems.length === nextWorkspaceAppIds[workspaceId].length
+                && currentItems.length === nextWorkspaceWindowItems[workspaceId].length
 
             if (unchanged) {
                 for (let itemIndex = 0; itemIndex < currentItems.length; itemIndex++) {
                     const currentItem = currentItems[itemIndex]
-                    const nextItem = nextWorkspaceAppIds[workspaceId][itemIndex]
+                    const nextItem = nextWorkspaceWindowItems[workspaceId][itemIndex]
                     if (currentItem.appId !== nextItem.appId
                         || currentItem.winId !== nextItem.winId
+                        || currentItem.col !== nextItem.col
+                        || currentItem.row !== nextItem.row
                         || currentItem.icon !== nextItem.icon) {
                         unchanged = false
                         break
@@ -354,10 +362,10 @@ Item {
             }
 
             if (unchanged)
-                nextWorkspaceAppIds[workspaceId] = currentItems
+                nextWorkspaceWindowItems[workspaceId] = currentItems
         }
 
-        root._workspaceAppIdsByWorkspace = nextWorkspaceAppIds
+        root._workspaceWindowItemsByWorkspace = nextWorkspaceWindowItems
     }
 
     // --- revert timer: 1.5 s after overview trigger, return to focus ---
@@ -399,7 +407,7 @@ Item {
     }
 
     Component.onCompleted: {
-        root._refreshWorkspaceAppIds()
+        root._refreshWorkspaceWindowItems()
         _refreshFocus()
         // Defer enabling Behaviors to the next event loop iteration so the initial
         // state renders without any startup animation flash.
@@ -426,7 +434,7 @@ Item {
     Connections {
         target: NiriService
         function onWindowsUpdated()      {
-            root._refreshWorkspaceAppIds()
+            root._refreshWorkspaceWindowItems()
             root._refreshFocus()
         }
         function onWorkspaceActivated()  {
@@ -582,7 +590,7 @@ Item {
                                 wsId: parent.wsId
                                 idx: parent.idx
                                 isActive: parent.isActive
-                                appItems: root._workspaceAppIdsByWorkspace[parent.wsId] || []
+                                windowItems: root._workspaceWindowItems(parent.wsId)
                                 focusedWindowId: root._focusedWindowId
                                 pillHeight: root._pillH
                                 pillPaddingH: root._pillPadH

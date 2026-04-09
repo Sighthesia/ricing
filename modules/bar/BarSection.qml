@@ -24,8 +24,6 @@ Item {
         }
     }
 
-    // Keep live widget width changes from visually reversing their growth direction
-    // while still smoothing section moves during drag sessions.
     Behavior on x {
         enabled: BarLayoutService.settingsMode
             && BarLayoutService.isDragging

@@ -9,16 +9,16 @@ Item {
     required property string wsId
     required property int idx
     required property bool isActive
-    required property var appItems
+    required property var windowItems
     required property string focusedWindowId
     required property int pillHeight
     required property int pillPaddingH
     required property int iconSpacing
     required property int smallIconSize
 
-    readonly property bool _hasApps: root.appItems.length > 0
+    readonly property bool _hasWindows: root.windowItems.length > 0
 
-    visible: root.isActive || root._hasApps
+    visible: root.isActive || root._hasWindows
     width: visible ? _pill.implicitWidth : 0
     height: visible ? _pill.implicitHeight : 0
 
@@ -44,7 +44,7 @@ Item {
             spacing: root.iconSpacing
 
             Repeater {
-                model: root.appItems
+                model: root.windowItems
 
                 delegate: Image {
                     required property var modelData
@@ -78,7 +78,7 @@ Item {
             }
 
             Text {
-                visible: !root._hasApps
+                visible: !root._hasWindows
                 text: root.idx
                 font.family: Theme.fontMono
                 font.bold: true
