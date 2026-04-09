@@ -42,7 +42,7 @@ PanelWindow {
     implicitHeight: _column.implicitHeight + 8
 
     // Hide (and thus yield all input) when no cards exist
-    visible: NotificationService.activeList.count > 0
+    visible: NotificationService.activeList.count > 0 && !SuperIslandService._notificationTakeoverActive()
 
     Column {
         id: _column

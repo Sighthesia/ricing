@@ -40,6 +40,18 @@ Singleton {
         return root._idleEvent()
     }
 
+    function _notificationTakeoverActive() {
+        if (!root._settings().showNotifications)
+            return false
+
+        const active = root.activeEvent || root._idleEvent()
+        if (active.type === "notification")
+            return true
+
+        const preview = root.hiddenPreviewEvent || root._idleEvent()
+        return root._hintPhase && preview.type === "notification"
+    }
+
     readonly property int queueLength: _queue.length
     readonly property bool hasPendingEvents: queueLength > 0
 
