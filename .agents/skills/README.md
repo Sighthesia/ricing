@@ -6,6 +6,7 @@
 
 - `qml-architecture`: QML 分层、文件结构、命名与 imports 规范。
 - `qml-state`: Settings、共享状态、持久化与错误处理。
+- `qml-workspace-overview-model`: 工作区 overview 的共享摘要模型与 per-workspace 数据绑定。
 
 ## Visual System
 

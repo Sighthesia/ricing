@@ -169,7 +169,6 @@ Item {
     // Cleared on the first non-skip _refreshFocus() call, or on flash revert.
     property bool   _justSwitchedWorkspace: false
     property var _iconPathCache: ({})
-    property var _workspaceWindowItemsByWorkspace: ({})
 
     // --- focused window data ---
     property string _focusedWindowId: ""
@@ -304,70 +303,6 @@ Item {
         return resolvedPath
     }
 
-    function _workspaceWindowItems(workspaceId) {
-        const workspaceItems = root._workspaceWindowItemsByWorkspace || ({})
-        return workspaceItems[workspaceId] || []
-    }
-
-    function _refreshWorkspaceWindowItems() {
-        let nextWorkspaceWindowItems = ({})
-        const currentWorkspaceWindowItems = root._workspaceWindowItemsByWorkspace || ({})
-
-        for (let workspaceIndex = 0; workspaceIndex < NiriService.workspaces.count; workspaceIndex++) {
-            const workspace = NiriService.workspaces.get(workspaceIndex)
-            nextWorkspaceWindowItems[workspace.wsId] = []
-        }
-
-        for (let i = 0; i < NiriService.windows.count; i++) {
-            const window = NiriService.windows.get(i)
-            if (!window.workspaceId)
-                continue
-
-            if (nextWorkspaceWindowItems[window.workspaceId] === undefined)
-                nextWorkspaceWindowItems[window.workspaceId] = []
-
-            nextWorkspaceWindowItems[window.workspaceId].push({
-                appId: window.appId,
-                winId: window.winId,
-                col: window.colIdx,
-                row: window.rowIdx,
-                icon: root._iconPath(window.appId)
-            })
-        }
-
-        for (const workspaceId in nextWorkspaceWindowItems) {
-            nextWorkspaceWindowItems[workspaceId].sort((left, right) => {
-                if (left.col !== right.col)
-                    return left.col - right.col
-                return left.row - right.row
-            })
-
-            const currentItems = currentWorkspaceWindowItems[workspaceId]
-            let unchanged = Array.isArray(currentItems)
-                && currentItems.length === nextWorkspaceWindowItems[workspaceId].length
-
-            if (unchanged) {
-                for (let itemIndex = 0; itemIndex < currentItems.length; itemIndex++) {
-                    const currentItem = currentItems[itemIndex]
-                    const nextItem = nextWorkspaceWindowItems[workspaceId][itemIndex]
-                    if (currentItem.appId !== nextItem.appId
-                        || currentItem.winId !== nextItem.winId
-                        || currentItem.col !== nextItem.col
-                        || currentItem.row !== nextItem.row
-                        || currentItem.icon !== nextItem.icon) {
-                        unchanged = false
-                        break
-                    }
-                }
-            }
-
-            if (unchanged)
-                nextWorkspaceWindowItems[workspaceId] = currentItems
-        }
-
-        root._workspaceWindowItemsByWorkspace = nextWorkspaceWindowItems
-    }
-
     // --- revert timer: 1.5 s after overview trigger, return to focus ---
     // Workspace switch: always starts the timer.
     // Hover: timer starts on EXIT, not on entry — overview holds while cursor is present.
@@ -407,7 +342,6 @@ Item {
     }
 
     Component.onCompleted: {
-        root._refreshWorkspaceWindowItems()
         _refreshFocus()
         // Defer enabling Behaviors to the next event loop iteration so the initial
         // state renders without any startup animation flash.
@@ -434,7 +368,6 @@ Item {
     Connections {
         target: NiriService
         function onWindowsUpdated()      {
-            root._refreshWorkspaceWindowItems()
             root._refreshFocus()
         }
         function onWorkspaceActivated()  {
@@ -573,12 +506,10 @@ Item {
                     }
 
                     Repeater {
-                        model: NiriService.workspaces
+                        model: WindowHintService.workspaceSummaries
 
                         delegate: Item {
-                            required property string wsId
-                            required property int idx
-                            required property bool isActive
+                            required property var modelData
 
                             visible: _pill.visible
                             width: _pill.width
@@ -587,10 +518,10 @@ Item {
                             WorkspaceParts.WorkspaceOverviewPill {
                                 id: _pill
 
-                                wsId: parent.wsId
-                                idx: parent.idx
-                                isActive: parent.isActive
-                                windowItems: root._workspaceWindowItems(parent.wsId)
+                                wsId: String(parent.modelData.workspaceId || "")
+                                idx: Number(parent.modelData.workspaceIndex || 0)
+                                isActive: !!parent.modelData.isActive
+                                windowItems: parent.modelData.icons || []
                                 focusedWindowId: root._focusedWindowId
                                 pillHeight: root._pillH
                                 pillPaddingH: root._pillPadH

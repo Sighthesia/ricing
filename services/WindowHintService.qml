@@ -10,6 +10,7 @@ Singleton {
 
     property bool hintHeld: false
     property var activeHint: _emptyHint()
+    property var workspaceSummaries: []
     readonly property bool _overlayBlocked:
         IslandOverlayService.mode !== "none"
         && IslandOverlayService.state !== "closed"
@@ -143,6 +144,49 @@ Singleton {
         }
 
         root._publishHint(nextHint)
+    }
+
+    function _refreshWorkspaceSummaries() {
+        root.workspaceSummaries = root._workspaceSummaries()
+    }
+
+    function workspaceIcons(workspaceId) {
+        const targetWorkspaceId = String(workspaceId || "")
+
+        for (let index = 0; index < root.workspaceSummaries.length; index++) {
+            const summary = root.workspaceSummaries[index]
+            if ((summary.workspaceId || "") === targetWorkspaceId)
+                return summary.icons || []
+        }
+
+        return []
+    }
+
+    function _workspaceSummaries() {
+        const items = []
+        let lastNonEmptyIndex = -1
+
+        for (let index = 0; index < NiriService.workspaces.count; index++) {
+            const summary = root._workspaceSummaryAt(index)
+            items.push(summary)
+
+            if ((summary.icons || []).length > 0)
+                lastNonEmptyIndex = index
+        }
+
+        if (items.length === 0)
+            return items
+
+        if (lastNonEmptyIndex === items.length - 1) {
+            items.push({
+                workspaceId: "",
+                workspaceIndex: (items[items.length - 1].workspaceIndex || 0) + 1,
+                isActive: false,
+                icons: []
+            })
+        }
+
+        return items
     }
 
     function _emptyWindow() {
@@ -300,34 +344,9 @@ Singleton {
         return {
             workspaceId: workspace.wsId,
             workspaceIndex: workspace.idx,
+            isActive: !!workspace.isActive,
             icons: root._workspaceIcons(workspace.wsId)
         }
-    }
-
-    function _workspaceSummaries() {
-        const items = []
-        let lastNonEmptyIndex = -1
-
-        for (let index = 0; index < NiriService.workspaces.count; index++) {
-            const summary = root._workspaceSummaryAt(index)
-            items.push(summary)
-
-            if ((summary.icons || []).length > 0)
-                lastNonEmptyIndex = index
-        }
-
-        if (items.length === 0)
-            return items
-
-        if (lastNonEmptyIndex === items.length - 1) {
-            items.push({
-                workspaceId: "",
-                workspaceIndex: (items[items.length - 1].workspaceIndex || 0) + 1,
-                icons: []
-            })
-        }
-
-        return items
     }
 
     function _buildHint(visible) {
@@ -366,20 +385,25 @@ Singleton {
         target: NiriService
 
         function onWindowsUpdated() {
+            root._refreshWorkspaceSummaries()
             if (root.hintHeld)
                 root._scheduleHintRefresh(true)
         }
 
         function onWorkspaceActivated() {
+            root._refreshWorkspaceSummaries()
             if (root.hintHeld)
                 root._scheduleHintRefresh(false)
         }
 
         function onWorkspacesUpdated() {
+            root._refreshWorkspaceSummaries()
             if (root.hintHeld)
                 root._scheduleHintRefresh(false)
         }
     }
+
+    Component.onCompleted: root._refreshWorkspaceSummaries()
 
     Connections {
         target: WindowHintTriggerService

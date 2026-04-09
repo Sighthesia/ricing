@@ -40,6 +40,7 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
 | [qml-architecture](.agents/skills/qml-architecture/SKILL.md) | Use when working on QML architecture, file structure, naming conventions, imports, or module layout. |
 | [qml-state](.agents/skills/qml-state/SKILL.md)               | Use when modifying settings, shared state, persistence, error handling, logging, or service-driven component behavior. |
+| [qml-workspace-overview-model](.agents/skills/qml-workspace-overview-model/SKILL.md) | Use when workspace tabs must show per-workspace windows or icons, especially when overview content keeps collapsing to the active workspace. |
 
 ### Visual System
 
