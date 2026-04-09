@@ -19,18 +19,19 @@ Singleton {
     readonly property int breakDurationMs: breakDurationSeconds * 1000
     readonly property int leadMs: leadSeconds * 1000
     readonly property int snoozeMs: snoozeMinutes * 60 * 1000
-    readonly property int outroMs: Math.max(700, Math.round(Theme.anim.moveDuration * 4))
+    readonly property int outroMs: Math.max(360, Math.round(Theme.anim.moveDuration * 1.6))
     readonly property bool overlayVisible:
         IslandOverlayService.mode === "break-reminder"
         && IslandOverlayService.state !== "closed"
     readonly property bool preAlertActive: phase === "pre-alert"
     readonly property bool breakActive: phase === "break"
     readonly property bool outroActive: phase === "outro"
+    readonly property bool closingActive: phase === "closing"
     readonly property int phaseElapsedMs: Math.max(0, _nowMs - _phaseStartedMs)
     readonly property int remainingMs: Math.max(0, _phaseDeadlineMs - _nowMs)
     readonly property int remainingWholeSeconds: Math.max(0, Math.ceil(remainingMs / 1000))
     readonly property int displayRemainingMs:
-        breakActive ? remainingMs : (outroActive ? 0 : breakDurationMs)
+        breakActive ? remainingMs : ((outroActive || closingActive) ? 0 : breakDurationMs)
     readonly property int displayRemainingWholeSeconds:
         Math.max(0, Math.ceil(displayRemainingMs / 1000))
     readonly property real breakProgress:
@@ -46,17 +47,20 @@ Singleton {
         return minutes.toString().padStart(2, "0") + ":" + seconds.toString().padStart(2, "0")
     }
     readonly property string phaseTitle:
-        outroActive ? "放松完成"
+        closingActive ? "休息结束"
+        : (outroActive ? "放松完成"
         : (breakActive ? "20-20-20 休息时间"
-        : (preAlertActive ? "即将开始护眼休息" : "专注中"))
+        : (preAlertActive ? "即将开始护眼休息" : "专注中")))
     readonly property string phaseSubtitle:
-        outroActive
+        closingActive
+            ? "正在回到专注状态。"
+            : (outroActive
             ? "让注意力缓慢回到当下，再继续专注。"
             : (breakActive
             ? "看向 20 英尺外至少 20 秒，让眼睛重新对焦。"
             : (preAlertActive
                 ? leadSeconds.toString() + " 秒后进入护眼休息。"
-                : "每工作 20 分钟，提醒你远眺 20 秒。"))
+                : "每工作 20 分钟，提醒你远眺 20 秒。")))
     readonly property bool timerActive: enabled || phase !== "work"
 
     property string phase: "work"
@@ -64,6 +68,7 @@ Singleton {
     property int _phaseStartedMs: 0
     property int _phaseDeadlineMs: 0
     property bool _closingOverlayInternally: false
+    property int _pendingWorkDurationMs: 0
 
     function _schedulePhase(nextPhase, durationMs) {
         root.phase = nextPhase
@@ -116,6 +121,14 @@ Singleton {
         root._schedulePhase("outro", root.outroMs)
     }
 
+    function _beginCloseAndReturn(durationMs) {
+        root._pendingWorkDurationMs = Math.max(1, durationMs)
+        root.phase = "closing"
+        root._closingOverlayInternally = true
+        _tickTimer.restart()
+        root._closeOverlay()
+    }
+
     function startBreakNow() {
         if (root.breakActive || root.outroActive) {
             IslandOverlayService.openOverlay("break-reminder", {
@@ -132,11 +145,11 @@ Singleton {
     }
 
     function finishBreak() {
-        root.restartCycle()
+        root._beginCloseAndReturn(root.workIntervalMs)
     }
 
     function snoozeBreak() {
-        root._enterWorkPhase(root.snoozeMs)
+        root._beginCloseAndReturn(root.snoozeMs)
     }
 
     function _syncEnabledState() {
@@ -181,6 +194,14 @@ Singleton {
                 root._enterOutroPhase()
                 return
             }
+
+            if (root.phase === "outro") {
+                root._beginCloseAndReturn(root.workIntervalMs)
+                return
+            }
+
+            if (root.phase === "closing")
+                return
 
             root.finishBreak()
         }
@@ -234,13 +255,21 @@ Singleton {
             if (IslandOverlayService.state !== "closed")
                 return
 
-            if (root._closingOverlayInternally) {
-                root._closingOverlayInternally = false
+            const wasClosingInternally = root._closingOverlayInternally
+            root._closingOverlayInternally = false
+
+            if (root.phase === "closing" && root._pendingWorkDurationMs > 0) {
+                const nextDuration = root._pendingWorkDurationMs
+                root._pendingWorkDurationMs = 0
+                root._schedulePhase("work", nextDuration)
                 return
             }
 
+            if (wasClosingInternally)
+                return
+
             if (root.breakActive && IslandOverlayService.mode !== "break-reminder")
-                root.finishBreak()
+                root._beginCloseAndReturn(root.workIntervalMs)
         }
     }
 }

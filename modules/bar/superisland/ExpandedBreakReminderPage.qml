@@ -24,11 +24,11 @@ Item {
 
     readonly property real _ringSize: Math.max(220, Math.min(width, height) * 0.28)
     readonly property real _ringThickness: Math.max(14, Math.round(_ringSize * 0.055))
-    readonly property real _haloPadding: Math.max(root._ringThickness * 1.45, 22)
+    readonly property real _haloPadding: Math.max(root._ringThickness * 3.35, 56)
     readonly property real _visualRingSize: root._ringSize + root._haloPadding * 2
     readonly property real _contentPadding: Math.max(20, Math.round(28 * Theme.uiScale))
     readonly property int _introDuration: Math.max(900, Math.round(Theme.anim.moveDuration * 5.5))
-    readonly property int _outroDuration: Math.max(700, BreakReminderService.outroMs)
+    readonly property int _outroDuration: Math.max(220, BreakReminderService.outroMs)
     readonly property real _introProgress:
         BreakReminderService.breakActive
             ? root._clamp01(BreakReminderService.phaseElapsedMs / root._introDuration)
@@ -53,6 +53,8 @@ Item {
         BreakReminderService.outroActive
             ? root._lerp(1.0, 0.0, root._outroEase)
             : root._lerp(0.0, 1.0, root._introEase)
+    readonly property real _pageContentOpacity:
+        BreakReminderService.closingActive ? 0 : 1
 
     function _clamp01(value) {
         return Math.max(0, Math.min(1, value))
@@ -97,6 +99,7 @@ Item {
         anchors.fill: parent
         anchors.margins: root._contentPadding
         spacing: Math.max(18, Math.round(22 * Theme.uiScale))
+        opacity: root._pageContentOpacity
 
         RowLayout {
             Layout.fillWidth: true
@@ -219,9 +222,10 @@ Item {
                             const context = getContext("2d")
                             const size = Math.min(width, height)
                             const center = size / 2
-                            const baseRadius = center - root._ringThickness / 2 + root._ringThickness * 0.95
-                            const segmentCount = 96
-                            const baseLineWidth = root._ringThickness * 0.56
+                            const ringRadius = root._ringSize / 2 - root._ringThickness / 2
+                            const segmentCount = 52
+                            const innerRadius = ringRadius + root._ringThickness * 1.42
+                            const baseLineWidth = root._ringThickness * 0.96
 
                             context.clearRect(0, 0, width, height)
                             context.lineCap = "round"
@@ -229,20 +233,21 @@ Item {
                             for (let index = 0; index < segmentCount; index++) {
                                 const progress = index / segmentCount
                                 const angle = progress * Math.PI * 2 - Math.PI / 2
-                                const nextAngle = angle + Math.PI * 2 / segmentCount * 0.86
-                                const wave = 0.5
-                                    + 0.27 * Math.sin(angle * 3 + root._haloPhase * Math.PI * 2)
-                                    + 0.18 * Math.sin(angle * 7 - root._haloPhase * Math.PI * 4)
+                                const nextAngle = angle + Math.PI * 2 / segmentCount * 0.36
+                                const wave = 0.62
+                                    + 0.34 * Math.sin(angle * 3 + root._haloPhase * Math.PI * 2)
+                                    + 0.22 * Math.sin(angle * 7 - root._haloPhase * Math.PI * 4)
                                 const clampedWave = Math.max(0.08, wave)
-                                const radius = baseRadius + Math.sin(angle * 2 + root._haloPhase * Math.PI * 2) * (root._ringThickness * 0.18)
+                                const lineWidth = baseLineWidth * (0.24 + clampedWave * 0.30)
+                                const radius = innerRadius + lineWidth / 2
 
                                 context.strokeStyle = Qt.rgba(
-                                    Colors.background.r * 0.55,
-                                    Colors.background.g * 0.55,
-                                    Colors.background.b * 0.55,
-                                    0.22 + clampedWave * 0.2
+                                    Colors.highlight.r,
+                                    Colors.highlight.g,
+                                    Colors.highlight.b,
+                                    0.30 + clampedWave * 0.20
                                 )
-                                context.lineWidth = baseLineWidth * (0.6 + clampedWave * 0.72)
+                                context.lineWidth = lineWidth
                                 context.beginPath()
                                 context.arc(center, center, radius, angle, nextAngle, false)
                                 context.stroke()
