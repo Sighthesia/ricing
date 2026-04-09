@@ -29,12 +29,18 @@ Singleton {
     readonly property int phaseElapsedMs: Math.max(0, _nowMs - _phaseStartedMs)
     readonly property int remainingMs: Math.max(0, _phaseDeadlineMs - _nowMs)
     readonly property int remainingWholeSeconds: Math.max(0, Math.ceil(remainingMs / 1000))
+    readonly property int displayRemainingMs:
+        breakActive ? remainingMs : (outroActive ? 0 : breakDurationMs)
+    readonly property int displayRemainingWholeSeconds:
+        Math.max(0, Math.ceil(displayRemainingMs / 1000))
     readonly property real breakProgress:
-        breakActive && breakDurationMs > 0
-            ? Math.max(0, Math.min(1, remainingMs / breakDurationMs))
+        breakDurationMs > 0
+            ? (breakActive
+                ? Math.max(0, Math.min(1, remainingMs / breakDurationMs))
+                : (outroActive ? 0 : 1))
             : 0
     readonly property string countdownText: {
-        const totalSeconds = remainingWholeSeconds
+        const totalSeconds = displayRemainingWholeSeconds
         const minutes = Math.floor(totalSeconds / 60)
         const seconds = totalSeconds % 60
         return minutes.toString().padStart(2, "0") + ":" + seconds.toString().padStart(2, "0")
@@ -51,6 +57,7 @@ Singleton {
             : (preAlertActive
                 ? leadSeconds.toString() + " 秒后进入护眼休息。"
                 : "每工作 20 分钟，提醒你远眺 20 秒。"))
+    readonly property bool timerActive: enabled || phase !== "work"
 
     property string phase: "work"
     property int _nowMs: Date.now()
@@ -109,6 +116,17 @@ Singleton {
         root._schedulePhase("outro", root.outroMs)
     }
 
+    function startBreakNow() {
+        if (root.breakActive || root.outroActive) {
+            IslandOverlayService.openOverlay("break-reminder", {
+                source: "break-reminder-command"
+            })
+            return
+        }
+
+        root._enterBreakPhase()
+    }
+
     function restartCycle() {
         root._enterWorkPhase(root.workIntervalMs)
     }
@@ -139,12 +157,14 @@ Singleton {
         id: _tickTimer
         interval: 33
         repeat: true
-        running: root.enabled
+        running: root.timerActive
 
         onTriggered: {
             root._nowMs = Date.now()
 
-            if (!root.enabled || root._phaseDeadlineMs <= 0 || root._nowMs < root._phaseDeadlineMs)
+            if ((root.phase === "work" && !root.enabled)
+                    || root._phaseDeadlineMs <= 0
+                    || root._nowMs < root._phaseDeadlineMs)
                 return
 
             if (root.phase === "work") {

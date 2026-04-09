@@ -9,10 +9,13 @@ import "." as SuperIslandParts
 Item {
     id: root
 
+    implicitWidth: _contentGrid.implicitWidth
+    implicitHeight: _contentGrid.implicitHeight
+
     function pageActivated() {
         _pageStagger.clear()
         _pageStagger.registerItem(_calendarCard, 0, 1)
-        _pageStagger.registerItem(_resourceCard, 1, 1)
+        _pageStagger.registerItem(_utilityCard, 1, 1)
         _pageStagger.registerItem(_mediaCard, 2, 1)
         _pageStagger.runEnter()
         _mediaContent.pageActivated()
@@ -33,7 +36,10 @@ Item {
     }
 
     GridLayout {
-        anchors.fill: parent
+        id: _contentGrid
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
         columns: 3
         columnSpacing: Math.round(12 * Theme.uiScale)
         rowSpacing: Math.round(12 * Theme.uiScale)
@@ -54,15 +60,26 @@ Item {
         }
 
         BarComponents.StaggerItem {
-            id: _resourceCard
+            id: _utilityCard
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignTop
-            implicitWidth: _resourceContent.implicitWidth
-            implicitHeight: _resourceContent.implicitHeight
+            implicitWidth: _utilityColumn.implicitWidth
+            implicitHeight: _utilityColumn.implicitHeight
 
-            SuperIslandParts.ExpandedControlCenterResourceCard {
-                id: _resourceContent
+            ColumnLayout {
+                id: _utilityColumn
                 anchors.fill: parent
+                spacing: Math.round(12 * Theme.uiScale)
+
+                SuperIslandParts.ExpandedControlCenterResourceCard {
+                    id: _resourceContent
+                    Layout.fillWidth: true
+                }
+
+                SuperIslandParts.ExpandedControlCenterBreakCommandsCard {
+                    id: _breakCommandContent
+                    Layout.fillWidth: true
+                }
             }
         }
 

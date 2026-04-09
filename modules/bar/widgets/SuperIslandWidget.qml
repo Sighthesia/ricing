@@ -417,8 +417,24 @@ Item {
     onLiveInstanceChanged: _stateMachine.syncOverlayExtensionReservation()
     on_OverlayBodyHeightChanged: _stateMachine.syncOverlayExtensionReservation()
     on_OverlayDetachedOffsetChanged: _stateMachine.syncOverlayExtensionReservation()
-    on_AttachedPanelHeightChanged: _stateMachine.syncOverlayExtensionReservation()
+    on_AttachedPanelHeightChanged: {
+        _stateMachine.syncOverlayExtensionReservation()
+        root._retargetAttachedPanelHeightIfNeeded()
+    }
     on_AttachedPanelVisibleHeightChanged: _stateMachine.syncOverlayExtensionReservation()
+
+    function _retargetAttachedPanelHeightIfNeeded() {
+        if (!root._overlaySessionActive || !root._attachedPanelExpanded || root._overlayClosing)
+            return
+
+        if (root._attachedPanelHeight <= root._attachedPanelRevealHeight + 0.5)
+            return
+
+        _attachedHeightRetargetAnim.stop()
+        _attachedHeightRetargetAnim.from = root._attachedPanelRevealHeight
+        _attachedHeightRetargetAnim.to = root._attachedPanelHeight
+        _attachedHeightRetargetAnim.start()
+    }
 
     function _cloneEvent(event) {
         const source = event || root._idleSnapshot()
@@ -538,6 +554,14 @@ Item {
     SystemClock {
         id: systemClock
         precision: SystemClock.Minutes
+    }
+
+    NumberAnimation {
+        id: _attachedHeightRetargetAnim
+        target: _viewState
+        property: "_attachedPanelRevealHeight"
+        duration: Theme.anim.moveDuration
+        easing.type: Theme.anim.moveType
     }
 
     IslandCards.SuperIslandStateMachine {

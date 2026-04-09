@@ -24,6 +24,8 @@ Item {
 
     readonly property real _ringSize: Math.max(220, Math.min(width, height) * 0.28)
     readonly property real _ringThickness: Math.max(14, Math.round(_ringSize * 0.055))
+    readonly property real _haloPadding: Math.max(root._ringThickness * 1.45, 22)
+    readonly property real _visualRingSize: root._ringSize + root._haloPadding * 2
     readonly property real _contentPadding: Math.max(20, Math.round(28 * Theme.uiScale))
     readonly property int _introDuration: Math.max(900, Math.round(Theme.anim.moveDuration * 5.5))
     readonly property int _outroDuration: Math.max(700, BreakReminderService.outroMs)
@@ -206,8 +208,8 @@ Item {
 
                 Item {
                     Layout.alignment: Qt.AlignHCenter
-                    implicitWidth: root._ringSize
-                    implicitHeight: root._ringSize
+                    implicitWidth: root._visualRingSize
+                    implicitHeight: root._visualRingSize
 
                     Canvas {
                         id: _haloCanvas
@@ -250,7 +252,9 @@ Item {
 
                     Canvas {
                         id: _ringCanvas
-                        anchors.fill: parent
+                        anchors.centerIn: parent
+                        width: root._ringSize
+                        height: root._ringSize
 
                         onPaint: {
                             const context = getContext("2d")
