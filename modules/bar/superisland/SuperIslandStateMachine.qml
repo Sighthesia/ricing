@@ -217,6 +217,10 @@ Item {
         transientPolicy.replaceActiveTransient(event)
     }
 
+    function replacePreviewTransient(event) {
+        transientPolicy.replacePreviewTransient(event)
+    }
+
     function triggerHintFlash() {
         transientPolicy.triggerHintFlash()
     }

@@ -148,6 +148,65 @@ Item {
         root.state._replaceIncomingEvent = root.host._idleSnapshot()
     }
 
+    function _sameEvent(left, right) {
+        const leftEvent = left || root.host._idleSnapshot()
+        const rightEvent = right || root.host._idleSnapshot()
+
+        return (leftEvent.id || "") === (rightEvent.id || "")
+            && (leftEvent.type || "idle") === (rightEvent.type || "idle")
+            && (leftEvent.revision || 0) === (rightEvent.revision || 0)
+            && (leftEvent.title || "") === (rightEvent.title || "")
+            && (leftEvent.subtitle || "") === (rightEvent.subtitle || "")
+            && (leftEvent.icon || "") === (rightEvent.icon || "")
+    }
+
+    function replacePreviewTransient(event) {
+        const outgoingFromIncomingLayer = root.state._replaceIncomingVisible
+        const currentEvent = root.host._displayEvent(
+            outgoingFromIncomingLayer ? root.state._replaceIncomingEvent : root.state._mainDisplayEvent
+        )
+        const nextEvent = root.host._displayEvent(event)
+        const currentDisplayEvent = currentEvent.type === "idle"
+            ? root.host._baselineEvent
+            : currentEvent
+        const nextDisplayEvent = nextEvent.type === "idle"
+            ? root.host._baselineEvent
+            : nextEvent
+        const outgoingY = outgoingFromIncomingLayer ? root.state._replaceIncomingY : root.state._mainTrackY
+        const outgoingOpacity = outgoingFromIncomingLayer
+            ? root.state._replaceIncomingOpacity
+            : root.state._mainTrackOpacity
+
+        if (_sameEvent(currentDisplayEvent, nextDisplayEvent)) {
+            root.state._mainDisplayEvent = nextDisplayEvent
+            root.state._mainTrackY = root.host._mainTrackCenterY
+            root.state._mainTrackScale = 1
+            root.state._mainTrackOpacity = 1
+            resetReplaceLayers()
+            return
+        }
+
+        root.timeline.replaceAnim.stop()
+        resetReplaceLayers()
+
+        root.state._mainDisplayEvent = nextDisplayEvent
+        root.state._replaceOutgoingEvent = currentDisplayEvent
+        root.state._replaceIncomingEvent = nextDisplayEvent
+        root.state._replaceOutgoingY = outgoingY
+        root.state._replaceOutgoingOpacity = outgoingOpacity
+        root.state._replaceOutgoingTargetY = outgoingFromIncomingLayer
+            ? outgoingY
+            : (root.host._mainTrackCenterY + root.host._replaceOffset)
+        root.state._replaceIncomingY = root.host._mainTrackCenterY - root.host._replaceOffset
+        root.state._replaceIncomingOpacity = 0
+        root.state._replaceOutgoingVisible = true
+        root.state._replaceIncomingVisible = true
+        root.state._mainTrackY = root.host._mainTrackCenterY
+        root.state._mainTrackScale = 1
+        root.state._mainTrackOpacity = 0
+        root.timeline.replaceAnim.start()
+    }
+
     function replaceActiveTransient(event) {
         const outgoingEvent = root.host._cloneEvent(
             root.state._replaceIncomingVisible ? root.state._replaceIncomingEvent : root.state._mainDisplayEvent

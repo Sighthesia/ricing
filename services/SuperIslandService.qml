@@ -75,6 +75,15 @@ Singleton {
         }
     }
 
+    Timer {
+        id: _hiddenPreviewExpiryTimer
+        repeat: false
+        onTriggered: {
+            root._expirePausedPreviewIfNeeded()
+            root._scheduleHiddenPreviewExpiry()
+        }
+    }
+
     function _log(message, event) {
         if (!root._debugLogging)
             return
@@ -114,6 +123,66 @@ Singleton {
         }
     }
 
+    function _eventPreviewRemainingMs(event) {
+        if (!event || !event.type || event.type === "idle" || event.type === "window-hint")
+            return -1
+
+        const timeoutMs = Number(event.timeoutMs || 0)
+        if (timeoutMs <= 0)
+            return -1
+
+        return Math.max(0, (Number(event.timestamp || 0) + timeoutMs) - Date.now())
+    }
+
+    function _scheduleHiddenPreviewExpiry() {
+        let remainingMs = -1
+
+        if (root.activeEvent.type === "window-hint") {
+            if (root._queue.length > 0)
+                remainingMs = root._eventPreviewRemainingMs(root._queue[0])
+
+            if (remainingMs < 0 && root._suspendedEvent && root._suspendedEvent.type !== "idle")
+                remainingMs = root._eventPreviewRemainingMs(root._suspendedEvent)
+        } else if (root._activeTimerPausedForOverlay
+                && root.activeEvent.type !== "idle"
+                && root.activeEvent.type !== "window-hint") {
+            remainingMs = root._eventPreviewRemainingMs(root.activeEvent)
+        }
+
+        if (remainingMs < 0) {
+            _hiddenPreviewExpiryTimer.stop()
+            return
+        }
+
+        _hiddenPreviewExpiryTimer.interval = Math.max(1, remainingMs)
+        _hiddenPreviewExpiryTimer.restart()
+    }
+
+    function _expirePausedPreviewIfNeeded() {
+        if (root.activeEvent.type === "window-hint") {
+            if (root._queue.length > 0 && root._eventPreviewRemainingMs(root._queue[0]) === 0)
+                root._queue = []
+
+            if (root._suspendedEvent && root._suspendedEvent.type !== "idle"
+                    && root._eventPreviewRemainingMs(root._suspendedEvent) === 0)
+                root._suspendedEvent = root._idleEvent()
+
+            return
+        }
+
+        if (!root._activeTimerPausedForOverlay
+                || root.activeEvent.type === "idle"
+                || root.activeEvent.type === "window-hint"
+                || root._eventPreviewRemainingMs(root.activeEvent) !== 0)
+            return
+
+        root._clearActiveTimerState()
+        root.activeEvent = root._idleEvent()
+        root.flashEvent = ({})
+        root.mode = "idle"
+        root.mainState = root._resolveBaselineState()
+    }
+
     function _scheduleActiveTimer(ms) {
         const duration = Math.max(1, Number(ms) || 0)
 
@@ -123,6 +192,7 @@ Singleton {
         root._pausedActiveRemainingMs = 0
         root._activeTimerPausedForOverlay = false
         _activeTimer.restart()
+        root._scheduleHiddenPreviewExpiry()
     }
 
     function _clearActiveTimerState() {
@@ -130,6 +200,7 @@ Singleton {
         root._activeDeadlineMs = 0
         root._pausedActiveRemainingMs = 0
         root._activeTimerPausedForOverlay = false
+        root._scheduleHiddenPreviewExpiry()
     }
 
     function _pauseActiveTimerForOverlay() {
@@ -147,6 +218,7 @@ Singleton {
 
         root._activeDeadlineMs = 0
         root._activeTimerPausedForOverlay = true
+        root._scheduleHiddenPreviewExpiry()
     }
 
     function _pauseActiveTimerForHint() {
@@ -164,6 +236,7 @@ Singleton {
 
         root._activeDeadlineMs = 0
         root._activeTimerPausedForOverlay = true
+        root._scheduleHiddenPreviewExpiry()
     }
 
     function _resumeActiveTimerAfterOverlay() {
@@ -187,6 +260,7 @@ Singleton {
                 : (root.activeEvent.timeoutMs > 0 ? root.activeEvent.timeoutMs : root._settings().defaultTimeout)
             )
         )
+        root._scheduleHiddenPreviewExpiry()
     }
 
     function pushEvent(event) {
@@ -230,6 +304,7 @@ Singleton {
             root.activeEvent = event
             root.flashEvent = event
             root.mode = "hint"
+            root._scheduleHiddenPreviewExpiry()
             return
         }
 
@@ -249,6 +324,7 @@ Singleton {
         root.flashEvent = event
         root.mode = "hint"
         root.mainState = root._resolveBaselineState()
+        root._scheduleHiddenPreviewExpiry()
     }
 
     function hideWindowHint() {
@@ -264,6 +340,7 @@ Singleton {
             root._queue = []
             root._suspendedEvent = root._idleEvent()
             root._activateEvent(next, true)
+            root._scheduleHiddenPreviewExpiry()
             return
         }
 
@@ -273,6 +350,7 @@ Singleton {
                 resumeEvent[key] = root._suspendedEvent[key]
             root._suspendedEvent = root._idleEvent()
             root._activateEvent(resumeEvent, true)
+            root._scheduleHiddenPreviewExpiry()
             return
         }
 
@@ -281,6 +359,7 @@ Singleton {
         root.mode = "idle"
         root.mainState = root._resolveBaselineState()
         root._clearActiveTimerState()
+        root._scheduleHiddenPreviewExpiry()
     }
 
     function replaceEvent(groupKey, event) {
@@ -305,6 +384,8 @@ Singleton {
 
         if (root._queue.length > 0 && root._queue[0].id === id)
             root._queue = []
+
+        root._scheduleHiddenPreviewExpiry()
     }
 
     function snoozeGroup(groupKey, ms) {
@@ -375,6 +456,7 @@ Singleton {
                 nextQueue.push(queuedEvent)
         }
         root._queue = nextQueue
+        root._scheduleHiddenPreviewExpiry()
 
         if (root.activeEvent.type !== "idle" && !root._isEventEnabled(root.activeEvent.type))
             root._finishTransient()
@@ -437,6 +519,7 @@ Singleton {
 
         if (root.activeEvent.type === "window-hint" && event.type !== "window-hint") {
             root._queue = [event]
+            root._scheduleHiddenPreviewExpiry()
             return
         }
 
@@ -452,6 +535,7 @@ Singleton {
                 && root.activeEvent.type !== "window-hint"
                 && event.type !== "window-hint") {
             root._queue = []
+            root._scheduleHiddenPreviewExpiry()
             root._activateEvent(event)
             return
         }
@@ -461,6 +545,7 @@ Singleton {
 
         if (root.activeEvent.type === "window" && event.type !== "window") {
             root._queue = []
+            root._scheduleHiddenPreviewExpiry()
             root._activateEvent(event, true)
             return
         }
@@ -472,6 +557,7 @@ Singleton {
 
         if (root.activeEvent.type !== "idle") {
             root._queue = [event]
+            root._scheduleHiddenPreviewExpiry()
             return
         }
 
@@ -486,6 +572,8 @@ Singleton {
         else
             root._resumeActiveTimerAfterOverlay()
 
+        root._scheduleHiddenPreviewExpiry()
+
         if (root.activeEvent.groupKey !== "overlay")
             return
 
@@ -495,6 +583,7 @@ Singleton {
         root.mode = "idle"
         root.mainState = root._resolveBaselineState()
         root._suspendedEvent = root._idleEvent()
+        root._scheduleHiddenPreviewExpiry()
 
         if (root._queue.length > 0)
             _pendingStartTimer.restart()
@@ -519,6 +608,7 @@ Singleton {
             root._activeDeadlineMs = 0
             root._pausedActiveRemainingMs = event.timeoutMs > 0 ? event.timeoutMs : root._settings().defaultTimeout
             root._activeTimerPausedForOverlay = true
+            root._scheduleHiddenPreviewExpiry()
             return
         }
 
@@ -528,6 +618,7 @@ Singleton {
         }
 
         root._scheduleActiveTimer(event.timeoutMs > 0 ? event.timeoutMs : root._settings().defaultTimeout)
+        root._scheduleHiddenPreviewExpiry()
     }
 
     function _finishTransient() {
@@ -549,6 +640,7 @@ Singleton {
         root.flashEvent = ({})
         root.mode = "idle"
         root.mainState = root._resolveBaselineState()
+        root._scheduleHiddenPreviewExpiry()
 
         if (root._queue.length > 0)
             _pendingStartTimer.restart()
