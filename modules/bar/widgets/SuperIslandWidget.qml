@@ -297,8 +297,12 @@ Item {
         (_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property real _idleCollapsedWidthLive:
         (_idleMeasureLoader.item ? _idleMeasureLoader.item.implicitWidth : 0) + root._padH * 2
+    readonly property bool _useAttachedCollapseBaseWidth:
+        root._attachedCollapseAnimating || root._phase === "hint-exit" || root._overlayClosing
     readonly property real _collapsedWidth:
-        root._attachedCollapseBaseWidth > 0 ? root._attachedCollapseBaseWidth : root._collapsedWidthLive
+        root._useAttachedCollapseBaseWidth && root._attachedCollapseBaseWidth > 0
+            ? root._attachedCollapseBaseWidth
+            : root._collapsedWidthLive
     readonly property real _expandedWidth:
         Math.max(
             root._collapsedWidth,
@@ -312,7 +316,9 @@ Item {
             ? root._idleCollapsedWidthLive
             : ((_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2)
     readonly property real _returnWidth:
-        root._attachedCollapseBaseWidth > 0 ? root._attachedCollapseBaseWidth : root._returnWidthLive
+        root._useAttachedCollapseBaseWidth && root._attachedCollapseBaseWidth > 0
+            ? root._attachedCollapseBaseWidth
+            : root._returnWidthLive
     readonly property real _transitionCollapsedWidth:
         root._phase === "exit" ? root._returnWidth : root._collapsedWidth
     readonly property real _idleOpticalOffset: 0

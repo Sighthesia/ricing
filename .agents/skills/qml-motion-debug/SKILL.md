@@ -211,6 +211,15 @@ Use when a paged list or deck needs a stable first-open reveal across repeated o
 - model refreshes may update state during the pending window, but they must not start a second enter path
 - once the first reveal completes, later refreshes may re-enter only if the page is still visible and the refresh is not part of the same activation sequence
 
+### Pattern J: Hidden Preview Must Reuse Replace Feedback
+Use when a hidden or background preview swaps beneath a `window-hint` or attached overlay.
+
+- do not assign the preview event directly into the steady-state display item if the visible surface is still on screen
+- route preview swaps through the same outgoing/incoming replace layers as foreground transient replacement
+- trigger the shared background pulse and scale spring for preview swaps too, otherwise the text changes but the whole panel feels static
+- let preview events expire while hint or overlay pauses the foreground timer, or the final notification will linger until the owner closes
+- keep cached collapse width only for the real collapse tail; do not let an old width snapshot hold the live pill wide throughout the whole hint or overlay session
+
 ## DymicShell-Specific Notes
 
 - Check `services/WindowHintService.qml` first for live hint snapshots.
@@ -221,6 +230,9 @@ Use when a paged list or deck needs a stable first-open reveal across repeated o
 - For `window-hint` to overlay handoff, compare `IslandOverlayService.mode` and `IslandOverlayService.state` separately before deciding a delayed pulse is still valid.
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.
+- For `window-hint` or overlay-owned preview swaps, route `hiddenPreviewEvent` through replace layers and pulse/spring feedback instead of mutating `_mainDisplayEvent` directly.
+- For `window-hint` or overlay sessions, let hidden preview expiry continue even while foreground timers are paused, or the last notification will outlive the surface owner.
+- For attached hint close, use cached collapse width only during the actual collapse path; stale width snapshots can cause wide-pill hold or close-time width flash.
 - For `window-hint` collapse, verify that `_hintExitAnim` does not reset phase or clear attached content before `_attachedCollapseAnim` finishes.
 - For attached shell collapse, verify that bridge shoulders disappear before visible height falls into the seam-sized range.
 - For launcher and clipboard result swaps, if the first open staggers correctly but later swaps drift into whole-list motion, reset the reused `ListView` state before re-entering and verify the outgoing snapshot layer is still retiring independently.

@@ -147,6 +147,10 @@ Item {
             Math.max(0, root.host._attachedPanelVisibleHeight),
             root.host._attachedPanelHeight
         )
+        root.state._attachedCollapseBaseWidth = Math.max(
+            root.host._attachedRevealSeedWidth,
+            root.host._attachedCollapseBaseWidthCandidate
+        )
 
         root.timeline.attachedCollapseAnim.targetWidth = toWidth !== undefined
             ? toWidth

@@ -205,6 +205,7 @@ Item {
         root.state._mainTrackScale = 1
         root.state._mainTrackOpacity = 0
         root.timeline.replaceAnim.start()
+        root.machine.triggerSharedBackgroundPulse("preview-replace")
     }
 
     function replaceActiveTransient(event) {
@@ -266,6 +267,11 @@ Item {
     function finishWindowHint() {
         if (root.state._phase !== "hint")
             return
+
+        if (root.host._isFullHintEventType(root.state._attachedHintEvent.type)
+                && !root.state._overlaySessionActive) {
+            root.state._attachedCollapseBaseWidth = 0
+        }
 
         root.state._phase = "hint-exit"
         root.machine.syncOverlayExtensionReservation()
