@@ -18,6 +18,8 @@ Item {
         event: root.event
         iconSource: root.iconSource
         anchors.fill: parent
+        anchors.topMargin: -Theme.barWidget.contentPaddingV
+        anchors.bottomMargin: -Theme.barWidget.contentPaddingV
     }
 
     MouseArea {

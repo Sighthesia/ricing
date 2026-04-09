@@ -8,15 +8,19 @@ Item {
 
     required property var event
     required property string iconSource
-    readonly property int _iconSize: Theme.barWidget.primaryIconSize
+    readonly property int _iconSize: Math.max(12, Theme.barWidget.primaryIconSize - 2)
+    readonly property int _contentPadV: Theme.barWidget.contentPaddingV + 3
+    readonly property int _contentPadH: Theme.barWidget.contentPaddingH + 2
+    readonly property int _titleMaxWidth: Math.round(220 * Theme.uiScale)
+    readonly property int _subtitleMaxWidth: Math.round(200 * Theme.uiScale)
 
     implicitWidth: content.implicitWidth
-    implicitHeight: Theme.barWidget.pillHeight
+    implicitHeight: Theme.barWidget.pillHeight + _contentPadV * 2
 
     RowLayout {
         id: content
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: Theme.barWidget.iconLabelSpacing
+        anchors.centerIn: parent
+        spacing: Math.max(4, Theme.barWidget.iconLabelSpacing - 1)
 
         Image {
             source: root.iconSource
@@ -40,7 +44,7 @@ Item {
                 font.bold: true
                 elide: Text.ElideRight
                 maximumLineCount: 1
-                Layout.maximumWidth: Math.round(180 * Theme.uiScale)
+                Layout.maximumWidth: root._titleMaxWidth
             }
 
             Text {
@@ -51,7 +55,7 @@ Item {
                 font.pixelSize: Theme.fontSizeSmall
                 elide: Text.ElideRight
                 maximumLineCount: 1
-                Layout.maximumWidth: Math.round(160 * Theme.uiScale)
+                Layout.maximumWidth: root._subtitleMaxWidth
             }
         }
 
