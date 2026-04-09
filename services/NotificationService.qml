@@ -133,8 +133,10 @@ Singleton {
     }
 
     function dismissAllActive() {
-        while (activeList.count > 0)
-            _stopTimer(activeList.get(0).id)
+        while (activeList.count > 0) {
+            var id = activeList.get(0).id;
+            dismissActive(id)
+        }
     }
 
     // Invoke a notification action then dismiss the popup.
