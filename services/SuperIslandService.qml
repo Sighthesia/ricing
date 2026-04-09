@@ -40,20 +40,8 @@ Singleton {
         return root._idleEvent()
     }
 
-    function _notificationTakeoverActive() {
-        if (!root._settings().showNotifications)
-            return false
-
-        const active = root.activeEvent || root._idleEvent()
-        if (active.type === "notification")
-            return true
-
-        const preview = root.hiddenPreviewEvent || root._idleEvent()
-        return root._hintPhase && preview.type === "notification"
-    }
-
     function syncNotificationPopupVisibility() {
-        const shouldEnablePopups = !root._notificationTakeoverActive()
+        const shouldEnablePopups = !root._settings().showNotifications
 
         if (NotificationService.popupsEnabled === shouldEnablePopups)
             return
@@ -770,15 +758,11 @@ Singleton {
     }
 
     Connections {
-        target: NotificationService.activeList
-        function onCountChanged() {
+        target: NotificationService
+        function onNotificationReceived(item) {
             if (root._suppressExternalSources || !root._settings().showNotifications)
                 return
 
-            if (NotificationService.activeList.count <= 0)
-                return
-
-            const item = NotificationService.activeList.get(0)
             if (!item || item.id === root._lastNotificationId)
                 return
 

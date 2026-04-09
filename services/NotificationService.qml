@@ -13,6 +13,8 @@ import qs.services
 Singleton {
     id: root
 
+    signal notificationReceived(var data)
+
     // --- Public state ---
 
     // Currently visible popup notifications (newest first).
@@ -24,8 +26,10 @@ Singleton {
     // When true, new notifications are only appended to history — no popups shown.
     property bool doNotDisturb: false
 
-    // Runtime gate for popup presentation. SuperIsland turns this off while it owns notification display.
+    // Runtime gate for popup presentation. Shell settings decide whether popup windows are allowed.
     property bool popupsEnabled: true
+    readonly property bool popupPresentationEnabled:
+        popupsEnabled && !SettingsService.data.superIsland.showNotifications
 
     // Count of items added since markAllSeen() was last called.
     readonly property int unreadCount: _unreadCount
@@ -221,9 +225,11 @@ Singleton {
             _prependHistory(data);
         }
 
+        root.notificationReceived(data)
+
         if (root.doNotDisturb) return;
 
-        if (!root.popupsEnabled) return;
+        if (!root.popupPresentationEnabled) return;
 
         // Store the live notification object so invokeAction() can reach its actions.
         if (!_activeNotifications[data.id]) _activeNotifications[data.id] = {};
@@ -250,6 +256,15 @@ Singleton {
 
         activeList.insert(0, data);
         _startTimer(data);
+    }
+
+    Connections {
+        target: SettingsService.data.superIsland
+
+        function onShowNotificationsChanged() {
+            if (SettingsService.data.superIsland.showNotifications)
+                root.dismissAllActive()
+        }
     }
 
     function _refreshNotificationDiagnostics() {
