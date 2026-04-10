@@ -388,10 +388,10 @@ Item {
         let previous = String(previousQuery || "")
         let next = String(nextQuery || "")
 
-        if (next.length <= previous.length)
+        if (previous.length === 0 || next.length === 0 || previous === next)
             return false
 
-        return next.startsWith(previous)
+        return next.startsWith(previous) || previous.startsWith(next)
     }
 
     function _resultKeyForItem(item, index): string {
