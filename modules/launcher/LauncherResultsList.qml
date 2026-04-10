@@ -21,7 +21,12 @@ Item {
     property int _expandDelaySlots: 0
     property int _filterTransitionRevision: 0
     property int _activeSwapExitDuration: 0
+    property bool _softManagedEntryActive: false
+    property bool _softReplaceActive: false
+    property int _activeSoftReplaceDuration: 0
     property var _outgoingItems: []
+    property var _incomingItems: []
+    property var _pendingIncomingItems: []
     property var _preTransitionVisibleKeys: []
     readonly property int _maxViewportSlots: 6
     readonly property int _managedEnterStep: SettingsService.effectiveAnimation.staggerLevel2Step
@@ -47,6 +52,34 @@ Item {
         interval: 0
         repeat: false
         onTriggered: root.releaseManagedEntry()
+    }
+
+    Timer {
+        id: _incomingStartTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            root._incomingItems = root._pendingIncomingItems
+            if (root._incomingItems.length > 0) {
+                _incomingClearTimer.interval = root._activeSoftReplaceDuration + 20
+                _incomingClearTimer.restart()
+            } else {
+                root._softReplaceActive = false
+                root._activeSoftReplaceDuration = 0
+            }
+        }
+    }
+
+    Timer {
+        id: _incomingClearTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            root._incomingItems = []
+            root._pendingIncomingItems = []
+            root._softReplaceActive = false
+            root._activeSoftReplaceDuration = 0
+        }
     }
 
     Timer {
@@ -238,7 +271,11 @@ Item {
         _outgoingClearTimer.stop()
         _managedEntryReleaseTimer.stop()
         _filterTransitionReleaseTimer.stop()
+        _incomingStartTimer.stop()
+        _incomingClearTimer.stop()
         root._outgoingItems = []
+        root._incomingItems = []
+        root._pendingIncomingItems = []
         root._filterTransitionActive = false
         root._syncVisibleStateDuringFilter = true
         root._managedEntryPending = false
@@ -247,6 +284,9 @@ Item {
         root._expandInsertCount = 0
         root._expandDelaySlots = 0
         root._activeSwapExitDuration = 0
+        root._softReplaceActive = false
+        root._activeSoftReplaceDuration = 0
+        root._softManagedEntryActive = false
         root._preTransitionVisibleKeys = []
     }
 
@@ -259,10 +299,53 @@ Item {
         return Math.max(0, root._activeSwapExitDuration)
     }
 
+    function activeSoftReplaceDuration(): int {
+        return Math.max(0, root._activeSoftReplaceDuration)
+    }
+
     function expandTransitionDuration(): int {
         return Theme.anim.moveDuration
             + root._windowForCount(root._expandDelaySlots)
             + Theme.anim.highlightDuration
+    }
+
+    function beginSoftReplace(displayItems, delayMs): void {
+        let snapshots = []
+        let visibleSlotCount = root._estimatedVisibleSlotCount()
+        let total = Math.min(displayItems ? displayItems.length : 0, visibleSlotCount)
+
+        _incomingStartTimer.stop()
+        _incomingClearTimer.stop()
+        root._incomingItems = []
+        root._pendingIncomingItems = []
+
+        for (let index = 0; index < total; index++) {
+            let item = displayItems[index]
+            if (!item)
+                continue
+
+            snapshots.push({
+                key: String(item.key || ""),
+                name: item.name || "",
+                description: item.description || "",
+                icon: item.icon || "",
+                y: index * 46,
+                delay: root._compressedDelay(index, total)
+            })
+        }
+
+        if (snapshots.length === 0) {
+            root._softReplaceActive = false
+            root._activeSoftReplaceDuration = 0
+            return
+        }
+
+        root._pendingIncomingItems = snapshots
+        root._softReplaceActive = true
+        root._activeSoftReplaceDuration = SettingsService.effectiveAnimation.staggerEnterDuration
+            + root._windowForCount(snapshots.length)
+        _incomingStartTimer.interval = Math.max(0, Number(delayMs) || 0)
+        _incomingStartTimer.restart()
     }
 
     function _windowForCount(total): int {
@@ -410,14 +493,16 @@ Item {
         return keys
     }
 
-    function prepareManagedEntry(): void {
+    function prepareManagedEntry(mode): void {
         root.scrollAnimationsEnabled = root.itemAnimationsEnabled
 
         if (!root.itemAnimationsEnabled) {
+            root._softManagedEntryActive = false
             root._managedEntryPending = false
             return
         }
 
+        root._softManagedEntryActive = String(mode || "") === "soft"
         root._managedEntryPending = true
     }
 
@@ -546,6 +631,7 @@ Item {
     function releaseManagedEntry(): void {
         if (!root.itemAnimationsEnabled) {
             root._filterTransitionActive = false
+            root._softManagedEntryActive = false
             root._managedEntryPending = false
             root.syncInstantiatedDelegateState()
             return
@@ -572,6 +658,7 @@ Item {
 
             root._queueManagedVisibleDelegates()
             root._filterTransitionActive = false
+            root._softManagedEntryActive = false
             root._managedEntryPending = false
         })
     }
@@ -581,6 +668,7 @@ Item {
         anchors.fill: parent
         z: 1
         clip: true
+        opacity: root._softReplaceActive ? 0 : 1
         cacheBuffer: 0
         reuseItems: false
         displayMarginBeginning: 92
@@ -703,10 +791,15 @@ Item {
             viewportPadding: 28
             scrollStep: SettingsService.effectiveAnimation.staggerExitStep
             viewportEnterBaseDelay: SettingsService.effectiveAnimation.staggerLevel2BaseDelay
-            managedEnterStep: root._managedEnterStep
+            managedEnterStep: root._softManagedEntryActive
+                ? Math.max(10, Math.round(root._managedEnterStep * 0.7))
+                : root._managedEnterStep
             managedEnterFadeEnabled: root.itemAnimationsEnabled
-            managedEnterStartOpacity: 0.0
-            managedEnterStartOffsetY: enterOffsetY
+            managedEnterStartOpacity: root._softManagedEntryActive ? 0.18 : 0.0
+            enterOffsetX: root._softManagedEntryActive ? 18 : 0
+            managedEnterStartOffsetY: root._softManagedEntryActive
+                ? Math.round(enterOffsetY * 0.55)
+                : enterOffsetY
             enterOffsetY: SettingsService.effectiveAnimation.staggerEnterOffsetY
             exitOffsetY: SettingsService.effectiveAnimation.staggerExitOffsetY
             property real _filterAddOpacity: 1
@@ -812,6 +905,76 @@ Item {
                     color: modelData.selected
                         ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
                         : "transparent"
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+
+                        Image {
+                            source: "image://icon/" + (modelData.icon || "application-x-executable")
+                            width: 20
+                            height: 20
+                            sourceSize: Qt.size(20, 20)
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            Text {
+                                text: modelData.name
+                                color: Colors.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall + 1
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+
+                            Text {
+                                text: modelData.description
+                                color: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.55)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall - 1
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                visible: modelData.description !== ""
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Item {
+        anchors.fill: parent
+        clip: true
+        visible: root.itemAnimationsEnabled && root._incomingItems.length > 0
+        z: 2
+
+        Repeater {
+            model: root._incomingItems
+
+            delegate: BarComponents.StaggerItem {
+                id: _incomingItem
+
+                required property var modelData
+
+                x: 0
+                y: modelData.y
+                width: resultList.width
+                height: 46
+                delay: modelData.delay
+                enterStartOpacity: 0.0
+                enterStartOffsetX: 24
+                enterStartOffsetY: Math.round(SettingsService.effectiveAnimation.staggerEnterOffsetY * 0.55)
+
+                Component.onCompleted: runEnter()
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
 
                     RowLayout {
                         anchors.fill: parent

@@ -265,6 +265,9 @@ Item {
         let currentInstantiatedKeys = _resultsList && _resultsList.instantiatedDelegateKeys
             ? _resultsList.instantiatedDelegateKeys()
             : []
+        let zeroQueryNarrowing = sameProvider
+            && String(root._lastQuery || "") === ""
+            && String(q || "") !== ""
         let sameProviderRefinement = sameProvider
             && root._isQueryRefinement(root._lastQuery, q)
         let retainedVisibleCount = 0
@@ -278,7 +281,13 @@ Item {
             && _results.count > 0
             && retainedVisibleCount > 0
             && (insertedCount > 0 || removedCount > 0 || retainedCount > 0)
+        let useSoftReplace = filterAnimationsEnabled
+            && zeroQueryNarrowing
+            && retainedCount > 0
         let syncVisibleStateDuringFilter = true
+        let transitionPath = sameProviderIncremental
+            ? "incremental"
+            : (useSoftReplace ? "softReplace" : "fullReplace")
 
         console.log(
             "[LauncherSearchTrace]",
@@ -286,7 +295,8 @@ Item {
             "query=", JSON.stringify(q),
             "sameProvider=", sameProvider,
             "sameProviderRefinement=", sameProviderRefinement,
-            "path=", sameProviderIncremental ? "incremental" : "fullReplace",
+            "zeroQueryNarrowing=", zeroQueryNarrowing,
+            "path=", transitionPath,
             "currentCount=", _results.count,
             "nextCount=", displayItems.length,
             "inserted=", insertedCount,
@@ -314,6 +324,8 @@ Item {
 
             if (_resultsList && _resultsList.resetFilterViewport)
                 _resultsList.resetFilterViewport()
+            if (_resultsList && _resultsList.syncVisibleDelegateState)
+                _resultsList.syncVisibleDelegateState()
 
             if (_resultsList && _resultsList.queueRetainedVisibleEntries)
                 _resultsList.queueRetainedVisibleEntries(retainedKeys)
@@ -342,12 +354,18 @@ Item {
             _resultsList.beginFilterTransition()
         if (_resultsList && _resultsList.runSwapExit)
             _resultsList.runSwapExit()
-        if (_resultsList && _resultsList.prepareManagedEntry)
-            _resultsList.prepareManagedEntry()
+        if (!useSoftReplace && _resultsList && _resultsList.prepareManagedEntry)
+            _resultsList.prepareManagedEntry(useSoftReplace ? "soft" : "")
+        if (useSoftReplace && _resultsList && _resultsList.beginSoftReplace) {
+            let swapExitDuration = _resultsList.activeSwapExitDuration
+                ? _resultsList.activeSwapExitDuration()
+                : 0
+            _resultsList.beginSoftReplace(displayItems, swapExitDuration + 20)
+        }
 
         console.log(
             "[LauncherSearchTrace]",
-            "fullReplace",
+            useSoftReplace ? "softReplace" : "fullReplace",
             "query=", JSON.stringify(q),
             "sameProvider=", sameProvider,
             "sameProviderRefinement=", sameProviderRefinement,
@@ -367,7 +385,15 @@ Item {
 
         _selectedIndex = root._resultData.length > 0 ? 0 : -1
 
-        if (_resultsList && _resultsList.scheduleManagedEntryRelease)
+        if (useSoftReplace && _resultsList && _resultsList.scheduleFilterTransitionRelease) {
+            let softReplaceDuration = _resultsList.activeSoftReplaceDuration
+                ? _resultsList.activeSoftReplaceDuration()
+                : 0
+            let swapExitDuration = _resultsList.activeSwapExitDuration
+                ? _resultsList.activeSwapExitDuration()
+                : 0
+            _resultsList.scheduleFilterTransitionRelease(swapExitDuration + softReplaceDuration + 40)
+        } else if (_resultsList && _resultsList.scheduleManagedEntryRelease)
             _resultsList.scheduleManagedEntryRelease(
                 (_resultsList.activeSwapExitDuration
                     ? _resultsList.activeSwapExitDuration()
