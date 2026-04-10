@@ -20,8 +20,8 @@ Item {
     property int _selectedIndex: -1
     property var _providers: [appProvider, clipProvider]
     property var _resultData: []
-    property string _lastNormalizedQuery: ""
     property var _lastProvider: null
+    property string _lastQuery: ""
     property bool _suspendRefresh: false
     property bool panelActive: LauncherService.isOpen
 
@@ -86,11 +86,11 @@ Item {
 
     // Called by LauncherPanel after panel becomes active
     function openPanel(): void {
-        root._lastNormalizedQuery = ""
         root._lastProvider = null
         if (_resultsList && _resultsList.resetTransientState)
             _resultsList.resetTransientState()
         _results.clear()
+        root._lastQuery = ""
         _searchHeader.text = LauncherService.prefillText
         _refreshResults()
 
@@ -107,13 +107,13 @@ Item {
     // Called by LauncherPanel when closing
     function closePanel(): void {
         _suspendRefresh = true
-        root._lastNormalizedQuery = ""
         root._lastProvider = null
         if (_resultsList && _resultsList.resetTransientState)
             _resultsList.resetTransientState()
         _searchHeader.text = ""
         _results.clear()
         root._resultData = []
+        root._lastQuery = ""
         _suspendRefresh = false
     }
 
@@ -160,46 +160,6 @@ Item {
         return appProvider
     }
 
-    function _providerDebugName(provider): string {
-        if (provider === appProvider)
-            return "applications"
-        if (provider === clipProvider)
-            return "clipboard"
-        return "unknown"
-    }
-
-    function _debugKeySample(keys, limit): string {
-        let sample = []
-        let capped = Math.min(Number(limit) || 0, keys ? keys.length : 0)
-
-        for (let index = 0; index < capped; index++)
-            sample.push(String(keys[index] || ""))
-
-        return "[" + sample.join(", ") + "]"
-    }
-
-    function _debugCurrentModelKeys(limit): string {
-        let keys = []
-        let capped = Math.min(Math.max(0, Number(limit) || 0), _results.count)
-
-        for (let index = 0; index < capped; index++) {
-            let existing = _results.get(index)
-            keys.push(existing ? String(existing.key || "") : "")
-        }
-
-        return root._debugKeySample(keys, capped)
-    }
-
-    function _debugDisplayItemKeys(displayItems, limit): string {
-        let keys = []
-        let capped = Math.min(Number(limit) || 0, displayItems.length)
-
-        for (let index = 0; index < capped; index++)
-            keys.push(String(displayItems[index].key || ""))
-
-        return root._debugKeySample(keys, capped)
-    }
-
     function _refreshResults(): void {
         if (_suspendRefresh || !root.panelActive)
             return
@@ -213,14 +173,12 @@ Item {
         else if (q === ">clip") q = ""
 
         let sameProvider = provider === root._lastProvider
-        let refiningQuery = sameProvider
-            && q.length > root._lastNormalizedQuery.length
-            && q.startsWith(root._lastNormalizedQuery)
 
         let items = provider.getResults(q)
         let displayItems = []
         let previousKeys = ({})
         let nextKeys = ({})
+        let retainedKeys = ({})
 
         for (let existingIndex = 0; existingIndex < _results.count; existingIndex++) {
             let existingItem = _results.get(existingIndex)
@@ -240,6 +198,7 @@ Item {
 
             displayItems.push(displayItem)
             nextKeys[displayItem.key] = true
+            retainedKeys[displayItem.key] = previousKeys[displayItem.key] === true
 
             if (!previousKeys[displayItem.key])
                 insertedCount += 1
@@ -247,22 +206,16 @@ Item {
                 insertedMaxIndex = i
         }
 
-        if (refiningQuery) {
-            let stabilized = root._stabilizeRefinedResults(displayItems, items)
-            displayItems = stabilized.displayItems
-            items = stabilized.items
-
-            console.log(
-                "[LauncherSearch]",
-                "stabilizedRefine",
-                "provider=", root._providerDebugName(provider),
-                "query=", JSON.stringify(q),
-                "nextTop=", root._debugDisplayItemKeys(displayItems, 6)
-            )
+        let removedCount = 0
+        let retainedCount = 0
+        for (let existingKey in previousKeys) {
+            if (!nextKeys[existingKey])
+                removedCount += 1
+            else
+                retainedCount += 1
         }
 
         if (root._displayItemsMatch(displayItems)) {
-            console.log("[LauncherSearch]", "branch=no-op")
             root._resultData = items
             _selectedIndex = root._resultData.length > 0 ? 0 : -1
             root._rememberSearchState(provider, q)
@@ -270,7 +223,6 @@ Item {
         }
 
         if (_results.count === 0) {
-            console.log("[LauncherSearch]", "branch=initial-entry")
             _resultsList.prepareManagedEntry()
             _results.clear()
             root._resultData = items
@@ -286,86 +238,58 @@ Item {
             return
         }
 
-        let shrinkOnly = displayItems.length < _results.count && insertedCount === 0
-        let removedCount = 0
+        let filterAnimationsEnabled = _resultsList && _resultsList.itemAnimationsEnabled
+        let sameProviderRefinement = sameProvider
+            && root._isQueryRefinement(root._lastQuery, q)
+        let sameProviderIncremental = filterAnimationsEnabled
+            && sameProviderRefinement
+            && _results.count > 0
+            && (insertedCount > 0 || removedCount > 0 || retainedCount > 0)
+        let syncVisibleStateDuringFilter = true
 
-        for (let existingKey in previousKeys) {
-            if (!nextKeys[existingKey])
-                removedCount += 1
-        }
+        if (sameProviderIncremental) {
+            console.log(
+                "[LauncherSearchDebug]",
+                "incremental",
+                "query=", JSON.stringify(q),
+                "sameProvider=", sameProvider,
+                "refinement=", sameProviderRefinement,
+                "inserted=", insertedCount,
+                "removed=", removedCount,
+                "retained=", retainedCount,
+                "currentCount=", _results.count,
+                "nextCount=", displayItems.length
+            )
 
-        let expandOnly = displayItems.length > _results.count
-            && removedCount === 0
-            && root._currentItemsAreStableSubsequence(displayItems)
+            let expandFadeEnabled = removedCount > 0
 
-        let currentInstantiatedKeys = _resultsList && _resultsList.instantiatedDelegateKeys
-            ? _resultsList.instantiatedDelegateKeys()
-            : []
-        let shrinkVisibleStable = root._nextTopKeysStayWithinVisibleWindow(displayItems, currentInstantiatedKeys)
-        let allowStableShrink = shrinkOnly && (shrinkVisibleStable || refiningQuery)
+            if (insertedCount > 0 && _resultsList && _resultsList.beginExpandTransition)
+                _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1, syncVisibleStateDuringFilter, expandFadeEnabled)
+            else if (_resultsList && _resultsList.beginFilterTransition)
+                _resultsList.beginFilterTransition(syncVisibleStateDuringFilter)
 
-        console.log(
-            "[LauncherSearch]",
-            "refresh",
-            "provider=", root._providerDebugName(provider),
-            "rawQuery=", JSON.stringify(_searchHeader.text),
-            "normalizedQuery=", JSON.stringify(q),
-            "lastQuery=", JSON.stringify(root._lastNormalizedQuery),
-            "sameProvider=", sameProvider,
-            "refiningQuery=", refiningQuery,
-            "previousCount=", _results.count,
-            "nextCount=", displayItems.length,
-            "insertedCount=", insertedCount,
-            "removedCount=", removedCount,
-            "shrinkOnly=", shrinkOnly,
-            "expandOnly=", expandOnly,
-            "shrinkVisibleStable=", shrinkVisibleStable,
-            "allowStableShrink=", allowStableShrink,
-            "currentTop=", root._debugCurrentModelKeys(6),
-            "nextTop=", root._debugDisplayItemKeys(displayItems, 6),
-            "instantiated=", root._debugKeySample(currentInstantiatedKeys, 6)
-        )
-
-        if (allowStableShrink) {
-            console.log("[LauncherSearch]", "branch=shrink-stable")
-            if (_resultsList && _resultsList.beginFilterTransition)
-                _resultsList.beginFilterTransition()
-            if (_resultsList && _resultsList.runSwapExit)
+            if (removedCount > 0 && _resultsList && _resultsList.runSwapExit)
                 _resultsList.runSwapExit(nextKeys)
             if (_resultsList && _resultsList.resetFilterViewport)
                 _resultsList.resetFilterViewport()
 
             root._syncResults(displayItems, items)
+            if (_resultsList && _resultsList.queueRetainedVisibleEntries)
+                _resultsList.queueRetainedVisibleEntries(retainedKeys)
 
-            if (_resultsList && _resultsList.syncVisibleDelegateState)
-                _resultsList.syncVisibleDelegateState()
-
-            if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
-                _resultsList.scheduleFilterTransitionRelease(Theme.anim.moveDuration + 20)
-            else if (_resultsList && _resultsList.endFilterTransition)
-                Qt.callLater(function() { _resultsList.endFilterTransition() })
-
-            root._rememberSearchState(provider, q)
-            return
-        }
-
-        if (expandOnly) {
-            console.log("[LauncherSearch]", "branch=expand-stable")
-            if (_resultsList && _resultsList.beginExpandTransition)
-                _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1)
-            else if (_resultsList && _resultsList.beginFilterTransition)
-                _resultsList.beginFilterTransition()
-            if (_resultsList && _resultsList.resetFilterViewport)
-                _resultsList.resetFilterViewport()
-
-            root._syncResults(displayItems, items)
+            let incrementalReleaseDelay = Theme.anim.moveDuration + 20
+            if (_resultsList) {
+                let expandDuration = insertedCount > 0 && _resultsList.expandTransitionDuration
+                    ? _resultsList.expandTransitionDuration()
+                    : 0
+                let swapExitDuration = removedCount > 0 && _resultsList.activeSwapExitDuration
+                    ? _resultsList.activeSwapExitDuration()
+                    : 0
+                incrementalReleaseDelay = Math.max(Theme.anim.moveDuration, expandDuration, swapExitDuration) + 20
+            }
 
             if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
-                _resultsList.scheduleFilterTransitionRelease(
-                    _resultsList.expandTransitionDuration
-                        ? _resultsList.expandTransitionDuration()
-                        : Theme.anim.moveDuration + Theme.anim.highlightDuration
-                )
+                _resultsList.scheduleFilterTransitionRelease(incrementalReleaseDelay)
             else if (_resultsList && _resultsList.endFilterTransition)
                 Qt.callLater(function() { _resultsList.endFilterTransition() })
 
@@ -380,7 +304,15 @@ Item {
         if (_resultsList && _resultsList.prepareManagedEntry)
             _resultsList.prepareManagedEntry()
 
-        console.log("[LauncherSearch]", "branch=full-replace")
+        console.log(
+            "[LauncherSearchDebug]",
+            "fullReplace",
+            "query=", JSON.stringify(q),
+            "sameProvider=", sameProvider,
+            "refinement=", sameProviderRefinement,
+            "currentCount=", _results.count,
+            "nextCount=", displayItems.length
+        )
 
         _results.clear()
         root._resultData = items
@@ -391,9 +323,9 @@ Item {
 
         if (_resultsList && _resultsList.scheduleManagedEntryRelease)
             _resultsList.scheduleManagedEntryRelease(
-                _resultsList.activeSwapExitDuration
+                (_resultsList.activeSwapExitDuration
                     ? _resultsList.activeSwapExitDuration()
-                    : 0
+                    : 0) + 20
             )
         else if (_resultsList && _resultsList.releaseManagedEntry)
             Qt.callLater(function() { _resultsList.releaseManagedEntry() })
@@ -401,9 +333,19 @@ Item {
         root._rememberSearchState(provider, q)
     }
 
-    function _rememberSearchState(provider, normalizedQuery): void {
+    function _rememberSearchState(provider, query): void {
         root._lastProvider = provider
-        root._lastNormalizedQuery = String(normalizedQuery || "")
+        root._lastQuery = String(query || "")
+    }
+
+    function _isQueryRefinement(previousQuery, nextQuery): bool {
+        let previous = String(previousQuery || "")
+        let next = String(nextQuery || "")
+
+        if (next.length <= previous.length)
+            return false
+
+        return next.startsWith(previous)
     }
 
     function _resultKeyForItem(item, index): string {
@@ -448,111 +390,6 @@ Item {
         }
 
         return -1
-    }
-
-    function _currentItemsAreStableSubsequence(displayItems): bool {
-        let displayIndex = 0
-
-        for (let resultIndex = 0; resultIndex < _results.count; resultIndex++) {
-            let existing = _results.get(resultIndex)
-            if (!existing)
-                return false
-
-            let existingKey = String(existing.key || "")
-            let matched = false
-
-            while (displayIndex < displayItems.length) {
-                let incoming = displayItems[displayIndex]
-                displayIndex += 1
-
-                if (String(incoming.key || "") !== existingKey)
-                    continue
-
-                if (String(existing.name || "") !== String(incoming.name || ""))
-                    return false
-                if (String(existing.description || "") !== String(incoming.description || ""))
-                    return false
-                if (String(existing.icon || "") !== String(incoming.icon || ""))
-                    return false
-
-                matched = true
-                break
-            }
-
-            if (!matched)
-                return false
-        }
-
-        return true
-    }
-
-    function _nextTopKeysStayWithinVisibleWindow(displayItems, currentVisibleKeys): bool {
-        if (!currentVisibleKeys || currentVisibleKeys.length === 0)
-            return false
-
-        let topCount = Math.min(displayItems.length, currentVisibleKeys.length)
-        let currentVisibleIndex = 0
-
-        for (let displayIndex = 0; displayIndex < topCount; displayIndex++) {
-            let targetKey = String(displayItems[displayIndex].key || "")
-            let matched = false
-
-            while (currentVisibleIndex < currentVisibleKeys.length) {
-                if (String(currentVisibleKeys[currentVisibleIndex]) === targetKey) {
-                    matched = true
-                    currentVisibleIndex += 1
-                    break
-                }
-
-                currentVisibleIndex += 1
-            }
-
-            if (!matched)
-                return false
-        }
-
-        return true
-    }
-
-    function _stabilizeRefinedResults(displayItems, items): var {
-        let keyedItems = ({})
-        let keyedDisplayItems = ({})
-        let stabilizedItems = []
-        let stabilizedDisplayItems = []
-
-        for (let index = 0; index < displayItems.length; index++) {
-            let displayItem = displayItems[index]
-            let key = String(displayItem.key || "")
-            keyedDisplayItems[key] = displayItem
-            keyedItems[key] = items[index]
-        }
-
-        for (let resultIndex = 0; resultIndex < _results.count; resultIndex++) {
-            let existing = _results.get(resultIndex)
-            let existingKey = existing ? String(existing.key || "") : ""
-            if (!keyedDisplayItems[existingKey])
-                continue
-
-            stabilizedDisplayItems.push(keyedDisplayItems[existingKey])
-            stabilizedItems.push(keyedItems[existingKey])
-            delete keyedDisplayItems[existingKey]
-            delete keyedItems[existingKey]
-        }
-
-        for (let nextIndex = 0; nextIndex < displayItems.length; nextIndex++) {
-            let nextDisplayItem = displayItems[nextIndex]
-            let nextKey = String(nextDisplayItem.key || "")
-            if (!keyedDisplayItems[nextKey])
-                continue
-
-            stabilizedDisplayItems.push(nextDisplayItem)
-            stabilizedItems.push(keyedItems[nextKey])
-        }
-
-        return {
-            displayItems: stabilizedDisplayItems,
-            items: stabilizedItems
-        }
     }
 
     function _syncResults(displayItems, items): void {
@@ -605,7 +442,8 @@ Item {
     Connections {
         target: DesktopEntries
         function onApplicationsChanged(): void {
-            if (root.panelActive) _refreshResults()
+            if (root.panelActive)
+                _refreshResults()
         }
     }
 

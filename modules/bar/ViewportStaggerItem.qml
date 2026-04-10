@@ -23,7 +23,6 @@ StaggerItem {
     property bool suppressViewportTransitions: ownerManagedEntry
     property bool syncViewportStateWhenSuppressed: false
     property bool managedEnterFadeEnabled: false
-
     readonly property real _contentY:
         listView && listView.contentY !== undefined ? Number(listView.contentY) : 0
     readonly property bool viewportVisible: {
@@ -52,11 +51,16 @@ StaggerItem {
     property bool _viewportShown: false
 
     function syncViewportState() {
+        if (typeof stopAnimations === "function")
+            stopAnimations()
+
         _viewportShown = viewportVisible
         _viewportInitialized = true
         enterStartOpacity = 0
+        enterStartOffsetX = enterOffsetX
         enterStartOffsetY = enterOffsetY
         opacity = viewportVisible ? 1 : 0
+        _tx = viewportVisible ? 0 : enterOffsetX
         _ty = viewportVisible ? 0 : enterOffsetY
     }
 
@@ -64,8 +68,10 @@ StaggerItem {
         _viewportInitialized = true
         _viewportShown = viewportVisible
         enterStartOpacity = managedEnterStartOpacity
+        enterStartOffsetX = enterOffsetX
         enterStartOffsetY = managedEnterStartOffsetY
         opacity = enterStartOpacity
+        _tx = enterStartOffsetX
         _ty = enterStartOffsetY
     }
 
@@ -136,6 +142,10 @@ StaggerItem {
             return
 
         if (suppressViewportTransitions) {
+            if (typeof stopAnimations === "function")
+                stopAnimations()
+
+            _viewportInitialized = true
             if (syncViewportStateWhenSuppressed)
                 syncViewportState()
             else
@@ -166,13 +176,20 @@ StaggerItem {
         if (suppressViewportTransitions)
             return
 
-        _viewportShown = viewportVisible
+        syncViewportState()
     }
 
     Component.onCompleted: {
         if (ownerManagedEntry) {
             prepareOwnedEnter()
-        } else if (suppressViewportTransitions && syncViewportStateWhenSuppressed) {
+        } else if (suppressViewportTransitions) {
+            if (typeof stopAnimations === "function")
+                stopAnimations()
+
+            _viewportInitialized = true
+            // New delegates created during a suppressed filter/expand window must
+            // adopt the current viewport state immediately, but they must not
+            // start an independent viewport enter animation.
             syncViewportState()
         } else if (trackViewport && scrollAnimationsEnabled && viewportVisible)
             runViewportEnter()
