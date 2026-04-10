@@ -30,6 +30,8 @@ Item {
     property var _preTransitionVisibleKeys: []
     readonly property int _maxViewportSlots: 6
     readonly property int _managedEnterStep: SettingsService.effectiveAnimation.staggerLevel2Step
+    readonly property int _filterSlideOffsetX: 30
+    readonly property int _filterSlideOffsetY: 14
 
     Timer {
         id: _outgoingClearTimer
@@ -311,8 +313,7 @@ Item {
 
     function beginSoftReplace(displayItems, delayMs): void {
         let snapshots = []
-        let visibleSlotCount = root._estimatedVisibleSlotCount()
-        let total = Math.min(displayItems ? displayItems.length : 0, visibleSlotCount)
+        let total = displayItems ? displayItems.length : 0
 
         _incomingStartTimer.stop()
         _incomingClearTimer.stop()
@@ -609,8 +610,9 @@ Item {
                 if (!enteringDelegate)
                     continue
 
-                enteringDelegate.enterStartOpacity = 1.0
-                enteringDelegate.enterStartOffsetY = Math.round(Number(enteringDelegate.enterOffsetY || 0) * 0.45)
+                enteringDelegate.enterStartOpacity = 0.0
+                enteringDelegate.enterStartOffsetX = root._filterSlideOffsetX
+                enteringDelegate.enterStartOffsetY = root._filterSlideOffsetY
 
                 if (enteringDelegate.queueManagedEnter)
                     enteringDelegate.queueManagedEnter(enteringIndex, enteringDelegates.length)
@@ -688,8 +690,8 @@ Item {
 
                 SequentialAnimation {
                     PropertyAction { property: "_filterAddOpacity"; value: root._expandFadeEnabled ? 0 : 1 }
-                    PropertyAction { property: "_filterAddOffsetX"; value: 30 }
-                    PropertyAction { property: "_filterAddOffsetY"; value: 0 }
+                    PropertyAction { property: "_filterAddOffsetX"; value: root._filterSlideOffsetX }
+                    PropertyAction { property: "_filterAddOffsetY"; value: root._filterSlideOffsetY }
                     PauseAnimation {
                         duration: root._compressedDelay(
                         _addTransition.ViewTransition.index,
@@ -762,8 +764,14 @@ Item {
                         easing.type: Easing.InCubic
                     }
                     NumberAnimation {
+                        property: "_tx"
+                        to: root._filterSlideOffsetX
+                        duration: SettingsService.effectiveAnimation.staggerExitDuration
+                        easing.type: Easing.InCubic
+                    }
+                    NumberAnimation {
                         property: "_ty"
-                        to: 18
+                        to: root._filterSlideOffsetY
                         duration: SettingsService.effectiveAnimation.staggerExitDuration
                         easing.type: Easing.InCubic
                     }
@@ -796,9 +804,9 @@ Item {
                 : root._managedEnterStep
             managedEnterFadeEnabled: root.itemAnimationsEnabled
             managedEnterStartOpacity: root._softManagedEntryActive ? 0.18 : 0.0
-            enterOffsetX: root._softManagedEntryActive ? 18 : 0
+            enterOffsetX: root._softManagedEntryActive ? root._filterSlideOffsetX : 0
             managedEnterStartOffsetY: root._softManagedEntryActive
-                ? Math.round(enterOffsetY * 0.55)
+                ? root._filterSlideOffsetY
                 : enterOffsetY
             enterOffsetY: SettingsService.effectiveAnimation.staggerEnterOffsetY
             exitOffsetY: SettingsService.effectiveAnimation.staggerExitOffsetY
@@ -888,8 +896,8 @@ Item {
                 width: resultList.width
                 height: 46
                 exitDelay: modelData.exitDelay
-                exitOffsetX: 30
-                exitOffsetY: 0
+                exitOffsetX: root._filterSlideOffsetX
+                exitOffsetY: root._filterSlideOffsetY
                 enterStartOpacity: 1.0
                 enterStartOffsetX: 0
                 enterStartOffsetY: 0
@@ -967,8 +975,8 @@ Item {
                 height: 46
                 delay: modelData.delay
                 enterStartOpacity: 0.0
-                enterStartOffsetX: 24
-                enterStartOffsetY: Math.round(SettingsService.effectiveAnimation.staggerEnterOffsetY * 0.55)
+                enterStartOffsetX: root._filterSlideOffsetX
+                enterStartOffsetY: root._filterSlideOffsetY
 
                 Component.onCompleted: runEnter()
 

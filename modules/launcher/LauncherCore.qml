@@ -245,22 +245,6 @@ Item {
             return
         }
 
-        if (_results.count === 0) {
-            _resultsList.prepareManagedEntry()
-            _results.clear()
-            root._resultData = items
-            for (let j = 0; j < displayItems.length; j++) {
-                _results.append(displayItems[j])
-            }
-            _selectedIndex = items.length > 0 ? 0 : -1
-            root._rememberSearchState(provider, q)
-            if (_resultsList && _resultsList.scheduleManagedEntryRelease)
-                _resultsList.scheduleManagedEntryRelease(0)
-            else
-                Qt.callLater(function() { _resultsList.releaseManagedEntry() })
-            return
-        }
-
         let filterAnimationsEnabled = _resultsList && _resultsList.itemAnimationsEnabled
         let currentInstantiatedKeys = _resultsList && _resultsList.instantiatedDelegateKeys
             ? _resultsList.instantiatedDelegateKeys()
@@ -271,26 +255,75 @@ Item {
         let zeroQueryReset = sameProvider
             && String(root._lastQuery || "") !== ""
             && String(q || "") === ""
-        let sameProviderRefinement = sameProvider
-            && root._isQueryRefinement(root._lastQuery, q)
+        let sameProviderNarrowing = sameProvider
+            && root._isQueryNarrowing(root._lastQuery, q)
+        let sameProviderBroadening = sameProvider
+            && root._isQueryBroadening(root._lastQuery, q)
+        let sameProviderRefinement = sameProviderNarrowing || sameProviderBroadening
         let retainedVisibleCount = 0
+        let visibleSlotCount = _resultsList && _resultsList._estimatedVisibleSlotCount
+            ? _resultsList._estimatedVisibleSlotCount()
+            : 6
 
         for (let visibleIndex = 0; visibleIndex < currentVisibleKeys.length; visibleIndex++) {
             if (retainedKeys[String(currentVisibleKeys[visibleIndex] || "")])
                 retainedVisibleCount += 1
         }
+        let retainedVisibleTopWindowCount = root._countCurrentVisibleKeysWithinTopWindow(
+            currentVisibleKeys,
+            displayItems,
+            visibleSlotCount
+        )
         let sameProviderIncremental = filterAnimationsEnabled
             && sameProviderRefinement
             && _results.count > 0
             && retainedVisibleCount > 0
+            && retainedVisibleTopWindowCount > 0
             && (insertedCount > 0 || removedCount > 0 || retainedCount > 0)
         let useSoftReplace = filterAnimationsEnabled
-            && (zeroQueryNarrowing || zeroQueryReset)
+            && (
+                zeroQueryNarrowing
+                || zeroQueryReset
+                || (sameProviderRefinement && retainedCount > 0 && (retainedVisibleCount === 0 || retainedVisibleTopWindowCount === 0))
+            )
             && retainedCount > 0
+        let zeroResultsRecovery = filterAnimationsEnabled
+            && _results.count === 0
+            && String(root._lastQuery || "") !== ""
+            && displayItems.length > 0
         let syncVisibleStateDuringFilter = true
         let transitionPath = sameProviderIncremental
             ? "incremental"
-            : (useSoftReplace ? "softReplace" : "fullReplace")
+            : ((useSoftReplace || zeroResultsRecovery) ? "softReplace" : "fullReplace")
+
+        if (_results.count === 0) {
+            let useSoftEntry = useSoftReplace || zeroResultsRecovery
+
+            if (useSoftEntry && _resultsList && _resultsList.beginSoftReplace)
+                _resultsList.beginSoftReplace(displayItems, 0)
+            else if (_resultsList && _resultsList.prepareManagedEntry)
+                _resultsList.prepareManagedEntry()
+
+            _results.clear()
+            root._resultData = items
+            for (let j = 0; j < displayItems.length; j++)
+                _results.append(displayItems[j])
+
+            _selectedIndex = items.length > 0 ? 0 : -1
+            root._rememberSearchState(provider, q)
+
+            if (useSoftEntry && _resultsList && _resultsList.scheduleFilterTransitionRelease) {
+                let softReplaceDuration = _resultsList.activeSoftReplaceDuration
+                    ? _resultsList.activeSoftReplaceDuration()
+                    : 0
+                _resultsList.scheduleFilterTransitionRelease(softReplaceDuration + 40)
+            } else if (_resultsList && _resultsList.scheduleManagedEntryRelease)
+                _resultsList.scheduleManagedEntryRelease(0)
+            else
+                Qt.callLater(function() { _resultsList.releaseManagedEntry() })
+
+            return
+        }
 
         console.log(
             "[LauncherSearchTrace]",
@@ -298,6 +331,8 @@ Item {
             "query=", JSON.stringify(q),
             "sameProvider=", sameProvider,
             "sameProviderRefinement=", sameProviderRefinement,
+            "sameProviderNarrowing=", sameProviderNarrowing,
+            "sameProviderBroadening=", sameProviderBroadening,
             "zeroQueryNarrowing=", zeroQueryNarrowing,
             "zeroQueryReset=", zeroQueryReset,
             "path=", transitionPath,
@@ -306,7 +341,9 @@ Item {
             "inserted=", insertedCount,
             "removed=", removedCount,
             "retained=", retainedCount,
+            "visibleSlots=", visibleSlotCount,
             "retainedVisible=", retainedVisibleCount,
+            "retainedVisibleTopWindow=", retainedVisibleTopWindowCount,
             "instantiatedTopKeys=", root._traceTopKeys(currentInstantiatedKeys, 8),
             "nextTopKeys=", root._traceTopKeysFromDisplayItems(displayItems, 8)
         )
@@ -414,14 +451,40 @@ Item {
         root._lastQuery = String(query || "")
     }
 
-    function _isQueryRefinement(previousQuery, nextQuery): bool {
+    function _isQueryNarrowing(previousQuery, nextQuery): bool {
         let previous = String(previousQuery || "")
         let next = String(nextQuery || "")
 
-        if (previous.length === 0 || next.length === 0 || previous === next)
+        if (previous.length === 0 || next.length === 0 || previous === next || next.length <= previous.length)
             return false
 
-        return next.startsWith(previous) || previous.startsWith(next)
+        return next.startsWith(previous)
+    }
+
+    function _isQueryBroadening(previousQuery, nextQuery): bool {
+        let previous = String(previousQuery || "")
+        let next = String(nextQuery || "")
+
+        if (previous.length === 0 || next.length === 0 || previous === next || next.length >= previous.length)
+            return false
+
+        return previous.startsWith(next)
+    }
+
+    function _countCurrentVisibleKeysWithinTopWindow(currentVisibleKeys, displayItems, slotCount): int {
+        let topWindow = ({})
+        let topCount = Math.min(displayItems ? displayItems.length : 0, Math.max(0, Number(slotCount) || 0))
+        let matchedCount = 0
+
+        for (let index = 0; index < topCount; index++)
+            topWindow[String((displayItems[index] && displayItems[index].key) || "")] = true
+
+        for (let visibleIndex = 0; visibleIndex < (currentVisibleKeys ? currentVisibleKeys.length : 0); visibleIndex++) {
+            if (topWindow[String(currentVisibleKeys[visibleIndex] || "")])
+                matchedCount += 1
+        }
+
+        return matchedCount
     }
 
     function _resultKeyForItem(item, index): string {
