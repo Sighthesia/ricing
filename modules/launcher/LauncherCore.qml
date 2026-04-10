@@ -268,6 +268,9 @@ Item {
         let zeroQueryNarrowing = sameProvider
             && String(root._lastQuery || "") === ""
             && String(q || "") !== ""
+        let zeroQueryReset = sameProvider
+            && String(root._lastQuery || "") !== ""
+            && String(q || "") === ""
         let sameProviderRefinement = sameProvider
             && root._isQueryRefinement(root._lastQuery, q)
         let retainedVisibleCount = 0
@@ -282,7 +285,7 @@ Item {
             && retainedVisibleCount > 0
             && (insertedCount > 0 || removedCount > 0 || retainedCount > 0)
         let useSoftReplace = filterAnimationsEnabled
-            && zeroQueryNarrowing
+            && (zeroQueryNarrowing || zeroQueryReset)
             && retainedCount > 0
         let syncVisibleStateDuringFilter = true
         let transitionPath = sameProviderIncremental
@@ -296,6 +299,7 @@ Item {
             "sameProvider=", sameProvider,
             "sameProviderRefinement=", sameProviderRefinement,
             "zeroQueryNarrowing=", zeroQueryNarrowing,
+            "zeroQueryReset=", zeroQueryReset,
             "path=", transitionPath,
             "currentCount=", _results.count,
             "nextCount=", displayItems.length,
