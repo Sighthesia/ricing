@@ -160,6 +160,26 @@ Item {
         return appProvider
     }
 
+    function _traceTopKeysFromDisplayItems(displayItems, limit): string {
+        let keys = []
+        let total = Math.min(displayItems ? displayItems.length : 0, Math.max(0, Number(limit) || 0))
+
+        for (let index = 0; index < total; index++)
+            keys.push(String((displayItems[index] && displayItems[index].key) || ""))
+
+        return "[" + keys.join(", ") + "]"
+    }
+
+    function _traceTopKeys(keys, limit): string {
+        let values = []
+        let total = Math.min(keys ? keys.length : 0, Math.max(0, Number(limit) || 0))
+
+        for (let index = 0; index < total; index++)
+            values.push(String(keys[index] || ""))
+
+        return "[" + values.join(", ") + "]"
+    }
+
     function _refreshResults(): void {
         if (_suspendRefresh || !root.panelActive)
             return
@@ -179,6 +199,9 @@ Item {
         let previousKeys = ({})
         let nextKeys = ({})
         let retainedKeys = ({})
+        let currentVisibleKeys = _resultsList && _resultsList.strictVisibleDelegateKeys
+            ? _resultsList.strictVisibleDelegateKeys()
+            : []
 
         for (let existingIndex = 0; existingIndex < _results.count; existingIndex++) {
             let existingItem = _results.get(existingIndex)
@@ -239,28 +262,42 @@ Item {
         }
 
         let filterAnimationsEnabled = _resultsList && _resultsList.itemAnimationsEnabled
+        let currentInstantiatedKeys = _resultsList && _resultsList.instantiatedDelegateKeys
+            ? _resultsList.instantiatedDelegateKeys()
+            : []
         let sameProviderRefinement = sameProvider
             && root._isQueryRefinement(root._lastQuery, q)
+        let retainedVisibleCount = 0
+
+        for (let visibleIndex = 0; visibleIndex < currentVisibleKeys.length; visibleIndex++) {
+            if (retainedKeys[String(currentVisibleKeys[visibleIndex] || "")])
+                retainedVisibleCount += 1
+        }
         let sameProviderIncremental = filterAnimationsEnabled
             && sameProviderRefinement
             && _results.count > 0
+            && retainedVisibleCount > 0
             && (insertedCount > 0 || removedCount > 0 || retainedCount > 0)
         let syncVisibleStateDuringFilter = true
 
-        if (sameProviderIncremental) {
-            console.log(
-                "[LauncherSearchDebug]",
-                "incremental",
-                "query=", JSON.stringify(q),
-                "sameProvider=", sameProvider,
-                "refinement=", sameProviderRefinement,
-                "inserted=", insertedCount,
-                "removed=", removedCount,
-                "retained=", retainedCount,
-                "currentCount=", _results.count,
-                "nextCount=", displayItems.length
-            )
+        console.log(
+            "[LauncherSearchTrace]",
+            "refreshDecision",
+            "query=", JSON.stringify(q),
+            "sameProvider=", sameProvider,
+            "sameProviderRefinement=", sameProviderRefinement,
+            "path=", sameProviderIncremental ? "incremental" : "fullReplace",
+            "currentCount=", _results.count,
+            "nextCount=", displayItems.length,
+            "inserted=", insertedCount,
+            "removed=", removedCount,
+            "retained=", retainedCount,
+            "retainedVisible=", retainedVisibleCount,
+            "instantiatedTopKeys=", root._traceTopKeys(currentInstantiatedKeys, 8),
+            "nextTopKeys=", root._traceTopKeysFromDisplayItems(displayItems, 8)
+        )
 
+        if (sameProviderIncremental) {
             let expandFadeEnabled = removedCount > 0
 
             if (insertedCount > 0 && _resultsList && _resultsList.beginExpandTransition)
@@ -274,6 +311,10 @@ Item {
                 _resultsList.resetFilterViewport()
 
             root._syncResults(displayItems, items)
+
+            if (_resultsList && _resultsList.resetFilterViewport)
+                _resultsList.resetFilterViewport()
+
             if (_resultsList && _resultsList.queueRetainedVisibleEntries)
                 _resultsList.queueRetainedVisibleEntries(retainedKeys)
 
@@ -305,13 +346,18 @@ Item {
             _resultsList.prepareManagedEntry()
 
         console.log(
-            "[LauncherSearchDebug]",
+            "[LauncherSearchTrace]",
             "fullReplace",
             "query=", JSON.stringify(q),
             "sameProvider=", sameProvider,
-            "refinement=", sameProviderRefinement,
+            "sameProviderRefinement=", sameProviderRefinement,
             "currentCount=", _results.count,
-            "nextCount=", displayItems.length
+            "nextCount=", displayItems.length,
+            "inserted=", insertedCount,
+            "removed=", removedCount,
+            "retained=", retainedCount,
+            "instantiatedTopKeys=", root._traceTopKeys(currentInstantiatedKeys, 8),
+            "nextTopKeys=", root._traceTopKeysFromDisplayItems(displayItems, 8)
         )
 
         _results.clear()
@@ -394,6 +440,10 @@ Item {
 
     function _syncResults(displayItems, items): void {
         let nextKeys = ({})
+        let removedOps = []
+        let movedOps = []
+        let insertedOps = []
+        let setOps = []
 
         for (let index = 0; index < displayItems.length; index++)
             nextKeys[displayItems[index].key] = true
@@ -401,8 +451,10 @@ Item {
         for (let removeIndex = _results.count - 1; removeIndex >= 0; removeIndex--) {
             let existing = _results.get(removeIndex)
             let existingKey = existing ? String(existing.key || "") : ""
-            if (!nextKeys[existingKey])
+            if (!nextKeys[existingKey]) {
+                removedOps.push(removeIndex + ":" + existingKey)
                 _results.remove(removeIndex, 1)
+            }
         }
 
         for (let targetIndex = 0; targetIndex < displayItems.length; targetIndex++) {
@@ -410,18 +462,35 @@ Item {
             let currentIndex = root._indexOfDisplayItem(displayItem.key, targetIndex)
 
             if (currentIndex === -1) {
+                insertedOps.push(targetIndex + ":" + String(displayItem.key || ""))
                 _results.insert(targetIndex, displayItem)
                 continue
             }
 
-            if (currentIndex !== targetIndex)
+            if (currentIndex !== targetIndex) {
+                movedOps.push(String(displayItem.key || "") + "@" + currentIndex + "->" + targetIndex)
                 _results.move(currentIndex, targetIndex, 1)
+            }
 
+            setOps.push(targetIndex + ":" + String(displayItem.key || ""))
             _results.set(targetIndex, displayItem)
         }
 
-        while (_results.count > displayItems.length)
+        while (_results.count > displayItems.length) {
+            let trailing = _results.get(_results.count - 1)
+            removedOps.push((_results.count - 1) + ":" + String((trailing && trailing.key) || ""))
             _results.remove(_results.count - 1, 1)
+        }
+
+        console.log(
+            "[LauncherSearchTrace]",
+            "syncResults",
+            "remove=", "[" + removedOps.slice(0, 8).join(", ") + "]",
+            "move=", "[" + movedOps.slice(0, 8).join(", ") + "]",
+            "insert=", "[" + insertedOps.slice(0, 8).join(", ") + "]",
+            "set=", "[" + setOps.slice(0, 8).join(", ") + "]",
+            "finalCount=", displayItems.length
+        )
 
         root._resultData = items
         _selectedIndex = root._resultData.length > 0 ? 0 : -1

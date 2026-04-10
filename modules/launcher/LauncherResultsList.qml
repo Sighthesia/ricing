@@ -32,7 +32,7 @@ Item {
         repeat: false
         onTriggered: {
             console.log(
-                "[LauncherSearchDebug]",
+                "[LauncherSearchTrace]",
                 "clearOutgoing",
                 "revision=", root._filterTransitionRevision,
                 "count=", root._outgoingItems.length
@@ -136,7 +136,7 @@ Item {
             ? SettingsService.effectiveAnimation.staggerExitDuration + root._windowForCount(snapshots.length)
             : 0
         console.log(
-            "[LauncherSearchDebug]",
+            "[LauncherSearchTrace]",
             "swapExit",
             "revision=", root._filterTransitionRevision,
             "visibleKeys=", root._debugKeys(root.visibleDelegateKeys()),
@@ -151,7 +151,11 @@ Item {
     }
 
     function resetFilterViewport(): void {
-        resultList.contentY = 0
+        if (resultList.count > 0)
+            resultList.positionViewAtIndex(0, ListView.Beginning)
+        else
+            resultList.contentY = 0
+
         if (resultList.forceLayout)
             resultList.forceLayout()
     }
@@ -166,7 +170,7 @@ Item {
         root._preTransitionVisibleKeys = root.strictVisibleDelegateKeys()
         root._filterTransitionRevision += 1
         console.log(
-            "[LauncherSearchDebug]",
+            "[LauncherSearchTrace]",
             "beginFilter",
             "revision=", root._filterTransitionRevision,
             "syncVisible=", syncVisibleStateDuringFilter !== false,
@@ -299,6 +303,69 @@ Item {
         return root._strictVisibleDelegates()
     }
 
+    function _estimatedVisibleSlotCount(): int {
+        let sampleDelegate = resultList.itemAtIndex(0)
+        let delegateHeight = sampleDelegate && Number(sampleDelegate.height || 0) > 0
+            ? Number(sampleDelegate.height || 0)
+            : 46
+        let estimated = Math.max(
+            1,
+            Math.min(
+                root._maxViewportSlots,
+                Math.ceil(Number(resultList.height || 0) / Math.max(1, delegateHeight))
+            )
+        )
+
+        console.log(
+            "[LauncherSearchTrace]",
+            "estimatedVisibleSlots",
+            "estimated=", estimated,
+            "listHeight=", Number(resultList.height || 0),
+            "delegateHeight=", delegateHeight
+        )
+
+        return estimated
+    }
+
+    function _instantiatedTopDelegateCount(limit): int {
+        let readyCount = 0
+        let total = Math.min(Math.max(0, Number(limit) || 0), resultList.count)
+
+        for (let index = 0; index < total; index++) {
+            if (resultList.itemAtIndex(index))
+                readyCount += 1
+        }
+
+        return readyCount
+    }
+
+    function _awaitTopDelegates(label, revision, attemptsRemaining, callback): void {
+        Qt.callLater(function() {
+            if (revision >= 0 && revision !== root._filterTransitionRevision)
+                return
+
+            if (resultList.forceLayout)
+                resultList.forceLayout()
+
+            let candidateVisibleSlots = root._estimatedVisibleSlotCount()
+            let readyCount = root._instantiatedTopDelegateCount(candidateVisibleSlots)
+
+            if (resultList.count > 0 && readyCount === 0 && attemptsRemaining > 0) {
+                console.log(
+                    "[LauncherSearchTrace]",
+                    label,
+                    "retry=", attemptsRemaining,
+                    "candidateVisibleSlots=", candidateVisibleSlots,
+                    "modelCount=", resultList.count
+                )
+                root._awaitTopDelegates(label, revision, attemptsRemaining - 1, callback)
+                return
+            }
+
+            callback(candidateVisibleSlots)
+        })
+    }
+
     function visibleDelegateKeys(): var {
         let delegates = root._visibleDelegates()
         let keys = []
@@ -332,6 +399,13 @@ Item {
 
             keys.push(String(delegate.key || ""))
         }
+
+        console.log(
+            "[LauncherSearchTrace]",
+            "instantiatedDelegateKeys",
+            "count=", keys.length,
+            "topKeys=", root._debugKeys(keys.slice(0, 8))
+        )
 
         return keys
     }
@@ -378,17 +452,27 @@ Item {
     }
 
     function syncInstantiatedDelegateState(): void {
-        if (resultList.forceLayout)
-            resultList.forceLayout()
+        root._awaitTopDelegates("syncInstantiatedDelegateStateWait", -1, 4, function() {
+            let syncedCount = 0
 
-        for (let index = 0; index < resultList.count; index++) {
-            let delegate = resultList.itemAtIndex(index)
-            if (!delegate)
-                continue
+            for (let index = 0; index < resultList.count; index++) {
+                let delegate = resultList.itemAtIndex(index)
+                if (!delegate)
+                    continue
 
-            if (delegate.syncViewportState)
-                delegate.syncViewportState()
-        }
+                if (delegate.syncViewportState) {
+                    delegate.syncViewportState()
+                    syncedCount += 1
+                }
+            }
+
+            console.log(
+                "[LauncherSearchTrace]",
+                "syncInstantiatedDelegateState",
+                "syncedCount=", syncedCount,
+                "modelCount=", resultList.count
+            )
+        })
     }
 
     function queueRetainedVisibleEntries(retainedKeys): void {
@@ -397,27 +481,41 @@ Item {
 
         let revision = root._filterTransitionRevision
 
-        Qt.callLater(function() {
+        root._awaitTopDelegates("retainedEnterWait", revision, 4, function(candidateVisibleSlots) {
             if (!root._filterTransitionActive || revision !== root._filterTransitionRevision)
                 return
 
-            if (resultList.forceLayout)
-                resultList.forceLayout()
-
             let previousVisibleSet = ({})
             let enteringDelegates = []
-            let delegates = root._strictVisibleDelegates()
+            let traceEntries = []
 
             for (let index = 0; index < root._preTransitionVisibleKeys.length; index++)
                 previousVisibleSet[String(root._preTransitionVisibleKeys[index] || "")] = true
 
-            for (let delegateIndex = 0; delegateIndex < delegates.length; delegateIndex++) {
-                let delegate = delegates[delegateIndex]
-                let delegateKey = String(delegate.key || "")
-
-                if (!retainedKeys || !retainedKeys[delegateKey] || previousVisibleSet[delegateKey])
+            for (let delegateIndex = 0; delegateIndex < resultList.count; delegateIndex++) {
+                let delegate = resultList.itemAtIndex(delegateIndex)
+                if (!delegate) {
+                    traceEntries.push(delegateIndex + ":<null>:skip=no-delegate")
                     continue
+                }
 
+                let delegateKey = String(delegate.key || "")
+                if (delegate.index >= candidateVisibleSlots) {
+                    traceEntries.push(delegate.index + ":" + delegateKey + ":skip=outside-window")
+                    continue
+                }
+
+                if (!retainedKeys || !retainedKeys[delegateKey]) {
+                    traceEntries.push(delegate.index + ":" + delegateKey + ":skip=not-retained")
+                    continue
+                }
+
+                if (previousVisibleSet[delegateKey]) {
+                    traceEntries.push(delegate.index + ":" + delegateKey + ":skip=previously-visible")
+                    continue
+                }
+
+                traceEntries.push(delegate.index + ":" + delegateKey + ":queue")
                 enteringDelegates.push(delegate)
             }
 
@@ -434,11 +532,13 @@ Item {
             }
 
             console.log(
-                "[LauncherSearchDebug]",
+                "[LauncherSearchTrace]",
                 "retainedEnter",
                 "revision=", revision,
+                "candidateVisibleSlots=", candidateVisibleSlots,
                 "postVisible=", root._debugKeys(root.strictVisibleDelegateKeys()),
-                "enteringKeys=", root._debugKeys(enteringDelegates.map(function(delegate) { return delegate.key }))
+                "enteringKeys=", root._debugKeys(enteringDelegates.map(function(delegate) { return delegate.key })),
+                "scan=", "[" + traceEntries.slice(0, 12).join(", ") + "]"
             )
         })
     }
@@ -450,6 +550,14 @@ Item {
             root.syncInstantiatedDelegateState()
             return
         }
+
+        console.log(
+            "[LauncherSearchTrace]",
+            "releaseManagedEntry",
+            "managedPending=", root._managedEntryPending,
+            "filterActive=", root._filterTransitionActive,
+            "modelCount=", resultList.count
+        )
 
         resultList.contentY = 0
         if (resultList.forceLayout)
