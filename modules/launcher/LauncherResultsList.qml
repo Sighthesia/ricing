@@ -11,7 +11,7 @@ Item {
     property alias model: resultList.model
     property int selectedIndex: -1
     property bool scrollAnimationsEnabled: false
-    readonly property bool itemAnimationsEnabled: true
+    property bool itemAnimationsEnabled: true
     property bool _filterTransitionActive: false
     property bool _syncVisibleStateDuringFilter: true
     property bool _managedEntryPending: false
@@ -166,6 +166,31 @@ Item {
             })
         }
 
+        if (root._outgoingItems.length > 0) {
+            let merged = []
+            let seen = ({})
+
+            function pushSnapshot(snapshot) {
+                let snapshotId = String(snapshot.key || "") + "@" + Math.round(Number(snapshot.y || 0))
+                if (seen[snapshotId])
+                    return
+
+                seen[snapshotId] = true
+                merged.push(snapshot)
+            }
+
+            for (let existingIndex = 0; existingIndex < root._outgoingItems.length; existingIndex++)
+                pushSnapshot(root._outgoingItems[existingIndex])
+
+            for (let snapshotIndex = 0; snapshotIndex < snapshots.length; snapshotIndex++)
+                pushSnapshot(snapshots[snapshotIndex])
+
+            for (let mergedIndex = 0; mergedIndex < merged.length; mergedIndex++)
+                merged[mergedIndex].exitDelay = root._compressedDelay(mergedIndex, merged.length)
+
+            snapshots = merged
+        }
+
         root._outgoingItems = snapshots
         root._activeSwapExitDuration = snapshots.length > 0
             ? SettingsService.effectiveAnimation.staggerExitDuration + root._windowForCount(snapshots.length)
@@ -211,12 +236,16 @@ Item {
             "syncVisible=", syncVisibleStateDuringFilter !== false,
             "preVisible=", root._debugKeys(root._preTransitionVisibleKeys)
         )
-        _outgoingClearTimer.stop()
+        if (root._incomingItems.length === 0 && root._pendingIncomingItems.length === 0) {
+            _outgoingClearTimer.stop()
+            root._outgoingItems = []
+            root._activeSwapExitDuration = 0
+        }
+        root._promoteInterruptedIncomingToOutgoing()
         _managedEntryReleaseTimer.stop()
         _filterTransitionReleaseTimer.stop()
-        root._outgoingItems = []
-        root._activeSwapExitDuration = 0
         root._managedEntryPending = false
+        root._softManagedEntryActive = false
         root._expandTransitionActive = false
         root._expandInsertCount = 0
         root._filterTransitionActive = true
@@ -347,6 +376,49 @@ Item {
             + root._windowForCount(snapshots.length)
         _incomingStartTimer.interval = Math.max(0, Number(delayMs) || 0)
         _incomingStartTimer.restart()
+    }
+
+    function _promoteInterruptedIncomingToOutgoing(): void {
+        let snapshots = []
+        let hadIncoming = root._incomingItems.length > 0 || root._pendingIncomingItems.length > 0
+
+        for (let index = 0; index < root._incomingItems.length; index++) {
+            let item = root._incomingItems[index]
+            if (!item)
+                continue
+
+            snapshots.push({
+                key: String(item.key || ""),
+                name: item.name || "",
+                description: item.description || "",
+                icon: item.icon || "",
+                selected: false,
+                y: Number(item.y || 0),
+                exitDelay: root._compressedDelay(index, root._incomingItems.length)
+            })
+        }
+
+        if (!hadIncoming)
+            return
+
+        _outgoingClearTimer.stop()
+        root._outgoingItems = []
+        root._activeSwapExitDuration = 0
+        _incomingStartTimer.stop()
+        _incomingClearTimer.stop()
+        root._incomingItems = []
+        root._pendingIncomingItems = []
+        root._softReplaceActive = false
+        root._activeSoftReplaceDuration = 0
+
+        if (snapshots.length === 0)
+            return
+
+        root._outgoingItems = snapshots
+        root._activeSwapExitDuration = SettingsService.effectiveAnimation.staggerExitDuration
+            + root._windowForCount(snapshots.length)
+        _outgoingClearTimer.interval = root._activeSwapExitDuration + 20
+        _outgoingClearTimer.restart()
     }
 
     function _windowForCount(total): int {

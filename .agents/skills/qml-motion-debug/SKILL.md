@@ -59,6 +59,12 @@ Use this skill when animation state changes are correct but the user still does 
 - Prefer retiring the bridge for the final tail of collapse using a host-owned threshold on reveal progress or visible panel height.
 - Do not try to solve this only by shrinking `cutRadius`; that usually makes the artifact smaller, not cleaner.
 
+### 10. Zero-Duration Animations Can Still Keep Incremental Diff Side Effects
+- Do not assume setting list animation durations to `0` disables the whole motion system.
+- If the owner still runs incremental `move` / `insert` / `remove` sync, clear-query or broadening-search paths can still leave visible residual overlap even when no animation is perceptible.
+- Common symptom: after disabling launcher row animations, narrowing search looks static as expected but clearing the keyword still shows residual rows or stale overlap for one frame.
+- Treat this as a state/update-path bug first: disable the incremental branch together with the row animations, or fall back to a full replace while animations are intentionally off.
+
 ## Debugging Ladder
 
 Work from outermost cause to innermost rendering node.
@@ -220,6 +226,33 @@ Use when a hidden or background preview swaps beneath a `window-hint` or attache
 - let preview events expire while hint or overlay pauses the foreground timer, or the final notification will linger until the owner closes
 - keep cached collapse width only for the real collapse tail; do not let an old width snapshot hold the live pill wide throughout the whole hint or overlay session
 
+### Pattern K: Disable Diff Path With Motion Toggle
+Use when a repeated list is being temporarily refactored with animations disabled.
+
+- gate the owner-level incremental sync branch on the same animation flag as the delegates
+- if row motion is off, prefer full replacement over `move` / `insert` / `remove` churn
+- in launcher search, this gate belongs in `modules/launcher/LauncherCore.qml`, not only in `modules/launcher/LauncherResultsList.qml`
+- otherwise the UI can still show clear-filter residue even though the outgoing layer and delegate animations are disabled
+
+### Pattern L: WinBoat-Style Filter Motion In QML ListView
+Use when a launcher, clipboard list, or similar `ListView` should match WinBoat-style search filtering where surviving rows move up, removed rows retire, and first/clear search changes still feel continuous.
+
+- Treat `src/renderer/views/Apps.vue` in WinBoat as the visual target, not as a literal implementation recipe; Vue `TransitionGroup` keeps the whole list live, but QML `ListView` virtualizes delegates and can drop them during big diff churn.
+- In DymicShell, split the problem into three paths inside `modules/launcher/LauncherCore.qml`: high-overlap refine goes `incremental`, first narrowing or clear/reset can go `softReplace`, provider switches may stay `fullReplace`.
+- Only allow launcher `incremental` motion when some currently visible retained rows still belong to the next top visible window; if retained rows survive only far below the fold, `ListView` can look blank or mis-animate even though the data diff is correct.
+- Reuse detached layers in `modules/launcher/LauncherResultsList.qml` for both outgoing and incoming content when `ListView` virtualization makes a direct live diff unreliable.
+- Keep the motion language consistent with WinBoat: removed rows, inserted rows, retained-row enters, and soft-replace incoming rows should all share the same diagonal fade-and-slide family instead of mixing vertical-only and horizontal-only paths.
+
+### Pattern M: High-Frequency Query Changes Need Graceful Interruption
+Use when rapid text input keeps restarting launcher or clipboard result motion before the previous transition finishes.
+
+- Do not solve this only by delaying refresh; deferred refresh can leave stale results visible, then make them disappear in one batch after the user finishes typing.
+- Do not simply disable row animation during fast typing if the goal is visual continuity; that fixes churn but removes the filtering feedback entirely.
+- When a new query arrives while a soft-replace incoming layer is still active, promote that incoming layer into an outgoing fade instead of clearing it immediately.
+- Clear older outgoing generations before promoting the newest interrupted incoming layer, otherwise multiple stale snapshot generations can stack visually.
+- In launcher search, this handoff belongs in `modules/launcher/LauncherResultsList.qml` near `beginFilterTransition()`, `beginSoftReplace()`, and `runSwapExit()`.
+- Prefer: newest interrupted layer fades out in place, newest query starts its own transition, and only one interrupted snapshot generation survives at a time.
+
 ## DymicShell-Specific Notes
 
 - Check `services/WindowHintService.qml` first for live hint snapshots.
@@ -236,6 +269,12 @@ Use when a hidden or background preview swaps beneath a `window-hint` or attache
 - For `window-hint` collapse, verify that `_hintExitAnim` does not reset phase or clear attached content before `_attachedCollapseAnim` finishes.
 - For attached shell collapse, verify that bridge shoulders disappear before visible height falls into the seam-sized range.
 - For launcher and clipboard result swaps, if the first open staggers correctly but later swaps drift into whole-list motion, reset the reused `ListView` state before re-entering and verify the outgoing snapshot layer is still retiring independently.
+- For launcher search clear-filter bugs, inspect `insertedCount` / `removedCount` before assuming stale outgoing snapshots. A clear from filtered to full results often shows `inserted > 0` and `removed == 0`, which means the overlap comes from insertion churn, not retiring rows.
+- When launcher list animations are intentionally disabled, keep `modules/launcher/LauncherCore.qml` and `modules/launcher/LauncherResultsList.qml` on the same feature flag so incremental diff logic does not outlive the motion layer.
+- For launcher search paths, separate narrowing and broadening in `modules/launcher/LauncherCore.qml`; a single symmetric `startsWith` refinement check makes it much harder to decide when `incremental` is actually safe.
+- For launcher search `incremental`, inspect both `retainedVisibleCount` and whether those retained visible rows still belong to the next top visible window; a retained row that survives only at index `46` does not make top-window incremental motion safe.
+- For launcher search `softReplace`, keep incoming and outgoing snapshot layers independent from the live `ListView`, and hide the live list until the snapshot handoff finishes.
+- For rapid launcher search updates, do not hard-clear `_incomingItems` during a new filter pass. Promote the interrupted incoming generation into `_outgoingItems`, but clear older outgoing generations first so only the latest interrupted layer remains visible.
 - When one repeated list feels faster than a sibling list with the same visual role, compare the shared base delay, step cadence, travel distance, and exit window before changing easing.
 
 ## Visual Language Reference
