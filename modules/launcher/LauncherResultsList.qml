@@ -151,6 +151,31 @@ Item {
             })
         }
 
+        if (root._outgoingItems.length > 0) {
+            let merged = []
+            let seen = ({})
+
+            function pushSnapshot(snapshot) {
+                let snapshotId = String(snapshot.key || "") + "@" + Math.round(Number(snapshot.y || 0))
+                if (seen[snapshotId])
+                    return
+
+                seen[snapshotId] = true
+                merged.push(snapshot)
+            }
+
+            for (let existingIndex = 0; existingIndex < root._outgoingItems.length; existingIndex++)
+                pushSnapshot(root._outgoingItems[existingIndex])
+
+            for (let snapshotIndex = 0; snapshotIndex < snapshots.length; snapshotIndex++)
+                pushSnapshot(snapshots[snapshotIndex])
+
+            for (let mergedIndex = 0; mergedIndex < merged.length; mergedIndex++)
+                merged[mergedIndex].exitDelay = root._compressedDelay(mergedIndex, merged.length)
+
+            snapshots = merged
+        }
+
         _outgoingClearTimer.stop()
         root._outgoingItems = snapshots
         root._activeSwapExitDuration = snapshots.length > 0
@@ -173,6 +198,26 @@ Item {
             resultList.forceLayout()
     }
 
+    function normalizeInstantiatedDelegates(): void {
+        for (let index = 0; index < resultList.count; index++) {
+            let delegate = resultList.itemAtIndex(index)
+            if (!delegate)
+                continue
+
+            if (delegate._filterAddHeight !== undefined)
+                delegate._filterAddHeight = 46
+            if (delegate._filterAddOpacity !== undefined)
+                delegate._filterAddOpacity = 1
+            delegate.opacity = 1
+
+            if (delegate.syncViewportState)
+                delegate.syncViewportState()
+        }
+
+        if (resultList.forceLayout)
+            resultList.forceLayout()
+    }
+
     function beginFilterTransition(syncVisibleStateDuringFilter): void {
         if (!root.itemAnimationsEnabled) {
             root.resetTransientState()
@@ -180,13 +225,10 @@ Item {
             return
         }
 
+        root.normalizeInstantiatedDelegates()
+
         root._preTransitionVisibleKeys = root.strictVisibleDelegateKeys()
         root._filterTransitionRevision += 1
-        if (root._incomingItems.length === 0 && root._pendingIncomingItems.length === 0) {
-            _outgoingClearTimer.stop()
-            root._outgoingItems = []
-            root._activeSwapExitDuration = 0
-        }
         root._promoteInterruptedIncomingToOutgoing()
         _managedEntryReleaseTimer.stop()
         _filterTransitionReleaseTimer.stop()
@@ -308,7 +350,7 @@ Item {
             let targetY = index * 46
             let sourceY = sourcePositions && sourcePositions[String(item.key || "")] !== undefined
                 ? Number(sourcePositions[String(item.key || "")])
-                : targetY
+                : (targetY + root._filterSlideOffsetY)
 
             snapshots.push({
                 key: String(item.key || ""),
@@ -317,6 +359,7 @@ Item {
                 icon: item.icon || "",
                 y: targetY,
                 delay: root._compressedDelay(index, total),
+                enterOffsetX: root._filterSlideOffsetX,
                 enterOffsetY: sourceY - targetY
             })
         }
@@ -336,15 +379,83 @@ Item {
     }
 
     function _promoteInterruptedIncomingToOutgoing(): void {
+        let snapshots = []
+        let hadIncoming = root._incomingItems.length > 0 || root._pendingIncomingItems.length > 0
+
+        for (let index = 0; index < root._incomingItems.length; index++) {
+            let item = root._incomingItems[index]
+            if (!item)
+                continue
+
+            snapshots.push({
+                key: String(item.key || ""),
+                name: item.name || "",
+                description: item.description || "",
+                icon: item.icon || "",
+                selected: false,
+                y: Number(item.y || 0),
+                exitDelay: root._compressedDelay(index, root._incomingItems.length)
+            })
+        }
+
+        for (let pendingIndex = 0; pendingIndex < root._pendingIncomingItems.length; pendingIndex++) {
+            let pendingItem = root._pendingIncomingItems[pendingIndex]
+            if (!pendingItem)
+                continue
+
+            snapshots.push({
+                key: String(pendingItem.key || ""),
+                name: pendingItem.name || "",
+                description: pendingItem.description || "",
+                icon: pendingItem.icon || "",
+                selected: false,
+                y: Number(pendingItem.y || 0),
+                exitDelay: root._compressedDelay(pendingIndex, root._pendingIncomingItems.length)
+            })
+        }
+
         _outgoingClearTimer.stop()
-        root._outgoingItems = []
-        root._activeSwapExitDuration = 0
         _incomingStartTimer.stop()
         _incomingClearTimer.stop()
         root._incomingItems = []
         root._pendingIncomingItems = []
         root._softReplaceActive = false
         root._activeSoftReplaceDuration = 0
+
+        if (!hadIncoming)
+            return
+
+        if (snapshots.length > 0 && root._outgoingItems.length > 0) {
+            let merged = []
+            let seen = ({})
+
+            function pushSnapshot(snapshot) {
+                let snapshotId = String(snapshot.key || "") + "@" + Math.round(Number(snapshot.y || 0))
+                if (seen[snapshotId])
+                    return
+
+                seen[snapshotId] = true
+                merged.push(snapshot)
+            }
+
+            for (let existingIndex = 0; existingIndex < root._outgoingItems.length; existingIndex++)
+                pushSnapshot(root._outgoingItems[existingIndex])
+
+            for (let snapshotIndex = 0; snapshotIndex < snapshots.length; snapshotIndex++)
+                pushSnapshot(snapshots[snapshotIndex])
+
+            snapshots = merged
+        }
+
+        root._outgoingItems = snapshots
+        root._activeSwapExitDuration = snapshots.length > 0
+            ? SettingsService.effectiveAnimation.staggerExitDuration + root._windowForCount(snapshots.length)
+            : 0
+
+        if (snapshots.length > 0) {
+            _outgoingClearTimer.interval = root._activeSwapExitDuration + 20
+            _outgoingClearTimer.restart()
+        }
     }
 
     function _windowForCount(total): int {
@@ -921,7 +1032,9 @@ Item {
                 height: 46
                 delay: modelData.delay
                 enterStartOpacity: 0.0
-                enterStartOffsetX: 0
+                enterStartOffsetX: modelData.enterOffsetX !== undefined
+                    ? modelData.enterOffsetX
+                    : root._filterSlideOffsetX
                 enterStartOffsetY: modelData.enterOffsetY !== undefined
                     ? modelData.enterOffsetY
                     : root._filterSlideOffsetY

@@ -275,6 +275,10 @@ Item {
             displayItems,
             visibleSlotCount
         )
+        let nextTopWindowKeys = ({})
+        let nextTopCount = Math.min(displayItems.length, Math.max(0, Number(visibleSlotCount) || 0))
+        for (let topIndex = 0; topIndex < nextTopCount; topIndex++)
+            nextTopWindowKeys[String((displayItems[topIndex] && displayItems[topIndex].key) || "")] = true
         let sameProviderFilterCanReuseLiveList = retainedVisibleCount > 0
             && retainedVisibleTopWindowCount > 0
         let sameProviderIncremental = filterAnimationsEnabled
@@ -299,10 +303,10 @@ Item {
                 && displayItems.length > 0
 
             if (zeroResultsRecovery) {
-                if (_resultsList && _resultsList.beginExpandTransition)
-                    _resultsList.beginExpandTransition(displayItems.length, displayItems.length, true, true)
-                else if (_resultsList && _resultsList.beginFilterTransition)
+                if (_resultsList && _resultsList.beginFilterTransition)
                     _resultsList.beginFilterTransition(true)
+                if (_resultsList && _resultsList.beginSoftReplace)
+                    _resultsList.beginSoftReplace(displayItems, 0, null)
             } else if (_resultsList && _resultsList.prepareManagedEntry) {
                 _resultsList.prepareManagedEntry()
             }
@@ -319,8 +323,8 @@ Item {
                 _resultsList.resetFilterViewport()
 
             if (zeroResultsRecovery) {
-                let zeroResultsRecoveryDelay = _resultsList && _resultsList.expandTransitionDuration
-                    ? _resultsList.expandTransitionDuration() + 20
+                let zeroResultsRecoveryDelay = _resultsList && _resultsList.activeSoftReplaceDuration
+                    ? _resultsList.activeSoftReplaceDuration() + 20
                     : Theme.anim.moveDuration + 20
 
                 if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
@@ -384,14 +388,16 @@ Item {
         }
 
         let expandFadeEnabled = removedCount > 0
+        let shouldSnapshotViewportExit = sameProviderBroadening || zeroQueryReset
+        let exitSnapshotKeepKeys = shouldSnapshotViewportExit ? nextTopWindowKeys : nextKeys
 
         if (insertedCount > 0 && _resultsList && _resultsList.beginExpandTransition)
             _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1, syncVisibleStateDuringFilter, expandFadeEnabled)
         else if (_resultsList && _resultsList.beginFilterTransition)
             _resultsList.beginFilterTransition(syncVisibleStateDuringFilter)
 
-        if (removedCount > 0 && _resultsList && _resultsList.runSwapExit)
-            _resultsList.runSwapExit(nextKeys)
+        if ((removedCount > 0 || shouldSnapshotViewportExit) && _resultsList && _resultsList.runSwapExit)
+            _resultsList.runSwapExit(exitSnapshotKeepKeys)
 
         root._syncResults(displayItems, items)
 
