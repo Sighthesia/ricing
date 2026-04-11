@@ -22,8 +22,10 @@ Item {
     property var _resultData: []
     property var _lastProvider: null
     property string _lastQuery: ""
+    property double _lastRefreshAtMs: 0
     property bool _suspendRefresh: false
     property bool panelActive: LauncherService.isOpen
+    readonly property int _rapidInputWindowMs: Math.max(110, Theme.anim.moveDuration)
 
     // Parallel stores: ListModel holds display-only scalars; _resultData holds
     // the full result objects including onActivate functions (ListModel cannot
@@ -281,6 +283,13 @@ Item {
             nextTopWindowKeys[String((displayItems[topIndex] && displayItems[topIndex].key) || "")] = true
         let sameProviderFilterCanReuseLiveList = retainedVisibleCount > 0
             && retainedVisibleTopWindowCount > 0
+        let refreshStartedAtMs = Date.now()
+        let rapidInputInterrupt = filterAnimationsEnabled
+            && sameProvider
+            && _resultsList
+            && _resultsList.isTransitionBusy
+            && _resultsList.isTransitionBusy()
+            && (refreshStartedAtMs - Number(root._lastRefreshAtMs || 0)) <= root._rapidInputWindowMs
         let sameProviderIncremental = filterAnimationsEnabled
             && sameProviderFilterNarrowing
             && _results.count > 0
@@ -357,7 +366,7 @@ Item {
             let outgoingKeepKeys = sameProviderBroadeningNeedsReplace ? nextTopWindowKeys : null
 
             if (_resultsList && _resultsList.beginFilterTransition)
-                _resultsList.beginFilterTransition(syncVisibleStateDuringFilter)
+                _resultsList.beginFilterTransition(syncVisibleStateDuringFilter, rapidInputInterrupt)
 
             if (_resultsList && _resultsList.runSwapExit)
                 _resultsList.runSwapExit(outgoingKeepKeys)
@@ -392,9 +401,9 @@ Item {
         let expandFadeEnabled = removedCount > 0
 
         if (insertedCount > 0 && _resultsList && _resultsList.beginExpandTransition)
-            _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1, syncVisibleStateDuringFilter, expandFadeEnabled)
+            _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1, syncVisibleStateDuringFilter, expandFadeEnabled, rapidInputInterrupt)
         else if (_resultsList && _resultsList.beginFilterTransition)
-            _resultsList.beginFilterTransition(syncVisibleStateDuringFilter)
+            _resultsList.beginFilterTransition(syncVisibleStateDuringFilter, rapidInputInterrupt)
 
         if (removedCount > 0 && _resultsList && _resultsList.runSwapExit)
             _resultsList.runSwapExit(nextKeys)
@@ -431,6 +440,7 @@ Item {
     function _rememberSearchState(provider, query): void {
         root._lastProvider = provider
         root._lastQuery = String(query || "")
+        root._lastRefreshAtMs = Date.now()
     }
 
     function _isQueryNarrowing(previousQuery, nextQuery): bool {

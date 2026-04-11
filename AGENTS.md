@@ -55,6 +55,7 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [qml-indicator-motion](.agents/skills/qml-indicator-motion/SKILL.md) | Use when building or debugging moving active indicators, sliding highlights, or stretch-then-settle pills behind workspace tabs, icon rows, or segmented controls. |
 | [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md)         | Use when debugging Quickshell or QML motion bugs where state updates occur but the visual transition looks static, too subtle, or wrong.                           |
+| [launcher-search-transitions](.agents/skills/launcher-search-transitions/SKILL.md) | Use when modifying launcher app or clipboard search transitions, especially when filtering causes blank frames, overlap, residual ghosts, or rapid-input handoff bugs. |
 
 ### Performance
 

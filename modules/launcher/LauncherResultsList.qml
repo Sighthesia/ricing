@@ -23,6 +23,7 @@ Item {
     property int _activeSwapExitDuration: 0
     property bool _softManagedEntryActive: false
     property bool _softReplaceActive: false
+    property bool _dropInterruptedTransitions: false
     property int _activeSoftReplaceDuration: 0
     property var _softReplaceOverlayKeys: ({})
     property var _outgoingItems: []
@@ -147,7 +148,7 @@ Item {
             })
         }
 
-        if (root._outgoingItems.length > 0) {
+        if (root._outgoingItems.length > 0 && !root._dropInterruptedTransitions) {
             let merged = []
             let seen = ({})
 
@@ -212,7 +213,15 @@ Item {
             resultList.forceLayout()
     }
 
-    function beginFilterTransition(syncVisibleStateDuringFilter): void {
+    function isTransitionBusy(): bool {
+        return root._filterTransitionActive
+            || root._softReplaceActive
+            || root._incomingItems.length > 0
+            || root._pendingIncomingItems.length > 0
+            || root._outgoingItems.length > 0
+    }
+
+    function beginFilterTransition(syncVisibleStateDuringFilter, dropInterruptedTransitions): void {
         if (!root.itemAnimationsEnabled) {
             root.resetTransientState()
             root.scrollAnimationsEnabled = false
@@ -223,7 +232,21 @@ Item {
 
         root._preTransitionVisibleKeys = root.strictVisibleDelegateKeys()
         root._filterTransitionRevision += 1
-        root._promoteInterruptedIncomingToOutgoing()
+        root._dropInterruptedTransitions = dropInterruptedTransitions === true
+        if (root._dropInterruptedTransitions) {
+            _outgoingClearTimer.stop()
+            _incomingStartTimer.stop()
+            _incomingClearTimer.stop()
+            root._outgoingItems = []
+            root._incomingItems = []
+            root._pendingIncomingItems = []
+            root._softReplaceOverlayKeys = ({})
+            root._softReplaceActive = false
+            root._activeSwapExitDuration = 0
+            root._activeSoftReplaceDuration = 0
+        } else {
+            root._promoteInterruptedIncomingToOutgoing()
+        }
         _managedEntryReleaseTimer.stop()
         _filterTransitionReleaseTimer.stop()
         root._managedEntryPending = false
@@ -234,8 +257,8 @@ Item {
         root._syncVisibleStateDuringFilter = syncVisibleStateDuringFilter !== false
     }
 
-    function beginExpandTransition(insertCount, delaySlots, syncVisibleStateDuringFilter, fadeEnabled): void {
-        beginFilterTransition(syncVisibleStateDuringFilter)
+    function beginExpandTransition(insertCount, delaySlots, syncVisibleStateDuringFilter, fadeEnabled, dropInterruptedTransitions): void {
+        beginFilterTransition(syncVisibleStateDuringFilter, dropInterruptedTransitions)
 
         if (!root.itemAnimationsEnabled)
             return
@@ -299,6 +322,7 @@ Item {
         root._expandDelaySlots = 0
         root._activeSwapExitDuration = 0
         root._softReplaceActive = false
+        root._dropInterruptedTransitions = false
         root._activeSoftReplaceDuration = 0
         root._softManagedEntryActive = false
         root._preTransitionVisibleKeys = []
@@ -424,23 +448,14 @@ Item {
                 icon: item.icon || "",
                 selected: false,
                 y: Number(item.y || 0),
-                exitDelay: root._compressedDelay(index, root._incomingItems.length)
-            })
-        }
-
-        for (let pendingIndex = 0; pendingIndex < root._pendingIncomingItems.length; pendingIndex++) {
-            let pendingItem = root._pendingIncomingItems[pendingIndex]
-            if (!pendingItem)
-                continue
-
-            snapshots.push({
-                key: String(pendingItem.key || ""),
-                name: pendingItem.name || "",
-                description: pendingItem.description || "",
-                icon: pendingItem.icon || "",
-                selected: false,
-                y: Number(pendingItem.y || 0),
-                exitDelay: root._compressedDelay(pendingIndex, root._pendingIncomingItems.length)
+                exitDelay: root._compressedDelay(index, root._incomingItems.length),
+                exitKind: "interruptedIncoming",
+                startOpacity: 0.42,
+                startOffsetX: Math.round(root._filterSlideOffsetX * 0.45),
+                startOffsetY: Math.round(root._filterSlideOffsetY * 0.45),
+                exitOffsetX: Math.round(root._filterSlideOffsetX * 0.7),
+                exitOffsetY: Math.round(root._filterSlideOffsetY * 0.7),
+                exitDuration: Math.max(80, Math.round(SettingsService.effectiveAnimation.staggerExitDuration * 0.55))
             })
         }
 
@@ -974,15 +989,29 @@ Item {
                 width: resultList.width
                 height: 46
                 exitDelay: modelData.exitDelay
-                exitOffsetX: root._filterSlideOffsetX
-                exitOffsetY: root._filterSlideOffsetY
-                enterStartOpacity: 1.0
-                enterStartOffsetX: 0
-                enterStartOffsetY: 0
+                exitDuration: modelData.exitDuration !== undefined
+                    ? Number(modelData.exitDuration)
+                    : SettingsService.effectiveAnimation.staggerExitDuration
+                exitOffsetX: modelData.exitOffsetX !== undefined
+                    ? Number(modelData.exitOffsetX)
+                    : root._filterSlideOffsetX
+                exitOffsetY: modelData.exitOffsetY !== undefined
+                    ? Number(modelData.exitOffsetY)
+                    : root._filterSlideOffsetY
+                enterStartOpacity: modelData.startOpacity !== undefined
+                    ? Number(modelData.startOpacity)
+                    : 1.0
+                enterStartOffsetX: modelData.startOffsetX !== undefined
+                    ? Number(modelData.startOffsetX)
+                    : 0
+                enterStartOffsetY: modelData.startOffsetY !== undefined
+                    ? Number(modelData.startOffsetY)
+                    : 0
 
                 Component.onCompleted: {
-                    _outgoingItem.opacity = 1.0
-                    _outgoingItem._ty = 0
+                    _outgoingItem.opacity = _outgoingItem.enterStartOpacity
+                    _outgoingItem._tx = _outgoingItem.enterStartOffsetX
+                    _outgoingItem._ty = _outgoingItem.enterStartOffsetY
                     _outgoingItem.runExit()
                 }
 
