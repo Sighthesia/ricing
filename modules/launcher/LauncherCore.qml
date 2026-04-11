@@ -259,7 +259,8 @@ Item {
             && root._isQueryNarrowing(root._lastQuery, q)
         let sameProviderBroadening = sameProvider
             && root._isQueryBroadening(root._lastQuery, q)
-        let sameProviderRefinement = sameProviderNarrowing || sameProviderBroadening
+        let sameProviderFilterNarrowing = zeroQueryNarrowing || sameProviderNarrowing
+        let sameProviderRefinement = sameProviderFilterNarrowing || sameProviderBroadening
         let retainedVisibleCount = 0
         let visibleSlotCount = _resultsList && _resultsList._estimatedVisibleSlotCount
             ? _resultsList._estimatedVisibleSlotCount()
@@ -274,35 +275,37 @@ Item {
             displayItems,
             visibleSlotCount
         )
-        let sameProviderIncremental = filterAnimationsEnabled
-            && sameProviderRefinement
-            && _results.count > 0
-            && retainedVisibleCount > 0
+        let sameProviderFilterCanReuseLiveList = retainedVisibleCount > 0
             && retainedVisibleTopWindowCount > 0
+        let sameProviderIncremental = filterAnimationsEnabled
+            && sameProviderFilterNarrowing
+            && _results.count > 0
+            && sameProviderFilterCanReuseLiveList
             && (insertedCount > 0 || removedCount > 0 || retainedCount > 0)
-        let useSoftReplace = filterAnimationsEnabled
-            && (
-                zeroQueryNarrowing
-                || zeroQueryReset
-                || (sameProviderRefinement && retainedCount > 0 && (retainedVisibleCount === 0 || retainedVisibleTopWindowCount === 0))
-            )
-            && retainedCount > 0
-        let zeroResultsRecovery = filterAnimationsEnabled
-            && _results.count === 0
-            && String(root._lastQuery || "") !== ""
-            && displayItems.length > 0
+        let sameProviderNarrowingNeedsReplace = filterAnimationsEnabled
+            && sameProviderFilterNarrowing
+            && _results.count > 0
+            && !sameProviderFilterCanReuseLiveList
         let syncVisibleStateDuringFilter = true
-        let transitionPath = sameProviderIncremental
-            ? "incremental"
-            : ((useSoftReplace || zeroResultsRecovery) ? "softReplace" : "fullReplace")
+        let transitionPath = _results.count === 0
+            ? "initialPopulate"
+            : (sameProviderIncremental
+                ? "incremental"
+                : (sameProviderNarrowingNeedsReplace ? "narrowingReplace" : "liveSync"))
 
         if (_results.count === 0) {
-            let useSoftEntry = useSoftReplace || zeroResultsRecovery
+            let zeroResultsRecovery = filterAnimationsEnabled
+                && String(root._lastQuery || "") !== ""
+                && displayItems.length > 0
 
-            if (useSoftEntry && _resultsList && _resultsList.beginSoftReplace)
-                _resultsList.beginSoftReplace(displayItems, 0)
-            else if (_resultsList && _resultsList.prepareManagedEntry)
+            if (zeroResultsRecovery) {
+                if (_resultsList && _resultsList.beginExpandTransition)
+                    _resultsList.beginExpandTransition(displayItems.length, displayItems.length, true, true)
+                else if (_resultsList && _resultsList.beginFilterTransition)
+                    _resultsList.beginFilterTransition(true)
+            } else if (_resultsList && _resultsList.prepareManagedEntry) {
                 _resultsList.prepareManagedEntry()
+            }
 
             _results.clear()
             root._resultData = items
@@ -312,78 +315,67 @@ Item {
             _selectedIndex = items.length > 0 ? 0 : -1
             root._rememberSearchState(provider, q)
 
-            if (useSoftEntry && _resultsList && _resultsList.scheduleFilterTransitionRelease) {
-                let softReplaceDuration = _resultsList.activeSoftReplaceDuration
-                    ? _resultsList.activeSoftReplaceDuration()
-                    : 0
-                _resultsList.scheduleFilterTransitionRelease(softReplaceDuration + 40)
-            } else if (_resultsList && _resultsList.scheduleManagedEntryRelease)
+            if (_resultsList && _resultsList.resetFilterViewport)
+                _resultsList.resetFilterViewport()
+
+            if (zeroResultsRecovery) {
+                let zeroResultsRecoveryDelay = _resultsList && _resultsList.expandTransitionDuration
+                    ? _resultsList.expandTransitionDuration() + 20
+                    : Theme.anim.moveDuration + 20
+
+                if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
+                    _resultsList.scheduleFilterTransitionRelease(zeroResultsRecoveryDelay)
+                else if (_resultsList && _resultsList.endFilterTransition)
+                    Qt.callLater(function() { _resultsList.endFilterTransition() })
+            } else if (_resultsList && _resultsList.scheduleManagedEntryRelease) {
                 _resultsList.scheduleManagedEntryRelease(0)
-            else
+            } else {
                 Qt.callLater(function() { _resultsList.releaseManagedEntry() })
+            }
 
             return
         }
 
-        console.log(
-            "[LauncherSearchTrace]",
-            "refreshDecision",
-            "query=", JSON.stringify(q),
-            "sameProvider=", sameProvider,
-            "sameProviderRefinement=", sameProviderRefinement,
-            "sameProviderNarrowing=", sameProviderNarrowing,
-            "sameProviderBroadening=", sameProviderBroadening,
-            "zeroQueryNarrowing=", zeroQueryNarrowing,
-            "zeroQueryReset=", zeroQueryReset,
-            "path=", transitionPath,
-            "currentCount=", _results.count,
-            "nextCount=", displayItems.length,
-            "inserted=", insertedCount,
-            "removed=", removedCount,
-            "retained=", retainedCount,
-            "visibleSlots=", visibleSlotCount,
-            "retainedVisible=", retainedVisibleCount,
-            "retainedVisibleTopWindow=", retainedVisibleTopWindowCount,
-            "instantiatedTopKeys=", root._traceTopKeys(currentInstantiatedKeys, 8),
-            "nextTopKeys=", root._traceTopKeysFromDisplayItems(displayItems, 8)
-        )
+        if (sameProviderNarrowingNeedsReplace) {
+            let incomingSourcePositions = ({})
+            for (let sourceIndex = 0; sourceIndex < displayItems.length; sourceIndex++) {
+                let sourceKey = String((displayItems[sourceIndex] && displayItems[sourceIndex].key) || "")
+                let currentIndex = root._indexOfDisplayItem(sourceKey, 0)
+                if (currentIndex >= 0)
+                    incomingSourcePositions[sourceKey] = currentIndex * 46
+            }
 
-        if (sameProviderIncremental) {
-            let expandFadeEnabled = removedCount > 0
-
-            if (insertedCount > 0 && _resultsList && _resultsList.beginExpandTransition)
-                _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1, syncVisibleStateDuringFilter, expandFadeEnabled)
-            else if (_resultsList && _resultsList.beginFilterTransition)
+            if (_resultsList && _resultsList.beginFilterTransition)
                 _resultsList.beginFilterTransition(syncVisibleStateDuringFilter)
 
-            if (removedCount > 0 && _resultsList && _resultsList.runSwapExit)
-                _resultsList.runSwapExit(nextKeys)
+            if (_resultsList && _resultsList.runSwapExit)
+                _resultsList.runSwapExit()
+            if (_resultsList && _resultsList.beginSoftReplace)
+                _resultsList.beginSoftReplace(displayItems, 0, incomingSourcePositions)
+
+            _results.clear()
+            root._resultData = items
+            for (let replaceIndex = 0; replaceIndex < displayItems.length; replaceIndex++)
+                _results.append(displayItems[replaceIndex])
+
+            _selectedIndex = root._resultData.length > 0 ? 0 : -1
+
             if (_resultsList && _resultsList.resetFilterViewport)
                 _resultsList.resetFilterViewport()
 
-            root._syncResults(displayItems, items)
-
-            if (_resultsList && _resultsList.resetFilterViewport)
-                _resultsList.resetFilterViewport()
-            if (_resultsList && _resultsList.syncVisibleDelegateState)
-                _resultsList.syncVisibleDelegateState()
-
-            if (_resultsList && _resultsList.queueRetainedVisibleEntries)
-                _resultsList.queueRetainedVisibleEntries(retainedKeys)
-
-            let incrementalReleaseDelay = Theme.anim.moveDuration + 20
+            let narrowingReplaceReleaseDelay = Theme.anim.moveDuration + 20
             if (_resultsList) {
-                let expandDuration = insertedCount > 0 && _resultsList.expandTransitionDuration
-                    ? _resultsList.expandTransitionDuration()
+                let incomingDuration = _resultsList.activeSoftReplaceDuration
+                    ? _resultsList.activeSoftReplaceDuration()
                     : 0
-                let swapExitDuration = removedCount > 0 && _resultsList.activeSwapExitDuration
+                let outgoingDuration = _resultsList.activeSwapExitDuration
                     ? _resultsList.activeSwapExitDuration()
                     : 0
-                incrementalReleaseDelay = Math.max(Theme.anim.moveDuration, expandDuration, swapExitDuration) + 20
+                narrowingReplaceReleaseDelay = Math.max(incomingDuration, outgoingDuration) + 20
             }
 
             if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
-                _resultsList.scheduleFilterTransitionRelease(incrementalReleaseDelay)
+                _resultsList.scheduleFilterTransitionRelease(narrowingReplaceReleaseDelay)
             else if (_resultsList && _resultsList.endFilterTransition)
                 Qt.callLater(function() { _resultsList.endFilterTransition() })
 
@@ -391,57 +383,41 @@ Item {
             return
         }
 
-        if (_resultsList && _resultsList.beginFilterTransition)
-            _resultsList.beginFilterTransition()
-        if (_resultsList && _resultsList.runSwapExit)
-            _resultsList.runSwapExit()
-        if (!useSoftReplace && _resultsList && _resultsList.prepareManagedEntry)
-            _resultsList.prepareManagedEntry(useSoftReplace ? "soft" : "")
-        if (useSoftReplace && _resultsList && _resultsList.beginSoftReplace) {
-            let swapExitDuration = _resultsList.activeSwapExitDuration
-                ? _resultsList.activeSwapExitDuration()
+        let expandFadeEnabled = removedCount > 0
+
+        if (insertedCount > 0 && _resultsList && _resultsList.beginExpandTransition)
+            _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1, syncVisibleStateDuringFilter, expandFadeEnabled)
+        else if (_resultsList && _resultsList.beginFilterTransition)
+            _resultsList.beginFilterTransition(syncVisibleStateDuringFilter)
+
+        if (removedCount > 0 && _resultsList && _resultsList.runSwapExit)
+            _resultsList.runSwapExit(nextKeys)
+
+        root._syncResults(displayItems, items)
+
+        if (_resultsList && _resultsList.resetFilterViewport)
+            _resultsList.resetFilterViewport()
+        if (_resultsList && _resultsList.syncVisibleDelegateState)
+            _resultsList.syncVisibleDelegateState()
+
+        if (sameProviderIncremental && _resultsList && _resultsList.queueRetainedVisibleEntries)
+            _resultsList.queueRetainedVisibleEntries(retainedKeys)
+
+        let liveSyncReleaseDelay = Theme.anim.moveDuration + 20
+        if (_resultsList) {
+            let expandDuration = insertedCount > 0 && _resultsList.expandTransitionDuration
+                ? _resultsList.expandTransitionDuration()
                 : 0
-            _resultsList.beginSoftReplace(displayItems, swapExitDuration + 20)
+            let retainedEnterDuration = sameProviderIncremental && _resultsList.retainedEntryDuration
+                ? _resultsList.retainedEntryDuration()
+                : 0
+            liveSyncReleaseDelay = Math.max(Theme.anim.moveDuration, expandDuration, retainedEnterDuration) + 20
         }
 
-        console.log(
-            "[LauncherSearchTrace]",
-            useSoftReplace ? "softReplace" : "fullReplace",
-            "query=", JSON.stringify(q),
-            "sameProvider=", sameProvider,
-            "sameProviderRefinement=", sameProviderRefinement,
-            "currentCount=", _results.count,
-            "nextCount=", displayItems.length,
-            "inserted=", insertedCount,
-            "removed=", removedCount,
-            "retained=", retainedCount,
-            "instantiatedTopKeys=", root._traceTopKeys(currentInstantiatedKeys, 8),
-            "nextTopKeys=", root._traceTopKeysFromDisplayItems(displayItems, 8)
-        )
-
-        _results.clear()
-        root._resultData = items
-        for (let batchIndex = 0; batchIndex < displayItems.length; batchIndex++)
-            _results.append(displayItems[batchIndex])
-
-        _selectedIndex = root._resultData.length > 0 ? 0 : -1
-
-        if (useSoftReplace && _resultsList && _resultsList.scheduleFilterTransitionRelease) {
-            let softReplaceDuration = _resultsList.activeSoftReplaceDuration
-                ? _resultsList.activeSoftReplaceDuration()
-                : 0
-            let swapExitDuration = _resultsList.activeSwapExitDuration
-                ? _resultsList.activeSwapExitDuration()
-                : 0
-            _resultsList.scheduleFilterTransitionRelease(swapExitDuration + softReplaceDuration + 40)
-        } else if (_resultsList && _resultsList.scheduleManagedEntryRelease)
-            _resultsList.scheduleManagedEntryRelease(
-                (_resultsList.activeSwapExitDuration
-                    ? _resultsList.activeSwapExitDuration()
-                    : 0) + 20
-            )
-        else if (_resultsList && _resultsList.releaseManagedEntry)
-            Qt.callLater(function() { _resultsList.releaseManagedEntry() })
+        if (_resultsList && _resultsList.scheduleFilterTransitionRelease)
+            _resultsList.scheduleFilterTransitionRelease(liveSyncReleaseDelay)
+        else if (_resultsList && _resultsList.endFilterTransition)
+            Qt.callLater(function() { _resultsList.endFilterTransition() })
 
         root._rememberSearchState(provider, q)
     }
@@ -574,16 +550,6 @@ Item {
             removedOps.push((_results.count - 1) + ":" + String((trailing && trailing.key) || ""))
             _results.remove(_results.count - 1, 1)
         }
-
-        console.log(
-            "[LauncherSearchTrace]",
-            "syncResults",
-            "remove=", "[" + removedOps.slice(0, 8).join(", ") + "]",
-            "move=", "[" + movedOps.slice(0, 8).join(", ") + "]",
-            "insert=", "[" + insertedOps.slice(0, 8).join(", ") + "]",
-            "set=", "[" + setOps.slice(0, 8).join(", ") + "]",
-            "finalCount=", displayItems.length
-        )
 
         root._resultData = items
         _selectedIndex = root._resultData.length > 0 ? 0 : -1

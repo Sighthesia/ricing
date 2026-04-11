@@ -38,12 +38,6 @@ Item {
         interval: root.visibleExitDuration() + 20
         repeat: false
         onTriggered: {
-            console.log(
-                "[LauncherSearchTrace]",
-                "clearOutgoing",
-                "revision=", root._filterTransitionRevision,
-                "count=", root._outgoingItems.length
-            )
             root._outgoingItems = []
             root._activeSwapExitDuration = 0
         }
@@ -96,15 +90,6 @@ Item {
 
     Layout.fillWidth: true
     Layout.fillHeight: true
-
-    function _debugKeys(keys): string {
-        let values = []
-
-        for (let index = 0; index < (keys ? keys.length : 0); index++)
-            values.push(String(keys[index] || ""))
-
-        return "[" + values.join(", ") + "]"
-    }
 
     function runEnter(): void {
         root.scrollAnimationsEnabled = root.itemAnimationsEnabled
@@ -166,47 +151,15 @@ Item {
             })
         }
 
-        if (root._outgoingItems.length > 0) {
-            let merged = []
-            let seen = ({})
-
-            function pushSnapshot(snapshot) {
-                let snapshotId = String(snapshot.key || "") + "@" + Math.round(Number(snapshot.y || 0))
-                if (seen[snapshotId])
-                    return
-
-                seen[snapshotId] = true
-                merged.push(snapshot)
-            }
-
-            for (let existingIndex = 0; existingIndex < root._outgoingItems.length; existingIndex++)
-                pushSnapshot(root._outgoingItems[existingIndex])
-
-            for (let snapshotIndex = 0; snapshotIndex < snapshots.length; snapshotIndex++)
-                pushSnapshot(snapshots[snapshotIndex])
-
-            for (let mergedIndex = 0; mergedIndex < merged.length; mergedIndex++)
-                merged[mergedIndex].exitDelay = root._compressedDelay(mergedIndex, merged.length)
-
-            snapshots = merged
-        }
-
+        _outgoingClearTimer.stop()
         root._outgoingItems = snapshots
         root._activeSwapExitDuration = snapshots.length > 0
             ? SettingsService.effectiveAnimation.staggerExitDuration + root._windowForCount(snapshots.length)
             : 0
-        console.log(
-            "[LauncherSearchTrace]",
-            "swapExit",
-            "revision=", root._filterTransitionRevision,
-            "visibleKeys=", root._debugKeys(root.visibleDelegateKeys()),
-            "snapshotKeys=", root._debugKeys(snapshots.map(function(snapshot) { return snapshot.key }))
-        )
+
         if (snapshots.length > 0) {
             _outgoingClearTimer.interval = root._activeSwapExitDuration + 20
             _outgoingClearTimer.restart()
-        } else {
-            _outgoingClearTimer.stop()
         }
     }
 
@@ -229,13 +182,6 @@ Item {
 
         root._preTransitionVisibleKeys = root.strictVisibleDelegateKeys()
         root._filterTransitionRevision += 1
-        console.log(
-            "[LauncherSearchTrace]",
-            "beginFilter",
-            "revision=", root._filterTransitionRevision,
-            "syncVisible=", syncVisibleStateDuringFilter !== false,
-            "preVisible=", root._debugKeys(root._preTransitionVisibleKeys)
-        )
         if (root._incomingItems.length === 0 && root._pendingIncomingItems.length === 0) {
             _outgoingClearTimer.stop()
             root._outgoingItems = []
@@ -340,7 +286,12 @@ Item {
             + Theme.anim.highlightDuration
     }
 
-    function beginSoftReplace(displayItems, delayMs): void {
+    function retainedEntryDuration(): int {
+        return SettingsService.effectiveAnimation.staggerEnterDuration
+            + root._windowForCount(root._estimatedVisibleSlotCount())
+    }
+
+    function beginSoftReplace(displayItems, delayMs, sourcePositions): void {
         let snapshots = []
         let total = displayItems ? displayItems.length : 0
 
@@ -354,13 +305,19 @@ Item {
             if (!item)
                 continue
 
+            let targetY = index * 46
+            let sourceY = sourcePositions && sourcePositions[String(item.key || "")] !== undefined
+                ? Number(sourcePositions[String(item.key || "")])
+                : targetY
+
             snapshots.push({
                 key: String(item.key || ""),
                 name: item.name || "",
                 description: item.description || "",
                 icon: item.icon || "",
-                y: index * 46,
-                delay: root._compressedDelay(index, total)
+                y: targetY,
+                delay: root._compressedDelay(index, total),
+                enterOffsetY: sourceY - targetY
             })
         }
 
@@ -379,28 +336,6 @@ Item {
     }
 
     function _promoteInterruptedIncomingToOutgoing(): void {
-        let snapshots = []
-        let hadIncoming = root._incomingItems.length > 0 || root._pendingIncomingItems.length > 0
-
-        for (let index = 0; index < root._incomingItems.length; index++) {
-            let item = root._incomingItems[index]
-            if (!item)
-                continue
-
-            snapshots.push({
-                key: String(item.key || ""),
-                name: item.name || "",
-                description: item.description || "",
-                icon: item.icon || "",
-                selected: false,
-                y: Number(item.y || 0),
-                exitDelay: root._compressedDelay(index, root._incomingItems.length)
-            })
-        }
-
-        if (!hadIncoming)
-            return
-
         _outgoingClearTimer.stop()
         root._outgoingItems = []
         root._activeSwapExitDuration = 0
@@ -410,15 +345,6 @@ Item {
         root._pendingIncomingItems = []
         root._softReplaceActive = false
         root._activeSoftReplaceDuration = 0
-
-        if (snapshots.length === 0)
-            return
-
-        root._outgoingItems = snapshots
-        root._activeSwapExitDuration = SettingsService.effectiveAnimation.staggerExitDuration
-            + root._windowForCount(snapshots.length)
-        _outgoingClearTimer.interval = root._activeSwapExitDuration + 20
-        _outgoingClearTimer.restart()
     }
 
     function _windowForCount(total): int {
@@ -472,14 +398,6 @@ Item {
             )
         )
 
-        console.log(
-            "[LauncherSearchTrace]",
-            "estimatedVisibleSlots",
-            "estimated=", estimated,
-            "listHeight=", Number(resultList.height || 0),
-            "delegateHeight=", delegateHeight
-        )
-
         return estimated
     }
 
@@ -505,15 +423,9 @@ Item {
 
             let candidateVisibleSlots = root._estimatedVisibleSlotCount()
             let readyCount = root._instantiatedTopDelegateCount(candidateVisibleSlots)
+            let targetReadyCount = Math.min(candidateVisibleSlots, resultList.count)
 
-            if (resultList.count > 0 && readyCount === 0 && attemptsRemaining > 0) {
-                console.log(
-                    "[LauncherSearchTrace]",
-                    label,
-                    "retry=", attemptsRemaining,
-                    "candidateVisibleSlots=", candidateVisibleSlots,
-                    "modelCount=", resultList.count
-                )
+            if (targetReadyCount > 0 && readyCount < targetReadyCount && attemptsRemaining > 0) {
                 root._awaitTopDelegates(label, revision, attemptsRemaining - 1, callback)
                 return
             }
@@ -555,13 +467,6 @@ Item {
 
             keys.push(String(delegate.key || ""))
         }
-
-        console.log(
-            "[LauncherSearchTrace]",
-            "instantiatedDelegateKeys",
-            "count=", keys.length,
-            "topKeys=", root._debugKeys(keys.slice(0, 8))
-        )
 
         return keys
     }
@@ -624,12 +529,6 @@ Item {
                 }
             }
 
-            console.log(
-                "[LauncherSearchTrace]",
-                "syncInstantiatedDelegateState",
-                "syncedCount=", syncedCount,
-                "modelCount=", resultList.count
-            )
         })
     }
 
@@ -645,35 +544,25 @@ Item {
 
             let previousVisibleSet = ({})
             let enteringDelegates = []
-            let traceEntries = []
 
             for (let index = 0; index < root._preTransitionVisibleKeys.length; index++)
                 previousVisibleSet[String(root._preTransitionVisibleKeys[index] || "")] = true
 
             for (let delegateIndex = 0; delegateIndex < resultList.count; delegateIndex++) {
                 let delegate = resultList.itemAtIndex(delegateIndex)
-                if (!delegate) {
-                    traceEntries.push(delegateIndex + ":<null>:skip=no-delegate")
+                if (!delegate)
                     continue
-                }
 
                 let delegateKey = String(delegate.key || "")
-                if (delegate.index >= candidateVisibleSlots) {
-                    traceEntries.push(delegate.index + ":" + delegateKey + ":skip=outside-window")
+                if (delegate.index >= candidateVisibleSlots)
                     continue
-                }
 
-                if (!retainedKeys || !retainedKeys[delegateKey]) {
-                    traceEntries.push(delegate.index + ":" + delegateKey + ":skip=not-retained")
+                if (!retainedKeys || !retainedKeys[delegateKey])
                     continue
-                }
 
-                if (previousVisibleSet[delegateKey]) {
-                    traceEntries.push(delegate.index + ":" + delegateKey + ":skip=previously-visible")
+                if (previousVisibleSet[delegateKey])
                     continue
-                }
 
-                traceEntries.push(delegate.index + ":" + delegateKey + ":queue")
                 enteringDelegates.push(delegate)
             }
 
@@ -683,22 +572,13 @@ Item {
                     continue
 
                 enteringDelegate.enterStartOpacity = 0.0
-                enteringDelegate.enterStartOffsetX = root._filterSlideOffsetX
-                enteringDelegate.enterStartOffsetY = root._filterSlideOffsetY
+                enteringDelegate.enterStartOffsetX = 0
+                enteringDelegate.enterStartOffsetY = 0
 
                 if (enteringDelegate.queueManagedEnter)
                     enteringDelegate.queueManagedEnter(enteringIndex, enteringDelegates.length)
             }
 
-            console.log(
-                "[LauncherSearchTrace]",
-                "retainedEnter",
-                "revision=", revision,
-                "candidateVisibleSlots=", candidateVisibleSlots,
-                "postVisible=", root._debugKeys(root.strictVisibleDelegateKeys()),
-                "enteringKeys=", root._debugKeys(enteringDelegates.map(function(delegate) { return delegate.key })),
-                "scan=", "[" + traceEntries.slice(0, 12).join(", ") + "]"
-            )
         })
     }
 
@@ -711,21 +591,25 @@ Item {
             return
         }
 
-        console.log(
-            "[LauncherSearchTrace]",
-            "releaseManagedEntry",
-            "managedPending=", root._managedEntryPending,
-            "filterActive=", root._filterTransitionActive,
-            "modelCount=", resultList.count
-        )
+        let revision = root._filterTransitionRevision
 
-        resultList.contentY = 0
+        if (resultList.count > 0)
+            resultList.positionViewAtIndex(0, ListView.Beginning)
+        else
+            resultList.contentY = 0
+
         if (resultList.forceLayout)
             resultList.forceLayout()
 
-        Qt.callLater(function() {
+        root._awaitTopDelegates("releaseManagedEntryWait", revision, 8, function() {
+            if (revision !== root._filterTransitionRevision)
+                return
+
             if (!root._managedEntryPending)
                 return
+
+            if (resultList.count > 0)
+                resultList.positionViewAtIndex(0, ListView.Beginning)
 
             if (resultList.forceLayout)
                 resultList.forceLayout()
@@ -734,6 +618,9 @@ Item {
             root._filterTransitionActive = false
             root._softManagedEntryActive = false
             root._managedEntryPending = false
+
+            if (root._visibleDelegates().length === 0)
+                root.syncInstantiatedDelegateState()
         })
     }
 
@@ -758,12 +645,13 @@ Item {
 
         add: Transition {
                 id: _addTransition
-                enabled: root.itemAnimationsEnabled && root._expandTransitionActive
+                enabled: root.itemAnimationsEnabled
+                    && root._filterTransitionActive
+                    && !root._managedEntryPending
 
                 SequentialAnimation {
                     PropertyAction { property: "_filterAddOpacity"; value: root._expandFadeEnabled ? 0 : 1 }
-                    PropertyAction { property: "_filterAddOffsetX"; value: root._filterSlideOffsetX }
-                    PropertyAction { property: "_filterAddOffsetY"; value: root._filterSlideOffsetY }
+                    PropertyAction { property: "_filterAddHeight"; value: 0 }
                     PauseAnimation {
                         duration: root._compressedDelay(
                         _addTransition.ViewTransition.index,
@@ -778,14 +666,8 @@ Item {
                         easing.type: Easing.OutCubic
                     }
                     NumberAnimation {
-                        property: "_filterAddOffsetX"
-                        to: 0
-                        duration: Theme.anim.moveDuration
-                        easing.type: Theme.anim.moveType
-                    }
-                    NumberAnimation {
-                        property: "_filterAddOffsetY"
-                        to: 0
+                        property: "_filterAddHeight"
+                        to: 46
                         duration: Theme.anim.moveDuration
                         easing.type: Theme.anim.moveType
                     }
@@ -819,7 +701,9 @@ Item {
 
         remove: Transition {
             id: _removeTransition
-            enabled: root.itemAnimationsEnabled && !root._filterTransitionActive
+            enabled: root.itemAnimationsEnabled
+                && !root._managedEntryPending
+                && !root._filterTransitionActive
 
             SequentialAnimation {
                 PauseAnimation {
@@ -832,19 +716,13 @@ Item {
                     NumberAnimation {
                         property: "opacity"
                         to: 0
-                        duration: SettingsService.effectiveAnimation.staggerExitDuration
+                        duration: Theme.anim.highlightDuration
                         easing.type: Easing.InCubic
                     }
                     NumberAnimation {
-                        property: "_tx"
-                        to: root._filterSlideOffsetX
-                        duration: SettingsService.effectiveAnimation.staggerExitDuration
-                        easing.type: Easing.InCubic
-                    }
-                    NumberAnimation {
-                        property: "_ty"
-                        to: root._filterSlideOffsetY
-                        duration: SettingsService.effectiveAnimation.staggerExitDuration
+                        property: "_filterAddHeight"
+                        to: 0
+                        duration: Theme.anim.moveDuration
                         easing.type: Easing.InCubic
                     }
                 }
@@ -883,19 +761,15 @@ Item {
             enterOffsetY: SettingsService.effectiveAnimation.staggerEnterOffsetY
             exitOffsetY: SettingsService.effectiveAnimation.staggerExitOffsetY
             property real _filterAddOpacity: 1
-            property real _filterAddOffsetX: 0
-            property real _filterAddOffsetY: 0
+            property real _filterAddHeight: 46
 
             width: resultList.width
-            height: 46
+            height: _filterAddHeight
+            clip: true
 
             Rectangle {
                 anchors.fill: parent
                 opacity: root.itemAnimationsEnabled && root._expandTransitionActive ? _item._filterAddOpacity : 1
-                transform: Translate {
-                    x: root.itemAnimationsEnabled && root._expandTransitionActive ? _item._filterAddOffsetX : 0
-                    y: root.itemAnimationsEnabled && root._expandTransitionActive ? _item._filterAddOffsetY : 0
-                }
                 color: root.selectedIndex === _item.index
                     ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
                     : ((root.itemAnimationsEnabled && root._expandTransitionActive && !root._expandFadeEnabled)
@@ -1047,8 +921,10 @@ Item {
                 height: 46
                 delay: modelData.delay
                 enterStartOpacity: 0.0
-                enterStartOffsetX: root._filterSlideOffsetX
-                enterStartOffsetY: root._filterSlideOffsetY
+                enterStartOffsetX: 0
+                enterStartOffsetY: modelData.enterOffsetY !== undefined
+                    ? modelData.enterOffsetY
+                    : root._filterSlideOffsetY
 
                 Component.onCompleted: runEnter()
 
