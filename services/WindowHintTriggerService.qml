@@ -3,6 +3,7 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.services
 
 // Bridges external press/release events into a shared hint-held signal.
 Singleton {
@@ -12,8 +13,19 @@ Singleton {
     readonly property bool _bundledHelperDisabled:
         (Quickshell.env("DYMICSHELL_WINDOW_HINT_TRIGGER_DISABLE") || "").trim() === "1"
     readonly property string _bundledHelperPath: Quickshell.shellDir + "/scripts/window_hint_trigger.py"
+    readonly property string _configuredMetaKeys: {
+        const settingsValue = SettingsService.data.shortcuts.windowHintMetaKeys
+        const normalizedSettings = settingsValue != null ? String(settingsValue).trim() : ""
+        if (normalizedSettings !== "")
+            return normalizedSettings
+
+        return (Quickshell.env("DYMICSHELL_WINDOW_HINT_META_KEYS") || "").trim()
+    }
+    readonly property string _escapedMetaKeys: root._configuredMetaKeys.replace(/'/g, "'\"'\"'")
     readonly property string _bundledHelperCommand:
-        "if command -v python3 >/dev/null 2>&1; then exec python3 '"
+        "export DYMICSHELL_WINDOW_HINT_META_KEYS='"
+        + root._escapedMetaKeys
+        + "'; if command -v python3 >/dev/null 2>&1; then exec python3 '"
         + root._bundledHelperPath
         + "'; else exit 0; fi"
     readonly property string helperCommand:
@@ -77,6 +89,22 @@ Singleton {
     Component.onCompleted: {
         if (root.available)
             _bridgeProcess.running = true
+    }
+
+    Connections {
+        target: SettingsService.data.shortcuts
+
+        function onWindowHintMetaKeysChanged() {
+            if (!root.available)
+                return
+
+            if (_bridgeProcess.running) {
+                _bridgeProcess.running = false
+                return
+            }
+
+            _bridgeProcess.running = true
+        }
     }
 
     Process {

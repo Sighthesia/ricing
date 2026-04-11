@@ -114,7 +114,14 @@ Singleton {
                 wallpaperDirectory: adapter.appearance.wallpaperDirectory,
                 matugenEnabled: adapter.appearance.matugenEnabled,
                 matugenScheme: adapter.appearance.matugenScheme,
-                darkMode: adapter.appearance.darkMode
+                darkMode: adapter.appearance.darkMode,
+                darkModeScheduleMode: adapter.appearance.darkModeScheduleMode,
+                darkModeScheduleLocationMode: adapter.appearance.darkModeScheduleLocationMode,
+                darkModeScheduleLatitude: adapter.appearance.darkModeScheduleLatitude,
+                darkModeScheduleLongitude: adapter.appearance.darkModeScheduleLongitude,
+                darkModeScheduleCity: adapter.appearance.darkModeScheduleCity,
+                darkModeScheduleDarkStart: adapter.appearance.darkModeScheduleDarkStart,
+                darkModeScheduleLightStart: adapter.appearance.darkModeScheduleLightStart
             },
             bar: {
                 height: adapter.bar.height,
@@ -216,6 +223,9 @@ Singleton {
                 hoverReveal: adapter.systemTray.hoverReveal,
                 flashEnabled: adapter.systemTray.flashEnabled,
                 pinnedItems: adapter.systemTray.pinnedItems
+            },
+            shortcuts: {
+                windowHintMetaKeys: adapter.shortcuts.windowHintMetaKeys
             }
         }
 
@@ -346,6 +356,13 @@ Singleton {
             property bool   matugenEnabled:  false
             property string matugenScheme:   "scheme-tonal-spot"
             property bool   darkMode:        true
+            property string darkModeScheduleMode: "manual"
+            property string darkModeScheduleLocationMode: "coordinates"
+            property real   darkModeScheduleLatitude: 0.0
+            property real   darkModeScheduleLongitude: 0.0
+            property string darkModeScheduleCity: ""
+            property string darkModeScheduleDarkStart: "20:00"
+            property string darkModeScheduleLightStart: "07:00"
             property string wallpaperDirectory: ""
         }
 
@@ -463,6 +480,10 @@ Singleton {
             property bool hoverReveal: true
             property bool flashEnabled: true
             property var pinnedItems: []
+        }
+
+        property JsonObject shortcuts: JsonObject {
+            property string windowHintMetaKeys: "leftmeta,rightmeta"
         }
     }
 }

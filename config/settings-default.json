@@ -18,6 +18,13 @@
         "matugenEnabled": false,
         "matugenScheme": "scheme-tonal-spot",
         "darkMode": true,
+        "darkModeScheduleMode": "manual",
+        "darkModeScheduleLocationMode": "coordinates",
+        "darkModeScheduleLatitude": 0.0,
+        "darkModeScheduleLongitude": 0.0,
+        "darkModeScheduleCity": "",
+        "darkModeScheduleDarkStart": "20:00",
+        "darkModeScheduleLightStart": "07:00",
         "wallpaperDirectory": ""
     },
     "bar": {
@@ -120,5 +127,8 @@
         "hoverReveal": true,
         "flashEnabled": true,
         "pinnedItems": []
+    },
+    "shortcuts": {
+        "windowHintMetaKeys": "leftmeta,rightmeta"
     }
 }

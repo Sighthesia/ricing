@@ -12,6 +12,7 @@ Singleton {
     property ListModel workspaces: ListModel {}
     property ListModel windows: ListModel {}
     property bool _windowsReloadQueued: false
+    property bool _configReloadQueued: false
     readonly property string _homeDir: {
         const home = Quickshell.env("HOME")
         return home ? home : Quickshell.workingDirectory
@@ -153,6 +154,15 @@ Singleton {
         niriWindowsFetcher.running = true;
     }
 
+    function reloadConfig() {
+        if (_niriConfigReloader.running) {
+            root._configReloadQueued = true
+            return
+        }
+
+        _niriConfigReloader.running = true
+    }
+
     Component.onCompleted: root.syncPowerSaveConfig()
 
     // Initial window fetch
@@ -208,7 +218,7 @@ Singleton {
             }
 
             console.info("[DymicShell:NiriService] Power save config written", root._powerSaveIncludeFile)
-            Qt.callLater(() => _niriConfigReloader.running = true)
+            Qt.callLater(() => root.reloadConfig())
         }
     }
 
@@ -224,6 +234,12 @@ Singleton {
 
         onExited: () => {
             console.info("[DymicShell:NiriService] Requested niri config reload", root._configFile)
+
+            if (!root._configReloadQueued)
+                return
+
+            root._configReloadQueued = false
+            Qt.callLater(() => root.reloadConfig())
         }
     }
 

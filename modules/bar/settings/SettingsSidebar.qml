@@ -24,7 +24,7 @@ Item {
     function runExitAnimation()  { exitAnimationTriggered() }
 
     // Track expanded state for each top-level category by index.
-    property var expandedStates: [true, false]
+    property var expandedStates: [true, false, false]
 
     implicitWidth: 108
     implicitHeight: navCol.implicitHeight + 16
@@ -38,6 +38,15 @@ Item {
                 { id: "bar",       label: "Bar"  },
                 { id: "animation", label: "动画" },
                 { id: "behavior",  label: "行为" }
+            ]
+        },
+        {
+            page: "shortcuts", icon: "\uf11c", label: "快捷键",
+            sections: [
+                { id: "shell",      label: "Shell" },
+                { id: "windows",    label: "窗口" },
+                { id: "workspaces", label: "工作区" },
+                { id: "system",     label: "系统" }
             ]
         },
         {

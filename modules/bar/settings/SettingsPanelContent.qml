@@ -154,9 +154,10 @@ Item {
                 anchors.fill: parent
                 source: {
                     switch (root.currentPage) {
-                        case "appearance": return "AppearancePage.qml"
-                        case "about":      return "AboutPage.qml"
-                        default:           return "AppearancePage.qml"
+                         case "appearance": return "AppearancePage.qml"
+                        case "shortcuts":  return "ShortcutsPage.qml"
+                         case "about":      return "AboutPage.qml"
+                         default:           return "AppearancePage.qml"
                     }
                 }
                 onLoaded: {
@@ -181,6 +182,5 @@ Item {
     }
 
 }
-
 
 
