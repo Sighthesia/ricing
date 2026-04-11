@@ -24,6 +24,7 @@ Item {
     property bool _softManagedEntryActive: false
     property bool _softReplaceActive: false
     property int _activeSoftReplaceDuration: 0
+    property var _softReplaceOverlayKeys: ({})
     property var _outgoingItems: []
     property var _incomingItems: []
     property var _pendingIncomingItems: []
@@ -70,12 +71,7 @@ Item {
         id: _incomingClearTimer
         interval: 0
         repeat: false
-        onTriggered: {
-            root._incomingItems = []
-            root._pendingIncomingItems = []
-            root._softReplaceActive = false
-            root._activeSoftReplaceDuration = 0
-        }
+        onTriggered: root.completeSoftReplace()
     }
 
     Timer {
@@ -204,8 +200,6 @@ Item {
             if (!delegate)
                 continue
 
-            if (delegate._filterAddHeight !== undefined)
-                delegate._filterAddHeight = 46
             if (delegate._filterAddOpacity !== undefined)
                 delegate._filterAddOpacity = 1
             delegate.opacity = 1
@@ -295,6 +289,7 @@ Item {
         root._outgoingItems = []
         root._incomingItems = []
         root._pendingIncomingItems = []
+        root._softReplaceOverlayKeys = ({})
         root._filterTransitionActive = false
         root._syncVisibleStateDuringFilter = true
         root._managedEntryPending = false
@@ -371,11 +366,46 @@ Item {
         }
 
         root._pendingIncomingItems = snapshots
+        let overlayKeys = ({})
+        for (let snapshotIndex = 0; snapshotIndex < snapshots.length; snapshotIndex++)
+            overlayKeys[String((snapshots[snapshotIndex] && snapshots[snapshotIndex].key) || "")] = true
+        root._softReplaceOverlayKeys = overlayKeys
         root._softReplaceActive = true
         root._activeSoftReplaceDuration = SettingsService.effectiveAnimation.staggerEnterDuration
             + root._windowForCount(snapshots.length)
         _incomingStartTimer.interval = Math.max(0, Number(delayMs) || 0)
         _incomingStartTimer.restart()
+    }
+
+    function completeSoftReplace(): void {
+        let revision = root._filterTransitionRevision
+
+        root._softReplaceActive = false
+
+        if (resultList.count > 0)
+            resultList.positionViewAtIndex(0, ListView.Beginning)
+
+        root._awaitTopDelegates("completeSoftReplaceWait", revision, 8, function() {
+            if (revision !== root._filterTransitionRevision)
+                return
+
+            if (resultList.forceLayout)
+                resultList.forceLayout()
+
+            root.syncInstantiatedDelegateState()
+            let visibleCount = root._visibleDelegates().length
+            let instantiatedCount = root.instantiatedDelegateKeys().length
+
+            if (resultList.count > 0 && (visibleCount === 0 || instantiatedCount === 0)) {
+                root._activeSoftReplaceDuration = 0
+                return
+            }
+
+            root._softReplaceOverlayKeys = ({})
+            root._incomingItems = []
+            root._pendingIncomingItems = []
+            root._activeSoftReplaceDuration = 0
+        })
     }
 
     function _promoteInterruptedIncomingToOutgoing(): void {
@@ -421,6 +451,7 @@ Item {
         root._pendingIncomingItems = []
         root._softReplaceActive = false
         root._activeSoftReplaceDuration = 0
+        root._softReplaceOverlayKeys = ({})
 
         if (!hadIncoming)
             return
@@ -740,7 +771,7 @@ Item {
         anchors.fill: parent
         z: 1
         clip: true
-        opacity: root._softReplaceActive ? 0 : 1
+        opacity: 1
         cacheBuffer: 0
         reuseItems: false
         displayMarginBeginning: 92
@@ -762,7 +793,6 @@ Item {
 
                 SequentialAnimation {
                     PropertyAction { property: "_filterAddOpacity"; value: root._expandFadeEnabled ? 0 : 1 }
-                    PropertyAction { property: "_filterAddHeight"; value: 0 }
                     PauseAnimation {
                         duration: root._compressedDelay(
                         _addTransition.ViewTransition.index,
@@ -775,12 +805,6 @@ Item {
                         to: 1
                         duration: root._expandFadeEnabled ? Theme.anim.highlightDuration : 0
                         easing.type: Easing.OutCubic
-                    }
-                    NumberAnimation {
-                        property: "_filterAddHeight"
-                        to: 46
-                        duration: Theme.anim.moveDuration
-                        easing.type: Theme.anim.moveType
                     }
                 }
             }
@@ -830,12 +854,6 @@ Item {
                         duration: Theme.anim.highlightDuration
                         easing.type: Easing.InCubic
                     }
-                    NumberAnimation {
-                        property: "_filterAddHeight"
-                        to: 0
-                        duration: Theme.anim.moveDuration
-                        easing.type: Easing.InCubic
-                    }
                 }
             }
         }
@@ -872,15 +890,17 @@ Item {
             enterOffsetY: SettingsService.effectiveAnimation.staggerEnterOffsetY
             exitOffsetY: SettingsService.effectiveAnimation.staggerExitOffsetY
             property real _filterAddOpacity: 1
-            property real _filterAddHeight: 46
+            readonly property bool _coveredBySoftReplace: root._softReplaceActive
+                && !!root._softReplaceOverlayKeys[String(_item.key || "")]
 
             width: resultList.width
-            height: _filterAddHeight
-            clip: true
+            height: 46
 
             Rectangle {
                 anchors.fill: parent
-                opacity: root.itemAnimationsEnabled && root._expandTransitionActive ? _item._filterAddOpacity : 1
+                opacity: _item._coveredBySoftReplace
+                    ? 0
+                    : (root.itemAnimationsEnabled && root._expandTransitionActive ? _item._filterAddOpacity : 1)
                 color: root.selectedIndex === _item.index
                     ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
                     : ((root.itemAnimationsEnabled && root._expandTransitionActive && !root._expandFadeEnabled)
@@ -927,6 +947,7 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
+                    enabled: !_item._coveredBySoftReplace
                     onEntered: root.selectRequested(_item.index)
                     onClicked: root.activateRequested(_item.index)
                 }

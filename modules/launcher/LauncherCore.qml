@@ -290,12 +290,17 @@ Item {
             && sameProviderFilterNarrowing
             && _results.count > 0
             && !sameProviderFilterCanReuseLiveList
+        let sameProviderBroadeningNeedsReplace = filterAnimationsEnabled
+            && _results.count > 0
+            && (sameProviderBroadening || zeroQueryReset)
         let syncVisibleStateDuringFilter = true
         let transitionPath = _results.count === 0
             ? "initialPopulate"
             : (sameProviderIncremental
                 ? "incremental"
-                : (sameProviderNarrowingNeedsReplace ? "narrowingReplace" : "liveSync"))
+                : ((sameProviderNarrowingNeedsReplace || sameProviderBroadeningNeedsReplace)
+                    ? "softReplace"
+                    : "liveSync"))
 
         if (_results.count === 0) {
             let zeroResultsRecovery = filterAnimationsEnabled
@@ -340,7 +345,7 @@ Item {
             return
         }
 
-        if (sameProviderNarrowingNeedsReplace) {
+        if (sameProviderNarrowingNeedsReplace || sameProviderBroadeningNeedsReplace) {
             let incomingSourcePositions = ({})
             for (let sourceIndex = 0; sourceIndex < displayItems.length; sourceIndex++) {
                 let sourceKey = String((displayItems[sourceIndex] && displayItems[sourceIndex].key) || "")
@@ -349,20 +354,17 @@ Item {
                     incomingSourcePositions[sourceKey] = currentIndex * 46
             }
 
+            let outgoingKeepKeys = sameProviderBroadeningNeedsReplace ? nextTopWindowKeys : null
+
             if (_resultsList && _resultsList.beginFilterTransition)
                 _resultsList.beginFilterTransition(syncVisibleStateDuringFilter)
 
             if (_resultsList && _resultsList.runSwapExit)
-                _resultsList.runSwapExit()
+                _resultsList.runSwapExit(outgoingKeepKeys)
             if (_resultsList && _resultsList.beginSoftReplace)
                 _resultsList.beginSoftReplace(displayItems, 0, incomingSourcePositions)
 
-            _results.clear()
-            root._resultData = items
-            for (let replaceIndex = 0; replaceIndex < displayItems.length; replaceIndex++)
-                _results.append(displayItems[replaceIndex])
-
-            _selectedIndex = root._resultData.length > 0 ? 0 : -1
+            root._syncResults(displayItems, items)
 
             if (_resultsList && _resultsList.resetFilterViewport)
                 _resultsList.resetFilterViewport()
@@ -388,16 +390,14 @@ Item {
         }
 
         let expandFadeEnabled = removedCount > 0
-        let shouldSnapshotViewportExit = sameProviderBroadening || zeroQueryReset
-        let exitSnapshotKeepKeys = shouldSnapshotViewportExit ? nextTopWindowKeys : nextKeys
 
         if (insertedCount > 0 && _resultsList && _resultsList.beginExpandTransition)
             _resultsList.beginExpandTransition(insertedCount, insertedMaxIndex + 1, syncVisibleStateDuringFilter, expandFadeEnabled)
         else if (_resultsList && _resultsList.beginFilterTransition)
             _resultsList.beginFilterTransition(syncVisibleStateDuringFilter)
 
-        if ((removedCount > 0 || shouldSnapshotViewportExit) && _resultsList && _resultsList.runSwapExit)
-            _resultsList.runSwapExit(exitSnapshotKeepKeys)
+        if (removedCount > 0 && _resultsList && _resultsList.runSwapExit)
+            _resultsList.runSwapExit(nextKeys)
 
         root._syncResults(displayItems, items)
 
