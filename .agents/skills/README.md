@@ -17,7 +17,7 @@
 
 - `qml-indicator-motion`: 活跃指示器、滑动高亮、胶囊跟随动效。
 - `qml-motion-debug`: 动效状态正确但视觉表现不对时的排查方法。
-- `launcher-search-transitions`: 启动器搜索过滤/替换过渡，尤其是空白帧、重叠、残影与快速输入中断问题。
+- `list-transition-handoffs`: 通用列表过滤/替换过渡接管，尤其是空白帧、重叠、残影与快速更新中断问题。
 
 ## Performance
 
