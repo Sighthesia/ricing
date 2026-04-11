@@ -9,6 +9,9 @@ Singleton {
     id: root
 
     property int _positionTick: 0
+    property string artUrl: ""
+    property string _lastArtKey: ""
+    property string _lastArtPlayerKey: ""
 
     readonly property var activePlayer: {
         const players = Mpris.players.values
@@ -28,8 +31,6 @@ Singleton {
         hasPlayer ? (activePlayer.trackTitle || "") : ""
     readonly property string artist:
         hasPlayer ? (activePlayer.trackArtist || "") : ""
-    readonly property string artUrl:
-        hasPlayer ? (activePlayer.trackArtUrl || "") : ""
     readonly property int positionMs: {
         root._positionTick
         if (!hasPlayer || !activePlayer.positionSupported)
@@ -59,6 +60,54 @@ Singleton {
     }
 
     signal mediaChanged()
+
+    function _artPlayerKey(player) {
+        if (!player)
+            return ""
+
+        return player.identity || player.desktopEntry || ""
+    }
+
+    function _artKey(player) {
+        if (!player)
+            return ""
+
+        return [
+            root._artPlayerKey(player),
+            player.trackTitle || "",
+            player.trackArtist || ""
+        ].join("|")
+    }
+
+    function _syncArtUrl() {
+        if (!root.hasPlayer) {
+            root.artUrl = ""
+            root._lastArtKey = ""
+            root._lastArtPlayerKey = ""
+            return
+        }
+
+        const player = root.activePlayer
+        const playerKey = root._artPlayerKey(player)
+        const artKey = root._artKey(player)
+        const nextArtUrl = player.trackArtUrl || ""
+
+        if (nextArtUrl !== "") {
+            root._lastArtPlayerKey = playerKey
+            root._lastArtKey = artKey
+            root.artUrl = nextArtUrl
+            return
+        }
+
+        // Keep the previous artwork while the player is replaying or briefly
+        // publishing empty metadata for the current track.
+        if (playerKey === root._lastArtPlayerKey && (artKey === root._lastArtKey || player.trackTitle === "" || player.trackArtist === ""))
+            return
+
+        root._lastArtPlayerKey = playerKey
+        root._lastArtKey = artKey
+        root.artUrl = ""
+    }
 
     function playPause() {
         if (!root.canTogglePlayback)
@@ -93,7 +142,10 @@ Singleton {
         root.mediaChanged()
     }
 
-    onActivePlayerChanged: root.mediaChanged()
+    onActivePlayerChanged: {
+        root._syncArtUrl()
+        root.mediaChanged()
+    }
 
     Timer {
         interval: 1000
@@ -104,19 +156,43 @@ Singleton {
 
     Connections {
         target: Mpris.players
-        function onObjectInsertedPost() { root.mediaChanged() }
-        function onObjectRemovedPre() { root.mediaChanged() }
+        function onObjectInsertedPost() {
+            root._syncArtUrl()
+            root.mediaChanged()
+        }
+        function onObjectRemovedPre() {
+            root._syncArtUrl()
+            root.mediaChanged()
+        }
     }
 
     Connections {
         target: root.activePlayer
         ignoreUnknownSignals: true
-        function onTrackTitleChanged() { root.mediaChanged() }
-        function onTrackArtistChanged() { root.mediaChanged() }
-        function onTrackArtUrlChanged() { root.mediaChanged() }
-        function onPlaybackStateChanged() { root.mediaChanged() }
-        function onIdentityChanged() { root.mediaChanged() }
-        function onDesktopEntryChanged() { root.mediaChanged() }
+        function onTrackTitleChanged() {
+            root._syncArtUrl()
+            root.mediaChanged()
+        }
+        function onTrackArtistChanged() {
+            root._syncArtUrl()
+            root.mediaChanged()
+        }
+        function onTrackArtUrlChanged() {
+            root._syncArtUrl()
+            root.mediaChanged()
+        }
+        function onPlaybackStateChanged() {
+            root._syncArtUrl()
+            root.mediaChanged()
+        }
+        function onIdentityChanged() {
+            root._syncArtUrl()
+            root.mediaChanged()
+        }
+        function onDesktopEntryChanged() {
+            root._syncArtUrl()
+            root.mediaChanged()
+        }
         function onPositionChanged() {
             root._positionTick++
             root.mediaChanged()
@@ -130,4 +206,6 @@ Singleton {
         function onPositionSupportedChanged() { root.mediaChanged() }
         function onLengthSupportedChanged() { root.mediaChanged() }
     }
+
+    Component.onCompleted: root._syncArtUrl()
 }
