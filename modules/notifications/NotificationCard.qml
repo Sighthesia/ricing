@@ -170,12 +170,12 @@ Item {
         ColumnLayout {
             id: _content
             anchors { left: parent.left; right: parent.right; top: parent.top }
-            anchors.margins: 12
-            spacing: 4
+            anchors.margins: ThemeCards.notificationCardPadding
+            spacing: ThemeCards.panelGap / 2
 
             // Header row: icon • app name • close button
             RowLayout {
-                spacing: 8
+                spacing: ThemeCards.panelGap
                 Layout.fillWidth: true
 
                 // Fallback: colored initial-letter badge when no icon path is available

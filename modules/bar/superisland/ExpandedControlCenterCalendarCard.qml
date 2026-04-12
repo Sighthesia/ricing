@@ -13,16 +13,16 @@ Rectangle {
     readonly property var _calendarCells: CalendarLogic.buildMonthCells(root._monthAnchor, root._now)
 
     radius: Theme.cornerRadius
-    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.68)
-    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.72)
+    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, ThemeCards.panelSurfaceAlpha)
+    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, ThemeCards.panelBorderAlpha)
     border.width: 1
-    implicitWidth: Math.round(640 * Theme.uiScale)
-    implicitHeight: Math.round(392 * Theme.uiScale)
+    implicitWidth: ThemeCards.largePanelWidth
+    implicitHeight: ThemeCards.largePanelHeight
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: Theme.settingsPanelPadding
-        spacing: 12
+        anchors.margins: ThemeCards.panelPadding
+        spacing: ThemeCards.largePanelGap
 
         RowLayout {
             Layout.fillWidth: true
@@ -69,15 +69,15 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: Theme.cornerRadius
+            radius: ThemeCards.compactRadius
             color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.34)
             border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
             border.width: 1
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: Theme.settingsPanelPadding
-                spacing: 10
+                anchors.margins: ThemeCards.largePanelInset
+                spacing: ThemeCards.compactGap
 
                 ColumnLayout {
                     spacing: 2
@@ -100,7 +100,7 @@ Rectangle {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: ThemeCards.panelGap
 
                     Repeater {
                         model: root._dayLabels
@@ -121,8 +121,8 @@ Rectangle {
                     id: _calendarGrid
                     Layout.fillWidth: true
                     columns: 7
-                    columnSpacing: 8
-                    rowSpacing: 8
+                    columnSpacing: ThemeCards.dayGridGap
+                    rowSpacing: ThemeCards.dayGridGap
 
                     Repeater {
                         model: root._calendarCells
@@ -130,8 +130,8 @@ Rectangle {
                         delegate: Rectangle {
                             required property var modelData
                             width: Math.max(0, (_calendarGrid.width - _calendarGrid.columnSpacing * 6) / 7)
-                            height: Math.round(44 * Theme.uiScale)
-                            radius: 10
+                            height: ThemeCards.dayCellHeight
+                            radius: ThemeCards.dayCellRadius
                             color: modelData.isToday
                                 ? Colors.highlight
                                 : (modelData.currentMonth

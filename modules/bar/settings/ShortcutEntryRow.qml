@@ -22,13 +22,13 @@ Item {
             || shortcutSequence.toLowerCase().indexOf(query) !== -1
     }
 
-    width: parent ? parent.width : 296
+    width: parent ? parent.width : ThemeSettings.rowWidth
     visible: height > 0.5 || opacity > 0.01
     opacity: _matchesFilter ? 1 : 0
     height: _matchesFilter ? implicitHeight : 0
 
     implicitWidth: width
-    implicitHeight: 62
+    implicitHeight: Math.round(62 * Theme.uiScale)
     clip: true
 
     Behavior on height {
@@ -41,9 +41,9 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        anchors.leftMargin: 4
-        anchors.rightMargin: 4
-        radius: 8
+        anchors.leftMargin: ThemeSettings.highlightInset
+        anchors.rightMargin: ThemeSettings.highlightInset
+        radius: Math.max(6, Math.round(8 * Theme.uiScale))
         color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.42)
         border.color: fieldInput.activeFocus ? Colors.highlight : Colors.border
         border.width: 1
@@ -55,16 +55,16 @@ Item {
 
     Row {
         anchors.fill: parent
-        anchors.leftMargin: Theme.settingsPanelPadding
-        anchors.rightMargin: Theme.settingsPanelPadding
-        spacing: 10
+        anchors.leftMargin: ThemeSettings.panelPadding
+        anchors.rightMargin: ThemeSettings.panelPadding
+        spacing: Math.max(6, Math.round(10 * Theme.uiScale))
 
         Rectangle {
             id: _sourceBadge
             anchors.verticalCenter: parent.verticalCenter
-            width: _sourceText.implicitWidth + 12
-            height: 18
-            radius: 9
+            width: _sourceText.implicitWidth + ThemeSettings.panelPadding
+            height: Math.round(18 * Theme.uiScale)
+            radius: height / 2
             color: root.shellOwned
                 ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.18)
                 : Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.24)
@@ -82,13 +82,13 @@ Item {
         }
 
         Item {
-            width: Math.max(0, parent.width - _sourceBadge.width - 160 - parent.spacing * 2)
+            width: Math.max(0, parent.width - _sourceBadge.width - Math.round(160 * Theme.uiScale) - parent.spacing * 2)
             height: parent.height
 
             Column {
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width
-                spacing: 4
+                spacing: ThemeSettings.pickerDropdownGap
 
                 Text {
                     width: parent.width
@@ -113,9 +113,9 @@ Item {
 
         Rectangle {
             anchors.verticalCenter: parent.verticalCenter
-            width: 160
-            height: 32
-            radius: 6
+            width: Math.round(160 * Theme.uiScale)
+            height: Math.round(32 * Theme.uiScale)
+            radius: Math.max(4, Math.round(6 * Theme.uiScale))
             color: Colors.background
             border.color: fieldInput.activeFocus ? Colors.highlight : Colors.border
             border.width: 1
@@ -127,10 +127,10 @@ Item {
             TextInput {
                 id: fieldInput
                 anchors.fill: parent
-                anchors.leftMargin: 8
-                anchors.rightMargin: 8
-                anchors.topMargin: 5
-                anchors.bottomMargin: 5
+                anchors.leftMargin: ThemeSettings.pickerPreviewPaddingStart
+                anchors.rightMargin: ThemeSettings.pickerPreviewPaddingStart
+                anchors.topMargin: Math.max(4, Math.round(5 * Theme.uiScale))
+                anchors.bottomMargin: Math.max(4, Math.round(5 * Theme.uiScale))
                 text: root.shortcutSequence
                 font.family: Theme.fontMono
                 font.pixelSize: Theme.fontSizeSmall

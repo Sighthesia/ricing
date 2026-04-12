@@ -45,8 +45,8 @@ Item {
     opacity: _matchesFilter ? 1 : 0
     height: _matchesFilter ? implicitHeight : 0
 
-    implicitWidth: 296
-    implicitHeight: Theme.settingsRowHeight
+    implicitWidth: ThemeSettings.rowWidth
+    implicitHeight: ThemeSettings.rowHeight
     clip: true
 
     Behavior on height {
@@ -66,8 +66,8 @@ Item {
     // Search match highlight background
     Rectangle {
         anchors.fill: parent
-        anchors.leftMargin: 4; anchors.rightMargin: 4
-        radius: 4
+        anchors.leftMargin: ThemeSettings.highlightInset; anchors.rightMargin: ThemeSettings.highlightInset
+        radius: ThemeSettings.highlightRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -75,9 +75,9 @@ Item {
 
     // Accent left-edge strip
     Rectangle {
-        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 4 }
-        width: 3
-        radius: 1
+        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: ThemeSettings.highlightInset }
+        width: ThemeSettings.accentStripWidth
+        radius: ThemeSettings.accentStripRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.9 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -89,13 +89,13 @@ Item {
 
     Row {
         anchors.fill: parent
-        anchors.leftMargin: Theme.settingsPanelPadding
-        anchors.rightMargin: Theme.settingsPanelPadding
-        spacing: 8
+        anchors.leftMargin: ThemeSettings.panelPadding
+        anchors.rightMargin: ThemeSettings.panelPadding
+        spacing: ThemeSettings.rowGap
 
         // Label
         Text {
-            width: Theme.settingsLabelWidth
+            width: ThemeSettings.labelWidth
             anchors.verticalCenter: parent.verticalCenter
             text: root.label
             font.family: Theme.fontFamily
@@ -106,9 +106,9 @@ Item {
 
         // Color preview swatch
         Rectangle {
-            width: 20; height: 20
+            width: ThemeSettings.swatchSize; height: ThemeSettings.swatchSize
             anchors.verticalCenter: parent.verticalCenter
-            radius: 4
+            radius: ThemeSettings.fieldRadius
             color: root.isValidHex(root.value) ? root.value : "#ffffff"
             border.color: Colors.border
             border.width: 1
@@ -117,8 +117,8 @@ Item {
         // Hex text input field
         Rectangle {
             anchors.verticalCenter: parent.verticalCenter
-            width: 100; height: 26
-            radius: 4
+            width: ThemeSettings.compactFieldWidth; height: ThemeSettings.pickerSearchHeight
+            radius: ThemeSettings.fieldRadius
             color: Colors.surface
             border.color: hexInput.activeFocus ? Colors.highlight : Colors.border
             border.width: 1
@@ -128,7 +128,7 @@ Item {
             TextInput {
                 id: hexInput
                 anchors.fill: parent
-                anchors.margins: 4
+                anchors.margins: ThemeSettings.highlightInset
                 text: root.value.toUpperCase()
                 font.family: Theme.fontMono
                 font.pixelSize: Theme.fontSizeSmall

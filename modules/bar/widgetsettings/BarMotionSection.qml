@@ -14,7 +14,7 @@ Item {
         { value: "snappy", label: "利落" }
     ]
 
-    implicitWidth: 296
+    implicitWidth: ThemeSettings.rowWidth
     implicitHeight: _column.implicitHeight
 
     Column {
@@ -26,16 +26,16 @@ Item {
         Item {
             objectName: "barMotionPresetSelector"
             width: parent.width
-            height: Theme.settingsRowHeight
+            height: ThemeSettings.rowHeight
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "预设"
                     font.family: Theme.fontFamily
@@ -45,7 +45,7 @@ Item {
 
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
+                    spacing: ThemeSettings.behaviorOptionGap
 
                     Repeater {
                         model: root._presetOptions
@@ -56,9 +56,9 @@ Item {
                             readonly property bool _selected:
                                 SettingsService.data.barMotion.preset === modelData.value
 
-                            width: 52
-                            height: 24
-                            radius: Theme.cornerRadius - 4
+                            width: ThemeSettings.behaviorOptionWidth
+                            height: ThemeSettings.switchHeight
+                            radius: ThemeSettings.sidebarSurfaceRadius
                             color: _selected ? Colors.highlight : Colors.surface
                             opacity: _selected ? 0.9 : 0.6
 

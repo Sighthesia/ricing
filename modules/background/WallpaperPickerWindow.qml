@@ -16,8 +16,8 @@ AnimatedPanelBase {
     anchors { top: true; right: true }
     margins { top: Theme.barHeight }
 
-    implicitWidth:  460
-    implicitHeight: 500
+    implicitWidth: Math.round(460 * Theme.uiScale)
+    implicitHeight: Math.round(500 * Theme.uiScale)
 
     focusable: true
 
@@ -44,7 +44,7 @@ AnimatedPanelBase {
     // Outer panel card (same style as WidgetPickerWindow / SettingsPanelWindow)
     Rectangle {
         anchors.fill: parent
-        anchors.margins: 4
+        anchors.margins: ThemeCards.panelInset
         radius: Theme.cornerRadius
         color: Colors.background
         border.color: Colors.border
@@ -63,17 +63,17 @@ AnimatedPanelBase {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
+            anchors.margins: ThemeCards.panelPadding
+            spacing: ThemeCards.panelGap
 
             // ── Header row ──────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                spacing: ThemeCards.panelGap
 
                 // Back button — only shown when not at the root wallpaper directory
                 Rectangle {
-                    width: 28; height: 28
+                    width: Math.round(28 * Theme.uiScale); height: Math.round(28 * Theme.uiScale)
                     radius: Theme.cornerRadius * 0.6
                     color: backArea.containsMouse
                            ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.18)
@@ -114,7 +114,7 @@ AnimatedPanelBase {
 
                 // Close button
                 Rectangle {
-                    width: 28; height: 28
+                    width: Math.round(28 * Theme.uiScale); height: Math.round(28 * Theme.uiScale)
                     radius: Theme.cornerRadius * 0.6
                     color: closeArea.containsMouse
                            ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.18)

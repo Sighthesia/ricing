@@ -193,11 +193,11 @@ Item {
             Row {
                 id: _ioRow
                 width: parent.width
-                spacing: 8
+                spacing: ThemeSettings.rowGap
 
             // ── 导出配置 ─────────────────────────
             Rectangle {
-                width: (parent.width - 8) / 2
+                width: (parent.width - ThemeSettings.rowGap) / 2
                 height: 34
                 radius: Theme.cornerRadius - 2
                 color: exportArea.containsMouse
@@ -207,7 +207,7 @@ Item {
                 Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
 
                 Row {
-                    anchors.centerIn: parent; spacing: 6
+                    anchors.centerIn: parent; spacing: ThemeSettings.sidebarContentGap
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         text: ""  // upload icon
@@ -232,7 +232,7 @@ Item {
 
                 // ── 导入配置 ─────────────────────────
                 Rectangle {
-                width: (parent.width - 8) / 2
+                width: (parent.width - ThemeSettings.rowGap) / 2
                 height: 34
                 radius: Theme.cornerRadius - 2
                 color: importArea.containsMouse
@@ -242,7 +242,7 @@ Item {
                 Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
 
                 Row {
-                    anchors.centerIn: parent; spacing: 6
+                    anchors.centerIn: parent; spacing: ThemeSettings.sidebarContentGap
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         text: ""  // download icon

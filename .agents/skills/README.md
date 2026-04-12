@@ -11,6 +11,7 @@
 
 - `qml-components`: Token、语义色、基础交互表面模式。
 - `qml-context-menu`: 右键菜单、托盘菜单与子菜单布局。
+- `qml-token-cleanup`: 视觉 token 收敛、`Theme*` 单例拆分与硬编码几何清理。
 - `qml-visual-language`: 视觉语言、连续表面与分页/列表动效契约。
 
 ## Motion

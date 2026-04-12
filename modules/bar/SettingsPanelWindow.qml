@@ -10,16 +10,16 @@ AnimatedPanelBase {
     id: panelWindow
 
     readonly property var _closeButton: _closeButtonSurface
-    readonly property int _headerHeight: 32
+    readonly property int _headerHeight: Math.round(32 * Theme.uiScale)
     readonly property bool _usesCenteredPlacement: true
     // Sit below the bar; without left/right anchoring, the compositor keeps the panel centered.
     anchors { top: true }
     margins { top: Theme.barHeight }
 
-    implicitWidth: 480
+    implicitWidth: ThemeCards.historyPanelHeight
     // Fixed height avoids per-frame Wayland surface resize during expand/collapse
     // animations. Content scrolls internally via AppearancePage's Flickable.
-    implicitHeight: 580
+    implicitHeight: Math.round(580 * Theme.uiScale)
 
     // Keyboard input for hex color editing
     focusable: true
@@ -30,9 +30,9 @@ AnimatedPanelBase {
     // Panel background card
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 4
-        anchors.rightMargin: 4
-        anchors.bottomMargin: 4
+        anchors.topMargin: ThemeCards.panelInset
+        anchors.rightMargin: ThemeCards.panelInset
+        anchors.bottomMargin: ThemeCards.panelInset
         radius: Theme.cornerRadius
         color: Colors.background
         border.color: Colors.border
@@ -63,11 +63,11 @@ AnimatedPanelBase {
                 top: parent.top
                 left: parent.left
                 right: parent.right
-                topMargin: 12
-                leftMargin: 12
-                rightMargin: 12
+                topMargin: ThemeCards.panelPadding
+                leftMargin: ThemeCards.panelPadding
+                rightMargin: ThemeCards.panelPadding
             }
-            spacing: 8
+            spacing: ThemeCards.panelGap
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
@@ -85,8 +85,8 @@ AnimatedPanelBase {
 
             Rectangle {
                 id: _closeButtonSurface
-                width: 28
-                height: 28
+                width: Math.round(28 * Theme.uiScale)
+                height: Math.round(28 * Theme.uiScale)
                 radius: Theme.cornerRadius - 2
                 color: _closeButtonArea.containsMouse ? Colors.surface : "transparent"
                 border.color: _closeButtonArea.containsMouse ? Colors.border : "transparent"
@@ -118,10 +118,10 @@ AnimatedPanelBase {
         id: contentLoader
         anchors {
             fill: parent
-            topMargin: panelWindow._headerHeight + 14
-            leftMargin: 4
-            rightMargin: 8
-            bottomMargin: 10
+            topMargin: panelWindow._headerHeight + ThemeCards.compactGap + Math.max(4, Math.round(4 * Theme.uiScale))
+            leftMargin: ThemeCards.panelInset
+            rightMargin: ThemeCards.panelGap
+            bottomMargin: ThemeCards.compactInset
         }
         sourceComponent: settingsPanelContentComponent
     }

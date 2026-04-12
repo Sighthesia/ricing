@@ -224,7 +224,7 @@ PopupWindow {
                 id: _headerRow
                 width: parent.width
                 anchors.top: parent.top
-                spacing: 8
+                spacing: ThemeSettings.rowGap
 
                 // Back button
                 Rectangle {
@@ -337,9 +337,9 @@ PopupWindow {
 
                             Text {
                                 width: parent.width
-                                height: Theme.settingsGroupHeaderHeight
-                                leftPadding: Theme.settingsPanelPadding
-                                rightPadding: Theme.settingsPanelPadding
+                                height: ThemeSettings.groupHeaderHeight
+                                leftPadding: ThemeSettings.panelPadding
+                                rightPadding: ThemeSettings.panelPadding
                                 text: "跨组件动效"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeSmall
@@ -363,9 +363,9 @@ PopupWindow {
 
                     Text {
                         width: parent.width
-                        height: Theme.settingsGroupHeaderHeight
-                        leftPadding: Theme.settingsPanelPadding
-                        rightPadding: Theme.settingsPanelPadding
+                        height: ThemeSettings.groupHeaderHeight
+                        leftPadding: ThemeSettings.panelPadding
+                        rightPadding: ThemeSettings.panelPadding
                         text: "当前组件"
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSmall
@@ -399,7 +399,7 @@ PopupWindow {
                         objectName: "widgetSettingsWidgetSpecificEmptyState"
                         width: parent.width
                         visible: !root._hasWidgetSpecificSection
-                        height: visible ? Theme.settingsRowHeight : 0
+                        height: visible ? ThemeSettings.rowHeight : 0
                         text: "当前组件暂无专属设置"
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeBody
                         color: Colors.textMuted; opacity: 0.5
@@ -417,7 +417,7 @@ PopupWindow {
             id: _siDelete
             anchors {
                 left: parent.left; right: parent.right; bottom: parent.bottom
-                margins: 12; bottomMargin: 10
+                margins: ThemeCards.panelPadding; bottomMargin: ThemeCards.compactInset
             }
             height: 28
             delay: 360

@@ -17,8 +17,8 @@ AnimatedPanelBase {
     margins { top: Theme.barHeight }
     exclusionMode: ExclusionMode.Ignore
 
-    implicitWidth: 640
-    implicitHeight: 480
+    implicitWidth: ThemeLauncher.panelWidth
+    implicitHeight: ThemeLauncher.panelHeight
     focusable: true
 
     active: LauncherService.isOpen
@@ -35,8 +35,8 @@ AnimatedPanelBase {
     // Panel background card
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 4
-        anchors.bottomMargin: 4
+        anchors.topMargin: ThemeLauncher.panelInset
+        anchors.bottomMargin: ThemeLauncher.panelInset
         radius: Theme.cornerRadius
         color: Colors.background
         border.color: Colors.border
@@ -57,10 +57,10 @@ AnimatedPanelBase {
         id: _core
         anchors {
             fill: parent
-            topMargin: 4
-            leftMargin: 4
-            rightMargin: 4
-            bottomMargin: 4
+            topMargin: ThemeLauncher.panelInset
+            leftMargin: ThemeLauncher.panelInset
+            rightMargin: ThemeLauncher.panelInset
+            bottomMargin: ThemeLauncher.panelInset
         }
     }
 }

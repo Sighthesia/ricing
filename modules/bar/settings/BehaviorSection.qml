@@ -7,7 +7,7 @@ import qs.services
 Item {
     id: root
 
-    implicitWidth: 296
+    implicitWidth: ThemeSettings.rowWidth
     implicitHeight: behaviorCol.implicitHeight
 
     Column {
@@ -18,16 +18,16 @@ Item {
         // Position selector row
         Item {
             width: parent.width
-            height: Theme.settingsRowHeight
+            height: ThemeSettings.rowHeight
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "位置"
                     font.family: Theme.fontFamily
@@ -37,7 +37,7 @@ Item {
 
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
+                    spacing: ThemeSettings.behaviorOptionGap
 
                     Repeater {
                         model: [
@@ -51,8 +51,8 @@ Item {
                             readonly property bool selected:
                                 SettingsService.data.bar.position === modelData.value
 
-                            width: 52; height: 24
-                            radius: Theme.cornerRadius - 4
+                            width: ThemeSettings.behaviorOptionWidth; height: ThemeSettings.switchHeight
+                            radius: ThemeSettings.sidebarSurfaceRadius
                             color: selected ? Colors.highlight : Colors.surface
                             opacity: selected ? 0.9 : 0.6
 
@@ -80,16 +80,16 @@ Item {
         // Auto-hide toggle row
         Item {
             width: parent.width
-            height: Theme.settingsRowHeight
+            height: ThemeSettings.rowHeight
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "自动隐藏"
                     font.family: Theme.fontFamily
@@ -100,11 +100,11 @@ Item {
                 // Toggle switch
                 Item {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 42; height: 24
+                    width: ThemeSettings.switchWidth; height: ThemeSettings.switchHeight
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 12
+                        radius: height / 2
                         color: SettingsService.data.barBehavior.autoHide
                             ? Colors.highlight : Colors.surface
                         opacity: 0.8
@@ -114,11 +114,13 @@ Item {
 
                     Rectangle {
                         id: knob
-                        width: 18; height: 18
-                        radius: 9
+                        width: ThemeSettings.switchKnobSize; height: ThemeSettings.switchKnobSize
+                        radius: width / 2
                         anchors.verticalCenter: parent.verticalCenter
                         color: Colors.text
-                        x: SettingsService.data.barBehavior.autoHide ? 21 : 3
+                        x: SettingsService.data.barBehavior.autoHide
+                            ? parent.width - width - ThemeSettings.switchInset
+                            : ThemeSettings.switchInset
 
                         Behavior on x {
                             NumberAnimation {

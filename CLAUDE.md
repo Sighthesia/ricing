@@ -17,6 +17,7 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | --- | --- |
 | [qml-components](.agents/skills/qml-components/SKILL.md) | Use when building UI elements with DymicShell tokens, semantic colors, theme values, base components, or interactive surface patterns. |
 | [qml-context-menu](.agents/skills/qml-context-menu/SKILL.md) | Use when creating, refactoring, or visually aligning bar-style context menus, tray menus, and submenus. |
+| [qml-token-cleanup](.agents/skills/qml-token-cleanup/SKILL.md) | Use when consolidating visual tokens, extracting repeated QML geometry into `Theme*` singletons, or cleaning hardcoded spacing, radius, widths, and panel dimensions across related UI families. |
 | [qml-visual-language](.agents/skills/qml-visual-language/SKILL.md) | Use when defining or enforcing visual identity, motion language, and cross-component consistency. |
 
 ### Motion

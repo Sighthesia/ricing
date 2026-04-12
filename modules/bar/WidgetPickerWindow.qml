@@ -15,8 +15,8 @@ AnimatedPanelBase {
     anchors { top: true }
     margins { top: Theme.barHeight }
 
-    implicitWidth: 480
-    implicitHeight: 480
+    implicitWidth: ThemeLauncher.panelHeight
+    implicitHeight: ThemeLauncher.panelHeight
 
     focusable: true
 
@@ -72,9 +72,9 @@ AnimatedPanelBase {
     // Outer card — same structure as SettingsPanelWindow
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 4
-        anchors.rightMargin: 4
-        anchors.bottomMargin: 4
+        anchors.topMargin: ThemeCards.panelInset
+        anchors.rightMargin: ThemeCards.panelInset
+        anchors.bottomMargin: ThemeCards.panelInset
         radius: Theme.cornerRadius
         color: Colors.background
         border.color: Colors.border
@@ -92,7 +92,7 @@ AnimatedPanelBase {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: ThemeCards.panelPadding
             spacing: Theme.barPadding
 
             // Panel title
@@ -113,9 +113,9 @@ AnimatedPanelBase {
 
                 Item {
                     anchors.right: _closeButtonSurface.left
-                    anchors.rightMargin: 8
+                    anchors.rightMargin: ThemeCards.panelGap
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(0, parent.width - _titleText.implicitWidth - _closeButtonSurface.width - 8)
+                    width: Math.max(0, parent.width - _titleText.implicitWidth - _closeButtonSurface.width - ThemeCards.panelGap)
                     height: 1
                 }
 
@@ -123,8 +123,8 @@ AnimatedPanelBase {
                     id: _closeButtonSurface
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 28
-                    height: 28
+                    width: Math.round(28 * Theme.uiScale)
+                    height: Math.round(28 * Theme.uiScale)
                     radius: Theme.cornerRadius - 2
                     color: _closeButtonArea.containsMouse ? Colors.surface : "transparent"
                     border.color: _closeButtonArea.containsMouse ? Colors.border : "transparent"

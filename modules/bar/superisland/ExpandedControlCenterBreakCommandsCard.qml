@@ -30,17 +30,17 @@ Rectangle {
     }
 
     radius: Theme.cornerRadius
-    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.68)
-    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.72)
+    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, ThemeCards.panelSurfaceAlpha)
+    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, ThemeCards.panelBorderAlpha)
     border.width: 1
-    implicitWidth: Math.round(280 * Theme.uiScale)
-    implicitHeight: _contentColumn.implicitHeight + Theme.settingsPanelPadding * 2
+    implicitWidth: ThemeCards.compactWidth
+    implicitHeight: _contentColumn.implicitHeight + ThemeCards.panelPadding * 2
 
     ColumnLayout {
         id: _contentColumn
         anchors.fill: parent
-        anchors.margins: Theme.settingsPanelPadding
-        spacing: 10
+        anchors.margins: ThemeCards.panelPadding
+        spacing: ThemeCards.compactGap
 
         ColumnLayout {
             spacing: 2
@@ -63,7 +63,7 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            radius: 12
+            radius: ThemeCards.compactRadius
             color: Qt.rgba(
                 Colors.highlight.r,
                 Colors.highlight.g,
@@ -78,7 +78,7 @@ Rectangle {
                 id: _summaryColumn
                 anchors.fill: parent
                 anchors.margins: Theme.barWidget.contentPaddingH
-                spacing: 4
+                spacing: ThemeCards.panelGap / 2
 
                 Text {
                     text: root._breakLive ? BreakReminderService.phaseTitle : "20-20-20 护眼节律"
@@ -102,13 +102,13 @@ Rectangle {
         GridLayout {
             Layout.fillWidth: true
             columns: 2
-            columnSpacing: 8
-            rowSpacing: 8
+            columnSpacing: ThemeCards.panelGap
+            rowSpacing: ThemeCards.panelGap
 
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 42
-                radius: 12
+                implicitHeight: ThemeCards.compactActionHeight
+                radius: ThemeCards.compactRadius
                 color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.9)
                 border.color: "transparent"
 
@@ -131,8 +131,8 @@ Rectangle {
 
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 42
-                radius: 12
+                implicitHeight: ThemeCards.compactActionHeight
+                radius: ThemeCards.compactRadius
                 color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.18)
                 border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
                 border.width: 1
@@ -155,8 +155,8 @@ Rectangle {
 
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 42
-                radius: 12
+                implicitHeight: ThemeCards.compactActionHeight
+                radius: ThemeCards.compactRadius
                 color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.18)
                 border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
                 border.width: 1
@@ -179,8 +179,8 @@ Rectangle {
 
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 42
-                radius: 12
+                implicitHeight: ThemeCards.compactActionHeight
+                radius: ThemeCards.compactRadius
                 color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.18)
                 border.color: root._reminderEnabled
                     ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.56)

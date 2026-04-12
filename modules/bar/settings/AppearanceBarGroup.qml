@@ -140,7 +140,7 @@ StaggerItem {
 
         Item {
             id: positionRow
-            width: parent ? parent.width : 296
+            width: parent ? parent.width : ThemeSettings.rowWidth
             readonly property bool filterVisible: root.searchQuery === "" || root.matches("位置")
             readonly property int filterOrder: {
                 if (!parent || !parent.children)
@@ -156,7 +156,7 @@ StaggerItem {
 
             visible: height > 0.5 || opacity > 0.01
             opacity: filterVisible ? 1 : 0
-            height: filterVisible ? Theme.settingsRowHeight : 0
+            height: filterVisible ? ThemeSettings.rowHeight : 0
             clip: true
 
             Behavior on height {
@@ -175,12 +175,12 @@ StaggerItem {
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "位置"
                     font.family: Theme.fontFamily
@@ -190,7 +190,7 @@ StaggerItem {
 
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
+                    spacing: ThemeSettings.behaviorOptionGap
 
                     Repeater {
                         model: [
@@ -204,9 +204,9 @@ StaggerItem {
                             readonly property bool selected:
                                 SettingsService.data.bar.position === modelData.value
 
-                            width: 52
-                            height: 24
-                            radius: Theme.cornerRadius - 4
+                            width: ThemeSettings.behaviorOptionWidth
+                            height: ThemeSettings.switchHeight
+                            radius: ThemeSettings.sidebarSurfaceRadius
                             color: selected ? Colors.highlight : Colors.surface
                             opacity: selected ? 0.9 : 0.6
 

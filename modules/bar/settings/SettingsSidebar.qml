@@ -26,8 +26,8 @@ Item {
     // Track expanded state for each top-level category by index.
     property var expandedStates: [true, false, false]
 
-    implicitWidth: 108
-    implicitHeight: navCol.implicitHeight + 16
+    implicitWidth: ThemeSettings.sidebarWidth
+    implicitHeight: navCol.implicitHeight + ThemeSettings.sidebarOuterPadding * 2
 
     readonly property var navModel: [
         {
@@ -65,8 +65,14 @@ Item {
 
     Column {
         id: navCol
-        anchors { top: parent.top; left: parent.left; right: parent.right; margins: 8; topMargin: 12 }
-        spacing: 2
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+            margins: ThemeSettings.sidebarOuterPadding
+            topMargin: ThemeSettings.sidebarTopPadding
+        }
+        spacing: ThemeSettings.sidebarItemGap
 
         Repeater {
             model: root.navModel
@@ -111,11 +117,11 @@ Item {
                 Item {
                     id: topItem
                     width: parent.width
-                    height: Theme.settingsRowHeight
+                    height: ThemeSettings.rowHeight
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: Theme.cornerRadius - 4
+                        radius: ThemeSettings.sidebarSurfaceRadius
                         color: Colors.highlight
                         opacity: isActive ? 0.25 : 0
                         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -125,7 +131,7 @@ Item {
                     HoverRevealHighlight {
                         id: topHighlight
                         anchors.fill: parent
-                        radius: Theme.cornerRadius - 4
+                        radius: ThemeSettings.sidebarSurfaceRadius
                         hovered: topArea.containsMouse && !isActive
                         highlightColor: Colors.surface
                         highlightOpacity: 0.5
@@ -134,7 +140,7 @@ Item {
                     // Expand arrow shown only when sub-items exist
                     Text {
                         visible: modelData.sections.length > 0
-                        anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
+                        anchors { right: parent.right; rightMargin: ThemeSettings.sidebarChevronMargin; verticalCenter: parent.verticalCenter }
                         text: "\uf105"
                         font.family: Theme.fontMono
                         font.pixelSize: Theme.fontSizeSmall
@@ -145,7 +151,7 @@ Item {
 
                     Row {
                         anchors.centerIn: parent
-                        spacing: 6
+                        spacing: ThemeSettings.sidebarContentGap
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData.icon
@@ -168,7 +174,7 @@ Item {
                     ClickRipple {
                         id: topRipple
                         anchors.fill: parent
-                        radius: Theme.cornerRadius - 4
+                        radius: ThemeSettings.sidebarSurfaceRadius
                         rippleColor: Colors.highlight
                     }
 
@@ -198,7 +204,7 @@ Item {
                     // Capture the parent page for use inside the inner Repeater delegate
                     property string pageId: modelData.page
                     width: parent.width
-                    spacing: 1
+                    spacing: ThemeSettings.sidebarSubItemGap
                     // Animate height to zero instead of toggling visibility for a smooth collapse.
                     clip: true
                     height: isExpanded && modelData.sections.length > 0 ? implicitHeight : 0
@@ -212,7 +218,7 @@ Item {
 
                             id: subDelegate
                             width: parent.width
-                            height: Theme.settingsGroupHeaderHeight
+                            height: ThemeSettings.groupHeaderHeight
                             delay:        40 + index * 40
                             // Sub-items are inside a clipped Column, so Y-offset would be
                             // visually cut off. Use opacity-only stagger (enterOffsetY: 0).
@@ -228,15 +234,15 @@ Item {
 
                             HoverRevealHighlight {
                                 id: subHighlight
-                                anchors { fill: parent; leftMargin: 8 }
-                                radius: Theme.cornerRadius - 4
+                                anchors { fill: parent; leftMargin: ThemeSettings.sidebarSubHighlightInset }
+                                radius: ThemeSettings.sidebarSurfaceRadius
                                 hovered: subArea.containsMouse
                                 highlightColor: Colors.surface
                                 highlightOpacity: 0.5
                             }
 
                             Text {
-                                anchors { left: parent.left; leftMargin: 20; verticalCenter: parent.verticalCenter }
+                                anchors { left: parent.left; leftMargin: ThemeSettings.sidebarSubLabelInset; verticalCenter: parent.verticalCenter }
                                 text: modelData.label
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeSmall - 1
@@ -245,8 +251,8 @@ Item {
 
                             ClickRipple {
                                 id: subRipple
-                                anchors { fill: parent; leftMargin: 8 }
-                                radius: Theme.cornerRadius - 4
+                                anchors { fill: parent; leftMargin: ThemeSettings.sidebarSubHighlightInset }
+                                radius: ThemeSettings.sidebarSurfaceRadius
                                 rippleColor: Colors.highlight
                             }
 

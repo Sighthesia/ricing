@@ -9,7 +9,7 @@ import "../settings"
 Item {
     id: root
 
-    implicitWidth: 296
+    implicitWidth: ThemeSettings.rowWidth
     implicitHeight: _col.implicitHeight
 
     Column {
@@ -20,16 +20,16 @@ Item {
         // ── Default mode ─────────────────────────────────────────────────
         Item {
             width: parent.width
-            height: Theme.settingsRowHeight
+            height: ThemeSettings.rowHeight
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "默认形态"
                     font.family: Theme.fontFamily
@@ -39,7 +39,7 @@ Item {
 
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
+                    spacing: ThemeSettings.behaviorOptionGap
 
                     Repeater {
                         model: [
@@ -53,8 +53,8 @@ Item {
                             readonly property bool _selected:
                                 SettingsService.data.workspaceWidget.defaultMode === modelData.value
 
-                            width: 52; height: 24
-                            radius: Theme.cornerRadius - 4
+                            width: ThemeSettings.behaviorOptionWidth; height: ThemeSettings.switchHeight
+                            radius: ThemeSettings.sidebarSurfaceRadius
                             color: _selected ? Colors.highlight : Colors.surface
                             opacity: _selected ? 0.9 : 0.6
 
@@ -86,16 +86,16 @@ Item {
         // ── Hover toggle ──────────────────────────────────────────────────
         Item {
             width: parent.width
-            height: Theme.settingsRowHeight
+            height: ThemeSettings.rowHeight
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "悬浮切换"
                     font.family: Theme.fontFamily
@@ -106,7 +106,7 @@ Item {
                 Rectangle {
                     id: _toggleTrack
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 36; height: 20; radius: 10
+                    width: Math.round(36 * Theme.uiScale); height: Math.round(20 * Theme.uiScale); radius: height / 2
                     color: SettingsService.data.workspaceWidget.hoverEnabled
                         ? Colors.highlight : Colors.surface
                     Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
@@ -115,7 +115,7 @@ Item {
                         id: _toggleKnob
                         anchors.verticalCenter: parent.verticalCenter
                         x: SettingsService.data.workspaceWidget.hoverEnabled ? parent.width - width - 2 : 2
-                        width: 16; height: 16; radius: 8
+                        width: Math.round(16 * Theme.uiScale); height: Math.round(16 * Theme.uiScale); radius: width / 2
                         color: Colors.text
 
                         Behavior on x { NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType } }

@@ -37,7 +37,7 @@ Item {
     readonly property int _filterDelay: _filterOrder * SettingsService.effectiveAnimation.staggerExitStep
 
     // Total height: header + (content if open)
-    implicitWidth: parent ? parent.width : 296
+    implicitWidth: parent ? parent.width : ThemeSettings.rowWidth
     implicitHeight: header.height + (_open ? contentCol.implicitHeight : 0)
     height: filterVisible ? implicitHeight : 0
     visible: height > 0.5 || filterVisible
@@ -59,15 +59,15 @@ Item {
     Item {
         id: header
         width: parent.width
-        height: Theme.settingsGroupHeaderHeight
+        height: ThemeSettings.groupHeaderHeight
 
         // Hover wipe highlight
         HoverRevealHighlight {
             id: headerHighlight
             anchors.fill: parent
-            anchors.leftMargin: 4
-            anchors.rightMargin: 4
-            radius: 4
+            anchors.leftMargin: ThemeSettings.highlightInset
+            anchors.rightMargin: ThemeSettings.highlightInset
+            radius: ThemeSettings.highlightRadius
             hovered: headerArea.containsMouse
             highlightColor: Colors.surface
             highlightOpacity: 0.6
@@ -77,7 +77,7 @@ Item {
         Text {
             id: arrow
             anchors.left: parent.left
-            anchors.leftMargin: 10
+            anchors.leftMargin: ThemeSettings.presetSwatchInset
             anchors.verticalCenter: parent.verticalCenter
             text: "\uf105"   // Nerd Font right arrow (›)
             font.family: Theme.fontMono
@@ -96,7 +96,7 @@ Item {
         // Section title
         Text {
             anchors.left: arrow.right
-            anchors.leftMargin: 5
+            anchors.leftMargin: ThemeSettings.presetSwatchGap
             anchors.verticalCenter: parent.verticalCenter
             text: root.title
             font.family: Theme.fontFamily
@@ -110,9 +110,9 @@ Item {
         ClickRipple {
             id: headerRipple
             anchors.fill: parent
-            anchors.leftMargin: 4
-            anchors.rightMargin: 4
-            radius: 4
+            anchors.leftMargin: ThemeSettings.highlightInset
+            anchors.rightMargin: ThemeSettings.highlightInset
+            radius: ThemeSettings.highlightRadius
             rippleColor: Colors.highlight
         }
 
@@ -163,26 +163,26 @@ Item {
 
     // Persistent highlight overlay (stays on until clearHighlight is called)
     Rectangle {
-        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 4; rightMargin: 4 }
+        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: ThemeSettings.highlightInset; rightMargin: ThemeSettings.highlightInset }
         height: header.height
-        radius: 4
+        radius: ThemeSettings.highlightRadius
         color: Colors.highlight
         opacity: root.highlighted ? 0.22 : 0
-        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
     }
 
     // Brief flash overlay (one-shot animation on top of persistent highlight)
     Rectangle {
         id: flashOverlay
-        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 4; rightMargin: 4 }
+        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: ThemeSettings.highlightInset; rightMargin: ThemeSettings.highlightInset }
         height: header.height
-        radius: 4
+        radius: ThemeSettings.highlightRadius
         color: Colors.highlight
         opacity: 0
         SequentialAnimation {
             id: flashAnim
-            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.28; duration: 140 }
-            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0; duration: 400; easing.type: Easing.OutQuad }
+            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0.28; duration: Math.max(1, Math.round(Theme.anim.highlightDuration * 0.78)) }
+            NumberAnimation { target: flashOverlay; property: "opacity"; to: 0; duration: Math.max(1, Math.round(Theme.anim.moveDuration * 1.25)); easing.type: Easing.OutQuad }
         }
     }
 }

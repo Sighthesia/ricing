@@ -54,8 +54,8 @@ Item {
     opacity: _matchesFilter ? 1 : 0
     height: _matchesFilter ? implicitHeight : 0
 
-    implicitWidth: 296
-    implicitHeight: Theme.settingsRowHeight
+    implicitWidth: ThemeSettings.rowWidth
+    implicitHeight: ThemeSettings.rowHeight
     clip: true
 
     Behavior on height {
@@ -75,8 +75,8 @@ Item {
     // Search match highlight background
     Rectangle {
         anchors.fill: parent
-        anchors.leftMargin: 4; anchors.rightMargin: 4
-        radius: 4
+        anchors.leftMargin: ThemeSettings.highlightInset; anchors.rightMargin: ThemeSettings.highlightInset
+        radius: ThemeSettings.highlightRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -84,9 +84,9 @@ Item {
 
     // Accent left-edge strip
     Rectangle {
-        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 4 }
-        width: 3
-        radius: 1
+        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: ThemeSettings.highlightInset }
+        width: ThemeSettings.accentStripWidth
+        radius: ThemeSettings.accentStripRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.9 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -94,13 +94,13 @@ Item {
 
     Row {
         anchors.fill: parent
-        anchors.leftMargin: Theme.settingsPanelPadding
-        anchors.rightMargin: Theme.settingsPanelPadding
-        spacing: 8
+        anchors.leftMargin: ThemeSettings.panelPadding
+        anchors.rightMargin: ThemeSettings.panelPadding
+        spacing: ThemeSettings.rowGap
 
         // Label
         Text {
-            width: Theme.settingsLabelWidth
+            width: ThemeSettings.labelWidth
             anchors.verticalCenter: parent.verticalCenter
             text: root.label
             font.family: Theme.fontFamily
@@ -112,24 +112,24 @@ Item {
         // Slider track + handle
         Item {
             anchors.verticalCenter: parent.verticalCenter
-            width: parent.width - Theme.settingsLabelWidth - 44 - 2 * parent.spacing
-            height: 20   // tall hit area around the 4px visual track
+            width: parent.width - ThemeSettings.labelWidth - ThemeSettings.sliderReadoutWidth - 2 * parent.spacing
+            height: ThemeSettings.sliderHitHeight
 
             // Visual track (unfilled)
             Rectangle {
                 id: track
                 width: parent.width
-                height: 4
+                height: ThemeSettings.sliderTrackHeight
                 anchors.verticalCenter: parent.verticalCenter
-                radius: 2
+                radius: height / 2
                 color: Colors.surface
             }
 
             // Filled portion up to handle center
             Rectangle {
-                height: 4
+                height: ThemeSettings.sliderTrackHeight
                 anchors.verticalCenter: parent.verticalCenter
-                radius: 2
+                radius: height / 2
                 color: Colors.highlight
                 width: {
                     let ratio = (root.value - root.from) / (root.to - root.from)
@@ -140,8 +140,8 @@ Item {
             // Draggable knob
             Rectangle {
                 id: handle
-                width: 14; height: 14
-                radius: 7
+                width: ThemeSettings.sliderHandleSize; height: ThemeSettings.sliderHandleSize
+                radius: width / 2
                 color: Colors.highlight
                 anchors.verticalCenter: parent.verticalCenter
                 x: {
@@ -171,7 +171,7 @@ Item {
 
         // Numeric readout
         Text {
-            width: 44
+            width: ThemeSettings.sliderReadoutWidth
             anchors.verticalCenter: parent.verticalCenter
             text: root.value.toFixed(root.stepSize < 1 ? 2 : 0) + root.unit
             font.family: Theme.fontMono

@@ -44,17 +44,17 @@ Rectangle {
     }
 
     radius: Theme.cornerRadius
-    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.68)
-    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.72)
+    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, ThemeCards.panelSurfaceAlpha)
+    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, ThemeCards.panelBorderAlpha)
     border.width: 1
-    implicitWidth: Math.round(280 * Theme.uiScale)
-    implicitHeight: _resourceColumn.implicitHeight + Theme.settingsPanelPadding * 2
+    implicitWidth: ThemeCards.compactWidth
+    implicitHeight: _resourceColumn.implicitHeight + ThemeCards.panelPadding * 2
 
     ColumnLayout {
         id: _resourceColumn
         anchors.fill: parent
-        anchors.margins: Theme.settingsPanelPadding
-        spacing: 10
+        anchors.margins: ThemeCards.panelPadding
+        spacing: ThemeCards.compactGap
 
         ColumnLayout {
             spacing: 2
@@ -78,7 +78,7 @@ Rectangle {
         GridLayout {
             Layout.fillWidth: true
             columns: 1
-            rowSpacing: 8
+            rowSpacing: ThemeCards.panelGap
 
             Repeater {
                 model: root._resourceMetrics
@@ -86,7 +86,7 @@ Rectangle {
                 delegate: Rectangle {
                     required property var modelData
                     Layout.fillWidth: true
-                    radius: 12
+                    radius: ThemeCards.compactRadius
                     color: Qt.rgba(
                         Colors.highlight.r,
                         Colors.highlight.g,
@@ -101,7 +101,7 @@ Rectangle {
                         id: _metricRow
                         anchors.fill: parent
                         anchors.margins: Theme.barWidget.contentPaddingH
-                        spacing: 10
+                        spacing: ThemeCards.compactGap
 
                         MonitorParts.SystemMonitorGauge {
                             metric: modelData
@@ -154,7 +154,7 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            radius: 12
+            radius: ThemeCards.compactRadius
             color: _powerSaveArea.containsMouse
                 ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, SettingsService.powerSaveEnabled ? 0.18 : 0.12)
                 : Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, SettingsService.powerSaveEnabled ? 0.22 : 0.12)
@@ -174,10 +174,10 @@ Rectangle {
 
             BarComponents.HoverRevealHighlight {
                 anchors.fill: parent
-                radius: 12
+                radius: ThemeCards.compactRadius
                 hovered: _powerSaveArea.containsMouse
                 highlightColor: Colors.highlight
-                highlightOpacity: 0.12
+                highlightOpacity: ThemeCards.hoverHighlightAlpha
                 adaptiveContrast: true
                 surfaceColor: parent.color
             }
@@ -185,7 +185,7 @@ Rectangle {
             BarComponents.ClickRipple {
                 id: _powerSaveRipple
                 anchors.fill: parent
-                radius: 12
+                radius: ThemeCards.compactRadius
                 rippleColor: Colors.highlight
             }
 
@@ -193,11 +193,11 @@ Rectangle {
                 id: _powerSaveRow
                 anchors.fill: parent
                 anchors.margins: Theme.barWidget.contentPaddingH
-                spacing: 10
+                spacing: ThemeCards.compactGap
 
                 Rectangle {
-                    Layout.preferredWidth: 34
-                    Layout.preferredHeight: 34
+                    Layout.preferredWidth: ThemeCards.compactIconSize
+                    Layout.preferredHeight: ThemeCards.compactIconSize
                     radius: 17
                     color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, SettingsService.powerSaveEnabled ? 0.22 : 0.12)
 
@@ -235,17 +235,19 @@ Rectangle {
                 }
 
                 Rectangle {
-                    Layout.preferredWidth: 42
-                    Layout.preferredHeight: 24
-                    radius: 12
+                    Layout.preferredWidth: ThemeSettings.switchWidth
+                    Layout.preferredHeight: ThemeSettings.switchHeight
+                    radius: ThemeCards.compactRadius
                     color: SettingsService.powerSaveEnabled ? Colors.highlight : Colors.surface
 
                     Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
-                        x: SettingsService.powerSaveEnabled ? parent.width - width - 3 : 3
-                        width: 18
-                        height: 18
-                        radius: 9
+                        x: SettingsService.powerSaveEnabled
+                            ? parent.width - width - ThemeSettings.switchInset
+                            : ThemeSettings.switchInset
+                        width: ThemeSettings.switchKnobSize
+                        height: ThemeSettings.switchKnobSize
+                        radius: width / 2
                         color: Colors.text
 
                         Behavior on x {

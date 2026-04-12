@@ -43,8 +43,8 @@ StaggerItem {
 
         Item {
             id: wallpaperPathRow
-            width: parent ? parent.width : 296
-            implicitHeight: Theme.settingsRowHeight
+            width: parent ? parent.width : ThemeSettings.rowWidth
+            implicitHeight: ThemeSettings.rowHeight
             readonly property bool filterVisible: root.searchQuery === "" || root.matches("壁纸路径")
             readonly property int filterOrder: {
                 if (!parent || !parent.children)
@@ -79,9 +79,9 @@ StaggerItem {
 
             Rectangle {
                 anchors.fill: parent
-                anchors.leftMargin: 4
-                anchors.rightMargin: 4
-                radius: 4
+                anchors.leftMargin: ThemeSettings.highlightInset
+                anchors.rightMargin: ThemeSettings.highlightInset
+                radius: ThemeSettings.highlightRadius
                 color: Colors.highlight
                 opacity: root.matches("壁纸路径") && root.searchQuery !== "" ? 0.1 : 0
                 Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -92,10 +92,10 @@ StaggerItem {
                     left: parent.left
                     top: parent.top
                     bottom: parent.bottom
-                    leftMargin: 4
+                    leftMargin: ThemeSettings.highlightInset
                 }
-                width: 3
-                radius: 1
+                width: ThemeSettings.accentStripWidth
+                radius: ThemeSettings.accentStripRadius
                 color: Colors.highlight
                 opacity: root.matches("壁纸路径") && root.searchQuery !== "" ? 0.9 : 0
                 Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -103,12 +103,12 @@ StaggerItem {
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "壁纸路径"
                     font.family: Theme.fontFamily
@@ -120,9 +120,9 @@ StaggerItem {
                 Rectangle {
                     id: wallpaperFieldRect
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - Theme.settingsLabelWidth - browseBtn.width - parent.spacing * 2
-                    height: parent.height - 8
-                    radius: 4
+                    width: parent.width - ThemeSettings.labelWidth - browseBtn.width - parent.spacing * 2
+                    height: parent.height - ThemeSettings.fieldVerticalInset
+                    radius: ThemeSettings.fieldRadius
                     color: Colors.surface
                     border.color: wallpaperInput.activeFocus ? Colors.highlight : Colors.border
                     border.width: 1
@@ -131,10 +131,10 @@ StaggerItem {
                     TextInput {
                         id: wallpaperInput
                         anchors.fill: parent
-                        anchors.leftMargin: 6
-                        anchors.rightMargin: 6
-                        anchors.topMargin: 2
-                        anchors.bottomMargin: 2
+                        anchors.leftMargin: ThemeSettings.fieldPaddingH
+                        anchors.rightMargin: ThemeSettings.fieldPaddingH
+                        anchors.topMargin: ThemeSettings.fieldPaddingV
+                        anchors.bottomMargin: ThemeSettings.fieldPaddingV
                         text: SettingsService.data.appearance.wallpaperPath
                         font.family: Theme.fontMono
                         font.pixelSize: Theme.fontSizeSmall
@@ -162,9 +162,9 @@ StaggerItem {
                 Rectangle {
                     id: browseBtn
                     anchors.verticalCenter: parent.verticalCenter
-                    width: browseBtnText.implicitWidth + 16
-                    height: parent.height - 8
-                    radius: 4
+                    width: browseBtnText.implicitWidth + ThemeSettings.panelPadding + ThemeSettings.highlightInset
+                    height: parent.height - ThemeSettings.fieldVerticalInset
+                    radius: ThemeSettings.fieldRadius
                     color: browseBtnArea.containsMouse ? Colors.highlight : Colors.surface
                     border.color: Colors.border
                     border.width: 1
@@ -234,7 +234,7 @@ StaggerItem {
 
         Item {
             id: scheduleStatusRow
-            width: parent ? parent.width : 296
+            width: parent ? parent.width : ThemeSettings.rowWidth
             readonly property bool filterVisible: SettingsService.data.appearance.darkModeScheduleMode === "custom-time"
             readonly property int filterOrder: {
                 if (!parent || !parent.children)
@@ -248,7 +248,7 @@ StaggerItem {
 
             visible: height > 0.5 || opacity > 0.01
             opacity: filterVisible ? 1 : 0
-            height: filterVisible ? Theme.settingsRowHeight : 0
+            height: filterVisible ? ThemeSettings.rowHeight : 0
             clip: true
 
             Behavior on height {
@@ -267,12 +267,12 @@ StaggerItem {
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "当前状态"
                     font.family: Theme.fontFamily
@@ -283,7 +283,7 @@ StaggerItem {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - Theme.settingsLabelWidth - parent.spacing
+                    width: parent.width - ThemeSettings.labelWidth - parent.spacing
                     text: WallpaperService.darkModeScheduleStatus
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeSmall
@@ -334,7 +334,7 @@ StaggerItem {
 
         Item {
             id: geocodeStatusRow
-            width: parent ? parent.width : 296
+            width: parent ? parent.width : ThemeSettings.rowWidth
             readonly property bool filterVisible:
                 SettingsService.data.appearance.darkModeScheduleMode === "sunrise-sunset"
                 && SettingsService.data.appearance.darkModeScheduleLocationMode === "city"
@@ -352,7 +352,7 @@ StaggerItem {
 
             visible: height > 0.5 || opacity > 0.01
             opacity: filterVisible ? 1 : 0
-            height: filterVisible ? Theme.settingsRowHeight : 0
+            height: filterVisible ? ThemeSettings.rowHeight : 0
             clip: true
 
             Behavior on height {
@@ -371,12 +371,12 @@ StaggerItem {
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "城市解析"
                     font.family: Theme.fontFamily
@@ -387,7 +387,7 @@ StaggerItem {
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - Theme.settingsLabelWidth - parent.spacing
+                    width: parent.width - ThemeSettings.labelWidth - parent.spacing
                     text: GeocodingService.lookupStatusText
                     font.family: Theme.fontMono
                     font.pixelSize: Theme.fontSizeSmall
@@ -464,8 +464,8 @@ StaggerItem {
 
             visible: height > 0.5 || opacity > 0.01
             opacity: filterVisible ? 1 : 0
-            height: filterVisible ? Theme.settingsRowHeight : 0
-            width: parent ? parent.width : 296
+            height: filterVisible ? ThemeSettings.rowHeight : 0
+            width: parent ? parent.width : ThemeSettings.rowWidth
 
             clip: true
 
@@ -485,12 +485,12 @@ StaggerItem {
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "配色算法"
                     font.family: Theme.fontFamily
@@ -501,14 +501,14 @@ StaggerItem {
 
                 Flickable {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - Theme.settingsLabelWidth - parent.spacing
-                    height: Theme.settingsRowHeight
+                    width: parent.width - ThemeSettings.labelWidth - parent.spacing
+                    height: ThemeSettings.rowHeight
                     contentWidth: schemeRow.implicitWidth
                     clip: true
 
                     Row {
                         id: schemeRow
-                        spacing: 4
+                        spacing: ThemeSettings.behaviorOptionGap
 
                         Repeater {
                             model: [
@@ -530,9 +530,9 @@ StaggerItem {
                                 readonly property string shortLabel:
                                     modelData.replace("scheme-", "")
 
-                                width: schemeLabel.implicitWidth + 12
-                                height: 22
-                                radius: Theme.cornerRadius - 4
+                                width: schemeLabel.implicitWidth + ThemeSettings.panelPadding
+                                height: Math.max(ThemeSettings.switchHeight - ThemeSettings.highlightInset * 2, Math.round(22 * Theme.uiScale))
+                                radius: ThemeSettings.sidebarSurfaceRadius
                                 color: selected ? Colors.highlight : Colors.surface
                                 opacity: selected ? 0.9 : 0.55
                                 Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }

@@ -117,7 +117,7 @@ Item {
                 RowLayout {
                     id: _badgeRow
                     anchors.centerIn: parent
-                    spacing: 8
+                    spacing: ThemeCards.panelGap
 
                     Rectangle {
                         width: 8
@@ -144,7 +144,7 @@ Item {
                 color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.34)
                 border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.8)
                 border.width: 1
-                radius: 12
+                radius: ThemeCards.compactRadius
                 implicitWidth: _snoozeLabel.implicitWidth + 28
                 implicitHeight: 38
 
@@ -170,7 +170,7 @@ Item {
                 visible: !BreakReminderService.outroActive
                 color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.9)
                 border.color: "transparent"
-                radius: 12
+                radius: ThemeCards.compactRadius
                 implicitWidth: _finishLabel.implicitWidth + 28
                 implicitHeight: 38
 
@@ -296,7 +296,7 @@ Item {
 
                     Column {
                         anchors.centerIn: parent
-                        spacing: 8
+                        spacing: ThemeCards.panelGap
 
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter

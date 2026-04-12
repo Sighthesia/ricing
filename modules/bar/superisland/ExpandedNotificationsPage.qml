@@ -9,7 +9,7 @@ import "./ExpandedNotificationsPageLogic.js" as PageLogic
 Item {
     id: root
 
-    readonly property int _appBadgeSize: 28
+    readonly property int _appBadgeSize: ThemeCards.historyBadgeSize
     readonly property int _maxExitSlots: 6
     property bool _pageActive: false
     property bool _historyRevealPending: false
@@ -114,9 +114,9 @@ Item {
             ListView {
                 id: _list
                 anchors.fill: parent
-                anchors.margins: 10
+                anchors.margins: ThemeCards.compactInset
                 clip: true
-                spacing: 8
+                spacing: ThemeCards.panelGap
                 model: NotificationService.historyList
                 displayMarginBeginning: 120
                 displayMarginEnd: 120
@@ -156,7 +156,7 @@ Item {
                         id: _cardBody
                         width: parent.width
                         implicitHeight: _row.implicitHeight + 18
-                        radius: Theme.cornerRadius - 2
+                        radius: ThemeCards.compactRadius
                         color: _cardArea.containsMouse
                             ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.10)
                             : Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.62)
@@ -170,13 +170,13 @@ Item {
                         RowLayout {
                             id: _row
                             anchors.fill: parent
-                            anchors.margins: 12
-                            spacing: 10
+                            anchors.margins: ThemeCards.panelPadding
+                            spacing: ThemeCards.compactGap
 
                             Rectangle {
                                 width: root._appBadgeSize
                                 height: root._appBadgeSize
-                                radius: 6
+                                radius: Math.max(4, Math.round(6 * Theme.uiScale))
                                 color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
 
                                 Text {

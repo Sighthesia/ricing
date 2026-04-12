@@ -46,10 +46,10 @@ Item {
 
     // Height collapses to a single row when closed; expands to include the
     // search bar + font list when open.
-    implicitWidth: 296
+    implicitWidth: ThemeSettings.rowWidth
     implicitHeight: _open
-        ? Theme.settingsRowHeight + dropdownCol.implicitHeight + 4
-        : Theme.settingsRowHeight
+        ? ThemeSettings.rowHeight + dropdownCol.implicitHeight + ThemeSettings.pickerDropdownGap
+        : ThemeSettings.rowHeight
 
     Behavior on implicitHeight {
         NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
@@ -91,17 +91,17 @@ Item {
     Item {
         id: headerRow
         width: parent.width
-        height: Theme.settingsRowHeight
+        height: ThemeSettings.rowHeight
 
         Row {
             anchors.fill: parent
-            anchors.leftMargin: Theme.settingsPanelPadding
-            anchors.rightMargin: Theme.settingsPanelPadding
-            spacing: 8
+            anchors.leftMargin: ThemeSettings.panelPadding
+            anchors.rightMargin: ThemeSettings.panelPadding
+            spacing: ThemeSettings.rowGap
 
             // Label
             Text {
-                width: Theme.settingsLabelWidth
+                width: ThemeSettings.labelWidth
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.label
                 font.family: Theme.fontFamily
@@ -113,9 +113,9 @@ Item {
             // Current font display + dropdown toggle
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - Theme.settingsLabelWidth - parent.spacing
-                height: parent.height - 8
-                radius: 4
+                width: parent.width - ThemeSettings.labelWidth - parent.spacing
+                height: parent.height - ThemeSettings.fieldVerticalInset
+                radius: ThemeSettings.fieldRadius
                 color: root._open
                     ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.08)
                     : Colors.surface
@@ -127,13 +127,13 @@ Item {
 
                 Row {
                     anchors.fill: parent
-                    anchors.leftMargin: 8
-                    anchors.rightMargin: 6
+                    anchors.leftMargin: ThemeSettings.pickerPreviewPaddingStart
+                    anchors.rightMargin: ThemeSettings.pickerPreviewPaddingEnd
 
                     // Font name preview — renders text using the selected font
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - chevron.width - 4
+                        width: parent.width - chevron.width - ThemeSettings.pickerLabelGap
                         text: root.value !== "" ? root.value : "未设置"
                         // Preview the chosen font; fall back if the name is invalid
                         font.family: root.value !== "" ? root.value : Theme.fontFamily
@@ -175,20 +175,20 @@ Item {
     // ── Dropdown ──────────────────────────────────────────────────────
     Column {
         id: dropdownCol
-        y: Theme.settingsRowHeight + 4
+        y: ThemeSettings.rowHeight + ThemeSettings.pickerDropdownGap
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: Theme.settingsPanelPadding
-        anchors.rightMargin: Theme.settingsPanelPadding
-        spacing: 4
+        anchors.leftMargin: ThemeSettings.panelPadding
+        anchors.rightMargin: ThemeSettings.panelPadding
+        spacing: ThemeSettings.pickerDropdownGap
         visible: root._open
 
         // Search bar
         Rectangle {
             id: searchBar
             width: parent.width
-            height: Theme.settingsRowHeight - 6
-            radius: 4
+            height: ThemeSettings.pickerSearchHeight
+            radius: ThemeSettings.fieldRadius
             color: Colors.surface
             border.color: searchInput.activeFocus ? Colors.highlight : Colors.border
             border.width: 1
@@ -196,7 +196,7 @@ Item {
 
             Text {
                 visible: searchInput.text === "" && !searchInput.activeFocus
-                anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                anchors { left: parent.left; leftMargin: ThemeSettings.pickerPreviewPaddingStart; verticalCenter: parent.verticalCenter }
                 text: FontService.fontsReady ? "搜索字体..." : "加载字体列表中…"
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall
@@ -206,7 +206,7 @@ Item {
             TextInput {
                 id: searchInput
                 anchors.fill: parent
-                anchors.margins: 6
+                anchors.margins: ThemeSettings.fieldPaddingH
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 color: Colors.text
@@ -220,9 +220,9 @@ Item {
             id: fontListRect
             width: parent.width
             // Show up to ~6 items; individual item height = settingsGroupHeaderHeight
-            height: Math.min(root._filteredFonts.length * Theme.settingsGroupHeaderHeight,
-                             Theme.settingsGroupHeaderHeight * 6)
-            radius: 4
+            height: Math.min(root._filteredFonts.length * ThemeSettings.groupHeaderHeight,
+                             ThemeSettings.groupHeaderHeight * ThemeSettings.pickerMaxVisibleRows)
+            radius: ThemeSettings.fieldRadius
             color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.8)
             border.color: Colors.border
             border.width: 1
@@ -266,7 +266,7 @@ Item {
                     required property int index
 
                     width: ListView.view.width
-                    height: Theme.settingsGroupHeaderHeight
+                    height: ThemeSettings.groupHeaderHeight
 
                     readonly property bool isSelected: modelData === root.value
 

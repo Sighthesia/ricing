@@ -29,7 +29,7 @@ PanelWindow {
     anchors.left:   !_isRight
 
     // Offset card column away from both the bar edge and the screen edge
-    readonly property int _edgeMargin: 12
+    readonly property int _edgeMargin: ThemeCards.popupEdgeMargin
     readonly property int _barOffset:  Theme.barHeight + _edgeMargin
 
     margins.top:    _isTop    ? _barOffset  : _edgeMargin
@@ -38,8 +38,8 @@ PanelWindow {
     margins.left:   !_isRight ? _edgeMargin : 0
 
     // card width (360) + 2×8 internal padding
-    implicitWidth:  376
-    implicitHeight: _column.implicitHeight + 8
+    implicitWidth: ThemeCards.popupCardWidth + ThemeCards.popupStackInset * 2
+    implicitHeight: _column.implicitHeight + ThemeCards.popupStackInset
 
     // Hide (and thus yield all input) when no cards exist
     visible: NotificationService.popupPresentationEnabled
@@ -54,8 +54,8 @@ PanelWindow {
             top:    root._isTop    ? parent.top    : undefined
             bottom: !root._isTop   ? parent.bottom : undefined
         }
-        spacing: 8
-        padding: 8
+        spacing: ThemeCards.panelGap
+        padding: ThemeCards.popupStackInset
 
         Repeater {
             model: NotificationService.activeList

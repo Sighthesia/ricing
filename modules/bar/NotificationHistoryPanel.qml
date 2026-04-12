@@ -11,12 +11,12 @@ AnimatedPanelBase {
     anchors { top: true; right: true }
     margins { top: Theme.barHeight }
 
-    implicitWidth: 400
-    implicitHeight: 480
+    implicitWidth: ThemeCards.historyPanelWidth
+    implicitHeight: ThemeCards.historyPanelHeight
     focusable: false
 
     // Component-local layout constants; promote to Theme tokens in a future notification token pass.
-    readonly property int _appBadgeSize: 28
+    readonly property int _appBadgeSize: ThemeCards.historyBadgeSize
     readonly property int _staggerBaseDelay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
     readonly property int _staggerStep: SettingsService.effectiveAnimation.staggerLevel1Step
 
@@ -85,9 +85,9 @@ AnimatedPanelBase {
     // Panel background
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 4
-        anchors.rightMargin: 4
-        anchors.bottomMargin: 4
+        anchors.topMargin: ThemeCards.panelInset
+        anchors.rightMargin: ThemeCards.panelInset
+        anchors.bottomMargin: ThemeCards.panelInset
         radius: Theme.cornerRadius
         color: Colors.background
         border.color: Colors.border
@@ -95,8 +95,8 @@ AnimatedPanelBase {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
+            anchors.margins: ThemeCards.panelPadding
+            spacing: ThemeCards.panelGap
 
             // Header: title + clear-all button
             RowLayout {
@@ -151,7 +151,7 @@ AnimatedPanelBase {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                spacing: 6
+                spacing: Math.max(4, Math.round(6 * Theme.uiScale))
                 model: NotificationService.historyList
 
                 delegate: StaggerItem {
@@ -202,8 +202,8 @@ AnimatedPanelBase {
 
         Rectangle {
             anchors.fill: parent
-            radius: Theme.cornerRadius / 2
-            color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.6)
+            radius: ThemeCards.compactRadius
+            color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, ThemeCards.historyItemSurfaceAlpha)
             border.color: Colors.border
             border.width: 1
 
@@ -213,13 +213,13 @@ AnimatedPanelBase {
                     left: parent.left; right: parent.right
                     verticalCenter: parent.verticalCenter
                 }
-                anchors.margins: 10
-                spacing: 8
+                anchors.margins: ThemeCards.compactInset
+                spacing: ThemeCards.panelGap
 
                 // App initial-letter badge
                 Rectangle {
                     width: root._appBadgeSize; height: root._appBadgeSize
-                    radius: 6
+                    radius: Math.max(4, Math.round(6 * Theme.uiScale))
                     color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
 
                     Text {

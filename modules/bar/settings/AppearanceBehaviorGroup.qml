@@ -38,7 +38,7 @@ StaggerItem {
 
         Item {
             id: autoHideRow
-            width: parent ? parent.width : 296
+            width: parent ? parent.width : ThemeSettings.rowWidth
             readonly property bool filterVisible: root.searchQuery === "" || root.groupMatches(["自动隐藏"])
             readonly property int filterOrder: {
                 if (!parent || !parent.children)
@@ -54,7 +54,7 @@ StaggerItem {
 
             visible: height > 0.5 || opacity > 0.01
             opacity: filterVisible ? 1 : 0
-            height: filterVisible ? Theme.settingsRowHeight : 0
+            height: filterVisible ? ThemeSettings.rowHeight : 0
             clip: true
 
             Behavior on height {
@@ -73,12 +73,12 @@ StaggerItem {
 
             Row {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.settingsPanelPadding
-                anchors.rightMargin: Theme.settingsPanelPadding
-                spacing: 8
+                anchors.leftMargin: ThemeSettings.panelPadding
+                anchors.rightMargin: ThemeSettings.panelPadding
+                spacing: ThemeSettings.rowGap
 
                 Text {
-                    width: Theme.settingsLabelWidth
+                    width: ThemeSettings.labelWidth
                     anchors.verticalCenter: parent.verticalCenter
                     text: "自动隐藏"
                     font.family: Theme.fontFamily
@@ -88,12 +88,12 @@ StaggerItem {
 
                 Item {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 42
-                    height: 24
+                    width: ThemeSettings.switchWidth
+                    height: ThemeSettings.switchHeight
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 12
+                        radius: height / 2
                         color: SettingsService.data.barBehavior.autoHide
                             ? Colors.highlight : Colors.surface
                         opacity: 0.8
@@ -102,12 +102,14 @@ StaggerItem {
                     }
 
                     Rectangle {
-                        width: 18
-                        height: 18
-                        radius: 9
+                        width: ThemeSettings.switchKnobSize
+                        height: ThemeSettings.switchKnobSize
+                        radius: width / 2
                         anchors.verticalCenter: parent.verticalCenter
                         color: Colors.text
-                        x: SettingsService.data.barBehavior.autoHide ? 21 : 3
+                        x: SettingsService.data.barBehavior.autoHide
+                            ? parent.width - width - ThemeSettings.switchInset
+                            : ThemeSettings.switchInset
 
                         Behavior on x {
                             NumberAnimation {

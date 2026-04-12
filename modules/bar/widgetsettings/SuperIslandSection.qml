@@ -6,7 +6,7 @@ import "../settings"
 Item {
     id: root
 
-    implicitWidth: 296
+    implicitWidth: ThemeSettings.rowWidth
     implicitHeight: _col.implicitHeight
 
     Column {

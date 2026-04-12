@@ -47,8 +47,8 @@ Item {
     opacity: (_matchesFilter && shown) ? (enabled ? 1 : 0.55) : 0
     height: (_matchesFilter && shown) ? implicitHeight : 0
 
-    implicitWidth: 296
-    implicitHeight: Theme.settingsRowHeight
+    implicitWidth: ThemeSettings.rowWidth
+    implicitHeight: ThemeSettings.rowHeight
     clip: true
 
     Behavior on height {
@@ -67,9 +67,9 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        anchors.leftMargin: 4
-        anchors.rightMargin: 4
-        radius: 4
+        anchors.leftMargin: ThemeSettings.highlightInset
+        anchors.rightMargin: ThemeSettings.highlightInset
+        radius: ThemeSettings.highlightRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.1 : 0
 
@@ -82,9 +82,9 @@ Item {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        anchors.leftMargin: 4
-        width: 3
-        radius: 1
+        anchors.leftMargin: ThemeSettings.highlightInset
+        width: ThemeSettings.accentStripWidth
+        radius: ThemeSettings.accentStripRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.9 : 0
 
@@ -95,12 +95,12 @@ Item {
 
     Row {
         anchors.fill: parent
-        anchors.leftMargin: Theme.settingsPanelPadding
-        anchors.rightMargin: Theme.settingsPanelPadding
-        spacing: 8
+        anchors.leftMargin: ThemeSettings.panelPadding
+        anchors.rightMargin: ThemeSettings.panelPadding
+        spacing: ThemeSettings.rowGap
 
         Text {
-            width: Theme.settingsLabelWidth
+            width: ThemeSettings.labelWidth
             anchors.verticalCenter: parent.verticalCenter
             text: root.label
             font.family: Theme.fontFamily
@@ -111,9 +111,9 @@ Item {
 
         Rectangle {
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.max(120, _segmentsRow.implicitWidth + 4)
-            height: 28
-            radius: 14
+            width: Math.max(ThemeSettings.segmentedMinWidth, _segmentsRow.implicitWidth + ThemeSettings.segmentedInset * 2)
+            height: ThemeSettings.segmentedHeight
+            radius: ThemeSettings.segmentedRadius
             color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.72)
             border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.72)
             border.width: 1
@@ -121,8 +121,8 @@ Item {
             Row {
                 id: _segmentsRow
                 anchors.fill: parent
-                anchors.margins: 2
-                spacing: 2
+                anchors.margins: ThemeSettings.segmentedInset
+                spacing: ThemeSettings.segmentedGap
 
                 Repeater {
                     model: root.options
@@ -131,7 +131,7 @@ Item {
                         required property var modelData
                         readonly property bool _selected: root.currentValue === modelData.value
 
-                        width: Math.max(48, _segmentLabel.implicitWidth + 18)
+                        width: Math.max(ThemeSettings.segmentedMinOptionWidth, _segmentLabel.implicitWidth + ThemeSettings.segmentedOptionPaddingH)
                         height: parent.height
                         radius: height / 2
                         color: _selected

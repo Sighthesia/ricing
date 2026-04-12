@@ -16,8 +16,8 @@ Item {
         "主题预设".toLowerCase().indexOf(filterQuery.toLowerCase()) !== -1
 
     visible: _matchesFilter
-    implicitWidth: parent ? parent.width : 296
-    height: cardRow.height + sectionLabel.height + 8
+    implicitWidth: parent ? parent.width : ThemeSettings.rowWidth
+    height: cardRow.height + sectionLabel.height + ThemeSettings.presetSectionGap
 
     // 7 built-in palettes; values are intentionally kept as plain strings
     // so they work with QML's color-from-string codec and also as hex text
@@ -62,12 +62,12 @@ Item {
 
     Text {
         id: sectionLabel
-        anchors { left: parent.left; leftMargin: Theme.settingsPanelPadding; top: parent.top }
+        anchors { left: parent.left; leftMargin: ThemeSettings.panelPadding; top: parent.top }
         text: "主题预设"
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSizeSmall
         color: Colors.textMuted
-        height: Theme.settingsGroupHeaderHeight
+        height: ThemeSettings.groupHeaderHeight
         verticalAlignment: Text.AlignVCenter
     }
 
@@ -77,12 +77,12 @@ Item {
         anchors {
             left: parent.left; right: parent.right
             top: sectionLabel.bottom
-            leftMargin: Theme.settingsPanelPadding
-            rightMargin: Theme.settingsPanelPadding
+            leftMargin: ThemeSettings.panelPadding
+            rightMargin: ThemeSettings.panelPadding
         }
-        height: 86   // 52px preview + 2px gap + 20px name label + 12px scrollbar
+        height: ThemeSettings.presetListHeight
         orientation: ListView.Horizontal
-        spacing: 6
+        spacing: ThemeSettings.presetListGap
         clip: true
         model: root.presets
         boundsBehavior: Flickable.StopAtBounds
@@ -94,8 +94,8 @@ Item {
         delegate: Item {
             required property var modelData
 
-            width: 66
-            height: 74
+            width: ThemeSettings.presetCardWidth
+            height: ThemeSettings.presetCardHeight
 
             // Checks whether this theme is currently active (all 6 colors match).
             readonly property bool isActive:
@@ -107,8 +107,8 @@ Item {
             Rectangle {
                 id: card
                 width: parent.width
-                height: 52
-                radius: 6
+                height: ThemeSettings.presetPreviewHeight
+                radius: ThemeSettings.presetCardRadius
                 color: modelData.bg
                 border.width: isActive ? 2 : 1
                 border.color: isActive ? Colors.highlight
@@ -119,23 +119,23 @@ Item {
                 // Accent bar pinned to bottom of card
                 Rectangle {
                     anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-                    height: 4
-                    radius: 2
+                    height: ThemeSettings.presetAccentHeight
+                    radius: ThemeSettings.presetAccentRadius
                     color: modelData.accent
                 }
 
                 // Three color-dot swatches in the upper area:
                 //  accent · text · textMuted
                 Row {
-                    anchors { top: parent.top; topMargin: 10; left: parent.left; leftMargin: 10 }
-                    spacing: 5
+                    anchors { top: parent.top; topMargin: ThemeSettings.presetSwatchInset; left: parent.left; leftMargin: ThemeSettings.presetSwatchInset }
+                    spacing: ThemeSettings.presetSwatchGap
 
                     Repeater {
                         model: [modelData.accent, modelData.text, modelData.textMuted]
                         delegate: Rectangle {
                             required property var modelData
-                            width: 8; height: 8
-                            radius: 4
+                            width: ThemeSettings.presetSwatchSize; height: ThemeSettings.presetSwatchSize
+                            radius: width / 2
                             color: modelData
                         }
                     }
@@ -161,7 +161,7 @@ Item {
 
             // Theme name label below the preview card
             Text {
-                anchors { top: card.bottom; topMargin: 2; horizontalCenter: parent.horizontalCenter }
+                anchors { top: card.bottom; topMargin: ThemeSettings.presetLabelGap; horizontalCenter: parent.horizontalCenter }
                 text: modelData.name
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall - 1
@@ -195,7 +195,7 @@ Item {
                     : -wheel.angleDelta.x  // native horizontal (reversed axis)
                 var maxX = Math.max(0, cardRow.contentWidth - cardRow.width)
                 cardRow.contentX = Math.max(0,
-                    Math.min(cardRow.contentX - delta / 120 * 80, maxX))
+                    Math.min(cardRow.contentX - delta / 120 * ThemeSettings.presetWheelStep, maxX))
                 wheel.accepted = true
             } else {
                 wheel.accepted = false

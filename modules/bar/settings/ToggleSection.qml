@@ -44,8 +44,8 @@ Item {
     opacity: _matchesFilter ? (enabled ? 1 : 0.55) : 0
     height: _matchesFilter ? implicitHeight : 0
 
-    implicitWidth: 296
-    implicitHeight: Theme.settingsRowHeight
+    implicitWidth: ThemeSettings.rowWidth
+    implicitHeight: ThemeSettings.rowHeight
     clip: true
 
     Behavior on height {
@@ -65,8 +65,9 @@ Item {
     // Search match highlight background
     Rectangle {
         anchors.fill: parent
-        anchors.leftMargin: 4; anchors.rightMargin: 4
-        radius: 4
+        anchors.leftMargin: ThemeSettings.highlightInset
+        anchors.rightMargin: ThemeSettings.highlightInset
+        radius: ThemeSettings.highlightRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -74,8 +75,8 @@ Item {
 
     // Accent left-edge strip
     Rectangle {
-        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 4 }
-        width: 3; radius: 1
+        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: ThemeSettings.highlightInset }
+        width: ThemeSettings.accentStripWidth; radius: ThemeSettings.accentStripRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.9 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -83,12 +84,12 @@ Item {
 
     Row {
         anchors.fill: parent
-        anchors.leftMargin: Theme.settingsPanelPadding
-        anchors.rightMargin: Theme.settingsPanelPadding
-        spacing: 8
+        anchors.leftMargin: ThemeSettings.panelPadding
+        anchors.rightMargin: ThemeSettings.panelPadding
+        spacing: ThemeSettings.rowGap
 
         Text {
-            width: Theme.settingsLabelWidth
+            width: ThemeSettings.labelWidth
             anchors.verticalCenter: parent.verticalCenter
             text: root.label
             font.family: Theme.fontFamily
@@ -99,12 +100,12 @@ Item {
 
         Item {
             anchors.verticalCenter: parent.verticalCenter
-            width: 42; height: 24
+            width: ThemeSettings.switchWidth; height: ThemeSettings.switchHeight
 
             // Toggle track — transitions between surface and highlight color
             Rectangle {
                 anchors.fill: parent
-                radius: 12
+                radius: height / 2
                 color: root.value ? Colors.highlight : Colors.surface
                 opacity: 0.85
                 Behavior on color { ColorAnimation { duration: Theme.anim.highlightDuration } }
@@ -113,11 +114,13 @@ Item {
             // Sliding knob
             Rectangle {
                 id: knob
-                width: 18; height: 18
-                radius: 9
+                width: ThemeSettings.switchKnobSize; height: ThemeSettings.switchKnobSize
+                radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
                 color: Colors.text
-                x: root.value ? 21 : 3
+                x: root.value
+                    ? parent.width - width - ThemeSettings.switchInset
+                    : ThemeSettings.switchInset
                 Behavior on x {
                     NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
                 }

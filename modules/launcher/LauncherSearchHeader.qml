@@ -17,7 +17,7 @@ Item {
     signal closeRequested()
 
     Layout.fillWidth: true
-    height: 44
+    height: ThemeLauncher.headerHeight
 
     function runEnter(): void {
     }
@@ -31,12 +31,12 @@ Item {
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
+            anchors.margins: ThemeLauncher.headerPadding
+            spacing: ThemeLauncher.headerGap
 
             Rectangle {
-                implicitWidth: _modeBadgeText.implicitWidth + 14
-                height: 22
+                implicitWidth: _modeBadgeText.implicitWidth + ThemeLauncher.modeBadgePaddingH
+                height: ThemeLauncher.modeBadgeHeight
                 radius: Theme.cornerRadius / 2
                 color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
 

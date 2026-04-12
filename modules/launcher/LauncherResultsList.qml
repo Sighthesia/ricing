@@ -909,7 +909,7 @@ Item {
                 && !!root._softReplaceOverlayKeys[String(_item.key || "")]
 
             width: resultList.width
-            height: 46
+            height: ThemeLauncher.resultRowHeight
 
             Rectangle {
                 anchors.fill: parent
@@ -924,25 +924,25 @@ Item {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 8
+                    anchors.margins: ThemeLauncher.resultInset
+                    spacing: ThemeLauncher.resultGap
 
                     Image {
                         source: "image://icon/" + (_item.icon || "application-x-executable")
-                        width: 20
-                        height: 20
-                        sourceSize: Qt.size(20, 20)
+                        width: ThemeLauncher.resultIconSize
+                        height: ThemeLauncher.resultIconSize
+                        sourceSize: Qt.size(ThemeLauncher.resultIconSize, ThemeLauncher.resultIconSize)
                     }
 
                     ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: 2
+                        spacing: ThemeLauncher.resultTextGap
 
                         Text {
                             text: _item.name
                             color: Colors.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSmall + 1
+                            font.pixelSize: ThemeLauncher.resultTitleSize
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
@@ -987,7 +987,7 @@ Item {
                 x: 0
                 y: modelData.y
                 width: resultList.width
-                height: 46
+                height: ThemeLauncher.resultRowHeight
                 exitDelay: modelData.exitDelay
                 exitDuration: modelData.exitDuration !== undefined
                     ? Number(modelData.exitDuration)
@@ -1023,25 +1023,25 @@ Item {
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.margins: 10
-                        spacing: 8
+                        anchors.margins: ThemeLauncher.resultInset
+                        spacing: ThemeLauncher.resultGap
 
                         Image {
                             source: "image://icon/" + (modelData.icon || "application-x-executable")
-                            width: 20
-                            height: 20
-                            sourceSize: Qt.size(20, 20)
+                            width: ThemeLauncher.resultIconSize
+                            height: ThemeLauncher.resultIconSize
+                            sourceSize: Qt.size(ThemeLauncher.resultIconSize, ThemeLauncher.resultIconSize)
                         }
 
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 2
+                            spacing: ThemeLauncher.resultTextGap
 
                             Text {
                                 text: modelData.name
                                 color: Colors.text
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSmall + 1
+                                font.pixelSize: ThemeLauncher.resultTitleSize
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }
@@ -1079,7 +1079,7 @@ Item {
                 x: 0
                 y: modelData.y
                 width: resultList.width
-                height: 46
+                height: ThemeLauncher.resultRowHeight
                 delay: modelData.delay
                 enterStartOpacity: 0.0
                 enterStartOffsetX: modelData.enterOffsetX !== undefined
@@ -1097,25 +1097,25 @@ Item {
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.margins: 10
-                        spacing: 8
+                        anchors.margins: ThemeLauncher.resultInset
+                        spacing: ThemeLauncher.resultGap
 
                         Image {
                             source: "image://icon/" + (modelData.icon || "application-x-executable")
-                            width: 20
-                            height: 20
-                            sourceSize: Qt.size(20, 20)
+                            width: ThemeLauncher.resultIconSize
+                            height: ThemeLauncher.resultIconSize
+                            sourceSize: Qt.size(ThemeLauncher.resultIconSize, ThemeLauncher.resultIconSize)
                         }
 
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 2
+                            spacing: ThemeLauncher.resultTextGap
 
                             Text {
                                 text: modelData.name
                                 color: Colors.text
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSmall + 1
+                                font.pixelSize: ThemeLauncher.resultTitleSize
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }

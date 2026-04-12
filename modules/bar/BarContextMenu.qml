@@ -114,7 +114,7 @@ ContextMenuPopup {
                 // Layout row content.
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8
+                    spacing: ThemeCards.panelGap
 
                     // Layout icon.
                     Text {
@@ -158,7 +158,7 @@ ContextMenuPopup {
                 // Settings row content.
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8
+                    spacing: ThemeCards.panelGap
 
                     // Settings icon.
                     Text {
@@ -215,7 +215,7 @@ ContextMenuPopup {
                 // Widget settings row content.
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8
+                    spacing: ThemeCards.panelGap
 
                     // Widget settings icon.
                     Text {

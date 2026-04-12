@@ -31,14 +31,15 @@ Item {
     height: (_matchesFilter && shown) ? implicitHeight : 0
     opacity: 1
 
-    implicitWidth: 296
-    implicitHeight: Theme.settingsRowHeight
+    implicitWidth: ThemeSettings.rowWidth
+    implicitHeight: ThemeSettings.rowHeight
 
     // Search match highlight background
     Rectangle {
         anchors.fill: parent
-        anchors.leftMargin: 4; anchors.rightMargin: 4
-        radius: 4
+        anchors.leftMargin: ThemeSettings.highlightInset
+        anchors.rightMargin: ThemeSettings.highlightInset
+        radius: ThemeSettings.highlightRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -46,9 +47,9 @@ Item {
 
     // Accent left-edge strip
     Rectangle {
-        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 4 }
-        width: 3
-        radius: 1
+        anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: ThemeSettings.highlightInset }
+        width: ThemeSettings.accentStripWidth
+        radius: ThemeSettings.accentStripRadius
         color: Colors.highlight
         opacity: root.searchHighlight ? 0.9 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration } }
@@ -56,13 +57,13 @@ Item {
 
     Row {
         anchors.fill: parent
-        anchors.leftMargin: Theme.settingsPanelPadding
-        anchors.rightMargin: Theme.settingsPanelPadding
-        spacing: 8
+        anchors.leftMargin: ThemeSettings.panelPadding
+        anchors.rightMargin: ThemeSettings.panelPadding
+        spacing: ThemeSettings.rowGap
 
         // Label
         Text {
-            width: Theme.settingsLabelWidth
+            width: ThemeSettings.labelWidth
             anchors.verticalCenter: parent.verticalCenter
             text: root.label
             font.family: Theme.fontFamily
@@ -74,9 +75,9 @@ Item {
         // Text input field
         Rectangle {
             anchors.verticalCenter: parent.verticalCenter
-            width: parent.width - Theme.settingsLabelWidth - parent.spacing
-            height: parent.height - 8
-            radius: 4
+            width: parent.width - ThemeSettings.labelWidth - parent.spacing
+            height: parent.height - ThemeSettings.fieldVerticalInset
+            radius: ThemeSettings.fieldRadius
             color: Colors.surface
             border.color: fieldInput.activeFocus ? Colors.highlight : Colors.border
             border.width: 1
@@ -86,10 +87,10 @@ Item {
             TextInput {
                 id: fieldInput
                 anchors.fill: parent
-                anchors.leftMargin: 6
-                anchors.rightMargin: 6
-                anchors.topMargin: 2
-                anchors.bottomMargin: 2
+                anchors.leftMargin: ThemeSettings.fieldPaddingH
+                anchors.rightMargin: ThemeSettings.fieldPaddingH
+                anchors.topMargin: ThemeSettings.fieldPaddingV
+                anchors.bottomMargin: ThemeSettings.fieldPaddingV
                 text: root.value
                 font.family: Theme.fontMono
                 font.pixelSize: Theme.fontSizeSmall
