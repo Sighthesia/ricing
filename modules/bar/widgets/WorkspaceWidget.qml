@@ -30,9 +30,6 @@ Item {
     implicitWidth: _pillTransition.animatedWidth
     width: implicitWidth
     height: implicitHeight
-    opacity: _hintYield ? 0.42 : 1
-    scale: _hintYield ? 0.96 : 1
-
     // --- structure constants ---
     readonly property int _revertDelay:  SettingsService.data.workspaceWidget.revertDelay
     readonly property int _revertCooldown:  50    // ms — post-revert hover-entry dead zone
@@ -46,7 +43,6 @@ Item {
     readonly property int _focusPulsePad: Theme.barWidget.focusPulsePadding
     readonly property int _titleMaxW:    SettingsService.data.workspaceWidget.titleMaxWidth
     readonly property bool _hoverActive: SettingsService.data.workspaceWidget.hoverEnabled
-    readonly property bool _hintYield:   WindowHintService.hintVisible
     readonly property int _pillH:        Theme.barHeight - 2 * Theme.iconPadding
     readonly property real _focusPillWidth: root._harnessFocusWidthOverride >= 0
         ? root._harnessFocusWidthOverride
@@ -106,20 +102,6 @@ Item {
     property bool _initialized: false
     property real _harnessFocusWidthOverride: -1
     property real _harnessOverviewWidthOverride: -1
-
-    Behavior on opacity {
-        NumberAnimation {
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
-        }
-    }
-
-    Behavior on scale {
-        NumberAnimation {
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
-        }
-    }
 
     // ""         = natural (overview when no focused window, focus otherwise)
     // "overview" = temporarily forced overview (hover from focus, workspace switch)
