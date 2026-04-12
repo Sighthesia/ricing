@@ -136,6 +136,14 @@ function _extractShellIpcActionId(normalized) {
     if (ipcMatch)
         return "shell." + ipcMatch[1] + "." + ipcMatch[2]
 
+    const helperMatch = /dymicshell-ipc"?\s+"?([a-z0-9_-]+)"?(?:\s+"?([a-z0-9_-]+)"?)?/i.exec(normalized)
+    if (helperMatch) {
+        if (helperMatch[2])
+            return "shell." + helperMatch[1] + "." + helperMatch[2]
+
+        return "shell.launcher." + helperMatch[1]
+    }
+
     if (normalized.indexOf("dymicshell-ipc\" \"toggle") >= 0)
         return "shell.launcher.toggle"
     if (normalized.indexOf("dymicshell-ipc\" \"openclipboard") >= 0)

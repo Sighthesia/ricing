@@ -59,6 +59,18 @@ Singleton {
         _writeProcess.running = true
     }
 
+    function increaseLevel(step) {
+        const amount = Number(step)
+        const delta = Number.isFinite(amount) && amount > 0 ? amount : 0.05
+        root.setLevel(root.level + delta)
+    }
+
+    function decreaseLevel(step) {
+        const amount = Number(step)
+        const delta = Number.isFinite(amount) && amount > 0 ? amount : 0.05
+        root.setLevel(root.level - delta)
+    }
+
     function _setStateOverride(state) {
         root._stateOverride = state === null ? null : root._normalizeState(state)
         root._maybeEmitStateChanged()
@@ -184,5 +196,12 @@ Singleton {
     Process {
         id: _writeProcess
         onExited: () => root.refresh()
+    }
+
+    IpcHandler {
+        target: "brightness"
+
+        function increase() { root.increaseLevel() }
+        function decrease() { root.decreaseLevel() }
     }
 }

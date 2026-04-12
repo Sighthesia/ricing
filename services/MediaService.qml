@@ -1,6 +1,7 @@
 pragma Singleton
 
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.Mpris
 import QtQuick
 
@@ -133,6 +134,18 @@ Singleton {
         root.activePlayer.next()
     }
 
+    function ipcPlayPause() {
+        root.playPause()
+    }
+
+    function ipcPrevious() {
+        root.previous()
+    }
+
+    function ipcNext() {
+        root.next()
+    }
+
     function setProgress(progress) {
         if (!root.canSeek || root.lengthMs <= 0)
             return
@@ -205,6 +218,14 @@ Singleton {
         function onCanSeekChanged() { root.mediaChanged() }
         function onPositionSupportedChanged() { root.mediaChanged() }
         function onLengthSupportedChanged() { root.mediaChanged() }
+    }
+
+    IpcHandler {
+        target: "media"
+
+        function playPause() { root.ipcPlayPause() }
+        function previous() { root.ipcPrevious() }
+        function next() { root.ipcNext() }
     }
 
     Component.onCompleted: root._syncArtUrl()

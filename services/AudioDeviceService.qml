@@ -143,6 +143,18 @@ Singleton {
         root.setMicrophoneMuted(!root.microphoneMuted)
     }
 
+    function increaseVolume(step) {
+        const amount = Number(step)
+        const delta = Number.isFinite(amount) && amount > 0 ? amount : 0.05
+        root.setVolumeLevel(root.volumeLevel + delta)
+    }
+
+    function decreaseVolume(step) {
+        const amount = Number(step)
+        const delta = Number.isFinite(amount) && amount > 0 ? amount : 0.05
+        root.setVolumeLevel(root.volumeLevel - delta)
+    }
+
     function _setStateOverride(state) {
         root._stateOverride = state === null ? null : root._normalizeState(state)
         root._maybeEmitStateChanged()
@@ -362,5 +374,14 @@ Singleton {
     Process {
         id: _writeProcess
         onExited: () => root.refresh()
+    }
+
+    IpcHandler {
+        target: "audio"
+
+        function volumeUp() { root.increaseVolume() }
+        function volumeDown() { root.decreaseVolume() }
+        function muteOutput() { root.toggleVolumeMute() }
+        function muteInput() { root.toggleMicrophoneMute() }
     }
 }

@@ -157,6 +157,14 @@ Item {
                         onValueCommitted: (newValue) => SettingsService.data.shortcuts.windowHintMetaKeys = newValue
                     }
 
+                    Text {
+                        width: parent.width
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall - 1
+                        color: Colors.textMuted
+                        wrapMode: Text.WordWrap
+                    }
+
                     Repeater {
                         model: NiriShortcutService.shortcutsModel
 
