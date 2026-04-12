@@ -486,4 +486,10 @@ Singleton {
             property string windowHintMetaKeys: "leftmeta,rightmeta"
         }
     }
+
+    IpcHandler {
+        target: "settings"
+
+        function toggle() { root.save() }
+    }
 }

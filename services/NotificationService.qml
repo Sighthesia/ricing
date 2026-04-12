@@ -408,4 +408,15 @@ Singleton {
             // Corrupt or empty file — start fresh
         }
     }
+
+    IpcHandler {
+        target: "notifications"
+
+        function toggleHistory() { root.popupsEnabled = !root.popupsEnabled }
+        function toggleDND() { root.doNotDisturb = !root.doNotDisturb }
+        function clear() {
+            root.historyList.clear()
+            root._unreadCount = 0
+        }
+    }
 }

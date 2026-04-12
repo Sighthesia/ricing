@@ -1,6 +1,7 @@
 pragma Singleton
 
 import Quickshell
+import Quickshell.Io
 import QtQuick
 
 // Shared overlay state for the paged SuperIsland expansion bridge.
@@ -135,5 +136,11 @@ Singleton {
             return state
 
         return ""
+    }
+
+    IpcHandler {
+        target: "controlCenter"
+
+        function toggle() { root.toggleOverlay("control-center", "ipc", "") }
     }
 }

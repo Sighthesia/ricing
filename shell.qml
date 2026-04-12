@@ -11,6 +11,8 @@ ShellRoot {
     id: root
 
     readonly property var _breakReminderService: BreakReminderService
+    readonly property var _nightLightService: NightLightService
+    readonly property var _powerProfileService: PowerProfileService
 
     Component.onCompleted: {
         LauncherService.ensureInitialized()

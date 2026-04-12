@@ -223,4 +223,10 @@ Singleton {
                 root._resetState()
         }
     }
+
+    IpcHandler {
+        target: "sessionMenu"
+
+        function toggle() { root.toggleSessionControl("ipc") }
+    }
 }
