@@ -18,11 +18,11 @@ Item {
     readonly property color _fill: host._mixColor(host._secondaryCapsuleFill, host._primaryCapsuleFill, _emphasis)
     readonly property color _border: host._mixColor(host._secondaryCapsuleBorder, host._primaryCapsuleBorder, _emphasis)
     readonly property color _textColor: host._mixColor(Colors.textMuted, Colors.text, _emphasis)
-    readonly property int _iconSize: Math.round(host._lerp(host._compactIcon, host._primaryIcon, _emphasis))
+    readonly property real _iconSize: host._lerp(host._compactIcon, host._primaryIcon, _emphasis)
     readonly property real _iconOpacity: host._lerp(0.4, 0.92, _emphasis)
     readonly property int _focusedIconIndex: host._focusedWorkspaceIconIndex(workspaceCapsule.capsule)
     readonly property real _iconStripSpacing: Math.max(2, Theme.barWidget.iconSpacing - 1)
-    readonly property real _indicatorSize: workspaceCapsule._iconSize + Math.max(6, Math.round(8 * Theme.uiScale))
+    readonly property real _indicatorSize: workspaceCapsule._iconSize + Math.max(6, 8 * Theme.uiScale)
     readonly property real _indicatorOffset: (workspaceCapsule._indicatorSize - workspaceCapsule._iconSize) / 2
     readonly property real _indicatorStep: workspaceCapsule._iconSize + workspaceCapsule._iconStripSpacing
     readonly property bool _showFocusIndicator: workspaceCapsule._focusedIconIndex >= 0

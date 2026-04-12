@@ -65,6 +65,12 @@ Use this skill when animation state changes are correct but the user still does 
 - Common symptom: after disabling launcher row animations, narrowing search looks static as expected but clearing the keyword still shows residual rows or stale overlap for one frame.
 - Treat this as a state/update-path bug first: disable the incremental branch together with the row animations, or fall back to a full replace while animations are intentionally off.
 
+### 11. Repeated `stop()+start()` Anchor Retargets Cause Tiny Shakes
+- If a rapidly updated anchor uses imperative `stop()` + reset `from/to` + `start()` on every snapshot, the visual can keep replaying only the easing front edge and appear to vibrate in place.
+- Common symptom: during continuous next/previous navigation, the capsule barely advances, keeps shaking near its old position, then surges toward the final target only after input stops.
+- Prefer a root-owned animated property with `Behavior`, so each update retargets from the currently rendered value instead of restarting the whole run.
+- If the UI still needs a post-animation settle/compact pass, keep a separate target property and only settle once the animated value is actually close to that target; do not trust a nominal timer duration alone.
+
 ## Debugging Ladder
 
 Work from outermost cause to innermost rendering node.
@@ -260,6 +266,7 @@ Use when rapid text input keeps restarting launcher or clipboard result motion b
 - Check `modules/bar/superisland/*` last for real geometry ownership.
 - For hint-like transitions, prefer explicit timeline control over `Qt.callLater()` pulses.
 - For `window-hint` style previews, verify that repeated `activeHint` refreshes do not cancel a just-started slot motion.
+- For `window-hint` capsule lanes, prefer root-owned anchor retarget with `Behavior` over imperative `NumberAnimation.stop()/start()` when held-state updates can arrive several times within one `moveDuration`.
 - For `window-hint` to overlay handoff, compare `IslandOverlayService.mode` and `IslandOverlayService.state` separately before deciding a delayed pulse is still valid.
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.

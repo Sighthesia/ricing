@@ -58,22 +58,31 @@ function retargetWorkspaceAnchor(host, target, immediate, workspaceAnimation) {
     workspaceAnimation.stop()
 
     if (immediate || target < 0 || host._animatedWorkspaceAnchor < 0) {
+        host._workspaceAnchorAnimationEnabled = false
+        host._workspaceAnchorDuration = host._workspaceAnchorBaseDuration
+        host._workspaceAnchorTarget = target
         host._animatedWorkspaceAnchor = target
+        host._workspaceAnchorAnimationEnabled = true
         return
     }
 
     var currentAnchor = host._animatedWorkspaceAnchor
     var duration = anchorAnimationDuration(host, currentAnchor, target, host._workspaceAnchorBaseDuration)
     if (duration === 0) {
+        host._workspaceAnchorAnimationEnabled = false
+        host._workspaceAnchorDuration = host._workspaceAnchorBaseDuration
+        host._workspaceAnchorTarget = target
         host._animatedWorkspaceAnchor = target
+        host._workspaceAnchorAnimationEnabled = true
         return
     }
 
-    workspaceAnimation.from = currentAnchor
-    workspaceAnimation.to = target
-    workspaceAnimation.duration = duration
+    host._workspaceAnchorDuration = duration
     host._workspaceSettlePending = true
-    workspaceAnimation.start()
+    host._workspaceAnchorTarget = target
+    host._animatedWorkspaceAnchor = target
+    workspaceAnimation.interval = Math.max(1, duration + 1)
+    workspaceAnimation.restart()
 }
 
 function retargetTitleAnchor(host, target, immediate, titleAnimation) {
@@ -81,22 +90,31 @@ function retargetTitleAnchor(host, target, immediate, titleAnimation) {
     titleAnimation.stop()
 
     if (immediate || target < 0 || host._animatedTitleAnchor < 0) {
+        host._titleAnchorAnimationEnabled = false
+        host._titleAnchorDuration = host._titleAnchorBaseDuration
+        host._titleAnchorTarget = target
         host._animatedTitleAnchor = target
+        host._titleAnchorAnimationEnabled = true
         return
     }
 
     var currentAnchor = host._animatedTitleAnchor
     var duration = anchorAnimationDuration(host, currentAnchor, target, host._titleAnchorBaseDuration)
     if (duration === 0) {
+        host._titleAnchorAnimationEnabled = false
+        host._titleAnchorDuration = host._titleAnchorBaseDuration
+        host._titleAnchorTarget = target
         host._animatedTitleAnchor = target
+        host._titleAnchorAnimationEnabled = true
         return
     }
 
-    titleAnimation.from = currentAnchor
-    titleAnimation.to = target
-    titleAnimation.duration = duration
+    host._titleAnchorDuration = duration
     host._titleSettlePending = true
-    titleAnimation.start()
+    host._titleAnchorTarget = target
+    host._animatedTitleAnchor = target
+    titleAnimation.interval = Math.max(1, duration + 1)
+    titleAnimation.restart()
 }
 
 function focusedWorkspaceIconIndexForHint(hint) {
@@ -122,8 +140,8 @@ function retargetHintAnchors(host, hint, immediate, workspaceAnimation, titleAni
 }
 
 function workspaceMetrics(host, slotPosition, lerpFn) {
-    var topY = -host._workspaceLeadingTrim
-    var centerY = host._workspaceSideHeight + host._workspaceColumnGap - host._workspaceLeadingTrim
+    var topY = 0
+    var centerY = host._workspaceSideHeight + host._workspaceColumnGap
     var bottomY = centerY + host._workspacePrimaryHeight + host._workspaceColumnGap
 
     if (slotPosition < -1) {

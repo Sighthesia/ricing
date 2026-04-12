@@ -44,8 +44,17 @@ Item {
     readonly property int _workspaceStageWidth: root._workspacePrimaryWidth
     readonly property int _workspaceStageHeight: root._workspaceSideHeight * 2 + root._workspacePrimaryHeight + root._workspaceColumnGap * 2
     readonly property var _workspaceStageLayout: HintLogic.workspaceStageLayoutForHint(root._hint)
-    readonly property real _workspaceLeadingTrimTarget: root._workspaceStageLayout.hasBefore ? 0 : root._workspaceSideHeight + root._workspaceColumnGap
-    readonly property real _workspaceTrailingTrimTarget: root._workspaceStageLayout.hasAfter ? 0 : root._workspaceSideHeight + root._workspaceColumnGap
+    readonly property bool _workspaceMotionActive:
+        root._workspaceSettlePending
+        || Math.abs(root._animatedWorkspaceAnchor - root._workspaceAnchorTarget) > 0.001
+    readonly property real _workspaceLeadingTrimTarget:
+        (root._workspaceMotionActive || root._workspaceStageLayout.hasBefore)
+            ? 0
+            : root._workspaceSideHeight + root._workspaceColumnGap
+    readonly property real _workspaceTrailingTrimTarget:
+        (root._workspaceMotionActive || root._workspaceStageLayout.hasAfter)
+            ? 0
+            : root._workspaceSideHeight + root._workspaceColumnGap
     readonly property real _workspaceVisibleStageHeight: root._workspaceStageHeight - root._workspaceLeadingTrim - root._workspaceTrailingTrim
     readonly property int _titleStageWidth: root._titleSideWidth * 2 + root._titlePrimaryWidth + root._capsuleGap * 2
     readonly property int _titleStageHeight: root._titleCapsuleHeight
@@ -59,6 +68,12 @@ Item {
 
     property real _animatedWorkspaceAnchor: -1
     property real _animatedTitleAnchor: -1
+    property real _workspaceAnchorTarget: -1
+    property real _titleAnchorTarget: -1
+    property int _workspaceAnchorDuration: root._workspaceAnchorBaseDuration
+    property int _titleAnchorDuration: root._titleAnchorBaseDuration
+    property bool _workspaceAnchorAnimationEnabled: true
+    property bool _titleAnchorAnimationEnabled: true
     property real _workspaceLeadingTrim: 0
     property real _workspaceTrailingTrim: 0
     property bool _workspaceTrimAnimationEnabled: true
@@ -128,7 +143,7 @@ Item {
     }
 
     function _retargetHintAnchors(hint, immediate) {
-        HintLogic.retargetHintAnchors(root, hint, immediate, _workspaceAnchorAnimation, _titleAnchorAnimation)
+        HintLogic.retargetHintAnchors(root, hint, immediate, _workspaceAnchorSettleTimer, _titleAnchorSettleTimer)
     }
 
     function _visibleWorkspaceIcons(capsule) {
@@ -149,7 +164,7 @@ Item {
 
     function _handleHintChange() {
         const wasVisible = !!(root._hint && root._hint.visible)
-        HintLogic.handleHintChange(root, root._liveHint, _workspaceAnchorAnimation, _titleAnchorAnimation)
+        HintLogic.handleHintChange(root, root._liveHint, _workspaceAnchorSettleTimer, _titleAnchorSettleTimer)
         root._syncWorkspaceStageTrim(!wasVisible || !root._hint || !root._hint.visible)
     }
 
@@ -166,6 +181,47 @@ Item {
         root._workspaceTrailingTrim = root._workspaceTrailingTrimTarget
     }
 
+    Timer {
+        id: _workspaceAnchorSettleTimer
+
+        repeat: false
+
+        onTriggered: {
+            if (!root._workspaceSettlePending)
+                return
+
+            if (Math.abs(root._animatedWorkspaceAnchor - root._workspaceAnchorTarget) > 0.001) {
+                interval = 16
+                restart()
+                return
+            }
+
+            root._workspaceSettlePending = false
+            root._settleWorkspaceStageSlots(root._hint)
+            root._syncWorkspaceStageTrim(true)
+        }
+    }
+
+    Timer {
+        id: _titleAnchorSettleTimer
+
+        repeat: false
+
+        onTriggered: {
+            if (!root._titleSettlePending)
+                return
+
+            if (Math.abs(root._animatedTitleAnchor - root._titleAnchorTarget) > 0.001) {
+                interval = 16
+                restart()
+                return
+            }
+
+            root._titleSettlePending = false
+            root._settleTitleStageSlots(root._hint)
+        }
+    }
+
     Connections {
         target: WindowHintService
 
@@ -174,19 +230,14 @@ Item {
         }
     }
 
-    NumberAnimation {
-        id: _workspaceAnchorAnimation
+    Behavior on _animatedWorkspaceAnchor {
+        enabled: root._workspaceAnchorAnimationEnabled
 
-        target: root
-        property: "_animatedWorkspaceAnchor"
-        easing.type: Theme.anim.moveType
+        NumberAnimation {
+            id: _workspaceAnchorAnimation
 
-        onStopped: {
-            if (!root._workspaceSettlePending)
-                return
-
-            root._workspaceSettlePending = false
-            root._settleWorkspaceStageSlots(root._hint)
+            duration: root._workspaceAnchorDuration
+            easing.type: Easing.OutSine
         }
     }
 
@@ -194,7 +245,7 @@ Item {
         enabled: root._workspaceTrimAnimationEnabled
 
         NumberAnimation {
-            duration: _workspaceAnchorAnimation.running ? _workspaceAnchorAnimation.duration : root._workspaceAnchorBaseDuration
+            duration: root._workspaceAnchorDuration
             easing.type: Theme.anim.moveType
         }
     }
@@ -203,24 +254,19 @@ Item {
         enabled: root._workspaceTrimAnimationEnabled
 
         NumberAnimation {
-            duration: _workspaceAnchorAnimation.running ? _workspaceAnchorAnimation.duration : root._workspaceAnchorBaseDuration
+            duration: root._workspaceAnchorDuration
             easing.type: Theme.anim.moveType
         }
     }
 
-    NumberAnimation {
-        id: _titleAnchorAnimation
+    Behavior on _animatedTitleAnchor {
+        enabled: root._titleAnchorAnimationEnabled
 
-        target: root
-        property: "_animatedTitleAnchor"
-        easing.type: Theme.anim.moveType
+        NumberAnimation {
+            id: _titleAnchorAnimation
 
-        onStopped: {
-            if (!root._titleSettlePending)
-                return
-
-            root._titleSettlePending = false
-            root._settleTitleStageSlots(root._hint)
+            duration: root._titleAnchorDuration
+            easing.type: Easing.OutSine
         }
     }
 
@@ -281,7 +327,8 @@ Item {
                     Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: root._workspaceStageWidth
-                        height: parent.height
+                        height: root._workspaceStageHeight
+                        y: -root._workspaceLeadingTrim
                         clip: true
 
                         Repeater {
