@@ -412,10 +412,14 @@ Singleton {
     IpcHandler {
         target: "notifications"
 
-        function toggleHistory() { root.popupsEnabled = !root.popupsEnabled }
+        function toggleHistory() {
+            BarLayoutService.notificationHistoryOpen = !BarLayoutService.notificationHistoryOpen
+            if (BarLayoutService.notificationHistoryOpen)
+                root.markAllSeen()
+        }
         function toggleDND() { root.doNotDisturb = !root.doNotDisturb }
         function clear() {
-            root.historyList.clear()
+            root.clearHistory()
             root._unreadCount = 0
         }
     }

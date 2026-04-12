@@ -3,17 +3,17 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.services
 
-// Placeholder IPC handler for night light toggle.
-// Expand this service when implementing actual night light / color temperature features.
+// Maps the legacy night-light shortcut onto DymicShell's dark/light appearance mode.
 Singleton {
     id: root
 
-    property bool enabled: false
+    readonly property bool enabled: SettingsService.data.appearance.darkMode
 
     IpcHandler {
         target: "nightLight"
 
-        function toggle() { root.enabled = !root.enabled }
+        function toggle() { WallpaperService.toggleTemporaryDarkMode() }
     }
 }

@@ -3,21 +3,21 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.services
 
-// Placeholder IPC handler for power profile cycling.
-// Expand this service when implementing actual power profile management.
+// Cycles the currently exposed shell power mode.
 Singleton {
     id: root
 
-    property string currentProfile: "balanced"
+    readonly property string currentProfile:
+        SettingsService.data.power.powerSaveEnabled ? "power-saver" : "balanced"
 
     IpcHandler {
         target: "powerProfile"
 
         function cycle() {
-            const profiles = ["balanced", "performance", "power-saver"]
-            const idx = profiles.indexOf(root.currentProfile)
-            root.currentProfile = profiles[(idx + 1) % profiles.length]
+            SettingsService.data.power.powerSaveEnabled = !SettingsService.data.power.powerSaveEnabled
+            SettingsService.save()
         }
     }
 }

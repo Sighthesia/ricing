@@ -17,6 +17,8 @@ Singleton {
     property bool applyQueued: false
     property bool applyQueuedSystemOnly: false
     property string darkModeScheduleStatus: root._computeScheduleStatus()
+    property bool _scheduleManualOverrideActive: false
+    property bool _scheduleOverrideTargetDark: SettingsService.data.appearance.darkMode
 
     function _computeScheduleStatus() {
         const appearance = SettingsService.data.appearance
@@ -33,8 +35,12 @@ Singleton {
             return "无法计算: " + (schedule.reason || "未知错误")
         }
 
-        const currentMode = schedule.targetDark ? "深色" : "浅色"
+        const effectiveDark = root._scheduleManualOverrideActive ? root._scheduleOverrideTargetDark : schedule.targetDark
+        const currentMode = effectiveDark ? "深色" : "浅色"
         let status = currentMode + "模式"
+
+        if (root._scheduleManualOverrideActive)
+            status += " | 手动临时覆盖"
 
         if (mode === "sunrise-sunset") {
             if (schedule.sunrise && schedule.sunset) {
@@ -176,6 +182,31 @@ Singleton {
         root.darkModeScheduleStatus = root._computeScheduleStatus()
     }
 
+    function _applyAppearanceModeChange() {
+        SettingsService.save()
+
+        if (SettingsService.data.appearance.matugenEnabled)
+            root.triggerMatugen()
+        else
+            root.syncAppearanceMode()
+
+        root.darkModeScheduleStatus = root._computeScheduleStatus()
+    }
+
+    function toggleTemporaryDarkMode() {
+        const appearance = SettingsService.data.appearance
+        const nextDark = !appearance.darkMode
+
+        if (appearance.darkModeScheduleMode !== "manual") {
+            root._scheduleManualOverrideActive = true
+            root._scheduleOverrideTargetDark = nextDark
+        }
+
+        appearance.darkMode = nextDark
+        root._applyAppearanceModeChange()
+        root.refreshDarkModeSchedule()
+    }
+
     function _applyScheduledDarkMode() {
         const appearance = SettingsService.data.appearance
         const schedule = ThemeSchedule.resolveDarkModeSchedule(appearance, new Date())
@@ -187,18 +218,37 @@ Singleton {
         }
 
         if (appearance.darkModeScheduleMode === "manual") {
+            root._scheduleManualOverrideActive = false
             scheduleTimer.stop()
             return
         }
 
-        if (appearance.darkMode !== schedule.targetDark) {
-            appearance.darkMode = schedule.targetDark
-            SettingsService.save()
+        if (root._scheduleManualOverrideActive) {
+            if (appearance.darkMode === schedule.targetDark) {
+                root._scheduleManualOverrideActive = false
+                root._scheduleOverrideTargetDark = schedule.targetDark
+            } else {
+                if (!schedule.nextTransition) {
+                    scheduleTimer.stop()
+                    return
+                }
 
-            if (appearance.matugenEnabled)
-                root.triggerMatugen()
-            else
-                root.syncAppearanceMode()
+                var overrideDelay = schedule.nextTransition.getTime() - (new Date()).getTime()
+                if (overrideDelay < 1000)
+                    overrideDelay = 1000
+
+                scheduleTimer.interval = overrideDelay
+                scheduleTimer.restart()
+                root.darkModeScheduleStatus = root._computeScheduleStatus()
+                return
+            }
+        }
+
+        if (appearance.darkMode !== schedule.targetDark) {
+            root._scheduleManualOverrideActive = false
+            root._scheduleOverrideTargetDark = schedule.targetDark
+            appearance.darkMode = schedule.targetDark
+            root._applyAppearanceModeChange()
         }
 
         if (!schedule.nextTransition) {

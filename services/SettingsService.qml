@@ -3,6 +3,7 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.services
 
 // Persists user settings and exposes the shared settings adapter to QML.
 Singleton {
@@ -490,6 +491,8 @@ Singleton {
     IpcHandler {
         target: "settings"
 
-        function toggle() { root.save() }
+        function toggle() {
+            BarLayoutService.activePanel = BarLayoutService.activePanel === "config" ? "none" : "config"
+        }
     }
 }
