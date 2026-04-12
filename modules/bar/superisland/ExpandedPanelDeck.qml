@@ -12,6 +12,7 @@ Item {
 
     property bool drawSurface: true
     property bool measurementMode: false
+    property bool activatePages: !measurementMode
 
     readonly property string currentPage: IslandOverlayService.mode || "launcher"
     readonly property bool _showChrome:
@@ -59,6 +60,9 @@ Item {
     }
 
     function _pageItem(pageName) {
+        if (!root.measurementMode && !root.activatePages)
+            return null
+
         if (pageName === "launcher")
             return launcherPageLoader.item
         if (pageName === "settings")
@@ -104,6 +108,9 @@ Item {
     }
 
     function _activatePage(pageName, includeHeader) {
+        if (!root.activatePages)
+            return
+
         root._runDeckEnter(includeHeader)
 
         if (root.measurementMode)
@@ -139,6 +146,9 @@ Item {
     }
 
     function _deactivatePage(pageName, includeHeader) {
+        if (!root.activatePages)
+            return
+
         if (includeHeader)
             _deckStagger.runExit()
 
@@ -183,7 +193,7 @@ Item {
 
     Component.onCompleted: {
         root._presentedPage = root.currentPage
-        if (root.measurementMode)
+        if (root.measurementMode || !root.activatePages)
             return
 
         Qt.callLater(function() {
@@ -192,7 +202,7 @@ Item {
     }
 
     Component.onDestruction: {
-        if (root.measurementMode)
+        if (root.measurementMode || !root.activatePages)
             return
 
         root._deactivatePage(
@@ -205,15 +215,22 @@ Item {
         target: IslandOverlayService
 
         function onModeChanged() {
-        if (root.measurementMode) {
-            root._presentedPage = IslandOverlayService.mode || "launcher"
-            root._pendingPage = ""
-            root._targetContentHeight = root._measurePageHeight(root._presentedPage)
-            return
-        }
+            if (root.measurementMode) {
+                root._presentedPage = IslandOverlayService.mode || "launcher"
+                root._pendingPage = ""
+                root._targetContentHeight = root._measurePageHeight(root._presentedPage)
+                return
+            }
 
-        let nextPage = IslandOverlayService.mode || "launcher"
-        let previousPage = root._presentedPage
+            if (!root.activatePages) {
+                root._presentedPage = IslandOverlayService.mode || "launcher"
+                root._pendingPage = ""
+                root._targetContentHeight = root._measurePageHeight(root._presentedPage)
+                return
+            }
+
+            let nextPage = IslandOverlayService.mode || "launcher"
+            let previousPage = root._presentedPage
 
             if (nextPage === previousPage)
                 return
@@ -400,7 +417,7 @@ Item {
 
                 Loader {
                     id: launcherPageLoader
-                    active: true
+                    active: root.measurementMode || (root.activatePages && root._presentedPage === "launcher")
                     anchors.fill: parent
                     visible: root._presentedPage === "launcher"
                     source: "ExpandedLauncherPage.qml"
@@ -408,7 +425,7 @@ Item {
 
                 Loader {
                     id: settingsPageLoader
-                    active: true
+                    active: root.measurementMode || (root.activatePages && root._presentedPage === "settings")
                     anchors.fill: parent
                     visible: root._presentedPage === "settings"
                     source: "ExpandedSettingsPage.qml"
@@ -416,7 +433,7 @@ Item {
 
                 Loader {
                     id: controlCenterPageLoader
-                    active: true
+                    active: root.measurementMode || (root.activatePages && root._presentedPage === "control-center")
                     anchors.fill: parent
                     visible: root._presentedPage === "control-center"
                     source: "ExpandedControlCenterPage.qml"
@@ -424,7 +441,7 @@ Item {
 
                 Loader {
                     id: notificationsPageLoader
-                    active: true
+                    active: root.measurementMode || (root.activatePages && root._presentedPage === "notifications")
                     anchors.fill: parent
                     visible: root._presentedPage === "notifications"
                     source: "ExpandedNotificationsPage.qml"
@@ -432,7 +449,7 @@ Item {
 
                 Loader {
                     id: sessionControlPageLoader
-                    active: true
+                    active: root.measurementMode || (root.activatePages && root._presentedPage === "session-control")
                     anchors.fill: parent
                     visible: root._presentedPage === "session-control"
                     source: "ExpandedSessionControlPage.qml"
@@ -440,7 +457,7 @@ Item {
 
                 Loader {
                     id: breakReminderPageLoader
-                    active: true
+                    active: root.measurementMode || (root.activatePages && root._presentedPage === "break-reminder")
                     anchors.fill: parent
                     visible: root._presentedPage === "break-reminder"
                     source: "ExpandedBreakReminderPage.qml"

@@ -43,6 +43,9 @@ considering a change done.
   preserve intermediate visual states across frames.
 - For indicator or capsule motion inside repeated rows, keep the animated state root-owned
   or keep delegate identity stable across service refreshes.
+- For `ListView` filter/reorder motion, prefer incremental model sync plus a detached outgoing
+  layer, keep delegate reuse/state from collapsing the timeline, and sync suppressed delegates
+  to their live viewport state before releasing transition ownership.
 
 ---
 

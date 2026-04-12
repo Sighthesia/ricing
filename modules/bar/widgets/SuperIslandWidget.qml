@@ -772,6 +772,7 @@ Item {
         enabled: false
         drawSurface: false
         measurementMode: false
+        activatePages: false
     }
 
     Loader {
