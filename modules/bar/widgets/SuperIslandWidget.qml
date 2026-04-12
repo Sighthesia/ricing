@@ -230,6 +230,8 @@ Item {
         root._overlaySessionActive ? root._overlayExpandedWidth : root._detachedHintWidth
     readonly property real _attachedPanelHeight:
         root._overlaySessionActive ? root._overlayBodyHeight : root._detachedHintHeight
+    readonly property real _detachedHintReservedHeight:
+        Math.max(root._transientExpandedHeight, root._fullHintExpandedPillHeight + 2)
     readonly property real _detachedHintWidth:
         Math.max(
             root._collapsedWidth,
@@ -327,7 +329,10 @@ Item {
     readonly property real _transientAccentBaseOpacity: 0
     readonly property real _overlayReservedExtension:
         root._attachedPanelActive
-            ? root._overlayDetachedOffset + root._attachedPanelHeight
+            ? root._overlayDetachedOffset
+                + (root._overlaySessionActive
+                    ? root._attachedPanelHeight
+                    : root._detachedHintReservedHeight)
             : 0
     readonly property real _overlayShellY: _pillClip.y
     readonly property real _overlayShellHeight:

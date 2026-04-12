@@ -68,6 +68,10 @@ function workspaceStageSlotPositionAt(host, slotIndex) {
     return StageUtils.workspaceStageSlotPositionAt(host, slotIndex)
 }
 
+function workspaceStageLayoutForHint(hint) {
+    return StageUtils.workspaceStageLayoutForHint(hint)
+}
+
 function titleStageSlotPositionAt(host, slotIndex) {
     return StageUtils.titleStageSlotPositionAt(host, slotIndex)
 }

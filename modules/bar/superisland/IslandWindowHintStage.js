@@ -19,6 +19,14 @@ function titleAnchorForHint(hint) {
     return (hint.windows || []).length > 0 ? 0 : 0
 }
 
+function workspaceSummaryHasContent(summary) {
+    return !!(summary && summary.icons && summary.icons.length > 0)
+}
+
+function workspaceCapsuleVisible(summary, isCurrent) {
+    return isCurrent || workspaceSummaryHasContent(summary)
+}
+
 function workspaceCapsuleForAbsolute(absoluteIndex, hint, workspaceLabelFn) {
     var safeHint = hint || {}
     var summaries = safeHint.workspaces || []
@@ -34,8 +42,39 @@ function workspaceCapsuleForAbsolute(absoluteIndex, hint, workspaceLabelFn) {
         label: workspaceLabelFn(workspaceIndex),
         icons: isCurrent ? (safeHint.windows || []) : (summary && summary.icons ? summary.icons.slice() : []),
         workspaceIndex: workspaceIndex,
-        visible: isCurrent || workspaceIndex > 0
+        visible: workspaceCapsuleVisible(summary, isCurrent)
     }
+}
+
+function workspaceStageLayoutForHint(hint) {
+    var safeHint = hint || {}
+    var summaries = safeHint.workspaces || []
+    var anchor = workspaceAnchorForHint(safeHint)
+    var layout = {
+        hasBefore: false,
+        hasAfter: false
+    }
+
+    if (anchor < 0 || anchor >= summaries.length)
+        return layout
+
+    var range = visibleAbsoluteRange(anchor, summaries.length)
+
+    for (var index = range.from; index <= range.to; index++) {
+        if (index === anchor)
+            continue
+
+        var summary = summaries[index]
+        if (!workspaceCapsuleVisible(summary, false))
+            continue
+
+        if (index < anchor)
+            layout.hasBefore = true
+        else if (index > anchor)
+            layout.hasAfter = true
+    }
+
+    return layout
 }
 
 function titleCapsuleForAbsolute(absoluteIndex, hint) {

@@ -128,6 +128,7 @@ Rules:
 - `BarTransientRevealHost` should reserve height once per transition, not from animated child size.
 - `WorkspaceWidget`-style overview rows should not let visible-item count changes thrash outer width contracts.
 - `SuperIsland` full hint surfaces should reserve a stable maximum height and animate internally.
+- `SuperIsland` `window-hint` height auto-fit must not feed animated `implicitHeight` back into detached overlay reservation. If `IslandWindowHintCard` trims internal stage height while `SuperIslandWidget._overlayReservedExtension` follows `root._detachedHintHeight`, the whole `BarWindow` can resize every frame. Keep `window-hint` reservation stable for the hint session and let only the internal clipped content animate. Relevant files: `modules/bar/superisland/IslandWindowHintCard.qml`, `modules/bar/widgets/SuperIslandWidget.qml`, `modules/bar/superisland/SuperIslandStateMachineOverlayPolicy.qml`, `modules/bar/BarWindow.qml`.
 
 ## Validation
 

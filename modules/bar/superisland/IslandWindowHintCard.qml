@@ -43,6 +43,10 @@ Item {
     readonly property real _overflowSlotPosition: 1.18
     readonly property int _workspaceStageWidth: root._workspacePrimaryWidth
     readonly property int _workspaceStageHeight: root._workspaceSideHeight * 2 + root._workspacePrimaryHeight + root._workspaceColumnGap * 2
+    readonly property var _workspaceStageLayout: HintLogic.workspaceStageLayoutForHint(root._hint)
+    readonly property real _workspaceLeadingTrimTarget: root._workspaceStageLayout.hasBefore ? 0 : root._workspaceSideHeight + root._workspaceColumnGap
+    readonly property real _workspaceTrailingTrimTarget: root._workspaceStageLayout.hasAfter ? 0 : root._workspaceSideHeight + root._workspaceColumnGap
+    readonly property real _workspaceVisibleStageHeight: root._workspaceStageHeight - root._workspaceLeadingTrim - root._workspaceTrailingTrim
     readonly property int _titleStageWidth: root._titleSideWidth * 2 + root._titlePrimaryWidth + root._capsuleGap * 2
     readonly property int _titleStageHeight: root._titleCapsuleHeight
     readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -55,6 +59,9 @@ Item {
 
     property real _animatedWorkspaceAnchor: -1
     property real _animatedTitleAnchor: -1
+    property real _workspaceLeadingTrim: 0
+    property real _workspaceTrailingTrim: 0
+    property bool _workspaceTrimAnimationEnabled: true
     property bool _workspaceSettlePending: false
     property bool _titleSettlePending: false
     // Inspired by end-4/dots-hyprland ("illogical impulse") workspace indicator motion.
@@ -70,7 +77,7 @@ Item {
             Math.max(root._workspaceStageWidth, root._titleStageWidth) + root._padH * 2 + root._stagePadH * 2
         )
     )
-    implicitHeight: root._workspaceStageHeight + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2
+    implicitHeight: root._workspaceVisibleStageHeight + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2
 
     function _lerp(from, to, progress) {
         return HintLogic.lerp(from, to, progress)
@@ -141,7 +148,22 @@ Item {
     }
 
     function _handleHintChange() {
+        const wasVisible = !!(root._hint && root._hint.visible)
         HintLogic.handleHintChange(root, root._liveHint, _workspaceAnchorAnimation, _titleAnchorAnimation)
+        root._syncWorkspaceStageTrim(!wasVisible || !root._hint || !root._hint.visible)
+    }
+
+    function _syncWorkspaceStageTrim(immediate) {
+        if (immediate) {
+            root._workspaceTrimAnimationEnabled = false
+            root._workspaceLeadingTrim = root._workspaceLeadingTrimTarget
+            root._workspaceTrailingTrim = root._workspaceTrailingTrimTarget
+            root._workspaceTrimAnimationEnabled = true
+            return
+        }
+
+        root._workspaceLeadingTrim = root._workspaceLeadingTrimTarget
+        root._workspaceTrailingTrim = root._workspaceTrailingTrimTarget
     }
 
     Connections {
@@ -165,6 +187,24 @@ Item {
 
             root._workspaceSettlePending = false
             root._settleWorkspaceStageSlots(root._hint)
+        }
+    }
+
+    Behavior on _workspaceLeadingTrim {
+        enabled: root._workspaceTrimAnimationEnabled
+
+        NumberAnimation {
+            duration: _workspaceAnchorAnimation.running ? _workspaceAnchorAnimation.duration : root._workspaceAnchorBaseDuration
+            easing.type: Theme.anim.moveType
+        }
+    }
+
+    Behavior on _workspaceTrailingTrim {
+        enabled: root._workspaceTrimAnimationEnabled
+
+        NumberAnimation {
+            duration: _workspaceAnchorAnimation.running ? _workspaceAnchorAnimation.duration : root._workspaceAnchorBaseDuration
+            easing.type: Theme.anim.moveType
         }
     }
 
@@ -212,6 +252,7 @@ Item {
         root._renderHint = root._cloneHint(root._liveHint)
         root._refreshStageSlots(root._renderHint, false, false)
         root._retargetHintAnchors(root._renderHint, true)
+        root._syncWorkspaceStageTrim(true)
     }
 
     Item {
@@ -235,7 +276,7 @@ Item {
 
                 Item {
                     width: parent.width
-                    height: root._workspaceStageHeight
+                    height: root._workspaceVisibleStageHeight
 
                     Item {
                         anchors.horizontalCenter: parent.horizontalCenter

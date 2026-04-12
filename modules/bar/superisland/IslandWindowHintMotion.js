@@ -122,8 +122,8 @@ function retargetHintAnchors(host, hint, immediate, workspaceAnimation, titleAni
 }
 
 function workspaceMetrics(host, slotPosition, lerpFn) {
-    var topY = 0
-    var centerY = host._workspaceSideHeight + host._workspaceColumnGap
+    var topY = -host._workspaceLeadingTrim
+    var centerY = host._workspaceSideHeight + host._workspaceColumnGap - host._workspaceLeadingTrim
     var bottomY = centerY + host._workspacePrimaryHeight + host._workspaceColumnGap
 
     if (slotPosition < -1) {
