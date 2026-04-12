@@ -10,7 +10,7 @@ Item {
     property var currentValue: ""
     property var options: []
     property string filterQuery: ""
-
+    property bool shown: true
     signal optionSelected(var value)
 
     readonly property bool _matchesFilter: {
@@ -44,8 +44,8 @@ Item {
     readonly property bool searchHighlight: filterQuery !== "" && _matchesFilter
 
     visible: height > 0.5 || opacity > 0.01
-    opacity: _matchesFilter ? 1 : 0
-    height: _matchesFilter ? implicitHeight : 0
+    opacity: (_matchesFilter && shown) ? (enabled ? 1 : 0.55) : 0
+    height: (_matchesFilter && shown) ? implicitHeight : 0
 
     implicitWidth: 296
     implicitHeight: Theme.settingsRowHeight
@@ -157,6 +157,7 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
+                            enabled: root.enabled
                             onClicked: root.optionSelected(modelData.value)
                         }
                     }

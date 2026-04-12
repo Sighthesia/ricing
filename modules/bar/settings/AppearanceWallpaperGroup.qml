@@ -38,8 +38,8 @@ StaggerItem {
         width: parent.width
         title: "壁纸 & 动态主题色"
         expanded: false
-        forceExpand: root.groupMatches(["壁纸路径", "动态主题色", "配色算法", "深色模式"])
-        filterVisible: root.searchQuery === "" || root.groupMatches(["壁纸路径", "动态主题色", "配色算法", "深色模式"])
+        forceExpand: root.groupMatches(["壁纸路径", "动态主题色", "切换模式", "位置来源", "城市", "纬度", "经度", "深色开始", "浅色开始", "配色算法", "日出日落", "自定义", "深色模式"])
+        filterVisible: root.searchQuery === "" || root.groupMatches(["壁纸路径", "动态主题色", "切换模式", "位置来源", "城市", "纬度", "经度", "深色开始", "浅色开始", "配色算法", "日出日落", "自定义", "深色模式"])
 
         Item {
             id: wallpaperPathRow
@@ -205,6 +205,7 @@ StaggerItem {
             label: "深色模式"
             filterQuery: root.searchQuery
             value: SettingsService.data.appearance.darkMode
+            enabled: SettingsService.data.appearance.darkModeScheduleMode === "manual"
             onToggled: function(v) {
                 SettingsService.data.appearance.darkMode = v
                 SettingsService.save()
@@ -212,6 +213,237 @@ StaggerItem {
                     WallpaperService.triggerMatugen()
                 else
                     WallpaperService.syncAppearanceMode()
+            }
+        }
+
+        SegmentedSection {
+            label: "切换模式"
+            filterQuery: root.searchQuery
+            currentValue: SettingsService.data.appearance.darkModeScheduleMode
+            options: [
+                { label: "手动", value: "manual" },
+                { label: "日出日落", value: "sunrise-sunset" },
+                { label: "自定义", value: "custom-time" }
+            ]
+            onOptionSelected: function(value) {
+                SettingsService.data.appearance.darkModeScheduleMode = value
+                SettingsService.save()
+                WallpaperService.refreshDarkModeSchedule()
+            }
+        }
+
+        Item {
+            id: scheduleStatusRow
+            width: parent ? parent.width : 296
+            readonly property bool filterVisible: SettingsService.data.appearance.darkModeScheduleMode === "custom-time"
+            readonly property int filterOrder: {
+                if (!parent || !parent.children)
+                    return 0
+                for (let index = 0; index < parent.children.length; index++) {
+                    if (parent.children[index] === scheduleStatusRow)
+                        return index
+                }
+                return 0
+            }
+
+            visible: height > 0.5 || opacity > 0.01
+            opacity: filterVisible ? 1 : 0
+            height: filterVisible ? Theme.settingsRowHeight : 0
+            clip: true
+
+            Behavior on height {
+                SequentialAnimation {
+                    PauseAnimation { duration: scheduleStatusRow.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+            }
+
+            Behavior on opacity {
+                SequentialAnimation {
+                    PauseAnimation { duration: scheduleStatusRow.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.highlightDuration }
+                }
+            }
+
+            Row {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.settingsPanelPadding
+                anchors.rightMargin: Theme.settingsPanelPadding
+                spacing: 8
+
+                Text {
+                    width: Theme.settingsLabelWidth
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "当前状态"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Colors.textMuted
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - Theme.settingsLabelWidth - parent.spacing
+                    text: WallpaperService.darkModeScheduleStatus
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Colors.text
+                    elide: Text.ElideRight
+                }
+            }
+        }
+
+        SegmentedSection {
+            label: "位置来源"
+            filterQuery: root.searchQuery
+            shown: SettingsService.data.appearance.darkModeScheduleMode === "sunrise-sunset"
+            currentValue: SettingsService.data.appearance.darkModeScheduleLocationMode
+            options: [
+                { label: "经纬度", value: "coordinates" },
+                { label: "城市", value: "city" }
+            ]
+            onOptionSelected: function(value) {
+                SettingsService.data.appearance.darkModeScheduleLocationMode = value
+                SettingsService.save()
+
+                if (value === "city") {
+                    if (SettingsService.data.appearance.darkModeScheduleCity !== "")
+                        GeocodingService.lookupCity(SettingsService.data.appearance.darkModeScheduleCity)
+                } else {
+                    WallpaperService.refreshDarkModeSchedule()
+                }
+            }
+        }
+
+        TextFieldSection {
+            label: "城市"
+            filterQuery: root.searchQuery
+            value: SettingsService.data.appearance.darkModeScheduleCity
+            shown: SettingsService.data.appearance.darkModeScheduleMode === "sunrise-sunset"
+                && SettingsService.data.appearance.darkModeScheduleLocationMode === "city"
+            onTextEdited: function(newValue) {
+                SettingsService.data.appearance.darkModeScheduleCity = newValue.trim()
+                GeocodingService.requestCityLookup(newValue)
+            }
+            onValueCommitted: function(newValue) {
+                SettingsService.data.appearance.darkModeScheduleCity = newValue
+                SettingsService.save()
+                GeocodingService.lookupCity(newValue)
+            }
+        }
+
+        Item {
+            id: geocodeStatusRow
+            width: parent ? parent.width : 296
+            readonly property bool filterVisible:
+                SettingsService.data.appearance.darkModeScheduleMode === "sunrise-sunset"
+                && SettingsService.data.appearance.darkModeScheduleLocationMode === "city"
+            readonly property int filterOrder: {
+                if (!parent || !parent.children)
+                    return 0
+
+                for (let index = 0; index < parent.children.length; index++) {
+                    if (parent.children[index] === geocodeStatusRow)
+                        return index
+                }
+
+                return 0
+            }
+
+            visible: height > 0.5 || opacity > 0.01
+            opacity: filterVisible ? 1 : 0
+            height: filterVisible ? Theme.settingsRowHeight : 0
+            clip: true
+
+            Behavior on height {
+                SequentialAnimation {
+                    PauseAnimation { duration: geocodeStatusRow.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.moveDuration; easing.type: Theme.anim.moveType }
+                }
+            }
+
+            Behavior on opacity {
+                SequentialAnimation {
+                    PauseAnimation { duration: geocodeStatusRow.filterOrder * SettingsService.effectiveAnimation.staggerExitStep }
+                    NumberAnimation { duration: Theme.anim.highlightDuration }
+                }
+            }
+
+            Row {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.settingsPanelPadding
+                anchors.rightMargin: Theme.settingsPanelPadding
+                spacing: 8
+
+                Text {
+                    width: Theme.settingsLabelWidth
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "城市解析"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Colors.textMuted
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - Theme.settingsLabelWidth - parent.spacing
+                    text: GeocodingService.lookupStatusText
+                    font.family: Theme.fontMono
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: GeocodingService.lookupState === "error" ? Colors.error : Colors.text
+                    elide: Text.ElideRight
+                }
+            }
+        }
+
+        TextFieldSection {
+            label: "纬度"
+            filterQuery: root.searchQuery
+            value: String(SettingsService.data.appearance.darkModeScheduleLatitude)
+            shown: SettingsService.data.appearance.darkModeScheduleMode === "sunrise-sunset"
+                && SettingsService.data.appearance.darkModeScheduleLocationMode === "coordinates"
+            onValueCommitted: function(newValue) {
+                SettingsService.data.appearance.darkModeScheduleLatitude = parseFloat(newValue)
+                SettingsService.save()
+                WallpaperService.refreshDarkModeSchedule()
+            }
+        }
+
+        TextFieldSection {
+            label: "经度"
+            filterQuery: root.searchQuery
+            value: String(SettingsService.data.appearance.darkModeScheduleLongitude)
+            shown: SettingsService.data.appearance.darkModeScheduleMode === "sunrise-sunset"
+                && SettingsService.data.appearance.darkModeScheduleLocationMode === "coordinates"
+            onValueCommitted: function(newValue) {
+                SettingsService.data.appearance.darkModeScheduleLongitude = parseFloat(newValue)
+                SettingsService.save()
+                WallpaperService.refreshDarkModeSchedule()
+            }
+        }
+
+        TextFieldSection {
+            label: "深色开始"
+            filterQuery: root.searchQuery
+            value: SettingsService.data.appearance.darkModeScheduleDarkStart
+            enabled: SettingsService.data.appearance.darkModeScheduleMode === "custom-time"
+            onValueCommitted: function(newValue) {
+                SettingsService.data.appearance.darkModeScheduleDarkStart = newValue
+                SettingsService.save()
+                WallpaperService.refreshDarkModeSchedule()
+            }
+        }
+
+        TextFieldSection {
+            label: "浅色开始"
+            filterQuery: root.searchQuery
+            value: SettingsService.data.appearance.darkModeScheduleLightStart
+            enabled: SettingsService.data.appearance.darkModeScheduleMode === "custom-time"
+            onValueCommitted: function(newValue) {
+                SettingsService.data.appearance.darkModeScheduleLightStart = newValue
+                SettingsService.save()
+                WallpaperService.refreshDarkModeSchedule()
             }
         }
 

@@ -16,7 +16,6 @@ Item {
 
     property string label: ""
     property bool value: false
-
     signal toggled(bool newValue)
 
     // When non-empty, this item shows only if its label matches the query,
@@ -42,7 +41,7 @@ Item {
     readonly property bool searchHighlight: filterQuery !== "" && _matchesFilter
 
     visible: height > 0.5 || opacity > 0.01
-    opacity: _matchesFilter ? 1 : 0
+    opacity: _matchesFilter ? (enabled ? 1 : 0.55) : 0
     height: _matchesFilter ? implicitHeight : 0
 
     implicitWidth: 296
@@ -127,6 +126,7 @@ Item {
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
+                enabled: root.enabled
                 onClicked: root.toggled(!root.value)
             }
         }

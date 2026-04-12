@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import qs.services
+import "ThemeSchedule.js" as ThemeSchedule
 
 // Owns wallpaper changes and the repo-local matugen export/apply pipeline.
 Singleton {
@@ -15,6 +16,51 @@ Singleton {
     property string pendingTargetMode: SettingsService.data.appearance.darkMode ? "dark" : "light"
     property bool applyQueued: false
     property bool applyQueuedSystemOnly: false
+    property string darkModeScheduleStatus: root._computeScheduleStatus()
+
+    function _computeScheduleStatus() {
+        const appearance = SettingsService.data.appearance
+        const mode = appearance.darkModeScheduleMode || "manual"
+
+        if (mode === "manual") {
+            return appearance.darkMode ? "深色模式 (手动)" : "浅色模式 (手动)"
+        }
+
+        const now = new Date()
+        const schedule = ThemeSchedule.resolveDarkModeSchedule(appearance, now)
+
+        if (!schedule.available) {
+            return "无法计算: " + (schedule.reason || "未知错误")
+        }
+
+        const currentMode = schedule.targetDark ? "深色" : "浅色"
+        let status = currentMode + "模式"
+
+        if (mode === "sunrise-sunset") {
+            if (schedule.sunrise && schedule.sunset) {
+                const sunriseStr = _formatTime(schedule.sunrise)
+                const sunsetStr = _formatTime(schedule.sunset)
+                status += " | 日出 " + sunriseStr + " / 日落 " + sunsetStr
+            }
+        } else if (mode === "custom-time") {
+            status += " | " + (schedule.darkStart || "--:--") + " ~ " + (schedule.lightStart || "--:--")
+        }
+
+        if (schedule.nextTransition) {
+            const nextStr = _formatTime(schedule.nextTransition)
+            status += " | 下次切换 " + nextStr
+        }
+
+        return status
+    }
+
+    function _formatTime(date) {
+        if (!date || typeof date.getTime !== "function")
+            return "--:--"
+        const hours = date.getHours()
+        const mins = date.getMinutes()
+        return (hours < 10 ? "0" : "") + hours + ":" + (mins < 10 ? "0" : "") + mins
+    }
 
     // Emitted after setWallpaper() is called — listeners (e.g., BackgroundWindow)
     // should react to this rather than polling swww.
@@ -28,6 +74,12 @@ Singleton {
     property string currentWallpaper: SettingsService.data.appearance.wallpaperPath
 
     readonly property bool matugenRunning: matugenProcess.running || matugenApplyProcess.running
+
+    Timer {
+        id: scheduleTimer
+        repeat: false
+        onTriggered: root._applyScheduledDarkMode()
+    }
 
     // Debounce rapid setWallpaper() calls before invoking matugen.
     Timer {
@@ -119,6 +171,77 @@ Singleton {
         root._runMatugenApply(mode, true)
     }
 
+    function refreshDarkModeSchedule() {
+        root._applyScheduledDarkMode()
+        root.darkModeScheduleStatus = root._computeScheduleStatus()
+    }
+
+    function _applyScheduledDarkMode() {
+        const appearance = SettingsService.data.appearance
+        const schedule = ThemeSchedule.resolveDarkModeSchedule(appearance, new Date())
+
+        if (!schedule.available) {
+            console.warn("[DymicShell:WallpaperService] dark mode schedule unavailable:", schedule.reason)
+            scheduleTimer.stop()
+            return
+        }
+
+        if (appearance.darkModeScheduleMode === "manual") {
+            scheduleTimer.stop()
+            return
+        }
+
+        if (appearance.darkMode !== schedule.targetDark) {
+            appearance.darkMode = schedule.targetDark
+            SettingsService.save()
+
+            if (appearance.matugenEnabled)
+                root.triggerMatugen()
+            else
+                root.syncAppearanceMode()
+        }
+
+        if (!schedule.nextTransition) {
+            scheduleTimer.stop()
+            return
+        }
+
+        var delay = schedule.nextTransition.getTime() - (new Date()).getTime()
+        if (delay < 1000)
+            delay = 1000
+
+        scheduleTimer.interval = delay
+        scheduleTimer.restart()
+    }
+
+    Connections {
+        target: SettingsService
+        function onSettingsLoaded() {
+            root.refreshDarkModeSchedule()
+        }
+
+        function onSettingsReloaded() {
+            root.refreshDarkModeSchedule()
+        }
+    }
+
+    Connections {
+        target: GeocodingService
+        function onCityResolved(city, latitude, longitude, displayName) {
+            if (SettingsService.data.appearance.darkModeScheduleLocationMode !== "city")
+                return
+
+            SettingsService.data.appearance.darkModeScheduleLatitude = latitude
+            SettingsService.data.appearance.darkModeScheduleLongitude = longitude
+            SettingsService.save()
+            root.refreshDarkModeSchedule()
+        }
+
+        function onCityResolveFailed(city, reason) {
+            console.warn("[DymicShell:WallpaperService] city lookup failed:", city, reason)
+        }
+    }
+
     function _runMatugenApply(mode, systemOnly) {
         root.pendingTargetMode = mode
         if (root.matugenRunning) {
@@ -178,5 +301,6 @@ Singleton {
         // Run matugen once at startup so color scheme is current.
         const path = SettingsService.data.appearance.wallpaperPath
         if (path !== "") _runMatugen(path)
+        root.refreshDarkModeSchedule()
     }
 }

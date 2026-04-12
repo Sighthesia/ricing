@@ -14,9 +14,10 @@ Item {
 
     property string label: ""
     property string value: ""
-
+    property bool shown: true
     // Fired when the user commits a new value (Enter key or focus lost)
     signal valueCommitted(string newValue)
+    signal textEdited(string newValue)
 
     // When non-empty, this item shows only if its label matches the query.
     property string filterQuery: ""
@@ -26,8 +27,9 @@ Item {
 
     readonly property bool searchHighlight: filterQuery !== "" && _matchesFilter
 
-    visible: _matchesFilter
-    height: _matchesFilter ? implicitHeight : 0
+    visible: _matchesFilter && shown
+    height: (_matchesFilter && shown) ? implicitHeight : 0
+    opacity: 1
 
     implicitWidth: 296
     implicitHeight: Theme.settingsRowHeight
@@ -93,8 +95,11 @@ Item {
                 font.pixelSize: Theme.fontSizeSmall
                 color: Colors.text
                 selectByMouse: true
+                enabled: root.enabled
                 clip: true
                 HoverHandler { cursorShape: Qt.IBeamCursor }
+
+                onTextEdited: root.textEdited(text)
 
                 onEditingFinished: {
                     let trimmed = text.trim()
