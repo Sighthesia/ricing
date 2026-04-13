@@ -72,7 +72,7 @@ Item {
         spacing: Theme.widgetSpacing
 
         move: Transition {
-            enabled: BarLayoutService.settingsMode || BarLayoutService.isDragging
+            enabled: BarLayoutService.isDragging
             NumberAnimation {
                 properties: "x,y"
                 duration: Theme.anim.moveDuration
