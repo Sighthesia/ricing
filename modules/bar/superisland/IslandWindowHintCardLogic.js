@@ -30,6 +30,7 @@ function _stageApi(workspaceLabelFn) {
         workspaceStageCapsulesForHint: StageUtils.workspaceStageCapsulesForHint,
         titleStageCapsulesForHint: StageUtils.titleStageCapsulesForHint,
         workspaceStageCapsuleAt: StageUtils.workspaceStageCapsuleAt,
+        workspaceStageAbsoluteIndexAt: StageUtils.workspaceStageAbsoluteIndexAt,
         titleStageCapsuleAt: StageUtils.titleStageCapsuleAt,
         workspaceStageSlotPositionAt: StageUtils.workspaceStageSlotPositionAt,
         titleStageSlotPositionAt: StageUtils.titleStageSlotPositionAt
@@ -60,6 +61,10 @@ function workspaceStageCapsuleAt(host, slotIndex) {
     return StageUtils.workspaceStageCapsuleAt(host, slotIndex)
 }
 
+function workspaceStageAbsoluteIndexAt(host, slotIndex) {
+    return StageUtils.workspaceStageAbsoluteIndexAt(host, slotIndex)
+}
+
 function titleStageCapsuleAt(host, slotIndex) {
     return StageUtils.titleStageCapsuleAt(host, slotIndex)
 }
@@ -70,6 +75,14 @@ function workspaceStageSlotPositionAt(host, slotIndex) {
 
 function workspaceStageLayoutForHint(hint) {
     return StageUtils.workspaceStageLayoutForHint(hint)
+}
+
+function visibleWorkspaceCountForHint(hint) {
+    return StageUtils.visibleWorkspaceCountForHint(hint)
+}
+
+function visibleWorkspaceStageSlotCount(host) {
+    return StageUtils.visibleWorkspaceStageSlotCount(host)
 }
 
 function titleStageSlotPositionAt(host, slotIndex) {
@@ -116,8 +129,8 @@ function focusedWorkspaceIconIndex(capsule) {
     return -1
 }
 
-function workspaceMetrics(host, slotPosition) {
-    return MotionUtils.workspaceMetrics(host, slotPosition, CloneUtils.lerp)
+function workspaceMetrics(host, slotPosition, absoluteIndex) {
+    return MotionUtils.workspaceMetrics(host, slotPosition, absoluteIndex, CloneUtils.lerp)
 }
 
 function titleMetrics(host, slotPosition) {

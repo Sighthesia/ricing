@@ -44,17 +44,34 @@ Item {
     readonly property int _workspaceStageWidth: root._workspacePrimaryWidth
     readonly property int _workspaceStageHeight: root._workspaceSideHeight * 2 + root._workspacePrimaryHeight + root._workspaceColumnGap * 2
     readonly property var _workspaceStageLayout: HintLogic.workspaceStageLayoutForHint(root._hint)
-    readonly property bool _workspaceMotionActive:
+    readonly property real _workspaceSingleSideTrim: root._workspaceSideHeight + root._workspaceColumnGap
+    readonly property int _workspaceCount:
         root._workspaceSettlePending
-        || Math.abs(root._animatedWorkspaceAnchor - root._workspaceAnchorTarget) > 0.001
+            ? HintLogic.visibleWorkspaceStageSlotCount(root)
+            : HintLogic.visibleWorkspaceCountForHint(root._hint)
+    readonly property bool _workspaceHasBefore: root._workspaceStageLayout.hasBefore
+    readonly property bool _workspaceHasAfter: root._workspaceStageLayout.hasAfter
+    readonly property real _workspaceSingleSideOffset:
+        root._workspaceCount <= 1
+            ? 0
+            : (root._workspaceCount === 2
+                ? (Math.max(0, Math.min(1, root._animatedWorkspaceAnchor))
+                    * root._workspaceSingleSideTrim / 2)
+                : ((Math.max(0, Math.min(1, root._animatedWorkspaceAnchor - (root._workspaceCount - 2)))
+                    - Math.max(0, Math.min(1, 1 - root._animatedWorkspaceAnchor)))
+                    * root._workspaceSingleSideTrim / 2))
     readonly property real _workspaceLeadingTrimTarget:
-        (root._workspaceMotionActive || root._workspaceStageLayout.hasBefore)
+        root._workspaceHasBefore && root._workspaceHasAfter
             ? 0
-            : root._workspaceSideHeight + root._workspaceColumnGap
+            : (root._workspaceHasBefore || root._workspaceHasAfter
+                ? root._workspaceSingleSideTrim / 2
+                : root._workspaceSingleSideTrim)
     readonly property real _workspaceTrailingTrimTarget:
-        (root._workspaceMotionActive || root._workspaceStageLayout.hasAfter)
+        root._workspaceHasBefore && root._workspaceHasAfter
             ? 0
-            : root._workspaceSideHeight + root._workspaceColumnGap
+            : (root._workspaceHasBefore || root._workspaceHasAfter
+                ? root._workspaceSingleSideTrim / 2
+                : root._workspaceSingleSideTrim)
     readonly property real _workspaceVisibleStageHeight: root._workspaceStageHeight - root._workspaceLeadingTrim - root._workspaceTrailingTrim
     readonly property int _titleStageWidth: root._titleSideWidth * 2 + root._titlePrimaryWidth + root._capsuleGap * 2
     readonly property int _titleStageHeight: root._titleCapsuleHeight
@@ -63,6 +80,7 @@ Item {
     readonly property int _titleAnchorBaseDuration: Math.max(140, Theme.anim.moveDuration)
     readonly property int _anchorDurationStep: Math.max(16, Math.round(Theme.anim.moveDuration * 0.1))
     readonly property int _anchorMaximumDuration: Math.max(190, Math.round(Theme.anim.moveDuration * 1.35))
+    readonly property int _workspaceTrimDuration: Math.max(90, Math.round(Theme.anim.moveDuration * 0.72))
     readonly property int _workspaceFocusLeadDuration: Math.max(70, Math.round(Theme.anim.moveDuration * 0.42))
     readonly property int _workspaceFocusTrailDuration: Math.max(240, Math.round(Theme.anim.moveDuration * 1.45))
 
@@ -118,6 +136,10 @@ Item {
         return HintLogic.workspaceStageCapsuleAt(root, slotIndex)
     }
 
+    function _workspaceStageAbsoluteIndexAt(slotIndex) {
+        return HintLogic.workspaceStageAbsoluteIndexAt(root, slotIndex)
+    }
+
     function _titleStageCapsuleAt(slotIndex) {
         return HintLogic.titleStageCapsuleAt(root, slotIndex)
     }
@@ -155,7 +177,11 @@ Item {
     }
 
     function _workspaceMetrics(slotPosition) {
-        return HintLogic.workspaceMetrics(root, slotPosition)
+        return HintLogic.workspaceMetrics(root, slotPosition, -1)
+    }
+
+    function _workspaceMetricsForSlot(slotPosition, absoluteIndex) {
+        return HintLogic.workspaceMetrics(root, slotPosition, absoluteIndex)
     }
 
     function _titleMetrics(slotPosition) {
@@ -198,7 +224,7 @@ Item {
 
             root._workspaceSettlePending = false
             root._settleWorkspaceStageSlots(root._hint)
-            root._syncWorkspaceStageTrim(true)
+            root._syncWorkspaceStageTrim(false)
         }
     }
 
@@ -245,7 +271,7 @@ Item {
         enabled: root._workspaceTrimAnimationEnabled
 
         NumberAnimation {
-            duration: root._workspaceAnchorDuration
+            duration: root._workspaceTrimDuration
             easing.type: Theme.anim.moveType
         }
     }
@@ -254,7 +280,7 @@ Item {
         enabled: root._workspaceTrimAnimationEnabled
 
         NumberAnimation {
-            duration: root._workspaceAnchorDuration
+            duration: root._workspaceTrimDuration
             easing.type: Theme.anim.moveType
         }
     }
@@ -340,6 +366,7 @@ Item {
                                 host: root
                                 focusIndexPair: _workspaceFocusIndexPair
                                 capsule: root._workspaceStageCapsuleAt(modelData)
+                                absoluteIndex: root._workspaceStageAbsoluteIndexAt(modelData)
                                 slotPosition: root._workspaceStageSlotPositionAt(modelData)
                                 hiddenForMotion: false
                             }

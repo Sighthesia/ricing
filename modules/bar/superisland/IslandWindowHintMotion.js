@@ -139,7 +139,26 @@ function retargetHintAnchors(host, hint, immediate, workspaceAnimation, titleAni
     retargetWorkspaceFocusIndicator(host, hint, immediate)
 }
 
-function workspaceMetrics(host, slotPosition, lerpFn) {
+function workspaceMetrics(host, slotPosition, absoluteIndex, lerpFn) {
+    if (host._workspaceCount === 2 && absoluteIndex >= 0) {
+        var visibleTop = host._workspaceSingleSideTrim / 2
+        var binaryGap = host._workspaceColumnGap
+        var binaryAnchor = Math.max(0, Math.min(1, host._animatedWorkspaceAnchor))
+        var emphasis = Math.max(0, 1 - Math.abs(absoluteIndex - binaryAnchor))
+        var width = lerpFn(host._workspaceSideWidth, host._workspacePrimaryWidth, emphasis)
+        var topHeight = lerpFn(host._workspacePrimaryHeight, host._workspaceSideHeight, binaryAnchor)
+        var bottomHeight = lerpFn(host._workspaceSideHeight, host._workspacePrimaryHeight, binaryAnchor)
+
+        return {
+            x: (host._workspaceStageWidth - width) / 2,
+            y: absoluteIndex === 0 ? visibleTop : (visibleTop + topHeight + binaryGap),
+            width: width,
+            height: absoluteIndex === 0 ? topHeight : bottomHeight,
+            emphasis: emphasis,
+            opacity: lerpFn(0.5, 1, emphasis)
+        }
+    }
+
     var topY = 0
     var centerY = host._workspaceSideHeight + host._workspaceColumnGap
     var bottomY = centerY + host._workspacePrimaryHeight + host._workspaceColumnGap

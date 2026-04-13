@@ -147,7 +147,7 @@ Singleton {
     }
 
     function _refreshWorkspaceSummaries() {
-        root.workspaceSummaries = root._workspaceSummaries()
+        root.workspaceSummaries = root._workspaceSummaries(true)
     }
 
     function workspaceIcons(workspaceId) {
@@ -162,7 +162,7 @@ Singleton {
         return []
     }
 
-    function _workspaceSummaries() {
+    function _workspaceSummaries(includeTrailingPlaceholder) {
         const items = []
         let lastNonEmptyIndex = -1
 
@@ -177,7 +177,7 @@ Singleton {
         if (items.length === 0)
             return items
 
-        if (lastNonEmptyIndex === items.length - 1) {
+        if (includeTrailingPlaceholder && lastNonEmptyIndex === items.length - 1) {
             items.push({
                 workspaceId: "",
                 workspaceIndex: (items[items.length - 1].workspaceIndex || 0) + 1,
@@ -373,7 +373,7 @@ Singleton {
             currentWindowIcon: currentWindow.icon,
             currentIndex: currentIndex,
             windows: windows,
-            workspaces: root._workspaceSummaries(),
+            workspaces: root._workspaceSummaries(false),
             previousWindow: root._windowAt(windows, currentIndex - 1),
             nextWindow: root._windowAt(windows, currentIndex + 1),
             previousWorkspace: root._workspaceSummaryAt(activePosition - 1),

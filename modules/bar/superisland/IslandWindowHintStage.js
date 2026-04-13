@@ -77,6 +77,33 @@ function workspaceStageLayoutForHint(hint) {
     return layout
 }
 
+function visibleWorkspaceCountForHint(hint) {
+    var safeHint = hint || {}
+    var summaries = safeHint.workspaces || []
+    var anchor = workspaceAnchorForHint(safeHint)
+    var visibleCount = 0
+
+    for (var index = 0; index < summaries.length; index++) {
+        if (workspaceCapsuleVisible(summaries[index], index === anchor))
+            visibleCount += 1
+    }
+
+    return visibleCount
+}
+
+function visibleWorkspaceStageSlotCount(host) {
+    var slots = host && host._workspaceStageSlots ? host._workspaceStageSlots : []
+    var visibleCount = 0
+
+    for (var index = 0; index < slots.length; index++) {
+        var slot = slots[index]
+        if (slot && slot.capsule && slot.capsule.visible)
+            visibleCount += 1
+    }
+
+    return visibleCount
+}
+
 function titleCapsuleForAbsolute(absoluteIndex, hint) {
     var safeHint = hint || {}
     var windows = safeHint.windows || []
@@ -232,6 +259,11 @@ function titleStageSlotAt(host, slotIndex) {
 function workspaceStageCapsuleAt(host, slotIndex) {
     var slot = workspaceStageSlotAt(host, slotIndex)
     return slot ? slot.capsule : null
+}
+
+function workspaceStageAbsoluteIndexAt(host, slotIndex) {
+    var slot = workspaceStageSlotAt(host, slotIndex)
+    return slot && slot.absoluteIndex !== undefined ? slot.absoluteIndex : -1
 }
 
 function titleStageCapsuleAt(host, slotIndex) {
