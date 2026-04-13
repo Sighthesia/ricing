@@ -31,6 +31,50 @@ function settleWorkspaceStageSlots(host, hint, stageApi, cloneApi) {
     )
 }
 
+function retireWorkspaceStageSlots(host, hint, stageApi, cloneApi) {
+    var entries = stageApi.workspaceStageCapsulesForHint(host, hint, false, stageApi.workspaceCapsuleForAbsolute)
+    var slots = cloneApi.slotsForEntries(
+        host._persistentStageSlotIndices,
+        host._workspaceStageSlots,
+        entries,
+        cloneApi.cloneWorkspaceCapsule,
+        "workspace-slot",
+        true
+    )
+    var activeIndices = ({})
+    var hasRetiring = false
+
+    for (var entryIndex = 0; entryIndex < entries.length; entryIndex++)
+        activeIndices[entries[entryIndex].absoluteIndex] = true
+
+    for (var slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+        var slot = slots[slotIndex]
+        if (!slot || slot.absoluteIndex < 0 || !slot.capsule)
+            continue
+        if (activeIndices[slot.absoluteIndex])
+            continue
+        if (slot.capsule.visible === false)
+            continue
+
+        slot = cloneApi.cloneStageSlot ? cloneApi.cloneStageSlot(slot, cloneApi.cloneWorkspaceCapsule, slot.slotId) : {
+            slotId: slot.slotId,
+            absoluteIndex: slot.absoluteIndex,
+            workspaceIndex: slot.workspaceIndex,
+            capsule: cloneApi.cloneWorkspaceCapsule(slot.capsule)
+        }
+        slot.capsule.visible = false
+        slots[slotIndex] = slot
+        hasRetiring = true
+    }
+
+    host._workspaceStageSlots = slots
+    return hasRetiring
+}
+
+function cleanupWorkspaceStageSlots(host, hint, stageApi, cloneApi) {
+    settleWorkspaceStageSlots(host, hint, stageApi, cloneApi)
+}
+
 function settleTitleStageSlots(host, hint, stageApi, cloneApi) {
     host._titleStageSlots = cloneApi.slotsForEntries(
         host._persistentStageSlotIndices,
@@ -140,20 +184,23 @@ function retargetHintAnchors(host, hint, immediate, workspaceAnimation, titleAni
 }
 
 function workspaceMetrics(host, slotPosition, absoluteIndex, lerpFn) {
-    if (host._workspaceCount === 2 && absoluteIndex >= 0) {
+    if (host._workspaceUsesBinaryLayout
+        && absoluteIndex >= host._workspaceVisibleStart
+        && absoluteIndex <= host._workspaceVisibleEnd) {
         var visibleTop = host._workspaceSingleSideTrim / 2
         var binaryGap = host._workspaceColumnGap
-        var binaryAnchor = Math.max(0, Math.min(1, host._animatedWorkspaceAnchor))
-        var emphasis = Math.max(0, 1 - Math.abs(absoluteIndex - binaryAnchor))
+        var binaryAnchor = host._workspaceBinaryAnchorProgress
+        var relativeIndex = Math.max(0, absoluteIndex - host._workspaceVisibleStart)
+        var emphasis = Math.max(0, 1 - Math.abs(relativeIndex - binaryAnchor))
         var width = lerpFn(host._workspaceSideWidth, host._workspacePrimaryWidth, emphasis)
         var topHeight = lerpFn(host._workspacePrimaryHeight, host._workspaceSideHeight, binaryAnchor)
         var bottomHeight = lerpFn(host._workspaceSideHeight, host._workspacePrimaryHeight, binaryAnchor)
 
         return {
             x: (host._workspaceStageWidth - width) / 2,
-            y: absoluteIndex === 0 ? visibleTop : (visibleTop + topHeight + binaryGap),
+            y: relativeIndex === 0 ? visibleTop : (visibleTop + topHeight + binaryGap),
             width: width,
-            height: absoluteIndex === 0 ? topHeight : bottomHeight,
+            height: relativeIndex === 0 ? topHeight : bottomHeight,
             emphasis: emphasis,
             opacity: lerpFn(0.5, 1, emphasis)
         }

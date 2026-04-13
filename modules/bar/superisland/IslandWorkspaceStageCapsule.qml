@@ -10,14 +10,28 @@ Item {
     required property QtObject focusIndexPair
     required property var capsule
     required property real slotPosition
+    required property int absoluteIndex
     property bool hiddenForMotion: false
     property real forcedOpacity: -1
 
-    readonly property var _metrics: host._workspaceMetrics(workspaceCapsule.slotPosition)
+    readonly property var _metrics: host._workspaceMetricsForSlot(workspaceCapsule.slotPosition, workspaceCapsule.absoluteIndex)
     readonly property real _emphasis: _metrics.emphasis
-    readonly property color _fill: host._mixColor(host._secondaryCapsuleFill, host._primaryCapsuleFill, _emphasis)
-    readonly property color _border: host._mixColor(host._secondaryCapsuleBorder, host._primaryCapsuleBorder, _emphasis)
-    readonly property color _textColor: host._mixColor(Colors.textMuted, Colors.text, _emphasis)
+    readonly property bool _isEmptyWorkspace: workspaceCapsule.capsule && (workspaceCapsule.capsule.icons || []).length === 0
+    readonly property real _visualEmphasis: workspaceCapsule._isEmptyWorkspace
+        ? Math.max(0.42, workspaceCapsule._emphasis)
+        : workspaceCapsule._emphasis
+    readonly property color _emptyFillBase: Qt.rgba(1, 1, 1, 0.085)
+    readonly property color _emptyBorderBase: Qt.rgba(1, 1, 1, 0.11)
+    readonly property color _fill: workspaceCapsule._isEmptyWorkspace
+        ? host._mixColor(workspaceCapsule._emptyFillBase, host._primaryCapsuleFill, _visualEmphasis)
+        : host._mixColor(host._secondaryCapsuleFill, host._primaryCapsuleFill, _visualEmphasis)
+    readonly property color _border: workspaceCapsule._isEmptyWorkspace
+        ? host._mixColor(workspaceCapsule._emptyBorderBase, host._primaryCapsuleBorder, _visualEmphasis)
+        : host._mixColor(host._secondaryCapsuleBorder, host._primaryCapsuleBorder, _visualEmphasis)
+    readonly property color _textColor: host._mixColor(Colors.textMuted, Colors.text, _visualEmphasis)
+    readonly property real _capsuleOpacity: workspaceCapsule._isEmptyWorkspace
+        ? Math.max(_metrics.opacity, host._lerp(0.58, 1, _visualEmphasis))
+        : _metrics.opacity
     readonly property real _iconSize: host._lerp(host._compactIcon, host._primaryIcon, _emphasis)
     readonly property real _iconOpacity: host._lerp(0.4, 0.92, _emphasis)
     readonly property int _focusedIconIndex: host._focusedWorkspaceIconIndex(workspaceCapsule.capsule)
@@ -40,8 +54,21 @@ Item {
     y: _metrics.y
     width: _metrics.width
     height: _metrics.height
-    opacity: hiddenForMotion ? 0 : (forcedOpacity >= 0 ? forcedOpacity * _metrics.opacity : (capsule && capsule.visible ? _metrics.opacity : 0))
+    opacity: hiddenForMotion
+        ? 0
+        : (forcedOpacity >= 0
+            ? forcedOpacity * workspaceCapsule._capsuleOpacity
+            : (capsule && capsule.visible ? workspaceCapsule._capsuleOpacity : 0))
     visible: capsule !== null && opacity > 0
+
+    Behavior on opacity {
+        enabled: !host._workspaceSettlePending
+
+        NumberAnimation {
+            duration: host._workspaceCapsuleOpacityDuration
+            easing.type: Theme.anim.moveType
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -144,9 +171,10 @@ Item {
                     text: workspaceCapsule.capsule && (workspaceCapsule.capsule.icons || []).length === 0
                         ? host._workspaceLabel(workspaceCapsule.capsule.workspaceIndex)
                         : ""
-                    color: Colors.textMuted
+                    color: workspaceCapsule._textColor
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
+                    font.bold: workspaceCapsule._emphasis >= 0.38
                     verticalAlignment: Text.AlignVCenter
                     visible: text !== ""
                 }

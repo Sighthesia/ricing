@@ -20,6 +20,7 @@ Singleton {
     readonly property bool triggerBridgeRunning: WindowHintTriggerService.running
 
     property int _revision: 0
+
     property var _lastVisibleHint: _emptyHint()
 
     Timer {
@@ -387,7 +388,7 @@ Singleton {
         function onWindowsUpdated() {
             root._refreshWorkspaceSummaries()
             if (root.hintHeld)
-                root._scheduleHintRefresh(true)
+                root._scheduleHintRefresh(false)
         }
 
         function onWorkspaceActivated() {

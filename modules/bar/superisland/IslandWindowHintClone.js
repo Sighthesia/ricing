@@ -143,7 +143,8 @@ function slotsForEntries(slotIndices, currentSlots, entries, cloneCapsuleFn, pre
             for (var j = 0; j < current.length; j++) {
                 if (assignedSlots[j])
                     continue
-                if (current[j].absoluteIndex >= 0)
+                if (current[j].absoluteIndex >= 0
+                    && (!current[j].capsule || current[j].capsule.visible !== false))
                     continue
 
                 slotIndex = j
@@ -180,6 +181,8 @@ function slotsForEntries(slotIndices, currentSlots, entries, cloneCapsuleFn, pre
             if (assignedSlots[n])
                 continue
             if (current[n].absoluteIndex < 0 || !current[n].capsule)
+                continue
+            if (current[n].capsule.visible === false)
                 continue
 
             slots[n] = cloneStageSlot(current[n], cloneCapsuleFn, current[n].slotId)

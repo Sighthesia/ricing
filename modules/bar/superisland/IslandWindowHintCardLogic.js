@@ -23,8 +23,8 @@ function _stageApi(workspaceLabelFn) {
     return {
         workspaceAnchorForHint: StageUtils.workspaceAnchorForHint,
         titleAnchorForHint: StageUtils.titleAnchorForHint,
-        workspaceCapsuleForAbsolute: function(absoluteIndex, hint) {
-            return StageUtils.workspaceCapsuleForAbsolute(absoluteIndex, hint, workspaceLabelFn)
+        workspaceCapsuleForAbsolute: function(absoluteIndex, hint, transitionAnchor) {
+            return StageUtils.workspaceCapsuleForAbsolute(absoluteIndex, hint, workspaceLabelFn, transitionAnchor)
         },
         titleCapsuleForAbsolute: StageUtils.titleCapsuleForAbsolute,
         workspaceStageCapsulesForHint: StageUtils.workspaceStageCapsulesForHint,
@@ -81,8 +81,16 @@ function visibleWorkspaceCountForHint(hint) {
     return StageUtils.visibleWorkspaceCountForHint(hint)
 }
 
+function visibleWorkspaceAbsoluteBoundsForHint(hint) {
+    return StageUtils.visibleWorkspaceAbsoluteBoundsForHint(hint)
+}
+
 function visibleWorkspaceStageSlotCount(host) {
     return StageUtils.visibleWorkspaceStageSlotCount(host)
+}
+
+function visibleWorkspaceStageSlotBounds(host) {
+    return StageUtils.visibleWorkspaceStageSlotBounds(host)
 }
 
 function titleStageSlotPositionAt(host, slotIndex) {
@@ -99,6 +107,18 @@ function settleWorkspaceStageSlots(host, hint) {
     var cloneApi = _cloneApi()
     var stageApi = _stageApi(cloneApi.workspaceLabel)
     MotionUtils.settleWorkspaceStageSlots(host, hint, stageApi, cloneApi)
+}
+
+function retireWorkspaceStageSlots(host, hint) {
+    var cloneApi = _cloneApi()
+    var stageApi = _stageApi(cloneApi.workspaceLabel)
+    return MotionUtils.retireWorkspaceStageSlots(host, hint, stageApi, cloneApi)
+}
+
+function cleanupWorkspaceStageSlots(host, hint) {
+    var cloneApi = _cloneApi()
+    var stageApi = _stageApi(cloneApi.workspaceLabel)
+    MotionUtils.cleanupWorkspaceStageSlots(host, hint, stageApi, cloneApi)
 }
 
 function settleTitleStageSlots(host, hint) {

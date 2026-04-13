@@ -23,16 +23,48 @@ function workspaceSummaryHasContent(summary) {
     return !!(summary && summary.icons && summary.icons.length > 0)
 }
 
-function workspaceCapsuleVisible(summary, isCurrent) {
-    return isCurrent || workspaceSummaryHasContent(summary)
+function workspaceEdgePlaceholderIndex(summaries, anchor, step) {
+    var safeSummaries = summaries || []
+    var resolvedAnchor = anchor !== undefined ? Math.round(anchor) : -1
+
+    if (resolvedAnchor < 0 || resolvedAnchor >= safeSummaries.length)
+        return -1
+    if (!workspaceSummaryHasContent(safeSummaries[resolvedAnchor]))
+        return -1
+
+    var candidate = resolvedAnchor + step
+    if (candidate < 0 || candidate >= safeSummaries.length)
+        return -1
+    if (workspaceSummaryHasContent(safeSummaries[candidate]))
+        return -1
+
+    for (var index = candidate + step; index >= 0 && index < safeSummaries.length; index += step) {
+        if (workspaceSummaryHasContent(safeSummaries[index]))
+            return -1
+    }
+
+    return candidate
 }
 
-function workspaceCapsuleForAbsolute(absoluteIndex, hint, workspaceLabelFn) {
+function workspaceIsEdgePlaceholder(summaries, absoluteIndex, anchor) {
+    return absoluteIndex === workspaceEdgePlaceholderIndex(summaries, anchor, -1)
+        || absoluteIndex === workspaceEdgePlaceholderIndex(summaries, anchor, 1)
+}
+
+function workspaceCapsuleVisible(summary, isCurrent, isTransitionCurrent) {
+    return isCurrent || isTransitionCurrent || workspaceSummaryHasContent(summary)
+}
+
+function workspaceCapsuleForAbsolute(absoluteIndex, hint, workspaceLabelFn, transitionAnchor) {
     var safeHint = hint || {}
     var summaries = safeHint.workspaces || []
     var activePosition = workspaceAnchorForHint(safeHint)
+    var transitionPosition = transitionAnchor !== undefined ? Math.round(transitionAnchor) : -1
     var summary = absoluteIndex >= 0 && absoluteIndex < summaries.length ? summaries[absoluteIndex] : null
     var isCurrent = absoluteIndex === activePosition
+    var isTransitionCurrent = absoluteIndex === transitionPosition
+    var isEdgePlaceholder = workspaceIsEdgePlaceholder(summaries, absoluteIndex, activePosition)
+        || workspaceIsEdgePlaceholder(summaries, absoluteIndex, transitionPosition)
     var workspaceIndex = isCurrent
         ? (safeHint.workspaceIndex !== undefined ? safeHint.workspaceIndex : (summary ? summary.workspaceIndex : -1))
         : (summary ? summary.workspaceIndex : -1)
@@ -42,53 +74,25 @@ function workspaceCapsuleForAbsolute(absoluteIndex, hint, workspaceLabelFn) {
         label: workspaceLabelFn(workspaceIndex),
         icons: isCurrent ? (safeHint.windows || []) : (summary && summary.icons ? summary.icons.slice() : []),
         workspaceIndex: workspaceIndex,
-        visible: workspaceCapsuleVisible(summary, isCurrent)
+        visible: isEdgePlaceholder || workspaceCapsuleVisible(summary, isCurrent, isTransitionCurrent)
     }
 }
 
 function workspaceStageLayoutForHint(hint) {
-    var safeHint = hint || {}
-    var summaries = safeHint.workspaces || []
-    var anchor = workspaceAnchorForHint(safeHint)
-    var layout = {
-        hasBefore: false,
-        hasAfter: false
+    var layout = workspaceDisplayLayoutForHint(hint)
+    return {
+        hasBefore: layout.hasBefore,
+        hasAfter: layout.hasAfter
     }
-
-    if (anchor < 0 || anchor >= summaries.length)
-        return layout
-
-    var range = visibleAbsoluteRange(anchor, summaries.length)
-
-    for (var index = range.from; index <= range.to; index++) {
-        if (index === anchor)
-            continue
-
-        var summary = summaries[index]
-        if (!workspaceCapsuleVisible(summary, false))
-            continue
-
-        if (index < anchor)
-            layout.hasBefore = true
-        else if (index > anchor)
-            layout.hasAfter = true
-    }
-
-    return layout
 }
 
 function visibleWorkspaceCountForHint(hint) {
-    var safeHint = hint || {}
-    var summaries = safeHint.workspaces || []
-    var anchor = workspaceAnchorForHint(safeHint)
-    var visibleCount = 0
+    return workspaceDisplayLayoutForHint(hint).count
+}
 
-    for (var index = 0; index < summaries.length; index++) {
-        if (workspaceCapsuleVisible(summaries[index], index === anchor))
-            visibleCount += 1
-    }
-
-    return visibleCount
+function visibleWorkspaceAbsoluteBoundsForHint(hint) {
+    var layout = workspaceDisplayLayoutForHint(hint)
+    return ({ first: layout.first, last: layout.last })
 }
 
 function visibleWorkspaceStageSlotCount(host) {
@@ -102,6 +106,25 @@ function visibleWorkspaceStageSlotCount(host) {
     }
 
     return visibleCount
+}
+
+function visibleWorkspaceStageSlotBounds(host) {
+    var slots = host && host._workspaceStageSlots ? host._workspaceStageSlots : []
+    var first = -1
+    var last = -1
+
+    for (var index = 0; index < slots.length; index++) {
+        var slot = slots[index]
+        if (!slot || slot.absoluteIndex < 0 || !slot.capsule || !slot.capsule.visible)
+            continue
+
+        if (first < 0 || slot.absoluteIndex < first)
+            first = slot.absoluteIndex
+        if (last < 0 || slot.absoluteIndex > last)
+            last = slot.absoluteIndex
+    }
+
+    return ({ first: first, last: last })
 }
 
 function titleCapsuleForAbsolute(absoluteIndex, hint) {
@@ -186,16 +209,19 @@ function mergedVisibleAbsoluteIndices(currentAnchor, targetAnchor, length) {
 
 function workspaceStageCapsulesForHint(host, hint, includeCurrentAnchor, workspaceCapsuleForAbsoluteFn) {
     var safeHint = hint || {}
-    var summaries = safeHint.workspaces || []
     var anchor = workspaceAnchorForHint(safeHint)
     var indices = includeCurrentAnchor
-        ? mergedVisibleAbsoluteIndices(host._animatedWorkspaceAnchor, anchor, summaries.length)
-        : visibleAbsoluteIndices(anchor, summaries.length)
+        ? mergedWorkspaceDisplayAbsoluteIndices(host._animatedWorkspaceAnchor, safeHint)
+        : workspaceDisplayAbsoluteIndicesForHint(safeHint)
     var items = []
 
     for (var listIndex = 0; listIndex < indices.length; listIndex++) {
         var index = indices[listIndex]
-        var capsule = workspaceCapsuleForAbsoluteFn(index, safeHint)
+        var capsule = workspaceCapsuleForAbsoluteFn(
+            index,
+            safeHint,
+            includeCurrentAnchor ? host._animatedWorkspaceAnchor : undefined
+        )
         if (!capsule.visible)
             continue
 
@@ -206,6 +232,138 @@ function workspaceStageCapsulesForHint(host, hint, includeCurrentAnchor, workspa
         })
     }
 
+    return items
+}
+
+function workspaceDisplayLayoutForHint(hint) {
+    var safeHint = hint || {}
+    var summaries = safeHint.workspaces || []
+    var anchor = workspaceAnchorForHint(safeHint)
+
+    return workspaceDisplayLayoutForAnchor(summaries, anchor)
+}
+
+function workspaceDisplayLayoutForAnchor(summaries, anchor) {
+    var resolvedAnchor = anchor !== undefined ? Math.round(anchor) : -1
+    var safeSummaries = summaries || []
+    var beforeIndex = -1
+    var afterIndex = -1
+
+    if (resolvedAnchor < 0 || resolvedAnchor >= safeSummaries.length) {
+        return {
+            first: -1,
+            last: -1,
+            count: 0,
+            hasBefore: false,
+            hasAfter: false
+        }
+    }
+
+    for (var before = resolvedAnchor - 1; before >= 0; before--) {
+        if (!workspaceSummaryHasContent(safeSummaries[before]))
+            continue
+
+        beforeIndex = before
+        break
+    }
+
+    for (var after = resolvedAnchor + 1; after < safeSummaries.length; after++) {
+        if (!workspaceSummaryHasContent(safeSummaries[after]))
+            continue
+
+        afterIndex = after
+        break
+    }
+
+    if (beforeIndex < 0)
+        beforeIndex = workspaceEdgePlaceholderIndex(safeSummaries, resolvedAnchor, -1)
+
+    if (afterIndex < 0)
+        afterIndex = workspaceEdgePlaceholderIndex(safeSummaries, resolvedAnchor, 1)
+
+    if (beforeIndex >= 0 && afterIndex >= 0) {
+        return {
+            first: beforeIndex,
+            last: afterIndex,
+            count: 3,
+            hasBefore: true,
+            hasAfter: true
+        }
+    }
+
+    if (beforeIndex >= 0) {
+        return {
+            first: beforeIndex,
+            last: resolvedAnchor,
+            count: 2,
+            hasBefore: true,
+            hasAfter: false
+        }
+    }
+
+    if (afterIndex >= 0) {
+        return {
+            first: resolvedAnchor,
+            last: afterIndex,
+            count: 2,
+            hasBefore: false,
+            hasAfter: true
+        }
+    }
+
+    return {
+        first: resolvedAnchor,
+        last: resolvedAnchor,
+        count: 1,
+        hasBefore: false,
+        hasAfter: false
+    }
+}
+
+function workspaceDisplayAbsoluteIndicesForHint(hint) {
+    return workspaceDisplayAbsoluteIndicesForAnchor((hint || {}).workspaces || [], workspaceAnchorForHint(hint))
+}
+
+function workspaceDisplayAbsoluteIndicesForAnchor(summaries, anchor) {
+    var layout = workspaceDisplayLayoutForAnchor(summaries, anchor)
+    var items = []
+
+    for (var index = layout.first; index <= layout.last; index++) {
+        if (index >= 0)
+            items.push(index)
+    }
+
+    return items
+}
+
+function mergedWorkspaceDisplayAbsoluteIndices(currentAnchor, hint) {
+    var safeHint = hint || {}
+    var summaries = safeHint.workspaces || []
+    var targetAnchor = workspaceAnchorForHint(safeHint)
+    var items = []
+    var seen = ({})
+    var targetItems = workspaceDisplayAbsoluteIndicesForAnchor(summaries, targetAnchor)
+    var currentItems = workspaceDisplayAbsoluteIndicesForAnchor(summaries, currentAnchor)
+
+    for (var index = 0; index < targetItems.length; index++) {
+        var targetAbsoluteIndex = targetItems[index]
+        if (seen[targetAbsoluteIndex])
+            continue
+
+        seen[targetAbsoluteIndex] = true
+        items.push(targetAbsoluteIndex)
+    }
+
+    for (var currentIndex = 0; currentIndex < currentItems.length; currentIndex++) {
+        var currentAbsoluteIndex = currentItems[currentIndex]
+        if (seen[currentAbsoluteIndex])
+            continue
+
+        seen[currentAbsoluteIndex] = true
+        items.push(currentAbsoluteIndex)
+    }
+
+    items.sort(function(left, right) { return left - right })
     return items
 }
 
