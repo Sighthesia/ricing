@@ -17,6 +17,8 @@ Item {
     readonly property bool _hoverReveal: !!(_settings && _settings.hoverReveal)
     readonly property bool _hoverRevealAllowed:
         root._hoverReveal && !(BarLayoutService.settingsMode && BarLayoutService.isDragging)
+    readonly property bool _dragCollapseActive:
+        BarLayoutService.settingsMode && BarLayoutService.isDragging
     readonly property bool _resolvedExpanded: root._enabled && root._hoverRevealAllowed && (root._hovered || _hoverExitHoldTimer.running)
     readonly property bool _transitionRunning: _transition.running
     readonly property bool _flashHeightAnimated: false
@@ -93,6 +95,17 @@ Item {
         _flashCollapseTimer.restart()
     }
 
+    function _forceImmediateCollapse() {
+        root._hovered = false
+        root._expandedVisualActive = false
+        root._flashExpanded = false
+        root._flashClosePending = false
+        root._flashMetricKey = ""
+        root._flashDetail = null
+        _hoverExitHoldTimer.stop()
+        _flashCollapseTimer.stop()
+    }
+
     function _syncExpandedVisualState() {
         if (root._resolvedExpanded)
             root._expandedVisualActive = true
@@ -103,11 +116,12 @@ Item {
         if (root._hoverRevealAllowed)
             return
 
-        root._hovered = false
-        _hoverExitHoldTimer.stop()
+        root._forceImmediateCollapse()
+    }
 
-        if (!_transition.running)
-            root._expandedVisualActive = false
+    on_DragCollapseActiveChanged: {
+        if (root._dragCollapseActive)
+            root._forceImmediateCollapse()
     }
     on_HoveredChanged: {
         if (root._hovered) {
