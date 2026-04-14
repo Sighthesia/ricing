@@ -42,6 +42,11 @@ choices. Reuse shared surface components such as `AnimatedPanelBase.qml`,
 Avoid feature-level hardcoded colors and timing literals unless the theme does
 not yet expose the value.
 
+Shared floating shells should use `modules/bar/FloatingShellSurface.qml` and
+`config/ThemeCards.qml` shell tokens instead of recreating border/radius/fill
+rectangles locally. Prefer the `shell*` token family when a panel, popup, or
+expanded surface should read like the SuperIsland family.
+
 ---
 
 ## Accessibility

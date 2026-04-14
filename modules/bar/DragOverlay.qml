@@ -111,6 +111,7 @@ Item {
         id: floatingCopy
         objectName: "dragOverlayFloatingCopy"
         visible: BarLayoutService.dragSnapshot.active && BarLayoutService.dragSnapshot.widgetId !== ""
+        enabled: false
         x: BarLayoutService.dragSnapshot.visual.left
         anchors.verticalCenter: parent.verticalCenter
         width: BarLayoutService.dragSnapshot.visual.width

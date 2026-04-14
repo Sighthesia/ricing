@@ -15,7 +15,9 @@ Item {
     readonly property var _settings: SettingsService.data ? SettingsService.data.systemMonitor : null
     readonly property bool _enabled: !!(_settings && _settings.enabled)
     readonly property bool _hoverReveal: !!(_settings && _settings.hoverReveal)
-    readonly property bool _resolvedExpanded: root._enabled && root._hoverReveal && (root._hovered || _hoverExitHoldTimer.running)
+    readonly property bool _hoverRevealAllowed:
+        root._hoverReveal && !(BarLayoutService.settingsMode && BarLayoutService.isDragging)
+    readonly property bool _resolvedExpanded: root._enabled && root._hoverRevealAllowed && (root._hovered || _hoverExitHoldTimer.running)
     readonly property bool _transitionRunning: _transition.running
     readonly property bool _flashHeightAnimated: false
     readonly property int _pillHeight: Theme.barWidget.pillHeight
@@ -97,6 +99,16 @@ Item {
     }
 
     on_ResolvedExpandedChanged: root._syncExpandedVisualState()
+    on_HoverRevealAllowedChanged: {
+        if (root._hoverRevealAllowed)
+            return
+
+        root._hovered = false
+        _hoverExitHoldTimer.stop()
+
+        if (!_transition.running)
+            root._expandedVisualActive = false
+    }
     on_HoveredChanged: {
         if (root._hovered) {
             _hoverExitHoldTimer.stop()
@@ -104,7 +116,7 @@ Item {
             return
         }
 
-        if (root._enabled && root._hoverReveal && root._expandedMetrics.length > 0)
+        if (root._enabled && root._hoverRevealAllowed && root._expandedMetrics.length > 0)
             _hoverExitHoldTimer.restart()
 
         if (!root._resolvedExpanded && root._flashClosePending)
@@ -203,7 +215,7 @@ Item {
         clip: true
 
         HoverHandler {
-            enabled: root._enabled
+            enabled: root._enabled && root._hoverRevealAllowed
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             onHoveredChanged: root._hovered = hovered
         }

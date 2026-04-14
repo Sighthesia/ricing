@@ -26,15 +26,15 @@ Item {
         // Semi-transparent fill makes each zone visually distinct without
         // fully obscuring the widgets underneath in layout mode.
         color: selected
-            ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.22)
+            ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.12)
             : highlighted
-                ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.15)
-                : Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.12)
+                ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.08)
+                : "transparent"
 
         border.color: (selected || highlighted) ? Colors.highlight : Colors.border
-        border.width: 1
+        border.width: (selected || highlighted) ? 1 : 0
 
-        opacity: selected ? 1.0 : highlighted ? 0.9 : 0.7
+        opacity: selected ? 1.0 : highlighted ? 0.85 : 0
 
         Behavior on opacity {
             NumberAnimation {
@@ -60,7 +60,7 @@ Item {
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSizeSmall
         color: selected ? Colors.highlight : Colors.textMuted
-        opacity: selected ? 0.9 : 0.65
+        opacity: selected ? 0.9 : highlighted ? 0.6 : 0.35
 
         Behavior on color {
             ColorAnimation { duration: Theme.anim.highlightDuration }

@@ -43,6 +43,8 @@ Item {
     readonly property int _focusPulsePad: Theme.barWidget.focusPulsePadding
     readonly property int _titleMaxW:    SettingsService.data.workspaceWidget.titleMaxWidth
     readonly property bool _hoverActive: SettingsService.data.workspaceWidget.hoverEnabled
+    readonly property bool _hoverAllowed:
+        root._hoverActive && !(BarLayoutService.settingsMode && BarLayoutService.isDragging)
     readonly property int _pillH:        Theme.barHeight - 2 * Theme.iconPadding
     readonly property real _focusPillWidth: root._harnessFocusWidthOverride >= 0
         ? root._harnessFocusWidthOverride
@@ -52,7 +54,11 @@ Item {
         : (_overviewRow.implicitWidth + root._padH * 2)
     readonly property real _collapsedPillWidth: Math.min(root._focusPillWidth, root._overviewPillWidth)
     readonly property real _expandedPillWidth: Math.max(root._focusPillWidth, root._overviewPillWidth)
-    readonly property real layoutMeasurementWidth: _pillTransition.animatedWidth
+    readonly property real _layoutContractWidth:
+        root._flashActive || root._showExpandedPillWidth
+            ? root._transitionExpandedWidth
+            : root._collapsedPillWidth
+    readonly property real layoutMeasurementWidth: root._layoutContractWidth
     readonly property real _flashPillWidth:
         Math.max(_overviewRow.implicitWidth, _focusRow.implicitWidth) + root._padH * 2
     readonly property real _transitionExpandedWidth:
@@ -551,12 +557,12 @@ Item {
         anchors.top:   parent.top
         width: _pill.width
         height: Theme.barHeight
-        enabled: !root._hintYield
+        enabled: !root._hintYield && root._hoverAllowed
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
         cursorShape: Qt.PointingHandCursor
         onEntered: {
-            if (!root._hoverActive || root._justReverted) return
+            if (!root._hoverAllowed || root._justReverted) return
             _revertTimer.stop()
             // If already overridden (e.g. re-entry after moving out briefly), just
             // hold the current state rather than flipping back immediately.
@@ -570,5 +576,18 @@ Item {
             root._modeOverride = root._showOverview ? "focus" : "overview"
         }
         onExited: _revertTimer.restart()
+    }
+
+    on_HoverAllowedChanged: {
+        if (root._hoverAllowed)
+            return
+
+        if (!root._flashActive) {
+            _revertTimer.stop()
+            root._modeOverride = ""
+            return
+        }
+
+        root._settleFlashToOverview()
     }
 }

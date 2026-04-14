@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import qs.config
 import qs.services
+import qs.modules.bar
 import "./settings"
 
 // Floating settings panel that appears below the Bar at the right side of the screen.
@@ -28,25 +29,12 @@ AnimatedPanelBase {
     active: BarLayoutService.activePanel === "config"
 
     // Panel background card
-    Rectangle {
+    FloatingShellSurface {
         anchors.fill: parent
         anchors.topMargin: ThemeCards.panelInset
         anchors.rightMargin: ThemeCards.panelInset
         anchors.bottomMargin: ThemeCards.panelInset
-        radius: Theme.cornerRadius
-        color: Colors.background
-        border.color: Colors.border
-        border.width: 1
-
-        // Subtle inner shadow effect: second border inset
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Theme.cornerRadius - 1
-            color: "transparent"
-            border.color: Qt.rgba(1, 1, 1, 0.04)
-            border.width: 1
-        }
+        contentMargin: 0
 
         // Clicking blank space inside the panel clears any jump-to highlights
         // and dismisses the search dropdown (unfocuses search field).

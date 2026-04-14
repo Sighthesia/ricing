@@ -211,7 +211,7 @@ function workspaceStageCapsulesForHint(host, hint, includeCurrentAnchor, workspa
     var safeHint = hint || {}
     var anchor = workspaceAnchorForHint(safeHint)
     var indices = includeCurrentAnchor
-        ? mergedWorkspaceDisplayAbsoluteIndices(host._animatedWorkspaceAnchor, safeHint)
+        ? mergedWorkspaceDisplayAbsoluteIndices(host, safeHint)
         : workspaceDisplayAbsoluteIndicesForHint(safeHint)
     var items = []
 
@@ -336,23 +336,36 @@ function workspaceDisplayAbsoluteIndicesForAnchor(summaries, anchor) {
     return items
 }
 
-function mergedWorkspaceDisplayAbsoluteIndices(currentAnchor, hint) {
+function visibleWorkspaceStageAbsoluteIndices(host) {
+    var slots = host && host._workspaceStageSlots ? host._workspaceStageSlots : []
+    var items = []
+    var seen = ({})
+
+    for (var index = 0; index < slots.length; index++) {
+        var slot = slots[index]
+        if (!slot || slot.absoluteIndex < 0 || !slot.capsule || slot.capsule.visible !== true)
+            continue
+        if (seen[slot.absoluteIndex])
+            continue
+
+        seen[slot.absoluteIndex] = true
+        items.push(slot.absoluteIndex)
+    }
+
+    return items
+}
+
+function mergedWorkspaceDisplayAbsoluteIndices(host, hint) {
     var safeHint = hint || {}
     var summaries = safeHint.workspaces || []
     var targetAnchor = workspaceAnchorForHint(safeHint)
     var items = []
     var seen = ({})
     var targetItems = workspaceDisplayAbsoluteIndicesForAnchor(summaries, targetAnchor)
-    var currentItems = workspaceDisplayAbsoluteIndicesForAnchor(summaries, currentAnchor)
+    var currentItems = visibleWorkspaceStageAbsoluteIndices(host)
 
-    for (var index = 0; index < targetItems.length; index++) {
-        var targetAbsoluteIndex = targetItems[index]
-        if (seen[targetAbsoluteIndex])
-            continue
-
-        seen[targetAbsoluteIndex] = true
-        items.push(targetAbsoluteIndex)
-    }
+    if (currentItems.length === 0)
+        currentItems = workspaceDisplayAbsoluteIndicesForAnchor(summaries, host ? host._animatedWorkspaceAnchor : -1)
 
     for (var currentIndex = 0; currentIndex < currentItems.length; currentIndex++) {
         var currentAbsoluteIndex = currentItems[currentIndex]
@@ -363,7 +376,15 @@ function mergedWorkspaceDisplayAbsoluteIndices(currentAnchor, hint) {
         items.push(currentAbsoluteIndex)
     }
 
-    items.sort(function(left, right) { return left - right })
+    for (var index = 0; index < targetItems.length; index++) {
+        var targetAbsoluteIndex = targetItems[index]
+        if (seen[targetAbsoluteIndex])
+            continue
+
+        seen[targetAbsoluteIndex] = true
+        items.push(targetAbsoluteIndex)
+    }
+
     return items
 }
 

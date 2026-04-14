@@ -12,6 +12,8 @@ Item {
 
     readonly property bool _enabled: SettingsService.data.systemTray.enabled
     readonly property bool _hoverRevealEnabled: SettingsService.data.systemTray.hoverReveal
+    readonly property bool _hoverRevealAllowed:
+        root._hoverRevealEnabled && !(BarLayoutService.settingsMode && BarLayoutService.isDragging)
     readonly property bool _flashEnabled: SettingsService.data.systemTray.flashEnabled
     readonly property int _padH: Theme.barWidget.contentPaddingH
     readonly property int _pillH: Theme.barWidget.pillHeight
@@ -68,7 +70,7 @@ Item {
     }
 
     function _enterHoverOpen() {
-        if (!root._enabled || !root._hoverRevealEnabled)
+        if (!root._enabled || !root._hoverRevealAllowed)
             return
 
         root._lockStripItemsDuringCollapse = false
@@ -115,7 +117,7 @@ Item {
         interval: Theme.anim.enterDuration
         repeat: false
         onTriggered: {
-            if (root._hovered && root._hoverRevealEnabled) {
+            if (root._hovered && root._hoverRevealAllowed) {
                 root._enterHoverOpen()
                 return
             }
@@ -136,7 +138,7 @@ Item {
         interval: root._flashHoldDuration
         repeat: false
         onTriggered: {
-            if (root._hovered && root._hoverRevealEnabled) {
+            if (root._hovered && root._hoverRevealAllowed) {
                 root._enterHoverOpen()
                 return
             }
@@ -152,7 +154,7 @@ Item {
         repeat: false
         onTriggered: {
             root._holdFlashExtension = false
-            if (root._hovered && root._hoverRevealEnabled && SystemTrayService.hasNonPinnedItems) {
+            if (root._hovered && root._hoverRevealAllowed && SystemTrayService.hasNonPinnedItems) {
                 root._enterHoverOpen()
                 return
             }
@@ -175,6 +177,17 @@ Item {
             if (root._state === "hover-open")
                 root._beginCollapse()
         }
+    }
+
+    on_HoverRevealAllowedChanged: {
+        if (root._hoverRevealAllowed)
+            return
+
+        root._hovered = false
+        hoverExitTimer.stop()
+
+        if (root._state === "hover-open")
+            root._beginCollapse()
     }
 
     BarComponents.BarExpandTransition {
@@ -205,6 +218,7 @@ Item {
 
         HoverHandler {
             id: pillHover
+            enabled: root._hoverRevealAllowed
 
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             onHoveredChanged: {

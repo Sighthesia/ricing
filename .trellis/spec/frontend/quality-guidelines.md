@@ -27,6 +27,8 @@ considering a change done.
   persistent local animation state.
 - Using `Qt.callLater()` to create user-visible motion when a real animation timeline
   is required.
+- Duplicating floating-shell chrome when a shared shell surface component and
+  shared shell tokens already exist.
 
 ---
 
@@ -34,6 +36,8 @@ considering a change done.
 
 - `shell.qml` should only wire top-level windows.
 - Use `Theme.*` / `Colors.*` for shared styling and animation values.
+- Use shared shell token families (`ThemeCards.shell*`) and shared shell
+  surfaces (`FloatingShellSurface.qml`) for floating popups/panels.
 - Use service singletons for shared state and persistence.
 - Use guard clauses and recoverable fallbacks for external input.
 - Keep file-level comments short and explain why, not history.

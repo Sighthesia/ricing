@@ -15,8 +15,8 @@ Rectangle {
 
     signal pressed()
 
-    implicitWidth: 82
-    implicitHeight: 28
+    implicitWidth: ThemeCards.overlayNavSegmentMinWidth
+    implicitHeight: ThemeCards.overlayNavSegmentHeight
     radius: 0
     color: selected
         ? Colors.highlight
@@ -24,10 +24,10 @@ Rectangle {
     border.color: "transparent"
     border.width: 0
 
-    topLeftRadius: firstSegment ? 10 : 0
-    bottomLeftRadius: firstSegment ? 10 : 0
-    topRightRadius: lastSegment ? 10 : 0
-    bottomRightRadius: lastSegment ? 10 : 0
+    topLeftRadius: firstSegment ? ThemeCards.overlayNavRadius : 0
+    bottomLeftRadius: firstSegment ? ThemeCards.overlayNavRadius : 0
+    topRightRadius: lastSegment ? ThemeCards.overlayNavRadius : 0
+    bottomRightRadius: lastSegment ? ThemeCards.overlayNavRadius : 0
 
     Behavior on color {
         ColorAnimation {
@@ -43,7 +43,7 @@ Rectangle {
 
     BarComponents.HoverRevealHighlight {
         anchors.fill: parent
-        radius: firstSegment || lastSegment ? 10 : 0
+        radius: firstSegment || lastSegment ? ThemeCards.overlayNavRadius : 0
         hovered: _area.containsMouse && !root.selected
         highlightColor: Colors.highlight
         highlightOpacity: 0.12
@@ -52,15 +52,15 @@ Rectangle {
     BarComponents.ClickRipple {
         id: _ripple
         anchors.fill: parent
-        radius: firstSegment || lastSegment ? 10 : 0
+        radius: firstSegment || lastSegment ? ThemeCards.overlayNavRadius : 0
         rippleColor: Colors.highlight
     }
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 8
-        anchors.rightMargin: 8
-        spacing: 5
+        anchors.leftMargin: ThemeCards.overlayNavPaddingH
+        anchors.rightMargin: ThemeCards.overlayNavPaddingH
+        spacing: ThemeCards.overlayNavSpacing
 
         Text {
             text: root.iconGlyph

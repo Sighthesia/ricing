@@ -33,24 +33,11 @@ AnimatedPanelBase {
     }
 
     // Panel background card
-    Rectangle {
+    FloatingShellSurface {
         anchors.fill: parent
         anchors.topMargin: ThemeLauncher.panelInset
         anchors.bottomMargin: ThemeLauncher.panelInset
-        radius: Theme.cornerRadius
-        color: Colors.background
-        border.color: Colors.border
-        border.width: 1
-
-        // Inner highlight border
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Theme.cornerRadius - 1
-            color: "transparent"
-            border.color: Qt.rgba(1, 1, 1, 0.04)
-            border.width: 1
-        }
+        contentMargin: 0
     }
 
     LauncherCore {

@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import qs.config
 import qs.services
+import qs.modules.bar
 import "media" as MediaParts
 
 // Drop-down media panel opened from the compact media widget blank area.
@@ -32,16 +33,13 @@ AnimatedPanelBase {
     }
 
     // Panel frame.
-    Rectangle {
+    FloatingShellSurface {
         anchors.fill: parent
         anchors.topMargin: 4
         anchors.leftMargin: 4
         anchors.rightMargin: 4
         anchors.bottomMargin: 4
-        radius: Theme.cornerRadius
-        color: Colors.background
-        border.color: Colors.border
-        border.width: 1
+        contentMargin: 0
     }
 
     // Panel content.

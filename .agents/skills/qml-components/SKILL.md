@@ -22,10 +22,37 @@ description: Use when building UI elements with DymicShell tokens, semantic colo
 
 ## Preferred Base Components
 - `modules/bar/AnimatedPanelBase.qml` - dropdown/panel base with safe surface lifecycle.
+- `modules/bar/FloatingShellSurface.qml` - shared shell surface for SuperIsland-family popups, cards, menus, and inner panels.
 - `modules/bar/StaggerItem.qml` - enter/exit stagger wrapper.
 - `modules/bar/HoverRevealHighlight.qml` - standard hover affordance.
 - `modules/bar/ClickRipple.qml` - standard click feedback.
 - `modules/bar/BarWidgetWrapper.qml` - bar widget container, drag support, shared animation contract.
+
+## Shared Shell Surface Pattern
+
+- When a panel, popup, inner card, badge, or action row should read like the
+  SuperIsland family, prefer `FloatingShellSurface.qml` over a local shell
+  `Rectangle`.
+- Put shared shell sizes, insets, radii, and alpha values in
+  `config/ThemeCards.qml`.
+- Typical token families to reuse first:
+- `ThemeCards.shell*` for outer shells
+- `ThemeCards.panel*` for general panel spacing
+- `ThemeCards.compact*` for inner control-center cards and action rows
+- `ThemeCards.notification*` for notification card geometry
+- `ThemeCards.overlayNav*` for expanded-page segmented controls
+- Preserve content layout when swapping shell bases: move padding to
+  `contentMargin` and avoid reworking business layout unless needed.
+
+## Delegate Animation Ownership
+
+- If a repeated delegate already owns its enter/exit animation, do not move that
+  animation into a shared shell wrapper during a visual refactor.
+- For list-wide stagger, let the parent assign timing slots from visual order and
+  let the delegate continue to execute its own motion.
+- A safe pattern for popup card stacks is: parent computes `enterDelay` /
+  `exitDelay`, delegate applies those delays before restarting its existing
+  `ParallelAnimation`.
 
 ## Attached Panel Geometry
 - When a floating panel must look attached to a pill or bar affordance, keep the main affordance, bridge, and panel body as separate geometric responsibilities even if one `ShapePath` renders the final shell.

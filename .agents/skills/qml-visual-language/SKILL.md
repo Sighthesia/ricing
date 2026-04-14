@@ -21,6 +21,54 @@ Define and enforce a consistent UI language across motion, structure, and surfac
 - Structural hierarchy, pulse, opacity, and spacing should reinforce the same intent.
 - A component can have local emphasis, but it must not break the shared identity.
 
+## Floating Shell Unification
+
+Bar-derived popups, cards, menus, and expanded inner surfaces must read like one
+`SuperIsland` family instead of multiple popup dialects.
+
+### Required Surface Contract
+
+- Prefer one shared shell language for launcher, settings, history, media, menus,
+  notification cards, and SuperIsland inner cards.
+- Treat the old floating-panel look as legacy. New work should start from the
+  shared shell language, not from ad hoc `Rectangle` shells.
+- Reuse one surface family across outer shell, inner cards, badges, and action
+  rows unless a local exception is intentionally emphasized.
+- If a component is visually derived from the bar or SuperIsland overlay, it
+  should feel attached to that system even when technically implemented as a
+  popup or detached window.
+
+### Required Token Contract
+
+- Put shared shell geometry, spacing, and alpha in `config/ThemeCards.qml`.
+- Use the `shell*` token family for common outer shell behavior.
+- Use `ThemeCards` card families such as compact, panel, notification, menu,
+  and overlay-nav tokens before adding new feature-local literals.
+- Keep feature-specific tokens only for business geometry that is truly local.
+  Do not let launcher, settings, or control-center pages each redefine their own
+  shell radius, border alpha, or padding language.
+
+### Migration Rules
+
+- When unifying an existing surface, change the shell first and preserve the
+  service/state/overlay ownership if possible.
+- Replace repeated local border/radius/fill rectangles with one shared shell
+  base before attempting larger structural migration.
+- Inner cards inside `modules/bar/superisland/*` should not quietly drift back
+  to a generic popup style just because they live inside a larger shell.
+- Small chips, badges, and action buttons matter. Once major shells are unified,
+  those smaller surfaces become the most visible remaining inconsistency.
+
+### Review Checklist For Floating Shells
+
+- Does this popup/card/menu look like it belongs to the SuperIsland family?
+- Are radius, border alpha, fill alpha, inset, and gap derived from shared
+  tokens rather than local literals?
+- Was the shell unified without moving unrelated ownership or behavior into a
+  new place?
+- After large surfaces were aligned, were the remaining small buttons, badges,
+  and chips checked for drift as well?
+
 ## Paged UI Language
 
 Any DymicShell UI that has a page concept must use one shared page-switch motion language instead of inventing page-local transitions.
@@ -66,6 +114,8 @@ Any repeated list content with clear rows or cards must use one shared stagger l
 - Scrolling a list must animate both directions: items entering the viewport stagger in, and items leaving the viewport stagger out.
 - Scroll-driven stagger must stay bounded to the visible window. Do not create unbounded delays from total model size.
 - Increase list-item travel and cadence enough that the stagger reads clearly at normal shell speeds; avoid effects so subtle they disappear during scroll.
+- For repeated notification cards or similar popup stacks, the list owner must assign stagger delays from visual order. Do not rely on a shell refactor preserving the old stagger implicitly.
+- If a delegate still has its own enter/exit animation, preserve that delegate-owned motion and let the parent only supply timing slots such as `enterDelay` or `exitDelay`.
 
 ### Use This For
 

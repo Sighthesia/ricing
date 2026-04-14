@@ -72,10 +72,7 @@ write_gtk_css_entrypoint() {
             printf '%s\n' '@import url("colors.css");' > "$tmp"
             ;;
         gtk4)
-            printf '%s\n%s\n%s\n' \
-                '@import url("libadwaita.css");' \
-                '@import url("libadwaita-tweaks.css");' \
-                '@import url("colors.css");' > "$tmp"
+            printf '%s\n' '@import url("colors.css");' > "$tmp"
             ;;
         *)
             rm -f "$tmp"
@@ -271,6 +268,24 @@ reload_kitty() {
         printf '[matugen-apply] kitty reload-conf rc=1\n'
     fi
     kitty_signal_all
+}
+
+reload_desktop_color_scheme_watchers() {
+    local unit
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        return 0
+    fi
+
+    for unit in \
+        xdg-desktop-portal.service \
+        xdg-desktop-portal-gtk.service \
+        xdg-desktop-portal-gnome.service \
+        xdg-desktop-portal-kde.service; do
+        systemctl --user try-restart "$unit" >/dev/null 2>&1 || true
+    done
+
+    printf '[matugen-apply] portal color-scheme watchers refreshed\n'
 }
 
 reload_btop() {
@@ -491,6 +506,7 @@ main() {
 
     write_gtk_css_entrypoint "$home/.config/gtk-3.0/gtk.css" gtk3
     write_gtk_css_entrypoint "$home/.config/gtk-4.0/gtk.css" gtk4
+    write_gtk_css_entrypoint "$home/.config/gtk-4.0/gtk-dark.css" gtk4
     upsert_ini_key "$home/.config/gtk-3.0/settings.ini" "Settings" "gtk-theme-name" "$gtk_theme_name"
     upsert_ini_key "$home/.config/gtk-4.0/settings.ini" "Settings" "gtk-theme-name" "$gtk_theme_name"
     upsert_ini_key "$home/.config/gtk-3.0/settings.ini" "Settings" "gtk-application-prefer-dark-theme" "$gtk_dark_preference"
@@ -500,6 +516,8 @@ main() {
         gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme_name" >/dev/null 2>&1 || true
         gsettings set org.gnome.desktop.interface color-scheme "$gsettings_color_scheme" >/dev/null 2>&1 || true
     fi
+
+    reload_desktop_color_scheme_watchers
 
     ensure_yazi_flavor "$mode"
 

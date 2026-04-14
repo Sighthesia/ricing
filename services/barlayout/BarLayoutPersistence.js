@@ -36,8 +36,10 @@ function persistLayoutJson(persistStore, json) {
 
 function writeLayoutJson(fileWriter, json) {
     fileWriter.running = false
+    fileWriter.stdinEnabled = true
     fileWriter.running = true
     fileWriter.write(json + "\n")
+    fileWriter.stdinEnabled = false
 }
 
 function saveLayoutJson(layoutModel, persistStore, fileWriter) {

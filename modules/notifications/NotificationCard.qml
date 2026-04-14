@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Widgets
+import "../bar" as BarComponents
 import qs.config
 import qs.services
 
@@ -24,8 +25,10 @@ Item {
     required property string actionsJson
     required property real   timestamp
 
-    // Component-local layout constants; promote to Theme tokens in a future notification token pass.
-    readonly property int _cardWidth:   360
+    property int enterDelay: 0
+    property int exitDelay: 0
+
+    readonly property int _cardWidth:   ThemeCards.notificationCardWidth
     readonly property int _appIconSize:  18
 
     implicitWidth: _cardWidth
@@ -58,13 +61,33 @@ Item {
 
     function triggerEnter() {
         _isExiting = false
-        _enterAnim.start()
+        _exitDelayTimer.stop()
+        _enterAnim.stop()
+        _offsetY = -20
+        _opacity = 0.0
+        _enterDelayTimer.interval = Math.max(0, card.enterDelay)
+        _enterDelayTimer.restart()
     }
 
     function triggerExit() {
         if (_isExiting) return
         _isExiting = true
-        _exitAnim.start()
+        _enterDelayTimer.stop()
+        _exitAnim.stop()
+        _exitDelayTimer.interval = Math.max(0, card.exitDelay)
+        _exitDelayTimer.restart()
+    }
+
+    Timer {
+        id: _enterDelayTimer
+        repeat: false
+        onTriggered: _enterAnim.restart()
+    }
+
+    Timer {
+        id: _exitDelayTimer
+        repeat: false
+        onTriggered: _exitAnim.restart()
     }
 
     // Enter: ease in from above with bounce
@@ -140,17 +163,18 @@ Item {
 
     // --- Visual card ---
 
-    Rectangle {
+    BarComponents.FloatingShellSurface {
         id: _bg
         anchors.left: parent.left
         anchors.right: parent.right
-        implicitHeight: _content.implicitHeight + 24
-        radius: Theme.cornerRadius
-        color: Colors.surface
-        border.color: urgency === 2
-            ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.8)
-            : Colors.border
-        border.width: 1
+        contentMargin: ThemeCards.notificationCardPadding
+        shellRadius: ThemeCards.notificationCardRadius
+        fillColor: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, ThemeCards.shellSurfaceAlpha)
+        borderColor: urgency === 2
+            ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, ThemeCards.shellBorderAlpha)
+            : Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, ThemeCards.shellBorderAlpha)
+        innerBorderColor: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, ThemeCards.shellInnerBorderAlpha)
+        implicitHeight: _content.implicitHeight + ThemeCards.notificationCardPadding * 2
 
         // Hover detection — routes pause/resume signals to the service
         HoverHandler {
@@ -170,7 +194,7 @@ Item {
         ColumnLayout {
             id: _content
             anchors { left: parent.left; right: parent.right; top: parent.top }
-            anchors.margins: ThemeCards.notificationCardPadding
+            anchors.margins: 0
             spacing: ThemeCards.panelGap / 2
 
             // Header row: icon • app name • close button
@@ -305,7 +329,7 @@ Item {
     }
 
     Component.onCompleted: {
-        // Defer one frame so the layout has settled before the enter animation starts
+        // Defer one frame so the layout has settled before the staggered enter starts.
         Qt.callLater(triggerEnter)
     }
 }

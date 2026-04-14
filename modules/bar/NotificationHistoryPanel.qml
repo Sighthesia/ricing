@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import qs.modules.bar
 
 // Drop-down panel showing notification history, anchored below the bar at the right edge.
 // Opened/closed by BarLayoutService.notificationHistoryOpen.
@@ -83,15 +84,10 @@ AnimatedPanelBase {
     }
 
     // Panel background
-    Rectangle {
+    FloatingShellSurface {
         anchors.fill: parent
-        anchors.topMargin: ThemeCards.panelInset
-        anchors.rightMargin: ThemeCards.panelInset
-        anchors.bottomMargin: ThemeCards.panelInset
-        radius: Theme.cornerRadius
-        color: Colors.background
-        border.color: Colors.border
-        border.width: 1
+        anchors.margins: ThemeCards.panelInset
+        contentMargin: 0
 
         ColumnLayout {
             anchors.fill: parent

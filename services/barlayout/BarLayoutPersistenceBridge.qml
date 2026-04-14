@@ -39,6 +39,6 @@ Item {
     Process {
         id: fileWriter
         stdinEnabled: true
-        command: ["sh", "-c", "mkdir -p '" + root.configDir + "' && cat > '" + root.configFile + "'"]
+        command: ["sh", "-c", "mkdir -p '" + root.configDir + "' && tmp=$(mktemp \"" + root.configFile + ".XXXXXX\") && cat > \"$tmp\" && mv \"$tmp\" '" + root.configFile + "'"]
     }
 }

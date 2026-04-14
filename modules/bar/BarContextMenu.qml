@@ -20,7 +20,7 @@ ContextMenuPopup {
     anchor.rect.width: 1
     anchor.rect.height: 1
 
-    implicitWidth: 160
+    implicitWidth: ThemeCards.menuWidth
     implicitHeight: menuColumn.implicitHeight + contentMargin * 2
 
     property real _clickX: 0
@@ -105,7 +105,7 @@ ContextMenuPopup {
             delay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
             exitDelay: 0
             width: parent.width
-            height: Theme.barHeight - Theme.barPadding
+            height: ThemeCards.menuRowHeight
 
             // Layout action row.
             ContextMenuAction {
@@ -149,7 +149,7 @@ ContextMenuPopup {
                  + SettingsService.effectiveAnimation.staggerLevel1Step
             exitDelay: 0
             width: parent.width
-            height: Theme.barHeight - Theme.barPadding
+            height: ThemeCards.menuRowHeight
 
             // Settings action row.
             ContextMenuAction {
@@ -206,7 +206,7 @@ ContextMenuPopup {
                  + SettingsService.effectiveAnimation.staggerLevel1Step * 2
             exitDelay: 0
             width: parent.width
-            height: visible ? Theme.barHeight - Theme.barPadding : 0
+            height: visible ? ThemeCards.menuRowHeight : 0
 
             // Widget settings action row.
             ContextMenuAction {

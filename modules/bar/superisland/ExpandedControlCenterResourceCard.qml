@@ -6,7 +6,7 @@ import ".." as BarComponents
 import "../widgets/systemmonitor" as MonitorParts
 
 // Resource summary surface for the SuperIsland control center page.
-Rectangle {
+BarComponents.FloatingShellSurface {
     id: root
 
     readonly property var _resourceMetrics: root._buildResourceMetrics()
@@ -43,17 +43,14 @@ Rectangle {
         SettingsService.save()
     }
 
-    radius: Theme.cornerRadius
-    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, ThemeCards.panelSurfaceAlpha)
-    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, ThemeCards.panelBorderAlpha)
-    border.width: 1
     implicitWidth: ThemeCards.compactWidth
     implicitHeight: _resourceColumn.implicitHeight + ThemeCards.panelPadding * 2
+    contentMargin: ThemeCards.panelPadding
 
     ColumnLayout {
         id: _resourceColumn
         anchors.fill: parent
-        anchors.margins: ThemeCards.panelPadding
+        anchors.margins: 0
         spacing: ThemeCards.compactGap
 
         ColumnLayout {
@@ -83,24 +80,24 @@ Rectangle {
             Repeater {
                 model: root._resourceMetrics
 
-                delegate: Rectangle {
+                delegate: BarComponents.FloatingShellSurface {
                     required property var modelData
                     Layout.fillWidth: true
-                    radius: ThemeCards.compactRadius
-                    color: Qt.rgba(
+                    shellRadius: ThemeCards.compactRadius
+                    contentMargin: Theme.barWidget.contentPaddingH
+                    fillColor: Qt.rgba(
                         Colors.highlight.r,
                         Colors.highlight.g,
                         Colors.highlight.b,
                         modelData.severity === "critical" ? 0.12 : 0.08
                     )
-                    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.24)
-                    border.width: 1
+                    borderColor: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.24)
                     implicitHeight: _metricRow.implicitHeight + Theme.barWidget.contentPaddingV * 4
 
                     RowLayout {
                         id: _metricRow
                         anchors.fill: parent
-                        anchors.margins: Theme.barWidget.contentPaddingH
+                        anchors.margins: 0
                         spacing: ThemeCards.compactGap
 
                         MonitorParts.SystemMonitorGauge {
@@ -152,23 +149,23 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        BarComponents.FloatingShellSurface {
             Layout.fillWidth: true
-            radius: ThemeCards.compactRadius
-            color: _powerSaveArea.containsMouse
+            shellRadius: ThemeCards.compactRadius
+            contentMargin: Theme.barWidget.contentPaddingH
+            fillColor: _powerSaveArea.containsMouse
                 ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, SettingsService.powerSaveEnabled ? 0.18 : 0.12)
                 : Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, SettingsService.powerSaveEnabled ? 0.22 : 0.12)
-            border.color: SettingsService.powerSaveEnabled
+            borderColor: SettingsService.powerSaveEnabled
                 ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.72)
                 : Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
-            border.width: 1
             implicitHeight: _powerSaveRow.implicitHeight + Theme.barWidget.contentPaddingV * 4
 
-            Behavior on color {
+            Behavior on fillColor {
                 ColorAnimation { duration: Theme.anim.highlightDuration }
             }
 
-            Behavior on border.color {
+            Behavior on borderColor {
                 ColorAnimation { duration: Theme.anim.highlightDuration }
             }
 
@@ -192,7 +189,7 @@ Rectangle {
             RowLayout {
                 id: _powerSaveRow
                 anchors.fill: parent
-                anchors.margins: Theme.barWidget.contentPaddingH
+                anchors.margins: 0
                 spacing: ThemeCards.compactGap
 
                 Rectangle {

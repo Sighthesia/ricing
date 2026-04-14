@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import qs.modules.bar
 
 // Widget picker panel — same visual style as SettingsPanelWindow.
 // Uses AnimatedPanelBase for a drop-down expand/collapse animation.
@@ -70,25 +71,12 @@ AnimatedPanelBase {
     }
 
     // Outer card — same structure as SettingsPanelWindow
-    Rectangle {
+    FloatingShellSurface {
         anchors.fill: parent
         anchors.topMargin: ThemeCards.panelInset
         anchors.rightMargin: ThemeCards.panelInset
         anchors.bottomMargin: ThemeCards.panelInset
-        radius: Theme.cornerRadius
-        color: Colors.background
-        border.color: Colors.border
-        border.width: 1
-
-        // Subtle inner highlight border
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Theme.cornerRadius - 1
-            color: "transparent"
-            border.color: Qt.rgba(1, 1, 1, 0.04)
-            border.width: 1
-        }
+        contentMargin: 0
 
         ColumnLayout {
             anchors.fill: parent

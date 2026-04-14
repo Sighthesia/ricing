@@ -19,7 +19,7 @@ Item {
     readonly property bool _showsCheckIndicator: root._buttonType !== QsMenuButtonType.None
     readonly property string _iconSource: root.entry?.icon ?? ""
     readonly property bool _hasIcon: root._iconSource !== ""
-    readonly property int _rowHeight: Theme.barHeight - Theme.barPadding
+    readonly property int _rowHeight: ThemeCards.menuRowHeight
 
     implicitWidth: parent ? parent.width : 160
     implicitHeight: root._isSeparator

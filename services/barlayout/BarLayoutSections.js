@@ -38,21 +38,26 @@ function resolveAdaptiveSectionBounds(usableBounds, contentWidths) {
     }
 }
 
-function resolveVisualPlacement(sectionName, usableBounds, contentWidths) {
+function resolveVisualPlacement(sectionName, usableBounds, contentWidths, adaptiveBounds) {
     var contentWidth = contentWidths[sectionName] || 0
 
     if (sectionName === "center") {
-        var centerVisualLeft = usableBounds.midpoint - contentWidth / 2
+        var centerLeftBound = adaptiveBounds ? adaptiveBounds.centerLeft : usableBounds.left
+        var centerRightBound = adaptiveBounds ? adaptiveBounds.centerRight : usableBounds.right
+        var centerBoundWidth = Math.max(0, centerRightBound - centerLeftBound)
+        var centerWidth = Math.min(contentWidth, centerBoundWidth)
+        var centerVisualLeft = usableBounds.midpoint - centerWidth / 2
 
         return {
-            left: Math.max(usableBounds.left, Math.min(usableBounds.right - contentWidth, centerVisualLeft)),
-            width: contentWidth,
+            left: Math.max(centerLeftBound, Math.min(centerRightBound - centerWidth, centerVisualLeft)),
+            width: centerWidth,
             centerX: usableBounds.midpoint
         }
     }
 
     if (sectionName === "right") {
-        var rightVisualLeft = Math.max(usableBounds.left, usableBounds.right - contentWidth)
+        var rightLeftBound = adaptiveBounds ? adaptiveBounds.rightVisualLeft : usableBounds.left
+        var rightVisualLeft = Math.max(rightLeftBound, usableBounds.right - contentWidth)
 
         return {
             left: rightVisualLeft,

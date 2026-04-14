@@ -86,11 +86,10 @@ Item {
         BarLayoutService.suppressWidgetPrimaryActions && !wrapper._isDragging
 
     implicitWidth: _isDragging ? 0 : _layoutMeasuredWidth
-    implicitHeight: _isDragging ? 0 : _naturalHeight
+    implicitHeight: _naturalHeight
 
     Behavior on implicitWidth {
-        enabled: !wrapper._suppressNextWidthAnimation
-            && BarLayoutService.settingsMode
+        enabled: false
         NumberAnimation {
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
@@ -107,6 +106,7 @@ Item {
         border.color: Colors.highlight
         border.width: wrapper._showSettingsOutline ? 1 : 0
         opacity: wrapper._showSettingsOutline ? 0.5 : 0
+        visible: !wrapper._isDragging
 
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType } }
     }
@@ -115,6 +115,7 @@ Item {
         id: contentContainer
         width: childrenRect.width
         height: childrenRect.height
+        visible: !wrapper._isDragging
     }
 
     TapHandler {
@@ -146,11 +147,11 @@ Item {
         if (BarLayoutService.settingsMode && wrapper.instanceKey && wrapper.sectionRole) {
             let widgetGeometry = BarLayoutService.widgetGeometry(wrapper.instanceKey)
             let sectionGeometry = BarLayoutService.sectionGeometry(wrapper.sectionRole)
-            let sectionVisualLeft = sectionGeometry && sectionGeometry.visualLeft !== undefined
-                ? Number(sectionGeometry.visualLeft) || 0
+            let sectionLeft = sectionGeometry && sectionGeometry.left !== undefined
+                ? Number(sectionGeometry.left) || 0
                 : 0
             let expectedX = widgetGeometry && widgetGeometry.left !== undefined
-                ? (Number(widgetGeometry.left) || 0) - sectionVisualLeft
+                ? (Number(widgetGeometry.left) || 0) - sectionLeft
                 : wrapper.x
 
             if (Math.abs(wrapper.x - expectedX) > 0.5) {

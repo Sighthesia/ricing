@@ -95,6 +95,7 @@ function recomputeGeometryContracts(root, options) {
         widgetPickerTargetSection: root.widgetPickerTargetSection,
         barContentWidth: root._barContentWidth,
         barContentPadding: root._barContentPadding,
-        pickerPanelWidth: options.pickerPanelWidth
+        pickerPanelWidth: options.pickerPanelWidth,
+        widgetSpacing: options.widgetSpacing
     }))
 }

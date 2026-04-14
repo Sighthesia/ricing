@@ -2,10 +2,11 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import ".." as BarComponents
 import "../media" as MediaParts
 
 // Media surface for the SuperIsland control center page.
-Rectangle {
+BarComponents.FloatingShellSurface {
     id: root
 
     function pageActivated() {
@@ -18,12 +19,9 @@ Rectangle {
             _mediaPanel.runExitAnimation()
     }
 
-    radius: Theme.cornerRadius
-    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.68)
-    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.72)
-    border.width: 1
-    implicitWidth: Math.round(360 * Theme.uiScale)
-    implicitHeight: _contentColumn.implicitHeight + Theme.settingsPanelPadding * 2
+    implicitWidth: ThemeCards.popupCardWidth
+    implicitHeight: _contentColumn.implicitHeight + ThemeCards.panelPadding * 2
+    contentMargin: ThemeCards.panelPadding
 
     Timer {
         id: _mediaEnterDelay
@@ -38,8 +36,8 @@ Rectangle {
     ColumnLayout {
         id: _contentColumn
         anchors.fill: parent
-        anchors.margins: Theme.settingsPanelPadding
-        spacing: 10
+        anchors.margins: 0
+        spacing: ThemeCards.compactGap
 
         ColumnLayout {
             spacing: 2

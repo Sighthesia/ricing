@@ -24,7 +24,7 @@ BarComponents.ContextMenuPopup {
     readonly property real _screenHeight: Screen.height || 0
     readonly property real _maxHeight:
         _screenHeight > 0 ? Math.max(180, root._screenHeight * 0.7) : 420
-    readonly property int _menuWidth: 160
+    readonly property int _menuWidth: ThemeCards.menuWidth
     property var _submenuMenu: null
 
     BarComponents.StaggerOrchestrator {
@@ -240,7 +240,7 @@ BarComponents.ContextMenuPopup {
             id: contentColumn
 
             width: parent.width
-            spacing: 2
+                spacing: ThemeCards.panelGap / 4
 
             Repeater {
                 id: entryRepeater

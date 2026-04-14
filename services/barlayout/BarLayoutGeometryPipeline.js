@@ -49,7 +49,7 @@ function recomputeGeometryContracts(options) {
             adaptiveBounds.leftRight,
             contentWidths.left || 0,
             orderedWidgetsBySection.left.length,
-            SectionsUtils.resolveVisualPlacement("left", usableBounds, contentWidths)
+            SectionsUtils.resolveVisualPlacement("left", usableBounds, contentWidths, adaptiveBounds)
         ),
         center: sectionGeometryWithVisual(
             "center",
@@ -57,7 +57,7 @@ function recomputeGeometryContracts(options) {
             adaptiveBounds.centerRight,
             contentWidths.center || 0,
             orderedWidgetsBySection.center.length,
-            SectionsUtils.resolveVisualPlacement("center", usableBounds, contentWidths)
+            SectionsUtils.resolveVisualPlacement("center", usableBounds, contentWidths, adaptiveBounds)
         ),
         right: sectionGeometryWithVisual(
             "right",
@@ -65,7 +65,7 @@ function recomputeGeometryContracts(options) {
             usableBounds.right,
             contentWidths.right || 0,
             orderedWidgetsBySection.right.length,
-            SectionsUtils.resolveVisualPlacement("right", usableBounds, contentWidths)
+            SectionsUtils.resolveVisualPlacement("right", usableBounds, contentWidths, adaptiveBounds)
         )
     }
 

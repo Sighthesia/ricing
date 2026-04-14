@@ -96,7 +96,7 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 10
+        spacing: ThemeCards.shellGap
 
         RowLayout {
             Layout.fillWidth: true
@@ -106,14 +106,12 @@ Item {
 
             BarComponents.StaggerItem {
                 id: _modeSwitcherItem
-                implicitWidth: 264
-                implicitHeight: 30
-                Rectangle {
+                implicitWidth: ThemeCards.overlayNavWidth
+                implicitHeight: ThemeCards.overlayNavHeight
+                BarComponents.FloatingShellSurface {
                     anchors.fill: parent
-                    radius: 11
-                    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.38)
-                    border.color: Colors.border
-                    border.width: 1
+                    contentMargin: 0
+                    shellRadius: ThemeCards.overlayNavRadius
 
                     RowLayout {
                         anchors.fill: parent
@@ -150,17 +148,13 @@ Item {
             id: _launcherBodyItem
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Rectangle {
+            BarComponents.FloatingShellSurface {
                 anchors.fill: parent
-                radius: Theme.cornerRadius
-                color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.88)
-                border.color: Colors.border
-                border.width: 1
+                contentMargin: ThemeCards.panelInset
 
                 Loader {
                     id: _launcherCoreLoader
                     anchors.fill: parent
-                    anchors.margins: 8
                     active: true
                     source: "../../launcher/LauncherCore.qml"
 

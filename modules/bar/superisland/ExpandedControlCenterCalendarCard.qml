@@ -1,10 +1,11 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.config
+import ".." as BarComponents
 import "./ExpandedControlCenterCalendar.js" as CalendarLogic
 
 // Calendar surface for the SuperIsland control center page.
-Rectangle {
+BarComponents.FloatingShellSurface {
     id: root
 
     readonly property var _dayLabels: ["一", "二", "三", "四", "五", "六", "日"]
@@ -12,16 +13,13 @@ Rectangle {
     readonly property var _monthAnchor: new Date(root._now.getFullYear(), root._now.getMonth(), 1)
     readonly property var _calendarCells: CalendarLogic.buildMonthCells(root._monthAnchor, root._now)
 
-    radius: Theme.cornerRadius
-    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, ThemeCards.panelSurfaceAlpha)
-    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, ThemeCards.panelBorderAlpha)
-    border.width: 1
+    contentMargin: ThemeCards.panelPadding
     implicitWidth: ThemeCards.largePanelWidth
     implicitHeight: ThemeCards.largePanelHeight
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: ThemeCards.panelPadding
+        anchors.margins: 0
         spacing: ThemeCards.largePanelGap
 
         RowLayout {
@@ -47,11 +45,10 @@ Rectangle {
                 }
             }
 
-            Rectangle {
-                radius: Theme.cornerRadius
-                color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.16)
-                border.color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.36)
-                border.width: 1
+            BarComponents.FloatingShellSurface {
+                shellRadius: ThemeCards.compactRadius
+                fillColor: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.16)
+                borderColor: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.36)
                 implicitWidth: _todayBadgeText.implicitWidth + Theme.barWidget.badgePaddingH * 2
                 implicitHeight: _todayBadgeText.implicitHeight + Theme.barWidget.badgePaddingV * 2
 
@@ -66,17 +63,17 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        BarComponents.FloatingShellSurface {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: ThemeCards.compactRadius
-            color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.34)
-            border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
-            border.width: 1
+            shellRadius: ThemeCards.compactRadius
+            contentMargin: ThemeCards.largePanelInset
+            fillColor: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.34)
+            borderColor: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: ThemeCards.largePanelInset
+                anchors.margins: 0
                 spacing: ThemeCards.compactGap
 
                 ColumnLayout {

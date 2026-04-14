@@ -2,9 +2,10 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import ".." as BarComponents
 
 // Break-reminder command surface for the SuperIsland control center page.
-Rectangle {
+BarComponents.FloatingShellSurface {
     id: root
 
     readonly property bool _reminderEnabled: SettingsService.data.superIsland.breakReminderEnabled
@@ -29,17 +30,80 @@ Rectangle {
         SettingsService.save()
     }
 
-    radius: Theme.cornerRadius
-    color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, ThemeCards.panelSurfaceAlpha)
-    border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, ThemeCards.panelBorderAlpha)
-    border.width: 1
+    component ActionButton: BarComponents.FloatingShellSurface {
+        id: buttonRoot
+
+        property alias label: buttonLabel.text
+        property color labelColor: Colors.text
+        property color actionFillColor: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.18)
+        property color actionBorderColor: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
+        property bool hovered: actionArea.containsMouse
+        property point ripplePoint: Qt.point(width / 2, height / 2)
+
+        signal clicked()
+
+        Layout.fillWidth: true
+        implicitHeight: ThemeCards.compactActionHeight
+        shellRadius: ThemeCards.compactRadius
+        fillColor: actionFillColor
+        borderColor: actionBorderColor
+        innerBorderColor: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, ThemeCards.shellInnerBorderAlpha)
+
+        Behavior on fillColor {
+            ColorAnimation { duration: Theme.anim.highlightDuration }
+        }
+
+        Behavior on borderColor {
+            ColorAnimation { duration: Theme.anim.highlightDuration }
+        }
+
+        BarComponents.HoverRevealHighlight {
+            anchors.fill: parent
+            radius: ThemeCards.compactRadius
+            hovered: buttonRoot.hovered
+            highlightColor: Colors.highlight
+            highlightOpacity: ThemeCards.hoverHighlightAlpha
+            adaptiveContrast: true
+            surfaceColor: buttonRoot.color
+        }
+
+        BarComponents.ClickRipple {
+            id: actionRipple
+            anchors.fill: parent
+            radius: ThemeCards.compactRadius
+            rippleColor: Colors.highlight
+        }
+
+        Text {
+            id: buttonLabel
+            anchors.centerIn: parent
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSmall
+            font.weight: Font.Medium
+            color: buttonRoot.labelColor
+        }
+
+        MouseArea {
+            id: actionArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: mouse => {
+                buttonRoot.ripplePoint = Qt.point(mouse.x, mouse.y)
+                actionRipple.triggerRipple(mouse.x, mouse.y)
+                buttonRoot.clicked()
+            }
+        }
+    }
+
     implicitWidth: ThemeCards.compactWidth
     implicitHeight: _contentColumn.implicitHeight + ThemeCards.panelPadding * 2
+    contentMargin: ThemeCards.panelPadding
 
     ColumnLayout {
         id: _contentColumn
         anchors.fill: parent
-        anchors.margins: ThemeCards.panelPadding
+        anchors.margins: 0
         spacing: ThemeCards.compactGap
 
         ColumnLayout {
@@ -61,23 +125,23 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        BarComponents.FloatingShellSurface {
             Layout.fillWidth: true
-            radius: ThemeCards.compactRadius
-            color: Qt.rgba(
+            shellRadius: ThemeCards.compactRadius
+            contentMargin: Theme.barWidget.contentPaddingH
+            fillColor: Qt.rgba(
                 Colors.highlight.r,
                 Colors.highlight.g,
                 Colors.highlight.b,
                 root._breakLive ? 0.16 : 0.09
             )
-            border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.28)
-            border.width: 1
+            borderColor: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.28)
             implicitHeight: _summaryColumn.implicitHeight + Theme.barWidget.contentPaddingV * 4
 
             ColumnLayout {
                 id: _summaryColumn
                 anchors.fill: parent
-                anchors.margins: Theme.barWidget.contentPaddingH
+                anchors.margins: 0
                 spacing: ThemeCards.panelGap / 2
 
                 Text {
@@ -105,102 +169,30 @@ Rectangle {
             columnSpacing: ThemeCards.panelGap
             rowSpacing: ThemeCards.panelGap
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: ThemeCards.compactActionHeight
-                radius: ThemeCards.compactRadius
-                color: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.9)
-                border.color: "transparent"
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root._breakLive ? "打开休息" : "立即休息"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.weight: Font.Medium
-                    color: Colors.background
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: BreakReminderService.startBreakNow()
-                }
+            ActionButton {
+                label: root._breakLive ? "打开休息" : "立即休息"
+                labelColor: Colors.background
+                actionFillColor: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.9)
+                actionBorderColor: Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.9)
+                onClicked: BreakReminderService.startBreakNow()
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: ThemeCards.compactActionHeight
-                radius: ThemeCards.compactRadius
-                color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.18)
-                border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
-                border.width: 1
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "延后提醒"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Colors.text
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: BreakReminderService.snoozeBreak()
-                }
+            ActionButton {
+                label: "延后提醒"
+                onClicked: BreakReminderService.snoozeBreak()
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: ThemeCards.compactActionHeight
-                radius: ThemeCards.compactRadius
-                color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.18)
-                border.color: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
-                border.width: 1
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "重置周期"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Colors.text
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: BreakReminderService.restartCycle()
-                }
+            ActionButton {
+                label: "重置周期"
+                onClicked: BreakReminderService.restartCycle()
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: ThemeCards.compactActionHeight
-                radius: ThemeCards.compactRadius
-                color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.18)
-                border.color: root._reminderEnabled
+            ActionButton {
+                label: root._reminderEnabled ? "关闭提醒" : "开启提醒"
+                actionBorderColor: root._reminderEnabled
                     ? Qt.rgba(Colors.highlight.r, Colors.highlight.g, Colors.highlight.b, 0.56)
                     : Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.42)
-                border.width: 1
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root._reminderEnabled ? "关闭提醒" : "开启提醒"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Colors.text
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root._toggleReminderEnabled()
-                }
+                onClicked: root._toggleReminderEnabled()
             }
         }
     }

@@ -6,7 +6,7 @@ import qs.config
 PopupWindow {
     id: root
 
-    property int contentMargin: 4
+    property int contentMargin: ThemeCards.shellInset
     property int surfaceTransformOrigin: Item.Top
     property real openScale: 0.85
     property real closedScale: 0.88

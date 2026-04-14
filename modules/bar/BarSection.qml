@@ -9,7 +9,7 @@ Item {
     required property string role
     property var widgetRegistry: ({})
 
-    implicitWidth: width > 0 ? width : widgetRow.implicitWidth
+    implicitWidth: width > 0 ? width : widgetStage.implicitWidth
     implicitHeight: parent ? parent.height : 0
 
     readonly property var _frameGeometry: BarLayoutService.sectionGeometry(section.role)
@@ -53,7 +53,6 @@ Item {
     Connections {
         target: BarLayoutService
         function onLayoutChanged() { section.rebuildWidgets(); }
-        function onSettingsModeChanged() { section.rebuildWidgets(); }
     }
 
     /// Determine insertion index for a drag at `localX` in section space.
@@ -65,20 +64,12 @@ Item {
         )
     }
 
-    Row {
-        id: widgetRow
-        x: section._visualOffsetX
+    Item {
+        id: widgetStage
+        x: 0
+        implicitWidth: Math.max(0, Number(section._frameGeometry.width) || 0)
+        height: parent.height
         anchors.verticalCenter: parent.verticalCenter
-        spacing: Theme.widgetSpacing
-
-        move: Transition {
-            enabled: BarLayoutService.isDragging
-            NumberAnimation {
-                properties: "x,y"
-                duration: Theme.anim.moveDuration
-                easing.type: Theme.anim.moveType
-            }
-        }
 
         Repeater {
             model: section.widgets
@@ -138,6 +129,16 @@ Item {
             widgetId: modelData.widgetId
             instanceKey: BarLayoutService.instanceKeyAt(modelData.index)
             sectionRole: section.role
+            readonly property var _widgetGeometry: BarLayoutService.widgetGeometry(instanceKey)
+
+            x: {
+                let geometry = _widgetGeometry
+                let sectionLeft = Number(section._frameGeometry.left) || 0
+                if (!geometry || geometry.left === undefined)
+                    return 0
+                return (Number(geometry.left) || 0) - sectionLeft
+            }
+            anchors.verticalCenter: parent.verticalCenter
 
             Loader {
                 source: section.widgetRegistry[modelData.widgetId] || ""

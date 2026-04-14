@@ -31,6 +31,8 @@ PanelWindow {
     // Offset card column away from both the bar edge and the screen edge
     readonly property int _edgeMargin: ThemeCards.popupEdgeMargin
     readonly property int _barOffset:  Theme.barHeight + _edgeMargin
+    readonly property int _staggerBaseDelay: SettingsService.effectiveAnimation.staggerLevel1BaseDelay
+    readonly property int _staggerStep: SettingsService.effectiveAnimation.staggerLevel1Step
 
     margins.top:    _isTop    ? _barOffset  : _edgeMargin
     margins.bottom: !_isTop   ? _barOffset  : _edgeMargin
@@ -38,12 +40,22 @@ PanelWindow {
     margins.left:   !_isRight ? _edgeMargin : 0
 
     // card width (360) + 2×8 internal padding
-    implicitWidth: ThemeCards.popupCardWidth + ThemeCards.popupStackInset * 2
+    implicitWidth: ThemeCards.notificationCardWidth + ThemeCards.popupStackInset * 2
     implicitHeight: _column.implicitHeight + ThemeCards.popupStackInset
 
     // Hide (and thus yield all input) when no cards exist
     visible: NotificationService.popupPresentationEnabled
         && NotificationService.activeList.count > 0
+
+    function _visualIndex(index) {
+        return root._isTop
+            ? index
+            : Math.max(0, NotificationService.activeList.count - 1 - index)
+    }
+
+    function _enterDelayFor(index) {
+        return root._staggerBaseDelay + root._visualIndex(index) * root._staggerStep
+    }
 
     Column {
         id: _column
@@ -71,6 +83,7 @@ PanelWindow {
                 urgency:     model.urgency
                 actionsJson: model.actionsJson
                 timestamp:   model.timestamp
+                enterDelay:  root._enterDelayFor(index)
 
                 onDismissRequested: (id) => NotificationService.dismissActive(id)
 
