@@ -153,6 +153,10 @@ function workspaceMetrics(host, slotPosition, absoluteIndex) {
     return MotionUtils.workspaceMetrics(host, slotPosition, absoluteIndex, CloneUtils.lerp)
 }
 
+function workspaceBottomInset(host) {
+    return MotionUtils.workspaceBottomInset(host, CloneUtils.lerp)
+}
+
 function titleMetrics(host, slotPosition) {
     return MotionUtils.titleMetrics(host, slotPosition, CloneUtils.lerp)
 }

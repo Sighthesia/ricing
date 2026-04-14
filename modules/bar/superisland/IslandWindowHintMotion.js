@@ -239,6 +239,28 @@ function workspaceMetrics(host, slotPosition, absoluteIndex, lerpFn) {
     }
 }
 
+function workspaceBottomInset(host, lerpFn) {
+    if (!host || host._animatedWorkspaceAnchor < 0)
+        return 0
+
+    var slots = host._workspaceStageSlots || []
+    var stageY = -host._workspaceLeadingTrim + host._workspaceSingleSideOffset
+    var baseHeight = host._workspaceBaseVisibleStageHeight
+    var maxOverflow = 0
+
+    for (var index = 0; index < slots.length; index++) {
+        var slot = slots[index]
+        if (!slot || slot.absoluteIndex < 0 || !slot.capsule)
+            continue
+
+        var metrics = workspaceMetrics(host, slot.absoluteIndex - host._animatedWorkspaceAnchor, slot.absoluteIndex, lerpFn)
+        var bottomEdge = stageY + metrics.y + metrics.height
+        maxOverflow = Math.max(maxOverflow, bottomEdge - baseHeight)
+    }
+
+    return Math.max(0, maxOverflow)
+}
+
 function titleMetrics(host, slotPosition, lerpFn) {
     var leftX = 0
     var centerX = host._titleSideWidth + host._capsuleGap

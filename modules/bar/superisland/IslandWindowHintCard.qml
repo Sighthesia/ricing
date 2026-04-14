@@ -57,10 +57,7 @@ Item {
             : ((Math.max(0, Math.min(1, root._animatedWorkspaceAnchor - (root._workspaceCount - 2)))
                 - Math.max(0, Math.min(1, 1 - root._animatedWorkspaceAnchor)))
                 * root._workspaceSingleSideTrim / 2)
-    readonly property real _workspaceBottomInset:
-        root._workspaceCount === 3
-            ? Math.max(0, root._workspaceSingleSideOffset)
-            : 0
+    readonly property real _workspaceBottomInset: HintLogic.workspaceBottomInset(root)
     readonly property real _workspaceLeadingTrimTarget:
         root._workspaceHasBefore && root._workspaceHasAfter
             ? 0
@@ -73,7 +70,8 @@ Item {
             : (root._workspaceHasBefore || root._workspaceHasAfter
                 ? root._workspaceSingleSideTrim / 2
                 : root._workspaceSingleSideTrim)
-    readonly property real _workspaceVisibleStageHeight: root._workspaceStageHeight - root._workspaceLeadingTrim - root._workspaceTrailingTrim
+    readonly property real _workspaceBaseVisibleStageHeight: root._workspaceStageHeight - root._workspaceLeadingTrim - root._workspaceTrailingTrim
+    readonly property real _workspaceVisibleStageHeight: root._workspaceBaseVisibleStageHeight + root._workspaceBottomInset
     readonly property int _titleStageWidth: root._titleSideWidth * 2 + root._titlePrimaryWidth + root._capsuleGap * 2
     readonly property int _titleStageHeight: root._titleCapsuleHeight
     readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -112,7 +110,7 @@ Item {
             Math.max(root._workspaceStageWidth, root._titleStageWidth) + root._padH * 2 + root._stagePadH * 2
         )
     )
-    implicitHeight: root._workspaceVisibleStageHeight + root._workspaceBottomInset + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2
+    implicitHeight: root._workspaceVisibleStageHeight + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2
 
     function _lerp(from, to, progress) {
         return HintLogic.lerp(from, to, progress)
@@ -375,7 +373,7 @@ Item {
 
                 Item {
                     width: parent.width
-                    height: root._workspaceVisibleStageHeight + root._workspaceBottomInset
+                    height: root._workspaceVisibleStageHeight
 
                     Item {
                         anchors.horizontalCenter: parent.horizontalCenter
