@@ -47,35 +47,20 @@ Item {
     readonly property real _workspaceSingleSideTrim: root._workspaceSideHeight + root._workspaceColumnGap
     readonly property int _workspaceCount:
         HintLogic.visibleWorkspaceCountForHint(root._hint)
-    readonly property var _workspaceVisibleBounds:
-        HintLogic.visibleWorkspaceAbsoluteBoundsForHint(root._hint)
-    readonly property int _workspaceVisibleStart:
-        root._workspaceVisibleBounds && root._workspaceVisibleBounds.first !== undefined
-            ? root._workspaceVisibleBounds.first
-            : -1
-    readonly property int _workspaceVisibleEnd:
-        root._workspaceVisibleBounds && root._workspaceVisibleBounds.last !== undefined
-            ? root._workspaceVisibleBounds.last
-            : -1
-    readonly property real _workspaceBinaryAnchorProgress:
-        root._workspaceCount === 2 && root._workspaceVisibleStart >= 0
-            ? Math.max(0, Math.min(1, root._animatedWorkspaceAnchor - root._workspaceVisibleStart))
-            : Math.max(0, Math.min(1, root._animatedWorkspaceAnchor))
     readonly property bool _workspaceHasBefore:
         root._workspaceHintLayout.hasBefore
     readonly property bool _workspaceHasAfter:
         root._workspaceHintLayout.hasAfter
-    readonly property bool _workspaceUsesBinaryLayout:
-        root._workspaceCount === 2
     readonly property real _workspaceSingleSideOffset:
         root._workspaceCount <= 1
             ? 0
-            : (root._workspaceCount === 2
-                ? (root._workspaceBinaryAnchorProgress
-                    * root._workspaceSingleSideTrim / 2)
-                : ((Math.max(0, Math.min(1, root._animatedWorkspaceAnchor - (root._workspaceCount - 2)))
-                    - Math.max(0, Math.min(1, 1 - root._animatedWorkspaceAnchor)))
-                    * root._workspaceSingleSideTrim / 2))
+            : ((Math.max(0, Math.min(1, root._animatedWorkspaceAnchor - (root._workspaceCount - 2)))
+                - Math.max(0, Math.min(1, 1 - root._animatedWorkspaceAnchor)))
+                * root._workspaceSingleSideTrim / 2)
+    readonly property real _workspaceBottomInset:
+        root._workspaceCount === 3
+            ? Math.max(0, root._workspaceSingleSideOffset)
+            : 0
     readonly property real _workspaceLeadingTrimTarget:
         root._workspaceHasBefore && root._workspaceHasAfter
             ? 0
@@ -127,7 +112,7 @@ Item {
             Math.max(root._workspaceStageWidth, root._titleStageWidth) + root._padH * 2 + root._stagePadH * 2
         )
     )
-    implicitHeight: root._workspaceVisibleStageHeight + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2
+    implicitHeight: root._workspaceVisibleStageHeight + root._workspaceBottomInset + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2
 
     function _lerp(from, to, progress) {
         return HintLogic.lerp(from, to, progress)
@@ -390,13 +375,13 @@ Item {
 
                 Item {
                     width: parent.width
-                    height: root._workspaceVisibleStageHeight
+                    height: root._workspaceVisibleStageHeight + root._workspaceBottomInset
 
                     Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: root._workspaceStageWidth
                         height: root._workspaceStageHeight
-                        y: -root._workspaceLeadingTrim
+                        y: -root._workspaceLeadingTrim + root._workspaceSingleSideOffset
                         clip: true
 
                         Repeater {

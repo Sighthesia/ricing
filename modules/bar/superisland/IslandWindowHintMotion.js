@@ -184,28 +184,6 @@ function retargetHintAnchors(host, hint, immediate, workspaceAnimation, titleAni
 }
 
 function workspaceMetrics(host, slotPosition, absoluteIndex, lerpFn) {
-    if (host._workspaceUsesBinaryLayout
-        && absoluteIndex >= host._workspaceVisibleStart
-        && absoluteIndex <= host._workspaceVisibleEnd) {
-        var visibleTop = host._workspaceSingleSideTrim / 2
-        var binaryGap = host._workspaceColumnGap
-        var binaryAnchor = host._workspaceBinaryAnchorProgress
-        var relativeIndex = Math.max(0, absoluteIndex - host._workspaceVisibleStart)
-        var emphasis = Math.max(0, 1 - Math.abs(relativeIndex - binaryAnchor))
-        var width = lerpFn(host._workspaceSideWidth, host._workspacePrimaryWidth, emphasis)
-        var topHeight = lerpFn(host._workspacePrimaryHeight, host._workspaceSideHeight, binaryAnchor)
-        var bottomHeight = lerpFn(host._workspaceSideHeight, host._workspacePrimaryHeight, binaryAnchor)
-
-        return {
-            x: (host._workspaceStageWidth - width) / 2,
-            y: relativeIndex === 0 ? visibleTop : (visibleTop + topHeight + binaryGap),
-            width: width,
-            height: relativeIndex === 0 ? topHeight : bottomHeight,
-            emphasis: emphasis,
-            opacity: lerpFn(0.5, 1, emphasis)
-        }
-    }
-
     var topY = 0
     var centerY = host._workspaceSideHeight + host._workspaceColumnGap
     var bottomY = centerY + host._workspacePrimaryHeight + host._workspaceColumnGap
