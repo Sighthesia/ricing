@@ -71,6 +71,12 @@ Use this skill when animation state changes are correct but the user still does 
 - Prefer a root-owned animated property with `Behavior`, so each update retargets from the currently rendered value instead of restarting the whole run.
 - If the UI still needs a post-animation settle/compact pass, keep a separate target property and only settle once the animated value is actually close to that target; do not trust a nominal timer duration alone.
 
+### 12. Dynamic Insets Must Follow Live Visible Geometry
+- If a title row or sibling lane needs extra clearance during rapid repeated transitions, do not derive that inset only from the target anchor or nominal final layout.
+- Common symptom: one fix removes overlap during slow transitions, but rapid repeated navigation still shows retiring capsules crossing into the next lane, while a broader inset causes early clipping, large blank gaps, or abrupt height jumps.
+- In DymicShell `window-hint`, compute clearance from the live stage slots that are still visually near the boundary, not from all retiring slots and not from anchor offset alone.
+- Clamp the sampling window to the relevant boundary neighborhood; otherwise far-off retiring capsules can reserve space long after they stopped being a real overlap risk.
+
 ## Debugging Ladder
 
 Work from outermost cause to innermost rendering node.
@@ -267,6 +273,7 @@ Use when rapid text input keeps restarting launcher or clipboard result motion b
 - For hint-like transitions, prefer explicit timeline control over `Qt.callLater()` pulses.
 - For `window-hint` style previews, verify that repeated `activeHint` refreshes do not cancel a just-started slot motion.
 - For `window-hint` capsule lanes, prefer root-owned anchor retarget with `Behavior` over imperative `NumberAnimation.stop()/start()` when held-state updates can arrive several times within one `moveDuration`.
+- For `window-hint` vertical clearance between workspace capsules and the title lane, derive bottom inset from the current `host._workspaceStageSlots` geometry near the lower boundary. Avoid using only `_workspaceSingleSideOffset`, and ignore slots beyond the overflow neighborhood so fast retirements do not create oversized blank space or height pops.
 - For `window-hint` to overlay handoff, compare `IslandOverlayService.mode` and `IslandOverlayService.state` separately before deciding a delayed pulse is still valid.
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.
@@ -274,6 +281,7 @@ Use when rapid text input keeps restarting launcher or clipboard result motion b
 - For `window-hint` or overlay sessions, let hidden preview expiry continue even while foreground timers are paused, or the last notification will outlive the surface owner.
 - For attached hint close, use cached collapse width only during the actual collapse path; stale width snapshots can cause wide-pill hold or close-time width flash.
 - For `window-hint` collapse, verify that `_hintExitAnim` does not reset phase or clear attached content before `_attachedCollapseAnim` finishes.
+- For `window-hint` title-overlap fixes, inspect `modules/bar/superisland/IslandWindowHintMotion.js` `workspaceBottomInset()` together with `modules/bar/superisland/IslandWindowHintCard.qml` `_workspaceBaseVisibleStageHeight` / `_workspaceVisibleStageHeight` before changing row gap or trim durations.
 - For attached shell collapse, verify that bridge shoulders disappear before visible height falls into the seam-sized range.
 - For launcher and clipboard result swaps, if the first open staggers correctly but later swaps drift into whole-list motion, reset the reused `ListView` state before re-entering and verify the outgoing snapshot layer is still retiring independently.
 - For launcher search clear-filter bugs, inspect `insertedCount` / `removedCount` before assuming stale outgoing snapshots. A clear from filtered to full results often shows `inserted > 0` and `removed == 0`, which means the overlap comes from insertion churn, not retiring rows.

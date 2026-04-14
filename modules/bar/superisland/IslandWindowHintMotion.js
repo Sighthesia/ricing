@@ -247,13 +247,18 @@ function workspaceBottomInset(host, lerpFn) {
     var stageY = -host._workspaceLeadingTrim + host._workspaceSingleSideOffset
     var baseHeight = host._workspaceBaseVisibleStageHeight
     var maxOverflow = 0
+    var overflowThreshold = host._overflowSlotPosition !== undefined ? host._overflowSlotPosition : 1.18
 
     for (var index = 0; index < slots.length; index++) {
         var slot = slots[index]
         if (!slot || slot.absoluteIndex < 0 || !slot.capsule)
             continue
 
-        var metrics = workspaceMetrics(host, slot.absoluteIndex - host._animatedWorkspaceAnchor, slot.absoluteIndex, lerpFn)
+        var slotPosition = slot.absoluteIndex - host._animatedWorkspaceAnchor
+        if (slotPosition > overflowThreshold)
+            continue
+
+        var metrics = workspaceMetrics(host, slotPosition, slot.absoluteIndex, lerpFn)
         var bottomEdge = stageY + metrics.y + metrics.height
         maxOverflow = Math.max(maxOverflow, bottomEdge - baseHeight)
     }
