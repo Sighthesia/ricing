@@ -239,8 +239,8 @@ Item {
             anchors.right: parent.right
             anchors.top: parent.top
             height: root._pillBackgroundHeight
-            radius: root._pillH / 2
-            color: Colors.surface
+            radius: ThemeCards.shellRadius
+            color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, ThemeCards.shellSurfaceAlpha)
         }
 
         Rectangle {
