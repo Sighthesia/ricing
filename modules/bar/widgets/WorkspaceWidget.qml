@@ -45,6 +45,8 @@ Item {
     readonly property bool _hoverActive: SettingsService.data.workspaceWidget.hoverEnabled
     readonly property bool _hoverAllowed:
         root._hoverActive && !(BarLayoutService.settingsMode && BarLayoutService.isDragging)
+    readonly property bool _dragCollapseActive:
+        BarLayoutService.settingsMode && BarLayoutService.isDragging
     readonly property int _pillH:        Theme.barHeight - 2 * Theme.iconPadding
     readonly property real _focusPillWidth: root._harnessFocusWidthOverride >= 0
         ? root._harnessFocusWidthOverride
@@ -423,8 +425,8 @@ Item {
 
             height: root._pillBackgroundHeight
 
-            radius: root._pillH / 2
-            color: Colors.surface
+            radius: ThemeCards.shellRadius
+            color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, ThemeCards.shellSurfaceAlpha)
         }
 
         Rectangle {
@@ -589,5 +591,18 @@ Item {
         }
 
         root._settleFlashToOverview()
+    }
+
+    on_DragCollapseActiveChanged: {
+        if (!root._dragCollapseActive)
+            return
+
+        _revertTimer.stop()
+        _revertCooldownTimer.stop()
+        _emptyWorkspaceSyncTimer.stop()
+        root._justReverted = false
+        root._modeOverride = ""
+        root._flashActive = false
+        root._emptyWorkspaceSettling = false
     }
 }

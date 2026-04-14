@@ -14,6 +14,8 @@ Item {
     readonly property bool _hoverRevealEnabled: SettingsService.data.systemTray.hoverReveal
     readonly property bool _hoverRevealAllowed:
         root._hoverRevealEnabled && !(BarLayoutService.settingsMode && BarLayoutService.isDragging)
+    readonly property bool _dragCollapseActive:
+        BarLayoutService.settingsMode && BarLayoutService.isDragging
     readonly property bool _flashEnabled: SettingsService.data.systemTray.flashEnabled
     readonly property int _padH: Theme.barWidget.contentPaddingH
     readonly property int _pillH: Theme.barWidget.pillHeight
@@ -111,6 +113,18 @@ Item {
         flashExitTimer.restart()
     }
 
+    function _forceImmediateCollapse() {
+        root._hovered = false
+        root._holdFlashExtension = false
+        root._lockStripItemsDuringCollapse = false
+        root._lockedStripItems = []
+        root._state = "idle"
+        hoverExitTimer.stop()
+        flashEnterTimer.stop()
+        flashHoldTimer.stop()
+        flashExitTimer.stop()
+    }
+
     Timer {
         id: flashEnterTimer
 
@@ -183,11 +197,12 @@ Item {
         if (root._hoverRevealAllowed)
             return
 
-        root._hovered = false
-        hoverExitTimer.stop()
+        root._forceImmediateCollapse()
+    }
 
-        if (root._state === "hover-open")
-            root._beginCollapse()
+    on_DragCollapseActiveChanged: {
+        if (root._dragCollapseActive)
+            root._forceImmediateCollapse()
     }
 
     BarComponents.BarExpandTransition {
