@@ -52,7 +52,7 @@ Item {
     readonly property bool _workspaceHasAfter:
         root._workspaceHintLayout.hasAfter
     readonly property real _workspaceSingleSideOffset:
-        root._workspaceCount <= 1
+        root._workspaceCount <= 1 || (root._workspaceHasBefore && root._workspaceHasAfter)
             ? 0
             : ((Math.max(0, Math.min(1, root._animatedWorkspaceAnchor - (root._workspaceCount - 2)))
                 - Math.max(0, Math.min(1, 1 - root._animatedWorkspaceAnchor)))
