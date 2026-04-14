@@ -10,18 +10,18 @@ Singleton {
     id: root
 
     readonly property var _media: root._mediaOverride !== null ? root._mediaOverride : ({
-        hasPlayer: MediaService.hasPlayer,
-        title: MediaService.title,
-        artist: MediaService.artist,
-        artUrl: MediaService.artUrl,
-        playerName: MediaService.playerName,
-        playbackState: MediaService.playbackState,
-        positionMs: MediaService.positionMs,
-        lengthMs: MediaService.lengthMs,
-        canGoPrevious: MediaService.canGoPrevious,
-        canTogglePlayback: MediaService.canTogglePlayback,
-        canGoNext: MediaService.canGoNext,
-        canSeek: MediaService.canSeek
+        hasPlayer: MediaService.hasPlayer || NeteaseWebLyricsService.active,
+        title: MediaService.hasPlayer ? MediaService.title : NeteaseWebLyricsService.title,
+        artist: MediaService.hasPlayer ? MediaService.artist : NeteaseWebLyricsService.artist,
+        artUrl: MediaService.hasPlayer ? MediaService.artUrl : "",
+        playerName: MediaService.hasPlayer ? MediaService.playerName : "",
+        playbackState: MediaService.hasPlayer ? MediaService.playbackState : NeteaseWebLyricsService.playbackState,
+        positionMs: MediaService.hasPlayer ? MediaService.positionMs : NeteaseWebLyricsService.positionMs,
+        lengthMs: MediaService.hasPlayer ? MediaService.lengthMs : NeteaseWebLyricsService.durationMs,
+        canGoPrevious: MediaService.hasPlayer ? MediaService.canGoPrevious : false,
+        canTogglePlayback: MediaService.hasPlayer ? MediaService.canTogglePlayback : false,
+        canGoNext: MediaService.hasPlayer ? MediaService.canGoNext : false,
+        canSeek: MediaService.hasPlayer ? MediaService.canSeek : false
     })
 
     readonly property bool hasMedia: !!root._media.hasPlayer
@@ -48,6 +48,11 @@ Singleton {
     readonly property bool canTogglePlayback: !!root._media.canTogglePlayback
     readonly property bool canGoNext: !!root._media.canGoNext
     readonly property bool canSeek: !!root._media.canSeek
+    readonly property string currentLyric: NeteaseWebLyricsService.currentLyric || ""
+    readonly property string nextLyric: NeteaseWebLyricsService.nextLyric || ""
+    readonly property string currentTranslatedLyric: NeteaseWebLyricsService.currentTranslatedLyric || ""
+    readonly property string nextTranslatedLyric: NeteaseWebLyricsService.nextTranslatedLyric || ""
+    readonly property bool hasLyrics: !!NeteaseWebLyricsService.hasLyrics
 
     property string announcementState: "idle"
     property bool panelOpen: false

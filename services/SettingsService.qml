@@ -198,6 +198,8 @@ Singleton {
                 showWhenIdle: adapter.mediaControl.showWhenIdle,
                 announcementEnabled: adapter.mediaControl.announcementEnabled,
                 hoverRevealControls: adapter.mediaControl.hoverRevealControls,
+                showLyrics: adapter.mediaControl.showLyrics,
+                preferLyrics: adapter.mediaControl.preferLyrics,
                 announcementDuration: adapter.mediaControl.announcementDuration,
                 cavaEnabled: adapter.mediaControl.cavaEnabled,
                 cavaBars: adapter.mediaControl.cavaBars,
@@ -453,6 +455,8 @@ Singleton {
             property bool showWhenIdle: true
             property bool announcementEnabled: true
             property bool hoverRevealControls: true
+            property bool showLyrics: true
+            property bool preferLyrics: true
             property int announcementDuration: 1500
             property bool cavaEnabled: true
             property int cavaBars: 20

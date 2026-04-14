@@ -101,6 +101,8 @@
         "showWhenIdle": true,
         "announcementEnabled": true,
         "hoverRevealControls": true,
+        "showLyrics": true,
+        "preferLyrics": true,
         "announcementDuration": 1500,
         "cavaEnabled": true,
         "cavaBars": 20,

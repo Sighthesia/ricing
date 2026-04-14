@@ -19,6 +19,11 @@ Item {
         MediaControlService.playerName !== ""
             ? MediaControlService.playerName
             : MediaControlService.playbackState
+    readonly property bool _showLyrics: SettingsService.data.mediaControl.showLyrics
+    readonly property string _currentLyric: MediaControlService.currentLyric || ""
+    readonly property string _nextLyric: MediaControlService.nextLyric || ""
+    readonly property string _currentTranslatedLyric: MediaControlService.currentTranslatedLyric || ""
+    readonly property string _nextTranslatedLyric: MediaControlService.nextTranslatedLyric || ""
 
     function runEnterAnimation() {
         _heroBlock.runEnter()
@@ -58,6 +63,7 @@ Item {
                 anchors.fill: parent
                 implicitHeight: Theme.barWidget.mediaPanelArtworkSize
                     + Theme.barWidget.contentPaddingV * 2
+                    + Math.max(0, _heroTextColumn.implicitHeight - Theme.fontSizeBody)
 
                 // Hero surface overlay.
                 Rectangle {
@@ -165,6 +171,59 @@ Item {
                                 font.pixelSize: Theme.fontSizeSmall
                                 visible: text !== ""
                                 elide: Text.ElideRight
+                            }
+
+                            // Current lyric line.
+                            Text {
+                                visible: root._showLyrics && root._currentLyric !== ""
+                                Layout.fillWidth: true
+                                text: root._currentLyric
+                                color: Colors.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                wrapMode: Text.NoWrap
+                            }
+
+                            // Next lyric line.
+                            Text {
+                                visible: root._showLyrics && root._nextLyric !== ""
+                                Layout.fillWidth: true
+                                text: root._nextLyric
+                                color: Colors.textMuted
+                                opacity: 0.75
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                wrapMode: Text.NoWrap
+                            }
+
+                            Text {
+                                visible: root._showLyrics && root._currentTranslatedLyric !== ""
+                                Layout.fillWidth: true
+                                text: root._currentTranslatedLyric
+                                color: Colors.text
+                                opacity: 0.85
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                wrapMode: Text.NoWrap
+                            }
+
+                            Text {
+                                visible: root._showLyrics && root._nextTranslatedLyric !== ""
+                                Layout.fillWidth: true
+                                text: root._nextTranslatedLyric
+                                color: Colors.textMuted
+                                opacity: 0.65
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                wrapMode: Text.NoWrap
                             }
 
                             Item { Layout.fillHeight: true }

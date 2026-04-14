@@ -56,6 +56,27 @@ Item {
 
         ToggleSection {
             width: parent.width
+            label: "显示歌词"
+            value: SettingsService.data.mediaControl.showLyrics
+            onToggled: newValue => {
+                SettingsService.data.mediaControl.showLyrics = newValue
+                SettingsService.save()
+            }
+        }
+
+        ToggleSection {
+            width: parent.width
+            label: "优先显示歌词"
+            value: SettingsService.data.mediaControl.preferLyrics
+            enabled: SettingsService.data.mediaControl.showLyrics
+            onToggled: newValue => {
+                SettingsService.data.mediaControl.preferLyrics = newValue
+                SettingsService.save()
+            }
+        }
+
+        ToggleSection {
+            width: parent.width
             label: "Cava 可视化"
             value: SettingsService.data.mediaControl.cavaEnabled
             onToggled: newValue => {

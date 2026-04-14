@@ -13,6 +13,8 @@ Item {
     readonly property bool _enabled: SettingsService.data.mediaControl.enabled
     readonly property bool _showIdle: SettingsService.data.mediaControl.showWhenIdle
     readonly property bool _hoverRevealControls: SettingsService.data.mediaControl.hoverRevealControls
+    readonly property bool _showLyrics: SettingsService.data.mediaControl.showLyrics
+    readonly property bool _preferLyrics: SettingsService.data.mediaControl.preferLyrics
     readonly property bool _active: root._enabled && (MediaControlService.hasMedia || root._showIdle)
     readonly property int _pillH: Theme.barWidget.pillHeight
     readonly property int _padH: Theme.barWidget.contentPaddingH
@@ -51,9 +53,11 @@ Item {
     readonly property bool flashVisible:
         root._active && (MediaControlService.announcementState !== "idle" || root._hoverFlashActive)
     readonly property string _displayTitle:
-        MediaControlService.title !== ""
-            ? MediaControlService.title
-            : (MediaControlService.playerName !== "" ? MediaControlService.playerName : "No Media")
+        root._showLyrics && root._preferLyrics && MediaControlService.currentLyric !== ""
+            ? MediaControlService.currentLyric
+            : (MediaControlService.title !== ""
+                ? MediaControlService.title
+                : (MediaControlService.playerName !== "" ? MediaControlService.playerName : "No Media"))
     
     function _triggerEventPulse() {
         _pulseAnim.stop()
