@@ -132,6 +132,10 @@ Item {
         root.state._attachedHintEvent = root.host._displayEvent(event)
         root.machine.syncOverlayExtensionReservation()
 
+        if (root.host._detachedHintActive && root.host._detachedHintHeight > root.state._attachedPanelRevealHeight) {
+            root.state._attachedPanelRevealHeight = root.host._detachedHintHeight
+        }
+
         if (root.state._overlaySessionActive || IslandOverlayService.mode !== "none")
             return
 

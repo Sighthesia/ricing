@@ -82,6 +82,7 @@ Use this skill when animation state changes are correct but the user still does 
 - Common symptom: the inner layout computes the larger height correctly, but the shell expands a beat later, so the user sees delayed clearance instead of content visibly pushing the shell open in real time.
 - In DymicShell detached `window-hint`, let height growth sync immediately to the measured target, while shrink-back can still animate for a cleaner settle.
 - Check the host-owned reveal height retarget path before touching child layout math; the bug is often in the shell wrapper, not in the content item.
+- When height still lags despite immediate-set, move the sync forward in the event pipeline: attach it directly to the moment the content hint updates, not to the host's `on_AttachedPanelHeightChanged`. The binding chain itself can add one-frame latency that defeats the "immediate" intent.
 
 ## Debugging Ladder
 
