@@ -77,6 +77,12 @@ Use this skill when animation state changes are correct but the user still does 
 - In DymicShell `window-hint`, compute clearance from the live stage slots that are still visually near the boundary, not from all retiring slots and not from anchor offset alone.
 - Clamp the sampling window to the relevant boundary neighborhood; otherwise far-off retiring capsules can reserve space long after they stopped being a real overlap risk.
 
+### 13. Content-Pushed Height Growth Should Not Wait For Retarget Animation
+- If an attached or detached panel grows because inner content now needs more space, do not always route that growth through the same reveal retarget animation used for open/close choreography.
+- Common symptom: the inner layout computes the larger height correctly, but the shell expands a beat later, so the user sees delayed clearance instead of content visibly pushing the shell open in real time.
+- In DymicShell detached `window-hint`, let height growth sync immediately to the measured target, while shrink-back can still animate for a cleaner settle.
+- Check the host-owned reveal height retarget path before touching child layout math; the bug is often in the shell wrapper, not in the content item.
+
 ## Debugging Ladder
 
 Work from outermost cause to innermost rendering node.
@@ -274,6 +280,7 @@ Use when rapid text input keeps restarting launcher or clipboard result motion b
 - For `window-hint` style previews, verify that repeated `activeHint` refreshes do not cancel a just-started slot motion.
 - For `window-hint` capsule lanes, prefer root-owned anchor retarget with `Behavior` over imperative `NumberAnimation.stop()/start()` when held-state updates can arrive several times within one `moveDuration`.
 - For `window-hint` vertical clearance between workspace capsules and the title lane, derive bottom inset from the current `host._workspaceStageSlots` geometry near the lower boundary. Avoid using only `_workspaceSingleSideOffset`, and ignore slots beyond the overflow neighborhood so fast retirements do not create oversized blank space or height pops.
+- For detached `window-hint` height changes, inspect `modules/bar/widgets/SuperIslandWidget.qml` `_retargetAttachedPanelHeightIfNeeded()` before tuning card spacing. If the card's `implicitHeight` is correct but shell growth lags, make growth immediate and reserve animation for shrink or explicit open/close choreography.
 - For `window-hint` to overlay handoff, compare `IslandOverlayService.mode` and `IslandOverlayService.state` separately before deciding a delayed pulse is still valid.
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.

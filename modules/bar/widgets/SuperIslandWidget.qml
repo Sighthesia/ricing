@@ -435,11 +435,17 @@ Item {
     on_AttachedPanelVisibleHeightChanged: _stateMachine.syncOverlayExtensionReservation()
 
     function _retargetAttachedPanelHeightIfNeeded() {
-        if (!root._overlaySessionActive || !root._attachedPanelExpanded || root._overlayClosing)
+        if (!root._attachedPanelActive || !root._attachedPanelExpanded || root._overlayClosing)
             return
 
-        if (root._attachedPanelHeight <= root._attachedPanelRevealHeight + 0.5)
+        if (Math.abs(root._attachedPanelHeight - root._attachedPanelRevealHeight) <= 0.5)
             return
+
+        if (root._detachedHintActive && root._attachedPanelHeight > root._attachedPanelRevealHeight) {
+            _attachedHeightRetargetAnim.stop()
+            _viewState._attachedPanelRevealHeight = root._attachedPanelHeight
+            return
+        }
 
         _attachedHeightRetargetAnim.stop()
         _attachedHeightRetargetAnim.from = root._attachedPanelRevealHeight
