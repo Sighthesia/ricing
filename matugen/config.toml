@@ -36,7 +36,7 @@ output_path = "~/.config/ghostty/themes/DymicShell"
 [templates.cosmic]
 input_path = "./templates/cosmic_theme.ron"
 output_path = "~/.config/matugen/themes/matugen_cosmic.theme.ron"
-post_hook = "python3 ./templates/cosmic_postprocess.py ~/.config/matugen/themes/matugen_cosmic.theme.ron"
+# post_hook = "python3 ./templates/cosmic_postprocess.py ~/.config/matugen/themes/matugen_cosmic.theme.ron"
 
 [templates.helix]
 input_path = "./templates/helix.toml"
