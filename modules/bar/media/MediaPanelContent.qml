@@ -2,272 +2,232 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import "." as MediaParts
 import ".." as BarComponents
 
-// Expanded media panel body with larger artwork and denser control layout.
-Item {
+// Expanded media panel body with shared SuperIsland shell treatment.
+BarComponents.FloatingShellSurface {
     id: root
 
+    property bool embedded: false
+
     implicitWidth: Theme.barWidget.mediaPanelWidth
-    implicitHeight: _layout.implicitHeight + Theme.settingsPanelPadding + Theme.barWidget.contentPaddingV
+    implicitHeight: _contentColumn.implicitHeight + root.contentMargin * 2
+    shellRadius: ThemeCards.shellRadius
+    contentMargin: root.embedded ? 0 : ThemeCards.panelPadding
+    fillColor: root.embedded
+        ? "transparent"
+        : Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, ThemeCards.shellSurfaceAlpha)
+    borderColor: root.embedded
+        ? "transparent"
+        : Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, ThemeCards.shellBorderAlpha)
+    innerBorderColor: root.embedded
+        ? "transparent"
+        : Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, ThemeCards.shellInnerBorderAlpha)
+    innerBorderWidth: root.embedded ? 0 : 1
 
     readonly property string _displayTitle:
         MediaControlService.title !== "" ? MediaControlService.title : "No Media"
     readonly property string _displayArtist:
         MediaControlService.artist !== "" ? MediaControlService.artist : MediaControlService.playerName
-    readonly property string _metaLine:
-        MediaControlService.playerName !== ""
-            ? MediaControlService.playerName
-            : MediaControlService.playbackState
     readonly property bool _showLyrics: SettingsService.data.mediaControl.showLyrics
     readonly property string _currentLyric: MediaControlService.currentLyric || ""
-    readonly property string _nextLyric: MediaControlService.nextLyric || ""
     readonly property string _currentTranslatedLyric: MediaControlService.currentTranslatedLyric || ""
-    readonly property string _nextTranslatedLyric: MediaControlService.nextTranslatedLyric || ""
+    readonly property color _panelFillColor: Qt.rgba(
+        Colors.background.r,
+        Colors.background.g,
+        Colors.background.b,
+        ThemeCards.shellSurfaceAlpha
+    )
+    readonly property color _panelBorderColor: Qt.rgba(
+        Colors.border.r,
+        Colors.border.g,
+        Colors.border.b,
+        ThemeCards.shellBorderAlpha
+    )
+    readonly property color _panelInnerBorderColor: Qt.rgba(
+        Colors.text.r,
+        Colors.text.g,
+        Colors.text.b,
+        ThemeCards.shellInnerBorderAlpha
+    )
+    property real _contentOpacity: 0
 
     function runEnterAnimation() {
-        _heroBlock.runEnter()
-        _progressBlock.runEnter()
-        _controlsBlock.runEnter()
+        _contentExitAnim.stop()
+        _contentEnterAnim.restart()
     }
 
     function runExitAnimation() {
-        _heroBlock.runExit()
-        _progressBlock.runExit()
-        _controlsBlock.runExit()
+        _contentEnterAnim.stop()
+        _contentExitAnim.restart()
     }
 
+    // Media panel stack.
     ColumnLayout {
-        id: _layout
+        id: _contentColumn
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.leftMargin: Theme.settingsPanelPadding
-        anchors.rightMargin: Theme.settingsPanelPadding
-        anchors.topMargin: Theme.settingsPanelPadding
-        spacing: Theme.barWidget.contentPaddingV
+        opacity: root._contentOpacity
+        spacing: ThemeCards.panelGap
 
-        // Hero surface.
-        BarComponents.StaggerItem {
-            id: _heroBlock
+        // Hero shell.
+        BarComponents.FloatingShellSurface {
+            id: _heroShell
             Layout.fillWidth: true
-            implicitHeight: _heroSurface.implicitHeight
-            delay: Theme.barWidget.mediaStaggerBaseDelay
-            exitDelay: Theme.barWidget.mediaStaggerHeroExitDelay
-            enterOffsetY: -Theme.barWidget.mediaStaggerHeroEnterOffset
-            exitOffsetY: -Theme.barWidget.mediaStaggerHeroExitOffset
+            shellRadius: ThemeCards.compactRadius
+            contentMargin: ThemeCards.compactInset
+            implicitHeight: _heroContent.implicitHeight + contentMargin * 2
+            fillColor: root._panelFillColor
+            borderColor: root._panelBorderColor
+            innerBorderColor: root._panelInnerBorderColor
+            innerBorderWidth: 1
 
-            // Hero surface body.
-            Item {
-                id: _heroSurface
+            // Hero content shell.
+            ColumnLayout {
+                id: _heroContent
                 anchors.fill: parent
-                implicitHeight: Theme.barWidget.mediaPanelArtworkSize
-                    + Theme.barWidget.contentPaddingV * 2
-                    + Math.max(0, _heroTextColumn.implicitHeight - Theme.fontSizeBody)
+                spacing: ThemeCards.compactGap
 
-                // Hero surface overlay.
-                Rectangle {
-                    anchors.fill: parent
-                    color: Colors.background
-                    opacity: Theme.barWidget.mediaSurfaceOverlayOpacity
-                }
-
-                // Panel visualizer strip.
-                MediaVisualizerBackground {
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.leftMargin: Theme.barWidget.contentPaddingH
-                        + Theme.barWidget.mediaPanelArtworkSize
-                        + Theme.barWidget.pillSpacing
-                    anchors.rightMargin: Theme.barWidget.contentPaddingH
-                    anchors.topMargin: Theme.barWidget.contentPaddingV * 2
-                    anchors.bottomMargin: Theme.barWidget.contentPaddingV
-                    bars: MediaControlService.visualizerHealthy ? MediaControlService.visualizerBars : []
-                    barOpacity: Theme.barWidget.mediaVisualizerBarOpacity
-                }
-
-                // Hero content row.
+                // Title row.
                 RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: Theme.barWidget.contentPaddingH
-                    anchors.rightMargin: Theme.barWidget.contentPaddingH
-                    anchors.topMargin: Theme.barWidget.contentPaddingV
-                    anchors.bottomMargin: Theme.barWidget.contentPaddingV
-                    spacing: Theme.barWidget.pillSpacing
+                    Layout.fillWidth: true
+                    spacing: ThemeCards.compactGap
 
-                    // Panel artwork.
-                    MediaArtwork {
+                    // Album artwork.
+                    MediaParts.MediaArtwork {
                         source: MediaControlService.artUrl
                         size: Theme.barWidget.mediaPanelArtworkSize
                         roundedRect: true
                         Layout.alignment: Qt.AlignVCenter
                     }
 
-                    // Hero text visualizer zone.
-                    Item {
+                    // Metadata column.
+                    ColumnLayout {
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignVCenter
-                        implicitHeight: _heroTextColumn.implicitHeight
+                        spacing: Math.max(2, Theme.barWidget.contentPaddingV)
 
-                        // Hero text column.
-                        ColumnLayout {
-                            id: _heroTextColumn
-                            anchors.fill: parent
-                            spacing: Math.max(2, Theme.barWidget.contentPaddingV)
+                        // Artist and title row.
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.barWidget.iconSpacing
 
-                            // Title row.
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: Theme.barWidget.iconSpacing
-
-                                // Artist label.
-                                Text {
-                                    visible: root._displayArtist !== ""
-                                    text: root._displayArtist
-                                    color: Colors.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeBody
-                                    elide: Text.ElideRight
-                                    maximumLineCount: 1
-                                    wrapMode: Text.NoWrap
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Layout.maximumWidth: Math.round(
-                                        Theme.barWidget.mediaPanelWidth
-                                        * Theme.barWidget.mediaPanelArtistMaxWidthRatio)
-                                }
-
-                                // Artist-title separator.
-                                Text {
-                                    visible: root._displayArtist !== ""
-                                    text: " - "
-                                    color: Colors.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeBody
-                                    opacity: Theme.barWidget.mediaFlashLabelOpacity
-                                }
-
-                                // Track title label.
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: root._displayTitle
-                                    color: Colors.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeBody
-                                    font.bold: true
-                                    elide: Text.ElideRight
-                                    maximumLineCount: 1
-                                    wrapMode: Text.NoWrap
-                                }
-                            }
-
-                            // Meta label.
+                            // Artist label.
                             Text {
-                                Layout.fillWidth: true
-                                text: root._metaLine
-                                color: Colors.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSmall
-                                visible: text !== ""
-                                elide: Text.ElideRight
-                            }
-
-                            // Current lyric line.
-                            Text {
-                                visible: root._showLyrics && root._currentLyric !== ""
-                                Layout.fillWidth: true
-                                text: root._currentLyric
-                                color: Colors.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSmall
-                                elide: Text.ElideRight
-                                maximumLineCount: 1
-                                wrapMode: Text.NoWrap
-                            }
-
-                            // Next lyric line.
-                            Text {
-                                visible: root._showLyrics && root._nextLyric !== ""
-                                Layout.fillWidth: true
-                                text: root._nextLyric
-                                color: Colors.textMuted
-                                opacity: 0.75
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSmall
-                                elide: Text.ElideRight
-                                maximumLineCount: 1
-                                wrapMode: Text.NoWrap
-                            }
-
-                            Text {
-                                visible: root._showLyrics && root._currentTranslatedLyric !== ""
-                                Layout.fillWidth: true
-                                text: root._currentTranslatedLyric
+                                visible: root._displayArtist !== ""
+                                text: root._displayArtist
                                 color: Colors.text
-                                opacity: 0.85
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSmall
+                                font.pixelSize: Theme.fontSizeBody
                                 elide: Text.ElideRight
                                 maximumLineCount: 1
                                 wrapMode: Text.NoWrap
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.maximumWidth: Math.round(
+                                    Theme.barWidget.mediaPanelWidth
+                                    * Theme.barWidget.mediaPanelArtistMaxWidthRatio)
                             }
 
+                            // Artist-title separator.
                             Text {
-                                visible: root._showLyrics && root._nextTranslatedLyric !== ""
-                                Layout.fillWidth: true
-                                text: root._nextTranslatedLyric
-                                color: Colors.textMuted
-                                opacity: 0.65
+                                visible: root._displayArtist !== ""
+                                text: " - "
+                                color: Colors.text
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSmall
+                                font.pixelSize: Theme.fontSizeBody
+                                opacity: Theme.barWidget.mediaFlashLabelOpacity
+                            }
+
+                            // Track title.
+                            Text {
+                                Layout.fillWidth: true
+                                text: root._displayTitle
+                                color: Colors.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeBody
+                                font.bold: true
                                 elide: Text.ElideRight
                                 maximumLineCount: 1
                                 wrapMode: Text.NoWrap
                             }
+                        }
 
-                            Item { Layout.fillHeight: true }
+                        // Current lyric line.
+                        Text {
+                            visible: root._showLyrics && root._currentLyric !== ""
+                            Layout.fillWidth: true
+                            text: root._currentLyric
+                            color: Colors.textMuted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            wrapMode: Text.NoWrap
+                        }
+
+                        // Current translated lyric line.
+                        Text {
+                            visible: root._showLyrics && root._currentTranslatedLyric !== ""
+                            Layout.fillWidth: true
+                            text: root._currentTranslatedLyric
+                            color: Colors.text
+                            opacity: 0.85
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            wrapMode: Text.NoWrap
                         }
                     }
+                }
+
+                // Background visualizer layer.
+                MediaParts.MediaVisualizerBackground {
+                    Layout.fillWidth: true
+                    implicitHeight: Math.max(Theme.barWidget.mediaPanelArtworkSize, Theme.barWidget.pillHeight)
+                    bars: MediaControlService.visualizerHealthy ? MediaControlService.visualizerBars : []
+                    barOpacity: Theme.barWidget.mediaVisualizerBarOpacity
                 }
             }
         }
 
-        // Progress and time group.
-        BarComponents.StaggerItem {
-            id: _progressBlock
+        // Transport shell.
+        BarComponents.FloatingShellSurface {
+            id: _bodyShell
             Layout.fillWidth: true
-            implicitHeight: _progressRow.implicitHeight
-            delay: Theme.barWidget.mediaStaggerBaseDelay + Theme.barWidget.mediaStaggerStep
-            exitDelay: Theme.barWidget.mediaStaggerExitStep
-            enterOffsetY: -Theme.barWidget.mediaStaggerProgressEnterOffset
-            exitOffsetY: -Theme.barWidget.mediaStaggerProgressExitOffset
+            shellRadius: ThemeCards.compactRadius
+            contentMargin: ThemeCards.compactInset
+            implicitHeight: _bodyContent.implicitHeight + contentMargin * 2
+            fillColor: root._panelFillColor
+            borderColor: root._panelBorderColor
+            innerBorderColor: root._panelInnerBorderColor
+            innerBorderWidth: 1
 
-            // Progress and time row.
-            Item {
-                id: _progressRow
+            // Body content.
+            ColumnLayout {
+                id: _bodyContent
                 anchors.fill: parent
-                implicitHeight: _progressRowContent.implicitHeight + Theme.barWidget.contentPaddingV
+                spacing: ThemeCards.compactGap
 
-                // Progress and time row content.
+                // Progress row.
                 RowLayout {
-                    id: _progressRowContent
-                    anchors.fill: parent
+                    Layout.fillWidth: true
                     spacing: 0
 
-                    // Elapsed time label.
+                    // Elapsed label.
                     Text {
                         text: MediaControlService.positionLabel
                         color: Colors.textMuted
                         font.family: Theme.fontMono
                         font.pixelSize: Theme.fontSizeSmall
                         Layout.alignment: Qt.AlignVCenter
-                        Layout.leftMargin: Theme.barWidget.contentPaddingH
                         Layout.minimumWidth: implicitWidth
                     }
 
-                    // Panel progress strip.
-                    MediaProgressStrip {
+                    // Seek strip.
+                    MediaParts.MediaProgressStrip {
                         Layout.fillWidth: true
                         Layout.leftMargin: Theme.barWidget.iconLabelSpacing
                         Layout.rightMargin: Theme.barWidget.iconLabelSpacing
@@ -277,7 +237,7 @@ Item {
                         onProgressCommitted: progressValue => MediaControlService.seekToProgress(progressValue)
                     }
 
-                    // Duration time label.
+                    // Duration label.
                     Text {
                         text: MediaControlService.durationLabel
                         color: Colors.textMuted
@@ -285,42 +245,49 @@ Item {
                         font.pixelSize: Theme.fontSizeSmall
                         horizontalAlignment: Text.AlignRight
                         Layout.alignment: Qt.AlignVCenter
-                        Layout.rightMargin: Theme.barWidget.contentPaddingH
                         Layout.minimumWidth: implicitWidth
                     }
                 }
+
+                // Transport controls.
+                MediaParts.MediaFlashControls {
+                    id: _panelControls
+                    Layout.fillWidth: true
+                    progress: MediaControlService.progress
+                    leadingLabel: ""
+                    durationLabel: ""
+                    playbackState: MediaControlService.playbackState
+                    canGoPrevious: MediaControlService.canGoPrevious
+                    canTogglePlayback: MediaControlService.canTogglePlayback
+                    canGoNext: MediaControlService.canGoNext
+                    showProgress: false
+                    topPadding: 0
+                    bottomPadding: 0
+                    onPreviousRequested: MediaControlService.previous()
+                    onPlayPauseRequested: MediaControlService.playPause()
+                    onNextRequested: MediaControlService.next()
+                }
             }
         }
+    }
 
-        BarComponents.StaggerItem {
-            id: _controlsBlock
-            Layout.fillWidth: true
-            Layout.topMargin: Theme.barWidget.mediaPanelControlsTopSpacing
-            implicitHeight: _panelControls.implicitHeight
-            delay: Theme.barWidget.mediaStaggerBaseDelay + Theme.barWidget.mediaStaggerStep * 2
-            exitDelay: Theme.barWidget.mediaStaggerExitStep * 2
-            enterOffsetY: -Theme.barWidget.mediaStaggerControlsEnterOffset
-            exitOffsetY: -Theme.barWidget.mediaStaggerControlsExitOffset
+    // Content enter animation.
+    NumberAnimation {
+        id: _contentEnterAnim
+        target: root
+        property: "_contentOpacity"
+        to: 1
+        duration: Theme.anim.highlightDuration
+        easing.type: Theme.anim.highlightType
+    }
 
-            // Panel transport controls.
-            MediaFlashControls {
-                id: _panelControls
-                anchors.fill: parent
-                progress: MediaControlService.progress
-                leadingLabel: ""
-                durationLabel: ""
-                playbackState: MediaControlService.playbackState
-                canGoPrevious: MediaControlService.canGoPrevious
-                canTogglePlayback: MediaControlService.canTogglePlayback
-                canGoNext: MediaControlService.canGoNext
-                showProgress: false
-                topPadding: Theme.barWidget.contentPaddingV
-                bottomPadding: Theme.barWidget.contentPaddingV * 2
-                onPreviousRequested: MediaControlService.previous()
-                onPlayPauseRequested: MediaControlService.playPause()
-                onNextRequested: MediaControlService.next()
-            }
-        }
-
+    // Content exit animation.
+    NumberAnimation {
+        id: _contentExitAnim
+        target: root
+        property: "_contentOpacity"
+        to: 0
+        duration: Theme.anim.moveDuration
+        easing.type: Theme.anim.moveType
     }
 }

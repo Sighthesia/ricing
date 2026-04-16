@@ -42,7 +42,9 @@ Load skills on demand; see `.agents/skills/README.md` for grouping.
 | [qml-token-cleanup](.agents/skills/qml-token-cleanup/SKILL.md)                       | Replacing hardcoded geometry with shared tokens           |
 | [qml-visual-language](.agents/skills/qml-visual-language/SKILL.md)                   | Visual identity and cross-component consistency           |
 | [qml-indicator-motion](.agents/skills/qml-indicator-motion/SKILL.md)                 | Active indicators and sliding highlights                  |
+| [attached-expansion-motion](.agents/skills/attached-expansion-motion/SKILL.md)       | Reusing SuperIsland attached panel motion in widgets      |
 | [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md)                         | Motion looks wrong even though state changes              |
+| [bar-widget-width-ownership](.agents/skills/bar-widget-width-ownership/SKILL.md)     | Widget-local width ownership vs bar reserved width        |
 | [list-transition-handoffs](.agents/skills/list-transition-handoffs/SKILL.md)         | Animated list replacement and filter handoffs             |
 | [qml-performance-debug](.agents/skills/qml-performance-debug/SKILL.md)               | Jank, frame drops, and layout thrash                      |
 | [reference-attribution](.agents/skills/reference-attribution/SKILL.md)               | Adapting patterns from another repo                       |
