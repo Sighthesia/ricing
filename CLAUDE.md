@@ -35,6 +35,7 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | Skill | When to use |
 | --- | --- |
 | [qml-performance-debug](.agents/skills/qml-performance-debug/SKILL.md) | Use when debugging DymicShell or Quickshell jank, frame drops, layout thrash, layer-shell resize churn, or slow widget transitions. |
+| [netease-web-lyrics-stability](.agents/skills/netease-web-lyrics-stability/SKILL.md) | Use when debugging or modifying the NetEase web lyrics bridge, especially if lyrics flash back to song title, player name, or stop advancing because weak payloads override the active session. |
 
 ### Workflow
 

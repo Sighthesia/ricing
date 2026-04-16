@@ -3,6 +3,7 @@
 
   const MESSAGE_TYPE = 'dymicshell-netease-lyrics-state';
   let lastSignature = '';
+  const isTopFrame = window.top === window;
 
   function normalizePayload(rawPayload) {
     const payload = rawPayload && typeof rawPayload === 'object' ? rawPayload : {};
@@ -60,14 +61,16 @@
     pushToBridge(payload.payload);
   }, false);
 
-  pushToBridge({
-    title: '__extension_loaded__',
-    artist: location.href,
-    playbackState: 'stopped',
-    durationMs: 0,
-    positionMs: 0,
-    rawLyric: '',
-  });
+  if (isTopFrame) {
+    pushToBridge({
+      title: '__extension_loaded__',
+      artist: location.href,
+      playbackState: 'stopped',
+      durationMs: 0,
+      positionMs: 0,
+      rawLyric: '',
+    });
+  }
 
   fetch(browser.runtime.getURL('page-probe.js'))
     .then((response) => response.text())
@@ -75,14 +78,16 @@
       const wrappedWindow = window.wrappedJSObject;
       if (wrappedWindow && typeof wrappedWindow.eval === 'function') {
         wrappedWindow.eval(source);
-        pushToBridge({
-          title: '__probe_injected__',
-          artist: location.href,
-          playbackState: 'stopped',
-          durationMs: 0,
-          positionMs: 0,
-          rawLyric: '',
-        });
+        if (isTopFrame) {
+          pushToBridge({
+            title: '__probe_injected__',
+            artist: location.href,
+            playbackState: 'stopped',
+            durationMs: 0,
+            positionMs: 0,
+            rawLyric: '',
+          });
+        }
         return;
       }
 
@@ -90,23 +95,27 @@
       script.textContent = source;
       (document.head || document.documentElement).appendChild(script);
       script.remove();
-      pushToBridge({
-        title: '__probe_injected_fallback__',
-        artist: location.href,
-        playbackState: 'stopped',
-        durationMs: 0,
-        positionMs: 0,
-        rawLyric: '',
-      });
+      if (isTopFrame) {
+        pushToBridge({
+          title: '__probe_injected_fallback__',
+          artist: location.href,
+          playbackState: 'stopped',
+          durationMs: 0,
+          positionMs: 0,
+          rawLyric: '',
+        });
+      }
     })
     .catch(() => {
-      pushToBridge({
-        title: '__probe_injection_failed__',
-        artist: location.href,
-        playbackState: 'stopped',
-        durationMs: 0,
-        positionMs: 0,
-        rawLyric: '',
-      });
+      if (isTopFrame) {
+        pushToBridge({
+          title: '__probe_injection_failed__',
+          artist: location.href,
+          playbackState: 'stopped',
+          durationMs: 0,
+          positionMs: 0,
+          rawLyric: '',
+        });
+      }
     });
 })();

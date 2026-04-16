@@ -26,6 +26,7 @@
 ## Performance
 
 - `qml-performance-debug`: 布局抖动、窗口 resize churn、卡顿排查。
+- `netease-web-lyrics-stability`: NetEase 网页歌词桥稳定性排查，尤其是弱 payload 抢断歌词会话、闪回歌名/浏览器名、歌词不连续推进。
 
 ## Workflow
 

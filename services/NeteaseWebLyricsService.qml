@@ -45,11 +45,21 @@ Singleton {
     property string currentTranslatedLyric: ""
     property string nextTranslatedLyric: ""
     property bool hasLyrics: false
-    readonly property bool active: songId !== "" || title !== "" || artist !== "" || rawLyric !== ""
+    readonly property bool active:
+        songId !== ""
+            || title !== ""
+            || artist !== ""
+            || rawLyric !== ""
+            || translatedLyric !== ""
+            || currentLyric !== ""
+            || nextLyric !== ""
+            || currentTranslatedLyric !== ""
+            || nextTranslatedLyric !== ""
 
     property var _lyricLines: []
     property var _translatedLyricLines: []
     property int _lastUpdateMs: 0
+    property int _positionAnchorMs: 0
     property string _lastPayloadSignature: ""
     property bool _restartPending: false
 
@@ -89,6 +99,19 @@ Singleton {
         default:
             return "stopped"
         }
+    }
+
+    function _effectivePositionMs() {
+        if (root.playbackState !== "playing")
+            return Math.max(0, root.positionMs)
+
+        const anchorMs = root._positionAnchorMs > 0 ? root._positionAnchorMs : root._lastUpdateMs
+        const elapsedMs = anchorMs > 0 ? Math.max(0, Date.now() - anchorMs) : 0
+        const nextPositionMs = Math.max(0, root.positionMs + elapsedMs)
+        if (root.durationMs <= 0)
+            return nextPositionMs
+
+        return Math.min(root.durationMs, nextPositionMs)
     }
 
     function _parseLyricLines(rawLyric) {
@@ -139,7 +162,7 @@ Singleton {
         } else {
             let current = ""
             let next = ""
-            const cursorMs = Math.max(0, root.positionMs)
+            const cursorMs = root._effectivePositionMs()
 
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i]
@@ -163,7 +186,7 @@ Singleton {
         } else {
             let currentTranslated = ""
             let nextTranslated = ""
-            const cursorMs = Math.max(0, root.positionMs)
+            const cursorMs = root._effectivePositionMs()
 
             for (let i = 0; i < translatedLines.length; i++) {
                 const line = translatedLines[i]
@@ -186,6 +209,10 @@ Singleton {
             || root.nextTranslatedLyric !== ""
             || root.rawLyric !== ""
             || root.translatedLyric !== ""
+
+        root.progress = root.durationMs > 0
+            ? Math.max(0, Math.min(1, root._effectivePositionMs() / root.durationMs))
+            : 0
     }
 
     function _resetState() {
@@ -207,6 +234,7 @@ Singleton {
         root._translatedLyricLines = []
         root._lastPayloadSignature = ""
         root._lastUpdateMs = 0
+        root._positionAnchorMs = 0
     }
 
     function _applyPayload(payload) {
@@ -222,25 +250,64 @@ Singleton {
             : (nextDurationMs > 0 ? Math.max(0, Math.round(nextProgress * nextDurationMs)) : 0)
         const nextRawLyric = root._normalizeText(payload.rawLyric || payload.lyric)
         const nextTranslatedLyric = root._normalizeText(payload.translatedLyric || payload.tlyric)
-        const signature = [nextSongId, nextTitle, nextArtist, nextPlaybackState, String(nextPositionMs), String(nextDurationMs), nextRawLyric, nextTranslatedLyric].join("|")
+        const hasSessionContent = root.hasLyrics || root.rawLyric !== "" || root.translatedLyric !== ""
+        const sessionSeemsSame =
+            (nextSongId !== "" && nextSongId === root.songId)
+                || (nextSongId === "" && hasSessionContent)
+        const resolvedSongId = nextSongId !== "" ? nextSongId : (sessionSeemsSame ? root.songId : "")
+        const resolvedTitle = nextTitle !== "" ? nextTitle : (sessionSeemsSame ? root.title : "")
+        const resolvedArtist = nextArtist !== "" ? nextArtist : (sessionSeemsSame ? root.artist : "")
+        const preserveLyricsPayload = sessionSeemsSame && nextRawLyric === "" && nextTranslatedLyric === ""
+        const resolvedRawLyric = nextRawLyric !== "" ? nextRawLyric : (preserveLyricsPayload ? root.rawLyric : "")
+        const resolvedTranslatedLyric = nextTranslatedLyric !== ""
+            ? nextTranslatedLyric
+            : (preserveLyricsPayload ? root.translatedLyric : "")
+        const sameSong = resolvedSongId !== "" && resolvedSongId === root.songId
+        const hasTimeline = root.durationMs > 0 || root.positionMs > 0
+        const invalidTimeline = nextDurationMs === 0 && nextPositionMs === 0
+        const preserveTimeline = sessionSeemsSame && hasTimeline && invalidTimeline
+        const preservePlaybackState = sessionSeemsSame
+            && root.playbackState !== "stopped"
+            && nextPlaybackState === "stopped"
+        const resolvedPlaybackState =
+            (preserveTimeline || preservePlaybackState)
+                ? root.playbackState
+                : nextPlaybackState
+        const resolvedProgress = preserveTimeline ? root.progress : nextProgress
+        const resolvedDurationMs = preserveTimeline ? root.durationMs : nextDurationMs
+        const resolvedPositionMs = preserveTimeline ? root.positionMs : nextPositionMs
+        const signature = [
+            resolvedSongId,
+            resolvedTitle,
+            resolvedArtist,
+            resolvedPlaybackState,
+            String(resolvedPositionMs),
+            String(resolvedDurationMs),
+            resolvedRawLyric,
+            resolvedTranslatedLyric
+        ].join("|")
 
-        root.songId = nextSongId
-        root.title = nextTitle
-        root.artist = nextArtist
-        root.playbackState = nextPlaybackState
-        root.progress = nextProgress
-        root.durationMs = nextDurationMs
-        root.positionMs = nextPositionMs
-        root.rawLyric = nextRawLyric
-        root.translatedLyric = nextTranslatedLyric
+        root.songId = resolvedSongId
+        root.title = resolvedTitle
+        root.artist = resolvedArtist
+        root.playbackState = resolvedPlaybackState
+        root.progress = resolvedProgress
+        root.durationMs = resolvedDurationMs
+        root.positionMs = resolvedPositionMs
+        root.rawLyric = resolvedRawLyric
+        root.translatedLyric = resolvedTranslatedLyric
         root._lastUpdateMs = Date.now()
+        if (!preserveTimeline)
+            root._positionAnchorMs = root._lastUpdateMs
+        else if (root.playbackState === "playing" && root._positionAnchorMs <= 0)
+            root._positionAnchorMs = root._lastUpdateMs
 
         if (signature === root._lastPayloadSignature)
             return
 
         root._lastPayloadSignature = signature
-        root._lyricLines = root._parseLyricLines(nextRawLyric)
-        root._translatedLyricLines = root._parseLyricLines(nextTranslatedLyric)
+        root._lyricLines = root._parseLyricLines(resolvedRawLyric)
+        root._translatedLyricLines = root._parseLyricLines(resolvedTranslatedLyric)
         root._syncLyricWindow()
     }
 

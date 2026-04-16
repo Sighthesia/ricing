@@ -4,6 +4,101 @@
   const BRIDGE_URL = 'http://127.0.0.1:18765/push';
   const LYRIC_API_PREFIX = 'https://music.163.com/api/song/lyric?id=';
   const lyricCache = new Map();
+  const frameStateCache = new Map();
+  let lastForwardedSignature = '';
+
+  function frameKey(sender) {
+    const tabId = sender && sender.tab && Number.isInteger(sender.tab.id) ? sender.tab.id : -1;
+    const frameId = sender && Number.isInteger(sender.frameId) ? sender.frameId : 0;
+    return `${tabId}:${frameId}`;
+  }
+
+  function payloadSignature(payload) {
+    return [
+      payload.songId,
+      payload.title,
+      payload.artist,
+      payload.playbackState,
+      payload.positionMs,
+      payload.durationMs,
+      payload.rawLyric,
+      payload.translatedLyric,
+    ].join('|');
+  }
+
+  function payloadScore(payload) {
+    let score = 0;
+    const title = payload.title == null ? '' : String(payload.title).trim();
+
+    if (payload.songId)
+      score += 1000;
+    if (payload.rawLyric)
+      score += 1000;
+    if (payload.translatedLyric)
+      score += 200;
+    if (payload.durationMs > 0)
+      score += 250;
+    if (payload.positionMs > 0)
+      score += 100;
+    if (payload.playbackState === 'playing')
+      score += 120;
+    else if (payload.playbackState === 'paused')
+      score += 60;
+    if (payload.artist)
+      score += 20;
+    if (title)
+      score += 10;
+    if (/^__.*__$/.test(title))
+      score -= 4000;
+    if (!payload.songId && !payload.rawLyric && payload.durationMs === 0 && payload.positionMs === 0)
+      score -= 500;
+
+    return score;
+  }
+
+  function pruneFrameStateCache() {
+    const cutoff = Date.now() - 5000;
+    for (const [key, entry] of frameStateCache.entries()) {
+      if (!entry || entry.updatedAt < cutoff)
+        frameStateCache.delete(key);
+    }
+  }
+
+  function updateFrameState(sender, payload) {
+    frameStateCache.set(frameKey(sender), {
+      payload,
+      updatedAt: Date.now(),
+    });
+  }
+
+  function selectBestPayload() {
+    pruneFrameStateCache();
+
+    let bestEntry = null;
+    let bestScore = -Infinity;
+    for (const entry of frameStateCache.values()) {
+      const score = payloadScore(entry.payload);
+      if (score > bestScore || (score === bestScore && bestEntry && entry.updatedAt > bestEntry.updatedAt)) {
+        bestEntry = entry;
+        bestScore = score;
+      }
+    }
+
+    return bestEntry ? bestEntry.payload : null;
+  }
+
+  function pushBestPayload() {
+    const bestPayload = selectBestPayload();
+    if (!bestPayload)
+      return Promise.resolve({ ok: false, ignored: true });
+
+    const signature = payloadSignature(bestPayload);
+    if (signature === lastForwardedSignature)
+      return Promise.resolve({ ok: true, skipped: true });
+
+    lastForwardedSignature = signature;
+    return pushToBridge(bestPayload);
+  }
 
   function normalizePlaybackState(value) {
     const normalized = value == null ? '' : String(value).trim().toLowerCase();
@@ -75,16 +170,20 @@
     }).then(() => ({ ok: true })).catch((error) => ({ ok: false, error: String(error) }));
   }
 
-  browser.runtime.onMessage.addListener((message) => {
+  browser.runtime.onMessage.addListener((message, sender) => {
     if (!message || message.type !== 'dymicshell-netease-lyrics-push')
       return Promise.resolve({ ok: false, ignored: true });
 
     const payload = normalizePayload(message.payload);
+    const commitPayload = (resolvedPayload) => {
+      updateFrameState(sender, resolvedPayload);
+      return pushBestPayload();
+    };
     if (payload.songId === '' || payload.rawLyric !== '' || payload.translatedLyric !== '')
-      return pushToBridge(payload);
+      return commitPayload(payload);
 
     return fetchLyrics(payload.songId).then((lyrics) => {
-      return pushToBridge({
+      return commitPayload({
         ...payload,
         rawLyric: lyrics.rawLyric || payload.rawLyric,
         translatedLyric: lyrics.translatedLyric || payload.translatedLyric,

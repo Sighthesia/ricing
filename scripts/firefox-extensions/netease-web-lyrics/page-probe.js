@@ -131,7 +131,7 @@
     }
 
     const nextPlaybackState = normalizeText(session.playbackState);
-    if (nextPlaybackState && nextPlaybackState !== state.playbackState) {
+    if (nextPlaybackState && nextPlaybackState !== 'none' && nextPlaybackState !== state.playbackState) {
       state.playbackState = nextPlaybackState;
       changed = true;
     }
@@ -166,27 +166,39 @@
     return Array.from(audioSet);
   }
 
+  function audioScore(audio) {
+    if (!audio || typeof audio.currentTime !== 'number')
+      return -1;
+
+    let score = 0;
+    if (!audio.paused)
+      score += 1000;
+    if (Number.isFinite(audio.duration) && audio.duration > 0)
+      score += 100;
+    if (Number.isFinite(audio.currentTime) && audio.currentTime > 0)
+      score += 10;
+    if (Number.isFinite(audio.readyState) && audio.readyState > 0)
+      score += audio.readyState;
+    if (audio.ended)
+      score -= 100;
+    return score;
+  }
+
   function mergeAudioState() {
     const audios = candidateAudios();
     let activeAudio = null;
+    let bestScore = -1;
 
     for (const audio of audios) {
-      if (audio && typeof audio.currentTime === 'number' && !audio.paused) {
-        activeAudio = audio;
-        break;
-      }
+      const score = audioScore(audio);
+      if (score <= bestScore)
+        continue;
+
+      bestScore = score;
+      activeAudio = audio;
     }
 
-    if (!activeAudio) {
-      for (const audio of audios) {
-        if (audio && typeof audio.currentTime === 'number') {
-          activeAudio = audio;
-          break;
-        }
-      }
-    }
-
-    if (!activeAudio)
+    if (!activeAudio || bestScore < 0)
       return false;
 
     let changed = false;
@@ -284,7 +296,9 @@
         return;
 
       audioSet.add(target);
-      const changed = mergeAudioState() || mergeMediaSession();
+      const sessionChanged = mergeMediaSession();
+      const audioChanged = mergeAudioState();
+      const changed = sessionChanged || audioChanged;
       if (changed)
         emitState();
     }, true);
@@ -333,7 +347,9 @@
   };
 
   setInterval(() => {
-    const changed = mergeMediaSession() || mergeAudioState();
+    const sessionChanged = mergeMediaSession();
+    const audioChanged = mergeAudioState();
+    const changed = sessionChanged || audioChanged;
     if (changed)
       emitState();
   }, 1000);

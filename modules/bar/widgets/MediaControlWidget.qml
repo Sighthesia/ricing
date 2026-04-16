@@ -5,6 +5,7 @@ import qs.config
 import qs.services
 import "../media" as MediaParts
 import "../" as BarParts
+import "../" as BarPanels
 
 // Persistent media widget with a transient flash control strip.
 Item {
@@ -37,6 +38,7 @@ Item {
     readonly property real _sharedProgressMaskY: root.flashVisible ? root._sharedProgressY : 0
     readonly property real _sharedProgressMaskHeight:
         root.flashVisible ? root._sharedProgressHeight : root._pillH
+    readonly property bool _useMaskedProgress: false
     readonly property real _flashProgressInset: root._padH * root._flashStageProgress
     readonly property real _flashProgressWidth:
         root.flashVisible
@@ -52,9 +54,17 @@ Item {
         root._active && root._hoverRevealControls && (root._hoverFlashRequested || root._hoverRetainActive)
     readonly property bool flashVisible:
         root._active && (MediaControlService.announcementState !== "idle" || root._hoverFlashActive)
-    readonly property string _displayTitle:
-        root._showLyrics && root._preferLyrics && MediaControlService.currentLyric !== ""
+    readonly property string _displayLyric:
+        MediaControlService.currentLyric !== ""
             ? MediaControlService.currentLyric
+            : MediaControlService.nextLyric
+    readonly property bool _useLyricsAsPrimaryText:
+        root._showLyrics && root._preferLyrics && MediaControlService.hasLyrics && root._displayLyric !== ""
+    readonly property string _displayArtist:
+        root._useLyricsAsPrimaryText ? "" : MediaControlService.artist
+    readonly property string _displayTitle:
+        root._useLyricsAsPrimaryText
+            ? root._displayLyric
             : (MediaControlService.title !== ""
                 ? MediaControlService.title
                 : (MediaControlService.playerName !== "" ? MediaControlService.playerName : "No Media"))
@@ -68,7 +78,7 @@ Item {
         _pulseScaleAnim.start()
     }
     readonly property string _contentSignature:
-        [MediaControlService.artUrl, MediaControlService.artist, root._displayTitle].join("|")
+        [MediaControlService.artUrl, root._displayArtist, root._displayTitle].join("|")
     readonly property int _contentSwapOffset:
         Math.max(2, Theme.barWidget.contentPaddingV * 2)
     readonly property real _flashStageVisibleOffset: Math.max(1, Math.round(Theme.uiScale))
@@ -86,6 +96,13 @@ Item {
     property bool _hoverHandlerIgnored: false
     property bool _contentInitialized: false
     property bool _contentSwapActive: false
+    property string _panelState: "closed"
+    property real _panelVisibleWidth: 0
+    property real _panelVisibleHeight: 0
+    property real _panelSurfaceOpacity: 0
+    property real _panelSurfaceScale: 0.985
+    property real _panelContentOpacity: 0
+    property real _panelThrowOffsetY: 0
     property var _currentContent: ({ title: "", artist: "", artUrl: "" })
     property var _outgoingContent: ({ title: "", artist: "", artUrl: "" })
     property var _incomingContent: ({ title: "", artist: "", artUrl: "" })
@@ -95,6 +112,94 @@ Item {
     readonly property bool _seekPreviewActive: _seekArea.pressed && root._seekPreviewProgress >= 0
     readonly property real _displayProgress:
         root._seekPreviewActive ? root._seekPreviewProgress : MediaControlService.progress
+    readonly property real _panelPillWidth:
+        Math.max(
+            Theme.barWidget.mediaCompactMinWidth,
+            root.width > 0 ? root.width : Theme.barWidget.mediaCompactMinWidth
+        )
+    readonly property real _panelPillHeight: root._pillH
+    readonly property real _panelWidth: Theme.barWidget.mediaPanelWidth + ThemeCards.panelPadding * 2
+    readonly property real _panelHeight: _panelContent.implicitHeight + ThemeCards.panelPadding * 2
+    readonly property real _panelShellY: _pillClip.y
+    readonly property real _panelDetachedY:
+        root._panelShellY + root._panelPillHeight + root._panelInwardCornerDepth
+    readonly property real _panelRevealLift: Math.max(8, Theme.barWidget.contentPaddingV * 4)
+    readonly property real _panelAttachmentOverlap: 1
+    readonly property real _panelShellRadius: ThemeCards.shellRadius
+    readonly property real _panelInwardCornerRadius: _panelShellRadius
+    readonly property real _panelInwardCornerDepth:
+        Math.max(18, root._panelInwardCornerRadius + (root._panelInwardCornerRadius - 18) * 0.3)
+    readonly property real _panelBridgeOutset: 0
+    readonly property real _panelWindowHeight: Math.max(_panelPillHeight, _panelDetachedY + _panelHeight)
+    readonly property real _panelShellHeight:
+        Math.max(0, (_panelHost.y + root._panelVisibleHeight) - _panelShellY)
+    readonly property real _panelReservedExtension:
+        root._panelState === "closed"
+            ? 0
+            : Math.max(0, Math.ceil(root._panelDetachedY + root._panelHeight))
+    readonly property real _panelShellBlend:
+        root._panelState === "closed"
+            ? 0
+            : Math.max(
+                0,
+                Math.min(
+                    1,
+                    root._panelState === "closing"
+                        ? root._panelRevealProgress
+                        : Math.max(root._panelRevealProgress, root._panelSurfaceOpacity)
+                )
+            )
+    readonly property real _panelWidthRevealProgress:
+        root._panelWidth > root._panelPillWidth
+            ? Math.max(0, Math.min(1, (root._panelVisibleWidth - root._panelPillWidth) / (root._panelWidth - root._panelPillWidth)))
+            : 1
+    readonly property real _panelHeightRevealProgress:
+        root._panelHeight > 0
+            ? Math.max(0, Math.min(1, root._panelVisibleHeight / root._panelHeight))
+            : 1
+    readonly property real _panelRevealProgress:
+        root._panelState === "closed"
+            ? 0
+            : Math.min(root._panelWidthRevealProgress, root._panelHeightRevealProgress)
+    readonly property real _panelRevealYOffset: (1 - root._panelRevealProgress) * root._panelRevealLift
+    readonly property bool _panelCollapseTailHidden:
+        root._panelState === "closing"
+            && (root._panelRevealProgress <= 0.2
+                || root._panelVisibleHeight <= Math.max(8, root._panelAttachmentOverlap + 6))
+
+    BarPanels.AttachedExpansionMotion {
+        id: _panelMotion
+
+        motionTarget: root
+        throwOffsetProperty: "_panelThrowOffsetY"
+        revealWidthProperty: "_panelVisibleWidth"
+        revealHeightProperty: "_panelVisibleHeight"
+        contentOpacityProperty: "_panelContentOpacity"
+        throwLift: Math.max(8, Theme.barWidget.contentPaddingV * 4)
+        throwDrop: Math.max(3, Math.round(root._panelRevealLift * 0.55))
+        throwCatchLift: Math.max(3, Math.round(root._panelRevealLift * 1.05))
+        revealWidthTarget: root._panelWidth
+        revealHeightTarget: root._panelHeight
+        collapseWidthTarget: root._panelPillWidth
+        collapseHeightTarget: 0
+        revealContentOpacityTarget: 1
+        collapseContentOpacityTarget: 1
+        throwLeadDuration: Math.max(1, Math.round(Theme.anim.springDuration / 6))
+        throwDropDuration: Math.max(1, Math.round(Theme.anim.springDuration / 2))
+
+        onRevealFinished: {
+            if (root._panelState === "opening")
+                root._panelState = "open"
+        }
+
+        onCollapseFinished: {
+            if (root._panelState !== "closing")
+                return
+
+            root._panelState = "closed"
+            root._resetPanelCollapsedSeed()
+        }
+    }
 
     implicitWidth: root._active ? _pillClip.implicitWidth : 0
     implicitHeight: root._active ? (_pillH + Theme.iconPadding) : 0
@@ -105,6 +210,58 @@ Item {
         property: "mediaControlFlashExtension"
         value: root._flashRenderVisible ? (root._flashGap + root._flashRowH) : 0
         restoreMode: Binding.RestoreBindingOrValue
+    }
+
+    function _resetPanelCollapsedSeed() {
+        root._panelVisibleWidth = root._panelPillWidth
+        root._panelVisibleHeight = 0
+        root._panelSurfaceOpacity = 0
+        root._panelSurfaceScale = 0.985
+        root._panelContentOpacity = 0
+        root._panelThrowOffsetY = 0
+    }
+
+    function _syncPanelExtensionReservation() {
+        if (root._panelReservedExtension > 0)
+            BarLayoutService.setTransientExtension("mediaControlPanelExtension", root._panelReservedExtension)
+        else
+            BarLayoutService.clearTransientExtension("mediaControlPanelExtension")
+    }
+
+    function _openPanel() {
+        _panelMotion.catchAnim.stop()
+        _panelMotion.collapseAnim.stop()
+        _panelSurfaceOpenAnim.stop()
+        _panelSurfaceCloseAnim.stop()
+        _panelEnterDelay.stop()
+
+        if (root._panelState === "closed")
+            root._resetPanelCollapsedSeed()
+
+        root._panelState = "opening"
+        _panelSurfaceCloseAnim.stop()
+        _panelSurfaceOpenAnim.restart()
+        _panelMotion.throwOutAnim.restart()
+        _panelMotion.revealAnim.restart()
+        _panelEnterDelay.restart()
+    }
+
+    function _closePanel() {
+        _panelMotion.throwOutAnim.stop()
+        _panelMotion.revealAnim.stop()
+        _panelSurfaceOpenAnim.stop()
+        _panelSurfaceCloseAnim.stop()
+        _panelEnterDelay.stop()
+
+        if (_panelContent && _panelContent.runExitAnimation)
+            _panelContent.runExitAnimation()
+
+        if (root._panelState === "closed" || root._panelState === "closing")
+            return
+
+        root._panelState = "closing"
+        _panelMotion.catchAnim.restart()
+        _panelMotion.collapseAnim.restart()
     }
 
     onFlashVisibleChanged: {
@@ -146,11 +303,45 @@ Item {
     }
 
     on_ActiveChanged: {
-        if (root._active)
+        if (root._active) {
+            if (MediaControlService.panelOpen)
+                root._openPanel()
+            else
+                root._resetPanelCollapsedSeed()
             return
+        }
 
         _hoverRetainRelease.stop()
         root._hoverRetainActive = false
+        root._closePanel()
+    }
+
+    Component.onCompleted: {
+        root._startContentSwap()
+        root._syncPanelExtensionReservation()
+
+        if (root._active && MediaControlService.panelOpen)
+            root._openPanel()
+        else
+            root._resetPanelCollapsedSeed()
+    }
+
+    Component.onDestruction: BarLayoutService.clearTransientExtension("mediaControlPanelExtension")
+
+    on_PanelReservedExtensionChanged: root._syncPanelExtensionReservation()
+
+    Connections {
+        target: MediaControlService
+
+        function onPanelOpenChanged() {
+            if (!root._active)
+                return
+
+            if (MediaControlService.panelOpen)
+                root._openPanel()
+            else
+                root._closePanel()
+        }
     }
 
     // Collapse hold timer.
@@ -169,12 +360,54 @@ Item {
         onTriggered: root._hoverRetainActive = false
     }
 
-    function _findBarContent() {
-        let candidate = root.parent
-        while (candidate && !candidate.hitTestSection)
-            candidate = candidate.parent
-        return candidate
+    Timer {
+        id: _panelEnterDelay
+        interval: Math.max(Theme.staggerDelay * 4, Math.round(Theme.anim.moveDuration / 2))
+        repeat: false
+        onTriggered: _panelContent.runEnterAnimation()
     }
+
+    ParallelAnimation {
+        id: _panelSurfaceOpenAnim
+
+        PropertyAnimation {
+            target: root
+            property: "_panelSurfaceOpacity"
+            to: 1
+            duration: Theme.anim.highlightDuration
+            easing.type: Theme.anim.highlightType
+        }
+
+        PropertyAnimation {
+            target: root
+            property: "_panelSurfaceScale"
+            to: 1
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
+        }
+    }
+
+    ParallelAnimation {
+        id: _panelSurfaceCloseAnim
+
+        PropertyAnimation {
+            target: root
+            property: "_panelSurfaceOpacity"
+            to: 0
+            duration: Theme.anim.highlightDuration
+            easing.type: Theme.anim.highlightType
+        }
+
+        PropertyAnimation {
+            target: root
+            property: "_panelSurfaceScale"
+            to: 0.985
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.moveType
+        }
+    }
+
 
     function _clampSeekProgress(xPosition) {
         if (_pillBackground.width <= 0)
@@ -186,7 +419,7 @@ Item {
     function _snapshotContent() {
         return {
             title: root._displayTitle,
-            artist: MediaControlService.artist,
+            artist: root._displayArtist,
             artUrl: MediaControlService.artUrl
         }
     }
@@ -208,6 +441,10 @@ Item {
         const nextContent = root._snapshotContent()
         const carryIncomingLayer = root._contentSwapActive
         const outgoingContent = carryIncomingLayer ? root._incomingContent : root._currentContent
+        const lyricOnlyUpdate = root._useLyricsAsPrimaryText
+            && root._contentInitialized
+            && nextContent.artUrl === root._currentContent.artUrl
+            && nextContent.artist === root._currentContent.artist
 
         if (!root._contentInitialized) {
             root._currentContent = nextContent
@@ -217,6 +454,18 @@ Item {
             root._outgoingContentStartOpacity = 1
             root._outgoingContentStartY = 0
             root._contentInitialized = true
+            return
+        }
+
+        if (lyricOnlyUpdate) {
+            _contentSwapAnim.stop()
+            root._currentContent = nextContent
+            root._outgoingContent = nextContent
+            root._incomingContent = nextContent
+            root._contentSwapProgress = 1
+            root._outgoingContentStartOpacity = 1
+            root._outgoingContentStartY = 0
+            root._contentSwapActive = false
             return
         }
 
@@ -236,8 +485,6 @@ Item {
     }
 
     on_ContentSignatureChanged: root._startContentSwap()
-
-    Component.onCompleted: root._startContentSwap()
 
     Connections {
         target: MediaControlService
@@ -361,7 +608,7 @@ Item {
             : root._pillH
         scale: root._pulseScale
         transformOrigin: Item.Center
-        clip: true
+        clip: false
 
         HoverHandler {
             id: _hoverHandler
@@ -375,95 +622,212 @@ Item {
             }
         }
 
-        // Pill background.
-        Rectangle {
-            id: _pillBackground
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: root.flashVisible
-                ? (root._pillH + root._flashGap + root._flashRowH)
-                : root._pillH
-            radius: root._pillH / 2
-            color: Colors.background
-            border.color: Colors.border
-            border.width: 1
+        // Throw layer keeps the exported widget geometry stable while the visible
+        // media surface and attached shell move together.
+        Item {
+            id: _pillThrowLayer
+            x: 0
+            y: root._panelThrowOffsetY
+            width: parent.width
+            height: parent.height
 
-            Behavior on height {
-                NumberAnimation {
-                    duration: Theme.anim.springDuration
-                    easing.type: Theme.anim.springType
-                    easing.overshoot: Theme.anim.springOvershoot
+            // Pill background.
+            Rectangle {
+                id: _pillBackground
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: root.flashVisible
+                    ? (root._pillH + root._flashGap + root._flashRowH)
+                    : root._pillH
+                radius: root._pillH / 2
+                color: Qt.rgba(
+                    Colors.background.r,
+                    Colors.background.g,
+                    Colors.background.b,
+                    Math.max(0, 1 - root._panelShellBlend)
+                )
+                border.color: Colors.border
+                border.width: root._panelShellBlend > 0.05 ? 0 : 1
+
+                Behavior on height {
+                    NumberAnimation {
+                        duration: Theme.anim.springDuration
+                        easing.type: Theme.anim.springType
+                        easing.overshoot: Theme.anim.springOvershoot
+                    }
                 }
             }
-        }
 
-        // Base highlight layer.
-        Rectangle {
-            anchors.fill: _pillBackground
-            radius: _pillBackground.radius
-            color: Colors.highlight
-            opacity: 0
-        }
-
-        // Transient accent layer.
-        Rectangle {
-            z: 1
-            anchors.fill: _pillBackground
-            radius: _pillBackground.radius
-            color: Colors.highlight
-            opacity: root._flashRenderVisible ? Math.min(1, root._transientAccentBaseOpacity + root._pulseOpacity) : 0
-        }
-
-        // Flash stage clip.
-        MediaParts.MediaFlashStage {
-            id: _flashStageClip
-            anchors.left: _pillBackground.left
-            anchors.right: _pillBackground.right
-            anchors.top: _pillBackground.top
-            height: Math.min(
-                _pillBackground.height,
-                root._pillH + (root._flashGap + root._flashRowH) * root._flashStageProgress
-            )
-            active: root._active
-            stageProgress: root._flashStageProgress
-            pillWidth: _pillBackground.width
-            pillHeight: root._pillH
-            padH: root._padH
-            gap: root._flashGap
-            rowHeight: root._flashRowH
-            restLift: root._flashRestLift
-            visibleOffset: root._flashStageVisibleOffset
-            leadingLabel: MediaControlService.positionLabel
-            durationLabel: MediaControlService.durationLabel
-            playbackState: MediaControlService.playbackState
-            canGoPrevious: MediaControlService.canGoPrevious
-            canTogglePlayback: MediaControlService.canTogglePlayback
-            canGoNext: MediaControlService.canGoNext
-            secondaryButtonSize: Theme.barWidget.mediaFlashCompactSecondaryButtonSize
-            primaryButtonSize: Theme.barWidget.mediaFlashCompactPrimaryButtonSize
-            secondaryIconSize: Theme.barWidget.mediaFlashCompactSecondaryIconSize
-            primaryIconSize: Theme.barWidget.mediaFlashCompactPrimaryIconSize
-            onPreviousRequested: MediaControlService.previous()
-            onPlayPauseRequested: MediaControlService.playPause()
-            onNextRequested: MediaControlService.next()
-        }
-
-        // Shared progress mask.
-        Item {
-            id: _sharedProgressMask
-            anchors.fill: parent
-            layer.enabled: true
-            opacity: 0
-
-            // Shared progress mask shape.
+            // Base highlight layer.
             Rectangle {
+                anchors.fill: _pillBackground
+                radius: _pillBackground.radius
+                color: Colors.highlight
+                opacity: 0
+            }
+
+            // Transient accent layer.
+            Rectangle {
+                z: 1
+                anchors.fill: _pillBackground
+                radius: _pillBackground.radius
+                color: Colors.highlight
+                opacity: root._flashRenderVisible ? Math.min(1, root._transientAccentBaseOpacity + root._pulseOpacity) : 0
+            }
+
+            // Flash stage clip.
+            MediaParts.MediaFlashStage {
+                id: _flashStageClip
+                anchors.left: _pillBackground.left
+                anchors.right: _pillBackground.right
+                anchors.top: _pillBackground.top
+                height: Math.min(
+                    _pillBackground.height,
+                    root._pillH + (root._flashGap + root._flashRowH) * root._flashStageProgress
+                )
+                active: root._active
+                stageProgress: root._flashStageProgress
+                pillWidth: _pillBackground.width
+                pillHeight: root._pillH
+                padH: root._padH
+                gap: root._flashGap
+                rowHeight: root._flashRowH
+                restLift: root._flashRestLift
+                visibleOffset: root._flashStageVisibleOffset
+                leadingLabel: MediaControlService.positionLabel
+                durationLabel: MediaControlService.durationLabel
+                playbackState: MediaControlService.playbackState
+                canGoPrevious: MediaControlService.canGoPrevious
+                canTogglePlayback: MediaControlService.canTogglePlayback
+                canGoNext: MediaControlService.canGoNext
+                secondaryButtonSize: Theme.barWidget.mediaFlashCompactSecondaryButtonSize
+                primaryButtonSize: Theme.barWidget.mediaFlashCompactPrimaryButtonSize
+                secondaryIconSize: Theme.barWidget.mediaFlashCompactSecondaryIconSize
+                primaryIconSize: Theme.barWidget.mediaFlashCompactPrimaryIconSize
+                onPreviousRequested: MediaControlService.previous()
+                onPlayPauseRequested: MediaControlService.playPause()
+                onNextRequested: MediaControlService.next()
+            }
+
+            // Shared progress mask.
+            Item {
+                id: _sharedProgressMask
+                anchors.fill: parent
+                visible: root._useMaskedProgress
+                layer.enabled: true
+                opacity: 0
+
+                // Shared progress mask shape.
+                Rectangle {
+                    x: root._flashProgressInset
+                    y: root._sharedProgressMaskY
+                    width: root._flashProgressWidth
+                    height: root._sharedProgressMaskHeight
+                    radius: root.flashVisible ? (root._sharedProgressHeight / 2) : (root._pillH / 2)
+                    color: "white"
+
+                    Behavior on y {
+                        NumberAnimation {
+                            duration: Theme.anim.springDuration
+                            easing.type: Theme.anim.springType
+                            easing.overshoot: Theme.anim.springOvershoot
+                        }
+                    }
+
+                    Behavior on height {
+                        NumberAnimation {
+                            duration: Theme.anim.springDuration
+                            easing.type: Theme.anim.springType
+                            easing.overshoot: Theme.anim.springOvershoot
+                        }
+                    }
+
+                    Behavior on radius {
+                        NumberAnimation {
+                            duration: Theme.anim.springDuration
+                            easing.type: Theme.anim.springType
+                            easing.overshoot: Theme.anim.springOvershoot
+                        }
+                    }
+                }
+            }
+
+            // Shared progress source.
+            Item {
+                id: _sharedProgressSource
+                anchors.fill: parent
+                visible: root._useMaskedProgress
+                opacity: 0
+
+                // Shared progress strip.
+                MediaParts.MediaProgressStrip {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: root._flashProgressInset
+                    anchors.rightMargin: root._flashProgressInset
+                    y: root._sharedProgressY
+                    progress: root._displayProgress
+                    expanded: root.flashVisible
+
+                    Behavior on y {
+                        NumberAnimation {
+                            duration: Theme.anim.springDuration
+                            easing.type: Theme.anim.springType
+                            easing.overshoot: Theme.anim.springOvershoot
+                        }
+                    }
+                }
+            }
+
+            // Shared progress masked output.
+            OpacityMask {
+                z: 1
+                anchors.fill: parent
+                visible: root._useMaskedProgress && Theme.graphicalEffectsEnabled
+                source: _sharedProgressSource
+                maskSource: _sharedProgressMask
+            }
+
+            // Shared progress fallback.
+            MediaParts.MediaProgressStrip {
+                z: 1
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root._flashProgressInset
+                anchors.rightMargin: root._flashProgressInset
+                y: root._sharedProgressY
+                visible: !root._useMaskedProgress || !Theme.graphicalEffectsEnabled
+                progress: root._displayProgress
+                expanded: root.flashVisible
+            }
+
+            // Seek hit target.
+            MouseArea {
+                id: _seekArea
+                z: 2
                 x: root._flashProgressInset
-                y: root._sharedProgressMaskY
+                y: root._sharedProgressY
                 width: root._flashProgressWidth
-                height: root._sharedProgressMaskHeight
-                radius: root.flashVisible ? (root._sharedProgressHeight / 2) : (root._pillH / 2)
-                color: "white"
+                height: root._sharedProgressHeight
+                enabled: root._flashRenderVisible && MediaControlService.canSeek
+                hoverEnabled: enabled
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onPressed: mouse => {
+                    root._seekPreviewProgress = root._clampSeekProgress(mouse.x)
+                }
+                onPositionChanged: mouse => {
+                    if (!pressed)
+                        return
+
+                    root._seekPreviewProgress = root._clampSeekProgress(mouse.x)
+                }
+                onReleased: mouse => {
+                    root._seekPreviewProgress = root._clampSeekProgress(mouse.x)
+                    MediaControlService.seekToProgress(root._seekPreviewProgress)
+                    root._seekPreviewProgress = -1
+                }
+                onCanceled: root._seekPreviewProgress = -1
 
                 Behavior on y {
                     NumberAnimation {
@@ -480,111 +844,11 @@ Item {
                         easing.overshoot: Theme.anim.springOvershoot
                     }
                 }
-
-                Behavior on radius {
-                    NumberAnimation {
-                        duration: Theme.anim.springDuration
-                        easing.type: Theme.anim.springType
-                        easing.overshoot: Theme.anim.springOvershoot
-                    }
-                }
-            }
-        }
-
-        // Shared progress source.
-        Item {
-            id: _sharedProgressSource
-            anchors.fill: parent
-            opacity: 0
-
-            // Shared progress strip.
-            MediaParts.MediaProgressStrip {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.leftMargin: root._flashProgressInset
-                anchors.rightMargin: root._flashProgressInset
-                y: root._sharedProgressY
-                progress: root._displayProgress
-                expanded: root.flashVisible
-
-                Behavior on y {
-                    NumberAnimation {
-                        duration: Theme.anim.springDuration
-                        easing.type: Theme.anim.springType
-                        easing.overshoot: Theme.anim.springOvershoot
-                    }
-                }
-            }
-        }
-
-        // Shared progress masked output.
-        OpacityMask {
-            z: 1
-            anchors.fill: parent
-            visible: Theme.graphicalEffectsEnabled
-            source: _sharedProgressSource
-            maskSource: _sharedProgressMask
-        }
-
-        MediaParts.MediaProgressStrip {
-            z: 1
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: root._flashProgressInset
-            anchors.rightMargin: root._flashProgressInset
-            y: root._sharedProgressY
-            visible: !Theme.graphicalEffectsEnabled
-            progress: root._displayProgress
-            expanded: root.flashVisible
-        }
-
-        // Seek hit target.
-        MouseArea {
-            id: _seekArea
-            z: 2
-            x: root._flashProgressInset
-            y: root._sharedProgressY
-            width: root._flashProgressWidth
-            height: root._sharedProgressHeight
-            enabled: root._flashRenderVisible && MediaControlService.canSeek
-            hoverEnabled: enabled
-            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onPressed: mouse => {
-                root._seekPreviewProgress = root._clampSeekProgress(mouse.x)
-            }
-            onPositionChanged: mouse => {
-                if (!pressed)
-                    return
-
-                root._seekPreviewProgress = root._clampSeekProgress(mouse.x)
-            }
-            onReleased: mouse => {
-                root._seekPreviewProgress = root._clampSeekProgress(mouse.x)
-                MediaControlService.seekToProgress(root._seekPreviewProgress)
-                root._seekPreviewProgress = -1
-            }
-            onCanceled: root._seekPreviewProgress = -1
-
-            Behavior on y {
-                NumberAnimation {
-                    duration: Theme.anim.springDuration
-                    easing.type: Theme.anim.springType
-                    easing.overshoot: Theme.anim.springOvershoot
-                }
             }
 
-            Behavior on height {
-                NumberAnimation {
-                    duration: Theme.anim.springDuration
-                    easing.type: Theme.anim.springType
-                    easing.overshoot: Theme.anim.springOvershoot
-                }
-            }
-        }
-
-        // Surface shell.
-        Item {
-            id: _surface
+            // Surface shell.
+            Item {
+                id: _surface
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
@@ -596,7 +860,7 @@ Item {
                 anchors.fill: parent
                 radius: root._pillH / 2
                 color: Colors.background
-                opacity: Theme.barWidget.mediaSurfaceOverlayOpacity
+                opacity: Theme.barWidget.mediaSurfaceOverlayOpacity * (1 - root._panelShellBlend)
             }
 
             // Surface visualizer.
@@ -611,7 +875,7 @@ Item {
                 anchors.bottomMargin: Theme.barWidget.mediaProgressThickness
                 visible: !Theme.powerSaveEnabled
                 bars: MediaControlService.visualizerHealthy ? MediaControlService.visualizerBars : []
-                barOpacity: Theme.barWidget.mediaVisualizerBarOpacity * 1.1
+                barOpacity: Theme.barWidget.mediaVisualizerBarOpacity * 1.1 * (1 - root._panelShellBlend * 0.75)
             }
 
             // Surface accent layer.
@@ -625,7 +889,7 @@ Item {
             // Surface hover highlight.
             BarParts.HoverRevealHighlight {
                 anchors.fill: parent
-                hovered: _mainArea.containsMouse
+                hovered: !root._panelShellBlend && _mainArea.containsMouse
                 radius: root._pillH / 2
             }
 
@@ -676,16 +940,62 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: (mouse) => {
-                    let barContent = root._findBarContent()
-                    if (barContent) {
-                        let centerPoint = root.mapToItem(barContent, root.width / 2, 0)
-                        BarLayoutService.mediaControlPanelX = centerPoint.x
-                    }
                     _mainRipple.triggerRipple(mouse.x, mouse.y)
                     MediaControlService.togglePanel()
                 }
             }
         }
+        }
 
+    }
+
+    BarPanels.AttachedExpansionShell {
+        id: _panelShellHost
+
+        anchorItem: _pillClip
+        active: root._panelState !== "closed"
+        collapseTailHidden: root._panelCollapseTailHidden
+        visibleWidth: root._panelVisibleWidth
+        shellHeight: root._panelShellHeight
+        shellY: root._panelShellY
+        surfaceOpacity: root._panelSurfaceOpacity
+        surfaceScale: root._panelSurfaceScale
+        throwOffsetY: root._panelThrowOffsetY
+        pillWidth: root._panelPillWidth
+        pillHeight: root._panelPillHeight
+        panelY: _panelHost.y
+        attachmentOverlap: root._panelAttachmentOverlap
+        shellRadius: root._panelShellRadius
+        bridgeOutset: root._panelBridgeOutset
+        inwardCornerRadius: root._panelInwardCornerRadius
+        pulseOpacity: 0
+        surfaceFillOpacity: 1
+    }
+
+    BarPanels.AttachedExpansionPanelHost {
+        id: _panelHost
+
+        anchorItem: _pillClip
+        active: root._panelState !== "closed"
+        collapseTailHidden: root._panelCollapseTailHidden
+        expanded: root._panelState !== "closed"
+        visibleWidth: root._panelVisibleWidth
+        visibleHeight: root._panelVisibleHeight
+        detachedY: root._panelDetachedY
+        attachmentOverlap: root._panelAttachmentOverlap
+        revealLift: root._panelRevealLift
+        revealYOffset: root._panelRevealYOffset
+        surfaceOpacity: root._panelSurfaceOpacity
+        surfaceScale: root._panelSurfaceScale
+        throwOffsetY: root._panelThrowOffsetY
+        contentOpacity: root._panelContentOpacity
+
+        // Inset the media body so the attached shell keeps readable chrome.
+        MediaParts.MediaPanelContent {
+            id: _panelContent
+            anchors.fill: parent
+            anchors.margins: ThemeCards.panelPadding
+            embedded: true
+        }
     }
 }

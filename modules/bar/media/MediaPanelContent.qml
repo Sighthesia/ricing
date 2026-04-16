@@ -26,13 +26,26 @@ BarComponents.FloatingShellSurface {
         : Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, ThemeCards.shellInnerBorderAlpha)
     innerBorderWidth: root.embedded ? 0 : 1
 
-    readonly property string _displayTitle:
-        MediaControlService.title !== "" ? MediaControlService.title : "No Media"
-    readonly property string _displayArtist:
-        MediaControlService.artist !== "" ? MediaControlService.artist : MediaControlService.playerName
     readonly property bool _showLyrics: SettingsService.data.mediaControl.showLyrics
+    readonly property bool _preferLyrics: SettingsService.data.mediaControl.preferLyrics
     readonly property string _currentLyric: MediaControlService.currentLyric || ""
+    readonly property string _nextLyric: MediaControlService.nextLyric || ""
     readonly property string _currentTranslatedLyric: MediaControlService.currentTranslatedLyric || ""
+    readonly property string _nextTranslatedLyric: MediaControlService.nextTranslatedLyric || ""
+    readonly property string _primaryLyric:
+        root._currentLyric !== "" ? root._currentLyric : root._nextLyric
+    readonly property string _primaryTranslatedLyric:
+        root._currentTranslatedLyric !== "" ? root._currentTranslatedLyric : root._nextTranslatedLyric
+    readonly property bool _useLyricsAsPrimaryText:
+        root._showLyrics && root._preferLyrics && MediaControlService.hasLyrics && root._primaryLyric !== ""
+    readonly property string _displayTitle:
+        root._useLyricsAsPrimaryText
+            ? root._primaryLyric
+            : (MediaControlService.title !== "" ? MediaControlService.title : "No Media")
+    readonly property string _displayArtist:
+        root._useLyricsAsPrimaryText
+            ? ""
+            : (MediaControlService.artist !== "" ? MediaControlService.artist : MediaControlService.playerName)
     readonly property color _panelFillColor: Qt.rgba(
         Colors.background.r,
         Colors.background.g,
@@ -156,7 +169,7 @@ BarComponents.FloatingShellSurface {
 
                         // Current lyric line.
                         Text {
-                            visible: root._showLyrics && root._currentLyric !== ""
+                            visible: root._showLyrics && !root._useLyricsAsPrimaryText && root._currentLyric !== ""
                             Layout.fillWidth: true
                             text: root._currentLyric
                             color: Colors.textMuted
@@ -169,9 +182,14 @@ BarComponents.FloatingShellSurface {
 
                         // Current translated lyric line.
                         Text {
-                            visible: root._showLyrics && root._currentTranslatedLyric !== ""
+                            visible: root._showLyrics
+                                && (root._useLyricsAsPrimaryText
+                                    ? root._primaryTranslatedLyric !== ""
+                                    : root._currentTranslatedLyric !== "")
                             Layout.fillWidth: true
-                            text: root._currentTranslatedLyric
+                            text: root._useLyricsAsPrimaryText
+                                ? root._primaryTranslatedLyric
+                                : root._currentTranslatedLyric
                             color: Colors.text
                             opacity: 0.85
                             font.family: Theme.fontFamily
