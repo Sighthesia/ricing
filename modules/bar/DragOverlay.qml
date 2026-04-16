@@ -113,21 +113,34 @@ Item {
         visible: BarLayoutService.dragSnapshot.active && BarLayoutService.dragSnapshot.widgetId !== ""
         enabled: false
         x: BarLayoutService.dragSnapshot.visual.left
-        anchors.verticalCenter: parent.verticalCenter
+        y: 0
         width: BarLayoutService.dragSnapshot.visual.width
-        height: parent.height
+        height: Theme.barHeight
         scale: Theme.dragScale
         opacity: Theme.dragOpacity
+        transformOrigin: Item.TopLeft
 
         Loader {
             id: floatingLoader
-            anchors.verticalCenter: parent.verticalCenter
+            x: 0
+            y: 0
             source: {
                 if (!floatingCopy.visible) return ""
                 let wid = BarLayoutService.dragSnapshot.widgetId
                 return dragOverlay.widgetRegistry[wid] || ""
             }
             active: source !== ""
+
+            onLoaded: {
+                if (!item)
+                    return
+
+                if (item.hasOwnProperty("liveInstance"))
+                    item.liveInstance = false
+
+                if (item.enabled !== undefined)
+                    item.enabled = false
+            }
         }
     }
 
