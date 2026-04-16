@@ -47,6 +47,11 @@ Shared floating shells should use `modules/bar/FloatingShellSurface.qml` and
 rectangles locally. Prefer the `shell*` token family when a panel, popup, or
 expanded surface should read like the SuperIsland family.
 
+Attached SuperIsland shells should derive edge-aware corner behavior from
+`Theme.screenCornerRadius` and keep bridge geometry in shared helpers such as
+`modules/bar/AttachedExpansionGeometry.js` so the pill-to-panel shape stays
+consistent across surfaces.
+
 ---
 
 ## Accessibility

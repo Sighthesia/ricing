@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import "." as MediaParts
 
 // Hosts the divider and transient transport controls below the compact media pill.
 Item {
@@ -59,7 +60,7 @@ Item {
         y: root.pillHeight + root.gap
         height: root.rowHeight
 
-        MediaFlashControls {
+        MediaParts.MediaFlashControls {
             id: _controls
             visible: root.active
             width: root._controlsWidth

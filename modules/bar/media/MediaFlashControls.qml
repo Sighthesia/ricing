@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import qs.config
+import "." as MediaParts
 import "../" as BarComponents
 
 // Interactive flash-row controls used by the compact widget and announcement strip.
@@ -134,7 +135,7 @@ Item {
         }
 
         // Inline progress strip.
-        MediaProgressStrip {
+        MediaParts.MediaProgressStrip {
             visible: root.showProgress
             progress: root.progress
             Layout.fillWidth: true

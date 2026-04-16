@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.config
+import "." as MediaParts
 
 // Compact media identity row used by the media control widget.
 Item {
@@ -27,7 +28,7 @@ Item {
         spacing: Theme.barWidget.iconLabelSpacing
 
         // Compact artwork.
-        MediaArtwork {
+        MediaParts.MediaArtwork {
             source: root.artUrl
             fallbackIcon: root.fallbackIcon
             size: root.artworkSize

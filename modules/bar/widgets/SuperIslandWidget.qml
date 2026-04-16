@@ -3,6 +3,7 @@ import QtQuick
 import qs.config
 import qs.services
 import ".." as BarComponents
+import ".." as BarPanels
 import "../superisland" as IslandCards
 
 // Visual SuperIsland host that delegates transition state orchestration to SuperIslandStateMachine.
@@ -188,15 +189,13 @@ Item {
     readonly property real _overlayRevealLift:
         Math.max(8, Theme.barWidget.contentPaddingV * 4)
     readonly property real _overlayAttachmentOverlap: 1
-    readonly property real _overlayShellRadius: Theme.cornerRadius
+    readonly property real _overlayShellRadius:
+        Math.max(Theme.cornerRadius, Theme.screenCornerRadius)
     readonly property real _overlayPillBackgroundWidth: _pillBg.width
-    readonly property real _overlayBridgeOutset:
-        Math.max(
-            root._overlayAttachmentOverlap,
-            root._overlayInwardCornerDepth - root._overlayInwardCornerRadius
-        )
+    readonly property real _overlayBridgeOutset: 0
     readonly property real _overlayInwardCornerRadius: root._overlayShellRadius
-    readonly property real _overlayInwardCornerDepth: root._overlayInwardCornerRadius
+    readonly property real _overlayInwardCornerDepth:
+        Math.max(18, root._overlayInwardCornerRadius + (root._overlayInwardCornerRadius - 18) * 0.3)
 
     readonly property real _attachedRevealSeedHeight: 0
     readonly property real _attachedRevealSeedWidth:
@@ -724,7 +723,7 @@ Item {
         }
     }
 
-    IslandCards.SuperIslandAttachedShell {
+    BarPanels.AttachedExpansionShell {
         id: _overlayShellHost
 
         anchorItem: _pillClip
@@ -746,7 +745,7 @@ Item {
         surfaceFillOpacity: root._attachedShellFillOpacity
     }
 
-    IslandCards.SuperIslandAttachedPanelHost {
+    BarPanels.AttachedExpansionPanelHost {
         id: _overlayPanelHost
 
         anchorItem: _pillClip

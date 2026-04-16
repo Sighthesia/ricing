@@ -69,6 +69,7 @@ BarComponents.FloatingShellSurface {
             MediaParts.MediaPanelContent {
                 id: _mediaPanel
                 anchors.fill: parent
+                embedded: true
             }
         }
     }

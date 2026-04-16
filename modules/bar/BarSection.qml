@@ -8,7 +8,6 @@ Item {
 
     required property string role
     property var widgetRegistry: ({})
-
     implicitWidth: width > 0 ? width : widgetStage.implicitWidth
     implicitHeight: parent ? parent.height : 0
 

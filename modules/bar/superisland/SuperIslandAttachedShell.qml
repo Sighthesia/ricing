@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Shapes
 import qs.config
 
+import "../AttachedExpansionGeometry.js" as AttachedExpansionGeometry
+
 // Draws the attached SuperIsland shell as one continuous pill-to-panel surface.
 Item {
     id: root
@@ -48,31 +50,8 @@ Item {
 
         ShapePath {
             id: shellPath
-
-            readonly property real minRadius: 0.01
-            readonly property real pillLeft: (root.width - root.pillWidth) / 2
-            readonly property real pillRight: pillLeft + root.pillWidth
-            readonly property real pillRadius: Math.max(minRadius, root.pillHeight / 2)
-            readonly property real panelLeft: 0.5
-            readonly property real panelRight: root.width - 0.5
-            readonly property real panelTop:
-                Math.max(root.pillHeight, root.panelY - root.y + root.attachmentOverlap)
-            readonly property real panelBottom: root.height - 0.5
-            readonly property real panelRadius:
-                Math.max(minRadius, Math.min(root.shellRadius, Math.max(1, (panelBottom - panelTop) / 2)))
-            readonly property real availableCornerHeight:
-                Math.max(minRadius, panelTop - root.pillHeight)
-            readonly property real neckRight:
-                Math.max(pillRight, Math.min(panelRight - panelRadius - minRadius, pillRight + root.bridgeOutset))
-            readonly property real neckLeft:
-                Math.min(pillLeft, Math.max(panelLeft + panelRadius + minRadius, pillLeft - root.bridgeOutset))
-            readonly property real cornerHorizontalSpan:
-                Math.max(minRadius, Math.min(panelRight - panelRadius - neckRight, neckLeft - (panelLeft + panelRadius)))
-            readonly property real cutRadius:
-                Math.max(minRadius, Math.min(root.inwardCornerRadius, availableCornerHeight, cornerHorizontalSpan))
-            readonly property real cornerStartY: panelTop - cutRadius
-            readonly property real rightShoulderX: neckRight + cutRadius
-            readonly property real leftShoulderX: neckLeft - cutRadius
+            readonly property real effectiveShellRadius: Math.max(root.shellRadius, Theme.screenCornerRadius)
+            readonly property var shapeMetrics: AttachedExpansionGeometry.metrics(root, effectiveShellRadius)
 
             strokeColor: Colors.border
             strokeWidth: 1
@@ -82,75 +61,75 @@ Item {
                 Colors.surface.b * (1 - root.pulseOpacity) + Colors.highlight.b * root.pulseOpacity,
                 root.surfaceFillOpacity
             )
-            startX: pillLeft + pillRadius
+            startX: shapeMetrics.pillLeft + shapeMetrics.pillRadius
             startY: 0
 
-            PathLine { x: shellPath.pillRight - shellPath.pillRadius; y: 0 }
+            PathLine { x: shellPath.shapeMetrics.pillRight - shellPath.shapeMetrics.pillRadius; y: 0 }
             PathArc {
-                x: shellPath.pillRight
-                y: shellPath.pillRadius
-                radiusX: shellPath.pillRadius
-                radiusY: shellPath.pillRadius
+                x: shellPath.shapeMetrics.pillRight
+                y: shellPath.shapeMetrics.pillRadius
+                radiusX: shellPath.shapeMetrics.pillRadius
+                radiusY: shellPath.shapeMetrics.pillRadius
                 direction: PathArc.Clockwise
             }
-            PathLine { x: shellPath.pillRight; y: root.pillHeight }
-            PathLine { x: shellPath.neckRight; y: root.pillHeight }
-            PathLine { x: shellPath.neckRight; y: shellPath.cornerStartY }
+            PathLine { x: shellPath.shapeMetrics.pillRight; y: root.pillHeight }
+            PathLine { x: shellPath.shapeMetrics.neckRight; y: root.pillHeight }
+            PathLine { x: shellPath.shapeMetrics.neckRight; y: shellPath.shapeMetrics.cornerStartY }
             PathArc {
-                x: shellPath.rightShoulderX
-                y: shellPath.panelTop
-                radiusX: shellPath.cutRadius
-                radiusY: shellPath.cutRadius
+                x: shellPath.shapeMetrics.rightShoulderX
+                y: shellPath.shapeMetrics.panelTop
+                radiusX: shellPath.shapeMetrics.cutRadius
+                radiusY: shellPath.shapeMetrics.cutRadius
                 direction: PathArc.Counterclockwise
             }
-            PathLine { x: shellPath.panelRight - shellPath.panelRadius; y: shellPath.panelTop }
+            PathLine { x: shellPath.shapeMetrics.panelRight - shellPath.shapeMetrics.panelRadius; y: shellPath.shapeMetrics.panelTop }
             PathArc {
-                x: shellPath.panelRight
-                y: shellPath.panelTop + shellPath.panelRadius
-                radiusX: shellPath.panelRadius
-                radiusY: shellPath.panelRadius
+                x: shellPath.shapeMetrics.panelRight
+                y: shellPath.shapeMetrics.panelTop + shellPath.shapeMetrics.panelRadius
+                radiusX: shellPath.shapeMetrics.panelRadius
+                radiusY: shellPath.shapeMetrics.panelRadius
                 direction: PathArc.Clockwise
             }
-            PathLine { x: shellPath.panelRight; y: shellPath.panelBottom - shellPath.panelRadius }
+            PathLine { x: shellPath.shapeMetrics.panelRight; y: shellPath.shapeMetrics.panelBottom - shellPath.shapeMetrics.panelRadius }
             PathArc {
-                x: shellPath.panelRight - shellPath.panelRadius
-                y: shellPath.panelBottom
-                radiusX: shellPath.panelRadius
-                radiusY: shellPath.panelRadius
+                x: shellPath.shapeMetrics.panelRight - shellPath.shapeMetrics.panelRadius
+                y: shellPath.shapeMetrics.panelBottom
+                radiusX: shellPath.shapeMetrics.panelRadius
+                radiusY: shellPath.shapeMetrics.panelRadius
                 direction: PathArc.Clockwise
             }
-            PathLine { x: shellPath.panelLeft + shellPath.panelRadius; y: shellPath.panelBottom }
+            PathLine { x: shellPath.shapeMetrics.panelLeft + shellPath.shapeMetrics.panelRadius; y: shellPath.shapeMetrics.panelBottom }
             PathArc {
-                x: shellPath.panelLeft
-                y: shellPath.panelBottom - shellPath.panelRadius
-                radiusX: shellPath.panelRadius
-                radiusY: shellPath.panelRadius
+                x: shellPath.shapeMetrics.panelLeft
+                y: shellPath.shapeMetrics.panelBottom - shellPath.shapeMetrics.panelRadius
+                radiusX: shellPath.shapeMetrics.panelRadius
+                radiusY: shellPath.shapeMetrics.panelRadius
                 direction: PathArc.Clockwise
             }
-            PathLine { x: shellPath.panelLeft; y: shellPath.panelTop + shellPath.panelRadius }
+            PathLine { x: shellPath.shapeMetrics.panelLeft; y: shellPath.shapeMetrics.panelTop + shellPath.shapeMetrics.panelRadius }
             PathArc {
-                x: shellPath.panelLeft + shellPath.panelRadius
-                y: shellPath.panelTop
-                radiusX: shellPath.panelRadius
-                radiusY: shellPath.panelRadius
+                x: shellPath.shapeMetrics.panelLeft + shellPath.shapeMetrics.panelRadius
+                y: shellPath.shapeMetrics.panelTop
+                radiusX: shellPath.shapeMetrics.panelRadius
+                radiusY: shellPath.shapeMetrics.panelRadius
                 direction: PathArc.Clockwise
             }
-            PathLine { x: shellPath.leftShoulderX; y: shellPath.panelTop }
+            PathLine { x: shellPath.shapeMetrics.leftShoulderX; y: shellPath.shapeMetrics.panelTop }
             PathArc {
-                x: shellPath.neckLeft
-                y: shellPath.cornerStartY
-                radiusX: shellPath.cutRadius
-                radiusY: shellPath.cutRadius
+                x: shellPath.shapeMetrics.neckLeft
+                y: shellPath.shapeMetrics.cornerStartY
+                radiusX: shellPath.shapeMetrics.cutRadius
+                radiusY: shellPath.shapeMetrics.cutRadius
                 direction: PathArc.Counterclockwise
             }
-            PathLine { x: shellPath.neckLeft; y: root.pillHeight }
-            PathLine { x: shellPath.pillLeft; y: root.pillHeight }
-            PathLine { x: shellPath.pillLeft; y: shellPath.pillRadius }
+            PathLine { x: shellPath.shapeMetrics.neckLeft; y: root.pillHeight }
+            PathLine { x: shellPath.shapeMetrics.pillLeft; y: root.pillHeight }
+            PathLine { x: shellPath.shapeMetrics.pillLeft; y: shellPath.shapeMetrics.pillRadius }
             PathArc {
-                x: shellPath.pillLeft + shellPath.pillRadius
+                x: shellPath.shapeMetrics.pillLeft + shellPath.shapeMetrics.pillRadius
                 y: 0
-                radiusX: shellPath.pillRadius
-                radiusY: shellPath.pillRadius
+                radiusX: shellPath.shapeMetrics.pillRadius
+                radiusY: shellPath.shapeMetrics.pillRadius
                 direction: PathArc.Clockwise
             }
         }

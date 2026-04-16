@@ -23,7 +23,21 @@ AnimatedPanelBase {
 
     // Logical open/close trigger — AnimatedPanelBase manages actual window visibility
     active: BarLayoutService.widgetPickerOpen && BarLayoutService.settingsMode
-    onActiveChanged: if (!active) BarLayoutService.widgetPickerOpen = false
+
+    // Close picker when layout mode exits or an invalid open is requested.
+    Connections {
+        target: BarLayoutService
+
+        function onSettingsModeChanged() {
+            if (!BarLayoutService.settingsMode && BarLayoutService.widgetPickerOpen)
+                BarLayoutService.widgetPickerOpen = false
+        }
+
+        function onWidgetPickerOpenChanged() {
+            if (BarLayoutService.widgetPickerOpen && !BarLayoutService.settingsMode)
+                BarLayoutService.widgetPickerOpen = false
+        }
+    }
 
     // Widget registry — mirrors BarContent.widgetRegistry.
     // FIXME: promote to a shared singleton in V2 to avoid duplication.

@@ -76,9 +76,6 @@ Singleton {
         return anchor ? anchor.leftMargin : 0
     }
 
-    // Horizontal anchor position for the media control detail panel.
-    property real mediaControlPanelX: 0
-
     readonly property real barContentWidth: _barContentWidth
     readonly property real barContentPadding: _barContentPadding
     readonly property var geometryMeasuredWidths: _widgetMeasuredWidths
@@ -312,31 +309,14 @@ Singleton {
     }
 
     function beginDrag(instanceKey, widgetId, visualCenterX) {
-        console.log("[BarDrag][ServiceBegin]",
-            "instance=", instanceKey,
-            "widget=", widgetId,
-            "visualCenterX=", visualCenterX,
-            "measuredWidth=", _effectiveMeasuredWidth(instanceKey))
         return DragFacadeUtils.beginDrag(root, instanceKey, widgetId, visualCenterX, _effectiveMeasuredWidth, updateDrag)
     }
 
     function updateDrag(visualCenterX) {
-        console.log("[BarDrag][ServiceUpdate]",
-            "instance=", draggedInstanceKey,
-            "widget=", draggedWidgetId,
-            "visualCenterX=", visualCenterX,
-            "ghostSection(before)=", ghostSection,
-            "ghostIndex(before)=", ghostIndex)
         return DragFacadeUtils.updateDrag(root, visualCenterX, dragTargetAtX)
     }
 
     function endDrag(alignment) {
-        console.log("[BarDrag][ServiceEnd]",
-            "instance=", draggedInstanceKey,
-            "widget=", draggedWidgetId,
-            "alignment=", alignment,
-            "ghostSection=", ghostSection,
-            "ghostIndex=", ghostIndex)
         return DragFacadeUtils.endDrag(root, alignment, isSamePlacement, moveWidget)
     }
 

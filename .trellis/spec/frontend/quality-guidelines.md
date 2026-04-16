@@ -29,6 +29,8 @@ considering a change done.
   is required.
 - Duplicating floating-shell chrome when a shared shell surface component and
   shared shell tokens already exist.
+- Introducing a separate media panel chrome path when the standalone panel and
+  embedded SuperIsland card can share the same shell treatment.
 
 ---
 
@@ -38,6 +40,8 @@ considering a change done.
 - Use `Theme.*` / `Colors.*` for shared styling and animation values.
 - Use shared shell token families (`ThemeCards.shell*`) and shared shell
   surfaces (`FloatingShellSurface.qml`) for floating popups/panels.
+- When a shell can appear both standalone and embedded, keep the content
+  component single-sourced and parameterize the chrome rather than cloning it.
 - Use service singletons for shared state and persistence.
 - Use guard clauses and recoverable fallbacks for external input.
 - Keep file-level comments short and explain why, not history.

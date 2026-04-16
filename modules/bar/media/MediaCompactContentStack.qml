@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import "." as MediaParts
 
 // Stacks current, outgoing, and incoming compact media content layers.
 Item {
@@ -19,7 +20,7 @@ Item {
     implicitWidth: Math.max(_currentLayer.implicitWidth, _outgoingLayer.implicitWidth, _incomingLayer.implicitWidth)
     implicitHeight: Math.max(_currentLayer.implicitHeight, _outgoingLayer.implicitHeight, _incomingLayer.implicitHeight)
 
-    MediaCompactContent {
+    MediaParts.MediaCompactContent {
         id: _currentLayer
         anchors.left: parent.left
         anchors.right: parent.right
@@ -33,7 +34,7 @@ Item {
         textMaxWidth: root.textMaxWidth
     }
 
-    MediaCompactContent {
+    MediaParts.MediaCompactContent {
         id: _outgoingLayer
         anchors.left: parent.left
         anchors.right: parent.right
@@ -47,7 +48,7 @@ Item {
         textMaxWidth: root.textMaxWidth
     }
 
-    MediaCompactContent {
+    MediaParts.MediaCompactContent {
         id: _incomingLayer
         anchors.left: parent.left
         anchors.right: parent.right

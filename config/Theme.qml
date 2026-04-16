@@ -130,6 +130,7 @@ Singleton {
 
     // Dimensions — bound to settings
     readonly property real cornerRadius:  SettingsService.data.appearance.cornerRadius
+    readonly property real screenCornerRadius: SettingsService.data.appearance.screenCornerRadius
     readonly property real barHeight:     SettingsService.data.bar.height
     readonly property real barPadding:    SettingsService.data.bar.padding
     readonly property real widgetPadding: 12        // structural constant, not user-facing

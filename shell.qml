@@ -29,7 +29,6 @@ ShellRoot {
             WidgetPickerWindow {}
             WallpaperPickerWindow {}
             NotificationPopupWindow {}
-            MediaControlPanel {}
         }
     }
 
