@@ -1,45 +1,45 @@
 ---
 name: netease-web-lyrics-stability
-description: Use when debugging or changing the NetEase web lyrics bridge, especially if lyrics flash back to song title, player name, or stop advancing because weak payloads briefly override the active lyrics session.
+description: Use when debugging or changing the NetEase web lyrics bridge, especially if track changes lose `songId`, bridge payloads leak placeholder metadata, or NetEase lyric recovery stops after weak browser payloads.
 ---
 
 # NetEase Web Lyrics Stability
 
-Treat NetEase lyrics as a latched session, not a stream of individually trustworthy payloads.
+Treat NetEase bridge payloads as incomplete browser hints that must be normalized before they become a lyrics session.
 
 ## When to Use
 - Working on `scripts/firefox-extensions/netease-web-lyrics/*`.
-- Working on `services/NeteaseWebLyricsService.qml` or `services/MediaControlService.qml`.
-- The media widget briefly flashes `START`, `Mozilla firefox`, or `No Media` while lyrics are active.
-- Lyrics stop advancing, jump back to the first line, or switch between lyric text and song metadata.
+- Working on `services/NeteaseWebLyricsService.qml`.
+- Refreshing the NetEase page mixes bridge state with `location.href`, placeholder titles, or probe-injection markers.
+- Track changes update metadata but lose `songId`, so lyrics stop recovering.
 
 ## Symptoms
-- `MediaControlWidget` toggles `_useLyricsAsPrimaryText` between `true` and `false` during playback.
-- `MediaControlService._preferLyricsMediaSource` flips even though the same song is still playing.
-- Logs show `neteaseActive=false` while `neteaseHasLyrics=true` or cached lyric lines still exist.
-- Firefox MPRIS metadata (`START`, `Mozilla firefox`) appears for one frame between lyric updates.
+- `curl -s "http://127.0.0.1:18765/health"` shows a valid title but an empty or stale `songId`.
+- Bridge payloads briefly contain `__probe_*__` markers, `location.href`, or other injection-only metadata.
+- Track changes clear old lyrics correctly, but the new song never restores synced lyrics.
 
 ## Root Cause
-- The NetEase web path has multiple weak state sources: frame-local probe data, async lyric fetches, and transient empty/stopped payloads.
-- A single weak payload can temporarily clear `title`, `artist`, `songId`, `playbackState`, `positionMs`, or lyric fields even though the current lyrics session is still valid.
-- If the UI reacts to those transient empties immediately, it falls back to Firefox MPRIS metadata and visibly flashes.
+- The NetEase web path combines probe data, async lyric fetches, and extension bootstrap state, and none of those payloads are trustworthy in isolation.
+- Track changes can publish fresh `title` and `artist` before the new `songId` arrives.
+- If placeholder bootstrap payloads or metadata-only payloads are forwarded directly, the bridge can leak URLs, probe markers, or lose the ability to recover lyrics.
 
 ## Stability Rules
 - Expect metadata to update before `songId` during a track change; a missing `songId` is not proof that the new song is invalid.
-- Invalidate the old lyrics session first, so new `title` metadata never renders with stale lyrics.
+- Invalidate the old lyrics session first, so new `title` metadata never reuses stale lyrics.
+- Do not forward extension bootstrap placeholders like `__probe_*__` or `location.href` into the bridge state.
 - If `songId` is missing, the background should fall back to a conservative lookup from `title + artist + duration`, then re-request lyrics and recover the session.
 - Keep detailed page logging disabled by default; enable it only for targeted debugging.
 
 ## Transferable Lesson
 - For browser-driven media bridges, do not assume each payload is complete or authoritative.
-- When multiple sources describe one session, publish a stable session snapshot and add latch/timeout behavior before letting the UI switch sources.
+- Keep source-normalization rules close to the bridge boundary, and keep display-layer latching separate.
 
 ## Correct Pattern
-- In `background.js`, score competing frame payloads and forward only the strongest recent candidate.
-- If the frame payload has metadata but no `songId`, fall back to `title + artist + duration` matching before requesting lyrics again.
-- In `NeteaseWebLyricsService.qml`, preserve session metadata and timeline when a payload is clearly weaker than the current session.
-- In `MediaControlService.qml`, latch the lyrics source for a short grace window and cache the last valid lyric lines so the UI never reacts to a one-frame empty state.
-- Keep media controls on `MediaService`, but keep lyrics title/timeline selection on the latched NetEase session while lyrics mode is active.
+- In `content-script.js`, keep probe bootstrap diagnostics local; do not push placeholder payloads to the bridge.
+- In `page-probe.js`, invalidate the old session when track metadata changes and only accept lyrics responses that still match the latest request.
+- In `background.js`, score competing frame payloads, recover missing `songId` conservatively, and only then request lyrics.
+- In `NeteaseWebLyricsService.qml`, preserve session metadata and timeline when a payload is clearly weaker than the current NetEase session.
+- Keep display-layer flash prevention in `lyrics-display-stability`; this skill is for bridge-side normalization and recovery.
 
 ## Debug Order
 - First check page-probe invalidation: did the old session get cleared when metadata changed?
@@ -56,6 +56,5 @@ Treat NetEase lyrics as a latched session, not a stream of individually trustwor
 ## References
 - `scripts/firefox-extensions/netease-web-lyrics/background.js`
 - `scripts/firefox-extensions/netease-web-lyrics/content-script.js`
+- `scripts/firefox-extensions/netease-web-lyrics/page-probe.js`
 - `services/NeteaseWebLyricsService.qml`
-- `services/MediaControlService.qml`
-- `modules/bar/widgets/MediaControlWidget.qml`

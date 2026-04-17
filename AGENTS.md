@@ -47,6 +47,7 @@ Load skills on demand; see `.agents/skills/README.md` for grouping.
 | [bar-widget-width-ownership](.agents/skills/bar-widget-width-ownership/SKILL.md)     | Widget-local width ownership vs bar reserved width        |
 | [list-transition-handoffs](.agents/skills/list-transition-handoffs/SKILL.md)         | Animated list replacement and filter handoffs             |
 | [qml-performance-debug](.agents/skills/qml-performance-debug/SKILL.md)               | Jank, frame drops, and layout thrash                      |
+| [lyrics-display-stability](.agents/skills/lyrics-display-stability/SKILL.md)         | Lyric display latching, sparse-line stability, and media text flash prevention |
 | [netease-web-lyrics-stability](.agents/skills/netease-web-lyrics-stability/SKILL.md) | NetEase web lyrics bridge weak-payload and source-latch debugging |
 | [reference-attribution](.agents/skills/reference-attribution/SKILL.md)               | Adapting patterns from another repo                       |
 | [attached-expansion-geometry](.agents/skills/attached-expansion-geometry/SKILL.md)   | SuperIsland or media attached-panel bridge geometry       |

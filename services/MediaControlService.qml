@@ -315,7 +315,14 @@ Singleton {
         id: _lyricsSourceTimer
         interval: 2500
         repeat: false
-        onTriggered: root._resetLyricsLatch()
+        onTriggered: {
+            if (root._lyricsSignalActive) {
+                _lyricsSourceTimer.restart()
+                return
+            }
+
+            root._resetLyricsLatch()
+        }
     }
 
     Timer {

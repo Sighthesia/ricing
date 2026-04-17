@@ -35,7 +35,13 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | Skill | When to use |
 | --- | --- |
 | [qml-performance-debug](.agents/skills/qml-performance-debug/SKILL.md) | Use when debugging DymicShell or Quickshell jank, frame drops, layout thrash, layer-shell resize churn, or slow widget transitions. |
-| [netease-web-lyrics-stability](.agents/skills/netease-web-lyrics-stability/SKILL.md) | Use when debugging or modifying the NetEase web lyrics bridge, especially if lyrics flash back to song title, player name, or stop advancing because weak payloads override the active session. |
+
+### Media
+
+| Skill | When to use |
+| --- | --- |
+| [lyrics-display-stability](.agents/skills/lyrics-display-stability/SKILL.md) | Use when lyric text, media metadata, or announcement pulses flicker during sparse lyric timing or weak source updates. |
+| [netease-web-lyrics-stability](.agents/skills/netease-web-lyrics-stability/SKILL.md) | Use when debugging or modifying the NetEase web lyrics bridge, especially if track changes lose `songId`, bridge payloads leak placeholder metadata, or NetEase lyric recovery stops after weak browser payloads. |
 
 ### Workflow
 
