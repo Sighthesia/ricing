@@ -54,17 +54,13 @@ Item {
         root._active && root._hoverRevealControls && (root._hoverFlashRequested || root._hoverRetainActive)
     readonly property bool flashVisible:
         root._active && (MediaControlService.announcementState !== "idle" || root._hoverFlashActive)
-    readonly property string _displayLyric:
-        MediaControlService.currentLyric !== ""
-            ? MediaControlService.currentLyric
-            : MediaControlService.nextLyric
     readonly property bool _useLyricsAsPrimaryText:
-        root._showLyrics && root._preferLyrics && MediaControlService.hasLyrics && root._displayLyric !== ""
+        root._showLyrics && root._preferLyrics && MediaControlService.hasLyrics && MediaControlService.displayPrimaryLyric !== ""
     readonly property string _displayArtist:
         root._useLyricsAsPrimaryText ? "" : MediaControlService.artist
     readonly property string _displayTitle:
         root._useLyricsAsPrimaryText
-            ? root._displayLyric
+            ? MediaControlService.displayPrimaryLyric
             : (MediaControlService.title !== ""
                 ? MediaControlService.title
                 : (MediaControlService.playerName !== "" ? MediaControlService.playerName : "No Media"))

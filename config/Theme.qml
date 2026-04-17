@@ -156,7 +156,10 @@ Singleton {
         readonly property int pillHeight:       Math.max(1, Math.round(root.barHeight - root.iconPadding * 2))
         readonly property int compactMediaArtworkSize: primaryIconSize + contentPaddingV * 2
         readonly property int mediaCompactMinWidth: Math.round(192 * uiScale)
-        readonly property int mediaCompactMaxTitleWidth: Math.round(164 * uiScale)
+        readonly property int mediaCompactMaxTitleWidth: {
+            const width = Number(SettingsService.data.mediaControl.compactTextMaxWidth)
+            return isFinite(width) ? Math.max(80, Math.round(width * uiScale)) : Math.round(164 * uiScale)
+        }
         readonly property real mediaCompactArtistWidthRatio: 0.38
         readonly property int mediaProgressThickness: Math.max(4, Math.round(4 * uiScale))
         readonly property int mediaExpandedProgressThickness: Math.max(6, Math.round(6 * uiScale))

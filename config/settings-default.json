@@ -103,6 +103,8 @@
         "hoverRevealControls": true,
         "showLyrics": true,
         "preferLyrics": true,
+        "lyricsPrimarySource": "original",
+        "compactTextMaxWidth": 164,
         "announcementDuration": 1500,
         "cavaEnabled": true,
         "cavaBars": 20,

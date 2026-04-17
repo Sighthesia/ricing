@@ -75,6 +75,32 @@ Item {
             }
         }
 
+        SegmentedSection {
+            width: parent.width
+            label: "歌词优先显示"
+            currentValue: SettingsService.data.mediaControl.lyricsPrimarySource
+            options: [
+                { value: "original", label: "原始歌词" },
+                { value: "translated", label: "翻译歌词" }
+            ]
+            shown: SettingsService.data.mediaControl.showLyrics && SettingsService.data.mediaControl.preferLyrics
+            onOptionSelected: value => {
+                SettingsService.data.mediaControl.lyricsPrimarySource = value
+                SettingsService.save()
+            }
+        }
+
+        SliderSection {
+            width: parent.width
+            label: "紧凑最大宽度"
+            value: SettingsService.data.mediaControl.compactTextMaxWidth
+            from: 100; to: 320; stepSize: 10; unit: "px"
+            onValueCommitted: newValue => {
+                SettingsService.data.mediaControl.compactTextMaxWidth = newValue
+                SettingsService.save()
+            }
+        }
+
         ToggleSection {
             width: parent.width
             label: "Cava 可视化"

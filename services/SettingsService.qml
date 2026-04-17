@@ -200,6 +200,8 @@ Singleton {
                 hoverRevealControls: adapter.mediaControl.hoverRevealControls,
                 showLyrics: adapter.mediaControl.showLyrics,
                 preferLyrics: adapter.mediaControl.preferLyrics,
+                lyricsPrimarySource: adapter.mediaControl.lyricsPrimarySource,
+                compactTextMaxWidth: adapter.mediaControl.compactTextMaxWidth,
                 announcementDuration: adapter.mediaControl.announcementDuration,
                 cavaEnabled: adapter.mediaControl.cavaEnabled,
                 cavaBars: adapter.mediaControl.cavaBars,
@@ -457,6 +459,8 @@ Singleton {
             property bool hoverRevealControls: true
             property bool showLyrics: true
             property bool preferLyrics: true
+            property string lyricsPrimarySource: "original"
+            property int compactTextMaxWidth: 164
             property int announcementDuration: 1500
             property bool cavaEnabled: true
             property int cavaBars: 20

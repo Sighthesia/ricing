@@ -28,6 +28,8 @@ Singleton {
         NeteaseWebLyricsService.songId !== ""
             ? "id:" + NeteaseWebLyricsService.songId
             : (root._lyricsMetadataKey !== "" ? "meta:" + root._lyricsMetadataKey : "")
+    readonly property bool preferTranslatedLyrics:
+        SettingsService.data.mediaControl.lyricsPrimarySource === "translated"
     readonly property string _playerTrackKey:
         MediaService.hasPlayer
             ? [MediaService.title || "", MediaService.artist || ""].join("|")
@@ -158,6 +160,20 @@ Singleton {
                     || root._stableNextLyric !== ""
                     || root._stableCurrentTranslatedLyric !== ""
                     || root._stableNextTranslatedLyric !== ""))
+    readonly property string displayPrimaryLyric: root.preferTranslatedLyrics
+        ? (root.currentTranslatedLyric !== ""
+            ? root.currentTranslatedLyric
+            : (root.nextTranslatedLyric !== ""
+                ? root.nextTranslatedLyric
+                : (root.currentLyric !== "" ? root.currentLyric : root.nextLyric)))
+        : (root.currentLyric !== ""
+            ? root.currentLyric
+            : (root.nextLyric !== ""
+                ? root.nextLyric
+                : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : root.nextTranslatedLyric)))
+    readonly property string displaySecondaryLyric: root.preferTranslatedLyrics
+        ? (root.currentLyric !== "" ? root.currentLyric : root.nextLyric)
+        : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : root.nextTranslatedLyric)
 
     property string announcementState: "idle"
     property bool panelOpen: false

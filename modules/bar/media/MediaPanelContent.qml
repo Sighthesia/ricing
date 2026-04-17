@@ -28,14 +28,8 @@ BarComponents.FloatingShellSurface {
 
     readonly property bool _showLyrics: SettingsService.data.mediaControl.showLyrics
     readonly property bool _preferLyrics: SettingsService.data.mediaControl.preferLyrics
-    readonly property string _currentLyric: MediaControlService.currentLyric || ""
-    readonly property string _nextLyric: MediaControlService.nextLyric || ""
-    readonly property string _currentTranslatedLyric: MediaControlService.currentTranslatedLyric || ""
-    readonly property string _nextTranslatedLyric: MediaControlService.nextTranslatedLyric || ""
-    readonly property string _primaryLyric:
-        root._currentLyric !== "" ? root._currentLyric : root._nextLyric
-    readonly property string _primaryTranslatedLyric:
-        root._currentTranslatedLyric !== "" ? root._currentTranslatedLyric : root._nextTranslatedLyric
+    readonly property string _primaryLyric: MediaControlService.displayPrimaryLyric || ""
+    readonly property string _secondaryLyric: MediaControlService.displaySecondaryLyric || ""
     readonly property string _displayTitle:
         MediaControlService.title !== "" ? MediaControlService.title : "No Media"
     readonly property string _displayArtist:
@@ -157,9 +151,9 @@ BarComponents.FloatingShellSurface {
 
                         // Primary translated lyric line.
                         Text {
-                            visible: root._showLyrics && root._preferLyrics && root._primaryTranslatedLyric !== ""
+                            visible: root._showLyrics && root._preferLyrics && root._secondaryLyric !== "" && root._secondaryLyric !== root._primaryLyric
                             Layout.fillWidth: true
-                            text: root._primaryTranslatedLyric
+                            text: root._secondaryLyric
                             color: Colors.text
                             opacity: 0.85
                             font.family: Theme.fontFamily
