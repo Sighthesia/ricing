@@ -24,8 +24,13 @@ Singleton {
         NeteaseWebLyricsService.songId !== ""
             ? NeteaseWebLyricsService.songId
             : [NeteaseWebLyricsService.title || "", NeteaseWebLyricsService.artist || ""].join("|")
+    readonly property string _playerTrackKey:
+        MediaService.hasPlayer
+            ? [MediaService.title || "", MediaService.artist || ""].join("|")
+            : ""
     property bool _lyricsSourceLatched: false
     property string _latchedLyricsSessionKey: ""
+    property string _latchedPlayerTrackKey: ""
     property string _stableCurrentLyric: ""
     property string _stableNextLyric: ""
     property string _stableCurrentTranslatedLyric: ""
@@ -146,21 +151,36 @@ Singleton {
         root._stableNextTranslatedLyric = ""
     }
 
+    function _resetLyricsLatch() {
+        _lyricsSourceTimer.stop()
+        root._lyricsSourceLatched = false
+        root._latchedLyricsSessionKey = ""
+        root._latchedPlayerTrackKey = ""
+        root._clearStableLyrics()
+    }
+
     function _refreshLyricsSession() {
         if (!SettingsService.data.mediaControl.showLyrics || !SettingsService.data.mediaControl.preferLyrics) {
-            _lyricsSourceTimer.stop()
-            root._lyricsSourceLatched = false
-            root._latchedLyricsSessionKey = ""
-            root._clearStableLyrics()
+            root._resetLyricsLatch()
             return
         }
 
         const sessionKey = root._lyricsSessionKey
-        if (sessionKey !== "" && root._latchedLyricsSessionKey !== "" && sessionKey !== root._latchedLyricsSessionKey)
-            root._clearStableLyrics()
+        const playerTrackKey = root._playerTrackKey
+        const lyricsSessionChanged = sessionKey !== ""
+            && root._latchedLyricsSessionKey !== ""
+            && sessionKey !== root._latchedLyricsSessionKey
+        const playerTrackChanged = playerTrackKey !== ""
+            && root._latchedPlayerTrackKey !== ""
+            && playerTrackKey !== root._latchedPlayerTrackKey
+
+        if (lyricsSessionChanged || playerTrackChanged)
+            root._resetLyricsLatch()
 
         if (sessionKey !== "")
             root._latchedLyricsSessionKey = sessionKey
+        if (playerTrackKey !== "")
+            root._latchedPlayerTrackKey = playerTrackKey
 
         if (NeteaseWebLyricsService.currentLyric !== "")
             root._stableCurrentLyric = NeteaseWebLyricsService.currentLyric
@@ -251,6 +271,7 @@ Singleton {
 
     on_LyricsSignalActiveChanged: root._refreshLyricsSession()
     on_LyricsSessionKeyChanged: root._refreshLyricsSession()
+    on_PlayerTrackKeyChanged: root._refreshLyricsSession()
 
     function _handleMediaChanged() {
         const signature = root._signatureForMedia(root._media)
@@ -294,11 +315,7 @@ Singleton {
         id: _lyricsSourceTimer
         interval: 2500
         repeat: false
-        onTriggered: {
-            root._lyricsSourceLatched = false
-            root._latchedLyricsSessionKey = ""
-            root._clearStableLyrics()
-        }
+        onTriggered: root._resetLyricsLatch()
     }
 
     Timer {

@@ -6,6 +6,8 @@
   window.__dymicshellNeteaseLyricsProbeInstalled = true;
 
   const MESSAGE_TYPE = 'dymicshell-netease-lyrics-state';
+  const DEBUG_PREFIX = '[DymicShell:NeteaseLyricsDebug]';
+  const DEBUG_ENABLED = !!window.__dymicshellNeteaseLyricsDebugEnabled;
   const state = {
     songId: '',
     title: '',
@@ -17,6 +19,8 @@
   };
   const audioSet = new Set();
   let lastSignature = '';
+  let latestLyricRequestId = '';
+  const lastDebugSignatureByReason = new Map();
 
   function normalizeText(value) {
     return value == null ? '' : String(value).trim();
@@ -27,6 +31,36 @@
     if (!Number.isFinite(parsed))
       return 0;
     return Math.max(0, Math.round(parsed));
+  }
+
+  function summarizeStateSnapshot(payload) {
+    const source = payload && typeof payload === 'object' ? payload : state;
+    return {
+      songId: normalizeText(source.songId),
+      title: normalizeText(source.title),
+      artist: normalizeText(source.artist),
+      playbackState: normalizeText(source.playbackState) || 'stopped',
+      positionMs: clampInt(source.positionMs),
+      durationMs: clampInt(source.durationMs),
+      hasRawLyric: !!normalizeText(source.rawLyric),
+    };
+  }
+
+  function lyricEndpointLabel(requestUrl) {
+    const match = /\/(lyric(?:\/v\d+)?)(?:\?|$)/.exec(requestUrl || '');
+    return match && match[1] ? `/${match[1]}` : '';
+  }
+
+  function debugLog(reason, details) {
+    if (!DEBUG_ENABLED)
+      return;
+
+    const signature = JSON.stringify(details || {});
+    if (lastDebugSignatureByReason.get(reason) === signature)
+      return;
+
+    lastDebugSignatureByReason.set(reason, signature);
+    console.info(DEBUG_PREFIX, reason, details || {});
   }
 
   function emitState() {
@@ -60,11 +94,92 @@
     }, '*');
   }
 
+  function trackKey(songId, title, artist) {
+    const normalizedSongId = normalizeText(songId);
+    if (normalizedSongId)
+      return normalizedSongId;
+
+    const normalizedTitle = normalizeText(title);
+    const normalizedArtist = normalizeText(artist);
+    if (!normalizedTitle && !normalizedArtist)
+      return '';
+
+    return `${normalizedTitle}|${normalizedArtist}`;
+  }
+
+  function metadataKey(title, artist) {
+    return trackKey('', title, artist);
+  }
+
+  function lyricRequestSongId(requestUrl) {
+    const urlMatch = /[?&]id=(\d+)/.exec(requestUrl || '');
+    return urlMatch && urlMatch[1] ? urlMatch[1] : '';
+  }
+
+  function isLyricRequest(requestUrl) {
+    return /\/lyric(?:\/v\d+)?(?:\?|$)/.test(requestUrl || '');
+  }
+
+  function shouldInvalidateLyrics(nextSongId, nextTitle, nextArtist) {
+    const previousSongId = normalizeText(state.songId);
+    const previousMetadataKey = metadataKey(state.title, state.artist);
+    const resolvedSongId = normalizeText(nextSongId) || previousSongId;
+    const resolvedMetadataKey = metadataKey(nextTitle || state.title, nextArtist || state.artist);
+
+    if (previousSongId && resolvedSongId && previousSongId !== resolvedSongId)
+      return true;
+
+    if (!previousMetadataKey || !resolvedMetadataKey || previousMetadataKey === resolvedMetadataKey)
+      return false;
+
+    return !nextSongId || previousSongId === resolvedSongId;
+  }
+
+  function invalidateLyricsForSession(nextSongId, reason, details) {
+    const previousState = summarizeStateSnapshot();
+    let changed = false;
+
+    latestLyricRequestId = '';
+    if (!nextSongId && state.songId !== '') {
+      state.songId = '';
+      changed = true;
+    }
+    if (state.rawLyric !== '') {
+      state.rawLyric = '';
+      changed = true;
+    }
+
+    debugLog('page:invalidateLyricsForSession', {
+      reason: reason || 'unknown',
+      changed,
+      nextSongId: normalizeText(nextSongId),
+      before: previousState,
+      after: summarizeStateSnapshot(),
+      details: details || {},
+    });
+
+    return changed;
+  }
+
+  function noteLyricRequest(requestUrl, source) {
+    const requestSongId = lyricRequestSongId(requestUrl);
+    if (requestSongId)
+      latestLyricRequestId = requestSongId;
+
+    debugLog('page:lyricRequestDetected', {
+      source: normalizeText(source),
+      endpoint: lyricEndpointLabel(requestUrl),
+      requestSongId,
+      latestLyricRequestId,
+    });
+  }
+
   function mergeTrack(track) {
     if (!track || typeof track !== 'object')
       return false;
 
     let changed = false;
+    const previousTrackKey = trackKey(state.songId, state.title, state.artist);
     const nextSongId = normalizeText(track.id || track.songId);
     const nextTitle = normalizeText(track.name || track.title);
     let nextArtist = normalizeText(track.artist);
@@ -73,6 +188,14 @@
       nextArtist = track.ar.map(item => normalizeText(item && item.name)).filter(Boolean).join(', ');
     else if (Array.isArray(track.artists))
       nextArtist = track.artists.map(item => normalizeText(item && item.name)).filter(Boolean).join(', ');
+
+    if (shouldInvalidateLyrics(nextSongId, nextTitle, nextArtist)) {
+      changed = invalidateLyricsForSession(nextSongId, 'mergeTrack:shouldInvalidateLyrics', {
+        nextSongId,
+        nextTitle,
+        nextArtist,
+      }) || changed;
+    }
 
     if (nextSongId && nextSongId !== state.songId) {
       state.songId = nextSongId;
@@ -87,6 +210,15 @@
       changed = true;
     }
 
+    const nextTrackKey = trackKey(nextSongId || state.songId, nextTitle || state.title, nextArtist || state.artist);
+    if (previousTrackKey && nextTrackKey && previousTrackKey !== nextTrackKey) {
+      changed = invalidateLyricsForSession(nextSongId, 'mergeTrack:trackKeyChanged', {
+        previousTrackKey,
+        nextTrackKey,
+        nextSongId,
+      }) || changed;
+    }
+
     return changed;
   }
 
@@ -94,18 +226,46 @@
     if (!data || typeof data !== 'object')
       return false;
 
+    const beforeState = summarizeStateSnapshot();
     let changed = false;
+    const requestSongId = lyricRequestSongId(requestUrl);
     const lyricText = normalizeText((data.lrc && data.lrc.lyric) || data.rawLyric || data.lyric);
+
+    debugLog('page:mergeLyricPayload', {
+      endpoint: lyricEndpointLabel(requestUrl),
+      requestSongId,
+      latestLyricRequestId,
+      hasRequestSongId: !!requestSongId,
+      hasRawLyric: !!lyricText,
+      before: beforeState,
+    });
+
+    if (requestSongId && latestLyricRequestId && requestSongId !== latestLyricRequestId) {
+      debugLog('page:mergeLyricPayloadSkipped', {
+        endpoint: lyricEndpointLabel(requestUrl),
+        requestSongId,
+        latestLyricRequestId,
+        before: beforeState,
+      });
+      return false;
+    }
+
     if (lyricText && lyricText !== state.rawLyric) {
       state.rawLyric = lyricText;
       changed = true;
     }
 
-    const urlMatch = /[?&]id=(\d+)/.exec(requestUrl || '');
-    if (urlMatch && urlMatch[1] && urlMatch[1] !== state.songId) {
-      state.songId = urlMatch[1];
+    if (requestSongId && requestSongId !== state.songId) {
+      state.songId = requestSongId;
       changed = true;
     }
+
+    debugLog('page:mergeLyricPayloadResult', {
+      endpoint: lyricEndpointLabel(requestUrl),
+      requestSongId,
+      changed,
+      after: summarizeStateSnapshot(),
+    });
 
     return changed;
   }
@@ -120,6 +280,12 @@
     if (metadata) {
       const nextTitle = normalizeText(metadata.title);
       const nextArtist = normalizeText(metadata.artist);
+      if (shouldInvalidateLyrics('', nextTitle, nextArtist)) {
+        changed = invalidateLyricsForSession('', 'mergeMediaSession:metadataChanged', {
+          nextTitle,
+          nextArtist,
+        }) || changed;
+      }
       if (nextTitle && nextTitle !== state.title) {
         state.title = nextTitle;
         changed = true;
@@ -240,7 +406,7 @@
     if (data.data && !Array.isArray(data.data) && typeof data.data === 'object')
       changed = mergeTrack(data.data) || changed;
 
-    if (/\/lyric(?:\?|$)/.test(requestUrl || ''))
+    if (isLyricRequest(requestUrl))
       changed = mergeLyricPayload(data, requestUrl) || changed;
 
     if (changed)
@@ -307,8 +473,11 @@
   const originalFetch = window.fetch;
   if (typeof originalFetch === 'function') {
     window.fetch = async function patchedFetch(input, init) {
-      const response = await originalFetch.call(this, input, init);
       const requestUrl = typeof input === 'string' ? input : (input && input.url) || '';
+      if (isLyricRequest(requestUrl))
+        noteLyricRequest(requestUrl, 'fetch');
+
+      const response = await originalFetch.call(this, input, init);
       try {
         const clone = response.clone();
         const contentType = clone.headers.get('content-type') || '';
@@ -327,6 +496,8 @@
   const originalSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function patchedOpen(method, requestUrl, ...rest) {
     this.__dymicshellRequestUrl = requestUrl;
+    if (isLyricRequest(requestUrl))
+      noteLyricRequest(requestUrl, 'xhr');
     return originalOpen.call(this, method, requestUrl, ...rest);
   };
   XMLHttpRequest.prototype.send = function patchedSend(body) {

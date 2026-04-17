@@ -251,13 +251,28 @@ Singleton {
         const nextRawLyric = root._normalizeText(payload.rawLyric || payload.lyric)
         const nextTranslatedLyric = root._normalizeText(payload.translatedLyric || payload.tlyric)
         const hasSessionContent = root.hasLyrics || root.rawLyric !== "" || root.translatedLyric !== ""
+        const metadataLooksSame =
+            nextSongId === ""
+                && root.songId === ""
+                && nextTitle !== ""
+                && nextTitle === root.title
+                && ((nextArtist !== "" && nextArtist === root.artist)
+                    || (nextArtist === "" && root.artist === ""))
+        const metadataLooksDifferent =
+            nextSongId === ""
+                && ((nextTitle !== "" && nextTitle !== root.title)
+                    || (nextArtist !== "" && nextArtist !== root.artist))
         const sessionSeemsSame =
             (nextSongId !== "" && nextSongId === root.songId)
-                || (nextSongId === "" && hasSessionContent)
+                || (metadataLooksSame && hasSessionContent)
         const resolvedSongId = nextSongId !== "" ? nextSongId : (sessionSeemsSame ? root.songId : "")
         const resolvedTitle = nextTitle !== "" ? nextTitle : (sessionSeemsSame ? root.title : "")
         const resolvedArtist = nextArtist !== "" ? nextArtist : (sessionSeemsSame ? root.artist : "")
-        const preserveLyricsPayload = sessionSeemsSame && nextRawLyric === "" && nextTranslatedLyric === ""
+        const preserveLyricsPayload =
+            sessionSeemsSame
+                && !metadataLooksDifferent
+                && nextRawLyric === ""
+                && nextTranslatedLyric === ""
         const resolvedRawLyric = nextRawLyric !== "" ? nextRawLyric : (preserveLyricsPayload ? root.rawLyric : "")
         const resolvedTranslatedLyric = nextTranslatedLyric !== ""
             ? nextTranslatedLyric
