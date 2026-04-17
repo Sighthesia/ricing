@@ -1,0 +1,44 @@
+{
+  "id": "netease-tampermonkey-conversion",
+  "name": "netease-tampermonkey-conversion",
+  "title": "Convert NetEase lyrics extension to Tampermonkey script",
+  "description": "Replace the temporary Firefox NetEase lyrics extension path with a Tampermonkey userscript implementation that can persist across browser restarts while preserving the local bridge integration.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "priority": "P1",
+  "creator": "Sighthesia",
+  "assignee": "Sighthesia",
+  "createdAt": "2026-04-17",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "current_phase": 3,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "implement"
+    },
+    {
+      "phase": 2,
+      "action": "check"
+    },
+    {
+      "phase": 3,
+      "action": "finish"
+    },
+    {
+      "phase": 4,
+      "action": "create-pr"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

@@ -1,6 +1,7 @@
 # NetEase Web Lyrics Firefox Extension
 
-This extension is the supported path for NetEase web lyrics capture in `DymicShell`.
+This Firefox add-on path is kept for temporary debugging.
+For persistent use, install the Tampermonkey userscript in `scripts/tampermonkey/netease-web-lyrics.md`.
 
 ## Install
 
