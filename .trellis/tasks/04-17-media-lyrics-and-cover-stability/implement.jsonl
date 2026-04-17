@@ -1,0 +1,11 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
+{"file": "services/NeteaseWebLyricsService.qml", "reason": "lyrics session stability"}
+{"file": "services/MediaControlService.qml", "reason": "media source selection and lyrics preference"}
+{"file": "services/MediaService.qml", "reason": "media metadata and artwork recovery"}
+{"file": "modules/bar/widgets/MediaControlWidget.qml", "reason": "compact media widget display behavior"}
+{"file": "modules/bar/media/MediaPanelContent.qml", "reason": "shared panel media presentation"}
+{"file": "modules/bar/media/MediaArtwork.qml", "reason": "artwork rendering path"}
+{"file": "scripts/firefox-extensions/netease-web-lyrics/background.js", "reason": "netease lyrics payload selection"}
+{"file": "scripts/firefox-extensions/netease-web-lyrics/content-script.js", "reason": "netease lyrics bridge payload forwarding"}
+{"file": "scripts/firefox-extensions/netease-web-lyrics/page-probe.js", "reason": "netease media session probe"}

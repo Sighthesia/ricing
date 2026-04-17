@@ -36,16 +36,10 @@ BarComponents.FloatingShellSurface {
         root._currentLyric !== "" ? root._currentLyric : root._nextLyric
     readonly property string _primaryTranslatedLyric:
         root._currentTranslatedLyric !== "" ? root._currentTranslatedLyric : root._nextTranslatedLyric
-    readonly property bool _useLyricsAsPrimaryText:
-        root._showLyrics && root._preferLyrics && MediaControlService.hasLyrics && root._primaryLyric !== ""
     readonly property string _displayTitle:
-        root._useLyricsAsPrimaryText
-            ? root._primaryLyric
-            : (MediaControlService.title !== "" ? MediaControlService.title : "No Media")
+        MediaControlService.title !== "" ? MediaControlService.title : "No Media"
     readonly property string _displayArtist:
-        root._useLyricsAsPrimaryText
-            ? ""
-            : (MediaControlService.artist !== "" ? MediaControlService.artist : MediaControlService.playerName)
+        MediaControlService.artist !== "" ? MediaControlService.artist : MediaControlService.playerName
     readonly property color _panelFillColor: Qt.rgba(
         Colors.background.r,
         Colors.background.g,
@@ -122,56 +116,24 @@ BarComponents.FloatingShellSurface {
                         Layout.alignment: Qt.AlignVCenter
                         spacing: Math.max(2, Theme.barWidget.contentPaddingV)
 
-                        // Artist and title row.
-                        RowLayout {
+                        // Track title.
+                        Text {
                             Layout.fillWidth: true
-                            spacing: Theme.barWidget.iconSpacing
-
-                            // Artist label.
-                            Text {
-                                visible: root._displayArtist !== ""
-                                text: root._displayArtist
-                                color: Colors.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeBody
-                                elide: Text.ElideRight
-                                maximumLineCount: 1
-                                wrapMode: Text.NoWrap
-                                Layout.alignment: Qt.AlignVCenter
-                                Layout.maximumWidth: Math.round(
-                                    Theme.barWidget.mediaPanelWidth
-                                    * Theme.barWidget.mediaPanelArtistMaxWidthRatio)
-                            }
-
-                            // Artist-title separator.
-                            Text {
-                                visible: root._displayArtist !== ""
-                                text: " - "
-                                color: Colors.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeBody
-                                opacity: Theme.barWidget.mediaFlashLabelOpacity
-                            }
-
-                            // Track title.
-                            Text {
-                                Layout.fillWidth: true
-                                text: root._displayTitle
-                                color: Colors.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeBody
-                                font.bold: true
-                                elide: Text.ElideRight
-                                maximumLineCount: 1
-                                wrapMode: Text.NoWrap
-                            }
+                            text: root._displayTitle
+                            color: Colors.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeBody
+                            font.bold: true
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            wrapMode: Text.NoWrap
                         }
 
-                        // Current lyric line.
+                        // Artist label.
                         Text {
-                            visible: root._showLyrics && !root._useLyricsAsPrimaryText && root._currentLyric !== ""
+                            visible: root._displayArtist !== ""
                             Layout.fillWidth: true
-                            text: root._currentLyric
+                            text: root._displayArtist
                             color: Colors.textMuted
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSmall
@@ -180,16 +142,24 @@ BarComponents.FloatingShellSurface {
                             wrapMode: Text.NoWrap
                         }
 
-                        // Current translated lyric line.
+                        // Primary lyric line.
                         Text {
-                            visible: root._showLyrics
-                                && (root._useLyricsAsPrimaryText
-                                    ? root._primaryTranslatedLyric !== ""
-                                    : root._currentTranslatedLyric !== "")
+                            visible: root._showLyrics && root._preferLyrics && root._primaryLyric !== ""
                             Layout.fillWidth: true
-                            text: root._useLyricsAsPrimaryText
-                                ? root._primaryTranslatedLyric
-                                : root._currentTranslatedLyric
+                            text: root._primaryLyric
+                            color: Colors.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSmall
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            wrapMode: Text.NoWrap
+                        }
+
+                        // Primary translated lyric line.
+                        Text {
+                            visible: root._showLyrics && root._preferLyrics && root._primaryTranslatedLyric !== ""
+                            Layout.fillWidth: true
+                            text: root._primaryTranslatedLyric
                             color: Colors.text
                             opacity: 0.85
                             font.family: Theme.fontFamily

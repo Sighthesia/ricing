@@ -101,6 +101,24 @@ Singleton {
         }
     }
 
+    function _hasCurrentSession() {
+        return root.songId !== ""
+            || root.rawLyric !== ""
+            || root.translatedLyric !== ""
+            || root.currentLyric !== ""
+            || root.nextLyric !== ""
+            || root.currentTranslatedLyric !== ""
+            || root.nextTranslatedLyric !== ""
+    }
+
+    function _isWeakerSessionPayload(nextSongId, nextTitle, nextArtist, nextRawLyric, nextTranslatedLyric) {
+        return root._hasCurrentSession()
+            && nextSongId === ""
+            && nextRawLyric === ""
+            && nextTranslatedLyric === ""
+            && (nextTitle !== "" || nextArtist !== "")
+    }
+
     function _effectivePositionMs() {
         if (root.playbackState !== "playing")
             return Math.max(0, root.positionMs)
@@ -251,9 +269,21 @@ Singleton {
         const nextRawLyric = root._normalizeText(payload.rawLyric || payload.lyric)
         const nextTranslatedLyric = root._normalizeText(payload.translatedLyric || payload.tlyric)
         const hasSessionContent = root.hasLyrics || root.rawLyric !== "" || root.translatedLyric !== ""
+        const emptyMetadataPayload = nextSongId === "" && nextTitle === "" && nextArtist === ""
+        const pauseSessionGap = hasSessionContent
+            && emptyMetadataPayload
+            && nextRawLyric === ""
+            && nextTranslatedLyric === ""
+            && nextPlaybackState === "paused"
+        const weakPayload = root._isWeakerSessionPayload(
+            nextSongId,
+            nextTitle,
+            nextArtist,
+            nextRawLyric,
+            nextTranslatedLyric
+        )
         const metadataLooksSame =
             nextSongId === ""
-                && root.songId === ""
                 && nextTitle !== ""
                 && nextTitle === root.title
                 && ((nextArtist !== "" && nextArtist === root.artist)
@@ -264,7 +294,8 @@ Singleton {
                     || (nextArtist !== "" && nextArtist !== root.artist))
         const sessionSeemsSame =
             (nextSongId !== "" && nextSongId === root.songId)
-                || (metadataLooksSame && hasSessionContent)
+            || (metadataLooksSame && hasSessionContent)
+            || pauseSessionGap
         const resolvedSongId = nextSongId !== "" ? nextSongId : (sessionSeemsSame ? root.songId : "")
         const resolvedTitle = nextTitle !== "" ? nextTitle : (sessionSeemsSame ? root.title : "")
         const resolvedArtist = nextArtist !== "" ? nextArtist : (sessionSeemsSame ? root.artist : "")
@@ -281,16 +312,25 @@ Singleton {
         const hasTimeline = root.durationMs > 0 || root.positionMs > 0
         const invalidTimeline = nextDurationMs === 0 && nextPositionMs === 0
         const preserveTimeline = sessionSeemsSame && hasTimeline && invalidTimeline
+        const pauseTimelineRegression = sessionSeemsSame
+            && root.positionMs > 0
+            && nextPlaybackState === "paused"
+            && nextPositionMs === 0
+            && nextPositionMs < root.positionMs
         const preservePlaybackState = sessionSeemsSame
             && root.playbackState !== "stopped"
             && nextPlaybackState === "stopped"
+        const preserveCurrentSession = weakPayload
+            && root.playbackState === "playing"
+            && sessionSeemsSame
         const resolvedPlaybackState =
-            (preserveTimeline || preservePlaybackState)
+            (preserveCurrentSession || preserveTimeline || preservePlaybackState)
                 ? root.playbackState
                 : nextPlaybackState
-        const resolvedProgress = preserveTimeline ? root.progress : nextProgress
-        const resolvedDurationMs = preserveTimeline ? root.durationMs : nextDurationMs
-        const resolvedPositionMs = preserveTimeline ? root.positionMs : nextPositionMs
+        const preserveTimelinePosition = preserveCurrentSession || preserveTimeline || pauseTimelineRegression
+        const resolvedProgress = preserveTimelinePosition ? root.progress : nextProgress
+        const resolvedDurationMs = preserveTimelinePosition ? root.durationMs : nextDurationMs
+        const resolvedPositionMs = preserveTimelinePosition ? root.positionMs : nextPositionMs
         const signature = [
             resolvedSongId,
             resolvedTitle,
@@ -302,17 +342,17 @@ Singleton {
             resolvedTranslatedLyric
         ].join("|")
 
-        root.songId = resolvedSongId
-        root.title = resolvedTitle
-        root.artist = resolvedArtist
+        root.songId = preserveCurrentSession ? root.songId : resolvedSongId
+        root.title = preserveCurrentSession ? root.title : resolvedTitle
+        root.artist = preserveCurrentSession ? root.artist : resolvedArtist
         root.playbackState = resolvedPlaybackState
         root.progress = resolvedProgress
         root.durationMs = resolvedDurationMs
         root.positionMs = resolvedPositionMs
-        root.rawLyric = resolvedRawLyric
-        root.translatedLyric = resolvedTranslatedLyric
+        root.rawLyric = preserveCurrentSession ? root.rawLyric : resolvedRawLyric
+        root.translatedLyric = preserveCurrentSession ? root.translatedLyric : resolvedTranslatedLyric
         root._lastUpdateMs = Date.now()
-        if (!preserveTimeline)
+        if (!(preserveTimeline || pauseTimelineRegression))
             root._positionAnchorMs = root._lastUpdateMs
         else if (root.playbackState === "playing" && root._positionAnchorMs <= 0)
             root._positionAnchorMs = root._lastUpdateMs

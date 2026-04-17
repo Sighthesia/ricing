@@ -18,28 +18,41 @@ Keep lyric display latched to session availability, not to the cadence of lyric 
 - `MediaControlWidget` briefly switches between lyric text and media metadata even though the same song is still active.
 - The compact widget pulses or re-announces during playback without a real track change.
 - The expanded panel flashes `No Media`, player identity, or untranslated metadata between lyric updates.
+- Pausing playback jumps the compact lyric readout back to the first credit line or song intro.
+- The expanded panel loses stable song metadata because lyric-first text replacement leaks out of the compact pill.
 
 ## Root Cause
 - Lyric sessions can stay valid for many seconds even when `currentLyric` and `nextLyric` do not change.
 - If the display latch expires based only on property-change frequency, sparse lyric timing looks like source loss.
 - Once the latch drops, the widget falls back to generic media metadata and may trigger extra content swaps or announcement pulses.
+- The compact pill and expanded panel need different text ownership: lyric-first replacement is useful in the pill, but unstable in the expanded panel.
+- Pause transitions can emit weak NetEase lyric updates that rewind the lyric cursor even while the real MPRIS player is already paused at the correct position.
 
 ## Transferable Lesson
 - Treat lyric display as a session-level state machine, not as a stream that must update every line to remain trusted.
 - Use grace windows to survive transient empties, but reset only when the source actually disappears or changes sessions.
+- When two surfaces share one media model, keep display policy local to the surface instead of pushing a single lyric-first text policy everywhere.
+- When browser-side lyrics and compositor-side playback disagree during pause, prefer the authoritative player timeline and freeze the last stable lyric snapshot.
 
 ## Correct Pattern
 - Keep the lyrics source latched while the source still reports an active session or cached lyric content.
 - Let grace timers expire only after confirming the signal is truly gone; do not tie expiry to lyric line frequency.
 - Keep lyric-only text changes from triggering full artwork or metadata swap animations.
 - Separate display-layer latching from source-specific bridge recovery; NetEase bridge rules belong in `netease-web-lyrics-stability`.
+- In `MediaControlWidget.qml`, allow the compact pill to replace its primary title with the current lyric when lyrics mode is active.
+- In `MediaPanelContent.qml`, keep song title and artist bound to stable media metadata and render lyrics as secondary lines below them.
+- In `MediaControlService.qml`, freeze `_stableCurrentLyric` and the displayed lyric lines while `MediaService.playbackState === "paused"` so weak NetEase pause payloads cannot rewind the visible lyric.
+- During paused lyric playback, prefer `MediaService` for playback state and timeline, and treat NetEase lyric updates as advisory until playback resumes.
 
 ## Verification
 - Play a song with multi-second gaps between lyric lines and confirm the widget does not flash back to player metadata.
 - Watch the compact widget and expanded panel while playback continues; neither should pulse or swap content without a real track change.
+- Pause during the middle of a song and confirm the compact pill keeps the current lyric instead of jumping back to the first lyric or credit line.
+- Open the media panel while lyrics are active and confirm the panel keeps stable title/artist text with lyrics rendered underneath.
 - Run `timeout 5 qs --path .` after modifying services or QML display code.
 
 ## References
 - `services/MediaControlService.qml`
 - `modules/bar/widgets/MediaControlWidget.qml`
 - `modules/bar/media/MediaPanelContent.qml`
+- `services/NeteaseWebLyricsService.qml`

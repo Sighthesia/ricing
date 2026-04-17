@@ -13,6 +13,8 @@ Singleton {
     property string artUrl: ""
     property string _lastArtKey: ""
     property string _lastArtPlayerKey: ""
+    property bool _artRecoveryPending: false
+    property int _artRecoveryStartedAt: 0
 
     readonly property var activePlayer: {
         const players = Mpris.players.values
@@ -85,6 +87,8 @@ Singleton {
             root.artUrl = ""
             root._lastArtKey = ""
             root._lastArtPlayerKey = ""
+            root._artRecoveryPending = false
+            root._artRecoveryStartedAt = 0
             return
         }
 
@@ -97,17 +101,42 @@ Singleton {
             root._lastArtPlayerKey = playerKey
             root._lastArtKey = artKey
             root.artUrl = nextArtUrl
+            root._artRecoveryPending = false
+            root._artRecoveryStartedAt = 0
             return
         }
 
         // Keep the previous artwork while the player is replaying or briefly
         // publishing empty metadata for the current track.
-        if (playerKey === root._lastArtPlayerKey && (artKey === root._lastArtKey || player.trackTitle === "" || player.trackArtist === ""))
+        if (playerKey === root._lastArtPlayerKey && (artKey === root._lastArtKey || player.trackTitle === "" || player.trackArtist === "")) {
+            if (root._artRecoveryStartedAt === 0)
+                root._artRecoveryStartedAt = Date.now()
+
+            root._artRecoveryPending = true
             return
+        }
 
         root._lastArtPlayerKey = playerKey
         root._lastArtKey = artKey
         root.artUrl = ""
+        root._artRecoveryStartedAt = Date.now()
+        root._artRecoveryPending = true
+    }
+
+    function _shouldRetryArtRecovery() {
+        if (!root.hasPlayer)
+            return false
+
+        if (root.artUrl !== "")
+            return false
+
+        if (!root._artRecoveryPending)
+            return false
+
+        if (root._artRecoveryStartedAt === 0)
+            return true
+
+        return Date.now() - root._artRecoveryStartedAt <= 15000
     }
 
     function playPause() {
@@ -165,6 +194,15 @@ Singleton {
         repeat: true
         running: root.hasPlayer && root.playbackState === "playing"
         onTriggered: root._positionTick++
+    }
+
+    // Artwork recovery poll.
+    Timer {
+        id: _artRecoveryTimer
+        interval: 1000
+        repeat: true
+        running: root._shouldRetryArtRecovery()
+        onTriggered: root._syncArtUrl()
     }
 
     Connections {

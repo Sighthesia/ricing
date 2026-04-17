@@ -20,10 +20,14 @@ Singleton {
                 || NeteaseWebLyricsService.nextTranslatedLyric !== ""
                 || NeteaseWebLyricsService.rawLyric !== ""
                 || NeteaseWebLyricsService.translatedLyric !== "")
+    readonly property string _lyricsMetadataKey:
+        NeteaseWebLyricsService.title !== "" && NeteaseWebLyricsService.artist !== ""
+            ? [NeteaseWebLyricsService.title, NeteaseWebLyricsService.artist].join("|")
+            : ""
     readonly property string _lyricsSessionKey:
         NeteaseWebLyricsService.songId !== ""
-            ? NeteaseWebLyricsService.songId
-            : [NeteaseWebLyricsService.title || "", NeteaseWebLyricsService.artist || ""].join("|")
+            ? "id:" + NeteaseWebLyricsService.songId
+            : (root._lyricsMetadataKey !== "" ? "meta:" + root._lyricsMetadataKey : "")
     readonly property string _playerTrackKey:
         MediaService.hasPlayer
             ? [MediaService.title || "", MediaService.artist || ""].join("|")
@@ -35,6 +39,11 @@ Singleton {
     property string _stableNextLyric: ""
     property string _stableCurrentTranslatedLyric: ""
     property string _stableNextTranslatedLyric: ""
+    readonly property bool _freezeLyricsOnPause:
+        root._preferLyricsMediaSource
+            && MediaService.hasPlayer
+            && MediaService.playbackState === "paused"
+            && root._hasStableLyricsCache()
     readonly property bool _preferLyricsMediaSource:
         root._lyricsSourceLatched
     readonly property var _media: root._mediaOverride !== null ? root._mediaOverride : ({
@@ -52,19 +61,25 @@ Singleton {
         artUrl: MediaService.hasPlayer ? MediaService.artUrl : "",
         playerName: MediaService.hasPlayer ? MediaService.playerName : "",
         playbackState: root._preferLyricsMediaSource
-            ? ((NeteaseWebLyricsService.playbackState !== "stopped" || !MediaService.hasPlayer)
+            ? ((MediaService.hasPlayer && MediaService.playbackState !== "playing")
+                ? MediaService.playbackState
+                : ((NeteaseWebLyricsService.playbackState !== "stopped" || !MediaService.hasPlayer)
                 ? NeteaseWebLyricsService.playbackState
-                : MediaService.playbackState)
+                : MediaService.playbackState))
             : (MediaService.hasPlayer ? MediaService.playbackState : NeteaseWebLyricsService.playbackState),
         positionMs: root._preferLyricsMediaSource
-            ? ((NeteaseWebLyricsService.durationMs > 0 || NeteaseWebLyricsService.positionMs > 0 || !MediaService.hasPlayer)
+            ? ((MediaService.hasPlayer && MediaService.playbackState !== "playing")
+                ? MediaService.positionMs
+                : ((NeteaseWebLyricsService.durationMs > 0 || NeteaseWebLyricsService.positionMs > 0 || !MediaService.hasPlayer)
                 ? NeteaseWebLyricsService.positionMs
-                : MediaService.positionMs)
+                : MediaService.positionMs))
             : (MediaService.hasPlayer ? MediaService.positionMs : NeteaseWebLyricsService.positionMs),
         lengthMs: root._preferLyricsMediaSource
-            ? ((NeteaseWebLyricsService.durationMs > 0 || !MediaService.hasPlayer)
+            ? ((MediaService.hasPlayer && MediaService.playbackState !== "playing")
+                ? MediaService.lengthMs
+                : ((NeteaseWebLyricsService.durationMs > 0 || !MediaService.hasPlayer)
                 ? NeteaseWebLyricsService.durationMs
-                : MediaService.lengthMs)
+                : MediaService.lengthMs))
             : (MediaService.hasPlayer ? MediaService.lengthMs : NeteaseWebLyricsService.durationMs),
         canGoPrevious: MediaService.hasPlayer ? MediaService.canGoPrevious : false,
         canTogglePlayback: MediaService.hasPlayer ? MediaService.canTogglePlayback : false,
@@ -97,37 +112,45 @@ Singleton {
     readonly property bool canGoNext: !!root._media.canGoNext
     readonly property bool canSeek: !!root._media.canSeek
     readonly property string currentLyric:
-        NeteaseWebLyricsService.currentLyric !== ""
+        root._freezeLyricsOnPause
+            ? root._stableCurrentLyric
+            : (NeteaseWebLyricsService.currentLyric !== ""
             ? NeteaseWebLyricsService.currentLyric
             : ((NeteaseWebLyricsService.currentLyric === ""
                 && NeteaseWebLyricsService.nextLyric === ""
                 && root._preferLyricsMediaSource)
                 ? root._stableCurrentLyric
-                : "")
+                : ""))
     readonly property string nextLyric:
-        NeteaseWebLyricsService.nextLyric !== ""
+        root._freezeLyricsOnPause
+            ? root._stableNextLyric
+            : (NeteaseWebLyricsService.nextLyric !== ""
             ? NeteaseWebLyricsService.nextLyric
             : ((NeteaseWebLyricsService.currentLyric === ""
                 && NeteaseWebLyricsService.nextLyric === ""
                 && root._preferLyricsMediaSource)
                 ? root._stableNextLyric
-                : "")
+                : ""))
     readonly property string currentTranslatedLyric:
-        NeteaseWebLyricsService.currentTranslatedLyric !== ""
+        root._freezeLyricsOnPause
+            ? root._stableCurrentTranslatedLyric
+            : (NeteaseWebLyricsService.currentTranslatedLyric !== ""
             ? NeteaseWebLyricsService.currentTranslatedLyric
             : ((NeteaseWebLyricsService.currentTranslatedLyric === ""
                 && NeteaseWebLyricsService.nextTranslatedLyric === ""
                 && root._preferLyricsMediaSource)
                 ? root._stableCurrentTranslatedLyric
-                : "")
+                : ""))
     readonly property string nextTranslatedLyric:
-        NeteaseWebLyricsService.nextTranslatedLyric !== ""
+        root._freezeLyricsOnPause
+            ? root._stableNextTranslatedLyric
+            : (NeteaseWebLyricsService.nextTranslatedLyric !== ""
             ? NeteaseWebLyricsService.nextTranslatedLyric
             : ((NeteaseWebLyricsService.currentTranslatedLyric === ""
                 && NeteaseWebLyricsService.nextTranslatedLyric === ""
                 && root._preferLyricsMediaSource)
                 ? root._stableNextTranslatedLyric
-                : "")
+                : ""))
     readonly property bool hasLyrics:
         !!NeteaseWebLyricsService.hasLyrics
             || (root._preferLyricsMediaSource
@@ -151,6 +174,13 @@ Singleton {
         root._stableNextTranslatedLyric = ""
     }
 
+    function _hasStableLyricsCache() {
+        return root._stableCurrentLyric !== ""
+            || root._stableNextLyric !== ""
+            || root._stableCurrentTranslatedLyric !== ""
+            || root._stableNextTranslatedLyric !== ""
+    }
+
     function _resetLyricsLatch() {
         _lyricsSourceTimer.stop()
         root._lyricsSourceLatched = false
@@ -167,14 +197,21 @@ Singleton {
 
         const sessionKey = root._lyricsSessionKey
         const playerTrackKey = root._playerTrackKey
+        const currentTrackMatchesLatched = playerTrackKey !== ""
+            && root._latchedPlayerTrackKey !== ""
+            && playerTrackKey === root._latchedPlayerTrackKey
+        const hasStableLyrics = root.hasLyrics || root._hasStableLyricsCache()
         const lyricsSessionChanged = sessionKey !== ""
             && root._latchedLyricsSessionKey !== ""
             && sessionKey !== root._latchedLyricsSessionKey
         const playerTrackChanged = playerTrackKey !== ""
             && root._latchedPlayerTrackKey !== ""
             && playerTrackKey !== root._latchedPlayerTrackKey
+        const shouldIgnoreSessionKeyChurn = lyricsSessionChanged
+            && currentTrackMatchesLatched
+            && hasStableLyrics
 
-        if (lyricsSessionChanged || playerTrackChanged)
+        if ((lyricsSessionChanged && !shouldIgnoreSessionKeyChurn) || playerTrackChanged)
             root._resetLyricsLatch()
 
         if (sessionKey !== "")
@@ -182,17 +219,20 @@ Singleton {
         if (playerTrackKey !== "")
             root._latchedPlayerTrackKey = playerTrackKey
 
-        if (NeteaseWebLyricsService.currentLyric !== "")
-            root._stableCurrentLyric = NeteaseWebLyricsService.currentLyric
-        if (NeteaseWebLyricsService.nextLyric !== "")
-            root._stableNextLyric = NeteaseWebLyricsService.nextLyric
-        if (NeteaseWebLyricsService.currentTranslatedLyric !== "")
-            root._stableCurrentTranslatedLyric = NeteaseWebLyricsService.currentTranslatedLyric
-        if (NeteaseWebLyricsService.nextTranslatedLyric !== "")
-            root._stableNextTranslatedLyric = NeteaseWebLyricsService.nextTranslatedLyric
+        if (!root._freezeLyricsOnPause) {
+            if (NeteaseWebLyricsService.currentLyric !== "")
+                root._stableCurrentLyric = NeteaseWebLyricsService.currentLyric
+            if (NeteaseWebLyricsService.nextLyric !== "")
+                root._stableNextLyric = NeteaseWebLyricsService.nextLyric
+            if (NeteaseWebLyricsService.currentTranslatedLyric !== "")
+                root._stableCurrentTranslatedLyric = NeteaseWebLyricsService.currentTranslatedLyric
+            if (NeteaseWebLyricsService.nextTranslatedLyric !== "")
+                root._stableNextTranslatedLyric = NeteaseWebLyricsService.nextTranslatedLyric
+        }
 
-        if (!root._lyricsSignalActive)
+        if (!root._lyricsSignalActive && !(currentTrackMatchesLatched && hasStableLyrics)) {
             return
+        }
 
         root._lyricsSourceLatched = true
         _lyricsSourceTimer.restart()
@@ -313,10 +353,13 @@ Singleton {
 
     Timer {
         id: _lyricsSourceTimer
-        interval: 2500
+        interval: 15000
         repeat: false
         onTriggered: {
-            if (root._lyricsSignalActive) {
+            if (root._lyricsSignalActive || (root._playerTrackKey !== ""
+                    && root._latchedPlayerTrackKey !== ""
+                    && root._playerTrackKey === root._latchedPlayerTrackKey
+                    && root._hasStableLyricsCache())) {
                 _lyricsSourceTimer.restart()
                 return
             }
