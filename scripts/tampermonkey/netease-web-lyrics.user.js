@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         DymicShell NetEase Lyrics Bridge
 // @namespace    https://sighthesia/dymicshell
-// @version      0.2.0
+// @version      0.2.2
 // @description  Capture NetEase web lyrics state and forward it to DymicShell's localhost bridge.
 // @match        https://music.163.com/*
 // @run-at       document-start
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addElement
+// @grant        unsafeWindow
 // @connect      127.0.0.1
 // @connect      music.163.com
 // ==/UserScript==
@@ -15,14 +16,31 @@
   'use strict';
 
   const MESSAGE_TYPE = 'dymicshell-netease-lyrics-state';
+  const EVENT_TYPE = 'dymicshell-netease-lyrics-state-event';
   const BRIDGE_URL = 'http://127.0.0.1:18765/push';
   const LYRIC_API_PREFIX = 'https://music.163.com/api/song/lyric?id=';
   const SEARCH_API_PREFIX = 'https://music.163.com/api/search/get/web?csrf_token=&type=1&offset=0&total=true&limit=10&s=';
+  const DEBUG_PREFIX = '[DymicShell:NeteaseLyricsUserscript]';
+  const DEBUG_ENABLED = window.localStorage && window.localStorage.getItem('dymicshellNeteaseLyricsDebug') === '1';
 
   const lyricCache = new Map();
   const songIdLookupCache = new Map();
   let lastForwardedSignature = '';
   let latestLookupKey = '';
+  let lastDebugSignature = '';
+  let bridgeFailureCount = 0;
+
+  function debugLog(reason, details) {
+    if (!DEBUG_ENABLED)
+      return;
+
+    const signature = reason + '|' + JSON.stringify(details || {});
+    if (signature === lastDebugSignature)
+      return;
+
+    lastDebugSignature = signature;
+    console.info(DEBUG_PREFIX, reason, details || {});
+  }
 
   function normalizeText(value) {
     return value == null ? '' : String(value).trim();
@@ -75,6 +93,16 @@
       return;
 
     lastForwardedSignature = signature;
+    debugLog('bridge:post', {
+      songId: normalized.songId,
+      title: normalized.title,
+      artist: normalized.artist,
+      playbackState: normalized.playbackState,
+      positionMs: normalized.positionMs,
+      durationMs: normalized.durationMs,
+      hasRawLyric: normalized.rawLyric !== '',
+      hasTranslatedLyric: normalized.translatedLyric !== '',
+    });
 
     GM_xmlhttpRequest({
       method: 'POST',
@@ -83,8 +111,28 @@
         'Content-Type': 'application/json',
       },
       data: JSON.stringify(normalized),
-      onerror: () => {},
-      ontimeout: () => {},
+      onload: (response) => {
+        bridgeFailureCount = 0;
+        if (!response || response.status < 200 || response.status >= 300) {
+          console.warn(DEBUG_PREFIX, 'bridge:unexpectedStatus', {
+            status: response ? response.status : 0,
+            statusText: response ? response.statusText : '',
+          });
+        }
+      },
+      onerror: (error) => {
+        bridgeFailureCount += 1;
+        console.warn(DEBUG_PREFIX, 'bridge:error', {
+          count: bridgeFailureCount,
+          error: error && error.error ? String(error.error) : 'network-error',
+        });
+      },
+      ontimeout: () => {
+        bridgeFailureCount += 1;
+        console.warn(DEBUG_PREFIX, 'bridge:timeout', {
+          count: bridgeFailureCount,
+        });
+      },
     });
   }
 
@@ -309,6 +357,7 @@
       window.__dymicshellNeteaseLyricsProbeInstalled = true;
 
       const MESSAGE_TYPE = 'dymicshell-netease-lyrics-state';
+      const EVENT_TYPE = 'dymicshell-netease-lyrics-state-event';
       const state = {
         songId: '',
         title: '',
@@ -362,6 +411,9 @@
 
         lastSignature = signature;
         window.postMessage({ type: MESSAGE_TYPE, payload }, '*');
+        document.dispatchEvent(new CustomEvent(EVENT_TYPE, {
+          detail: payload,
+        }));
       }
 
       function trackKey(songId, title, artist) {
@@ -730,15 +782,47 @@
     }
 
     const source = `(${pageProbeMain.toString()})();`;
-    if (typeof GM_addElement === 'function') {
-      GM_addElement(document.documentElement || document.head || document.body, 'script', { textContent: source });
-      return;
+
+    function appendProbeScript() {
+      const parent = document.documentElement || document.head || document.body;
+      if (!parent)
+        return false;
+
+      if (typeof GM_addElement === 'function') {
+        try {
+          GM_addElement(parent, 'script', { textContent: source });
+          return true;
+        } catch (_) {
+        }
+      }
+
+      const script = document.createElement('script');
+      script.textContent = source;
+      parent.appendChild(script);
+      script.remove();
+      return true;
     }
 
-    const script = document.createElement('script');
-    script.textContent = source;
-    (document.head || document.documentElement).appendChild(script);
-    script.remove();
+    if (appendProbeScript())
+      return;
+
+    const retryInjection = () => {
+      if (appendProbeScript()) {
+        document.removeEventListener('readystatechange', retryInjection, true);
+        document.removeEventListener('DOMContentLoaded', retryInjection, true);
+      }
+    };
+
+    document.addEventListener('readystatechange', retryInjection, true);
+    document.addEventListener('DOMContentLoaded', retryInjection, true);
+  }
+
+  function handleIncomingPayload(payload, source) {
+    debugLog('page:' + source, {
+      hasPayload: !!payload,
+      type: payload && payload.type ? String(payload.type) : '',
+    });
+    handleStateMessage(payload);
   }
 
   window.addEventListener('message', (event) => {
@@ -749,7 +833,15 @@
     if (!payload || payload.type !== MESSAGE_TYPE)
       return;
 
-    handleStateMessage(payload.payload);
+    handleIncomingPayload(payload.payload, 'postMessage');
+  }, false);
+
+  document.addEventListener(EVENT_TYPE, (event) => {
+    const detail = event && event.detail;
+    if (!detail || typeof detail !== 'object')
+      return;
+
+    handleIncomingPayload(detail, 'customEvent');
   }, false);
 
   injectPageProbe();

@@ -16,7 +16,7 @@
 - `services/BarLayoutService.qml` is the bar-layout facade; most layout logic lives in `services/barlayout/*.js`.
 - `config/Theme.qml`, `config/Colors.qml`, and `config/settings-default.json` are derived/shared inputs; prefer them over hardcoded sizes, colors, and defaults.
 - `matugen/config.toml` and `services/WallpaperService.qml` own wallpaper-driven theming.
-- `scripts/firefox-extensions/netease-web-lyrics/README.md` is the supported NetEase lyrics path.
+- `scripts/tampermonkey/netease-web-lyrics.user.js` is the persistent NetEase lyrics path; `scripts/firefox-extensions/netease-web-lyrics/README.md` documents the temporary Firefox fallback.
 
 ## Workflow
 
