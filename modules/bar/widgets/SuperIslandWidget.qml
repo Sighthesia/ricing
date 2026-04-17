@@ -478,7 +478,7 @@ Item {
             groupKey: "idle",
             priority: "passive",
             relayReplace: false,
-            title: Qt.formatDateTime(currentTime, "hh:mm"),
+            title: Qt.formatDate(currentTime, "M月d日") + " | " + Qt.formatDateTime(currentTime, "hh:mm"),
             subtitle: "",
             icon: "",
             workspaceLabel: "",
