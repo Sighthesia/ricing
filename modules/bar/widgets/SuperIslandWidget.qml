@@ -561,9 +561,10 @@ Item {
 
     Timer {
         id: timeTimer
-        interval: 60 * 1000
+        interval: 1000
         running: true
         repeat: true
+        triggeredOnStart: true
         onTriggered: root.currentTime = new Date()
     }
 
