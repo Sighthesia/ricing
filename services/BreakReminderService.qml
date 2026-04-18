@@ -25,10 +25,10 @@ Singleton {
         && IslandOverlayService.state !== "closed"
     readonly property bool preAlertActive: phase === "pre-alert"
     readonly property bool breakActive: phase === "break"
-    readonly property bool outroActive: phase === "outro"
     readonly property bool closingActive: phase === "closing"
-    readonly property int phaseElapsedMs: Math.max(0, _nowMs - _phaseStartedMs)
-    readonly property int remainingMs: Math.max(0, _phaseDeadlineMs - _nowMs)
+    readonly property bool outroActive: phase === "outro"
+    readonly property real phaseElapsedMs: Math.max(0, _nowMs - _phaseStartedMs)
+    readonly property real remainingMs: Math.max(0, _phaseDeadlineMs - _nowMs)
     readonly property int remainingWholeSeconds: Math.max(0, Math.ceil(remainingMs / 1000))
     readonly property int displayRemainingMs:
         breakActive ? remainingMs : ((outroActive || closingActive) ? 0 : breakDurationMs)
@@ -64,9 +64,9 @@ Singleton {
     readonly property bool timerActive: enabled || phase !== "work"
 
     property string phase: "work"
-    property int _nowMs: Date.now()
-    property int _phaseStartedMs: 0
-    property int _phaseDeadlineMs: 0
+    property real _nowMs: Date.now()
+    property real _phaseStartedMs: 0
+    property real _phaseDeadlineMs: 0
     property bool _closingOverlayInternally: false
     property int _pendingWorkDurationMs: 0
 
@@ -106,11 +106,17 @@ Singleton {
     }
 
     function _enterLeadPhase() {
+        if (!root.enabled)
+            return
+
         root._pushLeadReminder()
         root._schedulePhase("pre-alert", root.leadMs)
     }
 
     function _enterBreakPhase() {
+        if (!root.enabled)
+            return
+
         root._schedulePhase("break", root.breakDurationMs)
         IslandOverlayService.openOverlay("break-reminder", {
             source: "break-reminder"
@@ -126,6 +132,15 @@ Singleton {
         root.phase = "closing"
         root._closingOverlayInternally = true
         _tickTimer.restart()
+
+        if (!root.overlayVisible) {
+            const nextDuration = root._pendingWorkDurationMs
+            root._pendingWorkDurationMs = 0
+            root._closingOverlayInternally = false
+            root._schedulePhase("work", nextDuration)
+            return
+        }
+
         root._closeOverlay()
     }
 
@@ -162,6 +177,9 @@ Singleton {
             root._closeOverlay()
             return
         }
+
+        if (root.phase === "pre-alert" || root.phase === "break" || root.phase === "outro")
+            return
 
         root.restartCycle()
     }
@@ -222,10 +240,10 @@ Singleton {
         function onBreakReminderEnabledChanged() { root._syncEnabledState() }
         function onBreakReminderWorkMinutesChanged() { root.restartCycle() }
         function onBreakReminderDurationSecondsChanged() {
-            if (!root.breakActive)
+            if (!(root.breakActive || root.preAlertActive))
                 return
 
-            root._schedulePhase("break", root.breakDurationMs)
+            root._schedulePhase(root.breakActive ? "break" : "pre-alert", root.breakActive ? root.breakDurationMs : root.leadMs)
         }
         function onBreakReminderLeadSecondsChanged() {
             if (root.phase === "pre-alert")
@@ -262,6 +280,11 @@ Singleton {
                 const nextDuration = root._pendingWorkDurationMs
                 root._pendingWorkDurationMs = 0
                 root._schedulePhase("work", nextDuration)
+                return
+            }
+
+            if (root.phase === "outro") {
+                root._schedulePhase("work", root.workIntervalMs)
                 return
             }
 
