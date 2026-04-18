@@ -13,7 +13,7 @@ Item {
 
     property bool middleClickEnabled: false
     property bool wheelEnabled: true
-    property int buttonSize: Theme.barWidget.pillHeight
+    property int buttonSize: Math.max(1, Theme.barWidget.pillHeight - Theme.barWidget.contentPaddingV * 2)
     property int iconSize: Theme.barWidget.primaryIconSize
 
     readonly property string _iconSource: {

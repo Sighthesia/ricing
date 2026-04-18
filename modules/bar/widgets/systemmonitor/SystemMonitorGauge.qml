@@ -19,7 +19,7 @@ Item {
     readonly property color iconColor: root.metric && root.metric.available === false ? Colors.textMuted : root.semanticColor
     readonly property color trackColor: Colors.border
     readonly property color surfaceColor: Colors.surface
-    readonly property real gaugeSize: Theme.barWidget.pillHeight
+    readonly property real gaugeSize: Math.max(1, Theme.barWidget.pillHeight - Theme.barWidget.contentPaddingV * 2)
     readonly property real ringThickness: Math.max(2, Math.round(Theme.barWidget.contentPaddingV * 0.75))
     readonly property real iconSize: Theme.barWidget.compactIconSize
     readonly property bool _showDetail: (_hoverArea.containsMouse || root.detailPreview) && !!root.metric

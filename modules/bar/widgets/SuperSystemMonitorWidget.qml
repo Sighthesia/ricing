@@ -269,7 +269,7 @@ Item {
                 parent: mainRow
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.barWidget.iconSpacing
+                spacing: Theme.barWidget.pillSpacing
 
                 Repeater {
                     model: root._persistentMetrics
@@ -295,7 +295,7 @@ Item {
                     persistentRow.width + Theme.barWidget.pillSpacing,
                     parent.width - implicitWidth
                 ))
-                spacing: Theme.barWidget.iconSpacing
+                spacing: Theme.barWidget.pillSpacing
                 visible: root._enabled && root._expandedVisualActive && root._expandedMetrics.length > 0
 
                 Repeater {
