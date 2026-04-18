@@ -168,18 +168,14 @@ Singleton {
     readonly property string displayPrimaryLyric: root.preferTranslatedLyrics
         ? (root.currentTranslatedLyric !== ""
             ? root.currentTranslatedLyric
-            : (root.nextTranslatedLyric !== ""
-                ? root.nextTranslatedLyric
-                : (root.currentLyric !== "" ? root.currentLyric : root.nextLyric)))
+            : (root.currentLyric !== "" ? root.currentLyric : ""))
         : (root.currentLyric !== ""
             ? root.currentLyric
-            : (root.nextLyric !== ""
-                ? root.nextLyric
-                : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : root.nextTranslatedLyric)))
+            : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : ""))
     readonly property string compactPrimaryLyric: root._compactDisplayedLyric
     readonly property string displaySecondaryLyric: root.preferTranslatedLyrics
-        ? (root.currentLyric !== "" ? root.currentLyric : root.nextLyric)
-        : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : root.nextTranslatedLyric)
+        ? (root.currentLyric !== "" ? root.currentLyric : "")
+        : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : "")
     readonly property string displayPrimaryLyricKey: root._displayPrimaryLyricKey()
     readonly property string compactPrimaryLyricKey: root._compactDisplayedLyricKey
     readonly property string displaySecondaryLyricKey: root._displaySecondaryLyricKey()
@@ -282,12 +278,13 @@ Singleton {
         if (root._compactDisplayedTrack === trackPrefix && root._compactDisplayedLyric !== "")
             return
 
-        if (nextState.text !== "") {
+        // Do not promote the upcoming line before any current lyric is established.
+        if ((root._compactDisplayedLyric !== "" || stableCurrentState.text !== "") && nextState.text !== "") {
             root._setCompactDisplayedLyric(nextState, trackPrefix)
             return
         }
 
-        if (stableNextState.text !== "") {
+        if ((root._compactDisplayedLyric !== "" || stableCurrentState.text !== "") && stableNextState.text !== "") {
             root._setCompactDisplayedLyric(stableNextState, trackPrefix)
             return
         }
@@ -299,36 +296,28 @@ Singleton {
         if (root.preferTranslatedLyrics) {
             if (root.currentTranslatedLyric !== "")
                 return root._lyricKey("translated", "current", NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
-            if (root.nextTranslatedLyric !== "")
-                return root._lyricKey("translated", "next", NeteaseWebLyricsService.nextTranslatedLyricIndex, root.nextTranslatedLyric)
             if (root.currentLyric !== "")
                 return root._lyricKey("original", "current", NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
-
-            return root._lyricKey("original", "next", NeteaseWebLyricsService.nextLyricIndex, root.nextLyric)
+            return ""
         }
 
         if (root.currentLyric !== "")
             return root._lyricKey("original", "current", NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
-        if (root.nextLyric !== "")
-            return root._lyricKey("original", "next", NeteaseWebLyricsService.nextLyricIndex, root.nextLyric)
         if (root.currentTranslatedLyric !== "")
             return root._lyricKey("translated", "current", NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
-
-        return root._lyricKey("translated", "next", NeteaseWebLyricsService.nextTranslatedLyricIndex, root.nextTranslatedLyric)
+        return ""
     }
 
     function _displaySecondaryLyricKey() {
         if (root.preferTranslatedLyrics) {
             if (root.currentLyric !== "")
                 return root._lyricKey("original", "current", NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
-
-            return root._lyricKey("original", "next", NeteaseWebLyricsService.nextLyricIndex, root.nextLyric)
+            return ""
         }
 
         if (root.currentTranslatedLyric !== "")
             return root._lyricKey("translated", "current", NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
-
-        return root._lyricKey("translated", "next", NeteaseWebLyricsService.nextTranslatedLyricIndex, root.nextTranslatedLyric)
+        return ""
     }
 
     function _logLyricSelection(reason) {
