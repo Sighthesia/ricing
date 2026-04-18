@@ -13,6 +13,7 @@ Item {
     property real incomingY: 0
     property int artworkSize: Theme.barWidget.pillHeight - Theme.barWidget.contentPaddingV * 2
     property int textMaxWidth: Theme.barWidget.mediaCompactMaxTitleWidth
+    property string textOverflowMode: "elide"
     property bool textOnlySwap: false
     property var currentContent: ({ title: "", artist: "", artUrl: "" })
     property var outgoingContent: ({ title: "", artist: "", artUrl: "" })
@@ -39,6 +40,7 @@ Item {
         artUrl: root.currentContent.artUrl || ""
         artworkSize: root.artworkSize
         textMaxWidth: root.textMaxWidth
+        textOverflowMode: root.textOverflowMode
         showArtwork: true
         showText: false
     }
@@ -64,6 +66,7 @@ Item {
             artUrl: root.currentContent.artUrl || ""
             artworkSize: root.artworkSize
             textMaxWidth: root.textMaxWidth
+            textOverflowMode: root.textOverflowMode
             showArtwork: false
             showText: true
         }
@@ -79,6 +82,7 @@ Item {
             artUrl: root.outgoingContent.artUrl || ""
             artworkSize: root.artworkSize
             textMaxWidth: root.textMaxWidth
+            textOverflowMode: root.textOverflowMode
             showArtwork: false
             showText: true
         }
@@ -94,6 +98,7 @@ Item {
             artUrl: root.incomingContent.artUrl || ""
             artworkSize: root.artworkSize
             textMaxWidth: root.textMaxWidth
+            textOverflowMode: root.textOverflowMode
             showArtwork: false
             showText: true
         }
@@ -110,6 +115,7 @@ Item {
         artUrl: root.currentContent.artUrl || ""
         artworkSize: root.artworkSize
         textMaxWidth: root.textMaxWidth
+        textOverflowMode: root.textOverflowMode
     }
 
     MediaParts.MediaCompactContent {
@@ -123,6 +129,7 @@ Item {
         artUrl: root.outgoingContent.artUrl || ""
         artworkSize: root.artworkSize
         textMaxWidth: root.textMaxWidth
+        textOverflowMode: root.textOverflowMode
     }
 
     MediaParts.MediaCompactContent {
@@ -136,5 +143,6 @@ Item {
         artUrl: root.incomingContent.artUrl || ""
         artworkSize: root.artworkSize
         textMaxWidth: root.textMaxWidth
+        textOverflowMode: root.textOverflowMode
     }
 }

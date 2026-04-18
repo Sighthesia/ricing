@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import ".." as BarComponents
 
 // Focus-mode summary row showing the active app icon and title.
 Item {
@@ -13,6 +14,7 @@ Item {
     required property int iconTitleGap
     required property int focusPulsePad
     required property int titleMaxWidth
+    required property string titleOverflowMode
     required property real flashScale
     required property bool flashActive
     required property bool showOverview
@@ -68,15 +70,15 @@ Item {
             fillMode: Image.PreserveAspectFit
         }
 
-        Text {
+        // Keep the focused window title readable within the configured width budget.
+        BarComponents.OverflowText {
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(implicitWidth, root.titleMaxWidth)
             text: root.focusedTitle
-            elide: Text.ElideRight
-            maximumLineCount: 1
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeBody
-            color: Colors.text
+            overflowMode: root.titleOverflowMode
+            maximumWidth: root.titleMaxWidth
+            fontFamily: Theme.fontFamily
+            fontPixelSize: Theme.fontSizeBody
+            textColor: Colors.text
         }
     }
 

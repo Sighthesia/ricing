@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.config
+import ".." as BarComponents
 import "." as MediaParts
 
 // Compact media identity row used by the media control widget.
@@ -13,6 +14,7 @@ Item {
     property string fallbackIcon: "audio-x-generic-symbolic"
     property int artworkSize: Theme.barWidget.pillHeight - Theme.barWidget.contentPaddingV * 2
     property int textMaxWidth: Theme.barWidget.mediaCompactMaxTitleWidth
+    property string textOverflowMode: "elide"
     property bool showArtwork: true
     property bool showText: true
 
@@ -45,15 +47,14 @@ Item {
             Layout.alignment: Qt.AlignVCenter
 
             // Artist label.
-            Text {
+            // Keep the artist readable without widening the widget indefinitely.
+            BarComponents.OverflowText {
                 visible: root.artist !== ""
                 text: root.artist
-                color: Colors.text
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeBody
-                elide: Text.ElideRight
-                maximumLineCount: 1
-                wrapMode: Text.NoWrap
+                overflowMode: root.textOverflowMode
+                textColor: Colors.text
+                fontFamily: Theme.fontFamily
+                fontPixelSize: Theme.fontSizeBody
                 Layout.alignment: Qt.AlignVCenter
                 Layout.maximumWidth: Math.round(
                     root.textMaxWidth * Theme.barWidget.mediaCompactArtistWidthRatio)
@@ -72,15 +73,14 @@ Item {
             }
 
             // Track title label.
-            Text {
+            // Keep the title readable within the compact media width budget.
+            BarComponents.OverflowText {
                 text: root._displayTitle
-                color: Colors.text
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeBody
-                font.bold: true
-                elide: Text.ElideRight
-                maximumLineCount: 1
-                wrapMode: Text.NoWrap
+                overflowMode: root.textOverflowMode
+                textColor: Colors.text
+                fontFamily: Theme.fontFamily
+                fontPixelSize: Theme.fontSizeBody
+                fontWeight: Font.Bold
                 Layout.maximumWidth: root.textMaxWidth
             }
         }

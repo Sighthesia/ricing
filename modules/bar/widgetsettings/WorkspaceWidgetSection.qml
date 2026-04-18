@@ -146,6 +146,21 @@ Item {
             }
         }
 
+        // ── Long title overflow behavior ──────────────────────────────────
+        SegmentedSection {
+            width: parent.width
+            label: "长文本处理"
+            currentValue: SettingsService.data.workspaceWidget.titleOverflowMode
+            options: [
+                { value: "elide", label: "省略" },
+                { value: "scroll", label: "滚动" }
+            ]
+            onOptionSelected: value => {
+                SettingsService.data.workspaceWidget.titleOverflowMode = value
+                SettingsService.save()
+            }
+        }
+
         // ── Revert delay ─────────────────────────────────────────────────
         SliderSection {
             width: parent.width

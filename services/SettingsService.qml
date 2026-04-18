@@ -169,6 +169,7 @@ Singleton {
             workspaceWidget: {
                 defaultMode: adapter.workspaceWidget.defaultMode,
                 titleMaxWidth: adapter.workspaceWidget.titleMaxWidth,
+                titleOverflowMode: adapter.workspaceWidget.titleOverflowMode,
                 revertDelay: adapter.workspaceWidget.revertDelay,
                 hoverEnabled: adapter.workspaceWidget.hoverEnabled
             },
@@ -202,6 +203,7 @@ Singleton {
                 preferLyrics: adapter.mediaControl.preferLyrics,
                 lyricsPrimarySource: adapter.mediaControl.lyricsPrimarySource,
                 compactTextMaxWidth: adapter.mediaControl.compactTextMaxWidth,
+                compactTextOverflowMode: adapter.mediaControl.compactTextOverflowMode,
                 announcementDuration: adapter.mediaControl.announcementDuration,
                 cavaEnabled: adapter.mediaControl.cavaEnabled,
                 cavaBars: adapter.mediaControl.cavaBars,
@@ -426,6 +428,7 @@ Singleton {
         property JsonObject workspaceWidget: JsonObject {
             property string defaultMode:  "focus"
             property int    titleMaxWidth: 240
+            property string titleOverflowMode: "elide"
             property int    revertDelay:   1500
             property bool   hoverEnabled:  true
         }
@@ -461,6 +464,7 @@ Singleton {
             property bool preferLyrics: true
             property string lyricsPrimarySource: "original"
             property int compactTextMaxWidth: 164
+            property string compactTextOverflowMode: "elide"
             property int announcementDuration: 1500
             property bool cavaEnabled: true
             property int cavaBars: 20

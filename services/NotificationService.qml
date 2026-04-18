@@ -47,6 +47,8 @@ Singleton {
 
     // id → { notification: NotificationObject, timer: Timer }
     property var _activeNotifications: ({})
+    property var _cachedNotificationIds: []
+    readonly property int _maxCachedNotifications: 48
 
     readonly property string _cacheDir: {
         var cacheHome = Quickshell.env("XDG_CACHE_HOME")
@@ -220,6 +222,8 @@ Singleton {
     function _handleNotification(n) {
         var data = _buildData(n);
 
+        root._cacheNotificationObject(data.id, n)
+
         // Always append to history unless transient
         if (!n.transient) {
             _prependHistory(data);
@@ -230,10 +234,6 @@ Singleton {
         if (root.doNotDisturb) return;
 
         if (!root.popupPresentationEnabled) return;
-
-        // Store the live notification object so invokeAction() can reach its actions.
-        if (!_activeNotifications[data.id]) _activeNotifications[data.id] = {};
-        _activeNotifications[data.id].notification = n;
 
         // Replace existing popup from same app+summary if present
         for (var i = 0; i < activeList.count; i++) {
@@ -345,13 +345,47 @@ Singleton {
         _activeNotifications[data.id].timer = t;
     }
 
+    function _cacheNotificationObject(id, notification) {
+        if (!id || !notification)
+            return
+
+        if (!_activeNotifications[id])
+            _activeNotifications[id] = {}
+
+        _activeNotifications[id].notification = notification
+
+        var knownIds = _cachedNotificationIds.slice()
+        var existingIndex = knownIds.indexOf(id)
+        if (existingIndex >= 0)
+            knownIds.splice(existingIndex, 1)
+
+        knownIds.unshift(id)
+
+        while (knownIds.length > _maxCachedNotifications) {
+            var expiredId = knownIds.pop()
+            var expiredEntry = _activeNotifications[expiredId]
+
+            if (!expiredEntry)
+                continue
+
+            if (expiredEntry.timer) {
+                expiredEntry.timer.stop()
+                expiredEntry.timer.destroy()
+            }
+
+            delete _activeNotifications[expiredId]
+        }
+
+        _cachedNotificationIds = knownIds
+    }
+
     function _stopTimer(id) {
         var entry = _activeNotifications[id];
         if (entry && entry.timer) {
             entry.timer.stop();
             entry.timer.destroy();
+            delete entry.timer;
         }
-        delete _activeNotifications[id];
     }
 
     function _findActive(id) {

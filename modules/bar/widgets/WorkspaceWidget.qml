@@ -42,6 +42,8 @@ Item {
     readonly property int _iconTitleGap: Theme.barWidget.iconLabelSpacing
     readonly property int _focusPulsePad: Theme.barWidget.focusPulsePadding
     readonly property int _titleMaxW:    SettingsService.data.workspaceWidget.titleMaxWidth
+    readonly property string _titleOverflowMode:
+        SettingsService.data.workspaceWidget.titleOverflowMode || "elide"
     readonly property bool _hoverActive: SettingsService.data.workspaceWidget.hoverEnabled
     readonly property bool _hoverAllowed:
         root._hoverActive && !(BarLayoutService.settingsMode && BarLayoutService.isDragging)
@@ -537,6 +539,7 @@ Item {
                     iconTitleGap: root._iconTitleGap
                     focusPulsePad: root._focusPulsePad
                     titleMaxWidth: root._titleMaxW
+                    titleOverflowMode: root._titleOverflowMode
                     flashScale: root._flashScale
                     flashActive: root._flashActive
                     showOverview: root._showOverview

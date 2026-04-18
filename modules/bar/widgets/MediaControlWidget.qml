@@ -19,6 +19,8 @@ Item {
     readonly property bool _hoverRevealControls: SettingsService.data.mediaControl.hoverRevealControls
     readonly property bool _showLyrics: SettingsService.data.mediaControl.showLyrics
     readonly property bool _preferLyrics: SettingsService.data.mediaControl.preferLyrics
+    readonly property string _compactTextOverflowMode:
+        SettingsService.data.mediaControl.compactTextOverflowMode || "elide"
     readonly property bool _active: root._enabled && (MediaControlService.hasMedia || root._showIdle)
     readonly property int _pillH: Theme.barWidget.pillHeight
     readonly property int _padH: Theme.barWidget.contentPaddingH
@@ -981,6 +983,7 @@ Item {
                     incomingContent: root._incomingContent
                     artworkSize: root._contentArtworkSize
                     textMaxWidth: Theme.barWidget.mediaCompactMaxTitleWidth
+                    textOverflowMode: root._compactTextOverflowMode
                 }
             }
 

@@ -101,6 +101,21 @@ Item {
             }
         }
 
+        // Keep compact media text behavior configurable for long titles and lyrics.
+        SegmentedSection {
+            width: parent.width
+            label: "长文本处理"
+            currentValue: SettingsService.data.mediaControl.compactTextOverflowMode
+            options: [
+                { value: "elide", label: "省略" },
+                { value: "scroll", label: "滚动" }
+            ]
+            onOptionSelected: value => {
+                SettingsService.data.mediaControl.compactTextOverflowMode = value
+                SettingsService.save()
+            }
+        }
+
         ToggleSection {
             width: parent.width
             label: "Cava 可视化"
