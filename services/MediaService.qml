@@ -97,6 +97,13 @@ Singleton {
         const artKey = root._artKey(player)
         const nextArtUrl = player.trackArtUrl || ""
 
+        if (nextArtUrl === "" && root.artUrl !== "" && playerKey === root._lastArtPlayerKey && (artKey === root._lastArtKey || player.playbackState === MprisPlaybackState.Playing)) {
+            root._artRecoveryPending = true
+            if (root._artRecoveryStartedAt === 0)
+                root._artRecoveryStartedAt = Date.now()
+            return
+        }
+
         if (nextArtUrl !== "") {
             root._lastArtPlayerKey = playerKey
             root._lastArtKey = artKey

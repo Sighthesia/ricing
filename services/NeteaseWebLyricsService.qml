@@ -9,6 +9,8 @@ Singleton {
     id: root
 
     // FIXME: Keep this default port aligned with the userscript prototype.
+    readonly property bool _debugLyricDisplay:
+        (Quickshell.env("DYMICSHELL_MEDIA_LYRIC_DEBUG") || "").trim() === "1"
     readonly property int _defaultPort: 18765
     readonly property string _helperOverride: (Quickshell.env("DYMICSHELL_NETEASE_WEB_LYRICS_CMD") || "").trim()
     readonly property bool _bundledHelperDisabled:
@@ -44,6 +46,10 @@ Singleton {
     property string nextLyric: ""
     property string currentTranslatedLyric: ""
     property string nextTranslatedLyric: ""
+    property int currentLyricIndex: -1
+    property int nextLyricIndex: -1
+    property int currentTranslatedLyricIndex: -1
+    property int nextTranslatedLyricIndex: -1
     property bool hasLyrics: false
     readonly property bool active:
         songId !== ""
@@ -119,6 +125,19 @@ Singleton {
             && (nextTitle !== "" || nextArtist !== "")
     }
 
+    function _shouldPreserveCurrentSession(nextSongId, nextRawLyric, nextTranslatedLyric, nextPlaybackState) {
+        if (nextSongId !== "")
+            return false
+
+        if (nextRawLyric !== "" || nextTranslatedLyric !== "")
+            return false
+
+        if (!root._hasCurrentSession())
+            return false
+
+        return root.playbackState !== "stopped" || nextPlaybackState !== "stopped"
+    }
+
     function _effectivePositionMs() {
         if (root.playbackState !== "playing")
             return Math.max(0, root.positionMs)
@@ -173,52 +192,76 @@ Singleton {
     }
 
     function _syncLyricWindow() {
+        const previousOriginalCurrent = root.currentLyric
+        const previousOriginalNext = root.nextLyric
+        const previousTranslatedCurrent = root.currentTranslatedLyric
+        const previousTranslatedNext = root.nextTranslatedLyric
+        const previousOriginalCurrentIndex = root.currentLyricIndex
+        const previousOriginalNextIndex = root.nextLyricIndex
+        const previousTranslatedCurrentIndex = root.currentTranslatedLyricIndex
+        const previousTranslatedNextIndex = root.nextTranslatedLyricIndex
         const lines = root._lyricLines
         if (!lines || lines.length === 0) {
             root.currentLyric = ""
             root.nextLyric = ""
+            root.currentLyricIndex = -1
+            root.nextLyricIndex = -1
         } else {
             let current = ""
             let next = ""
+            let currentIndex = -1
+            let nextIndex = -1
             const cursorMs = root._effectivePositionMs()
 
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i]
                 if (line.timeMs <= cursorMs) {
                     current = line.text
+                    currentIndex = i
                     continue
                 }
 
                 next = line.text
+                nextIndex = i
                 break
             }
 
             root.currentLyric = current
             root.nextLyric = next
+            root.currentLyricIndex = currentIndex
+            root.nextLyricIndex = nextIndex
         }
 
         const translatedLines = root._translatedLyricLines
         if (!translatedLines || translatedLines.length === 0) {
             root.currentTranslatedLyric = ""
             root.nextTranslatedLyric = ""
+            root.currentTranslatedLyricIndex = -1
+            root.nextTranslatedLyricIndex = -1
         } else {
             let currentTranslated = ""
             let nextTranslated = ""
+            let currentTranslatedIndex = -1
+            let nextTranslatedIndex = -1
             const cursorMs = root._effectivePositionMs()
 
             for (let i = 0; i < translatedLines.length; i++) {
                 const line = translatedLines[i]
                 if (line.timeMs <= cursorMs) {
                     currentTranslated = line.text
+                    currentTranslatedIndex = i
                     continue
                 }
 
                 nextTranslated = line.text
+                nextTranslatedIndex = i
                 break
             }
 
             root.currentTranslatedLyric = currentTranslated
             root.nextTranslatedLyric = nextTranslated
+            root.currentTranslatedLyricIndex = currentTranslatedIndex
+            root.nextTranslatedLyricIndex = nextTranslatedIndex
         }
 
         root.hasLyrics = root.currentLyric !== ""
@@ -231,6 +274,37 @@ Singleton {
         root.progress = root.durationMs > 0
             ? Math.max(0, Math.min(1, root._effectivePositionMs() / root.durationMs))
             : 0
+
+        if (root._debugLyricDisplay) {
+            const changed = previousOriginalCurrent !== root.currentLyric
+                || previousOriginalNext !== root.nextLyric
+                || previousTranslatedCurrent !== root.currentTranslatedLyric
+                || previousTranslatedNext !== root.nextTranslatedLyric
+                || previousOriginalCurrentIndex !== root.currentLyricIndex
+                || previousOriginalNextIndex !== root.nextLyricIndex
+                || previousTranslatedCurrentIndex !== root.currentTranslatedLyricIndex
+                || previousTranslatedNextIndex !== root.nextTranslatedLyricIndex
+
+            console.log("[DymicShell:LyricWindow]", JSON.stringify({
+                changed: changed,
+                playbackState: root.playbackState,
+                cursorMs: root._effectivePositionMs(),
+                positionMs: root.positionMs,
+                durationMs: root.durationMs,
+                original: {
+                    current: root.currentLyric,
+                    next: root.nextLyric,
+                    currentIndex: root.currentLyricIndex,
+                    nextIndex: root.nextLyricIndex
+                },
+                translated: {
+                    current: root.currentTranslatedLyric,
+                    next: root.nextTranslatedLyric,
+                    currentIndex: root.currentTranslatedLyricIndex,
+                    nextIndex: root.nextTranslatedLyricIndex
+                }
+            }))
+        }
     }
 
     function _resetState() {
@@ -247,6 +321,10 @@ Singleton {
         root.nextLyric = ""
         root.currentTranslatedLyric = ""
         root.nextTranslatedLyric = ""
+        root.currentLyricIndex = -1
+        root.nextLyricIndex = -1
+        root.currentTranslatedLyricIndex = -1
+        root.nextTranslatedLyricIndex = -1
         root.hasLyrics = false
         root._lyricLines = []
         root._translatedLyricLines = []
@@ -320,9 +398,13 @@ Singleton {
         const preservePlaybackState = sessionSeemsSame
             && root.playbackState !== "stopped"
             && nextPlaybackState === "stopped"
-        const preserveCurrentSession = weakPayload
-            && root.playbackState === "playing"
-            && sessionSeemsSame
+        const preserveCurrentSession = root._shouldPreserveCurrentSession(
+            nextSongId,
+            nextRawLyric,
+            nextTranslatedLyric,
+            nextPlaybackState
+        )
+            && (weakPayload || metadataLooksDifferent || pauseSessionGap)
         const resolvedPlaybackState =
             (preserveCurrentSession || preserveTimeline || preservePlaybackState)
                 ? root.playbackState

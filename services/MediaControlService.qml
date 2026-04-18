@@ -9,6 +9,8 @@ import qs.services
 Singleton {
     id: root
 
+    readonly property bool _debugLyricDisplay:
+        (Quickshell.env("DYMICSHELL_MEDIA_LYRIC_DEBUG") || "").trim() === "1"
     readonly property bool _lyricsSignalActive:
         SettingsService.data.mediaControl.showLyrics
             && SettingsService.data.mediaControl.preferLyrics
@@ -41,6 +43,9 @@ Singleton {
     property string _stableNextLyric: ""
     property string _stableCurrentTranslatedLyric: ""
     property string _stableNextTranslatedLyric: ""
+    property string _compactDisplayedLyric: ""
+    property string _compactDisplayedLyricKey: ""
+    property string _compactDisplayedTrack: ""
     readonly property bool _freezeLyricsOnPause:
         root._preferLyricsMediaSource
             && MediaService.hasPlayer
@@ -171,9 +176,13 @@ Singleton {
             : (root.nextLyric !== ""
                 ? root.nextLyric
                 : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : root.nextTranslatedLyric)))
+    readonly property string compactPrimaryLyric: root._compactDisplayedLyric
     readonly property string displaySecondaryLyric: root.preferTranslatedLyrics
         ? (root.currentLyric !== "" ? root.currentLyric : root.nextLyric)
         : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : root.nextTranslatedLyric)
+    readonly property string displayPrimaryLyricKey: root._displayPrimaryLyricKey()
+    readonly property string compactPrimaryLyricKey: root._compactDisplayedLyricKey
+    readonly property string displaySecondaryLyricKey: root._displaySecondaryLyricKey()
 
     property string announcementState: "idle"
     property bool panelOpen: false
@@ -183,11 +192,178 @@ Singleton {
     property string _lastAnnouncementSignature: ""
     property string _lastPlaybackState: "stopped"
 
+    function _lyricKey(prefix, phase, index, text) {
+        if (text === "")
+            return ""
+
+        return prefix + ":" + text
+    }
+
+    function _firstNonEmpty(candidates) {
+        for (let i = 0; i < candidates.length; i++) {
+            if (candidates[i] !== "")
+                return candidates[i]
+        }
+
+        return ""
+    }
+
+    function _selectedCompactTrackPrefix() {
+        return root.preferTranslatedLyrics ? "translated" : "original"
+    }
+
+    function _compactTrackDisplayState(prefix, phase, index, text) {
+        if (text === "")
+            return { text: "", key: "" }
+
+        return {
+            text: text,
+            key: root._lyricKey(prefix, phase, index, text)
+        }
+    }
+
+    function _stableCompactTrackDisplayState(prefix, phase, text) {
+        if (text === "")
+            return { text: "", key: "" }
+
+        return {
+            text: text,
+            key: prefix + ":stable-" + phase + ":" + text
+        }
+    }
+
+    function _setCompactDisplayedLyric(state, trackPrefix) {
+        root._compactDisplayedTrack = state.text !== "" ? trackPrefix : ""
+        root._compactDisplayedLyric = state.text
+        root._compactDisplayedLyricKey = state.key
+    }
+
+    function _clearCompactDisplayedLyric() {
+        root._compactDisplayedTrack = ""
+        root._compactDisplayedLyric = ""
+        root._compactDisplayedLyricKey = ""
+    }
+
+    function _updateCompactDisplayedLyric() {
+        const trackPrefix = root._selectedCompactTrackPrefix()
+        const trackChanged = root._compactDisplayedTrack !== "" && root._compactDisplayedTrack !== trackPrefix
+        const currentState = root.preferTranslatedLyrics
+            ? root._compactTrackDisplayState(trackPrefix, "current", NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
+            : root._compactTrackDisplayState(trackPrefix, "current", NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
+        const stableCurrentState = root.preferTranslatedLyrics
+            ? root._stableCompactTrackDisplayState(trackPrefix, "current", root._stableCurrentTranslatedLyric)
+            : root._stableCompactTrackDisplayState(trackPrefix, "current", root._stableCurrentLyric)
+        const nextState = root.preferTranslatedLyrics
+            ? root._compactTrackDisplayState(trackPrefix, "next", NeteaseWebLyricsService.nextTranslatedLyricIndex, root.nextTranslatedLyric)
+            : root._compactTrackDisplayState(trackPrefix, "next", NeteaseWebLyricsService.nextLyricIndex, root.nextLyric)
+        const stableNextState = root.preferTranslatedLyrics
+            ? root._stableCompactTrackDisplayState(trackPrefix, "next", root._stableNextTranslatedLyric)
+            : root._stableCompactTrackDisplayState(trackPrefix, "next", root._stableNextLyric)
+
+        if (!SettingsService.data.mediaControl.showLyrics || !SettingsService.data.mediaControl.preferLyrics) {
+            root._clearCompactDisplayedLyric()
+            return
+        }
+
+        if (trackChanged)
+            root._clearCompactDisplayedLyric()
+
+        if (currentState.text !== "") {
+            root._setCompactDisplayedLyric(currentState, trackPrefix)
+            return
+        }
+
+        if (stableCurrentState.text !== "") {
+            if (root._compactDisplayedTrack !== trackPrefix || root._compactDisplayedLyric === "")
+                root._setCompactDisplayedLyric(stableCurrentState, trackPrefix)
+            return
+        }
+
+        if (root._compactDisplayedTrack === trackPrefix && root._compactDisplayedLyric !== "")
+            return
+
+        if (nextState.text !== "") {
+            root._setCompactDisplayedLyric(nextState, trackPrefix)
+            return
+        }
+
+        if (stableNextState.text !== "") {
+            root._setCompactDisplayedLyric(stableNextState, trackPrefix)
+            return
+        }
+
+        root._clearCompactDisplayedLyric()
+    }
+
+    function _displayPrimaryLyricKey() {
+        if (root.preferTranslatedLyrics) {
+            if (root.currentTranslatedLyric !== "")
+                return root._lyricKey("translated", "current", NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
+            if (root.nextTranslatedLyric !== "")
+                return root._lyricKey("translated", "next", NeteaseWebLyricsService.nextTranslatedLyricIndex, root.nextTranslatedLyric)
+            if (root.currentLyric !== "")
+                return root._lyricKey("original", "current", NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
+
+            return root._lyricKey("original", "next", NeteaseWebLyricsService.nextLyricIndex, root.nextLyric)
+        }
+
+        if (root.currentLyric !== "")
+            return root._lyricKey("original", "current", NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
+        if (root.nextLyric !== "")
+            return root._lyricKey("original", "next", NeteaseWebLyricsService.nextLyricIndex, root.nextLyric)
+        if (root.currentTranslatedLyric !== "")
+            return root._lyricKey("translated", "current", NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
+
+        return root._lyricKey("translated", "next", NeteaseWebLyricsService.nextTranslatedLyricIndex, root.nextTranslatedLyric)
+    }
+
+    function _displaySecondaryLyricKey() {
+        if (root.preferTranslatedLyrics) {
+            if (root.currentLyric !== "")
+                return root._lyricKey("original", "current", NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
+
+            return root._lyricKey("original", "next", NeteaseWebLyricsService.nextLyricIndex, root.nextLyric)
+        }
+
+        if (root.currentTranslatedLyric !== "")
+            return root._lyricKey("translated", "current", NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
+
+        return root._lyricKey("translated", "next", NeteaseWebLyricsService.nextTranslatedLyricIndex, root.nextTranslatedLyric)
+    }
+
+    function _logLyricSelection(reason) {
+        if (!root._debugLyricDisplay)
+            return
+
+        console.log("[DymicShell:MediaControlLyric]", JSON.stringify({
+            reason: reason,
+            preferTranslatedLyrics: root.preferTranslatedLyrics,
+            displayPrimaryLyric: root.displayPrimaryLyric,
+            displayPrimaryLyricKey: root.displayPrimaryLyricKey,
+            compactPrimaryLyric: root.compactPrimaryLyric,
+            compactPrimaryLyricKey: root.compactPrimaryLyricKey,
+            displaySecondaryLyric: root.displaySecondaryLyric,
+            currentLyric: root.currentLyric,
+            nextLyric: root.nextLyric,
+            currentTranslatedLyric: root.currentTranslatedLyric,
+            nextTranslatedLyric: root.nextTranslatedLyric,
+            stableCurrentLyric: root._stableCurrentLyric,
+            stableNextLyric: root._stableNextLyric,
+            stableCurrentTranslatedLyric: root._stableCurrentTranslatedLyric,
+            stableNextTranslatedLyric: root._stableNextTranslatedLyric,
+            compactDisplayedTrack: root._compactDisplayedTrack,
+            lyricsSourceLatched: root._lyricsSourceLatched,
+            freezeLyricsOnPause: root._freezeLyricsOnPause
+        }))
+    }
+
+
     function _clearStableLyrics() {
         root._stableCurrentLyric = ""
         root._stableNextLyric = ""
         root._stableCurrentTranslatedLyric = ""
         root._stableNextTranslatedLyric = ""
+        root._clearCompactDisplayedLyric()
     }
 
     function _hasStableLyricsCache() {
@@ -247,11 +423,13 @@ Singleton {
         }
 
         if (!root._lyricsSignalActive && !(currentTrackMatchesLatched && hasStableLyrics)) {
+            root._updateCompactDisplayedLyric()
             return
         }
 
         root._lyricsSourceLatched = true
         _lyricsSourceTimer.restart()
+        root._updateCompactDisplayedLyric()
     }
 
     function togglePanel() {
@@ -365,7 +543,19 @@ Singleton {
         root._refreshLyricsSession()
         root._lastAnnouncementSignature = root._signatureForMedia(root._media)
         root._lastPlaybackState = root.playbackState
+        root._logLyricSelection("component-completed")
     }
+
+    onDisplayPrimaryLyricChanged: root._logLyricSelection("display-primary-changed")
+    onCompactPrimaryLyricChanged: root._logLyricSelection("compact-primary-changed")
+    onDisplayPrimaryLyricKeyChanged: root._logLyricSelection("display-primary-key-changed")
+    onCompactPrimaryLyricKeyChanged: root._logLyricSelection("compact-primary-key-changed")
+    onPreferTranslatedLyricsChanged: root._updateCompactDisplayedLyric()
+    onCurrentLyricChanged: root._updateCompactDisplayedLyric()
+    onNextLyricChanged: root._updateCompactDisplayedLyric()
+    onCurrentTranslatedLyricChanged: root._updateCompactDisplayedLyric()
+    onNextTranslatedLyricChanged: root._updateCompactDisplayedLyric()
+    onHasLyricsChanged: root._updateCompactDisplayedLyric()
 
     Timer {
         id: _lyricsSourceTimer

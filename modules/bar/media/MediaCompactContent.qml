@@ -13,11 +13,13 @@ Item {
     property string fallbackIcon: "audio-x-generic-symbolic"
     property int artworkSize: Theme.barWidget.pillHeight - Theme.barWidget.contentPaddingV * 2
     property int textMaxWidth: Theme.barWidget.mediaCompactMaxTitleWidth
+    property bool showArtwork: true
+    property bool showText: true
 
     readonly property string _displayTitle: root.title !== "" ? root.title : "No Media"
 
     implicitWidth: _contentRow.implicitWidth
-    implicitHeight: _contentRow.implicitHeight
+    implicitHeight: root.showText ? _contentRow.implicitHeight : root.artworkSize
 
     // Compact content row.
     RowLayout {
@@ -29,6 +31,7 @@ Item {
 
         // Compact artwork.
         MediaParts.MediaArtwork {
+            visible: root.showArtwork
             source: root.artUrl
             fallbackIcon: root.fallbackIcon
             size: root.artworkSize
@@ -37,8 +40,8 @@ Item {
 
         // Compact text cluster.
         RowLayout {
+            visible: root.showText
             spacing: Theme.barWidget.iconSpacing
-            Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
 
             // Artist label.
@@ -78,7 +81,6 @@ Item {
                 elide: Text.ElideRight
                 maximumLineCount: 1
                 wrapMode: Text.NoWrap
-                Layout.fillWidth: true
                 Layout.maximumWidth: root.textMaxWidth
             }
         }

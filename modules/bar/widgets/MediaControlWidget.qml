@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
@@ -11,6 +12,8 @@ import "../" as BarPanels
 Item {
     id: root
 
+    readonly property bool _debugLyricDisplay:
+        (Quickshell.env("DYMICSHELL_MEDIA_LYRIC_DEBUG") || "").trim() === "1"
     readonly property bool _enabled: SettingsService.data.mediaControl.enabled
     readonly property bool _showIdle: SettingsService.data.mediaControl.showWhenIdle
     readonly property bool _hoverRevealControls: SettingsService.data.mediaControl.hoverRevealControls
@@ -55,15 +58,20 @@ Item {
     readonly property bool flashVisible:
         root._active && (MediaControlService.announcementState !== "idle" || root._hoverFlashActive)
     readonly property bool _useLyricsAsPrimaryText:
-        root._showLyrics && root._preferLyrics && MediaControlService.hasLyrics && MediaControlService.displayPrimaryLyric !== ""
+        root._showLyrics && root._preferLyrics && MediaControlService.hasLyrics && MediaControlService.compactPrimaryLyric !== ""
     readonly property string _displayArtist:
         root._useLyricsAsPrimaryText ? "" : MediaControlService.artist
     readonly property string _displayTitle:
         root._useLyricsAsPrimaryText
-            ? MediaControlService.displayPrimaryLyric
+            ? MediaControlService.compactPrimaryLyric
             : (MediaControlService.title !== ""
                 ? MediaControlService.title
                 : (MediaControlService.playerName !== "" ? MediaControlService.playerName : "No Media"))
+    readonly property string _displayTextSignature:
+        [root._displayArtist, root._displayTitle].join("|")
+    readonly property string _mediaIdentitySignature:
+        [MediaControlService.artUrl, MediaControlService.artist, MediaControlService.title, MediaControlService.playerName].join("|")
+    readonly property string _lyricDisplaySignature: MediaControlService.compactPrimaryLyricKey
     
     function _triggerEventPulse() {
         _pulseAnim.stop()
@@ -74,7 +82,11 @@ Item {
         _pulseScaleAnim.start()
     }
     readonly property string _contentSignature:
-        [MediaControlService.artUrl, root._displayArtist, root._displayTitle].join("|")
+        [
+            root._useLyricsAsPrimaryText ? "lyrics" : "media",
+            root._mediaIdentitySignature,
+            root._useLyricsAsPrimaryText ? root._lyricDisplaySignature : root._displayTextSignature
+        ].join("|")
     readonly property int _contentSwapOffset:
         Math.max(2, Theme.barWidget.contentPaddingV * 2)
     readonly property real _flashStageVisibleOffset: Math.max(1, Math.round(Theme.uiScale))
@@ -92,6 +104,7 @@ Item {
     property bool _hoverHandlerIgnored: false
     property bool _contentInitialized: false
     property bool _contentSwapActive: false
+    property bool _contentTextOnlySwap: false
     property string _panelState: "closed"
     property real _panelVisibleWidth: 0
     property real _panelVisibleHeight: 0
@@ -416,7 +429,10 @@ Item {
         return {
             title: root._displayTitle,
             artist: root._displayArtist,
-            artUrl: MediaControlService.artUrl
+            artUrl: MediaControlService.artUrl,
+            mode: root._useLyricsAsPrimaryText ? "lyrics" : "media",
+            mediaSignature: root._mediaIdentitySignature,
+            textSignature: root._useLyricsAsPrimaryText ? root._lyricDisplaySignature : root._displayTextSignature
         }
     }
 
@@ -437,10 +453,13 @@ Item {
         const nextContent = root._snapshotContent()
         const carryIncomingLayer = root._contentSwapActive
         const outgoingContent = carryIncomingLayer ? root._incomingContent : root._currentContent
-        const lyricOnlyUpdate = root._useLyricsAsPrimaryText
-            && root._contentInitialized
-            && nextContent.artUrl === root._currentContent.artUrl
-            && nextContent.artist === root._currentContent.artist
+        const currentContent = carryIncomingLayer ? root._incomingContent : root._currentContent
+        const textChanged = !root._contentInitialized || nextContent.textSignature !== (currentContent.textSignature || "")
+        const lyricOnlyUpdate = root._contentInitialized
+            && nextContent.mode === "lyrics"
+            && currentContent.mode === "lyrics"
+            && nextContent.mediaSignature === currentContent.mediaSignature
+            && textChanged
 
         if (!root._contentInitialized) {
             root._currentContent = nextContent
@@ -449,11 +468,32 @@ Item {
             root._contentSwapProgress = 1
             root._outgoingContentStartOpacity = 1
             root._outgoingContentStartY = 0
+            root._contentTextOnlySwap = false
             root._contentInitialized = true
+
+            if (root._debugLyricDisplay) {
+                console.log("[DymicShell:MediaWidgetSwap:init]", JSON.stringify({
+                    contentSignature: root._contentSignature,
+                    lyricDisplaySignature: root._lyricDisplaySignature,
+                    displayTitle: root._displayTitle,
+                    useLyricsAsPrimaryText: root._useLyricsAsPrimaryText
+                }))
+            }
+
             return
         }
 
-        if (lyricOnlyUpdate) {
+        if (!textChanged) {
+            if (root._debugLyricDisplay) {
+                console.log("[DymicShell:MediaWidgetSwap:skip]", JSON.stringify({
+                    reason: "text-unchanged",
+                    contentSignature: root._contentSignature,
+                    currentTextSignature: currentContent.textSignature || "",
+                    nextTextSignature: nextContent.textSignature || "",
+                    lyricDisplaySignature: root._lyricDisplaySignature
+                }))
+            }
+
             _contentSwapAnim.stop()
             root._currentContent = nextContent
             root._outgoingContent = nextContent
@@ -461,6 +501,7 @@ Item {
             root._contentSwapProgress = 1
             root._outgoingContentStartOpacity = 1
             root._outgoingContentStartY = 0
+            root._contentTextOnlySwap = false
             root._contentSwapActive = false
             return
         }
@@ -476,7 +517,23 @@ Item {
             ? ((root._incomingSwapProgress(root._contentSwapProgress) - 1) * root._contentSwapOffset)
             : 0
         root._contentSwapProgress = 0
+        root._contentTextOnlySwap = lyricOnlyUpdate
         root._contentSwapActive = true
+
+        if (root._debugLyricDisplay) {
+            console.log("[DymicShell:MediaWidgetSwap:start]", JSON.stringify({
+                contentSignature: root._contentSignature,
+                currentTextSignature: currentContent.textSignature || "",
+                nextTextSignature: nextContent.textSignature || "",
+                lyricDisplaySignature: root._lyricDisplaySignature,
+                displayTitle: root._displayTitle,
+                displayArtist: root._displayArtist,
+                textChanged: textChanged,
+                lyricOnlyUpdate: lyricOnlyUpdate,
+                carryIncomingLayer: carryIncomingLayer
+            }))
+        }
+
         _contentSwapAnim.start()
     }
 
@@ -575,7 +632,10 @@ Item {
         to: 1
         duration: Theme.anim.moveDuration
         easing.type: Theme.anim.moveType
-        onFinished: root._contentSwapActive = false
+        onFinished: {
+            // root._contentSwapActive = false
+            // root._contentTextOnlySwap = false
+        }
     }
 
     // Pulse backdrop.
@@ -597,7 +657,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         implicitWidth: Math.max(
             _contentStage.implicitWidth + root._padH * 2,
-            _flashStageClip.implicitWidth
+            root._flashRenderVisible ? _flashStageClip.implicitWidth : 0
         )
         implicitHeight: root._flashRenderVisible
             ? (root._pillH + root._flashGap + root._flashRowH)
@@ -905,6 +965,7 @@ Item {
                     id: _contentLayers
                     anchors.left: parent.left
                     anchors.right: parent.right
+                    textOnlySwap: root._contentSwapActive && root._contentTextOnlySwap
                     swapActive: root._contentSwapActive
                     outgoingOpacity: root._contentSwapActive
                         ? (root._outgoingContentStartOpacity * (1 - root._contentSwapProgress))

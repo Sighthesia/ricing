@@ -31,9 +31,13 @@ BarComponents.FloatingShellSurface {
     readonly property string _primaryLyric: MediaControlService.displayPrimaryLyric || ""
     readonly property string _secondaryLyric: MediaControlService.displaySecondaryLyric || ""
     readonly property string _displayTitle:
-        MediaControlService.title !== "" ? MediaControlService.title : "No Media"
+        MediaService.hasPlayer
+            ? (MediaService.title !== "" ? MediaService.title : "No Media")
+            : (MediaControlService.title !== "" ? MediaControlService.title : "No Media")
     readonly property string _displayArtist:
-        MediaControlService.artist !== "" ? MediaControlService.artist : MediaControlService.playerName
+        MediaService.hasPlayer
+            ? (MediaService.artist !== "" ? MediaService.artist : MediaService.playerName)
+            : (MediaControlService.artist !== "" ? MediaControlService.artist : MediaControlService.playerName)
     readonly property color _panelFillColor: Qt.rgba(
         Colors.background.r,
         Colors.background.g,
