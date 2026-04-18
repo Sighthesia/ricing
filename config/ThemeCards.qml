@@ -37,6 +37,7 @@ Singleton {
     readonly property int largePanelHeight: Math.round(392 * Theme.uiScale)
     readonly property int largePanelGap: Math.max(10, Math.round(12 * Theme.uiScale))
     readonly property int largePanelInset: Math.max(10, Math.round(12 * Theme.uiScale))
+    readonly property int superIslandControlCenterBodyHeight: Math.round(528 * Theme.uiScale)
     readonly property int dayGridGap: Math.max(6, Math.round(8 * Theme.uiScale))
     readonly property int dayCellHeight: Math.round(44 * Theme.uiScale)
     readonly property int dayCellRadius: Math.max(8, Math.round(10 * Theme.uiScale))

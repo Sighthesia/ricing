@@ -156,23 +156,22 @@ Item {
         root._screenHeight > 0
             ? Math.max(root._collapsedPillHeight, root._screenHeight - root._overlayDetachedOffset)
             : Math.round(900 * Theme.uiScale)
-    readonly property real _controlCenterMeasuredBodyHeight:
-        _overlayDeckMeasureLoader.item
-            ? _overlayDeckMeasureLoader.item.implicitHeight
-            : Math.round(528 * Theme.uiScale)
-    readonly property real _controlCenterAnimatedBodyHeight:
-        _overlayDeckHost.implicitHeight > 0
-            ? _overlayDeckHost.implicitHeight
-            : root._controlCenterMeasuredBodyHeight
+    readonly property real _controlCenterFallbackBodyHeight: ThemeCards.superIslandControlCenterBodyHeight
+    readonly property real _controlCenterMeasuredBodyHeight: Math.max(
+        _overlayDeckMeasureLoader.item ? _overlayDeckMeasureLoader.item.implicitHeight : 0,
+        _overlayDeckHost.implicitHeight > 0 ? _overlayDeckHost.implicitHeight : 0
+    )
     property real _overlayBodyHeight:
         root._fullScreenOverlayMode
             ? root._overlayAvailableBodyHeight
             : (root._controlCenterOverlayMode
                 ? Math.min(
                     root._overlayAvailableBodyHeight,
-                    Math.max(Math.round(528 * Theme.uiScale), root._controlCenterAnimatedBodyHeight)
+                    root._controlCenterMeasuredBodyHeight > 0
+                        ? root._controlCenterMeasuredBodyHeight
+                        : root._controlCenterFallbackBodyHeight
                 )
-                : Math.round(528 * Theme.uiScale))
+                : root._controlCenterFallbackBodyHeight)
     Behavior on _overlayBodyHeight {
         enabled: !root._fullScreenOverlayMode
 
