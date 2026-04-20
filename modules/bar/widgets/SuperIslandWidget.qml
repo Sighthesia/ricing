@@ -920,6 +920,7 @@ Item {
 
     Shortcut {
         sequence: "Escape"
+        context: Qt.ApplicationShortcut
         enabled: root._overlaySessionActive
         onActivated: {
             if (IslandOverlayService.mode === "session-control") {

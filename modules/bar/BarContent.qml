@@ -129,6 +129,7 @@ Item {
     // Global Esc: close any active panel, the context menu, and the widget picker.
     Shortcut {
         sequence: "Escape"
+        context: Qt.ApplicationShortcut
         enabled: BarLayoutService.activePanel !== "none"
             || contextMenu.visible
             || BarLayoutService.trayMenuOpen
