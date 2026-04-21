@@ -101,8 +101,10 @@ Item {
     property alias _overlayExpandedActive: _viewState._overlayExpandedActive
     readonly property real pillTopPadding: root._padV
 
+    readonly property real _mainTrackZoneHeight:
+        root._barExpandedHintActive ? Theme.barHeight : root._pillH
     readonly property real _mainTrackCenterY:
-        root._trackCenterY(_mainLoader.item, root._pillH, root._mainDisplayEvent, true)
+        root._trackCenterY(_mainLoader.item, root._mainTrackZoneHeight, root._mainDisplayEvent, true)
     readonly property real _flashTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
     readonly property real _flashRowBaseY: root._pillH + root._flashGap
@@ -188,8 +190,15 @@ Item {
     readonly property real _overlayRevealLift:
         Math.max(8, Theme.barWidget.contentPaddingV * 4)
     readonly property real _overlayAttachmentOverlap: 1
+    readonly property bool _barExpandedRectangularMode: root._barExpandedHintActive
+    readonly property real _barExpandedTopRadius:
+        Math.max(Theme.cornerRadius * 0.55, Math.round(Theme.barWidget.pillHeight * 0.28))
+    readonly property real _barExpandedDetachedRadius:
+        Math.max(Theme.cornerRadius, Math.round(Theme.barWidget.pillHeight * 0.42))
     readonly property real _overlayShellRadius:
-        Math.max(Theme.cornerRadius, Theme.screenCornerRadius)
+        root._barExpandedRectangularMode
+            ? root._barExpandedDetachedRadius
+            : Math.max(Theme.cornerRadius, Theme.screenCornerRadius)
     readonly property real _overlayPillBackgroundWidth: _pillBg.width
     readonly property real _overlayBridgeOutset: 0
     readonly property real _overlayInwardCornerRadius: root._overlayShellRadius
@@ -197,8 +206,10 @@ Item {
         Math.max(18, root._overlayInwardCornerRadius + (root._overlayInwardCornerRadius - 18) * 0.3)
 
     readonly property real _attachedRevealSeedHeight: 0
-    readonly property real _attachedRevealSeedWidth:
-        Math.max(root._overlayPillBackgroundWidth, root._collapsedWidth)
+    readonly property real _attachedRevealSeedWidth: {
+        const baseSeedWidth = Math.max(root._overlayPillBackgroundWidth, root._collapsedWidth)
+        return root._attachedPanelWidth > 0 ? Math.min(baseSeedWidth, root._attachedPanelWidth) : baseSeedWidth
+    }
     readonly property real _attachedCollapseBaseWidthCandidate:
         Math.max(root._collapsedWidthLive, _pillClip.width)
 
@@ -212,7 +223,8 @@ Item {
         Math.max(1, Math.round(Theme.anim.highlightDuration * 0.7))
 
     readonly property bool _detachedHintActive:
-        root._isFullHintEventType(root._attachedHintEvent.type) && root._hintPhase
+        root._isFullHintEventType(root._attachedHintEvent.type)
+        && (root._hintPhase || root._attachedCollapseAnimating)
     readonly property bool _attachedHintVisible:
         root._isFullHintEventType(root._attachedHintEvent.type)
         && (root._hintPhase || root._attachedCollapseAnimating)
@@ -225,9 +237,19 @@ Item {
             ? (root._overlayExpandedActive || root._overlayClosing)
             : root._hintPhase
     readonly property real _attachedPanelWidth:
-        root._overlaySessionActive ? root._overlayExpandedWidth : root._detachedHintWidth
+        root._overlaySessionActive
+            ? root._overlayExpandedWidth
+            : (root._barExpandedHintActive
+                ? Math.max(root._barExpandedMainHintWidth, root._barExpandedDetachedHintWidth)
+                : root._detachedHintWidth)
     readonly property real _attachedPanelHeight:
-        root._overlaySessionActive ? root._overlayBodyHeight : root._detachedHintHeight
+        root._overlaySessionActive
+            ? root._overlayBodyHeight
+            : (root._barExpandedHintActive ? root._barExpandedDetachedHintHeight : root._detachedHintHeight)
+    readonly property real _attachedPanelBodyWidth:
+        root._overlaySessionActive
+            ? root._attachedPanelVisibleWidth
+            : (root._barExpandedHintActive ? root._barExpandedDetachedHintWidth : root._attachedPanelVisibleWidth)
     readonly property real _detachedHintReservedHeight:
         Math.max(root._transientExpandedHeight, root._fullHintExpandedPillHeight + 2)
     readonly property real _detachedHintWidth:
@@ -237,11 +259,34 @@ Item {
                 ? _detachedHintMeasureLoader.item.implicitWidth
                 : root._collapsedWidth) + 2
         )
+    readonly property real _barExpandedMainHintWidthMeasured:
+        Math.max(
+            root._collapsedWidth,
+            (_barExpandedMainMeasureLoader.item
+                ? _barExpandedMainMeasureLoader.item.implicitWidth
+                : root._collapsedWidth) + 2
+        )
+    readonly property real _barExpandedMainHintWidth:
+        Math.max(root._collapsedWidth, root._barExpandedMainHintWidthMeasured)
+    readonly property real _barExpandedDetachedHintWidth:
+        ((_detachedHintDetachedMeasureLoader.item
+            ? _detachedHintDetachedMeasureLoader.item.implicitWidth
+            : 0) + 2)
+    readonly property bool _barExpandedHintActive:
+        root._detachedHintActive && root._attachedHintEvent.presentation === "bar-expanded"
+    readonly property real layoutMeasurementWidth: Math.max(0, _pillTransitionControl.animatedWidth)
     readonly property real _detachedHintHeight:
         Math.max(
             root._transientExpandedHeight,
             (_detachedHintMeasureLoader.item
                 ? _detachedHintMeasureLoader.item.implicitHeight
+                : root._fullHintExpandedPillHeight) + 2
+        )
+    readonly property real _barExpandedDetachedHintHeight:
+        Math.max(
+            root._transientExpandedHeight,
+            (_detachedHintDetachedMeasureLoader.item
+                ? _detachedHintDetachedMeasureLoader.item.implicitHeight
                 : root._fullHintExpandedPillHeight) + 2
         )
     readonly property real _attachedPanelOpacity:
@@ -263,8 +308,8 @@ Item {
         root._pillH + root._flashGap + root._flashRowH
     readonly property real _collapsedPillHeight: root._pillH
     readonly property bool _pillExpanded:
-        !root._detachedHintActive
-        && (root._phase === "enter" || root._phase === "hold" || root._phase === "hint")
+        (root._phase === "enter" || root._phase === "hold")
+        || root._barExpandedHintActive
 
     readonly property real _overlayExpandedWidth: {
         if (root._fullScreenOverlayMode)
@@ -289,7 +334,10 @@ Item {
         + Theme.barWidget.contentPaddingV * 2
         + root._windowHintStagePadV * 2
 
-    readonly property real _expandedPillHeight: root._transientExpandedHeight
+    readonly property real _expandedPillHeight:
+        root._barExpandedHintActive
+            ? Math.max(root._collapsedPillHeight, (_mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH))
+            : root._transientExpandedHeight
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
@@ -304,10 +352,12 @@ Item {
             ? root._attachedCollapseBaseWidth
             : root._collapsedWidthLive
     readonly property real _expandedWidth:
-        Math.max(
-            root._collapsedWidth,
-            (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
-        )
+        root._barExpandedHintActive
+            ? Math.max(root._collapsedWidth, root._barExpandedMainHintWidth)
+            : Math.max(
+                root._collapsedWidth,
+                (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
+            )
 
     readonly property real _mainTrackEnterY:
         -Math.max(root._pillH, _mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH)
@@ -402,8 +452,8 @@ Item {
         root._detachedHintActive
         && !root._overlaySessionActive
         && root._attachedContentOpacity >= 0.99
-        && root._attachedPanelVisibleWidth >= root._detachedHintWidth - 1
-        && root._attachedPanelVisibleHeight >= root._detachedHintHeight - 1
+        && root._attachedPanelVisibleWidth >= root._attachedPanelWidth - 1
+        && root._attachedPanelVisibleHeight >= root._attachedPanelHeight - 1
     readonly property bool _showOverlayHandoffHint:
         root._overlayHintHandoffActive
         && root._overlaySessionActive
@@ -414,23 +464,42 @@ Item {
         && (root._attachedRevealProgress <= 0.2
             || root._attachedPanelVisibleHeight <= Math.max(8, root._overlayAttachmentOverlap + 6))
 
-    implicitHeight: Theme.barHeight
-    implicitWidth: root._phase === "hint-exit"
-        ? root._collapsedWidth
-        : (root._phase === "exit"
-            ? root._returnWidth
-            : (root._pillExpanded ? root._expandedWidth : root._collapsedWidth))
+implicitHeight: Theme.barHeight
+implicitWidth: root._barExpandedHintActive
+    ? Math.max(0, root.layoutMeasurementWidth)
+    : Math.max(0, _pillTransitionControl.animatedWidth)
+width: implicitWidth
 
     Component.onCompleted: _stateMachine.initialize()
     Component.onDestruction: _stateMachine.teardown()
     onLiveInstanceChanged: _stateMachine.syncOverlayExtensionReservation()
     on_OverlayBodyHeightChanged: _stateMachine.syncOverlayExtensionReservation()
     on_OverlayDetachedOffsetChanged: _stateMachine.syncOverlayExtensionReservation()
+    on_AttachedPanelWidthChanged: root._retargetAttachedPanelWidthIfNeeded()
     on_AttachedPanelHeightChanged: {
         _stateMachine.syncOverlayExtensionReservation()
         root._retargetAttachedPanelHeightIfNeeded()
     }
     on_AttachedPanelVisibleHeightChanged: _stateMachine.syncOverlayExtensionReservation()
+
+    function _retargetAttachedPanelWidthIfNeeded() {
+        if (!root._attachedPanelActive || !root._attachedPanelExpanded || root._overlayClosing)
+            return
+
+        if (Math.abs(root._attachedPanelWidth - root._attachedPanelRevealWidth) <= 0.5)
+            return
+
+        if (root._detachedHintActive && root._attachedPanelWidth > root._attachedPanelRevealWidth) {
+            _attachedWidthRetargetAnim.stop()
+            _viewState._attachedPanelRevealWidth = root._attachedPanelWidth
+            return
+        }
+
+        _attachedWidthRetargetAnim.stop()
+        _attachedWidthRetargetAnim.from = root._attachedPanelRevealWidth
+        _attachedWidthRetargetAnim.to = root._attachedPanelWidth
+        _attachedWidthRetargetAnim.start()
+    }
 
     function _retargetAttachedPanelHeightIfNeeded() {
         if (!root._attachedPanelActive || !root._attachedPanelExpanded || root._overlayClosing)
@@ -458,6 +527,7 @@ Item {
             type: source.type || "idle",
             groupKey: source.groupKey || "idle",
             priority: source.priority || "passive",
+            presentation: source.presentation || "baseline",
             relayReplace: !!source.relayReplace,
             sticky: !!source.sticky,
             title: source.title || "",
@@ -476,6 +546,7 @@ Item {
             type: "idle",
             groupKey: "idle",
             priority: "passive",
+            presentation: "baseline",
             relayReplace: false,
             title: Qt.formatDate(currentTime, "M月d日") + " | " + Qt.formatDateTime(currentTime, "hh:mm"),
             subtitle: "",
@@ -525,8 +596,13 @@ Item {
     function _componentForEvent(event, useStrip) {
         if (!event || event.type === "idle")
             return _idleComponent
-        if (event.type === "window-hint")
+        if (event.type === "window-hint") {
+            if (!useStrip && event.presentation === "bar-expanded")
+                return _windowHintBarExpandedMainCardComponent
+            if (useStrip && event.presentation === "bar-expanded")
+                return _windowHintBarExpandedDetachedCardComponent
             return _windowHintCardComponent
+        }
         if (event.type === "media")
             return useStrip ? _stripMediaCardComponent : _mainMediaCardComponent
         if (event.type === "workspace" || event.type === "window")
@@ -558,6 +634,12 @@ Item {
         return (zoneHeight - itemHeight) / 2 + opticalOffset
     }
 
+    function _cloneEventWithPresentation(event, presentation) {
+        const nextEvent = root._cloneEvent(event)
+        nextEvent.presentation = presentation
+        return nextEvent
+    }
+
     Timer {
         id: timeTimer
         interval: 1000
@@ -570,6 +652,14 @@ Item {
     SystemClock {
         id: systemClock
         precision: SystemClock.Minutes
+    }
+
+    NumberAnimation {
+        id: _attachedWidthRetargetAnim
+        target: _viewState
+        property: "_attachedPanelRevealWidth"
+        duration: Theme.anim.moveDuration
+        easing.type: Theme.anim.moveType
     }
 
     NumberAnimation {
@@ -607,12 +697,13 @@ Item {
         expanded: root._pillExpanded
         animateWidth: true
         animateHeight: true
+        freezeExpandedRetargeting: root._barExpandedHintActive && running
     }
 
     Item {
         id: _pillClip
         anchors.top: parent.top
-        anchors.topMargin: root._padV + root._pillThrowOffsetY
+        anchors.topMargin: (root._barExpandedHintActive ? 0 : root._padV) + root._pillThrowOffsetY
         anchors.horizontalCenter: parent.horizontalCenter
         clip: true
         implicitWidth: _pillTransitionControl.animatedWidth
@@ -622,13 +713,14 @@ Item {
         scale: root._pulseScale
         transformOrigin: Item.Center
 
+        // Main bar host becomes a slimmer rounded rectangle during bar-expanded window hint.
         Rectangle {
             id: _pillBg
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             height: root._verticalRevealSurfaceHeight
-            radius: root._pillH / 2
+            radius: root._barExpandedRectangularMode ? root._barExpandedTopRadius : root._pillH / 2
             color: Colors.surface
             border.color: Colors.border
             border.width: root._attachedPanelActive ? 0 : 1
@@ -736,6 +828,7 @@ Item {
         surfaceScale: root._attachedSurfaceScale
         pillWidth: _pillClip.width
         pillHeight: root._pillH
+        panelWidth: root._attachedPanelBodyWidth
         panelY: _overlayPanelHost.y
         attachmentOverlap: root._overlayAttachmentOverlap
         shellRadius: root._overlayShellRadius
@@ -753,6 +846,7 @@ Item {
         collapseTailHidden: root._attachedCollapseTailHidden
         expanded: root._attachedPanelExpanded
         visibleWidth: root._attachedPanelVisibleWidth
+        panelWidth: root._attachedPanelBodyWidth
         visibleHeight: root._attachedPanelVisibleHeight
         detachedY: root._overlayDetachedY
         attachmentOverlap: root._overlayAttachmentOverlap
@@ -793,6 +887,26 @@ Item {
         visible: false
         enabled: false
         sourceComponent: _windowHintCardComponent
+    }
+
+    Loader {
+        id: _barExpandedMainMeasureLoader
+        property var eventData: root._attachedHintEvent
+
+        active: root._attachedHintVisible && root._barExpandedHintActive
+        visible: false
+        enabled: false
+        sourceComponent: _windowHintBarExpandedMainCardComponent
+    }
+
+    Loader {
+        id: _detachedHintDetachedMeasureLoader
+        property var eventData: root._attachedHintEvent
+
+        active: root._attachedHintVisible && root._barExpandedHintActive
+        visible: false
+        enabled: false
+        sourceComponent: _windowHintBarExpandedDetachedCardComponent
     }
 
     Loader {
@@ -877,6 +991,22 @@ Item {
 
         IslandCards.IslandWindowHintCard {
             event: eventData
+        }
+    }
+
+    Component {
+        id: _windowHintBarExpandedMainCardComponent
+
+        IslandCards.IslandWindowHintCard {
+            event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
+        }
+    }
+
+    Component {
+        id: _windowHintBarExpandedDetachedCardComponent
+
+        IslandCards.IslandWindowHintCard {
+            event: root._cloneEventWithPresentation(eventData, "bar-expanded-detached")
         }
     }
 

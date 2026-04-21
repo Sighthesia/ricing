@@ -204,6 +204,7 @@ Item {
         } else if (wrapper._reportedInstanceKey === wrapper.instanceKey) {
             wrapper._reportedInstanceKey = ""
         }
+
     }
 
     function clearReportedMeasuredWidth() {
@@ -251,9 +252,7 @@ Item {
         wrapper.tryStartEnterAnimation()
     }
 
-    on_NaturalWidthChanged: {
-        wrapper.tryStartEnterAnimation()
-    }
+    on_NaturalWidthChanged: wrapper.tryStartEnterAnimation()
 
     Timer {
         id: delegateAlignmentRetryTimer

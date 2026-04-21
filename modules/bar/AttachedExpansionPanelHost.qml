@@ -11,6 +11,7 @@ Item {
     required property bool expanded
     required property real visibleWidth
     required property real visibleHeight
+    property real panelWidth: root.visibleWidth
     required property real detachedY
     required property real attachmentOverlap
     required property real revealLift
@@ -24,7 +25,7 @@ Item {
 
     visible: root.active && !root.collapseTailHidden
     enabled: root.active && !root.collapseTailHidden
-    width: root.visibleWidth
+    width: root.panelWidth
     height: root.visibleHeight
     y: root.detachedY - root.attachmentOverlap + (root.expanded ? 0 : -root.revealLift) - root.revealYOffset + root.throwOffsetY
     opacity: root.surfaceOpacity

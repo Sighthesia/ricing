@@ -19,6 +19,7 @@ Item {
     property real throwOffsetY: 0
     required property real pillWidth
     required property real pillHeight
+    required property real panelWidth
     required property real panelY
     required property real attachmentOverlap
     required property real shellRadius

@@ -10,10 +10,19 @@ Item {
     id: root
 
     required property var event
+    readonly property string presentationMode: root.event && root.event.presentation ? root.event.presentation : "window-hint"
+    readonly property bool _barExpandedCombinedPresentation: root.presentationMode === "bar-expanded"
+    readonly property bool _barExpandedMainPresentation: root.presentationMode === "bar-expanded-main"
+    readonly property bool _barExpandedDetachedPresentation: root.presentationMode === "bar-expanded-detached"
+    readonly property bool _defaultPresentation:
+        !root._barExpandedCombinedPresentation
+        && !root._barExpandedMainPresentation
+        && !root._barExpandedDetachedPresentation
 
     readonly property bool _hostKeepsHintVisible: !!(root.event && root.event.type === "window-hint")
     readonly property var _liveHint: WindowHintService.activeHint
     property var _renderHint: null
+    property date currentTime: new Date()
     readonly property var _hint: root._renderHint || root._liveHint
     readonly property int _padH: Theme.barWidget.contentPaddingH
     readonly property int _padV: Theme.barWidget.contentPaddingV
@@ -41,7 +50,7 @@ Item {
     readonly property color _secondaryCapsuleBorder: Qt.rgba(1, 1, 1, 0.03)
     readonly property var _slotIndices: [-1, 0, 1]
     readonly property real _overflowSlotPosition: 1.18
-    readonly property int _workspaceStageWidth: root._workspacePrimaryWidth
+    readonly property int _workspaceStageWidth: Math.max(root._workspacePrimaryWidth, root._workspaceSideWidth)
     readonly property int _workspaceStageHeight: root._workspaceSideHeight * 2 + root._workspacePrimaryHeight + root._workspaceColumnGap * 2
     readonly property var _workspaceHintLayout: HintLogic.workspaceStageLayoutForHint(root._hint)
     readonly property real _workspaceSingleSideTrim: root._workspaceSideHeight + root._workspaceColumnGap
@@ -74,6 +83,24 @@ Item {
     readonly property real _workspaceVisibleStageHeight: root._workspaceBaseVisibleStageHeight + root._workspaceBottomInset
     readonly property int _titleStageWidth: root._titleSideWidth * 2 + root._titlePrimaryWidth + root._capsuleGap * 2
     readonly property int _titleStageHeight: root._titleCapsuleHeight
+    readonly property int _barExpandedTitleCapsuleHeight: Theme.barHeight
+    readonly property int _barExpandedDetachedClockHeight: Theme.barWidget.pillHeight
+    readonly property int _barExpandedDetachedContentHeight:
+        root._workspaceVisibleStageHeight + root._rowGap + root._barExpandedDetachedClockHeight
+    readonly property int _barExpandedCombinedHeight:
+        Theme.barHeight + root._barExpandedDetachedContentHeight
+    readonly property real _barExpandedShellRadius:
+        Math.max(Theme.cornerRadius, Theme.screenCornerRadius)
+    readonly property int _barExpandedMainWidth:
+        Math.max(root._minPreviewWidth, root._expandedTitleRowWidth + root._padH * 2 + root._stagePadH * 2)
+    readonly property int _barExpandedDetachedWidth:
+        root._workspaceStageWidth + root._padH * 2 + root._stagePadH * 2
+    readonly property real _expandedTitleRowWidth:
+        Math.max(
+            root._titleSideWidth,
+            _barExpandedCombinedTitleRow ? _barExpandedCombinedTitleRow.implicitWidth : 0,
+            _barExpandedMainTitleRow ? _barExpandedMainTitleRow.implicitWidth : 0
+        )
     readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     readonly property int _workspaceAnchorBaseDuration: Math.max(150, Math.round(Theme.anim.moveDuration * 1.05))
     readonly property int _titleAnchorBaseDuration: Math.max(140, Theme.anim.moveDuration)
@@ -103,14 +130,22 @@ Item {
     property var _workspaceStageSlots: root._emptyStageSlots("workspace-slot")
     property var _titleStageSlots: root._emptyStageSlots("title-slot")
 
-    implicitWidth: Math.min(
-        root._maxPreviewWidth,
-        Math.max(
-            root._minPreviewWidth,
-            Math.max(root._workspaceStageWidth, root._titleStageWidth) + root._padH * 2 + root._stagePadH * 2
-        )
-    )
-    implicitHeight: root._workspaceVisibleStageHeight + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2
+    implicitWidth: root._barExpandedMainPresentation
+        ? root._barExpandedMainWidth
+        : (root._barExpandedDetachedPresentation
+            ? root._barExpandedDetachedWidth
+            : Math.min(
+                root._maxPreviewWidth,
+                Math.max(
+                    root._minPreviewWidth,
+                    Math.max(root._workspaceStageWidth, root._titleStageWidth) + root._padH * 2 + root._stagePadH * 2
+                )
+            ))
+    implicitHeight: root._barExpandedMainPresentation
+        ? Theme.barHeight
+        : (root._barExpandedDetachedPresentation
+            ? (root._barExpandedDetachedContentHeight + root._padV * 2 + root._stagePadV * 2)
+            : (root._workspaceVisibleStageHeight + root._rowGap + root._titleStageHeight + root._padV * 2 + root._stagePadV * 2))
 
     function _lerp(from, to, progress) {
         return HintLogic.lerp(from, to, progress)
@@ -199,6 +234,7 @@ Item {
     function _handleHintChange() {
         const wasVisible = !!(root._hint && root._hint.visible)
         _workspaceStageCleanupTimer.stop()
+
         HintLogic.handleHintChange(root, root._liveHint, _workspaceAnchorSettleTimer, _titleAnchorSettleTimer)
         root._syncWorkspaceStageTrim(!wasVisible || !root._hint || !root._hint.visible)
     }
@@ -214,6 +250,17 @@ Item {
 
         root._workspaceLeadingTrim = root._workspaceLeadingTrimTarget
         root._workspaceTrailingTrim = root._workspaceTrailingTrimTarget
+    }
+
+    Timer {
+        id: _clockTimer
+
+        interval: 1000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+
+        onTriggered: root.currentTime = new Date()
     }
 
     Timer {
@@ -365,61 +412,406 @@ Item {
                 bottom: parent.bottom
             }
 
-            // Main capsule stack.
-            Column {
+            Item {
+                id: _defaultLayout
                 anchors.centerIn: parent
                 width: Math.max(root._workspaceStageWidth, root._titleStageWidth)
-                spacing: root._rowGap
+                height: root._workspaceVisibleStageHeight + root._rowGap + root._titleStageHeight
+                visible: root._defaultPresentation
 
+                // Default stack keeps the original two-row arrangement.
+                Column {
+                    anchors.centerIn: parent
+                    width: parent.width
+                    spacing: root._rowGap
+
+                    // Lower overview lane.
+                    Item {
+                        width: parent.width
+                        height: root._workspaceVisibleStageHeight
+
+                        Item {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: root._workspaceStageWidth
+                            height: root._workspaceStageHeight
+                            y: -root._workspaceLeadingTrim + root._workspaceSingleSideOffset
+                            clip: true
+
+                            Repeater {
+                                model: root._persistentStageSlotIndices
+
+                                delegate: IslandParts.IslandWorkspaceStageCapsule {
+                                    required property int modelData
+
+                                    host: root
+                                    focusIndexPair: _workspaceFocusIndexPair
+                                    capsule: root._workspaceStageCapsuleAt(modelData)
+                                    absoluteIndex: root._workspaceStageAbsoluteIndexAt(modelData)
+                                    slotPosition: root._workspaceStageSlotPositionAt(modelData)
+                                    hiddenForMotion: false
+                                }
+                            }
+                        }
+                    }
+
+                    // Original title lane.
+                    Item {
+                        width: parent.width
+                        height: root._titleStageHeight
+
+                        Item {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: root._titleStageWidth
+                            height: parent.height
+                            clip: true
+
+                            Repeater {
+                                model: root._persistentStageSlotIndices
+
+                                delegate: IslandParts.IslandTitleStageCapsule {
+                                    required property int modelData
+
+                                    host: root
+                                    capsule: root._titleStageCapsuleAt(modelData)
+                                    slotPosition: root._titleStageSlotPositionAt(modelData)
+                                    hiddenForMotion: false
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item {
+                id: _barExpandedLayout
+                anchors.centerIn: parent
+                width: root._barExpandedDetachedWidth
+                height: root._barExpandedCombinedHeight
+                visible: root._barExpandedCombinedPresentation
+
+                // Title lane keeps stage-slot animation alive in the widened body.
                 Item {
                     width: parent.width
-                    height: root._workspaceVisibleStageHeight
+                    height: Theme.barHeight
 
-                    Item {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: root._workspaceStageWidth
-                        height: root._workspaceStageHeight
-                        y: -root._workspaceLeadingTrim + root._workspaceSingleSideOffset
-                        clip: true
+                    Row {
+                        id: _barExpandedCombinedTitleRow
+
+                        anchors.centerIn: parent
+                        spacing: root._capsuleGap
 
                         Repeater {
-                            model: root._persistentStageSlotIndices
+                            model: root._hint.windows || []
 
-                            delegate: IslandParts.IslandWorkspaceStageCapsule {
-                                required property int modelData
+                            delegate: Item {
+                                required property int index
+                                required property var modelData
 
-                                host: root
-                                focusIndexPair: _workspaceFocusIndexPair
-                                capsule: root._workspaceStageCapsuleAt(modelData)
-                                absoluteIndex: root._workspaceStageAbsoluteIndexAt(modelData)
-                                slotPosition: root._workspaceStageSlotPositionAt(modelData)
-                                hiddenForMotion: false
+                                readonly property bool _focused: index === root._hint.currentIndex
+                                readonly property string _titleText: modelData ? (modelData.title || "") : ""
+                                readonly property string _iconSource: modelData ? (modelData.icon || "") : ""
+                                readonly property real _titleMeasuredWidth: _titleMeasurer.paintedWidth
+                                readonly property real _iconContentWidth:
+                                    _iconSource !== "" ? root._compactIcon + Theme.barWidget.badgePaddingH : 0
+                                readonly property real _minimumCapsuleWidth:
+                                    root._padH * 2 + Math.max(root._compactIcon, Math.round(Theme.fontSizeSmall * 2.6))
+                                readonly property real _maximumCapsuleWidth:
+                                    _focused ? root._titlePrimaryWidth : root._titleSideWidth
+
+                                implicitWidth: Math.max(
+                                    _minimumCapsuleWidth,
+                                    Math.min(
+                                        _maximumCapsuleWidth,
+                                        root._padH * 2 + _iconContentWidth + _titleMeasuredWidth
+                                    )
+                                )
+                                implicitHeight: root._barExpandedTitleCapsuleHeight
+                                width: implicitWidth
+                                height: implicitHeight
+
+                                // Hidden measurer keeps capsule background width aligned with rendered title content.
+                                Text {
+                                    id: _titleMeasurer
+
+                                    text: _titleText !== "" ? _titleText : " "
+                                    wrapMode: Text.NoWrap
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.bold: _focused
+                                    opacity: 0
+                                    anchors.left: parent.left
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: height / 2
+                                    color: root._mixColor(root._secondaryCapsuleFill, root._primaryCapsuleFill, _focused ? 1 : 0.25)
+                                    border.width: 1
+                                    border.color: root._mixColor(root._secondaryCapsuleBorder, root._primaryCapsuleBorder, _focused ? 1 : 0.25)
+                                }
+
+                                Item {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: root._padH
+                                    anchors.rightMargin: root._padH
+                                    clip: true
+
+                                    Row {
+                                        anchors.fill: parent
+                                        spacing: Theme.barWidget.badgePaddingH
+
+                                        Image {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: root._compactIcon
+                                            height: width
+                                            source: _iconSource
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            visible: source !== ""
+                                        }
+
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: Math.max(0, parent.width - (_iconSource !== "" ? root._compactIcon + Theme.barWidget.badgePaddingH : 0))
+                                            text: _titleText
+                                            color: Colors.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.bold: _focused
+                                            elide: Text.ElideRight
+                                            maximumLineCount: 1
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
+                // Lower lane reuses the animated workspace coverflow and relocated clock.
                 Item {
                     width: parent.width
-                    height: root._titleStageHeight
+                    height: root._barExpandedDetachedContentHeight
+                    y: Theme.barHeight
+
+                    Column {
+                        anchors.centerIn: parent
+                        width: parent.width
+                        spacing: root._rowGap
+
+                        // Workspace overview stays in the lower wide rectangle.
+                        Item {
+                            width: parent.width
+                            height: root._workspaceVisibleStageHeight
+
+                            Item {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: root._workspaceStageWidth
+                                height: root._workspaceStageHeight
+                                y: -root._workspaceLeadingTrim + root._workspaceSingleSideOffset
+                                clip: true
+
+                                Repeater {
+                                    model: root._persistentStageSlotIndices
+
+                                    delegate: IslandParts.IslandWorkspaceStageCapsule {
+                                        required property int modelData
+
+                                        host: root
+                                        focusIndexPair: _workspaceFocusIndexPair
+                                        capsule: root._workspaceStageCapsuleAt(modelData)
+                                        absoluteIndex: root._workspaceStageAbsoluteIndexAt(modelData)
+                                        slotPosition: root._workspaceStageSlotPositionAt(modelData)
+                                        hiddenForMotion: false
+                                    }
+                                }
+                            }
+                        }
+
+                        // Clock row remains centered below the workspace strip.
+                        Item {
+                            width: parent.width
+                            height: root._barExpandedDetachedClockHeight
+
+                            IslandParts.IslandIdleClockCard {
+                                anchors.centerIn: parent
+
+                                currentTime: root.currentTime
+                                hasPendingEvents: SuperIslandService.hasPendingEvents
+                                cardHeight: root._barExpandedDetachedClockHeight
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Inline title-only layout lets the bar host own the expansion width.
+            Item {
+                id: _barExpandedMainLayout
+                anchors.centerIn: parent
+                width: root._barExpandedMainWidth
+                height: Theme.barHeight
+                visible: root._barExpandedMainPresentation
+
+                // Title capsules are tiled in one row in bar-expanded main presentation.
+                    Row {
+                        id: _barExpandedMainTitleRow
+
+                        anchors.centerIn: parent
+                        spacing: root._capsuleGap
+
+                    Repeater {
+                        model: root._hint.windows || []
+
+                        delegate: Item {
+                            required property int index
+                            required property var modelData
+
+                            readonly property bool _focused: index === root._hint.currentIndex
+                            readonly property string _titleText: modelData ? (modelData.title || "") : ""
+                            readonly property string _iconSource: modelData ? (modelData.icon || "") : ""
+                            readonly property real _titleMeasuredWidth: _titleMeasurer.paintedWidth
+                            readonly property real _iconContentWidth:
+                                _iconSource !== "" ? root._compactIcon + Theme.barWidget.badgePaddingH : 0
+                            readonly property real _minimumCapsuleWidth:
+                                root._padH * 2 + Math.max(root._compactIcon, Math.round(Theme.fontSizeSmall * 2.6))
+                            readonly property real _maximumCapsuleWidth:
+                                _focused ? root._titlePrimaryWidth : root._titleSideWidth
+
+                            implicitWidth: Math.max(
+                                _minimumCapsuleWidth,
+                                Math.min(
+                                    _maximumCapsuleWidth,
+                                    root._padH * 2 + _iconContentWidth + _titleMeasuredWidth
+                                )
+                            )
+                            implicitHeight: root._barExpandedTitleCapsuleHeight
+                            width: implicitWidth
+                            height: implicitHeight
+
+                            // Hidden measurer keeps capsule background width aligned with rendered title content.
+                            Text {
+                                id: _titleMeasurer
+
+                                text: _titleText !== "" ? _titleText : " "
+                                wrapMode: Text.NoWrap
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.bold: _focused
+                                opacity: 0
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: height / 2
+                                color: root._mixColor(root._secondaryCapsuleFill, root._primaryCapsuleFill, _focused ? 1 : 0.25)
+                                border.width: 1
+                                border.color: root._mixColor(root._secondaryCapsuleBorder, root._primaryCapsuleBorder, _focused ? 1 : 0.25)
+                            }
+
+                            Item {
+                                anchors.fill: parent
+                                anchors.leftMargin: root._padH
+                                anchors.rightMargin: root._padH
+                                clip: true
+
+                                Row {
+                                    anchors.fill: parent
+                                    spacing: Theme.barWidget.badgePaddingH
+
+                                    Image {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: root._compactIcon
+                                        height: width
+                                        source: _iconSource
+                                        fillMode: Image.PreserveAspectFit
+                                        smooth: true
+                                        visible: source !== ""
+                                    }
+
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: Math.max(0, parent.width - (_iconSource !== "" ? root._compactIcon + Theme.barWidget.badgePaddingH : 0))
+                                        text: _titleText
+                                        color: Colors.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.bold: _focused
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item {
+                id: _barExpandedDetachedLayout
+                anchors.centerIn: parent
+                width: root._barExpandedDetachedWidth
+                height: root._barExpandedDetachedContentHeight
+                visible: root._barExpandedDetachedPresentation
+
+                // Lower shell keeps the workspace and clock as one attached rectangle.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: root._barExpandedShellRadius
+                    color: root._stageFill
+                    border.width: 1
+                    border.color: root._stageBorder
+                }
+
+                // Inner column keeps the workspace stage and relocated clock centered.
+                Column {
+                    anchors.centerIn: parent
+                    width: parent.width
+                    spacing: root._rowGap
 
                     Item {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: root._titleStageWidth
-                        height: parent.height
-                        clip: true
+                        width: parent.width
+                        height: root._workspaceVisibleStageHeight
 
-                        Repeater {
-                            model: root._persistentStageSlotIndices
+                        Item {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: root._workspaceStageWidth
+                            height: root._workspaceStageHeight
+                            y: -root._workspaceLeadingTrim + root._workspaceSingleSideOffset
+                            clip: true
 
-                            delegate: IslandParts.IslandTitleStageCapsule {
-                                required property int modelData
+                            Repeater {
+                                model: root._persistentStageSlotIndices
 
-                                host: root
-                                capsule: root._titleStageCapsuleAt(modelData)
-                                slotPosition: root._titleStageSlotPositionAt(modelData)
-                                hiddenForMotion: false
+                                delegate: IslandParts.IslandWorkspaceStageCapsule {
+                                    required property int modelData
+
+                                    host: root
+                                    focusIndexPair: _workspaceFocusIndexPair
+                                    capsule: root._workspaceStageCapsuleAt(modelData)
+                                    absoluteIndex: root._workspaceStageAbsoluteIndexAt(modelData)
+                                    slotPosition: root._workspaceStageSlotPositionAt(modelData)
+                                    hiddenForMotion: false
+                                }
                             }
+                        }
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: root._barExpandedDetachedClockHeight
+
+                        IslandParts.IslandIdleClockCard {
+                            anchors.centerIn: parent
+
+                            currentTime: root.currentTime
+                            hasPendingEvents: SuperIslandService.hasPendingEvents
+                            cardHeight: root._barExpandedDetachedClockHeight
                         }
                     }
                 }
