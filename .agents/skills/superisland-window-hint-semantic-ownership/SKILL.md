@@ -27,6 +27,13 @@ Trace the real root element, width owner, and content owner before changing wind
 - Separate "host root", "presentation root", "shell root", and "content root" in your mental model before changing geometry.
 - If width ownership and visual ownership differ, debug the exported width first and the inner layout second.
 - Do not assume a visually lower rectangle means the entire SuperIsland root moved there.
+- If a layout starts to feel "mixed", stop and name the owner of each rectangle before moving any margins or radii.
+- If two regions appear to touch, verify whether that touch should be owned by shared shell geometry or by one presentation branch.
+
+## Confusion Traps
+- Do not let a visually correct title row make you assume the detached lower panel is the same content root.
+- Do not tune spacing in a child rectangle when the real bug is that the parent still owns the wrong width or height.
+- Do not solve a bridge/corner problem by inventing a second local corner; use the shared shell or shared surface for continuity.
 
 ## Correct Pattern
 - Treat `_pillClip` / `_pillBg` in `SuperIslandWidget.qml` as the visible bar host body.

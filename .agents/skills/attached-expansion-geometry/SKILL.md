@@ -27,6 +27,13 @@ In DymicShell attached panel shells, `bridgeOutset` controls shoulder width firs
 - When a rounded handoff still looks wrong, check the contour anchor before changing the radius.
 - In attached-panel geometry, width-like parameters often dominate silhouette more than radius-like parameters.
 - If one parameter controls where a curve starts, and another controls how curved it is, fix the start position first.
+- Mixed layouts usually fail because a shell, not a child rectangle, owns the shoulder or corner continuity.
+- If the boundary between two regions feels "confusing", decide whether the fix belongs in shell geometry, content geometry, or width ownership before editing.
+
+## Confusion Traps
+- Do not keep shrinking radii when the real issue is a shoulder that begins too far out.
+- Do not split one bridge into multiple local bumps just to satisfy two neighboring rectangles.
+- Do not treat the panel top edge as a content spacing problem if the attached shell is still exporting the wrong contour.
 
 ## Correct Pattern
 - Treat `bridgeOutset` as shoulder-width control, not as a general smoothness control.
