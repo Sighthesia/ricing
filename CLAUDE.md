@@ -20,6 +20,7 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | [qml-context-menu](.agents/skills/qml-context-menu/SKILL.md) | Use when creating, refactoring, or visually aligning bar-style context menus, tray menus, and submenus. |
 | [qml-token-cleanup](.agents/skills/qml-token-cleanup/SKILL.md) | Use when consolidating visual tokens, extracting repeated QML geometry into `Theme*` singletons, or cleaning hardcoded spacing, radius, widths, and panel dimensions across related UI families. |
 | [qml-visual-language](.agents/skills/qml-visual-language/SKILL.md) | Use when defining or enforcing visual identity, motion language, and cross-component consistency. |
+| [superisland-window-hint-semantic-ownership](.agents/skills/superisland-window-hint-semantic-ownership/SKILL.md) | Use when changing SuperIsland window-hint geometry or layout and you need to separate the bar host, hint presentation root, attached shell, and detached lower content ownership. |
 
 ### Motion
 
