@@ -84,11 +84,9 @@ Item {
         _pulseScaleAnim.start()
     }
     readonly property string _contentSignature:
-        [
-            root._useLyricsAsPrimaryText ? "lyrics" : "media",
-            root._mediaIdentitySignature,
-            root._useLyricsAsPrimaryText ? root._lyricDisplaySignature : root._displayTextSignature
-        ].join("|")
+        root._useLyricsAsPrimaryText
+            ? ["lyrics", root._lyricDisplaySignature].join("|")
+            : ["media", root._mediaIdentitySignature, root._displayTextSignature].join("|")
     readonly property int _contentSwapOffset:
         Math.max(2, Theme.barWidget.contentPaddingV * 2)
     readonly property real _flashStageVisibleOffset: Math.max(1, Math.round(Theme.uiScale))
@@ -1023,6 +1021,7 @@ Item {
         throwOffsetY: root._panelThrowOffsetY
         pillWidth: root._panelPillWidth
         pillHeight: root._panelPillHeight
+        panelWidth: root._panelWidth
         panelY: _panelHost.y
         attachmentOverlap: root._panelAttachmentOverlap
         shellRadius: root._panelShellRadius

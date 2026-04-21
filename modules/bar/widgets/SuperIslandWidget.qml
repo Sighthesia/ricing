@@ -185,7 +185,9 @@ Item {
     readonly property real _overlayDetachedOffset:
         root._fullScreenSessionOverlayMode
             ? Theme.barHeight
-            : Math.max(Theme.barHeight, root._pillH + root._overlayInwardCornerDepth)
+            : (root._barExpandedHintActive
+                ? Theme.barHeight + root._overlayAttachmentOverlap
+                : Math.max(Theme.barHeight, root._pillH + root._overlayInwardCornerDepth))
     readonly property real _overlayDetachedY: root._overlayDetachedOffset
     readonly property real _overlayRevealLift:
         Math.max(8, Theme.barWidget.contentPaddingV * 4)
@@ -302,7 +304,15 @@ Item {
     readonly property real _attachedSurfaceScale:
         root._pulseScale * root._attachedContentScale
     readonly property real _attachedPulseOpacity:
-        root._attachedPanelActive ? root._sharedBackgroundPulseOpacity : 0
+        root._attachedPanelActive && !root._barExpandedHintActive
+            ? root._sharedBackgroundPulseOpacity
+            : 0
+    readonly property color _barExpandedPanelSurfaceColor: Qt.rgba(
+        Colors.surface.r * (1 - root._sharedBackgroundPulseOpacity) + Colors.highlight.r * root._sharedBackgroundPulseOpacity,
+        Colors.surface.g * (1 - root._sharedBackgroundPulseOpacity) + Colors.highlight.g * root._sharedBackgroundPulseOpacity,
+        Colors.surface.b * (1 - root._sharedBackgroundPulseOpacity) + Colors.highlight.b * root._sharedBackgroundPulseOpacity,
+        root._attachedShellFillOpacity
+    )
 
     readonly property real _transientExpandedHeight:
         root._pillH + root._flashGap + root._flashRowH
@@ -336,7 +346,7 @@ Item {
 
     readonly property real _expandedPillHeight:
         root._barExpandedHintActive
-            ? Math.max(root._collapsedPillHeight, (_mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH))
+            ? Theme.barHeight
             : root._transientExpandedHeight
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
@@ -385,6 +395,10 @@ Item {
     readonly property real _overlayShellY: _pillClip.y
     readonly property real _overlayShellHeight:
         Math.max(0, (_overlayPanelHost.y + root._attachedPanelVisibleHeight) - root._overlayShellY)
+    readonly property real _attachedShellPillHeight:
+        root._barExpandedHintActive ? Theme.barHeight : root._pillH
+    readonly property bool _attachedShellVisible:
+        root._attachedPanelActive && !root._barExpandedHintActive
 
     property alias _replaceOutgoingY: _viewState._replaceOutgoingY
     property alias _replaceOutgoingOpacity: _viewState._replaceOutgoingOpacity
@@ -696,7 +710,7 @@ width: implicitWidth
         expandedHeight: root._expandedPillHeight
         expanded: root._pillExpanded
         animateWidth: true
-        animateHeight: true
+        animateHeight: !root._barExpandedHintActive
         freezeExpandedRetargeting: root._barExpandedHintActive && running
     }
 
@@ -819,7 +833,7 @@ width: implicitWidth
         id: _overlayShellHost
 
         anchorItem: _pillClip
-        active: root._attachedPanelActive
+        active: root._attachedShellVisible
         collapseTailHidden: root._attachedCollapseTailHidden
         visibleWidth: root._attachedPanelVisibleWidth
         shellHeight: root._overlayShellHeight
@@ -827,7 +841,7 @@ width: implicitWidth
         surfaceOpacity: root._attachedPanelOpacity
         surfaceScale: root._attachedSurfaceScale
         pillWidth: _pillClip.width
-        pillHeight: root._pillH
+        pillHeight: root._attachedShellPillHeight
         panelWidth: root._attachedPanelBodyWidth
         panelY: _overlayPanelHost.y
         attachmentOverlap: root._overlayAttachmentOverlap
@@ -855,6 +869,16 @@ width: implicitWidth
         surfaceOpacity: root._attachedPanelOpacity
         surfaceScale: root._attachedSurfaceScale
         contentOpacity: root._attachedContentOpacity
+
+        // Bar-expanded mode owns the lower workspace surface locally so the shared shell stops affecting title background height.
+        Rectangle {
+            anchors.fill: parent
+            radius: root._overlayShellRadius
+            color: root._barExpandedPanelSurfaceColor
+            border.width: root._barExpandedHintActive ? 1 : 0
+            border.color: Colors.border
+            visible: root._barExpandedHintActive
+        }
 
         IslandCards.SuperIslandAttachedContentDeck {
             anchors.fill: parent
