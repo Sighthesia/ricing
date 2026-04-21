@@ -1,5 +1,6 @@
 import Quickshell
 import QtQuick
+import QtQuick.Shapes
 import qs.config
 import qs.services
 import ".." as BarComponents
@@ -197,6 +198,7 @@ Item {
         Math.max(Theme.cornerRadius * 0.55, Math.round(Theme.barWidget.pillHeight * 0.28))
     readonly property real _barExpandedDetachedRadius:
         Math.max(Theme.cornerRadius, Math.round(Theme.barWidget.pillHeight * 0.42))
+    readonly property real _barExpandedSeamArcRadius: root._barExpandedDetachedRadius
     readonly property real _overlayShellRadius:
         root._barExpandedRectangularMode
             ? root._barExpandedDetachedRadius
@@ -237,7 +239,7 @@ Item {
     readonly property bool _attachedPanelExpanded:
         root._overlaySessionActive
             ? (root._overlayExpandedActive || root._overlayClosing)
-            : root._hintPhase
+            : (root._hintPhase || root._attachedCollapseAnimating)
     readonly property real _attachedPanelWidth:
         root._overlaySessionActive
             ? root._overlayExpandedWidth
@@ -356,7 +358,10 @@ Item {
     readonly property real _idleCollapsedWidthLive:
         (_idleMeasureLoader.item ? _idleMeasureLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property bool _useAttachedCollapseBaseWidth:
-        root._attachedCollapseAnimating || root._phase === "hint-exit" || root._overlayClosing
+        root._attachedCollapseAnimating
+        || root._phase === "hint-exit"
+        || root._overlayClosing
+        || (root._barExpandedHintActive && root._attachedRevealProgress < 0.999)
     readonly property real _collapsedWidth:
         root._useAttachedCollapseBaseWidth && root._attachedCollapseBaseWidth > 0
             ? root._attachedCollapseBaseWidth
@@ -475,8 +480,8 @@ Item {
     readonly property bool _attachedCollapseTailHidden:
         root._attachedPanelActive
         && (root._phase === "hint-exit" || root._overlayClosing)
-        && (root._attachedRevealProgress <= 0.2
-            || root._attachedPanelVisibleHeight <= Math.max(8, root._overlayAttachmentOverlap + 6))
+        && (root._attachedRevealProgress <= 0.08
+            || root._attachedPanelVisibleHeight <= Math.max(4, root._overlayAttachmentOverlap + 2))
 
 implicitHeight: Theme.barHeight
 implicitWidth: root._barExpandedHintActive
@@ -503,7 +508,7 @@ width: implicitWidth
         if (Math.abs(root._attachedPanelWidth - root._attachedPanelRevealWidth) <= 0.5)
             return
 
-        if (root._detachedHintActive && root._attachedPanelWidth > root._attachedPanelRevealWidth) {
+        if (root._detachedHintActive && !root._barExpandedHintActive && root._attachedPanelWidth > root._attachedPanelRevealWidth) {
             _attachedWidthRetargetAnim.stop()
             _viewState._attachedPanelRevealWidth = root._attachedPanelWidth
             return
@@ -870,14 +875,58 @@ width: implicitWidth
         surfaceScale: root._attachedSurfaceScale
         contentOpacity: root._attachedContentOpacity
 
-        // Bar-expanded mode owns the lower workspace surface locally so the shared shell stops affecting title background height.
-        Rectangle {
+        // Bar-expanded lower host keeps the title seam square and the lower corners rounded.
+        Shape {
+            id: _barExpandedPanelSurface
             anchors.fill: parent
-            radius: root._overlayShellRadius
-            color: root._barExpandedPanelSurfaceColor
-            border.width: root._barExpandedHintActive ? 1 : 0
-            border.color: Colors.border
+            antialiasing: true
+            preferredRendererType: Shape.CurveRenderer
             visible: root._barExpandedHintActive
+
+            // Detached panel path owns the visible lower workspace body.
+            ShapePath {
+                fillColor: root._barExpandedPanelSurfaceColor
+                strokeColor: Colors.border
+                strokeWidth: root._barExpandedHintActive ? 1 : 0
+                startX: 0
+                startY: 0
+
+                PathLine {
+                    x: _barExpandedPanelSurface.width
+                    y: 0
+                }
+
+                PathLine {
+                    x: _barExpandedPanelSurface.width
+                    y: _barExpandedPanelSurface.height - root._barExpandedDetachedRadius
+                }
+
+                PathArc {
+                    x: _barExpandedPanelSurface.width - root._barExpandedDetachedRadius
+                    y: _barExpandedPanelSurface.height
+                    radiusX: root._barExpandedDetachedRadius
+                    radiusY: root._barExpandedDetachedRadius
+                    direction: PathArc.Clockwise
+                }
+
+                PathLine {
+                    x: root._barExpandedDetachedRadius
+                    y: _barExpandedPanelSurface.height
+                }
+
+                PathArc {
+                    x: 0
+                    y: _barExpandedPanelSurface.height - root._barExpandedDetachedRadius
+                    radiusX: root._barExpandedDetachedRadius
+                    radiusY: root._barExpandedDetachedRadius
+                    direction: PathArc.Clockwise
+                }
+
+                PathLine {
+                    x: 0
+                    y: 0
+                }
+            }
         }
 
         IslandCards.SuperIslandAttachedContentDeck {
@@ -889,6 +938,56 @@ width: implicitWidth
             showOverlayHandoffHint: root._showOverlayHandoffHint
             hintEvent: root._attachedHintEvent
             handoffHintEvent: root._overlayHandoffHintEvent
+        }
+    }
+
+    // Non-clipped seam arc layer keeps the decorative outer corners visible.
+    Item {
+        x: _overlayPanelHost.x
+        y: _overlayPanelHost.y
+        width: _overlayPanelHost.width
+        height: root._barExpandedSeamArcRadius
+        visible: root._barExpandedHintActive && _overlayPanelHost.visible
+        z: _overlayPanelHost.z + 1
+
+        // Left seam arc restores the outer silhouette without rounding the seam itself.
+        Canvas {
+            x: -root._barExpandedSeamArcRadius
+            y: 0
+            width: root._barExpandedSeamArcRadius
+            height: root._barExpandedSeamArcRadius
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.fillStyle = root._barExpandedPanelSurfaceColor
+                ctx.beginPath()
+                ctx.moveTo(0, 0)
+                ctx.lineTo(width, 0)
+                ctx.lineTo(width, height)
+                ctx.arc(0, height, width, 0, -Math.PI / 2, true)
+                ctx.fill()
+            }
+        }
+
+        // Right seam arc mirrors the same outer contour on the opposite side.
+        Canvas {
+            x: parent.width
+            y: 0
+            width: root._barExpandedSeamArcRadius
+            height: root._barExpandedSeamArcRadius
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.fillStyle = root._barExpandedPanelSurfaceColor
+                ctx.beginPath()
+                ctx.moveTo(width, 0)
+                ctx.lineTo(0, 0)
+                ctx.lineTo(0, height)
+                ctx.arc(width, height, width, Math.PI, Math.PI * 1.5, false)
+                ctx.fill()
+            }
         }
     }
 
@@ -1023,6 +1122,9 @@ width: implicitWidth
 
         IslandCards.IslandWindowHintCard {
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
+            titleCapsuleRevealProgress: root._attachedRevealProgress
+            outgoingClockOpacity: 1 - root._attachedRevealProgress
+            outgoingClockOffsetY: (1 - root._attachedRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
         }
     }
 
@@ -1031,6 +1133,8 @@ width: implicitWidth
 
         IslandCards.IslandWindowHintCard {
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-detached")
+            relocatedClockOpacity: root._attachedRevealProgress
+            relocatedClockOffsetY: (1 - root._attachedRevealProgress) * -Math.max(8, Theme.barWidget.contentPaddingV * 2)
         }
     }
 

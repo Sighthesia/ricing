@@ -129,7 +129,21 @@ Item {
     }
 
     function updateWindowHint(event) {
-        root.state._attachedHintEvent = root.host._displayEvent(event)
+        const nextEvent = root.host._displayEvent(event)
+        const isBarExpandedHint = nextEvent.presentation === "bar-expanded"
+        root.state._attachedHintEvent = nextEvent
+        if (isBarExpandedHint) {
+            root.state._mainDisplayEvent = nextEvent
+            root.state._phase = "hint"
+            root.state._mainTrackY = root.host._mainTrackCenterY
+            root.state._mainTrackScale = 1
+            root.state._mainTrackOpacity = 1
+            root.state._flashTrackY = root.host._flashStripY
+            root.state._flashTrackScale = root.host._flashScale
+            root.state._flashTrackOpacity = 1
+            root.timeline.hintEnterAnim.stop()
+            root.timeline.hintExitAnim.stop()
+        }
         root.machine.syncOverlayExtensionReservation()
 
         if (root.host._detachedHintActive && root.host._detachedHintHeight > root.state._attachedPanelRevealHeight) {
@@ -139,7 +153,7 @@ Item {
         if (root.state._overlaySessionActive || IslandOverlayService.mode !== "none")
             return
 
-        root.machine.triggerSharedBackgroundPulse("replace")
+        // Live window switches should retarget content without replaying entry motion.
     }
 
     function resetReplaceLayers() {
@@ -307,6 +321,23 @@ Item {
                 && pendingEvent.type !== "idle"
                 && !root.host._isHintEventType(pendingEvent.type))
             root.machine.resumeTransient(pendingEvent)
+    }
+
+    function startBarExpandedWindowHint(event) {
+        const nextEvent = root.host._displayEvent(event)
+        root.machine.log("startBarExpandedWindowHint", nextEvent)
+        root.state._mainDisplayEvent = nextEvent
+        root.state._attachedHintEvent = nextEvent
+        root.state._phase = "hint"
+        root.machine.syncOverlayExtensionReservation()
+        root.state._mainTrackY = root.host._mainTrackCenterY
+        root.state._mainTrackScale = 1
+        root.state._mainTrackOpacity = 1
+        root.state._flashSourceEvent = root.host._idleSnapshot()
+        root.state._flashTrackY = root.host._flashStripY
+        root.state._flashTrackScale = root.host._flashScale
+        root.state._flashTrackOpacity = 1
+        root.machine.startAttachedReveal(undefined, undefined, false)
     }
 
     function startExitTransition() {

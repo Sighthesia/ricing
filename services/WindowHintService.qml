@@ -96,6 +96,7 @@ Singleton {
             return ""
 
         return JSON.stringify({
+            presentation: hint.presentation || "",
             visible: hint.visible === true,
             workspaceId: hint.workspaceId || "",
             workspaceIndex: hint.workspaceIndex !== undefined ? hint.workspaceIndex : -1,
@@ -212,6 +213,7 @@ Singleton {
     function _emptyHint() {
         return {
             visible: false,
+            presentation: "bar-expanded",
             revision: root._revision,
             workspaceId: "",
             workspaceIndex: -1,
@@ -365,6 +367,7 @@ Singleton {
 
         return {
             visible: !!visible,
+            presentation: "bar-expanded",
             revision: nextRevision,
             workspaceId: workspace.wsId,
             workspaceIndex: workspace.idx,

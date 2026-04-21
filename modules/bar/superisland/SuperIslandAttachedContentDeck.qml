@@ -14,12 +14,22 @@ Item {
     required property var hintEvent
     required property var handoffHintEvent
 
+    function _resolvedHintEvent() {
+        const source = root.overlaySessionActive && root.overlayHintHandoffActive
+            ? root.handoffHintEvent
+            : root.hintEvent
+        const nextEvent = source || {}
+
+        if (!root.overlaySessionActive && nextEvent.presentation === "bar-expanded")
+            return Object.assign({}, nextEvent, { presentation: "bar-expanded-detached" })
+
+        return nextEvent
+    }
+
     Loader {
         id: hintCardLoader
 
-        property var eventData: root.overlaySessionActive && root.overlayHintHandoffActive
-            ? root.handoffHintEvent
-            : root.hintEvent
+        property var eventData: root._resolvedHintEvent()
 
         active: root.active && (root.detachedHintActive || root.overlayHintHandoffActive)
         anchors.fill: parent

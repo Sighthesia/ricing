@@ -21,14 +21,24 @@ Singleton {
     property string mode: "idle"
     property var activeEvent: _idleEvent()
     property var _suspendedEvent: _idleEvent()
+    function _isHintSuppressedPreviewType(type) {
+        return type === "window" || type === "workspace"
+    }
+
     readonly property var hiddenPreviewEvent: {
         const active = root.activeEvent || root._idleEvent()
 
         if (active.type === "window-hint") {
-            if (root._queue.length > 0)
-                return root._queue[0]
+            for (let index = 0; index < root._queue.length; index++) {
+                const queuedEvent = root._queue[index]
+                if (queuedEvent && !root._isHintSuppressedPreviewType(queuedEvent.type))
+                    return queuedEvent
+            }
 
-            if (root._suspendedEvent && root._suspendedEvent.type && root._suspendedEvent.type !== "idle")
+            if (root._suspendedEvent
+                    && root._suspendedEvent.type
+                    && root._suspendedEvent.type !== "idle"
+                    && !root._isHintSuppressedPreviewType(root._suspendedEvent.type))
                 return root._suspendedEvent
 
             return root._idleEvent()
@@ -298,6 +308,7 @@ Singleton {
             type: "window-hint",
             groupKey: "window-hint",
             priority: "important",
+            presentation: hint.presentation || "window-hint",
             title: hint.currentWindowTitle || "Window hint",
             subtitle: "",
             icon: hint.currentWindowIcon || "",

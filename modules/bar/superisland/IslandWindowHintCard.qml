@@ -1,5 +1,6 @@
 import Quickshell
 import QtQuick
+import QtQuick.Shapes
 import qs.config
 import qs.services
 import "." as IslandParts
@@ -10,6 +11,11 @@ Item {
     id: root
 
     required property var event
+    property real titleCapsuleRevealProgress: 1
+    property real outgoingClockOpacity: 0
+    property real outgoingClockOffsetY: 0
+    property real relocatedClockOpacity: 1
+    property real relocatedClockOffsetY: 0
     readonly property string presentationMode: root.event && root.event.presentation ? root.event.presentation : "window-hint"
     readonly property bool _barExpandedCombinedPresentation: root.presentationMode === "bar-expanded"
     readonly property bool _barExpandedMainPresentation: root.presentationMode === "bar-expanded-main"
@@ -91,6 +97,8 @@ Item {
         Theme.barHeight + root._barExpandedDetachedContentHeight
     readonly property real _barExpandedShellRadius:
         Math.max(Theme.cornerRadius, Theme.screenCornerRadius)
+    readonly property int _barExpandedNotchRadius: Math.max(10, Math.round(16 * Theme.uiScale))
+    readonly property int _barExpandedNotchHeight: root._barExpandedNotchRadius
     readonly property int _barExpandedMainWidth:
         Math.max(root._minPreviewWidth, root._expandedTitleRowWidth + root._padH * 2 + root._stagePadH * 2)
     readonly property int _barExpandedDetachedWidth:
@@ -110,6 +118,10 @@ Item {
     readonly property int _workspaceCapsuleOpacityDuration: Math.max(90, Math.round(Theme.anim.moveDuration * 0.72))
     readonly property int _workspaceFocusLeadDuration: Math.max(70, Math.round(Theme.anim.moveDuration * 0.42))
     readonly property int _workspaceFocusTrailDuration: Math.max(240, Math.round(Theme.anim.moveDuration * 1.45))
+    readonly property real _combinedBackdropOffsetY:
+        root._barExpandedCombinedPresentation
+            ? (1 - root.titleCapsuleRevealProgress) * Math.max(6, Theme.barWidget.contentPaddingV * 1.5)
+            : 0
 
     property real _animatedWorkspaceAnchor: -1
     property real _animatedTitleAnchor: -1
@@ -489,6 +501,83 @@ Item {
                 height: root._barExpandedCombinedHeight
                 visible: root._barExpandedCombinedPresentation
 
+                // Shared backdrop keeps the title and workspace lanes readable as one surface.
+                // Shared backdrop keeps the title and workspace lanes moving as one host.
+                Item {
+                    x: 0
+                    y: root._combinedBackdropOffsetY
+                    width: parent.width
+                    height: parent.height
+                    z: -1
+
+                    // Vertical drift keeps the shared backdrop aligned during the title reveal.
+                    Behavior on y {
+                        NumberAnimation {
+                            duration: Theme.anim.moveDuration
+                            easing.type: Theme.anim.moveType
+                        }
+                    }
+
+                    // Title lane keeps the seam square.
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: Theme.barHeight
+                        radius: 0
+                        color: root._stageFill
+                    }
+
+                    // Workspace lane keeps the seam square.
+                    Rectangle {
+                        x: 0
+                        y: Theme.barHeight
+                        width: parent.width
+                        height: root._barExpandedDetachedContentHeight
+                        radius: 0
+                        color: root._stageFill
+                    }
+
+                    // Outer corner caps sit outside the square seam.
+                    Canvas {
+                        x: -root._barExpandedNotchRadius
+                        y: -root._barExpandedNotchRadius
+                        width: root._barExpandedNotchRadius
+                        height: root._barExpandedNotchRadius
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.reset()
+                            ctx.fillStyle = root._stageFill
+                            ctx.beginPath()
+                            ctx.moveTo(0, 0)
+                            ctx.lineTo(width, 0)
+                            ctx.lineTo(width, height)
+                            ctx.arc(0, height, width, 0, -Math.PI / 2, true)
+                            ctx.fill()
+                        }
+                    }
+
+                    // Right corner cap mirrors the same outer arc.
+                    Canvas {
+                        x: parent.width
+                        y: -root._barExpandedNotchRadius
+                        width: root._barExpandedNotchRadius
+                        height: root._barExpandedNotchRadius
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.reset()
+                            ctx.fillStyle = root._stageFill
+                            ctx.beginPath()
+                            ctx.moveTo(0, 0)
+                            ctx.lineTo(width, 0)
+                            ctx.lineTo(width, height)
+                            ctx.arc(0, height, width, 0, -Math.PI / 2, true)
+                            ctx.fill()
+                        }
+                    }
+
+                }
+
                 // Title lane keeps stage-slot animation alive in the widened body.
                 Item {
                     width: parent.width
@@ -503,6 +592,7 @@ Item {
                         Repeater {
                             model: root._hint.windows || []
 
+                            // Title capsule wrapper provides enter/exit handoff for the widened host.
                             delegate: Item {
                                 required property int index
                                 required property var modelData
@@ -528,6 +618,33 @@ Item {
                                 implicitHeight: root._barExpandedTitleCapsuleHeight
                                 width: implicitWidth
                                 height: implicitHeight
+                                opacity: root.titleCapsuleRevealProgress
+                                y: (1 - root.titleCapsuleRevealProgress) * Math.max(6, Theme.barWidget.contentPaddingV * 1.5)
+                                scale: 0.96 + root.titleCapsuleRevealProgress * 0.04
+
+                                // Fade the incoming title capsule as the host widens.
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: Theme.anim.highlightDuration
+                                        easing.type: Theme.anim.highlightType
+                                    }
+                                }
+
+                                // Lift the capsule into place without changing its width contract.
+                                Behavior on y {
+                                    NumberAnimation {
+                                        duration: Theme.anim.moveDuration
+                                        easing.type: Theme.anim.moveType
+                                    }
+                                }
+
+                                // Restore full scale as the reveal settles.
+                                Behavior on scale {
+                                    NumberAnimation {
+                                        duration: Theme.anim.highlightDuration
+                                        easing.type: Theme.anim.highlightType
+                                    }
+                                }
 
                                 // Hidden measurer keeps capsule background width aligned with rendered title content.
                                 Text {
@@ -631,9 +748,29 @@ Item {
                         }
 
                         // Clock row remains centered below the workspace strip.
+                        // Clock handoff keeps the idle clock visible until the relocated copy arrives.
                         Item {
+                            visible: root.outgoingClockOpacity > 0.001
                             width: parent.width
                             height: root._barExpandedDetachedClockHeight
+                            opacity: root.outgoingClockOpacity
+                            y: root.outgoingClockOffsetY
+
+                            // Fade the outgoing clock so the relocated copy can take over cleanly.
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: Theme.anim.highlightDuration
+                                    easing.type: Theme.anim.highlightType
+                                }
+                            }
+
+                            // Keep the outgoing clock on the same motion curve as the title row.
+                            Behavior on y {
+                                NumberAnimation {
+                                    duration: Theme.anim.moveDuration
+                                    easing.type: Theme.anim.moveType
+                                }
+                            }
 
                             IslandParts.IslandIdleClockCard {
                                 anchors.centerIn: parent
@@ -665,6 +802,7 @@ Item {
                     Repeater {
                         model: root._hint.windows || []
 
+                        // Title capsule wrapper provides enter/exit handoff for the widened host.
                         delegate: Item {
                             required property int index
                             required property var modelData
@@ -690,6 +828,33 @@ Item {
                             implicitHeight: root._barExpandedTitleCapsuleHeight
                             width: implicitWidth
                             height: implicitHeight
+                            opacity: root.titleCapsuleRevealProgress
+                            y: (1 - root.titleCapsuleRevealProgress) * Math.max(6, Theme.barWidget.contentPaddingV * 1.5)
+                            scale: 0.96 + root.titleCapsuleRevealProgress * 0.04
+
+                            // Fade the incoming title capsule as the host widens.
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: Theme.anim.highlightDuration
+                                    easing.type: Theme.anim.highlightType
+                                }
+                            }
+
+                            // Lift the capsule into place without changing its width contract.
+                            Behavior on y {
+                                NumberAnimation {
+                                    duration: Theme.anim.moveDuration
+                                    easing.type: Theme.anim.moveType
+                                }
+                            }
+
+                            // Restore full scale as the reveal settles.
+                            Behavior on scale {
+                                NumberAnimation {
+                                    duration: Theme.anim.highlightDuration
+                                    easing.type: Theme.anim.highlightType
+                                }
+                            }
 
                             // Hidden measurer keeps capsule background width aligned with rendered title content.
                             Text {
@@ -752,27 +917,18 @@ Item {
                 }
             }
 
-            Item {
-                id: _barExpandedDetachedLayout
-                anchors.centerIn: parent
-                width: root._barExpandedDetachedWidth
-                height: root._barExpandedDetachedContentHeight
-                visible: root._barExpandedDetachedPresentation
-
-                // Lower shell keeps the workspace and clock as one attached rectangle.
-                Rectangle {
-                    anchors.fill: parent
-                    radius: root._barExpandedShellRadius
-                    color: root._stageFill
-                    border.width: 1
-                    border.color: root._stageBorder
-                }
-
-                // Inner column keeps the workspace stage and relocated clock centered.
-                Column {
+                Item {
+                    id: _barExpandedDetachedLayout
                     anchors.centerIn: parent
-                    width: parent.width
-                    spacing: root._rowGap
+                    width: root._barExpandedDetachedWidth
+                    height: root._barExpandedDetachedContentHeight
+                    visible: root._barExpandedDetachedPresentation
+
+                    // Inner column keeps the workspace stage and relocated clock centered.
+                    Column {
+                        anchors.centerIn: parent
+                        width: parent.width
+                        spacing: root._rowGap
 
                     Item {
                         width: parent.width
@@ -802,9 +958,28 @@ Item {
                         }
                     }
 
-                    Item {
-                        width: parent.width
-                        height: root._barExpandedDetachedClockHeight
+                    // Relocated clock fades into the detached lane instead of being hard-swapped.
+                        Item {
+                            width: parent.width
+                            height: root._barExpandedDetachedClockHeight
+                            opacity: root.relocatedClockOpacity
+                            y: root.relocatedClockOffsetY
+
+                            // Fade the relocated clock in as it reaches the lower lane.
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: Theme.anim.highlightDuration
+                                    easing.type: Theme.anim.highlightType
+                                }
+                            }
+
+                            // Match the relocation movement to the shared reveal timing.
+                            Behavior on y {
+                                NumberAnimation {
+                                    duration: Theme.anim.moveDuration
+                                    easing.type: Theme.anim.moveType
+                            }
+                        }
 
                         IslandParts.IslandIdleClockCard {
                             anchors.centerIn: parent

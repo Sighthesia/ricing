@@ -173,6 +173,10 @@ Item {
         transientPolicy.startWindowHint(event)
     }
 
+    function startBarExpandedWindowHint(event) {
+        transientPolicy.startBarExpandedWindowHint(event)
+    }
+
     function updateWindowHint(event) {
         transientPolicy.updateWindowHint(event)
     }
