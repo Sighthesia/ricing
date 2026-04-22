@@ -21,13 +21,9 @@ Item {
         ? Math.max(0.42, workspaceCapsule._emphasis)
         : workspaceCapsule._emphasis
     readonly property color _emptyFillBase: Qt.rgba(1, 1, 1, 0.085)
-    readonly property color _emptyBorderBase: Qt.rgba(1, 1, 1, 0.11)
     readonly property color _fill: workspaceCapsule._isEmptyWorkspace
         ? host._mixColor(workspaceCapsule._emptyFillBase, host._primaryCapsuleFill, _visualEmphasis)
         : host._mixColor(host._secondaryCapsuleFill, host._primaryCapsuleFill, _visualEmphasis)
-    readonly property color _border: workspaceCapsule._isEmptyWorkspace
-        ? host._mixColor(workspaceCapsule._emptyBorderBase, host._primaryCapsuleBorder, _visualEmphasis)
-        : host._mixColor(host._secondaryCapsuleBorder, host._primaryCapsuleBorder, _visualEmphasis)
     readonly property color _textColor: host._mixColor(Colors.textMuted, Colors.text, _visualEmphasis)
     readonly property real _capsuleOpacity: workspaceCapsule._isEmptyWorkspace
         ? Math.max(_metrics.opacity, host._lerp(0.58, 1, _visualEmphasis))
@@ -74,8 +70,6 @@ Item {
         anchors.fill: parent
         radius: height / 2
         color: workspaceCapsule._fill
-        border.width: 1
-        border.color: workspaceCapsule._border
     }
 
     Item {

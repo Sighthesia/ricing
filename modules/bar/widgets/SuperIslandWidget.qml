@@ -199,6 +199,13 @@ Item {
     readonly property real _barExpandedDetachedRadius:
         Math.max(Theme.cornerRadius, Math.round(Theme.barWidget.pillHeight * 0.42))
     readonly property real _barExpandedSeamArcRadius: root._barExpandedDetachedRadius
+    readonly property real _barExpandedSeamArcProgress: {
+        const widthDelta = Math.max(0, _pillBg.width - root._barExpandedDetachedHintWidth)
+        const fullArcWidthDelta = Math.max(1, root._barExpandedSeamArcRadius * 2)
+        return Math.max(0, Math.min(1, widthDelta / fullArcWidthDelta))
+    }
+    readonly property real _barExpandedSeamArcWidth:
+        root._barExpandedSeamArcRadius * root._barExpandedSeamArcProgress
     readonly property real _overlayShellRadius:
         root._barExpandedRectangularMode
             ? root._barExpandedDetachedRadius
@@ -789,7 +796,11 @@ width: implicitWidth
             height: 1
             radius: height / 2
             color: Colors.border
-            opacity: root._phase !== "idle" && root._flashSourceEvent.type !== "window-hint" ? 0.35 : 0
+            opacity: root._phase !== "idle"
+                && !root._barExpandedHintActive
+                && root._flashSourceEvent.type !== "window-hint"
+                    ? 0.35
+                    : 0
 
             Behavior on opacity {
                 NumberAnimation {
@@ -922,8 +933,7 @@ width: implicitWidth
             // Detached panel path owns the visible lower workspace body.
             ShapePath {
                 fillColor: root._barExpandedPanelSurfaceColor
-                strokeColor: Colors.border
-                strokeWidth: root._barExpandedHintActive ? 1 : 0
+                strokeWidth: 0
                 startX: 0
                 startY: 0
 
@@ -983,18 +993,19 @@ width: implicitWidth
         y: _overlayPanelHost.y
         width: _overlayPanelHost.width
         height: root._barExpandedSeamArcRadius
-        visible: root._barExpandedHintActive && _overlayPanelHost.visible
+        visible: root._barExpandedHintActive && _overlayPanelHost.visible && root._barExpandedSeamArcWidth > 0.01
         z: _overlayPanelHost.z + 1
-        opacity: root._attachedPanelOpacity * root._attachedRevealProgress
+        opacity: root._attachedPanelOpacity
         scale: root._attachedSurfaceScale
         transformOrigin: Item.Top
 
         // Left seam arc restores the outer silhouette without rounding the seam itself.
         Canvas {
-            x: -root._barExpandedSeamArcRadius
+            x: -root._barExpandedSeamArcWidth
             y: 0
-            width: root._barExpandedSeamArcRadius
+            width: root._barExpandedSeamArcWidth
             height: root._barExpandedSeamArcRadius
+            visible: width > 0.01
 
             onPaint: {
                 var ctx = getContext("2d")
@@ -1013,8 +1024,9 @@ width: implicitWidth
         Canvas {
             x: parent.width
             y: 0
-            width: root._barExpandedSeamArcRadius
+            width: root._barExpandedSeamArcWidth
             height: root._barExpandedSeamArcRadius
+            visible: width > 0.01
 
             onPaint: {
                 var ctx = getContext("2d")

@@ -61,8 +61,6 @@ Item {
     readonly property color _stageBorder: Qt.rgba(1, 1, 1, 0.035)
     readonly property color _primaryCapsuleFill: Qt.rgba(1, 1, 1, 0.09)
     readonly property color _secondaryCapsuleFill: Qt.rgba(1, 1, 1, 0.04)
-    readonly property color _primaryCapsuleBorder: Qt.rgba(1, 1, 1, 0.08)
-    readonly property color _secondaryCapsuleBorder: Qt.rgba(1, 1, 1, 0.03)
     readonly property var _slotIndices: [-1, 0, 1]
     readonly property real _overflowSlotPosition: 1.18
     readonly property int _workspaceStageWidth: Math.max(root._workspacePrimaryWidth, root._workspaceSideWidth)
@@ -109,7 +107,11 @@ Item {
     readonly property int _barExpandedNotchRadius: Math.max(10, Math.round(16 * Theme.uiScale))
     readonly property int _barExpandedNotchHeight: root._barExpandedNotchRadius
     readonly property int _barExpandedMainWidth:
-        Math.max(root._minPreviewWidth, root._expandedTitleRowWidth + root._padH * 2 + root._stagePadH * 2)
+        Math.max(
+            root._barExpandedDetachedWidth,
+            root._minPreviewWidth,
+            root._expandedTitleRowWidth + root._padH * 2 + root._stagePadH * 2
+        )
     readonly property int _barExpandedDetachedWidth:
         root._workspaceStageWidth + root._padH * 2 + root._stagePadH * 2
     readonly property real _expandedTitleRowWidth:
@@ -696,8 +698,6 @@ Item {
                                     anchors.fill: parent
                                     radius: height / 2
                                     color: root._mixColor(root._secondaryCapsuleFill, root._primaryCapsuleFill, _focused ? 1 : 0.25)
-                                    border.width: 1
-                                    border.color: root._mixColor(root._secondaryCapsuleBorder, root._primaryCapsuleBorder, _focused ? 1 : 0.25)
                                 }
 
                                 Item {
@@ -908,8 +908,6 @@ Item {
                                 anchors.fill: parent
                                 radius: height / 2
                                 color: root._mixColor(root._secondaryCapsuleFill, root._primaryCapsuleFill, _focused ? 1 : 0.25)
-                                border.width: 1
-                                border.color: root._mixColor(root._secondaryCapsuleBorder, root._primaryCapsuleBorder, _focused ? 1 : 0.25)
                             }
 
                             Item {
@@ -954,6 +952,7 @@ Item {
                 Item {
                     id: _barExpandedDetachedLayout
                     anchors.top: parent.top
+                    anchors.topMargin: root._padV + root._stagePadV
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: root._barExpandedDetachedWidth
                     height: root._barExpandedDetachedContentHeight
