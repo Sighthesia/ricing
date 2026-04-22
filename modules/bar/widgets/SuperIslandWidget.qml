@@ -204,8 +204,6 @@ Item {
         const fullArcWidthDelta = Math.max(1, root._barExpandedSeamArcRadius * 2)
         return Math.max(0, Math.min(1, widthDelta / fullArcWidthDelta))
     }
-    readonly property real _barExpandedSeamArcWidth:
-        root._barExpandedSeamArcRadius * root._barExpandedSeamArcProgress
     readonly property real _overlayShellRadius:
         root._barExpandedRectangularMode
             ? root._barExpandedDetachedRadius
@@ -260,7 +258,9 @@ Item {
     readonly property real _attachedPanelBodyWidth:
         root._overlaySessionActive
             ? root._attachedPanelVisibleWidth
-            : (root._barExpandedHintActive ? root._barExpandedDetachedHintWidth : root._attachedPanelVisibleWidth)
+            : (root._barExpandedHintActive
+                ? Math.min(root._barExpandedDetachedHintWidth, _pillTransitionControl.animatedWidth)
+                : root._attachedPanelVisibleWidth)
     readonly property real _detachedHintReservedHeight:
         Math.max(root._transientExpandedHeight, root._fullHintExpandedPillHeight + 2)
     readonly property real _detachedHintWidth:
@@ -271,18 +271,18 @@ Item {
                 : root._collapsedWidth) + 2
         )
     readonly property real _barExpandedMainHintWidthMeasured:
-        Math.max(
-            root._collapsedWidth,
-            (_barExpandedMainMeasureLoader.item
-                ? _barExpandedMainMeasureLoader.item.implicitWidth
-                : root._collapsedWidth) + 2
-        )
+        (_barExpandedMainMeasureLoader.item
+            ? _barExpandedMainMeasureLoader.item.implicitWidth
+            : 0) + 2
     readonly property real _barExpandedMainHintWidth:
-        Math.max(root._collapsedWidth, root._barExpandedMainHintWidthMeasured)
+        Math.max(root._barExpandedDetachedHintWidth, root._barExpandedMainHintWidthMeasured)
     readonly property real _barExpandedDetachedHintWidth:
         ((_detachedHintDetachedMeasureLoader.item
             ? _detachedHintDetachedMeasureLoader.item.implicitWidth
             : 0) + 2)
+    readonly property bool _barExpandedTitleWidthClamped:
+        root._barExpandedHintActive
+        && Math.abs(root._barExpandedMainHintWidth - root._barExpandedDetachedHintWidth) <= 1.5
     readonly property bool _barExpandedHintActive:
         root._detachedHintActive && root._attachedHintEvent.presentation === "bar-expanded"
     readonly property real layoutMeasurementWidth: Math.max(0, _pillTransitionControl.animatedWidth)
@@ -383,7 +383,7 @@ Item {
             : root._collapsedWidthLive
     readonly property real _expandedWidth:
         root._barExpandedHintActive
-            ? Math.max(root._collapsedWidth, root._barExpandedMainHintWidth)
+            ? root._barExpandedMainHintWidth
             : Math.max(
                 root._collapsedWidth,
                 (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
@@ -788,6 +788,15 @@ width: implicitWidth
         }
 
         Rectangle {
+            anchors.left: _pillBg.left
+            anchors.right: _pillBg.right
+            anchors.bottom: _pillBg.bottom
+            height: _pillBg.radius
+            color: Colors.surface
+            visible: root._barExpandedTitleWidthClamped
+        }
+
+        Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             y: (root._phase === "hint" || root._phase === "hint-exit")
                 ? root._hintDividerY
@@ -817,6 +826,18 @@ width: implicitWidth
             opacity: (root._transientPhase || root._overlaySessionActive)
                 ? Math.min(1, root._transientAccentBaseOpacity + root._sharedBackgroundPulseOpacity)
                 : 0
+        }
+
+        Rectangle {
+            anchors.left: _pillBg.left
+            anchors.right: _pillBg.right
+            anchors.bottom: _pillBg.bottom
+            height: _pillBg.radius
+            color: Colors.highlight
+            opacity: (root._transientPhase || root._overlaySessionActive)
+                ? Math.min(1, root._transientAccentBaseOpacity + root._sharedBackgroundPulseOpacity)
+                : 0
+            visible: root._barExpandedTitleWidthClamped && opacity > 0
         }
 
         Rectangle {
@@ -993,7 +1014,7 @@ width: implicitWidth
         y: _overlayPanelHost.y
         width: _overlayPanelHost.width
         height: root._barExpandedSeamArcRadius
-        visible: root._barExpandedHintActive && _overlayPanelHost.visible && root._barExpandedSeamArcWidth > 0.01
+        visible: root._barExpandedHintActive && _overlayPanelHost.visible && root._barExpandedSeamArcProgress > 0.01
         z: _overlayPanelHost.z + 1
         opacity: root._attachedPanelOpacity
         scale: root._attachedSurfaceScale
@@ -1001,11 +1022,13 @@ width: implicitWidth
 
         // Left seam arc restores the outer silhouette without rounding the seam itself.
         Canvas {
-            x: -root._barExpandedSeamArcWidth
+            x: -root._barExpandedSeamArcRadius
             y: 0
-            width: root._barExpandedSeamArcWidth
+            width: root._barExpandedSeamArcRadius
             height: root._barExpandedSeamArcRadius
-            visible: width > 0.01
+            visible: root._barExpandedSeamArcProgress > 0.01
+            scale: root._barExpandedSeamArcProgress
+            transformOrigin: Item.BottomRight
 
             onPaint: {
                 var ctx = getContext("2d")
@@ -1024,9 +1047,11 @@ width: implicitWidth
         Canvas {
             x: parent.width
             y: 0
-            width: root._barExpandedSeamArcWidth
+            width: root._barExpandedSeamArcRadius
             height: root._barExpandedSeamArcRadius
-            visible: width > 0.01
+            visible: root._barExpandedSeamArcProgress > 0.01
+            scale: root._barExpandedSeamArcProgress
+            transformOrigin: Item.BottomLeft
 
             onPaint: {
                 var ctx = getContext("2d")
