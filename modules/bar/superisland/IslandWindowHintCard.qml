@@ -11,6 +11,8 @@ Item {
     id: root
 
     required property var event
+    property bool measurementMode: false
+    property var hintData: null
     property real titleCapsuleRevealProgress: 1
     property real outgoingClockOpacity: 0
     property real outgoingClockOffsetY: 0
@@ -26,7 +28,14 @@ Item {
         && !root._barExpandedDetachedPresentation
 
     readonly property bool _hostKeepsHintVisible: !!(root.event && root.event.type === "window-hint")
-    readonly property var _liveHint: WindowHintService.activeHint
+    function _resolvedMeasurementHint() {
+        const baseHint = root.hintData || WindowHintService.activeHint || root.event || {}
+        return Object.assign({}, baseHint, {
+            presentation: root.presentationMode !== "" ? root.presentationMode : (baseHint.presentation || "window-hint")
+        })
+    }
+
+    readonly property var _liveHint: root.measurementMode ? root._resolvedMeasurementHint() : WindowHintService.activeHint
     property var _renderHint: null
     property date currentTime: new Date()
     readonly property var _hint: root._renderHint || root._liveHint
@@ -244,6 +253,17 @@ Item {
     }
 
     function _handleHintChange() {
+        if (root.measurementMode) {
+            _workspaceAnchorSettleTimer.stop()
+            _titleAnchorSettleTimer.stop()
+            _workspaceStageCleanupTimer.stop()
+            root._renderHint = root._cloneHint(root._liveHint)
+            root._refreshStageSlots(root._renderHint, false, false)
+            root._retargetHintAnchors(root._renderHint, true)
+            root._syncWorkspaceStageTrim(true)
+            return
+        }
+
         const wasVisible = !!(root._hint && root._hint.visible)
         _workspaceStageCleanupTimer.stop()
 
@@ -332,8 +352,19 @@ Item {
         }
     }
 
+    onEventChanged: {
+        if (root.measurementMode)
+            root._handleHintChange()
+    }
+
+    onHintDataChanged: {
+        if (root.measurementMode)
+            root._handleHintChange()
+    }
+
     Connections {
         target: WindowHintService
+        enabled: !root.measurementMode
 
         function onActiveHintChanged() {
             root._handleHintChange()
@@ -496,7 +527,8 @@ Item {
 
             Item {
                 id: _barExpandedLayout
-                anchors.centerIn: parent
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
                 width: root._barExpandedDetachedWidth
                 height: root._barExpandedCombinedHeight
                 visible: root._barExpandedCombinedPresentation
@@ -714,14 +746,16 @@ Item {
                     y: Theme.barHeight
 
                     Column {
-                        anchors.centerIn: parent
+                        anchors.top: parent.top
+                        anchors.horizontalCenter: parent.horizontalCenter
                         width: parent.width
+                        height: parent.height
                         spacing: root._rowGap
 
                         // Workspace overview stays in the lower wide rectangle.
                         Item {
                             width: parent.width
-                            height: root._workspaceVisibleStageHeight
+                            height: Math.max(0, parent.height - root._rowGap - root._barExpandedDetachedClockHeight)
 
                             Item {
                                 anchors.horizontalCenter: parent.horizontalCenter
@@ -919,20 +953,23 @@ Item {
 
                 Item {
                     id: _barExpandedDetachedLayout
-                    anchors.centerIn: parent
+                    anchors.top: parent.top
+                    anchors.horizontalCenter: parent.horizontalCenter
                     width: root._barExpandedDetachedWidth
                     height: root._barExpandedDetachedContentHeight
                     visible: root._barExpandedDetachedPresentation
 
                     // Inner column keeps the workspace stage and relocated clock centered.
                     Column {
-                        anchors.centerIn: parent
+                        anchors.top: parent.top
+                        anchors.horizontalCenter: parent.horizontalCenter
                         width: parent.width
+                        height: parent.height
                         spacing: root._rowGap
 
                     Item {
                         width: parent.width
-                        height: root._workspaceVisibleStageHeight
+                        height: Math.max(0, parent.height - root._rowGap - root._barExpandedDetachedClockHeight)
 
                         Item {
                             anchors.horizontalCenter: parent.horizontalCenter

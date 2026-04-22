@@ -304,7 +304,9 @@ Item {
     readonly property real _attachedContentScale:
         root._overlaySessionActive ? 1 : root._attachedPanelScale
     readonly property real _attachedSurfaceScale:
-        root._pulseScale * root._attachedContentScale
+        root._barExpandedHintActive
+            ? 1
+            : (root._pulseScale * root._attachedContentScale)
     readonly property real _attachedPulseOpacity:
         root._attachedPanelActive && !root._barExpandedHintActive
             ? root._sharedBackgroundPulseOpacity
@@ -471,8 +473,10 @@ Item {
         root._attachedPanelActive
             ? Math.min(root._attachedWidthRevealProgress, root._attachedHeightRevealProgress)
             : 0
+    readonly property real _attachedVerticalRevealProgress:
+        root._barExpandedHintActive ? root._attachedHeightRevealProgress : root._attachedRevealProgress
     readonly property real _attachedRevealYOffset:
-        (1 - root._attachedRevealProgress) * root._overlayRevealLift
+        (1 - root._attachedVerticalRevealProgress) * root._overlayRevealLift
     readonly property bool _hintRevealSettled:
         root._detachedHintActive
         && !root._overlaySessionActive
@@ -1044,7 +1048,7 @@ width: implicitWidth
         active: root._attachedHintVisible
         visible: false
         enabled: false
-        sourceComponent: _windowHintCardComponent
+        sourceComponent: _windowHintMeasureCardComponent
     }
 
     Loader {
@@ -1054,7 +1058,7 @@ width: implicitWidth
         active: root._attachedHintVisible && root._barExpandedHintActive
         visible: false
         enabled: false
-        sourceComponent: _windowHintBarExpandedMainCardComponent
+        sourceComponent: _windowHintBarExpandedMainMeasureCardComponent
     }
 
     Loader {
@@ -1064,7 +1068,7 @@ width: implicitWidth
         active: root._attachedHintVisible && root._barExpandedHintActive
         visible: false
         enabled: false
-        sourceComponent: _windowHintBarExpandedDetachedCardComponent
+        sourceComponent: _windowHintBarExpandedDetachedMeasureCardComponent
     }
 
     Loader {
@@ -1153,13 +1157,36 @@ width: implicitWidth
     }
 
     Component {
+        id: _windowHintMeasureCardComponent
+
+        IslandCards.IslandWindowHintCard {
+            event: eventData
+            measurementMode: true
+            hintData: WindowHintService.activeHint
+        }
+    }
+
+    Component {
         id: _windowHintBarExpandedMainCardComponent
 
         IslandCards.IslandWindowHintCard {
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
             titleCapsuleRevealProgress: root._barExpandedTitleRevealProgress
-            outgoingClockOpacity: 1 - root._attachedRevealProgress
-            outgoingClockOffsetY: (1 - root._attachedRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
+            outgoingClockOpacity: 1 - root._attachedVerticalRevealProgress
+            outgoingClockOffsetY: (1 - root._attachedVerticalRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
+        }
+    }
+
+    Component {
+        id: _windowHintBarExpandedMainMeasureCardComponent
+
+        IslandCards.IslandWindowHintCard {
+            event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
+            measurementMode: true
+            hintData: WindowHintService.activeHint
+            titleCapsuleRevealProgress: root._barExpandedTitleRevealProgress
+            outgoingClockOpacity: 1 - root._attachedVerticalRevealProgress
+            outgoingClockOffsetY: (1 - root._attachedVerticalRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
         }
     }
 
@@ -1168,8 +1195,20 @@ width: implicitWidth
 
         IslandCards.IslandWindowHintCard {
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-detached")
-            relocatedClockOpacity: root._attachedRevealProgress
-            relocatedClockOffsetY: (1 - root._attachedRevealProgress) * -Math.max(8, Theme.barWidget.contentPaddingV * 2)
+            relocatedClockOpacity: root._attachedVerticalRevealProgress
+            relocatedClockOffsetY: (1 - root._attachedVerticalRevealProgress) * -Math.max(8, Theme.barWidget.contentPaddingV * 2)
+        }
+    }
+
+    Component {
+        id: _windowHintBarExpandedDetachedMeasureCardComponent
+
+        IslandCards.IslandWindowHintCard {
+            event: root._cloneEventWithPresentation(eventData, "bar-expanded-detached")
+            measurementMode: true
+            hintData: WindowHintService.activeHint
+            relocatedClockOpacity: root._attachedVerticalRevealProgress
+            relocatedClockOffsetY: (1 - root._attachedVerticalRevealProgress) * -Math.max(8, Theme.barWidget.contentPaddingV * 2)
         }
     }
 
