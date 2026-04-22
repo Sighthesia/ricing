@@ -353,10 +353,16 @@ Item {
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
+    property real _barExpandedEntryBaseWidth: 0
+    property bool _barExpandedTitleRevealLatched: false
     readonly property real _collapsedWidthLive:
-        (_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2
+        root._barExpandedHintActive && root._barExpandedEntryBaseWidth > 0
+            ? root._barExpandedEntryBaseWidth
+            : ((_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2)
     readonly property real _idleCollapsedWidthLive:
         (_idleMeasureLoader.item ? _idleMeasureLoader.item.implicitWidth : 0) + root._padH * 2
+    readonly property real _barExpandedTitleRevealProgress:
+        root._barExpandedTitleRevealLatched ? 1 : root._attachedRevealProgress
     readonly property bool _useAttachedCollapseBaseWidth:
         root._attachedCollapseAnimating
         || root._phase === "hint-exit"
@@ -494,6 +500,23 @@ width: implicitWidth
     onLiveInstanceChanged: _stateMachine.syncOverlayExtensionReservation()
     on_OverlayBodyHeightChanged: _stateMachine.syncOverlayExtensionReservation()
     on_OverlayDetachedOffsetChanged: _stateMachine.syncOverlayExtensionReservation()
+    on_BarExpandedHintActiveChanged: {
+        if (root._barExpandedHintActive) {
+            root._barExpandedEntryBaseWidth = Math.max(0, _pillTransitionControl.animatedWidth)
+            root._barExpandedTitleRevealLatched = false
+            return
+        }
+
+        root._barExpandedEntryBaseWidth = 0
+        root._barExpandedTitleRevealLatched = false
+    }
+    on_HintRevealSettledChanged: {
+        if (!root._barExpandedHintActive || !root._hintRevealSettled)
+            return
+
+        root._barExpandedEntryBaseWidth = 0
+        root._barExpandedTitleRevealLatched = true
+    }
     on_AttachedPanelWidthChanged: root._retargetAttachedPanelWidthIfNeeded()
     on_AttachedPanelHeightChanged: {
         _stateMachine.syncOverlayExtensionReservation()
@@ -526,6 +549,14 @@ width: implicitWidth
 
         if (Math.abs(root._attachedPanelHeight - root._attachedPanelRevealHeight) <= 0.5)
             return
+
+        if (root._barExpandedHintActive
+                && !root._attachedCollapseAnimating
+                && root._attachedContentOpacity >= 0.99) {
+            _attachedHeightRetargetAnim.stop()
+            _viewState._attachedPanelRevealHeight = root._attachedPanelHeight
+            return
+        }
 
         if (root._detachedHintActive && root._attachedPanelHeight > root._attachedPanelRevealHeight) {
             _attachedHeightRetargetAnim.stop()
@@ -716,7 +747,7 @@ width: implicitWidth
         expanded: root._pillExpanded
         animateWidth: true
         animateHeight: !root._barExpandedHintActive
-        freezeExpandedRetargeting: root._barExpandedHintActive && running
+        freezeExpandedRetargeting: false
     }
 
     Item {
@@ -871,6 +902,7 @@ width: implicitWidth
         attachmentOverlap: root._overlayAttachmentOverlap
         revealLift: root._overlayRevealLift
         revealYOffset: root._attachedRevealYOffset
+        throwOffsetY: root._pillThrowOffsetY
         surfaceOpacity: root._attachedPanelOpacity
         surfaceScale: root._attachedSurfaceScale
         contentOpacity: root._attachedContentOpacity
@@ -949,6 +981,9 @@ width: implicitWidth
         height: root._barExpandedSeamArcRadius
         visible: root._barExpandedHintActive && _overlayPanelHost.visible
         z: _overlayPanelHost.z + 1
+        opacity: root._attachedPanelOpacity * root._attachedRevealProgress
+        scale: root._attachedSurfaceScale
+        transformOrigin: Item.Top
 
         // Left seam arc restores the outer silhouette without rounding the seam itself.
         Canvas {
@@ -1122,7 +1157,7 @@ width: implicitWidth
 
         IslandCards.IslandWindowHintCard {
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
-            titleCapsuleRevealProgress: root._attachedRevealProgress
+            titleCapsuleRevealProgress: root._barExpandedTitleRevealProgress
             outgoingClockOpacity: 1 - root._attachedRevealProgress
             outgoingClockOffsetY: (1 - root._attachedRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
         }
