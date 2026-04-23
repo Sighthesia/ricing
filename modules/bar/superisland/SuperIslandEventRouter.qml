@@ -17,6 +17,11 @@ Item {
         const previousEvent = root.host._cloneEvent(root.state._lastActiveEvent)
         const nextIsHint = root.host._isHintEventType(nextEvent.type)
         const previousIsHint = root.host._isHintEventType(previousEvent.type)
+        const barExpandedEnabled = SettingsService.data.superIsland.barExpandedWindowHintEnabled
+        const normalizedNextEvent = barExpandedEnabled
+            ? nextEvent
+            : Object.assign({}, nextEvent, { presentation: "window-hint" })
+        const nextPresentation = normalizedNextEvent.presentation
         const interruptingDetachedHint = !nextIsHint
             && nextEvent.type !== "idle"
             && root.host._hintPhase
@@ -51,37 +56,37 @@ Item {
 
         if (interruptingDetachedHint) {
             root.machine.finishWindowHint()
-        } else if (nextEvent.presentation === "bar-expanded" && nextEvent.type === "window-hint") {
+        } else if (nextPresentation === "bar-expanded" && nextEvent.type === "window-hint") {
             if (previousIsHint && root.host._hintPhase)
-                root.machine.updateWindowHint(nextEvent)
+                root.machine.updateWindowHint(normalizedNextEvent)
             else
-                root.machine.startBarExpandedWindowHint(nextEvent)
+                root.machine.startBarExpandedWindowHint(normalizedNextEvent)
         } else if (nextEvent.relayReplace && previousEvent.type !== "idle") {
             if (previousIsHint)
-                root.machine.resumeTransient(nextEvent)
+                root.machine.resumeTransient(normalizedNextEvent)
             else
-                root.machine.replaceActiveTransient(nextEvent)
+                root.machine.replaceActiveTransient(normalizedNextEvent)
         } else if (nextIsHint && previousEvent.type === "idle") {
-            root.machine.startWindowHint(nextEvent)
+            root.machine.startWindowHint(normalizedNextEvent)
         } else if (nextIsHint && !previousIsHint) {
-            root.machine.startWindowHint(nextEvent)
+            root.machine.startWindowHint(normalizedNextEvent)
         } else if (nextIsHint && previousIsHint) {
             if (root.host._hintPhase)
-                root.machine.updateWindowHint(nextEvent)
+                root.machine.updateWindowHint(normalizedNextEvent)
             else
-                root.machine.startWindowHint(nextEvent)
+                root.machine.startWindowHint(normalizedNextEvent)
         } else if (nextEvent.type !== "idle" && previousIsHint) {
-            root.machine.resumeTransient(nextEvent)
+            root.machine.resumeTransient(normalizedNextEvent)
         } else if (nextEvent.type === "idle" && previousIsHint) {
             root.machine.finishWindowHint()
         } else if (nextEvent.type !== "idle" && previousEvent.type === "idle") {
-            root.machine.startEnterTransition(nextEvent)
+            root.machine.startEnterTransition(normalizedNextEvent)
         } else if (nextEvent.type !== "idle" && previousEvent.type !== "idle") {
-            root.machine.startEnterTransition(nextEvent)
+            root.machine.startEnterTransition(normalizedNextEvent)
         } else if (nextEvent.type === "idle" && previousEvent.type !== "idle") {
             root.machine.startExitTransition()
         }
 
-        root.state._lastActiveEvent = nextEvent
+        root.state._lastActiveEvent = normalizedNextEvent
     }
 }

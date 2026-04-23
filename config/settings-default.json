@@ -91,6 +91,7 @@
         "showMedia": true,
         "showNotifications": true,
         "showWorkspaceEvents": true,
+        "barExpandedWindowHintEnabled": true,
         "breakReminderEnabled": true,
         "breakReminderWorkMinutes": 20,
         "breakReminderDurationSeconds": 20,

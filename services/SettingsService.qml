@@ -188,6 +188,7 @@ Singleton {
                 showMedia: adapter.superIsland.showMedia,
                 showNotifications: adapter.superIsland.showNotifications,
                 showWorkspaceEvents: adapter.superIsland.showWorkspaceEvents,
+                barExpandedWindowHintEnabled: adapter.superIsland.barExpandedWindowHintEnabled,
                 breakReminderEnabled: adapter.superIsland.breakReminderEnabled,
                 breakReminderWorkMinutes: adapter.superIsland.breakReminderWorkMinutes,
                 breakReminderDurationSeconds: adapter.superIsland.breakReminderDurationSeconds,
@@ -448,6 +449,7 @@ Singleton {
             property bool showMedia: true
             property bool showNotifications: true
             property bool showWorkspaceEvents: true
+            property bool barExpandedWindowHintEnabled: true
             property bool breakReminderEnabled: true
             property int breakReminderWorkMinutes: 20
             property int breakReminderDurationSeconds: 20

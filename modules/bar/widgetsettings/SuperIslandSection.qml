@@ -44,6 +44,17 @@ Item {
             }
         }
 
+        // Toggle the bar-expanded window hint style.
+        ToggleSection {
+            width: parent.width
+            label: "窗口提示展开样式"
+            value: SettingsService.data.superIsland.barExpandedWindowHintEnabled
+            onToggled: newValue => {
+                SettingsService.data.superIsland.barExpandedWindowHintEnabled = newValue
+                SettingsService.save()
+            }
+        }
+
         SliderSection {
             width: parent.width
             label: "通知显示时长"
