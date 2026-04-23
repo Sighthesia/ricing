@@ -46,6 +46,8 @@ Singleton {
     property string _compactDisplayedLyric: ""
     property string _compactDisplayedLyricKey: ""
     property string _compactDisplayedTrack: ""
+    property string _compactDisplayedLyricsSessionKey: ""
+    property string _compactDisplayedLyricsPlayerTrackKey: ""
     readonly property bool _freezeLyricsOnPause:
         root._preferLyricsMediaSource
             && MediaService.hasPlayer
@@ -214,7 +216,9 @@ Singleton {
 
         return {
             text: text,
-            key: root._lyricKey(prefix, phase, index, text)
+            // Use text-only keys for compact lyric display so repeated lyric updates
+            // do not trigger animation when visible text remains unchanged.
+            key: root._lyricKey(prefix, phase, 0, text)
         }
     }
 
@@ -224,7 +228,7 @@ Singleton {
 
         return {
             text: text,
-            key: prefix + ":stable-" + phase + ":" + text
+            key: root._lyricKey(prefix, phase, 0, text)
         }
     }
 
@@ -232,17 +236,20 @@ Singleton {
         root._compactDisplayedTrack = state.text !== "" ? trackPrefix : ""
         root._compactDisplayedLyric = state.text
         root._compactDisplayedLyricKey = state.key
+        root._compactDisplayedLyricsSessionKey = state.text !== "" ? root._lyricsSessionKey : ""
+        root._compactDisplayedLyricsPlayerTrackKey = state.text !== "" ? root._playerTrackKey : ""
     }
 
     function _clearCompactDisplayedLyric() {
         root._compactDisplayedTrack = ""
         root._compactDisplayedLyric = ""
         root._compactDisplayedLyricKey = ""
+        root._compactDisplayedLyricsSessionKey = ""
+        root._compactDisplayedLyricsPlayerTrackKey = ""
     }
 
     function _updateCompactDisplayedLyric() {
         const trackPrefix = root._selectedCompactTrackPrefix()
-        const trackChanged = root._compactDisplayedTrack !== "" && root._compactDisplayedTrack !== trackPrefix
         const currentState = root.preferTranslatedLyrics
             ? root._compactTrackDisplayState(trackPrefix, "current", NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
             : root._compactTrackDisplayState(trackPrefix, "current", NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
@@ -255,41 +262,38 @@ Singleton {
         const stableNextState = root.preferTranslatedLyrics
             ? root._stableCompactTrackDisplayState(trackPrefix, "next", root._stableNextTranslatedLyric)
             : root._stableCompactTrackDisplayState(trackPrefix, "next", root._stableNextLyric)
+        let desiredState = { text: "", key: "" }
 
         if (!SettingsService.data.mediaControl.showLyrics || !SettingsService.data.mediaControl.preferLyrics) {
-            root._clearCompactDisplayedLyric()
+            if (root._compactDisplayedLyric !== "")
+                root._clearCompactDisplayedLyric()
             return
         }
-
-        if (trackChanged)
-            root._clearCompactDisplayedLyric()
 
         if (currentState.text !== "") {
-            root._setCompactDisplayedLyric(currentState, trackPrefix)
+            desiredState = currentState
+        } else if (stableCurrentState.text !== "") {
+            desiredState = stableCurrentState
+        } else if (root._compactDisplayedTrack === trackPrefix && root._compactDisplayedLyric !== "") {
+            desiredState = {
+                text: root._compactDisplayedLyric,
+                key: root._compactDisplayedLyricKey
+            }
+        } else if ((root._compactDisplayedLyric !== "" || stableCurrentState.text !== "") && nextState.text !== "") {
+            desiredState = nextState
+        } else if ((root._compactDisplayedLyric !== "" || stableCurrentState.text !== "") && stableNextState.text !== "") {
+            desiredState = stableNextState
+        }
+
+        if (desiredState.text === root._compactDisplayedLyric && desiredState.key === root._compactDisplayedLyricKey)
+            return
+
+        if (desiredState.text === "") {
+            root._clearCompactDisplayedLyric()
             return
         }
 
-        if (stableCurrentState.text !== "") {
-            if (root._compactDisplayedTrack !== trackPrefix || root._compactDisplayedLyric === "")
-                root._setCompactDisplayedLyric(stableCurrentState, trackPrefix)
-            return
-        }
-
-        if (root._compactDisplayedTrack === trackPrefix && root._compactDisplayedLyric !== "")
-            return
-
-        // Do not promote the upcoming line before any current lyric is established.
-        if ((root._compactDisplayedLyric !== "" || stableCurrentState.text !== "") && nextState.text !== "") {
-            root._setCompactDisplayedLyric(nextState, trackPrefix)
-            return
-        }
-
-        if ((root._compactDisplayedLyric !== "" || stableCurrentState.text !== "") && stableNextState.text !== "") {
-            root._setCompactDisplayedLyric(stableNextState, trackPrefix)
-            return
-        }
-
-        root._clearCompactDisplayedLyric()
+        root._setCompactDisplayedLyric(desiredState, trackPrefix)
     }
 
     function _displayPrimaryLyricKey() {
@@ -391,6 +395,7 @@ Singleton {
         const shouldIgnoreSessionKeyChurn = lyricsSessionChanged
             && currentTrackMatchesLatched
             && hasStableLyrics
+            && root._lyricsSignalActive
 
         if ((lyricsSessionChanged && !shouldIgnoreSessionKeyChurn) || playerTrackChanged)
             root._resetLyricsLatch()
@@ -594,6 +599,18 @@ Singleton {
         target: MediaService
         function onMediaChanged() {
             root._handleMediaChanged()
+        }
+        function onTitleChanged() {
+            root._refreshLyricsSession()
+        }
+        function onArtistChanged() {
+            root._refreshLyricsSession()
+        }
+        function onPlaybackStateChanged() {
+            root._refreshLyricsSession()
+        }
+        function onHasPlayerChanged() {
+            root._refreshLyricsSession()
         }
     }
 

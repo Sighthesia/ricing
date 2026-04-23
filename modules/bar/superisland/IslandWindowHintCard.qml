@@ -106,11 +106,12 @@ Item {
         Math.max(Theme.cornerRadius, Theme.screenCornerRadius)
     readonly property int _barExpandedNotchRadius: Math.max(10, Math.round(16 * Theme.uiScale))
     readonly property int _barExpandedNotchHeight: root._barExpandedNotchRadius
+    readonly property int _barExpandedExclusivePushPadding: Math.max(0, Theme.widgetSpacing)
     readonly property int _barExpandedMainWidth:
         Math.max(
             root._barExpandedDetachedWidth,
             root._minPreviewWidth,
-            root._expandedTitleRowWidth + root._padH * 2 + root._stagePadH * 2
+            root._expandedTitleRowWidth + root._barExpandedExclusivePushPadding * 2
         )
     readonly property int _barExpandedDetachedWidth:
         root._workspaceStageWidth + root._padH * 2 + root._stagePadH * 2

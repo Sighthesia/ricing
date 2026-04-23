@@ -19,12 +19,11 @@ function resolveAdaptiveSectionBounds(usableBounds, contentWidths) {
         Math.max(0, usableBounds.midpoint - desiredLeftRight),
         Math.max(0, desiredRightLeft - usableBounds.midpoint)
     )
-    var centerVisualWidth = contentWidths.center || 0
-    var desiredCenterWidth = Math.max(0, Math.min(centerVisualWidth, centerHalfRoom * 2))
-    var centerInteractionWidth = Math.max(
-        0,
-        Math.min(Math.max(centerVisualWidth, desiredCenterWidth), centerHalfRoom * 2)
-    )
+    var centerVisualWidth = Math.max(0, contentWidths.center || 0)
+    var centerOwnsExclusiveWidth = centerVisualWidth > centerHalfRoom * 2
+    var centerInteractionWidth = centerOwnsExclusiveWidth
+        ? centerVisualWidth
+        : Math.max(0, Math.min(centerVisualWidth, centerHalfRoom * 2))
     var centerLeft = usableBounds.midpoint - centerInteractionWidth / 2
     var centerRight = usableBounds.midpoint + centerInteractionWidth / 2
 
@@ -33,23 +32,26 @@ function resolveAdaptiveSectionBounds(usableBounds, contentWidths) {
         centerLeft: centerLeft,
         centerRight: centerRight,
         rightLeft: centerRight,
-        leftVisualRight: Math.min(desiredLeftRight, centerLeft),
-        rightVisualLeft: Math.max(desiredRightLeft, centerRight)
+        leftVisualRight: centerOwnsExclusiveWidth ? centerLeft : Math.min(desiredLeftRight, centerLeft),
+        rightVisualLeft: centerOwnsExclusiveWidth ? centerRight : Math.max(desiredRightLeft, centerRight),
+        centerOwnsExclusiveWidth: centerOwnsExclusiveWidth
     }
 }
 
 function resolveVisualPlacement(sectionName, usableBounds, contentWidths, adaptiveBounds) {
-    var contentWidth = contentWidths[sectionName] || 0
+    var contentWidth = Math.max(0, contentWidths[sectionName] || 0)
 
     if (sectionName === "center") {
         var centerLeftBound = adaptiveBounds ? adaptiveBounds.centerLeft : usableBounds.left
         var centerRightBound = adaptiveBounds ? adaptiveBounds.centerRight : usableBounds.right
         var centerBoundWidth = Math.max(0, centerRightBound - centerLeftBound)
-        var centerWidth = Math.min(contentWidth, centerBoundWidth)
+        var centerWidth = adaptiveBounds && adaptiveBounds.centerOwnsExclusiveWidth
+            ? contentWidth
+            : Math.min(contentWidth, centerBoundWidth)
         var centerVisualLeft = usableBounds.midpoint - centerWidth / 2
 
         return {
-            left: Math.max(centerLeftBound, Math.min(centerRightBound - centerWidth, centerVisualLeft)),
+            left: centerVisualLeft,
             width: centerWidth,
             centerX: usableBounds.midpoint
         }
@@ -66,10 +68,13 @@ function resolveVisualPlacement(sectionName, usableBounds, contentWidths, adapti
         }
     }
 
+    var leftRightBound = adaptiveBounds ? adaptiveBounds.leftVisualRight : usableBounds.right
+    var leftVisualLeft = Math.min(usableBounds.left, leftRightBound - contentWidth)
+
     return {
-        left: usableBounds.left,
+        left: leftVisualLeft,
         width: contentWidth,
-        centerX: usableBounds.left + contentWidth / 2
+        centerX: leftVisualLeft + contentWidth / 2
     }
 }
 

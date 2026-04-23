@@ -1,0 +1,14 @@
+{"file": ".opencode/commands/trellis/finish-work.md", "reason": "Finish work checklist"}
+{"file": ".opencode/commands/trellis/check-frontend.md", "reason": "Frontend check spec"}
+{"file": "modules/bar/widgets/SuperIslandWidget.qml", "reason": "Verify widened body placement, width reservation, and reveal motion contracts"}
+{"file": "modules/bar/widgets/WorkspaceWidget.qml", "reason": "Verify workspace pill behavior while the bar center is widened and neighbors are displaced"}
+{"file": "modules/bar/superisland/IslandWindowHintCard.qml", "reason": "Verify current hint rendering remains intact or is cleanly separated"}
+{"file": "modules/bar/superisland/SuperIslandAttachedShell.qml", "reason": "Verify attached shell geometry stays coherent with any widened-body variant"}
+{"file": "services/SuperIslandService.qml", "reason": "Verify event ownership and hold-mode state transitions stay consistent"}
+{"file": "services/WindowHintService.qml", "reason": "Verify hint payload derivation remains data-only and stable"}
+{"file": "services/barlayout/BarLayoutMeasurement.js", "reason": "Verify reserved width and measured width remain synchronized"}
+{"file": "services/barlayout/BarLayoutGeometryStateFacade.js", "reason": "Verify geometry-state updates propagate widened reservation correctly"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend quality and structure checks"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Component-level layout and motion conventions"}
+{"file": ".agents/skills/bar-widget-width-ownership/SKILL.md", "reason": "Validate widget-local width ownership before changing bar-global geometry"}
+{"file": ".agents/skills/attached-expansion-motion/SKILL.md", "reason": "Validate attached expansion motion reuse and stable geometry ownership"}

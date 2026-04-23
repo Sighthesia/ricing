@@ -96,6 +96,19 @@ Item {
         }
     }
 
+    // Spring push/release keeps displaced widgets slightly overshooting then settling.
+    Behavior on x {
+        enabled: !wrapper._isDragging
+            && !BarLayoutService.settingsMode
+            && wrapper._enterDone
+            && !wrapper._suppressNextWidthAnimation
+        NumberAnimation {
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
+        }
+    }
+
     // Background for highlight pulse + settings mode outline
     Rectangle {
         id: pulseBackground

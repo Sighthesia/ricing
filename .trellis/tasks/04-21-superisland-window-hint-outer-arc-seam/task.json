@@ -1,0 +1,44 @@
+{
+  "id": "superisland-window-hint-outer-arc-seam",
+  "name": "superisland-window-hint-outer-arc-seam",
+  "title": "[window-hint] 将 workspace 背景矩形顶部与 title 背景矩形顶部相接处的圆角改为直角，并在直角外侧添加三角形外圆弧装饰，形成一体圆弧质感",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "priority": "P2",
+  "creator": "opencode-agent",
+  "assignee": "opencode-agent",
+  "createdAt": "2026-04-21",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "feature/superisland-window-hint-expanded-layout",
+  "worktree_path": null,
+  "current_phase": 3,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "implement"
+    },
+    {
+      "phase": 2,
+      "action": "check"
+    },
+    {
+      "phase": 3,
+      "action": "finish"
+    },
+    {
+      "phase": 4,
+      "action": "create-pr"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

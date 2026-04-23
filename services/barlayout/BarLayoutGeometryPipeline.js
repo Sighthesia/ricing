@@ -13,7 +13,7 @@ function _sectionNames() {
 function sectionGeometryWithVisual(sectionName, left, right, contentWidth, slotCount, visualPlacement) {
     var geometry = GeometryUtils.clampedSectionGeometry(sectionName, left, right, contentWidth, slotCount)
 
-    geometry.visualLeft = Math.max(0, Number(visualPlacement.left) || 0)
+    geometry.visualLeft = Number(visualPlacement.left) || 0
     geometry.visualWidth = Math.max(0, Number(visualPlacement.width) || 0)
     geometry.visualCenterX = Number(visualPlacement.centerX) || 0
 
