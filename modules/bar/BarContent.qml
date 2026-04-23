@@ -56,8 +56,7 @@ Item {
         id: leftSection
         role: "left"
         widgetRegistry: barContent.widgetRegistry
-        x: barContent._sectionGeometry("left").left
-        width: barContent._sectionGeometry("left").width
+        width: barContent._sectionGeometry("left").layoutWidth
         anchors.verticalCenter: undefined
         anchors.top: parent.top
         height: Theme.barHeight
@@ -68,8 +67,7 @@ Item {
         id: centerSection
         role: "center"
         widgetRegistry: barContent.widgetRegistry
-        x: barContent._sectionGeometry("center").left
-        width: barContent._sectionGeometry("center").width
+        width: barContent._sectionGeometry("center").layoutWidth
         anchors.verticalCenter: undefined
         anchors.top: parent.top
         height: Theme.barHeight
@@ -80,8 +78,7 @@ Item {
         id: rightSection
         role: "right"
         widgetRegistry: barContent.widgetRegistry
-        x: barContent._sectionGeometry("right").left
-        width: barContent._sectionGeometry("right").width
+        width: barContent._sectionGeometry("right").layoutWidth
         anchors.verticalCenter: undefined
         anchors.top: parent.top
         height: Theme.barHeight

@@ -12,8 +12,13 @@ Item {
     implicitHeight: parent ? parent.height : 0
 
     readonly property var _frameGeometry: BarLayoutService.sectionGeometry(section.role)
-    readonly property real _visualOffsetX:
-        (_frameGeometry.visualLeft || 0) - (_frameGeometry.left || 0)
+    readonly property real _layoutLeft: Number(_frameGeometry.layoutLeft) || 0
+    readonly property real _layoutWidth: Number(_frameGeometry.layoutWidth) || 0
+    readonly property real _pushOffsetX: Number(_frameGeometry.pushOffsetX) || 0
+    property real _animatedLayoutLeft: _layoutLeft
+    property real _animatedSectionPushOffsetX: _pushOffsetX
+
+    x: _animatedLayoutLeft + _animatedSectionPushOffsetX
 
     Behavior on implicitWidth {
         enabled: BarLayoutService.settingsMode
@@ -23,17 +28,30 @@ Item {
         }
     }
 
-    Behavior on x {
-        enabled: BarLayoutService.settingsMode
-            && BarLayoutService.isDragging
+    // Animate section drift separately from push offset.
+    Behavior on _animatedLayoutLeft {
+        enabled: true
         NumberAnimation {
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
     }
 
+    // Animate push displacement independently from local slot layout.
+    Behavior on _animatedSectionPushOffsetX {
+        enabled: !BarLayoutService.settingsMode
+        NumberAnimation {
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
+        }
+    }
+
     // Collect enabled widgets for this section, sorted by order
     property var widgets: []
+
+    on_LayoutLeftChanged: section._animatedLayoutLeft = section._layoutLeft
+    on_PushOffsetXChanged: section._animatedSectionPushOffsetX = section._pushOffsetX
 
     function rebuildWidgets() {
         let result = [];
@@ -66,7 +84,7 @@ Item {
     Item {
         id: widgetStage
         x: 0
-        implicitWidth: Math.max(0, Number(section._frameGeometry.width) || 0)
+        implicitWidth: Math.max(0, Number(section._layoutWidth) || 0)
         height: parent.height
         anchors.verticalCenter: parent.verticalCenter
 
@@ -129,14 +147,15 @@ Item {
             instanceKey: BarLayoutService.instanceKeyAt(modelData.index)
             sectionRole: section.role
             readonly property var _widgetGeometry: BarLayoutService.widgetGeometry(instanceKey)
+            readonly property real _baseLeft: Number(_widgetGeometry ? _widgetGeometry.baseLeft : 0) || 0
+            readonly property real _localLeft: Number(_widgetGeometry ? _widgetGeometry.localLeft : 0) || 0
+            readonly property string _alignmentMode: _widgetGeometry && _widgetGeometry.alignmentMode !== undefined
+                ? _widgetGeometry.alignmentMode
+                : "left"
 
-            x: {
-                let geometry = _widgetGeometry
-                let sectionLeft = Number(section._frameGeometry.left) || 0
-                if (!geometry || geometry.left === undefined)
-                    return 0
-                return (Number(geometry.left) || 0) - sectionLeft
-            }
+            x: _localLeft
+            readonly property real _localSlotX: _localLeft
+            readonly property real _baseSlotX: _baseLeft
             anchors.verticalCenter: parent.verticalCenter
 
             Loader {

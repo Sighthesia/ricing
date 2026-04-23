@@ -29,7 +29,7 @@ function orderedEnabledWidgetsForSection(layoutModel, sectionName, instanceKeyAt
     return widgets
 }
 
-function slotGeometryOutput(sectionName, sectionLeft, orderedWidgets, effectiveMeasuredWidthFn, slotGeometryRecordFn, slotSpacing) {
+function slotGeometryOutput(sectionName, sectionLeft, orderedWidgets, effectiveMeasuredWidthFn, slotGeometryRecordFn, slotSpacing, sectionGeometry) {
     var slots = []
     var currentLeft = sectionLeft
     var spacing = Math.max(0, Number(slotSpacing) || 0)
@@ -44,7 +44,7 @@ function slotGeometryOutput(sectionName, sectionLeft, orderedWidgets, effectiveM
             order: widget.order,
             alignment: widget.alignment,
             measuredWidth: measuredWidth
-        }, i, currentLeft, measuredWidth))
+        }, i, currentLeft, measuredWidth, sectionGeometry))
 
         currentLeft += measuredWidth
 
@@ -90,7 +90,9 @@ function slotGeometriesFromSections(sectionNames, sectionGeometries, orderedWidg
         var sectionName = sectionNames[i]
         nextSlotGeometries[sectionName] = slotGeometryOutputFn(
             sectionName,
-            sectionGeometries[sectionName].visualLeft,
+            sectionGeometries[sectionName].layoutLeft !== undefined
+                ? sectionGeometries[sectionName].layoutLeft
+                : sectionGeometries[sectionName].visualLeft,
             orderedWidgetsBySection[sectionName]
         )
     }

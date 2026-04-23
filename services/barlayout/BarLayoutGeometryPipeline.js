@@ -10,14 +10,17 @@ function _sectionNames() {
     return ["left", "center", "right"]
 }
 
-function sectionGeometryWithVisual(sectionName, left, right, contentWidth, slotCount, visualPlacement) {
-    var geometry = GeometryUtils.clampedSectionGeometry(sectionName, left, right, contentWidth, slotCount)
+function sectionGeometryWithVisual(sectionName, usableBounds, contentWidths, adaptiveBounds, slotCount, visualPlacement) {
+    var contract = SectionsUtils.sectionGeometryContract(sectionName, usableBounds, contentWidths, adaptiveBounds, visualPlacement)
 
-    geometry.visualLeft = Number(visualPlacement.left) || 0
-    geometry.visualWidth = Math.max(0, Number(visualPlacement.width) || 0)
-    geometry.visualCenterX = Number(visualPlacement.centerX) || 0
-
-    return geometry
+    return GeometryUtils.clampedSectionGeometry(
+        sectionName,
+        contract.layoutLeft,
+        contract.layoutRight,
+        contract.contentWidth,
+        slotCount,
+        contract
+    )
 }
 
 function recomputeGeometryContracts(options) {
@@ -45,25 +48,25 @@ function recomputeGeometryContracts(options) {
     var nextSectionGeometries = {
         left: sectionGeometryWithVisual(
             "left",
-            usableBounds.left,
-            adaptiveBounds.leftRight,
-            contentWidths.left || 0,
+            usableBounds,
+            contentWidths,
+            adaptiveBounds,
             orderedWidgetsBySection.left.length,
             SectionsUtils.resolveVisualPlacement("left", usableBounds, contentWidths, adaptiveBounds)
         ),
         center: sectionGeometryWithVisual(
             "center",
-            adaptiveBounds.centerLeft,
-            adaptiveBounds.centerRight,
-            contentWidths.center || 0,
+            usableBounds,
+            contentWidths,
+            adaptiveBounds,
             orderedWidgetsBySection.center.length,
             SectionsUtils.resolveVisualPlacement("center", usableBounds, contentWidths, adaptiveBounds)
         ),
         right: sectionGeometryWithVisual(
             "right",
-            adaptiveBounds.rightLeft,
-            usableBounds.right,
-            contentWidths.right || 0,
+            usableBounds,
+            contentWidths,
+            adaptiveBounds,
             orderedWidgetsBySection.right.length,
             SectionsUtils.resolveVisualPlacement("right", usableBounds, contentWidths, adaptiveBounds)
         )
@@ -74,14 +77,15 @@ function recomputeGeometryContracts(options) {
         nextSectionGeometries,
         orderedWidgetsBySection,
         function(sectionName, sectionLeft, orderedWidgets) {
-            return DeriveUtils.slotGeometryOutput(
-                sectionName,
-                sectionLeft,
-                orderedWidgets,
-                options.effectiveMeasuredWidthFn,
-                GeometryUtils.slotGeometryRecord,
-                options.widgetSpacing
-            )
+        return DeriveUtils.slotGeometryOutput(
+            sectionName,
+            sectionLeft,
+            orderedWidgets,
+            options.effectiveMeasuredWidthFn,
+            GeometryUtils.slotGeometryRecord,
+            options.widgetSpacing,
+            nextSectionGeometries[sectionName]
+        )
         }
     )
     var nextWidgetGeometries = DeriveUtils.widgetGeometriesFromSlots(
@@ -153,7 +157,7 @@ function insertionSlots(sectionGeometry, slots, excludeInstanceKey, widgetSpacin
         return slots
 
     var filteredSlots = []
-    var currentLeft = sectionGeometry.visualLeft
+    var currentLeft = sectionGeometry.layoutLeft !== undefined ? sectionGeometry.layoutLeft : sectionGeometry.visualLeft
     var spacing = Math.max(0, Number(widgetSpacing) || 0)
 
     for (var i = 0; i < slots.length; i++) {
@@ -167,7 +171,7 @@ function insertionSlots(sectionGeometry, slots, excludeInstanceKey, widgetSpacin
             order: slot.order,
             alignment: slot.alignment,
             measuredWidth: slot.measuredWidth
-        }, filteredSlots.length, currentLeft, slot.width))
+        }, filteredSlots.length, currentLeft, slot.width, sectionGeometry))
         currentLeft += slot.width
 
         if (i < slots.length - 1)

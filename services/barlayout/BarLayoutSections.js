@@ -12,6 +12,49 @@ function barUsableBounds(barContentWidth, barContentPadding) {
     }
 }
 
+function sectionGeometryContract(sectionName, usableBounds, contentWidths, adaptiveBounds, visualPlacement) {
+    var contentWidth = Math.max(0, contentWidths[sectionName] || 0)
+    var alignmentMode = sectionName === "center" ? "center" : sectionName
+    var anchorMode = sectionName === "center" ? "center" : "edge"
+    var fixedEdge = sectionName === "left"
+        ? "left"
+        : (sectionName === "right" ? "right" : "none")
+    var layoutLeft = sectionName === "center"
+        ? adaptiveBounds.centerLeft
+        : (sectionName === "right" ? adaptiveBounds.rightLeft : usableBounds.left)
+    var layoutRight = sectionName === "center"
+        ? adaptiveBounds.centerRight
+        : (sectionName === "left" ? adaptiveBounds.leftRight : usableBounds.right)
+    var visualLeft = Number(visualPlacement.left) || layoutLeft
+    var visualWidth = Math.max(0, Number(visualPlacement.width) || contentWidth)
+    var visualRight = visualLeft + visualWidth
+    var contentLeft = visualLeft
+    var contentRight = visualRight
+    var pushOffsetX = visualLeft - layoutLeft
+    var driftPolicy = adaptiveBounds.centerOwnsExclusiveWidth ? "push" : "pinned"
+
+    return {
+        layoutLeft: layoutLeft,
+        layoutRight: layoutRight,
+        layoutWidth: Math.max(0, layoutRight - layoutLeft),
+        visualLeft: visualLeft,
+        visualRight: visualRight,
+        visualWidth: visualWidth,
+        contentLeft: contentLeft,
+        contentRight: contentRight,
+        contentWidth: Math.max(0, contentWidth),
+        anchorMode: anchorMode,
+        alignmentMode: alignmentMode,
+        fixedEdge: fixedEdge,
+        driftPolicy: driftPolicy,
+        driftMinX: layoutLeft,
+        driftMaxX: visualLeft,
+        pushOffsetX: pushOffsetX,
+        pushTargetOffsetX: pushOffsetX,
+        pushSource: adaptiveBounds.centerOwnsExclusiveWidth ? "center-exclusive" : ""
+    }
+}
+
 function resolveAdaptiveSectionBounds(usableBounds, contentWidths) {
     var desiredLeftRight = Math.min(usableBounds.right, usableBounds.left + (contentWidths.left || 0))
     var desiredRightLeft = Math.max(usableBounds.left, usableBounds.right - (contentWidths.right || 0))
