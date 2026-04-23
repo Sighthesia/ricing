@@ -12,13 +12,16 @@ Item {
     implicitHeight: parent ? parent.height : 0
 
     readonly property var _frameGeometry: BarLayoutService.sectionGeometry(section.role)
+    readonly property bool _centerAnchoredSection: (_frameGeometry.anchorMode || "") === "center"
     readonly property real _layoutLeft: Number(_frameGeometry.layoutLeft) || 0
     readonly property real _layoutWidth: Number(_frameGeometry.layoutWidth) || 0
     readonly property real _pushOffsetX: Number(_frameGeometry.pushOffsetX) || 0
     property real _animatedLayoutLeft: _layoutLeft
     property real _animatedSectionPushOffsetX: _pushOffsetX
 
-    x: _animatedLayoutLeft + _animatedSectionPushOffsetX
+    x: _centerAnchoredSection
+        ? (_layoutLeft + _pushOffsetX)
+        : (_animatedLayoutLeft + _animatedSectionPushOffsetX)
 
     Behavior on implicitWidth {
         enabled: BarLayoutService.settingsMode
@@ -30,7 +33,7 @@ Item {
 
     // Animate section drift separately from push offset.
     Behavior on _animatedLayoutLeft {
-        enabled: true
+        enabled: !section._centerAnchoredSection
         NumberAnimation {
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
@@ -39,7 +42,7 @@ Item {
 
     // Animate push displacement independently from local slot layout.
     Behavior on _animatedSectionPushOffsetX {
-        enabled: !BarLayoutService.settingsMode
+        enabled: !BarLayoutService.settingsMode && !section._centerAnchoredSection
         NumberAnimation {
             duration: Theme.anim.springDuration
             easing.type: Theme.anim.springType
@@ -52,6 +55,13 @@ Item {
 
     on_LayoutLeftChanged: section._animatedLayoutLeft = section._layoutLeft
     on_PushOffsetXChanged: section._animatedSectionPushOffsetX = section._pushOffsetX
+    on_CenterAnchoredSectionChanged: {
+        if (!section._centerAnchoredSection)
+            return
+
+        section._animatedLayoutLeft = section._layoutLeft
+        section._animatedSectionPushOffsetX = section._pushOffsetX
+    }
 
     function rebuildWidgets() {
         let result = [];
