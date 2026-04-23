@@ -285,6 +285,7 @@ Use when rapid text input keeps restarting launcher or clipboard result motion b
 - For `window-hint` to overlay handoff, compare `IslandOverlayService.mode` and `IslandOverlayService.state` separately before deciding a delayed pulse is still valid.
 - For mixed-width capsule lanes, verify the stage wrapper is centered independently from sibling lanes.
 - For `window-hint` previews, if the UI becomes blank only during rapid source churn, keep the last visible snapshot until a real close event rather than publishing an empty intermediate snapshot.
+- For `bar-expanded` window-hint height/position bugs, separate width reveal from vertical reveal: width growth should not drive `revealYOffset`, clock handoff offsets, or workspace lane vertical motion. Keep hidden measurement loaders on the stable data path, but exclude them from live motion ownership so they can measure without re-animating the visible subtree.
 - For `window-hint` or overlay-owned preview swaps, route `hiddenPreviewEvent` through replace layers and pulse/spring feedback instead of mutating `_mainDisplayEvent` directly.
 - For `window-hint` or overlay sessions, let hidden preview expiry continue even while foreground timers are paused, or the last notification will outlive the surface owner.
 - For attached hint close, use cached collapse width only during the actual collapse path; stale width snapshots can cause wide-pill hold or close-time width flash.

@@ -51,6 +51,11 @@ Item {
 
         if (interruptingDetachedHint) {
             root.machine.finishWindowHint()
+        } else if (nextEvent.presentation === "bar-expanded" && nextEvent.type === "window-hint") {
+            if (previousIsHint && root.host._hintPhase)
+                root.machine.updateWindowHint(nextEvent)
+            else
+                root.machine.startBarExpandedWindowHint(nextEvent)
         } else if (nextEvent.relayReplace && previousEvent.type !== "idle") {
             if (previousIsHint)
                 root.machine.resumeTransient(nextEvent)

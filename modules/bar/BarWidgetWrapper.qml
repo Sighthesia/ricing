@@ -96,6 +96,15 @@ Item {
         }
     }
 
+    // Keep local slot reflow smooth while section push is owned above.
+    Behavior on x {
+        enabled: !wrapper._isDragging && wrapper._enterDone
+        NumberAnimation {
+            duration: Theme.anim.moveDuration
+            easing.type: Theme.anim.moveType
+        }
+    }
+
     // Background for highlight pulse + settings mode outline
     Rectangle {
         id: pulseBackground
@@ -146,12 +155,8 @@ Item {
 
         if (BarLayoutService.settingsMode && wrapper.instanceKey && wrapper.sectionRole) {
             let widgetGeometry = BarLayoutService.widgetGeometry(wrapper.instanceKey)
-            let sectionGeometry = BarLayoutService.sectionGeometry(wrapper.sectionRole)
-            let sectionLeft = sectionGeometry && sectionGeometry.left !== undefined
-                ? Number(sectionGeometry.left) || 0
-                : 0
-            let expectedX = widgetGeometry && widgetGeometry.left !== undefined
-                ? (Number(widgetGeometry.left) || 0) - sectionLeft
+            let expectedX = widgetGeometry && widgetGeometry.localLeft !== undefined
+                ? Number(widgetGeometry.localLeft) || 0
                 : wrapper.x
 
             if (Math.abs(wrapper.x - expectedX) > 0.5) {
@@ -204,6 +209,7 @@ Item {
         } else if (wrapper._reportedInstanceKey === wrapper.instanceKey) {
             wrapper._reportedInstanceKey = ""
         }
+
     }
 
     function clearReportedMeasuredWidth() {
@@ -251,9 +257,7 @@ Item {
         wrapper.tryStartEnterAnimation()
     }
 
-    on_NaturalWidthChanged: {
-        wrapper.tryStartEnterAnimation()
-    }
+    on_NaturalWidthChanged: wrapper.tryStartEnterAnimation()
 
     Timer {
         id: delegateAlignmentRetryTimer

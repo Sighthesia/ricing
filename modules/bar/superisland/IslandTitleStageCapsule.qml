@@ -15,7 +15,6 @@ Item {
     readonly property var _metrics: host._titleMetrics(titleCapsule.slotPosition)
     readonly property real _emphasis: _metrics.emphasis
     readonly property color _fill: host._mixColor(host._secondaryCapsuleFill, host._primaryCapsuleFill, _emphasis)
-    readonly property color _border: host._mixColor(host._secondaryCapsuleBorder, host._primaryCapsuleBorder, _emphasis)
     readonly property color _textColor: host._mixColor(Colors.textMuted, Colors.text, _emphasis)
     readonly property real _iconOpacity: host._lerp(0.68, 0.92, _emphasis)
     readonly property int _iconSize: Math.round(host._lerp(Math.max(10, host._compactIcon - 1), host._compactIcon, _emphasis))
@@ -33,8 +32,6 @@ Item {
         anchors.fill: parent
         radius: height / 2
         color: titleCapsule._fill
-        border.width: 1
-        border.color: titleCapsule._border
     }
 
     Item {

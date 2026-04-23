@@ -17,6 +17,7 @@ Item {
     property bool expanded: false
     property bool animateWidth: true
     property bool animateHeight: true
+    property bool freezeExpandedRetargeting: false
     property bool pulseEnabled: Theme.anim.barExpandPulseEnabled
     property bool timelinePulseEnabled: pulseEnabled
 
@@ -337,6 +338,11 @@ Item {
     function _handleLiveGeometryChange() {
         if (!_ready)
             return
+
+        if (expanded && freezeExpandedRetargeting) {
+            _syncToCurrentTruth()
+            return
+        }
 
         const widthChanged = _targetDeltaExceedsThreshold(_animatedWidth, _targetWidth())
         const heightChanged = _targetDeltaExceedsThreshold(_animatedHeight, _targetHeight())

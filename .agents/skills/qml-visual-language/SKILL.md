@@ -176,6 +176,38 @@ The SuperIsland expanded area has a single design language that all components u
 - On collapse, can the user still see the surface shrink and travel back toward the bar instead of disappearing halfway?
 - On collapse, do bridge decorations retire cleanly instead of turning into thin suspended shards near the pill?
 
+## SuperIsland Semantic Ownership Map
+
+Use this map when a change spans `SuperIslandWidget.qml`, `IslandWindowHintCard.qml`, and attached shell helpers.
+
+### Root Elements
+
+- `modules/bar/widgets/SuperIslandWidget.qml`: the bar host root `Item`.
+- `modules/bar/superisland/IslandWindowHintCard.qml`: the window-hint presentation root `Item`.
+- `modules/bar/AttachedExpansionShell.qml`: the attached-shell geometry root `Item` when that shell is active.
+
+### Width Ownership
+
+- The bar reservation width is owned by `SuperIslandWidget.qml` through its exported `layoutMeasurementWidth` and `implicitWidth`.
+- `BarWidgetWrapper` measures the root export, not the inner title row.
+- `IslandWindowHintCard.qml` only owns the internal hint layout width for the active presentation branch.
+
+### Visual Body Ownership
+
+- The visible bar-position SuperIsland body is `_pillClip` with `_pillBg` inside `SuperIslandWidget.qml`.
+- The lower workspace/clock rectangle in `bar-expanded-detached` is `IslandWindowHintCard.qml`'s `_barExpandedDetachedLayout` and its background `Rectangle`.
+- The title capsule strip in `bar-expanded-main` is `IslandWindowHintCard.qml`'s `_barExpandedMainLayout` and the `Row` inside it.
+
+### Important Clarification
+
+- The bar-position SuperIsland is not physically moved into the workspace rectangle.
+- Only the window-hint content is rehomed into a detached lower presentation while the host root remains in the bar and keeps owning the exported width contract.
+
+### Debug Rule
+
+- If the title row background looks wrong, fix `IslandWindowHintCard.qml`.
+- If the bar still reserves the wrong width, fix `SuperIslandWidget.qml`'s exported width contract first.
+
 ## References
 
 - `modules/bar/widgets/SuperIslandWidget.qml`

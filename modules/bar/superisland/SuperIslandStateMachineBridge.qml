@@ -94,7 +94,7 @@ Item {
             if (root.host._isHintEventType(previewEvent.type))
                 return
 
-            if (root.state._overlaySessionActive || root.host._hintPhase)
+            if (root.state._overlaySessionActive)
                 root.machine.replacePreviewTransient(previewEvent)
 
             SuperIslandService.syncNotificationPopupVisibility()

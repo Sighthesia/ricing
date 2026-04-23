@@ -1,0 +1,11 @@
+{"file": ".opencode/commands/trellis/check-frontend.md", "reason": "Frontend check spec"}
+{"file": "modules/bar/widgets/SuperIslandWidget.qml", "reason": "Primary place to inspect width takeover, layering, and body relocation glitches"}
+{"file": "modules/bar/superisland/IslandWindowHintCard.qml", "reason": "Likely source of incorrect title-row placement or capsule overlap"}
+{"file": "modules/bar/superisland/IslandWindowHintMotion.js", "reason": "Transition retargeting bugs will surface here first"}
+{"file": "modules/bar/superisland/IslandWindowHintStage.js", "reason": "Anchor and visibility mistakes can collapse the hint layout"}
+{"file": "modules/bar/superisland/SuperIslandAttachedShell.qml", "reason": "Inspect if bridge or shell geometry looks wrong during widened hint mode"}
+{"file": "services/SuperIslandService.qml", "reason": "Debug event collisions between the new mode and existing hold behavior"}
+{"file": "services/WindowHintService.qml", "reason": "Debug stale snapshots or missing hint updates"}
+{"file": "services/barlayout/BarLayoutMeasurement.js", "reason": "Debug exclusive width versus visual width mismatches"}
+{"file": ".trellis/tasks/03-27-niri-window-hint/prd.md", "reason": "Compare against original ownership assumptions when behavior is ambiguous"}
+{"file": ".agents/skills/bar-widget-width-ownership/SKILL.md", "reason": "Debug checklist for width-ownership problems in bar widgets"}

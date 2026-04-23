@@ -1,0 +1,17 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
+{"file": "services/WindowHintService.qml", "reason": "Current window-hint snapshot and trigger data contract for the new presentation"}
+{"file": "services/SuperIslandService.qml", "reason": "Current window-hint event routing and hold behavior that the new independent mode must extend"}
+{"file": "modules/bar/widgets/SuperIslandWidget.qml", "reason": "Owns SuperIsland rendering, attached expansion, and body placement that must widen and relocate"}
+{"file": "modules/bar/widgets/WorkspaceWidget.qml", "reason": "Workspace widget likely needs yielding behavior when expanded hint claims center-bar width"}
+{"file": "modules/bar/superisland/IslandWindowHintCard.qml", "reason": "Baseline window-hint presentation whose title row will be re-homed into the widened bar body"}
+{"file": "modules/bar/superisland/IslandWindowHintCardLogic.js", "reason": "Current slot and geometry logic for title/workspace capsule staging"}
+{"file": "modules/bar/superisland/IslandWindowHintStage.js", "reason": "Computes capsule visibility, anchors, and stage bounds for hint rows"}
+{"file": "modules/bar/superisland/IslandWindowHintMotion.js", "reason": "Controls hint retargeting and slot refresh behavior during transitions"}
+{"file": "services/barlayout/BarLayoutMeasurement.js", "reason": "Width ownership contract needed when the expanded hint temporarily pushes other widgets aside"}
+{"file": "services/barlayout/BarLayoutGeometryStateFacade.js", "reason": "Bar geometry state propagation for widened reservation through layout state"}
+{"file": ".trellis/tasks/03-27-niri-window-hint/info.md", "reason": "Existing architecture notes for the current mixed ownership window-hint design"}
+{"file": ".trellis/tasks/03-27-niri-window-hint/prd.md", "reason": "Prior design tradeoffs and ownership boundaries for current hint and SuperIsland split"}
+{"file": ".agents/skills/bar-widget-width-ownership/SKILL.md", "reason": "Guidance on making visual width and reserved bar width stay in sync for one widget"}
+{"file": ".agents/skills/attached-expansion-motion/SKILL.md", "reason": "Guidance on reusing attached SuperIsland motion without layout thrash"}
+{"file": ".agents/skills/qml-visual-language/SKILL.md", "reason": "Shared SuperIsland visual-language contract for expanded-area surfaces"}

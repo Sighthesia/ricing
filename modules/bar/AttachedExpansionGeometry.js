@@ -5,8 +5,10 @@ function metrics(root, effectiveShellRadius) {
     var pillLeft = (root.width - root.pillWidth) / 2
     var pillRight = pillLeft + root.pillWidth
     var pillRadius = Math.max(minRadius, root.pillHeight / 2)
-    var panelLeft = 0.5
-    var panelRight = root.width - 0.5
+    var rawPanelWidth = root.panelWidth !== undefined ? root.panelWidth : root.width
+    var panelWidth = Math.max(minRadius, Math.min(root.width - 1, rawPanelWidth - 1))
+    var panelLeft = (root.width - panelWidth) / 2
+    var panelRight = panelLeft + panelWidth
     var panelTop = Math.max(root.pillHeight, root.panelY - root.y + root.attachmentOverlap)
     var panelBottom = root.height - 0.5
     var panelRadius = Math.max(minRadius, Math.min(effectiveShellRadius, Math.max(1, (panelBottom - panelTop) / 2)))

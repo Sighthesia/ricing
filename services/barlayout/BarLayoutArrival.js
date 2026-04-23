@@ -21,10 +21,10 @@ function arrivalGeometryForSlot(instanceKey, widgetId, sectionName, slot, phase,
         instanceKey: instanceKey,
         widgetId: widgetId,
         section: sectionName,
-        barLeft: slot.left,
+        barLeft: slot.visualLeft !== undefined ? slot.visualLeft : slot.left,
         barWidth: slot.width,
-        barRight: slot.right,
-        barCenterX: slot.centerX,
+        barRight: slot.visualRight !== undefined ? slot.visualRight : slot.right,
+        barCenterX: slot.visualCenterX !== undefined ? slot.visualCenterX : slot.centerX,
         phase: phase,
         readyForDelegate: readyForDelegate === true
     }
@@ -43,10 +43,10 @@ function syncArrivalGeometriesWithSlots(arrivalGeometries, slotGeometries) {
             continue
 
         nextArrivalGeometries[instanceKey] = Object.assign({}, snapshot, {
-            barLeft: slot.left,
+            barLeft: slot.visualLeft !== undefined ? slot.visualLeft : slot.left,
             barWidth: slot.width,
-            barRight: slot.right,
-            barCenterX: slot.centerX
+            barRight: slot.visualRight !== undefined ? slot.visualRight : slot.right,
+            barCenterX: slot.visualCenterX !== undefined ? slot.visualCenterX : slot.centerX
         })
     }
 

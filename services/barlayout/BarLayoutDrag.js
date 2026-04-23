@@ -20,11 +20,12 @@ function insertionIndicatorGeometry(sectionName, index, boundaryX, sectionLeft) 
 }
 
 function dragTargetForVisualCenter(visualCenterX, sectionName, sectionGeometry, insertionIndex) {
+    var layoutLeft = sectionGeometry.layoutLeft !== undefined ? Number(sectionGeometry.layoutLeft) || 0 : Number(sectionGeometry.left) || 0
     return {
         section: sectionName,
         index: insertionIndex,
         pointerX: Math.max(0, Number(visualCenterX) || 0),
-        localX: Math.max(0, Number(visualCenterX) || 0) - sectionGeometry.left
+        localX: Math.max(0, Number(visualCenterX) || 0) - layoutLeft
     }
 }
 
