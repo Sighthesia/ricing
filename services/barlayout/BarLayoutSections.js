@@ -31,7 +31,14 @@ function sectionGeometryContract(sectionName, usableBounds, contentWidths, adapt
     var contentLeft = visualLeft
     var contentRight = visualRight
     var pushOffsetX = visualLeft - layoutLeft
-    var driftPolicy = adaptiveBounds.centerOwnsExclusiveWidth ? "push" : "pinned"
+    var centerPushesLeft = !!(adaptiveBounds && adaptiveBounds.centerPushesLeft)
+    var centerPushesRight = !!(adaptiveBounds && adaptiveBounds.centerPushesRight)
+    var pushedByCenter = (sectionName === "left" && centerPushesLeft)
+        || (sectionName === "right" && centerPushesRight)
+    var driftPolicy = pushedByCenter ? "push" : "pinned"
+    var pushSource = pushedByCenter
+        ? (sectionName === "left" ? "center-overlap-left" : "center-overlap-right")
+        : ""
 
     return {
         layoutLeft: layoutLeft,
@@ -51,33 +58,29 @@ function sectionGeometryContract(sectionName, usableBounds, contentWidths, adapt
         driftMaxX: visualLeft,
         pushOffsetX: pushOffsetX,
         pushTargetOffsetX: pushOffsetX,
-        pushSource: adaptiveBounds.centerOwnsExclusiveWidth ? "center-exclusive" : ""
+        pushSource: pushSource
     }
 }
 
 function resolveAdaptiveSectionBounds(usableBounds, contentWidths) {
+    var centerVisualWidth = Math.max(0, contentWidths.center || 0)
     var desiredLeftRight = Math.min(usableBounds.right, usableBounds.left + (contentWidths.left || 0))
     var desiredRightLeft = Math.max(usableBounds.left, usableBounds.right - (contentWidths.right || 0))
-    var centerHalfRoom = Math.min(
-        Math.max(0, usableBounds.midpoint - desiredLeftRight),
-        Math.max(0, desiredRightLeft - usableBounds.midpoint)
-    )
-    var centerVisualWidth = Math.max(0, contentWidths.center || 0)
-    var centerOwnsExclusiveWidth = centerVisualWidth > centerHalfRoom * 2
-    var centerInteractionWidth = centerOwnsExclusiveWidth
-        ? centerVisualWidth
-        : Math.max(0, Math.min(centerVisualWidth, centerHalfRoom * 2))
-    var centerLeft = usableBounds.midpoint - centerInteractionWidth / 2
-    var centerRight = usableBounds.midpoint + centerInteractionWidth / 2
+    var centerLeft = usableBounds.midpoint - centerVisualWidth / 2
+    var centerRight = usableBounds.midpoint + centerVisualWidth / 2
+    var centerPushesLeft = desiredLeftRight > centerLeft
+    var centerPushesRight = desiredRightLeft < centerRight
 
     return {
-        leftRight: centerLeft,
+        leftRight: Math.min(desiredLeftRight, centerLeft),
         centerLeft: centerLeft,
         centerRight: centerRight,
-        rightLeft: centerRight,
-        leftVisualRight: centerOwnsExclusiveWidth ? centerLeft : Math.min(desiredLeftRight, centerLeft),
-        rightVisualLeft: centerOwnsExclusiveWidth ? centerRight : Math.max(desiredRightLeft, centerRight),
-        centerOwnsExclusiveWidth: centerOwnsExclusiveWidth
+        rightLeft: Math.max(desiredRightLeft, centerRight),
+        leftVisualRight: Math.min(desiredLeftRight, centerLeft),
+        rightVisualLeft: Math.max(desiredRightLeft, centerRight),
+        centerOwnsExclusiveWidth: centerPushesLeft || centerPushesRight,
+        centerPushesLeft: centerPushesLeft,
+        centerPushesRight: centerPushesRight
     }
 }
 
@@ -85,17 +88,11 @@ function resolveVisualPlacement(sectionName, usableBounds, contentWidths, adapti
     var contentWidth = Math.max(0, contentWidths[sectionName] || 0)
 
     if (sectionName === "center") {
-        var centerLeftBound = adaptiveBounds ? adaptiveBounds.centerLeft : usableBounds.left
-        var centerRightBound = adaptiveBounds ? adaptiveBounds.centerRight : usableBounds.right
-        var centerBoundWidth = Math.max(0, centerRightBound - centerLeftBound)
-        var centerWidth = adaptiveBounds && adaptiveBounds.centerOwnsExclusiveWidth
-            ? contentWidth
-            : Math.min(contentWidth, centerBoundWidth)
-        var centerVisualLeft = usableBounds.midpoint - centerWidth / 2
+        var centerVisualLeft = usableBounds.midpoint - contentWidth / 2
 
         return {
             left: centerVisualLeft,
-            width: centerWidth,
+            width: contentWidth,
             centerX: usableBounds.midpoint
         }
     }

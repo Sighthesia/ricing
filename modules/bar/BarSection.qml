@@ -13,16 +13,14 @@ Item {
 
     readonly property var _frameGeometry: BarLayoutService.sectionGeometry(section.role)
     readonly property bool _centerAnchoredSection: (_frameGeometry.anchorMode || "") === "center"
-    readonly property real _layoutLeft: Number(_frameGeometry.layoutLeft) || 0
+    readonly property bool _pushDrivenByCenter: (_frameGeometry.pushSource || "").indexOf("center-overlap-") === 0
     readonly property real _layoutWidth: Number(_frameGeometry.layoutWidth) || 0
-    readonly property real _pushOffsetX: Number(_frameGeometry.pushOffsetX) || 0
-    property real _animatedLayoutLeft: _layoutLeft
-    property real _animatedSectionPushOffsetX: _pushOffsetX
+    readonly property real _visualLeft: Number(_frameGeometry.visualLeft) || 0
+    property real _animatedVisualLeft: _visualLeft
 
-    x: _centerAnchoredSection
-        ? (_layoutLeft + _pushOffsetX)
-        : (_animatedLayoutLeft + _animatedSectionPushOffsetX)
+    x: _centerAnchoredSection || _pushDrivenByCenter ? _visualLeft : _animatedVisualLeft
 
+    // Keep the section reservation tied to the shared layout width.
     Behavior on implicitWidth {
         enabled: BarLayoutService.settingsMode
         NumberAnimation {
@@ -31,37 +29,20 @@ Item {
         }
     }
 
-    // Animate section drift separately from push offset.
-    Behavior on _animatedLayoutLeft {
-        enabled: !section._centerAnchoredSection
+    // Keep the whole section body structurally synced to collision ownership.
+    Behavior on _animatedVisualLeft {
+        enabled: false
         NumberAnimation {
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
     }
 
-    // Animate push displacement independently from local slot layout.
-    Behavior on _animatedSectionPushOffsetX {
-        enabled: !BarLayoutService.settingsMode && !section._centerAnchoredSection
-        NumberAnimation {
-            duration: Theme.anim.springDuration
-            easing.type: Theme.anim.springType
-            easing.overshoot: Theme.anim.springOvershoot
-        }
-    }
-
-    // Collect enabled widgets for this section, sorted by order
+    // Collect enabled widgets for this section, sorted by order.
     property var widgets: []
 
-    on_LayoutLeftChanged: section._animatedLayoutLeft = section._layoutLeft
-    on_PushOffsetXChanged: section._animatedSectionPushOffsetX = section._pushOffsetX
-    on_CenterAnchoredSectionChanged: {
-        if (!section._centerAnchoredSection)
-            return
-
-        section._animatedLayoutLeft = section._layoutLeft
-        section._animatedSectionPushOffsetX = section._pushOffsetX
-    }
+    on_VisualLeftChanged: section._animatedVisualLeft = section._visualLeft
+    on_CenterAnchoredSectionChanged: section._animatedVisualLeft = section._visualLeft
 
     function rebuildWidgets() {
         let result = [];
@@ -77,6 +58,7 @@ Item {
 
     Component.onCompleted: rebuildWidgets()
 
+    // Rebuild the section model when the shared layout updates.
     Connections {
         target: BarLayoutService
         function onLayoutChanged() { section.rebuildWidgets(); }
@@ -91,6 +73,7 @@ Item {
         )
     }
 
+    // Section-local slot stage.
     Item {
         id: widgetStage
         x: 0
@@ -104,7 +87,7 @@ Item {
         }
     }
 
-    // Active target highlight: shown when the widget picker is open and targeting this section
+    // Section highlight overlay.
     Rectangle {
         anchors.fill: parent
         radius: Theme.cornerRadius
@@ -116,7 +99,7 @@ Item {
         }
     }
 
-    // Insertion indicator line (visible during drag when hovering this section)
+    // Section insertion marker.
     Rectangle {
         id: insertIndicator
         visible: BarLayoutService.isDragging
@@ -147,9 +130,11 @@ Item {
         }
     }
 
+    // Widget delegate template.
     Component {
         id: widgetDelegate
 
+        // Render each widget in the section-local slot geometry.
         BarWidgetWrapper {
             required property var modelData
             staggerIndex: modelData.index
@@ -168,6 +153,7 @@ Item {
             readonly property real _baseSlotX: _baseLeft
             anchors.verticalCenter: parent.verticalCenter
 
+            // Load the widget content after the wrapper owns the slot geometry.
             Loader {
                 source: section.widgetRegistry[modelData.widgetId] || ""
                 active: source !== ""

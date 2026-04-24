@@ -1,0 +1,6 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
+{"file": ".agents/skills/superisland-window-hint-semantic-ownership/SKILL.md", "reason": "Window hint ownership semantics"}
+{"file": ".agents/skills/bar-widget-width-ownership/SKILL.md", "reason": "Bar width ownership and push behavior"}
+{"file": ".agents/skills/qml-motion-debug/SKILL.md", "reason": "QML motion synchronization debugging"}
+{"file": ".agents/skills/qml-performance-debug/SKILL.md", "reason": "Layout and transition timing stability"}

@@ -109,8 +109,6 @@ Item {
     readonly property int _barExpandedExclusivePushPadding: Math.max(0, Theme.widgetSpacing)
     readonly property int _barExpandedMainWidth:
         Math.max(
-            root._barExpandedDetachedWidth,
-            root._minPreviewWidth,
             root._expandedTitleRowWidth + root._barExpandedExclusivePushPadding * 2
         )
     readonly property int _barExpandedDetachedWidth:
