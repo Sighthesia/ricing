@@ -58,7 +58,9 @@ function sectionGeometryContract(sectionName, usableBounds, contentWidths, adapt
         driftMaxX: visualLeft,
         pushOffsetX: pushOffsetX,
         pushTargetOffsetX: pushOffsetX,
-        pushSource: pushSource
+        pushSource: pushSource,
+        layoutReservationWidth: Math.max(0, layoutRight - layoutLeft),
+        layoutRevealWidth: visualWidth
     }
 }
 
@@ -68,8 +70,11 @@ function resolveAdaptiveSectionBounds(usableBounds, contentWidths) {
     var desiredRightLeft = Math.max(usableBounds.left, usableBounds.right - (contentWidths.right || 0))
     var centerLeft = usableBounds.midpoint - centerVisualWidth / 2
     var centerRight = usableBounds.midpoint + centerVisualWidth / 2
-    var centerPushesLeft = desiredLeftRight > centerLeft
-    var centerPushesRight = desiredRightLeft < centerRight
+    var leftOverlap = Math.max(0, desiredLeftRight - centerLeft)
+    var rightOverlap = Math.max(0, centerRight - desiredRightLeft)
+    var collisionEpsilon = 0.5
+    var centerPushesLeft = leftOverlap > collisionEpsilon
+    var centerPushesRight = rightOverlap > collisionEpsilon
 
     return {
         leftRight: Math.min(desiredLeftRight, centerLeft),

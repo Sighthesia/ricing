@@ -12,37 +12,14 @@ Item {
     implicitHeight: parent ? parent.height : 0
 
     readonly property var _frameGeometry: BarLayoutService.sectionGeometry(section.role)
-    readonly property bool _centerAnchoredSection: (_frameGeometry.anchorMode || "") === "center"
-    readonly property bool _pushDrivenByCenter: (_frameGeometry.pushSource || "").indexOf("center-overlap-") === 0
     readonly property real _layoutWidth: Number(_frameGeometry.layoutWidth) || 0
     readonly property real _visualLeft: Number(_frameGeometry.visualLeft) || 0
-    property real _animatedVisualLeft: _visualLeft
 
-    x: _centerAnchoredSection || _pushDrivenByCenter ? _visualLeft : _animatedVisualLeft
-
-    // Keep the section reservation tied to the shared layout width.
-    Behavior on implicitWidth {
-        enabled: BarLayoutService.settingsMode
-        NumberAnimation {
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
-        }
-    }
-
-    // Keep the whole section body structurally synced to collision ownership.
-    Behavior on _animatedVisualLeft {
-        enabled: false
-        NumberAnimation {
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
-        }
-    }
+    // The section viewport follows the shared geometry slot directly.
+    x: _visualLeft
 
     // Collect enabled widgets for this section, sorted by order.
     property var widgets: []
-
-    on_VisualLeftChanged: section._animatedVisualLeft = section._visualLeft
-    on_CenterAnchoredSectionChanged: section._animatedVisualLeft = section._visualLeft
 
     function rebuildWidgets() {
         let result = [];

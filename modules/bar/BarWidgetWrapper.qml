@@ -11,42 +11,97 @@ Item {
     // Stable instance key in format "{widgetId}_{n}". Set by BarSection delegate.
     property string instanceKey: ""
     property string sectionRole: ""
-    default property alias content: contentContainer.data
+    default property alias content: contentHost.data
 
     // Collapse layout space during drag; content stays visible (clip: false)
     property bool _isDragging: false
     property bool _suppressNextWidthAnimation: false
     property bool _awaitingDelegateAlignment: false
-    property real _naturalWidth: contentContainer.childrenRect.width
-    property real _naturalHeight: contentContainer.childrenRect.height
+    property real _naturalWidth: contentHost.childrenRect.width
+    property real _naturalHeight: contentHost.childrenRect.height
+    readonly property var _widgetGeometry: wrapper.instanceKey
+        ? BarLayoutService.widgetGeometry(wrapper.instanceKey)
+        : null
     readonly property var _measurementSource: {
-        if (contentContainer.children.length <= 0)
+        if (contentHost.children.length <= 0)
             return null
 
-        const child = contentContainer.children[0]
+        const child = contentHost.children[0]
         if (child && child.item)
             return child.item
 
         return child
     }
-    readonly property real _layoutMeasuredWidth: {
+    readonly property real _revealWidth: {
         let source = wrapper._measurementSource
 
-        if (source && source.layoutMeasurementWidth !== undefined) {
+        if (source && source.layoutRevealWidth !== undefined)
+            return Math.max(0, Number(source.layoutRevealWidth) || 0)
+
+        if (source && source.layoutMeasurementWidth !== undefined)
             return Math.max(0, Number(source.layoutMeasurementWidth) || 0)
-        }
 
-        if (source) {
-            let implicitWidth = Math.max(0, Number(source.implicitWidth) || 0)
-            if (implicitWidth > 0)
-                return implicitWidth
+        if (source && source.implicitWidth !== undefined)
+            return Math.max(0, Number(source.implicitWidth) || 0)
 
-            let sourceWidth = Math.max(0, Number(source.width) || 0)
-            if (sourceWidth > 0)
-                return sourceWidth
-        }
+        if (source && source.width !== undefined)
+            return Math.max(0, Number(source.width) || 0)
 
         return Math.max(0, wrapper._naturalWidth)
+    }
+    readonly property real _revealHeight: {
+        let source = wrapper._measurementSource
+
+        if (source && source.layoutRevealHeight !== undefined)
+            return Math.max(0, Number(source.layoutRevealHeight) || 0)
+
+        if (source && source.implicitHeight !== undefined)
+            return Math.max(0, Number(source.implicitHeight) || 0)
+
+        if (source && source.height !== undefined)
+            return Math.max(0, Number(source.height) || 0)
+
+        return Math.max(0, wrapper._naturalHeight)
+    }
+    readonly property real _globalRevealHeight:
+        Math.max(Theme.barHeight, Theme.barHeight + BarLayoutService.barTransientExtension)
+    readonly property real _contentOffsetX:
+        wrapper.sectionRole === "center"
+        ? Math.max(0, (wrapper.width - wrapper._revealWidth) / 2)
+        : 0
+    readonly property real _slotReservationWidth: {
+        let geometry = wrapper._widgetGeometry
+
+        if (geometry && geometry.layoutReservationWidth !== undefined)
+            return Math.max(0, Number(geometry.layoutReservationWidth) || 0)
+
+        if (geometry && geometry.reservationWidth !== undefined)
+            return Math.max(0, Number(geometry.reservationWidth) || 0)
+
+        if (geometry && geometry.width !== undefined)
+            return Math.max(0, Number(geometry.width) || 0)
+
+        return wrapper._layoutMeasuredWidth
+    }
+    readonly property real _reservationWidth: {
+        let source = wrapper._measurementSource
+
+        if (source && source.layoutReservationWidth !== undefined)
+            return Math.max(0, Number(source.layoutReservationWidth) || 0)
+
+        if (source && source.layoutMeasurementWidth !== undefined)
+            return Math.max(0, Number(source.layoutMeasurementWidth) || 0)
+
+        if (source && source.implicitWidth !== undefined)
+            return Math.max(0, Number(source.implicitWidth) || 0)
+
+        if (source && source.width !== undefined)
+            return Math.max(0, Number(source.width) || 0)
+
+        return Math.max(0, wrapper._naturalWidth)
+    }
+    readonly property real _layoutMeasuredWidth: {
+        return wrapper._reservationWidth
     }
     property bool _enterStarted: false
     readonly property var _arrivalGeometry: {
@@ -85,20 +140,12 @@ Item {
     readonly property bool _primaryActionsSuppressed:
         BarLayoutService.suppressWidgetPrimaryActions && !wrapper._isDragging
 
-    implicitWidth: _isDragging ? 0 : _layoutMeasuredWidth
-    implicitHeight: _naturalHeight
+    implicitWidth: _isDragging ? 0 : _slotReservationWidth
+    implicitHeight: parent ? parent.height : _naturalHeight
+    width: implicitWidth
 
     Behavior on implicitWidth {
         enabled: false
-        NumberAnimation {
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
-        }
-    }
-
-    // Keep local slot reflow smooth while section push is owned above.
-    Behavior on x {
-        enabled: !wrapper._isDragging && wrapper._enterDone
         NumberAnimation {
             duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
@@ -120,11 +167,22 @@ Item {
         Behavior on opacity { NumberAnimation { duration: Theme.anim.highlightDuration; easing.type: Theme.anim.highlightType } }
     }
 
+    // Keep the bar host sized to the reserved slot while allowing detached lower panels
+    // to render outside the top host footprint.
     Item {
         id: contentContainer
-        width: childrenRect.width
-        height: childrenRect.height
+        width: parent.width
+        height: Math.max(wrapper._globalRevealHeight, wrapper._revealHeight, wrapper._naturalHeight)
+        clip: false
         visible: !wrapper._isDragging
+
+        // Center-only widgets may reserve more width than their visible host footprint.
+        Item {
+            id: contentHost
+            x: wrapper._contentOffsetX
+            width: wrapper._revealWidth
+            height: contentContainer.height
+        }
     }
 
     TapHandler {

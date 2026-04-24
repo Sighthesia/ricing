@@ -285,7 +285,15 @@ Item {
         && Math.abs(root._barExpandedMainHintWidth - root._barExpandedDetachedHintWidth) <= 1.5
     readonly property bool _barExpandedHintActive:
         root._detachedHintActive && root._attachedHintEvent.presentation === "bar-expanded"
-    readonly property real layoutMeasurementWidth: Math.max(0, _pillTransitionControl.animatedWidth)
+    // Bar reservation must follow only the top host footprint; the detached lower panel is visual-only.
+    readonly property real _barExpandedHostFootprintWidth: Math.max(0, _pillTransitionControl.animatedWidth)
+    readonly property real layoutReservationWidth: root._barExpandedHostFootprintWidth
+    readonly property real layoutMeasurementWidth: root._barExpandedHostFootprintWidth
+    readonly property real layoutRevealHeight: Math.max(
+        Theme.barHeight,
+        ((_overlayPanelHost ? _overlayPanelHost.y : 0) + root._attachedPanelVisibleHeight),
+        ((_pillClip ? _pillClip.y : 0) + (_pillClip ? _pillClip.height : Theme.barHeight))
+    )
     readonly property real _detachedHintHeight:
         Math.max(
             root._transientExpandedHeight,
