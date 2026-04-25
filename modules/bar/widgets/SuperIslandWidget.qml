@@ -200,6 +200,9 @@ Item {
         Math.max(Theme.cornerRadius, Math.round(Theme.barWidget.pillHeight * 0.42))
     readonly property real _barExpandedSeamArcRadius: root._barExpandedDetachedRadius
     readonly property real _barExpandedSeamArcProgress: {
+        if (root._barExpandedTitleWidthClamped)
+            return 0
+
         const widthDelta = Math.max(0, _pillBg.width - root._barExpandedDetachedHintWidth)
         const fullArcWidthDelta = Math.max(1, root._barExpandedSeamArcRadius * 2)
         return Math.max(0, Math.min(1, widthDelta / fullArcWidthDelta))
@@ -282,7 +285,7 @@ Item {
             : 0) + 2)
     readonly property bool _barExpandedTitleWidthClamped:
         root._barExpandedHintActive
-        && Math.abs(root._barExpandedMainHintWidth - root._barExpandedDetachedHintWidth) <= 1.5
+        && Math.abs(_pillTransitionControl.animatedWidth - root._attachedPanelBodyWidth) <= 1.5
     readonly property bool _barExpandedHintActive:
         root._detachedHintActive && root._attachedHintEvent.presentation === "bar-expanded"
     // Bar reservation must follow only the top host footprint; the detached lower panel is visual-only.
@@ -790,6 +793,10 @@ width: implicitWidth
             anchors.top: parent.top
             height: root._verticalRevealSurfaceHeight
             radius: root._barExpandedRectangularMode ? root._barExpandedTopRadius : root._pillH / 2
+            topLeftRadius: root._barExpandedRectangularMode ? root._barExpandedTopRadius : radius
+            topRightRadius: root._barExpandedRectangularMode ? root._barExpandedTopRadius : radius
+            bottomLeftRadius: root._barExpandedTitleWidthClamped ? 0 : radius
+            bottomRightRadius: root._barExpandedTitleWidthClamped ? 0 : radius
             color: Colors.surface
             border.color: Colors.border
             border.width: root._attachedPanelActive ? 0 : 1
@@ -827,9 +834,14 @@ width: implicitWidth
             }
         }
 
+        // Highlight surface mirrors the host seam shape during bar-expanded clamping.
         Rectangle {
             anchors.fill: _pillBg
             radius: _pillBg.radius
+            topLeftRadius: _pillBg.topLeftRadius
+            topRightRadius: _pillBg.topRightRadius
+            bottomLeftRadius: _pillBg.bottomLeftRadius
+            bottomRightRadius: _pillBg.bottomRightRadius
             color: Colors.highlight
             opacity: (root._transientPhase || root._overlaySessionActive)
                 ? Math.min(1, root._transientAccentBaseOpacity + root._sharedBackgroundPulseOpacity)
@@ -1022,7 +1034,10 @@ width: implicitWidth
         y: _overlayPanelHost.y
         width: _overlayPanelHost.width
         height: root._barExpandedSeamArcRadius
-        visible: root._barExpandedHintActive && _overlayPanelHost.visible && root._barExpandedSeamArcProgress > 0.01
+        visible: root._barExpandedHintActive
+            && !root._barExpandedTitleWidthClamped
+            && _overlayPanelHost.visible
+            && root._barExpandedSeamArcProgress > 0.01
         z: _overlayPanelHost.z + 1
         opacity: root._attachedPanelOpacity
         scale: root._attachedSurfaceScale
