@@ -1045,13 +1045,12 @@ width: implicitWidth
 
         // Left seam arc restores the outer silhouette without rounding the seam itself.
         Canvas {
-            x: -root._barExpandedSeamArcRadius
+            x: -root._barExpandedSeamArcRadius * root._barExpandedSeamArcProgress
+                + (1 - root._barExpandedSeamArcProgress) * root._barExpandedTopRadius
             y: 0
             width: root._barExpandedSeamArcRadius
             height: root._barExpandedSeamArcRadius
             visible: root._barExpandedSeamArcProgress > 0.01
-            scale: root._barExpandedSeamArcProgress
-            transformOrigin: Item.BottomRight
 
             onPaint: {
                 var ctx = getContext("2d")
@@ -1069,12 +1068,12 @@ width: implicitWidth
         // Right seam arc mirrors the same outer contour on the opposite side.
         Canvas {
             x: parent.width
+                - root._barExpandedSeamArcRadius * (1 - root._barExpandedSeamArcProgress)
+                - (1 - root._barExpandedSeamArcProgress) * root._barExpandedTopRadius
             y: 0
             width: root._barExpandedSeamArcRadius
             height: root._barExpandedSeamArcRadius
             visible: root._barExpandedSeamArcProgress > 0.01
-            scale: root._barExpandedSeamArcProgress
-            transformOrigin: Item.BottomLeft
 
             onPaint: {
                 var ctx = getContext("2d")
