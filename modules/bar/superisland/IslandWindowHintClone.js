@@ -68,6 +68,9 @@ function cloneWorkspaceCapsule(capsule) {
         label: capsule.label || "",
         icons: (capsule.icons || []).slice(),
         workspaceIndex: capsule.workspaceIndex !== undefined ? capsule.workspaceIndex : -1,
+        isCurrent: capsule.isCurrent === true,
+        isTransitionCurrent: capsule.isTransitionCurrent === true,
+        isEdgePlaceholder: capsule.isEdgePlaceholder === true,
         visible: capsule.visible !== false
     }
 }

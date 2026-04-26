@@ -184,6 +184,33 @@ function retargetHintAnchors(host, hint, immediate, workspaceAnimation, titleAni
 }
 
 function workspaceMetrics(host, slotPosition, absoluteIndex, lerpFn) {
+    var capsule = null
+    if (host && host._workspaceStageSlots) {
+        for (var slotIndex = 0; slotIndex < host._workspaceStageSlots.length; slotIndex++) {
+            var slot = host._workspaceStageSlots[slotIndex]
+            if (slot && slot.absoluteIndex === absoluteIndex) {
+                capsule = slot.capsule
+                break
+            }
+        }
+    }
+
+    var keepPrimaryMetrics = capsule
+        && (capsule.isCurrent === true || capsule.isTransitionCurrent === true)
+        && capsule.isEdgePlaceholder !== true
+        && (!capsule.icons || capsule.icons.length === 0)
+
+    if (keepPrimaryMetrics) {
+        return {
+            x: (host._workspaceStageWidth - host._workspacePrimaryWidth) / 2,
+            y: host._workspaceSideHeight + host._workspaceColumnGap,
+            width: host._workspacePrimaryWidth,
+            height: host._workspacePrimaryHeight,
+            emphasis: 1,
+            opacity: 1
+        }
+    }
+
     var topY = 0
     var centerY = host._workspaceSideHeight + host._workspaceColumnGap
     var bottomY = centerY + host._workspacePrimaryHeight + host._workspaceColumnGap
@@ -252,6 +279,8 @@ function workspaceBottomInset(host, lerpFn) {
     for (var index = 0; index < slots.length; index++) {
         var slot = slots[index]
         if (!slot || slot.absoluteIndex < 0 || !slot.capsule)
+            continue
+        if (slot.capsule.visible !== true)
             continue
 
         var slotPosition = slot.absoluteIndex - host._animatedWorkspaceAnchor
@@ -326,7 +355,13 @@ function handleHintChange(host, liveHint, workspaceAnimation, titleAnimation, cl
     }
 
     var wasVisible = !!(host._renderHint && host._renderHint.visible)
+    var previousAnchor = stageApi.workspaceAnchorForHint(host._renderHint)
+    var nextAnchor = stageApi.workspaceAnchorForHint(nextHint)
     host._renderHint = nextHint
     refreshStageSlots(host, nextHint, wasVisible, wasVisible, stageApi, cloneApi)
+
+    if (wasVisible && previousAnchor === nextAnchor)
+        cleanupWorkspaceStageSlots(host, nextHint, stageApi, cloneApi)
+
     retargetHintAnchors(host, nextHint, !wasVisible, workspaceAnimation, titleAnimation, stageApi)
 }

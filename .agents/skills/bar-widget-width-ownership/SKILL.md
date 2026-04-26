@@ -39,6 +39,7 @@ In DymicShell bar widgets, the width the user sees and the width the bar reserve
 - Prefer the `SuperSystemMonitorWidget` pattern for bar-local width animation: export the animated width via the widget root `implicitWidth`, and let `BarWidgetWrapper` read that fallback path.
 - Only define `layoutMeasurementWidth` when the layout contract must intentionally differ from the visible/animated width.
 - If `layoutMeasurementWidth` exists, treat it as the single authoritative layout export; do not also expect wrapper fallback to `implicitWidth` to matter.
+- When a visual subregion must track the same spring as the title but should never shrink below a detached minimum, clamp the shared animated width at the host boundary instead of binding the subregion directly to the title's instantaneous width.
 
 ## Debug Checklist
 

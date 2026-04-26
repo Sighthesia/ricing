@@ -278,7 +278,7 @@ Item {
             ? _barExpandedMainMeasureLoader.item.implicitWidth
             : 0) + 2
     readonly property real _barExpandedMainHintWidth:
-        Math.max(root._collapsedWidth, root._barExpandedMainHintWidthMeasured)
+        Math.max(root._collapsedWidth, root._barExpandedDetachedHintWidth, root._barExpandedMainHintWidthMeasured)
     readonly property real _barExpandedDetachedHintWidth:
         ((_detachedHintDetachedMeasureLoader.item
             ? _detachedHintDetachedMeasureLoader.item.implicitWidth

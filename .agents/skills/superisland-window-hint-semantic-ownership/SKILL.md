@@ -69,6 +69,8 @@ Trace the real root element, width owner, and content owner before changing wind
 - In `modules/bar/widgets/SuperIslandWidget.qml`, treat the host-level divider rectangle inside `_pillClip` as a separate visual owner from the title capsules; disable it explicitly for `bar-expanded` window hint if it leaks into the title area.
 - Clamp the bar-expanded title host minimum width to `_barExpandedDetachedHintWidth`, not to the idle or collapsed pill width.
 - When the title host is clamped to the workspace host width, square the title host's bottom corners so the two backgrounds read as one surface.
+- When the title host has a spring width but the lower workspace body should stay visually stable, give the workspace its own synchronized spring path that is clamped by the detached minimum width instead of binding it rigidly to the title's instantaneous width.
+- Use the same animated width source for both hosts only when the lower body is intentionally allowed to shrink during the same phase; otherwise, keep the lower body on a clamped spring so it can follow the title near minimum without collapsing too early.
 - Drive the lower workspace host width from the same animated width export that shrinks the title host, such as `_pillTransitionControl.animatedWidth`, instead of leaving the lower host on a static measured width.
 - For seam arc adaptation, keep a full-size decorative arc and scale it from the seam edge; avoid reducing canvas width, which visually crops the arc.
 - Drive decorative seam-arc visibility from the width delta between title host and detached workspace host.

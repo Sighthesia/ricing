@@ -74,6 +74,9 @@ function workspaceCapsuleForAbsolute(absoluteIndex, hint, workspaceLabelFn, tran
         label: workspaceLabelFn(workspaceIndex),
         icons: isCurrent ? (safeHint.windows || []) : (summary && summary.icons ? summary.icons.slice() : []),
         workspaceIndex: workspaceIndex,
+        isCurrent: isCurrent,
+        isTransitionCurrent: isTransitionCurrent,
+        isEdgePlaceholder: isEdgePlaceholder,
         visible: isEdgePlaceholder || workspaceCapsuleVisible(summary, isCurrent, isTransitionCurrent)
     }
 }
