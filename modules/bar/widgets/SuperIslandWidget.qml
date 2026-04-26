@@ -365,6 +365,17 @@ Item {
         (_idleMeasureLoader.item ? _idleMeasureLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property real _barExpandedTitleRevealProgress:
         root._barExpandedTitleRevealLatched ? 1 : root._attachedRevealProgress
+    readonly property real _barExpandedTitleRevealWidthProgress:
+        root._barExpandedMainWidth > root._barExpandedEntryBaseWidth
+            ? Math.max(
+                0,
+                Math.min(
+                    1,
+                    (root._barExpandedHostFootprintWidth - root._barExpandedEntryBaseWidth)
+                        / (root._barExpandedMainWidth - root._barExpandedEntryBaseWidth)
+                )
+            )
+            : 1
     readonly property bool _useAttachedCollapseBaseWidth:
         root._attachedCollapseAnimating
         || root._phase === "hint-exit"
@@ -1265,7 +1276,10 @@ width: implicitWidth
 
         IslandCards.IslandWindowHintCard {
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
-            titleCapsuleRevealProgress: root._barExpandedTitleRevealProgress
+            titleCapsuleRevealProgress: Math.max(
+                root._barExpandedTitleRevealProgress,
+                root._barExpandedTitleRevealWidthProgress
+            )
             outgoingClockOpacity: 1 - root._attachedVerticalRevealProgress
             outgoingClockOffsetY: (1 - root._attachedVerticalRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
         }
@@ -1278,7 +1292,10 @@ width: implicitWidth
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
             measurementMode: true
             hintData: WindowHintService.activeHint
-            titleCapsuleRevealProgress: root._barExpandedTitleRevealProgress
+            titleCapsuleRevealProgress: Math.max(
+                root._barExpandedTitleRevealProgress,
+                root._barExpandedTitleRevealWidthProgress
+            )
             outgoingClockOpacity: 1 - root._attachedVerticalRevealProgress
             outgoingClockOffsetY: (1 - root._attachedVerticalRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
         }

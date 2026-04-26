@@ -129,6 +129,7 @@ Item {
     }
 
     function updateWindowHint(event) {
+        const previousEvent = root.state._attachedHintEvent
         const nextEvent = root.host._displayEvent(event)
         const isBarExpandedHint = nextEvent.presentation === "bar-expanded"
         root.state._attachedHintEvent = nextEvent
@@ -153,7 +154,24 @@ Item {
         if (root.state._overlaySessionActive || IslandOverlayService.mode !== "none")
             return
 
+        if (_hintSwitchChanged(previousEvent, nextEvent))
+            root.machine.triggerSharedBackgroundPulse("hint-switch")
+
         // Live window switches should retarget content without replaying entry motion.
+    }
+
+    function _hintSwitchChanged(previousEvent, nextEvent) {
+        const previous = previousEvent || root.host._idleSnapshot()
+        const next = nextEvent || root.host._idleSnapshot()
+
+        return (previous.currentWindowId || "") !== (next.currentWindowId || "")
+            || (previous.currentIndex !== undefined ? previous.currentIndex : -1)
+                !== (next.currentIndex !== undefined ? next.currentIndex : -1)
+            || (previous.workspaceId || "") !== (next.workspaceId || "")
+            || (previous.workspaceIndex !== undefined ? previous.workspaceIndex : -1)
+                !== (next.workspaceIndex !== undefined ? next.workspaceIndex : -1)
+            || (previous.activeWorkspacePosition !== undefined ? previous.activeWorkspacePosition : -1)
+                !== (next.activeWorkspacePosition !== undefined ? next.activeWorkspacePosition : -1)
     }
 
     function resetReplaceLayers() {

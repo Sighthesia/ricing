@@ -50,17 +50,8 @@ Item {
                 implicitHeight: root.card._barExpandedTitleCapsuleHeight
                 width: implicitWidth
                 height: implicitHeight
-                opacity: root.revealProgress
                 y: (1 - root.revealProgress) * Math.max(6, Theme.barWidget.contentPaddingV * 1.5)
                 scale: 0.96 + root.revealProgress * 0.04
-
-                // Fade the capsule in as the widened host settles.
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: Theme.anim.highlightDuration
-                        easing.type: Theme.anim.highlightType
-                    }
-                }
 
                 // Lift the capsule into place without changing its width contract.
                 Behavior on y {
