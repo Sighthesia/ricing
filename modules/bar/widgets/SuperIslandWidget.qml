@@ -369,7 +369,7 @@ Item {
         root._attachedCollapseAnimating
         || root._phase === "hint-exit"
         || root._overlayClosing
-        || (root._barExpandedHintActive && root._attachedRevealProgress < 0.999)
+        || (root._barExpandedHintActive && !root._barExpandedTitleRevealLatched)
     readonly property real _collapsedWidth: WidthResolver.collapsedWidth(root)
     readonly property real _expandedWidth: WidthResolver.expandedWidth(root)
 
@@ -475,12 +475,7 @@ Item {
         root._barExpandedHintActive ? root._attachedHeightRevealProgress : root._attachedRevealProgress
     readonly property real _attachedRevealYOffset:
         (1 - root._attachedVerticalRevealProgress) * root._overlayRevealLift
-    readonly property bool _hintRevealSettled:
-        root._detachedHintActive
-        && !root._overlaySessionActive
-        && root._attachedContentOpacity >= 0.99
-        && root._attachedPanelVisibleWidth >= root._attachedPanelWidth - 1
-        && root._attachedPanelVisibleHeight >= root._attachedPanelHeight - 1
+    property bool _hintRevealSettled: false
     readonly property bool _showOverlayHandoffHint:
         root._overlayHintHandoffActive
         && root._overlaySessionActive
@@ -508,6 +503,7 @@ width: implicitWidth
             root._barExpandedEntryBaseWidth = baseWidth
             root._barExpandedExitBaseWidth = baseWidth
             root._barExpandedTitleRevealLatched = false
+            root._hintRevealSettled = false
             root._logWidthChain("barExpandedHintActive=true")
             return
         }
@@ -515,6 +511,7 @@ width: implicitWidth
         root._barExpandedEntryBaseWidth = 0
         root._barExpandedExitBaseWidth = 0
         root._barExpandedTitleRevealLatched = false
+        root._hintRevealSettled = false
         root._logWidthChain("barExpandedHintActive=false")
     }
     on_HintRevealSettledChanged: {
@@ -1065,12 +1062,21 @@ width: implicitWidth
 
         // Left seam arc restores the outer silhouette without rounding the seam itself.
         Canvas {
+            id: _leftSeamArcCanvas
             x: -root._barExpandedSeamArcRadius * root._barExpandedSeamArcProgress
                 + (1 - root._barExpandedSeamArcProgress) * root._barExpandedTopRadius
             y: 0
             width: root._barExpandedSeamArcRadius
             height: root._barExpandedSeamArcRadius
             visible: root._barExpandedSeamArcProgress > 0.01
+
+            Connections {
+                target: root
+
+                function onBarExpandedPanelSurfaceColorChanged() {
+                    _leftSeamArcCanvas.requestPaint()
+                }
+            }
 
             onPaint: {
                 var ctx = getContext("2d")
@@ -1087,6 +1093,7 @@ width: implicitWidth
 
         // Right seam arc mirrors the same outer contour on the opposite side.
         Canvas {
+            id: _rightSeamArcCanvas
             x: parent.width
                 - root._barExpandedSeamArcRadius * (1 - root._barExpandedSeamArcProgress)
                 - (1 - root._barExpandedSeamArcProgress) * root._barExpandedTopRadius
@@ -1094,6 +1101,14 @@ width: implicitWidth
             width: root._barExpandedSeamArcRadius
             height: root._barExpandedSeamArcRadius
             visible: root._barExpandedSeamArcProgress > 0.01
+
+            Connections {
+                target: root
+
+                function onBarExpandedPanelSurfaceColorChanged() {
+                    _rightSeamArcCanvas.requestPaint()
+                }
+            }
 
             onPaint: {
                 var ctx = getContext("2d")

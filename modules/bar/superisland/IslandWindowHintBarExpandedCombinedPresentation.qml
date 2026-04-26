@@ -53,14 +53,24 @@ Item {
 
         // Left corner cap sits outside the square seam.
         Canvas {
+            id: _leftCornerCapCanvas
             x: -root.card._barExpandedNotchRadius
             y: -root.card._barExpandedNotchRadius
             width: root.card._barExpandedNotchRadius
             height: root.card._barExpandedNotchRadius
+            property color _canvasFill: root.card._stageFill
+
+            Connections {
+                target: _leftCornerCapCanvas
+
+                function onCanvasFillChanged() {
+                    _leftCornerCapCanvas.requestPaint()
+                }
+            }
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.reset()
-                ctx.fillStyle = root.card._stageFill
+                ctx.fillStyle = _canvasFill
                 ctx.beginPath()
                 ctx.moveTo(0, 0)
                 ctx.lineTo(width, 0)
@@ -72,14 +82,24 @@ Item {
 
         // Right corner cap mirrors the same outer arc.
         Canvas {
+            id: _rightCornerCapCanvas
             x: parent.width
             y: -root.card._barExpandedNotchRadius
             width: root.card._barExpandedNotchRadius
             height: root.card._barExpandedNotchRadius
+            property color _canvasFill: root.card._stageFill
+
+            Connections {
+                target: _rightCornerCapCanvas
+
+                function onCanvasFillChanged() {
+                    _rightCornerCapCanvas.requestPaint()
+                }
+            }
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.reset()
-                ctx.fillStyle = root.card._stageFill
+                ctx.fillStyle = _canvasFill
                 ctx.beginPath()
                 ctx.moveTo(0, 0)
                 ctx.lineTo(width, 0)

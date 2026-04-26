@@ -29,6 +29,7 @@ function ensureAttachedRevealSettled(state, host) {
     state._attachedRevealUseHandoffCurve = false
     state._overlayHintHandoffActive = false
     state._overlayHandoffHintEvent = host._idleSnapshot()
+    host._hintRevealSettled = true
 }
 
 function resetAttachedOverlayState(state, host) {
@@ -44,6 +45,7 @@ function resetAttachedOverlayState(state, host) {
     state._attachedPanelRevealHeight = 0
     state._attachedContentOpacity = 0
     state._pillThrowOffsetY = 0
+    host._hintRevealSettled = false
 }
 
 function maybeCompleteHintExitAfterCollapse(state, host, completeWindowHintExitFn) {

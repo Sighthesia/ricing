@@ -58,10 +58,10 @@ Item {
     readonly property int _titleCapsuleHeight: Math.max(30, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 6)
     readonly property int _minPreviewWidth: Math.round(320 * Theme.uiScale)
     readonly property int _maxPreviewWidth: Math.round(560 * Theme.uiScale)
-    readonly property color _stageFill: Qt.rgba(1, 1, 1, 0.02)
-    readonly property color _stageBorder: Qt.rgba(1, 1, 1, 0.035)
-    readonly property color _primaryCapsuleFill: Qt.rgba(1, 1, 1, 0.09)
-    readonly property color _secondaryCapsuleFill: Qt.rgba(1, 1, 1, 0.04)
+    readonly property color _stageFill: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.02)
+    readonly property color _stageBorder: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.035)
+    readonly property color _primaryCapsuleFill: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.09)
+    readonly property color _secondaryCapsuleFill: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.04)
     readonly property var _slotIndices: [-1, 0, 1]
     readonly property real _overflowSlotPosition: 1.18
     readonly property int _workspaceStageWidth: Math.max(root._workspacePrimaryWidth, root._workspaceSideWidth)
