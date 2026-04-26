@@ -1,6 +1,7 @@
 import QtQuick
 import qs.config
 import "." as SuperIslandParts
+import "./SuperIslandWindowHintPresentationAdapter.js" as HintPresentationAdapter
 
 // Crossfades between the hint handoff card and expanded overlay deck content.
 Item {
@@ -18,12 +19,7 @@ Item {
         const source = root.overlaySessionActive && root.overlayHintHandoffActive
             ? root.handoffHintEvent
             : root.hintEvent
-        const nextEvent = source || {}
-
-        if (!root.overlaySessionActive && nextEvent.presentation === "bar-expanded")
-            return Object.assign({}, nextEvent, { presentation: "bar-expanded-detached" })
-
-        return nextEvent
+        return HintPresentationAdapter.resolvedDeckHintEvent(source, root.overlaySessionActive)
     }
 
     Loader {

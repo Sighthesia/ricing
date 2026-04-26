@@ -6,6 +6,8 @@ import qs.services
 import ".." as BarComponents
 import ".." as BarPanels
 import "../superisland" as IslandCards
+import "../superisland/SuperIslandWindowHintWidthResolver.js" as WidthResolver
+import "../superisland/SuperIslandWindowHintPresentationAdapter.js" as HintPresentationAdapter
 
 // Visual SuperIsland host that delegates transition state orchestration to SuperIslandStateMachine.
 Item {
@@ -14,7 +16,8 @@ Item {
     property bool liveInstance: false
     property string debugInstanceLabel: liveInstance ? "live" : "preview"
 
-    readonly property bool _debugLogging: false
+    readonly property bool _debugLogging:
+        (Quickshell.env("DYMICSHELL_SUPERISLAND_DEBUG") || "").trim() === "1"
 
     IslandCards.SuperIslandViewState {
         id: _viewState
@@ -218,12 +221,8 @@ Item {
         Math.max(18, root._overlayInwardCornerRadius + (root._overlayInwardCornerRadius - 18) * 0.3)
 
     readonly property real _attachedRevealSeedHeight: 0
-    readonly property real _attachedRevealSeedWidth: {
-        const baseSeedWidth = Math.max(root._overlayPillBackgroundWidth, root._collapsedWidth)
-        return root._attachedPanelWidth > 0 ? Math.min(baseSeedWidth, root._attachedPanelWidth) : baseSeedWidth
-    }
-    readonly property real _attachedCollapseBaseWidthCandidate:
-        Math.max(root._collapsedWidthLive, _pillClip.width)
+    readonly property real _attachedRevealSeedWidth: WidthResolver.attachedRevealSeedWidth(root)
+    readonly property real _attachedCollapseBaseWidthCandidate: WidthResolver.attachedCollapseBaseWidthCandidate(root)
 
     readonly property real _pillThrowLift:
         Math.max(6, Math.round(root._pillH * 0.2))
@@ -266,30 +265,15 @@ Item {
                 : root._attachedPanelVisibleWidth)
     readonly property real _detachedHintReservedHeight:
         Math.max(root._transientExpandedHeight, root._fullHintExpandedPillHeight + 2)
-    readonly property real _detachedHintWidth:
-        Math.max(
-            root._collapsedWidth,
-            (_detachedHintMeasureLoader.item
-                ? _detachedHintMeasureLoader.item.implicitWidth
-                : root._collapsedWidth) + 2
-        )
-    readonly property real _barExpandedMainHintWidthMeasured:
-        (_barExpandedMainMeasureLoader.item
-            ? _barExpandedMainMeasureLoader.item.implicitWidth
-            : 0) + 2
-    readonly property real _barExpandedMainHintWidth:
-        Math.max(root._collapsedWidth, root._barExpandedDetachedHintWidth, root._barExpandedMainHintWidthMeasured)
-    readonly property real _barExpandedDetachedHintWidth:
-        ((_detachedHintDetachedMeasureLoader.item
-            ? _detachedHintDetachedMeasureLoader.item.implicitWidth
-            : 0) + 2)
-    readonly property bool _barExpandedTitleWidthClamped:
-        root._barExpandedHintActive
-        && Math.abs(_pillTransitionControl.animatedWidth - root._attachedPanelBodyWidth) <= 1.5
+    readonly property real _detachedHintWidth: WidthResolver.detachedHintWidth(root)
+    readonly property real _barExpandedMainHintWidthMeasured: WidthResolver.barExpandedMainHintWidthMeasured(root)
+    readonly property real _barExpandedMainHintWidth: WidthResolver.barExpandedMainHintWidth(root)
+    readonly property real _barExpandedDetachedHintWidth: WidthResolver.barExpandedDetachedHintWidth(root)
+    readonly property bool _barExpandedTitleWidthClamped: WidthResolver.barExpandedTitleWidthClamped(root)
     readonly property bool _barExpandedHintActive:
         root._detachedHintActive && root._attachedHintEvent.presentation === "bar-expanded"
     // Bar reservation must follow only the top host footprint; the detached lower panel is visual-only.
-    readonly property real _barExpandedHostFootprintWidth: Math.max(0, _pillTransitionControl.animatedWidth)
+    readonly property real _barExpandedHostFootprintWidth: WidthResolver.barExpandedHostFootprintWidth(root)
     readonly property real layoutReservationWidth: root._barExpandedHostFootprintWidth
     readonly property real layoutMeasurementWidth: root._barExpandedHostFootprintWidth
     readonly property real layoutRevealHeight: Math.max(
@@ -376,10 +360,7 @@ Item {
     property real _barExpandedEntryBaseWidth: 0
     property real _barExpandedExitBaseWidth: 0
     property bool _barExpandedTitleRevealLatched: false
-    readonly property real _collapsedWidthLive:
-        root._barExpandedHintActive && root._barExpandedEntryBaseWidth > 0
-            ? root._barExpandedEntryBaseWidth
-            : ((_mainLoader.item ? _mainLoader.item.implicitWidth : 0) + root._padH * 2)
+    readonly property real _collapsedWidthLive: WidthResolver.collapsedWidthLive(root)
     readonly property real _idleCollapsedWidthLive:
         (_idleMeasureLoader.item ? _idleMeasureLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property real _barExpandedTitleRevealProgress:
@@ -389,24 +370,8 @@ Item {
         || root._phase === "hint-exit"
         || root._overlayClosing
         || (root._barExpandedHintActive && root._attachedRevealProgress < 0.999)
-    readonly property real _collapsedWidth:
-        root._useAttachedCollapseBaseWidth && root._attachedCollapseBaseWidth > 0
-            ? root._attachedCollapseBaseWidth
-            : root._collapsedWidthLive
-    readonly property real _expandedWidth:
-        root._barExpandedHintActive
-            ? (root._phase === "hint-exit"
-                ? Math.max(
-                    root._barExpandedExitBaseWidth > 0
-                        ? root._barExpandedExitBaseWidth
-                        : root._idleCollapsedWidthLive,
-                    root._idleCollapsedWidthLive
-                )
-                : root._barExpandedMainHintWidth)
-            : Math.max(
-                root._collapsedWidth,
-                (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
-            )
+    readonly property real _collapsedWidth: WidthResolver.collapsedWidth(root)
+    readonly property real _expandedWidth: WidthResolver.expandedWidth(root)
 
     readonly property real _mainTrackEnterY:
         -Math.max(root._pillH, _mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH)
@@ -461,6 +426,13 @@ Item {
     property alias _overlayHintHandoffActive: _viewState._overlayHintHandoffActive
     property alias _attachedHintEvent: _viewState._attachedHintEvent
     property alias _pillTransition: _pillTransitionControl
+    property alias _resolverPillTransitionControl: _pillTransitionControl
+    property alias _resolverPillClip: _pillClip
+    property alias _resolverMainLoader: _mainLoader
+    property alias _resolverStripLoader: _stripLoader
+    property alias _resolverDetachedHintMeasureLoader: _detachedHintMeasureLoader
+    property alias _resolverBarExpandedMainMeasureLoader: _barExpandedMainMeasureLoader
+    property alias _resolverDetachedHintDetachedMeasureLoader: _detachedHintDetachedMeasureLoader
 
     readonly property real _attachedPanelVisibleWidth:
         root._attachedPanelActive
@@ -536,12 +508,14 @@ width: implicitWidth
             root._barExpandedEntryBaseWidth = baseWidth
             root._barExpandedExitBaseWidth = baseWidth
             root._barExpandedTitleRevealLatched = false
+            root._logWidthChain("barExpandedHintActive=true")
             return
         }
 
         root._barExpandedEntryBaseWidth = 0
         root._barExpandedExitBaseWidth = 0
         root._barExpandedTitleRevealLatched = false
+        root._logWidthChain("barExpandedHintActive=false")
     }
     on_HintRevealSettledChanged: {
         if (!root._barExpandedHintActive || !root._hintRevealSettled)
@@ -549,7 +523,11 @@ width: implicitWidth
 
         root._barExpandedEntryBaseWidth = 0
         root._barExpandedTitleRevealLatched = true
+        root._logWidthChain("hintRevealSettled")
     }
+    on_PhaseChanged: root._logWidthChain("phaseChanged")
+    on_ExpandedWidthChanged: root._logWidthChain("expandedWidthChanged")
+    on_CollapsedWidthChanged: root._logWidthChain("collapsedWidthChanged")
     on_AttachedPanelWidthChanged: root._retargetAttachedPanelWidthIfNeeded()
     on_AttachedPanelHeightChanged: {
         _stateMachine.syncOverlayExtensionReservation()
@@ -680,9 +658,11 @@ width: implicitWidth
         if (!event || event.type === "idle")
             return _idleComponent
         if (event.type === "window-hint") {
-            if (!useStrip && event.presentation === "bar-expanded")
+            const presentationKind = HintPresentationAdapter.windowHintPresentationKindForEvent(event, useStrip)
+
+            if (presentationKind === "bar-expanded-main")
                 return _windowHintBarExpandedMainCardComponent
-            if (useStrip && event.presentation === "bar-expanded")
+            if (presentationKind === "bar-expanded-detached")
                 return _windowHintBarExpandedDetachedCardComponent
             return _windowHintCardComponent
         }
@@ -721,6 +701,35 @@ width: implicitWidth
         const nextEvent = root._cloneEvent(event)
         nextEvent.presentation = presentation
         return nextEvent
+    }
+
+    function _logWidthChain(context) {
+        if (!root._debugLogging)
+            return
+
+        console.log("[DymicShell:SuperIslandWidth]", JSON.stringify({
+            label: root.debugInstanceLabel,
+            context: context,
+            phase: root._phase,
+            presentation: root._attachedHintEvent && root._attachedHintEvent.presentation ? root._attachedHintEvent.presentation : "",
+            barExpandedHintActive: root._barExpandedHintActive,
+            layoutMeasurementWidth: Math.round(root.layoutMeasurementWidth || 0),
+            layoutReservationWidth: Math.round(root.layoutReservationWidth || 0),
+            hostFootprintWidth: Math.round(root._barExpandedHostFootprintWidth || 0),
+            animatedWidth: Math.round((_pillTransitionControl && _pillTransitionControl.animatedWidth) || 0),
+            collapsedWidthLive: Math.round(root._collapsedWidthLive || 0),
+            collapsedWidth: Math.round(root._collapsedWidth || 0),
+            expandedWidth: Math.round(root._expandedWidth || 0),
+            detachedHintWidth: Math.round(root._detachedHintWidth || 0),
+            barExpandedMainHintWidthMeasured: Math.round(root._barExpandedMainHintWidthMeasured || 0),
+            barExpandedMainHintWidth: Math.round(root._barExpandedMainHintWidth || 0),
+            barExpandedDetachedHintWidth: Math.round(root._barExpandedDetachedHintWidth || 0),
+            mainLoaderImplicitWidth: Math.round((_mainLoader.item && _mainLoader.item.implicitWidth) || 0),
+            stripLoaderImplicitWidth: Math.round((_stripLoader.item && _stripLoader.item.implicitWidth) || 0),
+            barExpandedMainMeasureImplicitWidth: Math.round((_barExpandedMainMeasureLoader.item && _barExpandedMainMeasureLoader.item.implicitWidth) || 0),
+            detachedMeasureImplicitWidth: Math.round((_detachedHintMeasureLoader.item && _detachedHintMeasureLoader.item.implicitWidth) || 0),
+            detachedDetachedMeasureImplicitWidth: Math.round((_detachedHintDetachedMeasureLoader.item && _detachedHintDetachedMeasureLoader.item.implicitWidth) || 0)
+        }))
     }
 
     Timer {
