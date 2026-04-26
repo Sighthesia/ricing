@@ -374,6 +374,7 @@ Item {
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
     property real _barExpandedEntryBaseWidth: 0
+    property real _barExpandedExitBaseWidth: 0
     property bool _barExpandedTitleRevealLatched: false
     readonly property real _collapsedWidthLive:
         root._barExpandedHintActive && root._barExpandedEntryBaseWidth > 0
@@ -394,7 +395,14 @@ Item {
             : root._collapsedWidthLive
     readonly property real _expandedWidth:
         root._barExpandedHintActive
-            ? root._barExpandedMainHintWidth
+            ? (root._phase === "hint-exit"
+                ? Math.max(
+                    root._barExpandedExitBaseWidth > 0
+                        ? root._barExpandedExitBaseWidth
+                        : root._idleCollapsedWidthLive,
+                    root._idleCollapsedWidthLive
+                )
+                : root._barExpandedMainHintWidth)
             : Math.max(
                 root._collapsedWidth,
                 (_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2
@@ -524,12 +532,15 @@ width: implicitWidth
     on_OverlayDetachedOffsetChanged: _stateMachine.syncOverlayExtensionReservation()
     on_BarExpandedHintActiveChanged: {
         if (root._barExpandedHintActive) {
-            root._barExpandedEntryBaseWidth = Math.max(0, _pillTransitionControl.animatedWidth)
+            const baseWidth = Math.max(0, _pillTransitionControl.animatedWidth)
+            root._barExpandedEntryBaseWidth = baseWidth
+            root._barExpandedExitBaseWidth = baseWidth
             root._barExpandedTitleRevealLatched = false
             return
         }
 
         root._barExpandedEntryBaseWidth = 0
+        root._barExpandedExitBaseWidth = 0
         root._barExpandedTitleRevealLatched = false
     }
     on_HintRevealSettledChanged: {

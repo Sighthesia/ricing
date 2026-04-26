@@ -29,6 +29,7 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | [attached-expansion-motion](.agents/skills/attached-expansion-motion/SKILL.md) | Use when reusing SuperIsland-style attached panel motion in standalone widgets, especially if pill and panel feel detached, throw/catch affects the wrong layer, or the motion becomes janky. |
 | [qml-indicator-motion](.agents/skills/qml-indicator-motion/SKILL.md) | Use when building or debugging moving active indicators, sliding highlights, or stretch-then-settle pills behind workspace tabs, icon rows, or segmented controls. |
 | [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md) | Use when debugging Quickshell or QML motion bugs where state updates occur but the visual transition looks static, too subtle, or wrong. |
+| [superisland-window-hint-exit-timing](.agents/skills/superisland-window-hint-exit-timing/SKILL.md) | Use when bar-expanded window-hint title/workspace exit timing splits, width targets seem ignored, or changing exit timing breaks throw/catch alignment. |
 | [list-transition-handoffs](.agents/skills/list-transition-handoffs/SKILL.md) | Use when modifying animated list filtering or replacement transitions that mix live delegates with detached layers, especially when rapid updates cause blank frames, overlap, or ghosts. |
 
 ### Performance

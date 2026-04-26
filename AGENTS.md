@@ -46,6 +46,7 @@ Load skills on demand; see `.agents/skills/README.md` for grouping.
 | [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md)                         | Motion looks wrong even though state changes              |
 | [bar-widget-width-ownership](.agents/skills/bar-widget-width-ownership/SKILL.md)     | Widget-local width ownership vs bar reserved width        |
 | [superisland-window-hint-semantic-ownership](.agents/skills/superisland-window-hint-semantic-ownership/SKILL.md) | Window-hint root elements, width ownership, and corner-bridge semantics |
+| [superisland-window-hint-exit-timing](.agents/skills/superisland-window-hint-exit-timing/SKILL.md) | Split title/workspace exit timing, exit width targets, and throw/catch-safe hint retreat |
 | [list-transition-handoffs](.agents/skills/list-transition-handoffs/SKILL.md)         | Animated list replacement and filter handoffs             |
 | [qml-performance-debug](.agents/skills/qml-performance-debug/SKILL.md)               | Jank, frame drops, and layout thrash                      |
 | [lyrics-display-stability](.agents/skills/lyrics-display-stability/SKILL.md)         | Lyric display latching, sparse-line stability, and media text flash prevention |

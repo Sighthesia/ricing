@@ -20,6 +20,7 @@
 - `qml-indicator-motion`: 活跃指示器、滑动高亮、胶囊跟随动效。
 - `attached-expansion-motion`: 复用 SuperIsland attached panel 开合/throw-catch 时的所有权拆分与防卡顿模式。
 - `qml-motion-debug`: 动效状态正确但视觉表现不对时的排查方法。
+- `superisland-window-hint-exit-timing`: SuperIsland window hint 退场时序排查，尤其是 title/workspace 背景退场不同步、退出目标宽度取错、改坏 throw/catch 对位时。
 - `list-transition-handoffs`: 通用列表过滤/替换过渡接管，尤其是空白帧、重叠、残影与快速更新中断问题。
 - `bar-widget-width-ownership`: bar widget 的视觉宽度、spring 宽度与独占宽度不同步时，优先排查 widget root 到 `BarWidgetWrapper` 的导出链，而不是直接改全局 bar 布局。
 
