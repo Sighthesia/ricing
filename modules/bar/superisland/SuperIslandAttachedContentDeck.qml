@@ -15,6 +15,15 @@ Item {
     required property var hintEvent
     required property var handoffHintEvent
 
+    readonly property real hintPulseScale:
+        (hintCardLoader.item && hintCardLoader.item._switchPulseScale !== undefined)
+            ? hintCardLoader.item._switchPulseScale
+            : 1
+    readonly property real hintPulseOpacity:
+        (hintCardLoader.item && hintCardLoader.item._switchPulseOpacity !== undefined)
+            ? hintCardLoader.item._switchPulseOpacity
+            : 0
+
     function _resolvedHintEvent() {
         const source = root.overlaySessionActive && root.overlayHintHandoffActive
             ? root.handoffHintEvent

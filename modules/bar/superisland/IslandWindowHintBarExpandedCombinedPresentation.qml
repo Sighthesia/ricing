@@ -9,6 +9,10 @@ Item {
     required property Item card
 
     readonly property real titleRowImplicitWidth: _mainPresentation.titleRowImplicitWidth
+    readonly property real _combinedPulseOpacity: Math.max(
+        root.card._switchPulseOpacity,
+        root.card._sharedBackgroundPulseOpacity
+    )
 
     implicitWidth: root.card._barExpandedDetachedWidth
     implicitHeight: root.card._barExpandedCombinedHeight
@@ -17,11 +21,21 @@ Item {
 
     // Shared backdrop keeps the title and workspace lanes readable as one surface.
     Item {
+        id: _backdropLayer
+
         x: 0
         y: root.card._combinedBackdropOffsetY
         width: parent.width
         height: parent.height
         z: -1
+        scale: root.card._switchPulseScale
+        transformOrigin: Item.Center
+
+        Item {
+            id: _pulseBackdrop
+            anchors.fill: parent
+            visible: false
+        }
 
         // Vertical drift keeps the shared backdrop aligned during the title reveal.
         Behavior on y {
@@ -32,24 +46,57 @@ Item {
         }
 
         // Title lane keeps the seam square.
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: Theme.barHeight
-            radius: 0
-            color: root.card._stageFill
-        }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: Theme.barHeight
+                radius: 0
+                color: root.card._stageFill
+                scale: root.card._switchPulseScale
+                transformOrigin: Item.Center
+            }
 
         // Workspace lane keeps the seam square.
-        Rectangle {
-            x: 0
-            y: Theme.barHeight
-            width: parent.width
-            height: root.card._barExpandedDetachedContentHeight
-            radius: 0
-            color: root.card._stageFill
-        }
+            Rectangle {
+                x: 0
+                y: Theme.barHeight
+                width: parent.width
+                height: root.card._barExpandedDetachedContentHeight
+                radius: 0
+                color: root.card._stageFill
+                scale: root.card._switchPulseScale
+                transformOrigin: Item.Center
+            }
+
+        // Pulse overlay reuses the same backdrop lanes and corner caps.
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: Theme.barHeight
+                radius: 0
+                color: root.card._switchPulseFill
+                opacity: root._combinedPulseOpacity
+                visible: opacity > 0
+                z: 1
+                scale: root.card._switchPulseScale
+                transformOrigin: Item.Center
+            }
+
+            Rectangle {
+                x: 0
+                y: Theme.barHeight
+                width: parent.width
+                height: root.card._barExpandedDetachedContentHeight
+                radius: 0
+                color: root.card._switchPulseFill
+                opacity: root._combinedPulseOpacity
+                visible: opacity > 0
+                z: 1
+                scale: root.card._switchPulseScale
+                transformOrigin: Item.Center
+            }
 
         // Left corner cap sits outside the square seam.
         Canvas {
@@ -58,19 +105,16 @@ Item {
             y: -root.card._barExpandedNotchRadius
             width: root.card._barExpandedNotchRadius
             height: root.card._barExpandedNotchRadius
-            property color _canvasFill: root.card._stageFill
+            property color canvasFill: root._combinedPulseOpacity > 0 ? root.card._switchPulseFill : root.card._stageFill
 
-            Connections {
-                target: _leftCornerCapCanvas
+            onCanvasFillChanged: requestPaint()
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
 
-                function onCanvasFillChanged() {
-                    _leftCornerCapCanvas.requestPaint()
-                }
-            }
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.reset()
-                ctx.fillStyle = _canvasFill
+                ctx.fillStyle = canvasFill
                 ctx.beginPath()
                 ctx.moveTo(0, 0)
                 ctx.lineTo(width, 0)
@@ -87,19 +131,16 @@ Item {
             y: -root.card._barExpandedNotchRadius
             width: root.card._barExpandedNotchRadius
             height: root.card._barExpandedNotchRadius
-            property color _canvasFill: root.card._stageFill
+            property color canvasFill: root._combinedPulseOpacity > 0 ? root.card._switchPulseFill : root.card._stageFill
 
-            Connections {
-                target: _rightCornerCapCanvas
+            onCanvasFillChanged: requestPaint()
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
 
-                function onCanvasFillChanged() {
-                    _rightCornerCapCanvas.requestPaint()
-                }
-            }
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.reset()
-                ctx.fillStyle = _canvasFill
+                ctx.fillStyle = canvasFill
                 ctx.beginPath()
                 ctx.moveTo(0, 0)
                 ctx.lineTo(width, 0)

@@ -39,6 +39,9 @@ Item {
     property var _renderHint: null
     property date currentTime: new Date()
     readonly property var _hint: root._renderHint || root._liveHint
+    property real _switchPulseScale: 1
+    property real _switchPulseOpacity: 0
+    readonly property color _switchPulseFill: HintLogic.mixColor(root._stageFill, Colors.highlight, root._switchPulseOpacity)
 
     readonly property int _padH: Theme.barWidget.contentPaddingH
     readonly property int _padV: Theme.barWidget.contentPaddingV
@@ -213,6 +216,27 @@ Item {
         root._workspaceTrailingTrim = root._workspaceTrailingTrimTarget
     }
 
+    function _hintSwitchChanged(previousHint, nextHint) {
+        const previous = previousHint || {}
+        const next = nextHint || {}
+
+        return (previous.currentWindowId || "") !== (next.currentWindowId || "")
+            || (previous.currentIndex !== undefined ? previous.currentIndex : -1)
+                !== (next.currentIndex !== undefined ? next.currentIndex : -1)
+            || (previous.workspaceId || "") !== (next.workspaceId || "")
+            || (previous.workspaceIndex !== undefined ? previous.workspaceIndex : -1)
+                !== (next.workspaceIndex !== undefined ? next.workspaceIndex : -1)
+            || (previous.activeWorkspacePosition !== undefined ? previous.activeWorkspacePosition : -1)
+                !== (next.activeWorkspacePosition !== undefined ? next.activeWorkspacePosition : -1)
+    }
+
+    function _triggerSwitchPulse() {
+        _switchPulseAnim.stop()
+        root._switchPulseScale = 1
+        root._switchPulseOpacity = 0
+        _switchPulseAnim.start()
+    }
+
     // Clock updates keep the hint snapshot aligned with live time.
     Timer {
         id: _clockTimer
@@ -341,7 +365,13 @@ Item {
     Connections {
         target: WindowHintService
         enabled: !root.measurementMode
-        function onActiveHintChanged() { root._handleHintChange() }
+        function onActiveHintChanged() {
+            const previousHint = root._renderHint || root._liveHint
+            root._handleHintChange()
+            const nextHint = root._renderHint || root._liveHint
+            if (root._hintSwitchChanged(previousHint, nextHint) && nextHint && nextHint.visible === true)
+                root._triggerSwitchPulse()
+        }
     }
 
     // Clone the render hint once the root is ready.
@@ -351,6 +381,51 @@ Item {
         root._retargetHintAnchors(root._renderHint, true)
         root._syncWorkspaceStageTrim(true)
     }
+
+    // Whole-card spring and pulse feedback for hint switches.
+    SequentialAnimation {
+        id: _switchPulseAnim
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: root
+                property: "_switchPulseScale"
+                to: 1.018
+                duration: Theme.anim.pulseSpringDuration
+                easing.type: Theme.anim.pulseSpringType
+                easing.overshoot: Theme.anim.pulseSpringOvershoot
+            }
+
+            NumberAnimation {
+                target: root
+                property: "_switchPulseOpacity"
+                to: 0.12
+                duration: Theme.anim.highlightDuration
+                easing.type: Theme.anim.highlightType
+            }
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: root
+                property: "_switchPulseScale"
+                to: 1
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+
+            NumberAnimation {
+                target: root
+                property: "_switchPulseOpacity"
+                to: 0
+                duration: Theme.anim.moveDuration
+                easing.type: Theme.anim.moveType
+            }
+        }
+    }
+
+    scale: root._switchPulseScale
+    transformOrigin: Item.Center
 
     // Default presentation stays in a thin composition shell.
     IslandParts.IslandWindowHintDefaultPresentation {

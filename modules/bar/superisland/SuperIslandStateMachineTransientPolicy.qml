@@ -355,6 +355,7 @@ Item {
         root.state._flashTrackY = root.host._flashStripY
         root.state._flashTrackScale = root.host._flashScale
         root.state._flashTrackOpacity = 1
+        root.machine.triggerSharedBackgroundPulse("bar-expanded-hint-enter")
         root.machine.startAttachedReveal(undefined, undefined, false)
     }
 

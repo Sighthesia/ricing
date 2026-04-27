@@ -135,16 +135,18 @@ Item {
             target: root.motionTarget
             property: root.revealWidthProperty
             to: root.revealWidthTarget
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
         }
 
         NumberAnimation {
             target: root.motionTarget
             property: root.revealHeightProperty
             to: root.revealHeightTarget
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
         }
 
         NumberAnimation {
@@ -165,16 +167,18 @@ Item {
             target: root.motionTarget
             property: root.revealWidthProperty
             to: root.resolvedCollapseWidthTarget()
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
         }
 
         NumberAnimation {
             target: root.motionTarget
             property: root.revealHeightProperty
             to: root.resolvedCollapseHeightTarget()
-            duration: Theme.anim.moveDuration
-            easing.type: Theme.anim.moveType
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
         }
 
         NumberAnimation {

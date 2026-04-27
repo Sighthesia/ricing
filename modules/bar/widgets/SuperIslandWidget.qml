@@ -307,16 +307,19 @@ Item {
         root._overlaySessionActive ? 1 : root._attachedPanelScale
     readonly property real _attachedSurfaceScale:
         root._barExpandedHintActive
-            ? 1
+            ? (_attachedContentDeck.hintPulseScale * root._pulseScale * root._attachedContentScale)
             : (root._pulseScale * root._attachedContentScale)
     readonly property real _attachedPulseOpacity:
-        root._attachedPanelActive && !root._barExpandedHintActive
-            ? root._sharedBackgroundPulseOpacity
+        root._attachedPanelActive
+            ? Math.max(
+                root._sharedBackgroundPulseOpacity,
+                root._barExpandedHintActive ? _attachedContentDeck.hintPulseOpacity : 0
+            )
             : 0
     readonly property color _barExpandedPanelSurfaceColor: Qt.rgba(
-        Colors.surface.r * (1 - root._sharedBackgroundPulseOpacity) + Colors.highlight.r * root._sharedBackgroundPulseOpacity,
-        Colors.surface.g * (1 - root._sharedBackgroundPulseOpacity) + Colors.highlight.g * root._sharedBackgroundPulseOpacity,
-        Colors.surface.b * (1 - root._sharedBackgroundPulseOpacity) + Colors.highlight.b * root._sharedBackgroundPulseOpacity,
+        Colors.surface.r * (1 - root._attachedPulseOpacity) + Colors.highlight.r * root._attachedPulseOpacity,
+        Colors.surface.g * (1 - root._attachedPulseOpacity) + Colors.highlight.g * root._attachedPulseOpacity,
+        Colors.surface.b * (1 - root._attachedPulseOpacity) + Colors.highlight.b * root._attachedPulseOpacity,
         root._attachedShellFillOpacity
     )
 
@@ -603,6 +606,11 @@ width: implicitWidth
             subtitle: source.subtitle || "",
             icon: source.icon || "",
             workspaceLabel: source.workspaceLabel || "",
+            workspaceId: source.workspaceId || "",
+            workspaceIndex: source.workspaceIndex !== undefined ? source.workspaceIndex : -1,
+            activeWorkspacePosition: source.activeWorkspacePosition !== undefined ? source.activeWorkspacePosition : -1,
+            currentWindowId: source.currentWindowId || "",
+            currentIndex: source.currentIndex !== undefined ? source.currentIndex : -1,
             timeoutMs: source.timeoutMs || 0,
             revision: source.revision || 0,
             timestamp: source.timestamp || 0
@@ -758,16 +766,18 @@ width: implicitWidth
         id: _attachedWidthRetargetAnim
         target: _viewState
         property: "_attachedPanelRevealWidth"
-        duration: Theme.anim.moveDuration
-        easing.type: Theme.anim.moveType
+        duration: Theme.anim.springDuration
+        easing.type: Theme.anim.springType
+        easing.overshoot: Theme.anim.springOvershoot
     }
 
     NumberAnimation {
         id: _attachedHeightRetargetAnim
         target: _viewState
         property: "_attachedPanelRevealHeight"
-        duration: Theme.anim.moveDuration
-        easing.type: Theme.anim.moveType
+        duration: Theme.anim.springDuration
+        easing.type: Theme.anim.springType
+        easing.overshoot: Theme.anim.springOvershoot
     }
 
     IslandCards.SuperIslandStateMachine {
@@ -972,34 +982,28 @@ width: implicitWidth
         surfaceFillOpacity: root._attachedShellFillOpacity
     }
 
-    BarPanels.AttachedExpansionPanelHost {
-        id: _overlayPanelHost
+    // Bar-expanded lower background must live outside the clipped panel host so pulse and spring remain visible.
+    Item {
+        id: _barExpandedPanelSurfaceHost
 
-        anchorItem: _pillClip
-        active: root._attachedPanelActive
-        collapseTailHidden: root._attachedCollapseTailHidden
-        expanded: root._attachedPanelExpanded
-        visibleWidth: root._attachedPanelVisibleWidth
-        panelWidth: root._attachedPanelBodyWidth
-        visibleHeight: root._attachedPanelVisibleHeight
-        detachedY: root._overlayDetachedY
-        attachmentOverlap: root._overlayAttachmentOverlap
-        revealLift: root._overlayRevealLift
-        revealYOffset: root._attachedRevealYOffset
-        throwOffsetY: root._pillThrowOffsetY
-        surfaceOpacity: root._attachedPanelOpacity
-        surfaceScale: root._attachedSurfaceScale
-        contentOpacity: root._attachedContentOpacity
+        x: _overlayPanelHost.x
+        y: _overlayPanelHost.y
+        width: _overlayPanelHost.width
+        height: _overlayPanelHost.height
+        visible: root._barExpandedHintActive && _overlayPanelHost.visible
+        z: _overlayPanelHost.z - 1
+        opacity: root._attachedPanelOpacity
+        scale: root._attachedSurfaceScale
+        transformOrigin: Item.Top
 
-        // Bar-expanded lower host keeps the title seam square and the lower corners rounded.
+        // Detached panel path owns the visible lower workspace body.
         Shape {
             id: _barExpandedPanelSurface
             anchors.fill: parent
             antialiasing: true
             preferredRendererType: Shape.CurveRenderer
-            visible: root._barExpandedHintActive
 
-            // Detached panel path owns the visible lower workspace body.
+            // Detached panel path keeps the title seam square and the lower corners rounded.
             ShapePath {
                 fillColor: root._barExpandedPanelSurfaceColor
                 strokeWidth: 0
@@ -1043,8 +1047,31 @@ width: implicitWidth
                 }
             }
         }
+    }
 
+    BarPanels.AttachedExpansionPanelHost {
+        id: _overlayPanelHost
+
+        anchorItem: _pillClip
+        active: root._attachedPanelActive
+        collapseTailHidden: root._attachedCollapseTailHidden
+        expanded: root._attachedPanelExpanded
+        visibleWidth: root._attachedPanelVisibleWidth
+        panelWidth: root._attachedPanelBodyWidth
+        visibleHeight: root._attachedPanelVisibleHeight
+        detachedY: root._overlayDetachedY
+        attachmentOverlap: root._overlayAttachmentOverlap
+        revealLift: root._overlayRevealLift
+        revealYOffset: root._attachedRevealYOffset
+        throwOffsetY: root._pillThrowOffsetY
+        surfaceOpacity: root._attachedPanelOpacity
+        surfaceScale: root._attachedSurfaceScale
+        contentOpacity: root._attachedContentOpacity
+
+        // Attached content stays clipped inside the reveal host.
         IslandCards.SuperIslandAttachedContentDeck {
+            id: _attachedContentDeck
+
             anchors.fill: parent
             active: root._attachedPanelActive
             overlaySessionActive: root._overlaySessionActive
@@ -1080,19 +1107,16 @@ width: implicitWidth
             width: root._barExpandedSeamArcRadius
             height: root._barExpandedSeamArcRadius
             visible: root._barExpandedSeamArcProgress > 0.01
+            property color canvasFill: root._barExpandedPanelSurfaceColor
 
-            Connections {
-                target: root
-
-                function onBarExpandedPanelSurfaceColorChanged() {
-                    _leftSeamArcCanvas.requestPaint()
-                }
-            }
+            onCanvasFillChanged: requestPaint()
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
 
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.reset()
-                ctx.fillStyle = root._barExpandedPanelSurfaceColor
+                ctx.fillStyle = canvasFill
                 ctx.beginPath()
                 ctx.moveTo(0, 0)
                 ctx.lineTo(width, 0)
@@ -1112,19 +1136,16 @@ width: implicitWidth
             width: root._barExpandedSeamArcRadius
             height: root._barExpandedSeamArcRadius
             visible: root._barExpandedSeamArcProgress > 0.01
+            property color canvasFill: root._barExpandedPanelSurfaceColor
 
-            Connections {
-                target: root
-
-                function onBarExpandedPanelSurfaceColorChanged() {
-                    _rightSeamArcCanvas.requestPaint()
-                }
-            }
+            onCanvasFillChanged: requestPaint()
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
 
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.reset()
-                ctx.fillStyle = root._barExpandedPanelSurfaceColor
+                ctx.fillStyle = canvasFill
                 ctx.beginPath()
                 ctx.moveTo(width, 0)
                 ctx.lineTo(0, 0)
