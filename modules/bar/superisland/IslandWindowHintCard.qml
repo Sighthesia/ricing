@@ -390,7 +390,7 @@ Item {
             NumberAnimation {
                 target: root
                 property: "_switchPulseScale"
-                to: 1.018
+                to: Theme.anim.sharedPulseScale
                 duration: Theme.anim.pulseSpringDuration
                 easing.type: Theme.anim.pulseSpringType
                 easing.overshoot: Theme.anim.pulseSpringOvershoot

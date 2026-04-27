@@ -306,9 +306,7 @@ Item {
     readonly property real _attachedContentScale:
         root._overlaySessionActive ? 1 : root._attachedPanelScale
     readonly property real _attachedSurfaceScale:
-        root._barExpandedHintActive
-            ? (_attachedContentDeck.hintPulseScale * root._pulseScale * root._attachedContentScale)
-            : (root._pulseScale * root._attachedContentScale)
+        root._pulseScale * root._attachedContentScale
     readonly property real _attachedPulseOpacity:
         root._attachedPanelActive
             ? Math.max(

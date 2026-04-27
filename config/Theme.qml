@@ -74,6 +74,7 @@ Singleton {
             root.powerSaveEnabled ? 1 : Math.round(180 / _animationSpeedFactor)
         readonly property int pulseSpringType: Easing.OutBack
         readonly property real pulseSpringOvershoot: 1.08
+        readonly property real sharedPulseScale: 1.018
 
         readonly property int barExpandPreloadDuration:
             root.powerSaveEnabled ? 1 : Math.max(1, Math.round(pulseSpringDuration
