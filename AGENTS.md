@@ -42,15 +42,16 @@ Load skills on demand; see `.agents/skills/README.md` for grouping.
 | [qml-token-cleanup](.agents/skills/qml-token-cleanup/SKILL.md)                       | Replacing hardcoded geometry with shared tokens           |
 | [qml-visual-language](.agents/skills/qml-visual-language/SKILL.md)                   | Visual identity and cross-component consistency           |
 | [qml-indicator-motion](.agents/skills/qml-indicator-motion/SKILL.md)                 | Active indicators and sliding highlights                  |
-| [attached-expansion-motion](.agents/skills/attached-expansion-motion/SKILL.md)       | Reusing SuperIsland attached panel motion in widgets      |
+| [visual-vs-layout-motion-ownership](.agents/skills/visual-vs-layout-motion-ownership/SKILL.md) | Separating visible motion from exported layout geometry   |
 | [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md)                         | Motion looks wrong even though state changes              |
-| [bar-widget-width-ownership](.agents/skills/bar-widget-width-ownership/SKILL.md)     | Widget-local width ownership vs bar reserved width        |
-| [superisland-window-hint-semantic-ownership](.agents/skills/superisland-window-hint-semantic-ownership/SKILL.md) | Window-hint root elements, width ownership, and corner-bridge semantics |
-| [superisland-window-hint-exit-timing](.agents/skills/superisland-window-hint-exit-timing/SKILL.md) | Split title/workspace exit timing, exit width targets, and throw/catch-safe hint retreat |
+| [exported-layout-width-ownership](.agents/skills/exported-layout-width-ownership/SKILL.md) | Visible width vs reserved layout width synchronization    |
+| [multi-surface-semantic-ownership](.agents/skills/multi-surface-semantic-ownership/SKILL.md) | Root, shell, and content ownership across attached surfaces |
+| [single-instance-handoff-motion](.agents/skills/single-instance-handoff-motion/SKILL.md) | Teleport/duplicate-safe cross-host handoff motion         |
+| [split-host-exit-synchronization](.agents/skills/split-host-exit-synchronization/SKILL.md) | Synchronizing exit timing across separate geometry owners |
 | [list-transition-handoffs](.agents/skills/list-transition-handoffs/SKILL.md)         | Animated list replacement and filter handoffs             |
 | [qml-performance-debug](.agents/skills/qml-performance-debug/SKILL.md)               | Jank, frame drops, and layout thrash                      |
-| [lyrics-display-stability](.agents/skills/lyrics-display-stability/SKILL.md)         | Lyric display latching, sparse-line stability, and media text flash prevention |
-| [netease-web-lyrics-stability](.agents/skills/netease-web-lyrics-stability/SKILL.md) | NetEase web lyrics bridge weak-payload and source-latch debugging |
+| [session-latched-display-state](.agents/skills/session-latched-display-state/SKILL.md) | Stable display state under sparse or weak updates         |
+| [weak-signal-bridge-normalization](.agents/skills/weak-signal-bridge-normalization/SKILL.md) | Normalizing incomplete bridge payloads before app state   |
 | [reference-attribution](.agents/skills/reference-attribution/SKILL.md)               | Adapting patterns from another repo                       |
-| [attached-expansion-geometry](.agents/skills/attached-expansion-geometry/SKILL.md)   | SuperIsland or media attached-panel bridge geometry       |
-| [qml-workspace-overview-model](.agents/skills/qml-workspace-overview-model/SKILL.md) | Workspace tabs showing per-workspace windows or icons     |
+| [contour-anchor-before-radius](.agents/skills/contour-anchor-before-radius/SKILL.md) | Fixing bridge silhouette by anchor before radius tuning   |
+| [shared-summary-model-delegates](.agents/skills/shared-summary-model-delegates/SKILL.md) | Per-item overview delegates backed by one summary model   |

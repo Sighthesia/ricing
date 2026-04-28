@@ -1,11 +1,11 @@
 ---
-name: superisland-window-hint-semantic-ownership
-description: Use when changing SuperIsland window-hint geometry or layout and you need to separate the bar host, hint presentation root, attached shell, and detached lower content ownership.
+name: multi-surface-semantic-ownership
+description: Use when one visual feature spans multiple roots, shells, or detached surfaces and layout bugs stem from confusing the host owner, presentation owner, shell owner, or content owner.
 ---
 
-# SuperIsland Window-Hint Semantic Ownership
+# Multi-Surface Semantic Ownership
 
-Trace the real root element, width owner, and content owner before changing window-hint geometry.
+Trace the real root, width owner, shell owner, and content owner before changing geometry.
 
 ## When to Use
 - You are editing `modules/bar/widgets/SuperIslandWidget.qml` or `modules/bar/superisland/IslandWindowHintCard.qml`.
