@@ -53,6 +53,13 @@ Singleton {
             && MediaService.hasPlayer
             && MediaService.playbackState === "paused"
             && root._hasStableLyricsCache()
+    readonly property bool _suppressStableLyricsAtTrackStart:
+        MediaService.hasPlayer
+            && MediaService.playbackState === "playing"
+            && MediaService.positionMs >= 0
+            && MediaService.positionMs < 1500
+            && NeteaseWebLyricsService.currentLyric === ""
+            && NeteaseWebLyricsService.currentTranslatedLyric === ""
     readonly property bool _preferLyricsMediaSource:
         root._lyricsSourceLatched
     readonly property var _media: root._mediaOverride !== null ? root._mediaOverride : ({
@@ -123,13 +130,15 @@ Singleton {
     readonly property string currentLyric:
         root._freezeLyricsOnPause
             ? root._stableCurrentLyric
+            : (root._suppressStableLyricsAtTrackStart
+            ? ""
             : (NeteaseWebLyricsService.currentLyric !== ""
             ? NeteaseWebLyricsService.currentLyric
             : ((NeteaseWebLyricsService.currentLyric === ""
                 && NeteaseWebLyricsService.nextLyric === ""
                 && root._preferLyricsMediaSource)
                 ? root._stableCurrentLyric
-                : ""))
+                : "")))
     readonly property string nextLyric:
         root._freezeLyricsOnPause
             ? root._stableNextLyric
@@ -143,13 +152,15 @@ Singleton {
     readonly property string currentTranslatedLyric:
         root._freezeLyricsOnPause
             ? root._stableCurrentTranslatedLyric
+            : (root._suppressStableLyricsAtTrackStart
+            ? ""
             : (NeteaseWebLyricsService.currentTranslatedLyric !== ""
             ? NeteaseWebLyricsService.currentTranslatedLyric
             : ((NeteaseWebLyricsService.currentTranslatedLyric === ""
                 && NeteaseWebLyricsService.nextTranslatedLyric === ""
                 && root._preferLyricsMediaSource)
                 ? root._stableCurrentTranslatedLyric
-                : ""))
+                : "")))
     readonly property string nextTranslatedLyric:
         root._freezeLyricsOnPause
             ? root._stableNextTranslatedLyric
@@ -265,6 +276,12 @@ Singleton {
         let desiredState = { text: "", key: "" }
 
         if (!SettingsService.data.mediaControl.showLyrics || !SettingsService.data.mediaControl.preferLyrics) {
+            if (root._compactDisplayedLyric !== "")
+                root._clearCompactDisplayedLyric()
+            return
+        }
+
+        if (root._suppressStableLyricsAtTrackStart) {
             if (root._compactDisplayedLyric !== "")
                 root._clearCompactDisplayedLyric()
             return
