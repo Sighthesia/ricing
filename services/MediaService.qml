@@ -10,19 +10,50 @@ Singleton {
     id: root
 
     property int _positionTick: 0
+    property string _preferredPlayerKey: ""
+    property var _activePlayerRef: null
     property string artUrl: ""
     property string _lastArtKey: ""
     property string _lastArtPlayerKey: ""
+    property string _lastArtTitle: ""
+    property string _lastArtArtist: ""
     property bool _artRecoveryPending: false
     property int _artRecoveryStartedAt: 0
 
-    readonly property var activePlayer: {
+    readonly property var activePlayer: root._activePlayerRef
+
+    function _selectActivePlayer() {
         const players = Mpris.players.values
+        let preferredPlayer = null
+        let firstPlayingPlayer = null
+
         for (let i = 0; i < players.length; i++) {
-            if (players[i].isPlaying)
-                return players[i]
+            const player = players[i]
+            const playerKey = root._artPlayerKey(player)
+
+            if (playerKey !== "" && playerKey === root._preferredPlayerKey)
+                preferredPlayer = player
+
+            if (firstPlayingPlayer === null && player.isPlaying)
+                firstPlayingPlayer = player
         }
+
+        if (preferredPlayer !== null && preferredPlayer.isPlaying)
+            return preferredPlayer
+
+        if (firstPlayingPlayer !== null)
+            return firstPlayingPlayer
+
+        if (preferredPlayer !== null)
+            return preferredPlayer
+
         return players.length > 0 ? players[0] : null
+    }
+
+    function _syncActivePlayer() {
+        const nextPlayer = root._selectActivePlayer()
+        root._activePlayerRef = nextPlayer
+        root._preferredPlayerKey = root._artPlayerKey(nextPlayer)
     }
 
     readonly property bool hasPlayer: activePlayer !== null
@@ -87,6 +118,8 @@ Singleton {
             root.artUrl = ""
             root._lastArtKey = ""
             root._lastArtPlayerKey = ""
+            root._lastArtTitle = ""
+            root._lastArtArtist = ""
             root._artRecoveryPending = false
             root._artRecoveryStartedAt = 0
             return
@@ -95,9 +128,11 @@ Singleton {
         const player = root.activePlayer
         const playerKey = root._artPlayerKey(player)
         const artKey = root._artKey(player)
+        const trackTitle = player.trackTitle || ""
+        const trackArtist = player.trackArtist || ""
         const nextArtUrl = player.trackArtUrl || ""
 
-        if (nextArtUrl === "" && root.artUrl !== "" && playerKey === root._lastArtPlayerKey && (artKey === root._lastArtKey || player.playbackState === MprisPlaybackState.Playing)) {
+        if (nextArtUrl === "" && root.artUrl !== "" && playerKey === root._lastArtPlayerKey && trackTitle === root._lastArtTitle && trackArtist === root._lastArtArtist) {
             root._artRecoveryPending = true
             if (root._artRecoveryStartedAt === 0)
                 root._artRecoveryStartedAt = Date.now()
@@ -107,6 +142,8 @@ Singleton {
         if (nextArtUrl !== "") {
             root._lastArtPlayerKey = playerKey
             root._lastArtKey = artKey
+            root._lastArtTitle = trackTitle
+            root._lastArtArtist = trackArtist
             root.artUrl = nextArtUrl
             root._artRecoveryPending = false
             root._artRecoveryStartedAt = 0
@@ -115,7 +152,7 @@ Singleton {
 
         // Keep the previous artwork while the player is replaying or briefly
         // publishing empty metadata for the current track.
-        if (playerKey === root._lastArtPlayerKey && (artKey === root._lastArtKey || player.trackTitle === "" || player.trackArtist === "")) {
+        if (playerKey === root._lastArtPlayerKey && (artKey === root._lastArtKey || trackTitle === "" || trackArtist === "")) {
             if (root._artRecoveryStartedAt === 0)
                 root._artRecoveryStartedAt = Date.now()
 
@@ -125,6 +162,8 @@ Singleton {
 
         root._lastArtPlayerKey = playerKey
         root._lastArtKey = artKey
+        root._lastArtTitle = trackTitle
+        root._lastArtArtist = trackArtist
         root.artUrl = ""
         root._artRecoveryStartedAt = Date.now()
         root._artRecoveryPending = true
@@ -215,10 +254,12 @@ Singleton {
     Connections {
         target: Mpris.players
         function onObjectInsertedPost() {
+            root._syncActivePlayer()
             root._syncArtUrl()
             root.mediaChanged()
         }
         function onObjectRemovedPre() {
+            root._syncActivePlayer()
             root._syncArtUrl()
             root.mediaChanged()
         }
@@ -228,41 +269,48 @@ Singleton {
         target: root.activePlayer
         ignoreUnknownSignals: true
         function onTrackTitleChanged() {
+            root._syncActivePlayer()
             root._syncArtUrl()
             root.mediaChanged()
         }
         function onTrackArtistChanged() {
+            root._syncActivePlayer()
             root._syncArtUrl()
             root.mediaChanged()
         }
         function onTrackArtUrlChanged() {
+            root._syncActivePlayer()
             root._syncArtUrl()
             root.mediaChanged()
         }
         function onPlaybackStateChanged() {
+            root._syncActivePlayer()
             root._syncArtUrl()
             root.mediaChanged()
         }
         function onIdentityChanged() {
+            root._syncActivePlayer()
             root._syncArtUrl()
             root.mediaChanged()
         }
         function onDesktopEntryChanged() {
+            root._syncActivePlayer()
             root._syncArtUrl()
             root.mediaChanged()
         }
         function onPositionChanged() {
+            root._syncActivePlayer()
             root._positionTick++
             root.mediaChanged()
         }
-        function onLengthChanged() { root.mediaChanged() }
-        function onCanControlChanged() { root.mediaChanged() }
-        function onCanGoPreviousChanged() { root.mediaChanged() }
-        function onCanTogglePlayingChanged() { root.mediaChanged() }
-        function onCanGoNextChanged() { root.mediaChanged() }
-        function onCanSeekChanged() { root.mediaChanged() }
-        function onPositionSupportedChanged() { root.mediaChanged() }
-        function onLengthSupportedChanged() { root.mediaChanged() }
+        function onLengthChanged() { root._syncActivePlayer(); root.mediaChanged() }
+        function onCanControlChanged() { root._syncActivePlayer(); root.mediaChanged() }
+        function onCanGoPreviousChanged() { root._syncActivePlayer(); root.mediaChanged() }
+        function onCanTogglePlayingChanged() { root._syncActivePlayer(); root.mediaChanged() }
+        function onCanGoNextChanged() { root._syncActivePlayer(); root.mediaChanged() }
+        function onCanSeekChanged() { root._syncActivePlayer(); root.mediaChanged() }
+        function onPositionSupportedChanged() { root._syncActivePlayer(); root.mediaChanged() }
+        function onLengthSupportedChanged() { root._syncActivePlayer(); root.mediaChanged() }
     }
 
     IpcHandler {
@@ -273,5 +321,8 @@ Singleton {
         function next() { root.ipcNext() }
     }
 
-    Component.onCompleted: root._syncArtUrl()
+    Component.onCompleted: {
+        root._syncActivePlayer()
+        root._syncArtUrl()
+    }
 }
