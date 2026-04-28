@@ -19,12 +19,20 @@ Item {
     property real outgoingClockOffsetY: 0
     property real relocatedClockOpacity: 1
     property real relocatedClockOffsetY: 0
+    property bool sharedClockActive: false
 
     readonly property string presentationMode: root.event && root.event.presentation ? root.event.presentation : "window-hint"
     readonly property bool _barExpandedCombinedPresentation: HintPresentationAdapter.isBarExpandedCombinedPresentation(root.presentationMode)
     readonly property bool _barExpandedMainPresentation: HintPresentationAdapter.isBarExpandedMainPresentation(root.presentationMode)
     readonly property bool _barExpandedDetachedPresentation: HintPresentationAdapter.isBarExpandedDetachedPresentation(root.presentationMode)
     readonly property bool _defaultPresentation: HintPresentationAdapter.isDefaultPresentation(root.presentationMode)
+    readonly property real relocatedClockRowY:
+        root._barExpandedDetachedPresentation && _barExpandedDetachedPresentationItem
+            ? (_barExpandedDetachedPresentationItem.y + _barExpandedDetachedPresentationItem.relocatedClockRowY)
+            : 0
+    readonly property real relocatedClockCenterY:
+        root.relocatedClockRowY
+        + (root._barExpandedDetachedPresentation ? root._barExpandedDetachedClockHeight / 2 : 0)
 
     readonly property bool _hostKeepsHintVisible: !!(root.event && root.event.type === "window-hint")
 
@@ -463,6 +471,7 @@ Item {
         anchors.topMargin: root._padV + root._stagePadV
         anchors.horizontalCenter: parent.horizontalCenter
         card: root
+        sharedClockActive: root.sharedClockActive
         visible: root._barExpandedDetachedPresentation
     }
 }

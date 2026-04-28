@@ -8,22 +8,35 @@ Item {
     id: root
 
     required property Item card
+    property bool sharedClockActive: false
+
+    readonly property real _visibleContentHeight: Math.max(0, Math.min(root.height, root.card.height - root.y))
+    readonly property real _revealProgress:
+        root.height > 0
+            ? Math.max(0, Math.min(1, root._visibleContentHeight / root.height))
+            : 1
+    readonly property real _contentTravel:
+        (1 - root._revealProgress) * (root.card._workspaceVisibleStageHeight + root.card._rowGap)
+    readonly property real relocatedClockRowY: _contentMotionLayer.y + _clockRow.y
 
     implicitWidth: root.card._barExpandedDetachedWidth
     implicitHeight: root.card._barExpandedDetachedContentHeight
     width: implicitWidth
     height: implicitHeight
 
-    // Inner column keeps the workspace strip and relocated clock centered.
-    Column {
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
+    // Shared motion layer lets workspace content travel with the reveal instead of only being clipped.
+    Item {
+        id: _contentMotionLayer
+
+        x: 0
+        y: -root._contentTravel
         width: parent.width
         height: parent.height
-        spacing: root.card._rowGap
 
         // Workspace overview stays in the lower wide rectangle.
         Item {
+            x: 0
+            y: 0
             width: parent.width
             height: Math.max(0, parent.height - root.card._rowGap - root.card._barExpandedDetachedClockHeight)
 
@@ -34,37 +47,14 @@ Item {
             }
         }
 
-        // Relocated clock fades into the detached lane instead of swapping abruptly.
+        // Detached clock row remains as a geometry target for the shared moving clock.
         Item {
+            id: _clockRow
+
+            x: 0
+            y: root.card._workspaceVisibleStageHeight + root.card._rowGap + root.card.relocatedClockOffsetY
             width: parent.width
             height: root.card._barExpandedDetachedClockHeight
-            opacity: root.card.relocatedClockOpacity
-            y: root.card.relocatedClockOffsetY
-
-            // Fade the relocated clock in as it reaches the lower lane.
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Theme.anim.highlightDuration
-                    easing.type: Theme.anim.highlightType
-                }
-            }
-
-            // Match the relocation movement to the shared reveal timing.
-            Behavior on y {
-                NumberAnimation {
-                    duration: Theme.anim.moveDuration
-                    easing.type: Theme.anim.moveType
-                }
-            }
-
-            // Idle clock remains centered inside the relocated row.
-            IslandParts.IslandIdleClockCard {
-                anchors.centerIn: parent
-
-                currentTime: root.card.currentTime
-                hasPendingEvents: SuperIslandService.hasPendingEvents
-                cardHeight: root.card._barExpandedDetachedClockHeight
-            }
         }
     }
 }

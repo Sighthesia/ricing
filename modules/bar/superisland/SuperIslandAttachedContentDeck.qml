@@ -14,11 +14,13 @@ Item {
     required property bool showOverlayHandoffHint
     required property var hintEvent
     required property var handoffHintEvent
+    property bool sharedClockActive: false
 
     readonly property real hintPulseOpacity:
         (hintCardLoader.item && hintCardLoader.item._switchPulseOpacity !== undefined)
             ? hintCardLoader.item._switchPulseOpacity
             : 0
+    readonly property Item hintCardLoaderItem: hintCardLoader.item
 
     function _resolvedHintEvent() {
         const source = root.overlaySessionActive && root.overlayHintHandoffActive
@@ -72,6 +74,7 @@ Item {
 
         SuperIslandParts.IslandWindowHintCard {
             event: hintCardLoader.eventData
+            sharedClockActive: root.sharedClockActive
         }
     }
 

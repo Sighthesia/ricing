@@ -488,6 +488,40 @@ Item {
     readonly property real _attachedRevealYOffset:
         (1 - root._attachedVerticalRevealProgress) * root._overlayRevealLift
     property bool _hintRevealSettled: false
+    readonly property bool _barExpandedSharedClockVisible:
+        root._barExpandedHintActive
+        || (root._phase === "idle" && root._mainDisplayEvent && root._mainDisplayEvent.type === "idle"
+            && root._lastActiveEvent && root._lastActiveEvent.presentation === "bar-expanded")
+    readonly property bool _barExpandedMainCardVisible:
+        root._barExpandedHintActive
+        && root._phase === "hint"
+        && !root._attachedCollapseAnimating
+        && root._attachedPanelVisibleHeight > Math.max(0, root._windowHintSideHeight / 2)
+    readonly property bool _barExpandedWindowHintTailActive:
+        root._barExpandedHintActive
+        && root._mainDisplayEvent
+        && root._mainDisplayEvent.type === "window-hint"
+        && root._phase !== "hint"
+    readonly property real _barExpandedSharedClockHeight: root._pillH
+    readonly property real _barExpandedSharedClockLandingY:
+        root._padV + root._trackCenterY(_idleMeasureLoader.item, root._pillH, null, true)
+    readonly property real _barExpandedSharedClockStartCenterY:
+        root._barExpandedSharedClockLandingY + root._barExpandedSharedClockHeight / 2
+    readonly property real _barExpandedSharedClockStartY:
+        root._barExpandedSharedClockLandingY
+    readonly property real _barExpandedSharedClockTargetCenterY:
+        (_overlayPanelHost ? _overlayPanelHost.y + 1 : 1)
+        + ((_attachedContentDeck && _attachedContentDeck.hintCardLoaderItem
+                && _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY !== undefined)
+            ? _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY
+            : Math.max(root._pillH / 2, root._attachedPanelVisibleHeight - root._pillH / 2))
+    readonly property real _barExpandedSharedClockTargetY:
+        root._barExpandedSharedClockTargetCenterY - root._barExpandedSharedClockHeight / 2
+    readonly property real _barExpandedSharedClockY:
+        root._barExpandedSharedClockStartCenterY
+        + (root._barExpandedSharedClockTargetCenterY - root._barExpandedSharedClockStartCenterY)
+            * root._attachedVerticalRevealProgress
+        - root._barExpandedSharedClockHeight / 2
     readonly property bool _showOverlayHandoffHint:
         root._overlayHintHandoffActive
         && root._overlaySessionActive
@@ -673,6 +707,9 @@ width: implicitWidth
             return _idleComponent
         if (event.type === "window-hint") {
             const presentationKind = HintPresentationAdapter.windowHintPresentationKindForEvent(event, useStrip)
+
+            if (!useStrip && presentationKind === "bar-expanded-main" && !root._barExpandedMainCardVisible)
+                return _emptyComponent
 
             if (presentationKind === "bar-expanded-main")
                 return _windowHintBarExpandedMainCardComponent
@@ -911,10 +948,12 @@ width: implicitWidth
             id: _replaceLoader
             property var eventData: root._replaceOutgoingEvent
             property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
+            readonly property bool _windowHintReplaceBlocked:
+                eventData && eventData.type === "window-hint" && root._barExpandedWindowHintTailActive
             anchors.horizontalCenter: parent.horizontalCenter
-            active: root._replaceOutgoingVisible
+            active: root._replaceOutgoingVisible && !_windowHintReplaceBlocked
             y: root._replaceOutgoingY
-            opacity: root._replaceOutgoingOpacity
+            opacity: _windowHintReplaceBlocked ? 0 : root._replaceOutgoingOpacity
             sourceComponent: root._componentForEvent(eventData, false)
         }
 
@@ -922,10 +961,12 @@ width: implicitWidth
             id: _replaceIncomingLoader
             property var eventData: root._replaceIncomingEvent
             property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
+            readonly property bool _windowHintReplaceBlocked:
+                eventData && eventData.type === "window-hint" && root._barExpandedWindowHintTailActive
             anchors.horizontalCenter: parent.horizontalCenter
-            active: root._replaceIncomingVisible
+            active: root._replaceIncomingVisible && !_windowHintReplaceBlocked
             y: root._replaceIncomingY
-            opacity: root._replaceIncomingOpacity
+            opacity: _windowHintReplaceBlocked ? 0 : root._replaceIncomingOpacity
             sourceComponent: root._componentForEvent(eventData, false)
         }
 
@@ -933,10 +974,16 @@ width: implicitWidth
             id: _mainLoader
             property var eventData: root._mainDisplayEvent
             property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
+            readonly property bool _windowHintMainCardActive:
+                eventData && eventData.type === "window-hint" && root._barExpandedHintActive
             anchors.horizontalCenter: parent.horizontalCenter
             y: root._mainTrackY
             scale: root._mainTrackScale
-            opacity: (root._replaceOutgoingVisible || root._replaceIncomingVisible) ? 0 : root._mainTrackOpacity
+            opacity: (root._replaceOutgoingVisible || root._replaceIncomingVisible
+                    || root._barExpandedWindowHintTailActive
+                    || (_windowHintMainCardActive && !root._barExpandedMainCardVisible))
+                ? 0
+                : root._mainTrackOpacity
             sourceComponent: root._componentForEvent(eventData, false)
         }
 
@@ -955,6 +1002,19 @@ width: implicitWidth
             clip: !root._isFullHintEventType(eventData.type)
             sourceComponent: root._componentForEvent(eventData, true)
         }
+    }
+
+    // Shared handoff layer must live outside the clipped pill host so the clock can cross the seam.
+    IslandCards.IslandIdleClockCard {
+        anchors.horizontalCenter: _pillClip.horizontalCenter
+        y: root._barExpandedSharedClockY
+        opacity: root._barExpandedSharedClockVisible ? 1 : 0
+        visible: opacity > 0
+        z: _overlayPanelHost.z + 2
+
+        currentTime: root.currentTime
+        hasPendingEvents: SuperIslandService.hasPendingEvents
+        cardHeight: root._barExpandedSharedClockHeight
     }
 
     BarPanels.AttachedExpansionShell {
@@ -1078,6 +1138,7 @@ width: implicitWidth
             showOverlayHandoffHint: root._showOverlayHandoffHint
             hintEvent: root._attachedHintEvent
             handoffHintEvent: root._overlayHandoffHintEvent
+            sharedClockActive: root._barExpandedSharedClockVisible
         }
     }
 
@@ -1215,6 +1276,17 @@ width: implicitWidth
     }
 
     Component {
+        id: _emptyComponent
+
+        Item {
+            implicitWidth: 0
+            implicitHeight: 0
+            width: 0
+            height: 0
+        }
+    }
+
+    Component {
         id: _idleComponent
 
         IslandCards.IslandIdleClockCard {
@@ -1327,6 +1399,7 @@ width: implicitWidth
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-detached")
             relocatedClockOpacity: root._attachedVerticalRevealProgress
             relocatedClockOffsetY: (1 - root._attachedVerticalRevealProgress) * -Math.max(8, Theme.barWidget.contentPaddingV * 2)
+            sharedClockActive: root._barExpandedSharedClockVisible
         }
     }
 
@@ -1339,6 +1412,7 @@ width: implicitWidth
             hintData: WindowHintService.activeHint
             relocatedClockOpacity: root._attachedVerticalRevealProgress
             relocatedClockOffsetY: (1 - root._attachedVerticalRevealProgress) * -Math.max(8, Theme.barWidget.contentPaddingV * 2)
+            sharedClockActive: root._barExpandedSharedClockVisible
         }
     }
 
