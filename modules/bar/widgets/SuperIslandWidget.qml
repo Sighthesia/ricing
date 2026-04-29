@@ -202,6 +202,11 @@ Item {
     readonly property real _barExpandedDetachedRadius:
         Math.max(Theme.cornerRadius, Math.round(Theme.barWidget.pillHeight * 0.42))
     readonly property real _barExpandedSeamArcRadius: root._barExpandedDetachedRadius
+    readonly property bool _barExpandedTailRectReleased:
+        root._barExpandedHintActive
+        && (root._phase === "hint-exit" || root._overlayClosing)
+        && (root._attachedRevealProgress <= 0.16
+            || root._attachedPanelVisibleHeight <= Math.max(root._windowHintSideHeight, root._overlayAttachmentOverlap + 2))
     readonly property real _barExpandedSeamArcProgress: {
         if (root._barExpandedTitleWidthClamped)
             return 0
@@ -247,16 +252,26 @@ Item {
         root._overlaySessionActive
             ? (root._overlayExpandedActive || root._overlayClosing)
             : (root._hintPhase || root._attachedCollapseAnimating)
+    readonly property bool _barExpandedHintLiveSizing:
+        root._barExpandedHintActive && root._phase === "hint" && !root._attachedCollapseAnimating
+    readonly property real _pillBaseTopMargin:
+        root._barExpandedHintActive && root._phase === "hint" ? 0 : root._padV
     readonly property real _attachedPanelWidth:
         root._overlaySessionActive
             ? root._overlayExpandedWidth
             : (root._barExpandedHintActive
                 ? Math.max(root._barExpandedMainHintWidth, root._barExpandedDetachedHintWidth)
                 : root._detachedHintWidth)
+    readonly property real _liveDetachedHintSessionHeight:
+        root._barExpandedHintActive ? root._barExpandedDetachedHintHeight : root._detachedHintHeight
+    readonly property real _attachedHintSessionHeight:
+        root._latchedDetachedHintSessionHeight > 0
+            ? Math.max(root._latchedDetachedHintSessionHeight, root._liveDetachedHintSessionHeight)
+            : root._liveDetachedHintSessionHeight
     readonly property real _attachedPanelHeight:
         root._overlaySessionActive
             ? root._overlayBodyHeight
-            : (root._barExpandedHintActive ? root._barExpandedDetachedHintHeight : root._detachedHintHeight)
+            : (root._barExpandedHintLiveSizing ? root._liveDetachedHintSessionHeight : root._attachedHintSessionHeight)
     readonly property real _attachedPanelBodyWidth:
         root._overlaySessionActive
             ? root._attachedPanelVisibleWidth
@@ -264,12 +279,19 @@ Item {
                 ? Math.min(root._barExpandedDetachedHintWidth, _pillTransitionControl.animatedWidth)
                 : root._attachedPanelVisibleWidth)
     readonly property real _detachedHintReservedHeight:
-        Math.max(root._transientExpandedHeight, root._fullHintExpandedPillHeight + 2)
+        Math.max(
+            root._transientExpandedHeight,
+            root._attachedHintSessionHeight,
+            root._fullHintExpandedPillHeight + 2
+        )
     readonly property real _detachedHintWidth: WidthResolver.detachedHintWidth(root)
     readonly property real _barExpandedMainHintWidthMeasured: WidthResolver.barExpandedMainHintWidthMeasured(root)
     readonly property real _barExpandedMainHintWidth: WidthResolver.barExpandedMainHintWidth(root)
     readonly property real _barExpandedDetachedHintWidth: WidthResolver.barExpandedDetachedHintWidth(root)
-    readonly property bool _barExpandedTitleWidthClamped: WidthResolver.barExpandedTitleWidthClamped(root)
+    readonly property bool _barExpandedTitleWidthClamped:
+        root._barExpandedTitleRevealLatched
+        && !root._barExpandedTailRectReleased
+        && WidthResolver.barExpandedTitleWidthClamped(root)
     readonly property bool _barExpandedHintActive:
         root._detachedHintActive && root._attachedHintEvent.presentation === "bar-expanded"
     // Bar reservation must follow only the top host footprint; the detached lower panel is visual-only.
@@ -326,7 +348,7 @@ Item {
     readonly property real _collapsedPillHeight: root._pillH
     readonly property bool _pillExpanded:
         (root._phase === "enter" || root._phase === "hold")
-        || root._barExpandedHintActive
+        || (root._barExpandedHintActive && root._phase === "hint")
 
     readonly property real _overlayExpandedWidth: {
         if (root._fullScreenOverlayMode)
@@ -365,7 +387,9 @@ Item {
     readonly property real _idleCollapsedWidthLive:
         (_idleMeasureLoader.item ? _idleMeasureLoader.item.implicitWidth : 0) + root._padH * 2
     readonly property real _barExpandedTitleRevealProgress:
-        root._barExpandedTitleRevealLatched ? 1 : root._attachedRevealProgress
+        root._phase === "hint-exit"
+            ? root._attachedVerticalRevealProgress
+            : (root._barExpandedTitleRevealLatched ? 1 : root._attachedRevealProgress)
     readonly property real _barExpandedTitleRevealWidthProgress:
         root._barExpandedMainWidth > root._barExpandedEntryBaseWidth
             ? Math.max(
@@ -396,7 +420,11 @@ Item {
             ? root._attachedCollapseBaseWidth
             : root._returnWidthLive
     readonly property real _transitionCollapsedWidth:
-        root._phase === "exit" ? root._returnWidth : root._collapsedWidth
+        root._phase === "exit"
+            ? root._returnWidth
+            : (root._barExpandedHintActive && root._phase === "hint-exit"
+                ? root._idleCollapsedWidthLive
+                : root._collapsedWidth)
     readonly property real _idleOpticalOffset: 0
     readonly property bool _hintPhase: root._phase === "hint" || root._phase === "hint-exit"
     readonly property bool _listensToService: true
@@ -437,6 +465,7 @@ Item {
     property alias _overlayHandoffHintEvent: _viewState._overlayHandoffHintEvent
     property alias _overlayHintHandoffActive: _viewState._overlayHintHandoffActive
     property alias _attachedHintEvent: _viewState._attachedHintEvent
+    property real _latchedDetachedHintSessionHeight: 0
     property alias _pillTransition: _pillTransitionControl
     property alias _resolverPillTransitionControl: _pillTransitionControl
     property alias _resolverPillClip: _pillClip
@@ -494,14 +523,14 @@ Item {
             && root._lastActiveEvent && root._lastActiveEvent.presentation === "bar-expanded")
     readonly property bool _barExpandedMainCardVisible:
         root._barExpandedHintActive
-        && root._phase === "hint"
-        && !root._attachedCollapseAnimating
+        && !root._attachedCollapseTailHidden
         && root._attachedPanelVisibleHeight > Math.max(0, root._windowHintSideHeight / 2)
     readonly property bool _barExpandedWindowHintTailActive:
         root._barExpandedHintActive
         && root._mainDisplayEvent
         && root._mainDisplayEvent.type === "window-hint"
         && root._phase !== "hint"
+        && !root._barExpandedMainCardVisible
     readonly property real _barExpandedSharedClockHeight: root._pillH
     readonly property real _barExpandedSharedClockLandingY:
         root._padV + root._trackCenterY(_idleMeasureLoader.item, root._pillH, null, true)
@@ -517,11 +546,13 @@ Item {
             : Math.max(root._pillH / 2, root._attachedPanelVisibleHeight - root._pillH / 2))
     readonly property real _barExpandedSharedClockTargetY:
         root._barExpandedSharedClockTargetCenterY - root._barExpandedSharedClockHeight / 2
-    readonly property real _barExpandedSharedClockY:
+    readonly property real _barExpandedSharedClockBaseY:
         root._barExpandedSharedClockStartCenterY
         + (root._barExpandedSharedClockTargetCenterY - root._barExpandedSharedClockStartCenterY)
             * root._attachedVerticalRevealProgress
         - root._barExpandedSharedClockHeight / 2
+    readonly property real _barExpandedSharedClockY:
+        root._barExpandedSharedClockBaseY + root._pillThrowOffsetY
     readonly property bool _showOverlayHandoffHint:
         root._overlayHintHandoffActive
         && root._overlaySessionActive
@@ -544,6 +575,8 @@ width: implicitWidth
     on_OverlayBodyHeightChanged: _stateMachine.syncOverlayExtensionReservation()
     on_OverlayDetachedOffsetChanged: _stateMachine.syncOverlayExtensionReservation()
     on_BarExpandedHintActiveChanged: {
+        root._syncDetachedHintSessionHeight()
+
         if (root._barExpandedHintActive) {
             const baseWidth = Math.max(0, _pillTransitionControl.animatedWidth)
             root._barExpandedEntryBaseWidth = baseWidth
@@ -568,7 +601,10 @@ width: implicitWidth
         root._barExpandedTitleRevealLatched = true
         root._logWidthChain("hintRevealSettled")
     }
-    on_PhaseChanged: root._logWidthChain("phaseChanged")
+    on_PhaseChanged: {
+        root._syncBarExpandedExitBaseWidth()
+        root._logWidthChain("phaseChanged")
+    }
     on_ExpandedWidthChanged: root._logWidthChain("expandedWidthChanged")
     on_CollapsedWidthChanged: root._logWidthChain("collapsedWidthChanged")
     on_AttachedPanelWidthChanged: root._retargetAttachedPanelWidthIfNeeded()
@@ -577,6 +613,44 @@ width: implicitWidth
         root._retargetAttachedPanelHeightIfNeeded()
     }
     on_AttachedPanelVisibleHeightChanged: _stateMachine.syncOverlayExtensionReservation()
+    on_AttachedPanelVisibleWidthChanged: root._syncBarExpandedExitBaseWidth()
+    on_DetachedHintActiveChanged: root._syncDetachedHintSessionHeight()
+    on_AttachedCollapseAnimatingChanged: root._syncDetachedHintSessionHeight()
+    on_DetachedHintHeightChanged: root._syncDetachedHintSessionHeight()
+    on_BarExpandedDetachedHintHeightChanged: root._syncDetachedHintSessionHeight()
+
+    function _syncDetachedHintSessionHeight() {
+        if (root._overlaySessionActive)
+            return
+
+        if (!root._detachedHintActive && !root._attachedCollapseAnimating) {
+            root._latchedDetachedHintSessionHeight = 0
+            return
+        }
+
+        if (root._detachedHintActive && !root._attachedCollapseAnimating) {
+            root._latchedDetachedHintSessionHeight = root._liveDetachedHintSessionHeight
+            return
+        }
+
+        root._latchedDetachedHintSessionHeight = Math.max(
+            root._latchedDetachedHintSessionHeight,
+            root._liveDetachedHintSessionHeight
+        )
+    }
+
+    function _syncBarExpandedExitBaseWidth() {
+        if (!root._barExpandedHintActive || root._phase !== "hint-exit")
+            return
+
+        root._barExpandedExitBaseWidth = Math.max(
+            root._barExpandedExitBaseWidth,
+            _pillTransitionControl ? _pillTransitionControl.animatedWidth : 0,
+            root._attachedPanelVisibleWidth,
+            root._barExpandedDetachedHintWidth,
+            root._idleCollapsedWidthLive
+        )
+    }
 
     function _retargetAttachedPanelWidthIfNeeded() {
         if (!root._attachedPanelActive || !root._attachedPanelExpanded || root._overlayClosing)
@@ -603,6 +677,15 @@ width: implicitWidth
 
         if (Math.abs(root._attachedPanelHeight - root._attachedPanelRevealHeight) <= 0.5)
             return
+
+        if (root._detachedHintActive && !root._attachedCollapseAnimating && !root._barExpandedHintActive) {
+            _attachedHeightRetargetAnim.stop()
+
+            if (root._attachedPanelHeight > root._attachedPanelRevealHeight)
+                _viewState._attachedPanelRevealHeight = root._attachedPanelHeight
+
+            return
+        }
 
         if (root._barExpandedHintActive
                 && !root._attachedCollapseAnimating
@@ -848,7 +931,7 @@ width: implicitWidth
     Item {
         id: _pillClip
         anchors.top: parent.top
-        anchors.topMargin: (root._barExpandedHintActive ? 0 : root._padV) + root._pillThrowOffsetY
+        anchors.topMargin: root._pillBaseTopMargin + root._pillThrowOffsetY
         anchors.horizontalCenter: parent.horizontalCenter
         clip: true
         implicitWidth: _pillTransitionControl.animatedWidth
@@ -1367,10 +1450,12 @@ width: implicitWidth
 
         IslandCards.IslandWindowHintCard {
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
-            titleCapsuleRevealProgress: Math.max(
-                root._barExpandedTitleRevealProgress,
-                root._barExpandedTitleRevealWidthProgress
-            )
+            titleCapsuleRevealProgress: root._phase === "hint-exit"
+                ? root._barExpandedTitleRevealProgress
+                : Math.max(
+                    root._barExpandedTitleRevealProgress,
+                    root._barExpandedTitleRevealWidthProgress
+                )
             outgoingClockOpacity: 1 - root._attachedVerticalRevealProgress
             outgoingClockOffsetY: (1 - root._attachedVerticalRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
         }
@@ -1383,10 +1468,12 @@ width: implicitWidth
             event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
             measurementMode: true
             hintData: WindowHintService.activeHint
-            titleCapsuleRevealProgress: Math.max(
-                root._barExpandedTitleRevealProgress,
-                root._barExpandedTitleRevealWidthProgress
-            )
+            titleCapsuleRevealProgress: root._phase === "hint-exit"
+                ? root._barExpandedTitleRevealProgress
+                : Math.max(
+                    root._barExpandedTitleRevealProgress,
+                    root._barExpandedTitleRevealWidthProgress
+                )
             outgoingClockOpacity: 1 - root._attachedVerticalRevealProgress
             outgoingClockOffsetY: (1 - root._attachedVerticalRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
         }

@@ -18,6 +18,8 @@ Item {
     property bool animateWidth: true
     property bool animateHeight: true
     property bool freezeExpandedRetargeting: false
+    property bool freezeExpandedWidthRetargeting: false
+    property bool freezeExpandedHeightRetargeting: false
     property bool pulseEnabled: Theme.anim.barExpandPulseEnabled
     property bool timelinePulseEnabled: pulseEnabled
 
@@ -344,8 +346,18 @@ Item {
             return
         }
 
-        const widthChanged = _targetDeltaExceedsThreshold(_animatedWidth, _targetWidth())
-        const heightChanged = _targetDeltaExceedsThreshold(_animatedHeight, _targetHeight())
+        if (expanded && freezeExpandedWidthRetargeting)
+            _animatedWidth = _targetWidth()
+
+        if (expanded && freezeExpandedHeightRetargeting)
+            _animatedHeight = _targetHeight()
+
+        const widthChanged = !expanded || !freezeExpandedWidthRetargeting
+            ? _targetDeltaExceedsThreshold(_animatedWidth, _targetWidth())
+            : false
+        const heightChanged = !expanded || !freezeExpandedHeightRetargeting
+            ? _targetDeltaExceedsThreshold(_animatedHeight, _targetHeight())
+            : false
         const hasGeometryDelta = widthChanged || heightChanged
         const canAnimateDelta = (widthChanged && animateWidth) || (heightChanged && animateHeight)
 
@@ -422,6 +434,8 @@ Item {
     onExpandedHeightChanged: _handleTargetChange(true)
     onAnimateWidthChanged: _handleLiveGeometryChange()
     onAnimateHeightChanged: _handleLiveGeometryChange()
+    onFreezeExpandedWidthRetargetingChanged: _handleLiveGeometryChange()
+    onFreezeExpandedHeightRetargetingChanged: _handleLiveGeometryChange()
     onPulseEnabledChanged: {
         if (!_ready || _timeline.running)
             return

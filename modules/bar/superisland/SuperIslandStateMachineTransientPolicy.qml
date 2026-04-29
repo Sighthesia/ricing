@@ -147,8 +147,10 @@ Item {
         }
         root.machine.syncOverlayExtensionReservation()
 
-        if (root.host._detachedHintActive && root.host._detachedHintHeight > root.state._attachedPanelRevealHeight) {
-            root.state._attachedPanelRevealHeight = root.host._detachedHintHeight
+        if (root.host._detachedHintActive
+                && (root.host._barExpandedHintActive
+                    || root.host._attachedPanelHeight > root.state._attachedPanelRevealHeight)) {
+            root.state._attachedPanelRevealHeight = root.host._attachedPanelHeight
         }
 
         if (root.state._overlaySessionActive || IslandOverlayService.mode !== "none")
@@ -307,6 +309,13 @@ Item {
         if (root.host._isFullHintEventType(root.state._attachedHintEvent.type)
                 && !root.state._overlaySessionActive) {
             root.state._attachedCollapseBaseWidth = 0
+            root.host._barExpandedExitBaseWidth = Math.max(
+                root.host._barExpandedExitBaseWidth,
+                root.host._barExpandedHostFootprintWidth,
+                root.host._attachedPanelVisibleWidth,
+                root.host._barExpandedDetachedHintWidth,
+                root.host._idleCollapsedWidthLive
+            )
         }
 
         root.state._phase = "hint-exit"
