@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/04-29-superisland-architecture-refactor/prd.md", "reason": "Check the implemented slice against the agreed architectural scope and acceptance criteria."}
+{"file": ".trellis/spec/guides/index.md", "reason": "Shared quality checklist entry point."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Verify state ownership and geometry ownership remain coherent after refactor."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Check whether the refactor actually improved structure instead of spreading duplication."}

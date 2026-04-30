@@ -13,11 +13,11 @@ function _animatedWidth(control, fallback) {
 }
 
 function attachedRevealSeedWidth(root) {
-    var collapsedWidthLive = _num(root && root._collapsedWidthLive, 0)
-    var overlayWidth = _num(root && root._overlayPillBackgroundWidth, collapsedWidthLive)
-    var panelWidth = _num(root && root._attachedPanelWidth, 0)
-    var baseSeedWidth = Math.max(overlayWidth, collapsedWidthLive)
-    return panelWidth > 0 ? Math.min(baseSeedWidth, panelWidth) : baseSeedWidth
+    var overlayWidth = _num(root && root._overlayPillBackgroundWidth, 0)
+    var mainWidth = _itemWidth(root && root._resolverMainLoader ? root._resolverMainLoader.item : null, 0)
+    var padH = _num(root && root._padH, 0)
+    var liveWidth = mainWidth > 0 ? mainWidth + padH * 2 : overlayWidth
+    return Math.max(0, Math.min(liveWidth, overlayWidth > 0 ? overlayWidth : liveWidth))
 }
 
 function attachedCollapseBaseWidthCandidate(root) {

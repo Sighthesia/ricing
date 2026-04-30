@@ -7,7 +7,6 @@ import ".." as BarComponents
 import ".." as BarPanels
 import "../superisland" as IslandCards
 import "../superisland/SuperIslandWindowHintWidthResolver.js" as WidthResolver
-import "../superisland/SuperIslandWindowHintPresentationAdapter.js" as HintPresentationAdapter
 
 // Visual SuperIsland host that delegates transition state orchestration to SuperIslandStateMachine.
 Item {
@@ -21,6 +20,31 @@ Item {
 
     IslandCards.SuperIslandViewState {
         id: _viewState
+    }
+
+    // Card component registry owns all card Component definitions and selection logic.
+    IslandCards.SuperIslandCardComponentRegistry {
+        id: _cardRegistry
+
+        pillHeight: root._pillH
+        flashRowHeight: root._flashRowH
+        currentTime: root.currentTime
+        hasPendingEvents: SuperIslandService.hasPendingEvents
+        overlayExpandedWidth: root._overlayExpandedWidth
+        phase: root._phase
+        barExpandedTitleRevealProgress: root._barExpandedTitleRevealProgress
+        barExpandedTitleRevealWidthProgress: root._barExpandedTitleRevealWidthProgress
+        attachedVerticalRevealProgress: root._attachedVerticalRevealProgress
+        barExpandedSharedClockVisible: root._barExpandedSharedClockVisible
+        barExpandedMainCardVisible: root._barExpandedMainCardVisible
+        contentPaddingV: Theme.barWidget.contentPaddingV
+    }
+
+    // Overlay geometry helper owns screen info, mode flags, and shell shape properties.
+    IslandCards.SuperIslandOverlayGeometry {
+        id: _overlayGeometry
+        barExpandedHintActive: root._barExpandedHintActive
+        pillHeight: root._pillH
     }
 
     property alias currentTime: _viewState.currentTime
@@ -95,7 +119,7 @@ Item {
         })
     })
 
-    readonly property var _baselineEvent: root._displayEvent(SuperIslandService.mainState)
+    readonly property var _baselineEvent: _cardRegistry.displayEvent(SuperIslandService.mainState)
     readonly property string transitionMode:
         root._phase === "exit" ? "exit-track"
         : (root._phase === "idle" ? "single-track" : "dual-track")
@@ -141,28 +165,15 @@ Item {
     readonly property real _returnTrackCenterY:
         root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
 
-    readonly property bool _fullScreenOverlayMode:
-        IslandOverlayService.mode === "break-reminder"
-        || IslandOverlayService.mode === "session-control"
-    readonly property bool _fullScreenSessionOverlayMode:
-        IslandOverlayService.mode === "session-control"
-    readonly property bool _controlCenterOverlayMode:
-        IslandOverlayService.mode === "control-center"
-    readonly property var _primaryScreen:
-        Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
-    readonly property real _screenWidth:
-        (_primaryScreen && _primaryScreen.width ? _primaryScreen.width : 0)
-            || Screen.width
-            || BarLayoutService.barContentWidth
-    readonly property real _screenHeight:
-        (_primaryScreen && _primaryScreen.height ? _primaryScreen.height : 0)
-            || Screen.height
-            || 0
-    readonly property real _overlayAvailableBodyHeight:
-        root._screenHeight > 0
-            ? Math.max(root._collapsedPillHeight, root._screenHeight - root._overlayDetachedOffset)
-            : Math.round(900 * Theme.uiScale)
-    readonly property real _controlCenterFallbackBodyHeight: ThemeCards.superIslandControlCenterBodyHeight
+    // Overlay mode flags and screen geometry delegated to the geometry helper.
+    readonly property alias _fullScreenOverlayMode: _overlayGeometry.fullScreenOverlayMode
+    readonly property alias _fullScreenSessionOverlayMode: _overlayGeometry.fullScreenSessionOverlayMode
+    readonly property alias _controlCenterOverlayMode: _overlayGeometry.controlCenterOverlayMode
+    readonly property alias _primaryScreen: _overlayGeometry.primaryScreen
+    readonly property alias _screenWidth: _overlayGeometry.screenWidth
+    readonly property alias _screenHeight: _overlayGeometry.screenHeight
+    readonly property alias _overlayAvailableBodyHeight: _overlayGeometry.overlayAvailableBodyHeight
+    readonly property alias _controlCenterFallbackBodyHeight: _overlayGeometry.controlCenterFallbackBodyHeight
     readonly property real _controlCenterMeasuredBodyHeight: Math.max(
         _overlayDeckMeasureLoader.item ? _overlayDeckMeasureLoader.item.implicitHeight : 0,
         _overlayDeckHost.implicitHeight > 0 ? _overlayDeckHost.implicitHeight : 0
@@ -186,22 +197,15 @@ Item {
             easing.type: Theme.anim.moveType
         }
     }
-    readonly property real _overlayDetachedOffset:
-        root._fullScreenSessionOverlayMode
-            ? Theme.barHeight
-            : (root._barExpandedHintActive
-                ? Theme.barHeight + root._overlayAttachmentOverlap
-                : Math.max(Theme.barHeight, root._pillH + root._overlayInwardCornerDepth))
-    readonly property real _overlayDetachedY: root._overlayDetachedOffset
-    readonly property real _overlayRevealLift:
-        Math.max(8, Theme.barWidget.contentPaddingV * 4)
-    readonly property real _overlayAttachmentOverlap: 1
-    readonly property bool _barExpandedRectangularMode: root._barExpandedHintActive
-    readonly property real _barExpandedTopRadius:
-        Math.max(Theme.cornerRadius * 0.55, Math.round(Theme.barWidget.pillHeight * 0.28))
-    readonly property real _barExpandedDetachedRadius:
-        Math.max(Theme.cornerRadius, Math.round(Theme.barWidget.pillHeight * 0.42))
-    readonly property real _barExpandedSeamArcRadius: root._barExpandedDetachedRadius
+    // Overlay positioning and shape geometry delegated to the geometry helper.
+    readonly property alias _overlayDetachedOffset: _overlayGeometry.overlayDetachedOffset
+    readonly property alias _overlayDetachedY: _overlayGeometry.overlayDetachedY
+    readonly property alias _overlayRevealLift: _overlayGeometry.overlayRevealLift
+    readonly property alias _overlayAttachmentOverlap: _overlayGeometry.overlayAttachmentOverlap
+    readonly property alias _barExpandedRectangularMode: _overlayGeometry.barExpandedRectangularMode
+    readonly property alias _barExpandedTopRadius: _overlayGeometry.barExpandedTopRadius
+    readonly property alias _barExpandedDetachedRadius: _overlayGeometry.barExpandedDetachedRadius
+    readonly property alias _barExpandedSeamArcRadius: _overlayGeometry.barExpandedSeamArcRadius
     readonly property bool _barExpandedTailRectReleased:
         root._barExpandedHintActive
         && (root._phase === "hint-exit" || root._overlayClosing)
@@ -215,15 +219,12 @@ Item {
         const fullArcWidthDelta = Math.max(1, root._barExpandedSeamArcRadius * 2)
         return Math.max(0, Math.min(1, widthDelta / fullArcWidthDelta))
     }
-    readonly property real _overlayShellRadius:
-        root._barExpandedRectangularMode
-            ? root._barExpandedDetachedRadius
-            : Math.max(Theme.cornerRadius, Theme.screenCornerRadius)
+    // Shell shape properties delegated to the geometry helper.
+    readonly property alias _overlayShellRadius: _overlayGeometry.overlayShellRadius
     readonly property real _overlayPillBackgroundWidth: _pillBg.width
-    readonly property real _overlayBridgeOutset: 0
-    readonly property real _overlayInwardCornerRadius: root._overlayShellRadius
-    readonly property real _overlayInwardCornerDepth:
-        Math.max(18, root._overlayInwardCornerRadius + (root._overlayInwardCornerRadius - 18) * 0.3)
+    readonly property alias _overlayBridgeOutset: _overlayGeometry.overlayBridgeOutset
+    readonly property alias _overlayInwardCornerRadius: _overlayGeometry.overlayInwardCornerRadius
+    readonly property alias _overlayInwardCornerDepth: _overlayGeometry.overlayInwardCornerDepth
 
     readonly property real _attachedRevealSeedHeight: 0
     readonly property real _attachedRevealSeedWidth: WidthResolver.attachedRevealSeedWidth(root)
@@ -360,8 +361,8 @@ Item {
         )
         return Math.max(root._collapsedWidth, Math.min(Math.round(980 * Theme.uiScale), availableWidth))
     }
-    readonly property real _attachedShellFillOpacity:
-        root._fullScreenOverlayMode ? 0.78 : 1
+    // Shell fill opacity delegated to the geometry helper.
+    readonly property alias _attachedShellFillOpacity: _overlayGeometry.attachedShellFillOpacity
 
     readonly property real _fullHintExpandedPillHeight:
         root._pillH
@@ -481,7 +482,7 @@ Item {
                 root._attachedRevealSeedWidth,
                 Math.min(root._attachedPanelRevealWidth, root._attachedPanelWidth)
             )
-            : 0
+            : root._attachedRevealSeedWidth
     readonly property real _attachedPanelVisibleHeight:
         root._attachedPanelActive
             ? Math.max(0, Math.min(root._attachedPanelRevealHeight, root._attachedPanelHeight))
@@ -492,7 +493,7 @@ Item {
                 0,
                 Math.min(
                     1,
-                    (root._attachedPanelVisibleWidth - root._attachedRevealSeedWidth)
+                    (Math.min(root._attachedPanelRevealWidth, root._attachedPanelWidth) - root._attachedRevealSeedWidth)
                         / (root._attachedPanelWidth - root._attachedRevealSeedWidth)
                 )
             )
@@ -707,52 +708,17 @@ width: implicitWidth
         _attachedHeightRetargetAnim.start()
     }
 
-    function _cloneEvent(event) {
-        const source = event || root._idleSnapshot()
-        return {
-            id: source.id || "",
-            type: source.type || "idle",
-            groupKey: source.groupKey || "idle",
-            priority: source.priority || "passive",
-            presentation: source.presentation || "baseline",
-            relayReplace: !!source.relayReplace,
-            sticky: !!source.sticky,
-            title: source.title || "",
-            subtitle: source.subtitle || "",
-            icon: source.icon || "",
-            workspaceLabel: source.workspaceLabel || "",
-            workspaceId: source.workspaceId || "",
-            workspaceIndex: source.workspaceIndex !== undefined ? source.workspaceIndex : -1,
-            activeWorkspacePosition: source.activeWorkspacePosition !== undefined ? source.activeWorkspacePosition : -1,
-            currentWindowId: source.currentWindowId || "",
-            currentIndex: source.currentIndex !== undefined ? source.currentIndex : -1,
-            timeoutMs: source.timeoutMs || 0,
-            revision: source.revision || 0,
-            timestamp: source.timestamp || 0
-        }
-    }
-
+    // Wrapper functions that delegate to the card registry for backward compatibility.
     function _idleSnapshot() {
-        return {
-            id: "idle",
-            type: "idle",
-            groupKey: "idle",
-            priority: "passive",
-            presentation: "baseline",
-            relayReplace: false,
-            title: Qt.formatDate(currentTime, "M月d日") + " | " + Qt.formatDateTime(currentTime, "hh:mm"),
-            subtitle: "",
-            icon: "",
-            workspaceLabel: "",
-            timeoutMs: 0,
-            timestamp: Date.now()
-        }
+        return _cardRegistry.idleSnapshot()
     }
 
     function _displayEvent(event) {
-        if (!event || event.type === "idle")
-            return root._idleSnapshot()
-        return root._cloneEvent(event)
+        return _cardRegistry.displayEvent(event)
+    }
+
+    function _cloneEvent(event) {
+        return _cardRegistry.cloneEvent(event)
     }
 
     function _isHintEventType(eventType) {
@@ -785,30 +751,6 @@ width: implicitWidth
         })
     }
 
-    function _componentForEvent(event, useStrip) {
-        if (!event || event.type === "idle")
-            return _idleComponent
-        if (event.type === "window-hint") {
-            const presentationKind = HintPresentationAdapter.windowHintPresentationKindForEvent(event, useStrip)
-
-            if (!useStrip && presentationKind === "bar-expanded-main" && !root._barExpandedMainCardVisible)
-                return _emptyComponent
-
-            if (presentationKind === "bar-expanded-main")
-                return _windowHintBarExpandedMainCardComponent
-            if (presentationKind === "bar-expanded-detached")
-                return _windowHintBarExpandedDetachedCardComponent
-            return _windowHintCardComponent
-        }
-        if (event.type === "media")
-            return useStrip ? _stripMediaCardComponent : _mainMediaCardComponent
-        if (event.type === "workspace" || event.type === "window")
-            return useStrip ? _stripWorkspaceCardComponent : _mainWorkspaceCardComponent
-        if (event.priority === "critical" || event.subtitle !== "")
-            return useStrip ? _stripNotificationCardComponent : _mainNotificationCardComponent
-        return useStrip ? _stripCompactEventComponent : _compactEventComponent
-    }
-
     function _preferredOverlayPage() {
         const configuredPage = SettingsService.data.superIsland
             ? SettingsService.data.superIsland.expandedDefaultPage
@@ -829,12 +771,6 @@ width: implicitWidth
             ? root._idleOpticalOffset
             : 0
         return (zoneHeight - itemHeight) / 2 + opticalOffset
-    }
-
-    function _cloneEventWithPresentation(event, presentation) {
-        const nextEvent = root._cloneEvent(event)
-        nextEvent.presentation = presentation
-        return nextEvent
     }
 
     function _logWidthChain(context) {
@@ -1037,7 +973,7 @@ width: implicitWidth
             active: root._replaceOutgoingVisible && !_windowHintReplaceBlocked
             y: root._replaceOutgoingY
             opacity: _windowHintReplaceBlocked ? 0 : root._replaceOutgoingOpacity
-            sourceComponent: root._componentForEvent(eventData, false)
+            sourceComponent: _cardRegistry.componentForEvent(eventData, false)
         }
 
         Loader {
@@ -1050,7 +986,7 @@ width: implicitWidth
             active: root._replaceIncomingVisible && !_windowHintReplaceBlocked
             y: root._replaceIncomingY
             opacity: _windowHintReplaceBlocked ? 0 : root._replaceIncomingOpacity
-            sourceComponent: root._componentForEvent(eventData, false)
+            sourceComponent: _cardRegistry.componentForEvent(eventData, false)
         }
 
         Loader {
@@ -1067,7 +1003,7 @@ width: implicitWidth
                     || (_windowHintMainCardActive && !root._barExpandedMainCardVisible))
                 ? 0
                 : root._mainTrackOpacity
-            sourceComponent: root._componentForEvent(eventData, false)
+            sourceComponent: _cardRegistry.componentForEvent(eventData, false)
         }
 
         Loader {
@@ -1083,7 +1019,7 @@ width: implicitWidth
                 ? root._verticalRevealSurfaceHeight
                 : root._flashRowH
             clip: !root._isFullHintEventType(eventData.type)
-            sourceComponent: root._componentForEvent(eventData, true)
+            sourceComponent: _cardRegistry.componentForEvent(eventData, true)
         }
     }
 
@@ -1316,7 +1252,7 @@ width: implicitWidth
         active: root._attachedHintVisible
         visible: false
         enabled: false
-        sourceComponent: _windowHintMeasureCardComponent
+        sourceComponent: _cardRegistry.windowHintMeasureCardComponent
     }
 
     Loader {
@@ -1326,7 +1262,7 @@ width: implicitWidth
         active: root._attachedHintVisible && root._barExpandedHintActive
         visible: false
         enabled: false
-        sourceComponent: _windowHintBarExpandedMainMeasureCardComponent
+        sourceComponent: _cardRegistry.windowHintBarExpandedMainMeasureCardComponent
     }
 
     Loader {
@@ -1336,7 +1272,7 @@ width: implicitWidth
         active: root._attachedHintVisible && root._barExpandedHintActive
         visible: false
         enabled: false
-        sourceComponent: _windowHintBarExpandedDetachedMeasureCardComponent
+        sourceComponent: _cardRegistry.windowHintBarExpandedDetachedMeasureCardComponent
     }
 
     Loader {
@@ -1345,7 +1281,7 @@ width: implicitWidth
         active: true
         visible: false
         enabled: false
-        sourceComponent: _idleComponent
+        sourceComponent: _cardRegistry.idleComponent
     }
 
     Loader {
@@ -1355,190 +1291,7 @@ width: implicitWidth
         active: root._controlCenterOverlayMode
         visible: false
         enabled: false
-        sourceComponent: _overlayDeckMeasureComponent
-    }
-
-    Component {
-        id: _emptyComponent
-
-        Item {
-            implicitWidth: 0
-            implicitHeight: 0
-            width: 0
-            height: 0
-        }
-    }
-
-    Component {
-        id: _idleComponent
-
-        IslandCards.IslandIdleClockCard {
-            currentTime: root.currentTime
-            hasPendingEvents: SuperIslandService.hasPendingEvents
-            cardHeight: root._pillH
-        }
-    }
-
-    Component {
-        id: _overlayDeckMeasureComponent
-
-        IslandCards.ExpandedPanelDeck {
-            width: root._overlayExpandedWidth
-            drawSurface: false
-            measurementMode: true
-        }
-    }
-
-    Component {
-        id: _compactEventComponent
-
-        IslandCards.IslandCompactEventCard {
-            event: eventData
-            iconSource: resolvedIcon
-            cardHeight: root._pillH
-        }
-    }
-
-    Component {
-        id: _mainNotificationCardComponent
-
-        IslandCards.IslandNotificationActionCard {
-            event: eventData
-            iconSource: resolvedIcon
-        }
-    }
-
-    Component {
-        id: _mainMediaCardComponent
-
-        IslandCards.IslandMediaCard {
-            event: eventData
-            iconSource: resolvedIcon
-            compact: true
-        }
-    }
-
-    Component {
-        id: _mainWorkspaceCardComponent
-
-        IslandCards.IslandWorkspaceCard {
-            event: eventData
-            iconSource: resolvedIcon
-        }
-    }
-
-    Component {
-        id: _windowHintCardComponent
-
-        IslandCards.IslandWindowHintCard {
-            event: eventData
-        }
-    }
-
-    Component {
-        id: _windowHintMeasureCardComponent
-
-        IslandCards.IslandWindowHintCard {
-            event: eventData
-            measurementMode: true
-            hintData: WindowHintService.activeHint
-        }
-    }
-
-    Component {
-        id: _windowHintBarExpandedMainCardComponent
-
-        IslandCards.IslandWindowHintCard {
-            event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
-            titleCapsuleRevealProgress: root._phase === "hint-exit"
-                ? root._barExpandedTitleRevealProgress
-                : Math.max(
-                    root._barExpandedTitleRevealProgress,
-                    root._barExpandedTitleRevealWidthProgress
-                )
-            outgoingClockOpacity: 1 - root._attachedVerticalRevealProgress
-            outgoingClockOffsetY: (1 - root._attachedVerticalRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
-        }
-    }
-
-    Component {
-        id: _windowHintBarExpandedMainMeasureCardComponent
-
-        IslandCards.IslandWindowHintCard {
-            event: root._cloneEventWithPresentation(eventData, "bar-expanded-main")
-            measurementMode: true
-            hintData: WindowHintService.activeHint
-            titleCapsuleRevealProgress: root._phase === "hint-exit"
-                ? root._barExpandedTitleRevealProgress
-                : Math.max(
-                    root._barExpandedTitleRevealProgress,
-                    root._barExpandedTitleRevealWidthProgress
-                )
-            outgoingClockOpacity: 1 - root._attachedVerticalRevealProgress
-            outgoingClockOffsetY: (1 - root._attachedVerticalRevealProgress) * Math.max(8, Theme.barWidget.contentPaddingV * 2)
-        }
-    }
-
-    Component {
-        id: _windowHintBarExpandedDetachedCardComponent
-
-        IslandCards.IslandWindowHintCard {
-            event: root._cloneEventWithPresentation(eventData, "bar-expanded-detached")
-            relocatedClockOpacity: root._attachedVerticalRevealProgress
-            relocatedClockOffsetY: (1 - root._attachedVerticalRevealProgress) * -Math.max(8, Theme.barWidget.contentPaddingV * 2)
-            sharedClockActive: root._barExpandedSharedClockVisible
-        }
-    }
-
-    Component {
-        id: _windowHintBarExpandedDetachedMeasureCardComponent
-
-        IslandCards.IslandWindowHintCard {
-            event: root._cloneEventWithPresentation(eventData, "bar-expanded-detached")
-            measurementMode: true
-            hintData: WindowHintService.activeHint
-            relocatedClockOpacity: root._attachedVerticalRevealProgress
-            relocatedClockOffsetY: (1 - root._attachedVerticalRevealProgress) * -Math.max(8, Theme.barWidget.contentPaddingV * 2)
-            sharedClockActive: root._barExpandedSharedClockVisible
-        }
-    }
-
-    Component {
-        id: _stripCompactEventComponent
-
-        IslandCards.IslandCompactEventCard {
-            event: eventData
-            iconSource: resolvedIcon
-            cardHeight: root._flashRowH
-        }
-    }
-
-    Component {
-        id: _stripNotificationCardComponent
-
-        IslandCards.IslandNotificationActionCard {
-            event: eventData
-            iconSource: resolvedIcon
-        }
-    }
-
-    Component {
-        id: _stripMediaCardComponent
-
-        IslandCards.IslandMediaCard {
-            event: eventData
-            iconSource: resolvedIcon
-            compact: false
-        }
-    }
-
-    Component {
-        id: _stripWorkspaceCardComponent
-
-        IslandCards.IslandWorkspaceCard {
-            event: eventData
-            iconSource: resolvedIcon
-        }
+        sourceComponent: _cardRegistry.overlayDeckMeasureComponent
     }
 
     Shortcut {

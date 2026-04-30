@@ -52,6 +52,34 @@ Attached SuperIsland shells should derive edge-aware corner behavior from
 `modules/bar/AttachedExpansionGeometry.js` so the pill-to-panel shape stays
 consistent across surfaces.
 
+### Convention: Extract helper objects before splitting behavior
+
+When a host component grows large, first extract pure derived clusters into a
+small helper object before moving interaction logic.
+
+**Good**:
+- Move stable geometry, screen fallback, or mode-flag clusters into a helper
+  `QtObject` / `Item`.
+- Keep the host wiring those values through aliases so existing call sites do
+  not change.
+
+**Avoid**:
+- Moving motion/state-machine logic and geometry in the same slice.
+- Replacing host properties with ad-hoc duplicated copies in multiple children.
+
+**Why**: it reduces host complexity without changing runtime behavior, and it
+creates a safe boundary for later refactors.
+
+**Example**:
+```qml
+// Overlay geometry helper owns screen info and shell shape properties.
+QtObject {
+    id: overlayGeometry
+    required property bool barExpandedHintActive
+    required property real pillHeight
+}
+```
+
 ---
 
 ## Accessibility

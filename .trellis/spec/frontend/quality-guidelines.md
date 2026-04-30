@@ -55,6 +55,25 @@ considering a change done.
   layer, keep delegate reuse/state from collapsing the timeline, and sync suppressed delegates
   to their live viewport state before releasing transition ownership.
 
+### Convention: Use helper extraction for host slimming
+
+When a composition root starts mixing many unrelated derived values, extract the
+most stable, pure property clusters into a helper object before touching motion
+or service behavior.
+
+**Good**:
+- Extract screen/mode/shape constants into a helper object.
+- Keep host aliases or bindings so downstream code still sees the same property
+names.
+
+**Avoid**:
+- Splitting behavior and geometry in the same refactor slice when one of them
+depends on local child IDs or animation progress.
+- Leaving a large host file untouched just because the extraction is not perfect.
+
+**Why**: this gives you a low-risk first slice that reduces file size and makes
+the next extraction boundary obvious.
+
 ---
 
 ## Testing Requirements

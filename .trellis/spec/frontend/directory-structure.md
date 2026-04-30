@@ -43,6 +43,35 @@ the feature that uses them. Window roots live beside their subcomponents.
 - `modules/launcher/` contains launcher shell UI and providers.
 - `modules/notifications/` contains notification window and card UI.
 
+### Convention: Group subdomains before mechanics
+
+For large feature areas, prefer folders that match the user-facing subdomain
+first, then the implementation mechanism.
+
+**Good**:
+- `modules/bar/superisland/cards/` for reusable card factories or leaf cards.
+- `modules/bar/superisland/attached/` for attached-shell ownership.
+- `modules/bar/superisland/expanded/` for paged expanded content.
+- `modules/bar/superisland/core/` for state machine and routing glue.
+
+**Avoid**:
+- A flat feature directory where `StateMachine`, `Timeline`, `WindowHint`, and
+  `Expanded*` all sit side by side without clarifying which part owns the user
+  flow.
+
+**Why**: mechanism names help implementation, but subdomain names help future
+readers understand which parts belong together and which parts can change
+independently.
+
+**Example**:
+```text
+modules/bar/superisland/
+├── cards/
+├── attached/
+├── expanded/
+└── core/
+```
+
 ---
 
 ## Naming Conventions
