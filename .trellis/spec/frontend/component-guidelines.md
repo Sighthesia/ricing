@@ -113,6 +113,46 @@ QtObject {
 }
 ```
 
+### Convention: Separate scene routing from surface ownership
+
+When one visual family supports multiple presentations of the same feature,
+split the composition so one owner chooses *which* presentation is active and a
+different owner draws any shared backdrop or decorative surface chrome.
+
+**Good**:
+- Let a scene component route between default, combined, detached, or similar
+  presentation branches.
+- Let a surface component own shared backdrops, pulse layers, and decorative
+  corner pieces reused by one presentation family.
+- Keep card/root components focused on shared state, snapshot data, and derived
+  geometry instead of also owning every visible branch.
+
+**Avoid**:
+- Mixing scene selection, shared backdrop drawing, and state snapshot logic in
+  one large presentation root.
+- Forcing a host widget to know the internal decorative structure of each
+  presentation branch.
+
+**Why**: this makes visible ownership easier to locate, keeps composition roots
+smaller, and prepares the feature for a later motion-ownership refactor without
+changing current behavior first.
+
+**Example**:
+```qml
+// Scene owner chooses the active presentation branch.
+Item {
+    Loader {
+        sourceComponent: isCombined ? combinedScene : defaultScene
+    }
+}
+
+// Surface owner draws the shared backdrop for one presentation family.
+Item {
+    Rectangle { /* title lane surface */ }
+    Rectangle { /* workspace lane surface */ }
+}
+```
+
 ---
 
 ## Accessibility
