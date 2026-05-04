@@ -8,8 +8,8 @@ function debugLog(host, state, message) {
     if (!host || !host._debugLogging)
         return
 
-    console.info(
-        "[DymicShell:SuperIsland]",
+    console.log(
+        "[DymicShell:SuperIslandReturn]",
         message,
         "phase=", state && state._phase ? state._phase : "",
         "flashType=", state && state._flashSourceEvent ? (state._flashSourceEvent.type || "") : "",
@@ -17,6 +17,13 @@ function debugLog(host, state, message) {
         "attachedBaseWidth=", state && state._attachedCollapseBaseWidth !== undefined ? Math.round(state._attachedCollapseBaseWidth) : -1,
         "overlaySessionActive=", state ? state._overlaySessionActive : false
     )
+}
+
+function debugWindowHintReturnLog(host, state, message) {
+    if (!host || !host._debugLogging || typeof host._logWindowHintReturn !== "function")
+        return
+
+    host._logWindowHintReturn(message, "timeline callback", "actual-return")
 }
 
 function ensureAttachedRevealSettled(state, host) {
@@ -53,23 +60,26 @@ function maybeCompleteHintExitAfterCollapse(state, host, completeWindowHintExitF
         return
 
     debugLog(host, state, "maybeCompleteHintExitAfterCollapse")
-
-    if (state._phase === "hint-exit") {
-        if (typeof completeWindowHintExitFn === "function")
-            completeWindowHintExitFn()
-        return
-    }
+    debugWindowHintReturnLog(host, state, "maybeCompleteHintExitAfterCollapse:enter")
 
     if (!host || !host._isFullHintEventType || !host._isFullHintEventType(state._attachedHintEvent.type)) {
         resetAttachedOverlayState(state, host)
+        debugWindowHintReturnLog(host, state, "maybeCompleteHintExitAfterCollapse:resetOnly")
         return
     }
+
+    if (state._phase !== "hint-exit")
+        return
 
     resetAttachedOverlayState(state, host)
     state._flashSourceEvent = host._idleSnapshot()
     state._flashTrackY = host._flashStripY
     state._flashTrackScale = host._flashScale
     state._flashTrackOpacity = 0
+    debugWindowHintReturnLog(host, state, "maybeCompleteHintExitAfterCollapse:beforeComplete")
+
+    if (typeof completeWindowHintExitFn === "function")
+        completeWindowHintExitFn()
 }
 
 function finishReplace(state, host, resetReplaceLayersFn) {
@@ -123,6 +133,11 @@ function finishReturn(state, host) {
 function maybeCompleteHintExit(state, host, completeWindowHintExitFn) {
     if (host._isFullHintEventType(state._attachedHintEvent.type))
         return
+
+    if (state._phase !== "hint-exit")
+        return
+
+    debugWindowHintReturnLog(host, state, "maybeCompleteHintExit:enter")
 
     if (typeof completeWindowHintExitFn === "function")
         completeWindowHintExitFn()

@@ -16,7 +16,9 @@ function attachedRevealSeedWidth(root) {
     var overlayWidth = _num(root && root._overlayPillBackgroundWidth, 0)
     var mainWidth = _itemWidth(root && root._resolverMainLoader ? root._resolverMainLoader.item : null, 0)
     var padH = _num(root && root._padH, 0)
-    var liveWidth = mainWidth > 0 ? mainWidth + padH * 2 : overlayWidth
+    var liveWidth = mainWidth > 0
+        ? mainWidth + padH * 2
+        : _num(root && root._collapsedWidthLive, 0)
     return Math.max(0, Math.min(liveWidth, overlayWidth > 0 ? overlayWidth : liveWidth))
 }
 

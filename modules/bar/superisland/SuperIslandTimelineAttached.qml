@@ -47,7 +47,10 @@ Item {
         onCatchFinished: TimelineCallbacks.ensureThrowReset(root.state)
         onCatchStopped: TimelineCallbacks.ensureThrowReset(root.state)
         onRevealFinished: TimelineCallbacks.ensureAttachedRevealSettled(root.state, root.host)
-        onCollapseFinished: TimelineCallbacks.maybeCompleteHintExitAfterCollapse(root.state, root.host, root.completeWindowHintExit)
+        onCollapseFinished: {
+            TimelineCallbacks.debugWindowHintReturnLog(root.host, root.state, "attachedCollapse:finished")
+            TimelineCallbacks.maybeCompleteHintExitAfterCollapse(root.state, root.host, root.completeWindowHintExit)
+        }
     }
 
     QtObject {
@@ -58,12 +61,16 @@ Item {
         readonly property bool running: _motion.collapseAnim.running
 
         function start() {
+            if (root.host._debugLogging)
+                TimelineCallbacks.debugWindowHintReturnLog(root.host, root.state, "attachedCollapse:start")
             _motion.targetWidth = targetWidth
             _motion.targetHeight = targetHeight
             _motion.collapseAnim.start()
         }
 
         function stop() {
+            if (root.host._debugLogging)
+                TimelineCallbacks.debugWindowHintReturnLog(root.host, root.state, "attachedCollapse:stop")
             _motion.collapseAnim.stop()
         }
     }

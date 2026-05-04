@@ -14,9 +14,17 @@ Item {
 
     property bool liveInstance: false
     property string debugInstanceLabel: liveInstance ? "live" : "preview"
-
     readonly property bool _debugLogging:
         (Quickshell.env("DYMICSHELL_SUPERISLAND_DEBUG") || "").trim() === "1"
+    readonly property bool _debugWidthLogging:
+        (Quickshell.env("DYMICSHELL_SUPERISLAND_WIDTH_DEBUG") || "").trim() === "1"
+    property string _lastWindowHintReturnDebugSignature: ""
+    property alias _windowHintReturnSession: _viewState._windowHintReturnSession
+    property alias _windowHintReturnStep: _viewState._windowHintReturnStep
+
+    onLiveInstanceChanged: {
+        _stateMachine.syncOverlayExtensionReservation()
+    }
 
     IslandCards.SuperIslandViewState {
         id: _viewState
@@ -144,15 +152,12 @@ Item {
         root._flashRowBaseY
         + root._trackCenterY(_mainLoader.item, root._flashRowH, root._mainDisplayEvent, true)
 
-    readonly property int _windowHintStagePadV: Math.max(14, Math.round(18 * Theme.uiScale))
-    readonly property int _windowHintRowGap: Math.max(10, Math.round(12 * Theme.uiScale))
-    readonly property int _windowHintWorkspaceColumnGap: Math.max(6, Math.round(8 * Theme.uiScale))
-    readonly property int _windowHintSideHeight:
-        Math.max(30, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 2)
-    readonly property int _windowHintPrimaryHeight:
-        Math.max(44, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 5)
-    readonly property int _windowHintTitleHeight:
-        Math.max(30, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 6)
+    readonly property int _windowHintStagePadV: ThemeSuperIsland.windowHintStagePadV
+    readonly property int _windowHintRowGap: ThemeSuperIsland.windowHintRowGap
+    readonly property int _windowHintWorkspaceColumnGap: ThemeSuperIsland.windowHintWorkspaceColumnGap
+    readonly property int _windowHintSideHeight: ThemeSuperIsland.windowHintWorkspaceSideHeight
+    readonly property int _windowHintPrimaryHeight: ThemeSuperIsland.windowHintWorkspacePrimaryHeight
+    readonly property int _windowHintTitleHeight: ThemeSuperIsland.windowHintTitleCapsuleHeight
 
     readonly property real _hintTrackY: root._mainTrackCenterY - root._hintLift
     readonly property real _hintDividerY: root._pillH + Math.max(0, (root._flashGap - 1) / 2)
@@ -163,7 +168,9 @@ Item {
             ? root._sharedBackgroundPulseOpacity
             : 0
     readonly property real _returnTrackCenterY:
-        root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
+        root._barExpandedHintActive || root._phase === "hint-exit"
+            ? root._barExpandedSharedClockTargetCenterY
+            : root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
 
     // Overlay mode flags and screen geometry delegated to the geometry helper.
     readonly property alias _fullScreenOverlayMode: _overlayGeometry.fullScreenOverlayMode
@@ -330,6 +337,10 @@ Item {
         root._overlaySessionActive ? 1 : root._attachedPanelScale
     readonly property real _attachedSurfaceScale:
         root._pulseScale * root._attachedContentScale
+    readonly property real _barExpandedSharedClockScale:
+        root._attachedContentScale * root._flashScale
+    readonly property real _barExpandedSharedClockOpacity:
+        root._attachedPanelOpacity * root._flashScale
     readonly property real _attachedPulseOpacity:
         root._attachedPanelActive
             ? Math.max(
@@ -533,6 +544,8 @@ Item {
         && root._phase !== "hint"
         && !root._barExpandedMainCardVisible
     readonly property real _barExpandedSharedClockHeight: root._pillH
+    readonly property real _pillAnimatedWidth: _pillTransitionControl.animatedWidth
+    property var _barExpandedSharedClockEvent: root._baselineEvent
     readonly property real _barExpandedSharedClockLandingY:
         root._padV + root._trackCenterY(_idleMeasureLoader.item, root._pillH, null, true)
     readonly property real _barExpandedSharedClockStartCenterY:
@@ -540,11 +553,14 @@ Item {
     readonly property real _barExpandedSharedClockStartY:
         root._barExpandedSharedClockLandingY
     readonly property real _barExpandedSharedClockTargetCenterY:
-        (_overlayPanelHost ? _overlayPanelHost.y + 1 : 1)
-        + ((_attachedContentDeck && _attachedContentDeck.hintCardLoaderItem
-                && _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY !== undefined)
-            ? _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY
-            : Math.max(root._pillH / 2, root._attachedPanelVisibleHeight - root._pillH / 2))
+        root._barExpandedSharedClockTargetCenterYLatched > 0
+            ? root._barExpandedSharedClockTargetCenterYLatched
+            : ((_overlayPanelHost ? _overlayPanelHost.y + 1 : 1)
+                + ((_attachedContentDeck && _attachedContentDeck.hintCardLoaderItem
+                        && _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY !== undefined)
+                    ? _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY
+                    : Math.max(root._pillH / 2, root._attachedPanelVisibleHeight - root._pillH / 2)))
+    property real _barExpandedSharedClockTargetCenterYLatched: 0
     readonly property real _barExpandedSharedClockTargetY:
         root._barExpandedSharedClockTargetCenterY - root._barExpandedSharedClockHeight / 2
     readonly property real _barExpandedSharedClockBaseY:
@@ -561,8 +577,6 @@ Item {
     readonly property bool _attachedCollapseTailHidden:
         root._attachedPanelActive
         && (root._phase === "hint-exit" || root._overlayClosing)
-        && (root._attachedRevealProgress <= 0.08
-            || root._attachedPanelVisibleHeight <= Math.max(4, root._overlayAttachmentOverlap + 2))
 
 implicitHeight: Theme.barHeight
 implicitWidth: root._barExpandedHintActive
@@ -572,13 +586,13 @@ width: implicitWidth
 
     Component.onCompleted: _stateMachine.initialize()
     Component.onDestruction: _stateMachine.teardown()
-    onLiveInstanceChanged: _stateMachine.syncOverlayExtensionReservation()
     on_OverlayBodyHeightChanged: _stateMachine.syncOverlayExtensionReservation()
     on_OverlayDetachedOffsetChanged: _stateMachine.syncOverlayExtensionReservation()
     on_BarExpandedHintActiveChanged: {
         root._syncDetachedHintSessionHeight()
 
         if (root._barExpandedHintActive) {
+            root._barExpandedSharedClockEvent = root._baselineEvent
             const baseWidth = Math.max(0, _pillTransitionControl.animatedWidth)
             root._barExpandedEntryBaseWidth = baseWidth
             root._barExpandedExitBaseWidth = baseWidth
@@ -594,6 +608,12 @@ width: implicitWidth
         root._hintRevealSettled = false
         root._logWidthChain("barExpandedHintActive=false")
     }
+    on_BarExpandedSharedClockVisibleChanged: {
+        if (!root._barExpandedSharedClockVisible) {
+            root._barExpandedSharedClockTargetCenterYLatched = 0
+            root._barExpandedSharedClockEvent = root._baselineEvent
+        }
+    }
     on_HintRevealSettledChanged: {
         if (!root._barExpandedHintActive || !root._hintRevealSettled)
             return
@@ -603,6 +623,11 @@ width: implicitWidth
         root._logWidthChain("hintRevealSettled")
     }
     on_PhaseChanged: {
+        if (root._phase === "hint-exit" && root._barExpandedHintActive) {
+            root._barExpandedSharedClockTargetCenterYLatched = root._barExpandedSharedClockTargetCenterY
+            root._barExpandedSharedClockEvent = root._baselineEvent
+        }
+
         root._syncBarExpandedExitBaseWidth()
         root._logWidthChain("phaseChanged")
     }
@@ -774,7 +799,7 @@ width: implicitWidth
     }
 
     function _logWidthChain(context) {
-        if (!root._debugLogging)
+        if (!root._debugWidthLogging)
             return
 
         console.log("[DymicShell:SuperIslandWidth]", JSON.stringify({
@@ -800,6 +825,105 @@ width: implicitWidth
             detachedMeasureImplicitWidth: Math.round((_detachedHintMeasureLoader.item && _detachedHintMeasureLoader.item.implicitWidth) || 0),
             detachedDetachedMeasureImplicitWidth: Math.round((_detachedHintDetachedMeasureLoader.item && _detachedHintDetachedMeasureLoader.item.implicitWidth) || 0)
         }))
+    }
+
+    function _beginWindowHintReturnSession(reason) {
+        if (!root._debugLogging)
+            return
+
+        root._windowHintReturnSession += 1
+        root._windowHintReturnStep = 0
+        root._lastWindowHintReturnDebugSignature = ""
+
+        console.log("[DymicShell:SuperIslandReturn]", JSON.stringify({
+            label: root.debugInstanceLabel,
+            context: "windowHintReturnSession:start",
+            reason: reason || "",
+            returnSession: root._windowHintReturnSession,
+            returnStep: 0,
+            phase: root._phase,
+            attachedHintType: root._attachedHintEvent && root._attachedHintEvent.type ? root._attachedHintEvent.type : "",
+            attachedHintPresentation: root._attachedHintEvent && root._attachedHintEvent.presentation ? root._attachedHintEvent.presentation : "",
+            mainType: root._mainDisplayEvent && root._mainDisplayEvent.type ? root._mainDisplayEvent.type : "",
+            flashType: root._flashSourceEvent && root._flashSourceEvent.type ? root._flashSourceEvent.type : "",
+            source: "session-start"
+        }))
+    }
+
+    function _logWindowHintReturn(context, note, source) {
+        if (!root._debugLogging)
+            return
+
+        const hasReturnSession = root._windowHintReturnSession > 0
+        const returnStep = hasReturnSession ? root._windowHintReturnStep + 1 : 0
+        const snapshot = {
+            label: root.debugInstanceLabel,
+            context: context,
+            note: note || "",
+            reason: note || "",
+            source: source || "",
+            returnSession: hasReturnSession ? root._windowHintReturnSession : 0,
+            returnStep: returnStep,
+            phase: root._phase,
+            attachedHintType: root._attachedHintEvent && root._attachedHintEvent.type ? root._attachedHintEvent.type : "",
+            attachedHintPresentation: root._attachedHintEvent && root._attachedHintEvent.presentation ? root._attachedHintEvent.presentation : "",
+            mainType: root._mainDisplayEvent && root._mainDisplayEvent.type ? root._mainDisplayEvent.type : "",
+            flashType: root._flashSourceEvent && root._flashSourceEvent.type ? root._flashSourceEvent.type : "",
+            barExpandedHintActive: root._barExpandedHintActive,
+            barExpandedSharedClockVisible: root._barExpandedSharedClockVisible,
+            barExpandedSharedClockTargetCenterY: Math.round(root._barExpandedSharedClockTargetCenterY || 0),
+            barExpandedSharedClockTargetCenterYLatched: Math.round(root._barExpandedSharedClockTargetCenterYLatched || 0),
+            barExpandedSharedClockY: Math.round(root._barExpandedSharedClockY || 0),
+            mainTrackY: Math.round(root._mainTrackY || 0),
+            mainTrackScale: Math.round(root._mainTrackScale * 1000) / 1000,
+            mainTrackOpacity: Math.round(root._mainTrackOpacity * 1000) / 1000,
+            flashTrackY: Math.round(root._flashTrackY || 0),
+            flashTrackScale: Math.round(root._flashTrackScale * 1000) / 1000,
+            flashTrackOpacity: Math.round(root._flashTrackOpacity * 1000) / 1000,
+            attachedPanelRevealWidth: Math.round(root._attachedPanelRevealWidth || 0),
+            attachedPanelRevealHeight: Math.round(root._attachedPanelRevealHeight || 0),
+            attachedContentOpacity: Math.round(root._attachedContentOpacity * 1000) / 1000,
+            attachedCollapseAnimating: root._attachedCollapseAnimating,
+            implicitWidth: Math.round(root.implicitWidth || 0),
+            layoutMeasurementWidth: Math.round(root.layoutMeasurementWidth || 0),
+            pillAnimatedWidth: Math.round(root._pillAnimatedWidth || 0)
+        }
+
+        const signature = JSON.stringify({
+            context: snapshot.context,
+            returnSession: snapshot.returnSession,
+            phase: snapshot.phase,
+            attachedHintType: snapshot.attachedHintType,
+            attachedHintPresentation: snapshot.attachedHintPresentation,
+            mainType: snapshot.mainType,
+            flashType: snapshot.flashType,
+            barExpandedHintActive: snapshot.barExpandedHintActive,
+            barExpandedSharedClockVisible: snapshot.barExpandedSharedClockVisible,
+            barExpandedSharedClockTargetCenterY: snapshot.barExpandedSharedClockTargetCenterY,
+            barExpandedSharedClockTargetCenterYLatched: snapshot.barExpandedSharedClockTargetCenterYLatched,
+            barExpandedSharedClockY: snapshot.barExpandedSharedClockY,
+            mainTrackY: snapshot.mainTrackY,
+            mainTrackScale: snapshot.mainTrackScale,
+            mainTrackOpacity: snapshot.mainTrackOpacity,
+            flashTrackY: snapshot.flashTrackY,
+            flashTrackScale: snapshot.flashTrackScale,
+            flashTrackOpacity: snapshot.flashTrackOpacity,
+            attachedPanelRevealWidth: snapshot.attachedPanelRevealWidth,
+            attachedPanelRevealHeight: snapshot.attachedPanelRevealHeight,
+            attachedContentOpacity: snapshot.attachedContentOpacity,
+            attachedCollapseAnimating: snapshot.attachedCollapseAnimating,
+            implicitWidth: snapshot.implicitWidth,
+            layoutMeasurementWidth: snapshot.layoutMeasurementWidth,
+            pillAnimatedWidth: snapshot.pillAnimatedWidth
+        })
+        if (signature === root._lastWindowHintReturnDebugSignature)
+            return
+
+        if (hasReturnSession)
+            root._windowHintReturnStep = returnStep
+
+        root._lastWindowHintReturnDebugSignature = signature
+        console.log("[DymicShell:SuperIslandReturn]", signature)
     }
 
     Timer {
@@ -1004,36 +1128,23 @@ width: implicitWidth
                 ? 0
                 : root._mainTrackOpacity
             sourceComponent: _cardRegistry.componentForEvent(eventData, false)
-        }
-
-        Loader {
-            id: _stripLoader
-            property var eventData: root._flashSourceEvent
-            property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
-            anchors.horizontalCenter: parent.horizontalCenter
-            active: root.flashTrackVisible && !root._isFullHintEventType(eventData.type)
-            y: root._flashTrackY
-            opacity: root._flashTrackOpacity
-            scale: root._flashTrackScale
-            height: root._isFullHintEventType(eventData.type)
-                ? root._verticalRevealSurfaceHeight
-                : root._flashRowH
-            clip: !root._isFullHintEventType(eventData.type)
-            sourceComponent: _cardRegistry.componentForEvent(eventData, true)
-        }
     }
 
-    // Shared handoff layer must live outside the clipped pill host so the clock can cross the seam.
-    IslandCards.IslandIdleClockCard {
-        anchors.horizontalCenter: _pillClip.horizontalCenter
-        y: root._barExpandedSharedClockY
-        opacity: root._barExpandedSharedClockVisible ? 1 : 0
-        visible: opacity > 0
-        z: _overlayPanelHost.z + 2
-
-        currentTime: root.currentTime
-        hasPendingEvents: SuperIslandService.hasPendingEvents
-        cardHeight: root._barExpandedSharedClockHeight
+    Loader {
+        id: _stripLoader
+        property var eventData: root._flashSourceEvent
+        property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
+        anchors.horizontalCenter: parent.horizontalCenter
+        active: root.flashTrackVisible && !root._isFullHintEventType(eventData.type)
+        y: root._flashTrackY
+        opacity: root._flashTrackOpacity
+        scale: root._flashTrackScale
+        height: root._isFullHintEventType(eventData.type)
+            ? root._verticalRevealSurfaceHeight
+            : root._flashRowH
+        clip: !root._isFullHintEventType(eventData.type)
+        sourceComponent: _cardRegistry.componentForEvent(eventData, true)
+    }
     }
 
     BarPanels.AttachedExpansionShell {
@@ -1124,6 +1235,27 @@ width: implicitWidth
                 }
             }
         }
+    }
+
+    // Shared clock layer carries persistent media during hint motion.
+    Loader {
+        id: _barExpandedSharedClockLoader
+
+        property var eventData: root._barExpandedSharedClockEvent
+        property string resolvedIcon: root._resolvedIconSource(eventData.icon || "")
+        property date currentTime: root.currentTime
+        property bool hasPendingEvents: _cardRegistry.hasPendingEvents
+        property int cardHeight: root._barExpandedSharedClockHeight
+
+        anchors.horizontalCenter: _overlayPanelHost.horizontalCenter
+        active: root._detachedHintActive
+        visible: active
+        y: root._barExpandedSharedClockY
+        opacity: root._barExpandedSharedClockOpacity
+        scale: root._barExpandedSharedClockScale
+        z: _overlayPanelHost.z + 2
+        transformOrigin: Item.Top
+        sourceComponent: _cardRegistry.componentForEvent(eventData, false)
     }
 
     BarPanels.AttachedExpansionPanelHost {

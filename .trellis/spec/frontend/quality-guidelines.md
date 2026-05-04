@@ -55,6 +55,32 @@ considering a change done.
   layer, keep delegate reuse/state from collapsing the timeline, and sync suppressed delegates
   to their live viewport state before releasing transition ownership.
 
+### Convention: Keep shared media visibility source-driven
+
+When a shared clock/media row is reused by multiple hosts, the default media
+visibility must stay driven by `SettingsService.data.superIsland.showMedia`
+unless the final owner explicitly needs to override it.
+
+**Good**:
+- Let `showMedia` default from `SettingsService.data.superIsland.showMedia`.
+- Override media visibility only at the final owner that truly owns the shared
+  presentation.
+
+**Avoid**:
+- Hardcoding `showMedia: true` in intermediate wrappers or shared loaders.
+- Forcing the same media row on and off from multiple layers of the host chain.
+
+**Why**: it keeps embedded and standalone uses of the same clock/media component
+consistent and prevents one path from silently bypassing user settings.
+
+**Example**:
+```qml
+// Shared media row stays settings-driven unless the final owner overrides it.
+IslandClockMediaRow {
+    showMedia: SettingsService.data.superIsland.showMedia
+}
+```
+
 ### Convention: Use helper extraction for host slimming
 
 When a composition root starts mixing many unrelated derived values, extract the
@@ -73,6 +99,41 @@ depends on local child IDs or animation progress.
 
 **Why**: this gives you a low-risk first slice that reduces file size and makes
 the next extraction boundary obvious.
+
+### Convention: Finish coupled return handoffs in one frame
+
+When a transient or hint return path hands visual ownership back to the steady
+idle state, the phase flip, track reset, and baseline event restoration must
+settle in the same frame unless one explicit animation owner still controls all
+affected properties.
+
+**Good**:
+- Let one completion owner finalize position, scale, opacity, and steady-state
+  event identity together.
+- If exit completion is synchronized to an animation callback, restore the
+  baseline track state in that same callback when no later timeline owns the
+  remaining properties.
+
+**Avoid**:
+- Flipping `phase` to `idle` in one tick and deferring `resetTracks()` or other
+  baseline geometry/style restoration to `Qt.callLater()`.
+- Splitting return completion so geometry settles in one owner while width,
+  scale, or style identity only catches up in a later callback.
+
+**Why**: return-path bugs in SuperIsland showed that next-tick cleanup can make
+  the visible clock land at the correct position first, while width/style still
+  belongs to the previous owner and catches up a frame later. For coupled
+  handoffs, same-frame completion is safer than staggered cleanup.
+
+**Example**:
+```qml
+function completeWindowHintExit() {
+    root.state._phase = "idle"
+    root.state._mainDisplayEvent = settledMainEvent
+    root.machine.resetTracks()
+    root.machine.syncOverlayExtensionReservation()
+}
+```
 
 ---
 

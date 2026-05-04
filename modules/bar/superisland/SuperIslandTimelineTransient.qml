@@ -236,38 +236,73 @@ Item {
     ParallelAnimation {
         id: _hintExitAnim
 
+        onRunningChanged: {
+            if (!root.host._debugLogging)
+                return
+
+            root.host._logWindowHintReturn(
+                running ? "hintExitAnim:start" : "hintExitAnim:stop",
+                running ? "animation running=true" : "animation running=false",
+                "actual-return"
+            )
+        }
+
         NumberAnimation {
             target: root.state
             property: "_mainTrackY"
-            to: root.host._mainTrackCenterY
-            duration: Theme.anim.highlightDuration
+            to: root.host._mainTrackEnterY
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
+        }
+
+        NumberAnimation {
+            target: root.state
+            property: "_mainTrackScale"
+            to: 0.92
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
+        }
+
+        NumberAnimation {
+            target: root.state
+            property: "_mainTrackOpacity"
+            to: 0
+            duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
 
         NumberAnimation {
             target: root.state
             property: "_flashTrackY"
-            to: root.host._hintTrackY - Theme.barWidget.contentPaddingV * 3
-            duration: Theme.anim.highlightDuration
-            easing.type: Theme.anim.moveType
+            to: root.host._returnTrackCenterY
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
         }
 
         NumberAnimation {
             target: root.state
             property: "_flashTrackScale"
-            to: 0.96
-            duration: Theme.anim.highlightDuration
-            easing.type: Theme.anim.moveType
+            to: 1
+            duration: Theme.anim.springDuration
+            easing.type: Theme.anim.springType
+            easing.overshoot: Theme.anim.springOvershoot
         }
 
         NumberAnimation {
             target: root.state
             property: "_flashTrackOpacity"
-            to: 0
-            duration: Theme.anim.highlightDuration
+            to: 1
+            duration: Theme.anim.moveDuration
             easing.type: Theme.anim.moveType
         }
 
-        onFinished: TimelineCallbacks.maybeCompleteHintExit(root.state, root.host, root.completeWindowHintExit)
+        onFinished: {
+            if (root.host._debugLogging)
+                root.host._logWindowHintReturn("hintExitAnim:finished", "animation finished", "actual-return")
+            TimelineCallbacks.maybeCompleteHintExit(root.state, root.host, root.completeWindowHintExit)
+        }
     }
 }

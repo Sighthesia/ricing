@@ -97,55 +97,26 @@ Item {
     }
 
     function log(message, event) {
-        if (!host._debugLogging)
+        if (!host._debugWidthLogging)
             return
-
-        if (!event) {
-            console.log("SuperIslandWidget[" + host.debugInstanceLabel + "]:", message)
-            return
-        }
 
         console.log(
-            "SuperIslandWidget[" + host.debugInstanceLabel + "]:", message,
-            "id=", event.id || "",
-            "type=", event.type || "",
-            "priority=", event.priority || "",
-            "phase=", state._phase,
-            "flashType=", state._flashSourceEvent.type || "",
-            "mainType=", state._mainDisplayEvent.type || "",
-            "collapsedWidthLive=", host._collapsedWidthLive !== undefined ? Math.round(host._collapsedWidthLive) : -1,
-            "collapsedWidth=", host._collapsedWidth !== undefined ? Math.round(host._collapsedWidth) : -1,
-            "transitionCollapsedWidth=", host._transitionCollapsedWidth !== undefined ? Math.round(host._transitionCollapsedWidth) : -1,
-            "collapseBaseCandidate=", host._attachedCollapseBaseWidthCandidate !== undefined ? Math.round(host._attachedCollapseBaseWidthCandidate) : -1,
-            "attachedBaseWidth=", state._attachedCollapseBaseWidth !== undefined ? Math.round(state._attachedCollapseBaseWidth) : -1,
-            "attachedPanelActive=", host._attachedPanelActive,
-            "attachedVisibleWidth=", host._attachedPanelVisibleWidth !== undefined ? Math.round(host._attachedPanelVisibleWidth) : -1,
-            "title=", event.title || "",
-            "subtitle=", event.subtitle || ""
+            "SuperIslandWidget[" + host.debugInstanceLabel + "]:",
+            message,
+            event ? ("type=" + (event.type || "") + " id=" + (event.id || "")) : ""
         )
     }
 
     function logPulse(message) {
-        if (!host._debugLogging)
+        if (!host._debugWidthLogging)
             return
 
         console.log(
-            "SuperIslandWidget[" + host.debugInstanceLabel + "]: pulse", message,
+            "SuperIslandWidget[" + host.debugInstanceLabel + "]: pulse",
+            message,
             "owner=", state._pulseOwner,
             "phase=", state._phase,
-            "flashType=", state._flashSourceEvent.type || "",
-            "collapsedWidthLive=", host._collapsedWidthLive !== undefined ? Math.round(host._collapsedWidthLive) : -1,
-            "collapsedWidth=", host._collapsedWidth !== undefined ? Math.round(host._collapsedWidth) : -1,
-            "transitionCollapsedWidth=", host._transitionCollapsedWidth !== undefined ? Math.round(host._transitionCollapsedWidth) : -1,
-            "collapseBaseCandidate=", host._attachedCollapseBaseWidthCandidate !== undefined ? Math.round(host._attachedCollapseBaseWidthCandidate) : -1,
-            "attachedBaseWidth=", state._attachedCollapseBaseWidth !== undefined ? Math.round(state._attachedCollapseBaseWidth) : -1,
-            "overlayMode=", IslandOverlayService.mode,
-            "overlayState=", IslandOverlayService.state,
-            "overlaySessionActive=", state._overlaySessionActive,
-            "overlayExpandedActive=", state._overlayExpandedActive,
-            "overlayPulsePending=", state._overlayPulsePending,
-            "pulseAnimRunning=", timeline.sharedBackgroundPulseAnim.running,
-            "scaleAnimRunning=", timeline.pulseScaleAnim.running
+            "flashType=", state._flashSourceEvent.type || ""
         )
     }
 
@@ -159,6 +130,16 @@ Item {
 
     function syncOverlayExtensionReservation() {
         overlayPolicy.syncOverlayExtensionReservation()
+    }
+
+    function _beginWindowHintReturnSession(reason) {
+        if (typeof host._beginWindowHintReturnSession === "function")
+            host._beginWindowHintReturnSession(reason)
+    }
+
+    function _logWindowHintReturn(context, note, source) {
+        if (typeof host._logWindowHintReturn === "function")
+            host._logWindowHintReturn(context, note, source)
     }
 
     function startEnterTransition(event) {

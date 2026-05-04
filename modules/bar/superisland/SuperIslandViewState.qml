@@ -89,6 +89,13 @@ QtObject {
         property real collapseBaseWidth: 0
     }
 
+    property QtObject returnDebug: QtObject {
+        id: returnDebug
+
+        property int windowHintSession: 0
+        property int windowHintStep: 0
+    }
+
     // Canonical aliases.
     property alias phase: flow.phase
     property alias mainDisplayEvent: flow.mainDisplayEvent
@@ -131,6 +138,9 @@ QtObject {
     property alias attachedCollapseBaseWidth: attached.collapseBaseWidth
     property alias attachedHintEvent: attached.hintEvent
 
+    property alias windowHintReturnSession: returnDebug.windowHintSession
+    property alias windowHintReturnStep: returnDebug.windowHintStep
+
     // Backward-compatibility aliases for existing `_` state references.
     property alias _phase: flow.phase
     property alias _mainDisplayEvent: flow.mainDisplayEvent
@@ -172,4 +182,7 @@ QtObject {
     property alias _attachedRevealUseHandoffCurve: attached.revealUseHandoffCurve
     property alias _attachedCollapseBaseWidth: attached.collapseBaseWidth
     property alias _attachedHintEvent: attached.hintEvent
+
+    property alias _windowHintReturnSession: returnDebug.windowHintSession
+    property alias _windowHintReturnStep: returnDebug.windowHintStep
 }

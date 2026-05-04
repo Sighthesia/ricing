@@ -318,24 +318,38 @@ Item {
             )
         }
 
+        root.machine._beginWindowHintReturnSession("finishWindowHint")
         root.state._phase = "hint-exit"
         root.machine.syncOverlayExtensionReservation()
+        root.machine._logWindowHintReturn("finishWindowHint:enterHintExit", "phase set to hint-exit", "actual-return")
         root.timeline.hintEnterAnim.stop()
         if (root.host._isFullHintEventType(root.state._attachedHintEvent.type))
             root.machine.startAttachedCollapse()
         if (!root.host._isFullHintEventType(root.state._attachedHintEvent.type))
             root.machine.triggerEdgeReboundScale()
         root.timeline.hintExitAnim.start()
+        root.machine._logWindowHintReturn("finishWindowHint:afterHintExitStart", "hintExitAnim start requested", "actual-return")
     }
 
     function completeWindowHintExit() {
+        root.machine._logWindowHintReturn("completeWindowHintExit:enter", "before hintExitAnim stop", "completion")
+        root.timeline.hintExitAnim.stop()
+
         const pendingEvent = root.host._displayEvent(SuperIslandService.activeEvent)
+        const settledHintEvent = root.host._displayEvent(root.state._attachedHintEvent)
+        const retainedActiveEvent = settledHintEvent.type !== "idle"
+            ? settledHintEvent
+            : pendingEvent
+        const settledMainEvent = root.host._displayEvent(SuperIslandService.mainState)
 
         root.state._phase = "idle"
         root.state._attachedCollapseAnimating = false
         root.state._attachedHintEvent = root.host._idleSnapshot()
         root.state._flashSourceEvent = root.host._idleSnapshot()
-        root.state._mainDisplayEvent = root.host._baselineEvent
+        root.state._mainDisplayEvent = settledMainEvent
+        root.state._lastActiveEvent = retainedActiveEvent.type === "idle"
+            ? root.state._lastActiveEvent
+            : retainedActiveEvent
         root.state._sharedBackgroundPulseOpacity = 0
         root.state._attachedPanelRevealWidth = 0
         root.state._attachedPanelRevealHeight = 0
@@ -343,6 +357,7 @@ Item {
         root.state._attachedCollapseBaseWidth = 0
         root.machine.resetTracks()
         root.machine.syncOverlayExtensionReservation()
+        root.machine._logWindowHintReturn("completeWindowHintExit:afterReset", "steady-state restored", "post-reset")
 
         if (!root.state._overlaySessionActive
                 && pendingEvent.type !== "idle"
