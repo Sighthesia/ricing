@@ -5,7 +5,6 @@ import qs.config
 import qs.services
 import "." as IslandParts
 import "./IslandWindowHintCardLogic.js" as HintLogic
-import "./SuperIslandWindowHintPresentationAdapter.js" as HintPresentationAdapter
 
 // Thin composition root for the SuperIsland window hint.
 Item {
@@ -22,17 +21,12 @@ Item {
     property bool sharedClockActive: false
 
     readonly property string presentationMode: root.event && root.event.presentation ? root.event.presentation : "window-hint"
-    readonly property bool _barExpandedCombinedPresentation: HintPresentationAdapter.isBarExpandedCombinedPresentation(root.presentationMode)
-    readonly property bool _barExpandedMainPresentation: HintPresentationAdapter.isBarExpandedMainPresentation(root.presentationMode)
-    readonly property bool _barExpandedDetachedPresentation: HintPresentationAdapter.isBarExpandedDetachedPresentation(root.presentationMode)
-    readonly property bool _defaultPresentation: HintPresentationAdapter.isDefaultPresentation(root.presentationMode)
-    readonly property real relocatedClockRowY:
-        root._barExpandedDetachedPresentation && _barExpandedDetachedPresentationItem
-            ? (_barExpandedDetachedPresentationItem.y + _barExpandedDetachedPresentationItem.relocatedClockRowY)
-            : 0
-    readonly property real relocatedClockCenterY:
-        root.relocatedClockRowY
-        + (root._barExpandedDetachedPresentation ? root._barExpandedDetachedClockHeight / 2 : 0)
+    readonly property bool _defaultPresentation: _windowHintSceneItem ? _windowHintSceneItem.defaultPresentation : false
+    readonly property bool _barExpandedCombinedPresentation: _windowHintSceneItem ? _windowHintSceneItem.barExpandedCombinedPresentation : false
+    readonly property bool _barExpandedMainPresentation: _windowHintSceneItem ? _windowHintSceneItem.barExpandedMainPresentation : false
+    readonly property bool _barExpandedDetachedPresentation: _windowHintSceneItem ? _windowHintSceneItem.barExpandedDetachedPresentation : false
+    readonly property real relocatedClockRowY: _windowHintSceneItem.relocatedClockRowY
+    readonly property real relocatedClockCenterY: _windowHintSceneItem.relocatedClockCenterY
 
     readonly property bool _hostKeepsHintVisible: !!(root.event && root.event.type === "window-hint")
 
@@ -123,8 +117,7 @@ Item {
     readonly property real _expandedTitleRowWidth:
         Math.max(
             root._titleSideWidth,
-            _barExpandedCombinedPresentationItem ? _barExpandedCombinedPresentationItem.titleRowImplicitWidth : 0,
-            _barExpandedMainPresentationItem ? _barExpandedMainPresentationItem.titleRowImplicitWidth : 0
+            _windowHintSceneItem ? _windowHintSceneItem.titleRowImplicitWidth : 0
         )
     readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     readonly property int _workspaceAnchorBaseDuration: Math.max(150, Math.round(Theme.anim.moveDuration * 1.05))
@@ -435,43 +428,11 @@ Item {
     scale: root._switchPulseScale
     transformOrigin: Item.Center
 
-    // Default presentation stays in a thin composition shell.
-    IslandParts.IslandWindowHintDefaultPresentation {
-        id: _defaultPresentationItem
+    // Presentation scene owns the visible routing while the card keeps state and snapshot logic.
+    IslandParts.IslandWindowHintScene {
+        id: _windowHintSceneItem
 
-        anchors.centerIn: parent
+        anchors.fill: parent
         card: root
-        visible: root._defaultPresentation
-    }
-
-    // Combined bar-expanded presentation keeps both lanes in one surface.
-    IslandParts.IslandWindowHintBarExpandedCombinedPresentation {
-        id: _barExpandedCombinedPresentationItem
-
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        card: root
-        visible: root._barExpandedCombinedPresentation
-    }
-
-    // Main bar-expanded presentation must still mount directly for width ownership and measurement.
-    IslandParts.IslandWindowHintBarExpandedMainPresentation {
-        id: _barExpandedMainPresentationItem
-
-        anchors.centerIn: parent
-        card: root
-        visible: root._barExpandedMainPresentation
-    }
-
-    // Detached bar-expanded presentation stands alone when the combined shell is inactive.
-    IslandParts.IslandWindowHintBarExpandedDetachedPresentation {
-        id: _barExpandedDetachedPresentationItem
-
-        anchors.top: parent.top
-        anchors.topMargin: root._padV + root._stagePadV
-        anchors.horizontalCenter: parent.horizontalCenter
-        card: root
-        sharedClockActive: root.sharedClockActive
-        visible: root._barExpandedDetachedPresentation
     }
 }

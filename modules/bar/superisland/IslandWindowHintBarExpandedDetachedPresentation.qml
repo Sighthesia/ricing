@@ -18,6 +18,7 @@ Item {
     readonly property real _contentTravel:
         (1 - root._revealProgress) * (root.card._workspaceVisibleStageHeight + root.card._rowGap)
     readonly property real relocatedClockRowY: _contentMotionLayer.y + _clockRow.y
+    readonly property real relocatedClockCenterY: root.relocatedClockRowY + root.card._barExpandedDetachedClockHeight / 2
 
     implicitWidth: root.card._barExpandedDetachedWidth
     implicitHeight: root.card._barExpandedDetachedContentHeight
