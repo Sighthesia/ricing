@@ -52,6 +52,39 @@ Attached SuperIsland shells should derive edge-aware corner behavior from
 `modules/bar/AttachedExpansionGeometry.js` so the pill-to-panel shape stays
 consistent across surfaces.
 
+### Convention: Extract feature-local visual tokens before scene splitting
+
+When a visual family grows beyond a single component, first extract the most
+stable feature-local style values into a dedicated token owner under `config/`
+before splitting scenes, shells, or state-machine ownership.
+
+**Good**:
+- Keep global tokens in `Theme.qml` / `Colors.qml`.
+- Move feature-only geometry such as preview widths, deck chrome spacing, or
+  hint-specific stage padding into a dedicated file such as
+  `config/ThemeSuperIsland.qml`.
+- Let large host files keep their current behavior while they switch from local
+  literals to the shared feature-local tokens.
+
+**Avoid**:
+- Starting a large visual refactor by moving scenes and behavior while style
+  literals still live inline across several files.
+- Promoting feature-specific geometry into global theme files when the values do
+  not belong to the wider shell system.
+
+**Why**: a token-extraction-first slice improves discoverability, reduces
+duplicate literals, and creates a lower-risk boundary for later architecture
+cleanup.
+
+**Example**:
+```qml
+// Feature-local visual tokens keep SuperIsland-only geometry out of host files.
+Singleton {
+    readonly property int windowHintStagePadH: Math.max(14, Math.round(18 * Theme.uiScale))
+    readonly property int expandedDeckMargin: 12
+}
+```
+
 ### Convention: Extract helper objects before splitting behavior
 
 When a host component grows large, first extract pure derived clusters into a
