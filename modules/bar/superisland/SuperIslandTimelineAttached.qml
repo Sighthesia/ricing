@@ -48,7 +48,6 @@ Item {
         onCatchStopped: TimelineCallbacks.ensureThrowReset(root.state)
         onRevealFinished: TimelineCallbacks.ensureAttachedRevealSettled(root.state, root.host)
         onCollapseFinished: {
-            TimelineCallbacks.debugWindowHintReturnLog(root.host, root.state, "attachedCollapse:finished")
             TimelineCallbacks.maybeCompleteHintExitAfterCollapse(root.state, root.host, root.completeWindowHintExit)
         }
     }

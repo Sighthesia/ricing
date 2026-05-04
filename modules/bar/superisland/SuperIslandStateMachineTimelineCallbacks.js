@@ -60,7 +60,6 @@ function maybeCompleteHintExitAfterCollapse(state, host, completeWindowHintExitF
         return
 
     debugLog(host, state, "maybeCompleteHintExitAfterCollapse")
-    debugWindowHintReturnLog(host, state, "maybeCompleteHintExitAfterCollapse:enter")
 
     if (!host || !host._isFullHintEventType || !host._isFullHintEventType(state._attachedHintEvent.type)) {
         resetAttachedOverlayState(state, host)
@@ -71,15 +70,36 @@ function maybeCompleteHintExitAfterCollapse(state, host, completeWindowHintExitF
     if (state._phase !== "hint-exit")
         return
 
+    if (typeof completeWindowHintExitFn === "function")
+        completeWindowHintExitFn()
+}
+
+function completeWindowHintExit(state, host, settledMainEvent, retainedActiveEvent, resetTracksFn, syncReservationFn) {
+    if (!host)
+        return
+
+    if (typeof host._releaseBarExpandedSharedClockReturnTarget === "function")
+        host._releaseBarExpandedSharedClockReturnTarget()
+
     resetAttachedOverlayState(state, host)
+    state._phase = "idle"
     state._flashSourceEvent = host._idleSnapshot()
     state._flashTrackY = host._flashStripY
     state._flashTrackScale = host._flashScale
     state._flashTrackOpacity = 0
-    debugWindowHintReturnLog(host, state, "maybeCompleteHintExitAfterCollapse:beforeComplete")
+    state._mainDisplayEvent = settledMainEvent
+    state._lastActiveEvent = retainedActiveEvent.type === "idle"
+        ? state._lastActiveEvent
+        : retainedActiveEvent
+    state._sharedBackgroundPulseOpacity = 0
 
-    if (typeof completeWindowHintExitFn === "function")
-        completeWindowHintExitFn()
+    if (typeof resetTracksFn === "function")
+        resetTracksFn()
+
+    if (typeof syncReservationFn === "function")
+        syncReservationFn()
+
+    debugWindowHintReturnLog(host, state, "completeWindowHintExit:steadyStateRestored")
 }
 
 function finishReplace(state, host, resetReplaceLayersFn) {

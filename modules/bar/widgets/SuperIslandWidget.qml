@@ -553,13 +553,7 @@ Item {
     readonly property real _barExpandedSharedClockStartY:
         root._barExpandedSharedClockLandingY
     readonly property real _barExpandedSharedClockTargetCenterY:
-        root._barExpandedSharedClockTargetCenterYLatched > 0
-            ? root._barExpandedSharedClockTargetCenterYLatched
-            : ((_overlayPanelHost ? _overlayPanelHost.y + 1 : 1)
-                + ((_attachedContentDeck && _attachedContentDeck.hintCardLoaderItem
-                        && _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY !== undefined)
-                    ? _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY
-                    : Math.max(root._pillH / 2, root._attachedPanelVisibleHeight - root._pillH / 2)))
+        root._resolveBarExpandedSharedClockTargetCenterY()
     property real _barExpandedSharedClockTargetCenterYLatched: 0
     readonly property real _barExpandedSharedClockTargetY:
         root._barExpandedSharedClockTargetCenterY - root._barExpandedSharedClockHeight / 2
@@ -610,8 +604,7 @@ width: implicitWidth
     }
     on_BarExpandedSharedClockVisibleChanged: {
         if (!root._barExpandedSharedClockVisible) {
-            root._barExpandedSharedClockTargetCenterYLatched = 0
-            root._barExpandedSharedClockEvent = root._baselineEvent
+            root._releaseBarExpandedSharedClockReturnTarget()
         }
     }
     on_HintRevealSettledChanged: {
@@ -624,8 +617,7 @@ width: implicitWidth
     }
     on_PhaseChanged: {
         if (root._phase === "hint-exit" && root._barExpandedHintActive) {
-            root._barExpandedSharedClockTargetCenterYLatched = root._barExpandedSharedClockTargetCenterY
-            root._barExpandedSharedClockEvent = root._baselineEvent
+            root._latchBarExpandedSharedClockReturnTarget()
         }
 
         root._syncBarExpandedExitBaseWidth()
@@ -663,6 +655,27 @@ width: implicitWidth
             root._latchedDetachedHintSessionHeight,
             root._liveDetachedHintSessionHeight
         )
+    }
+
+    function _resolveBarExpandedSharedClockTargetCenterY() {
+        if (root._barExpandedSharedClockTargetCenterYLatched > 0)
+            return root._barExpandedSharedClockTargetCenterYLatched
+
+        return (_overlayPanelHost ? _overlayPanelHost.y + 1 : 1)
+            + ((_attachedContentDeck && _attachedContentDeck.hintCardLoaderItem
+                    && _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY !== undefined)
+                ? _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY
+                : Math.max(root._pillH / 2, root._attachedPanelVisibleHeight - root._pillH / 2))
+    }
+
+    function _latchBarExpandedSharedClockReturnTarget() {
+        root._barExpandedSharedClockTargetCenterYLatched = root._resolveBarExpandedSharedClockTargetCenterY()
+        root._barExpandedSharedClockEvent = root._baselineEvent
+    }
+
+    function _releaseBarExpandedSharedClockReturnTarget() {
+        root._barExpandedSharedClockTargetCenterYLatched = 0
+        root._barExpandedSharedClockEvent = root._baselineEvent
     }
 
     function _syncBarExpandedExitBaseWidth() {

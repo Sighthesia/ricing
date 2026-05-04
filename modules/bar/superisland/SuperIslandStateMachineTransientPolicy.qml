@@ -342,21 +342,14 @@ Item {
             : pendingEvent
         const settledMainEvent = root.host._displayEvent(SuperIslandService.mainState)
 
-        root.state._phase = "idle"
-        root.state._attachedCollapseAnimating = false
-        root.state._attachedHintEvent = root.host._idleSnapshot()
-        root.state._flashSourceEvent = root.host._idleSnapshot()
-        root.state._mainDisplayEvent = settledMainEvent
-        root.state._lastActiveEvent = retainedActiveEvent.type === "idle"
-            ? root.state._lastActiveEvent
-            : retainedActiveEvent
-        root.state._sharedBackgroundPulseOpacity = 0
-        root.state._attachedPanelRevealWidth = 0
-        root.state._attachedPanelRevealHeight = 0
-        root.state._attachedContentOpacity = 0
-        root.state._attachedCollapseBaseWidth = 0
-        root.machine.resetTracks()
-        root.machine.syncOverlayExtensionReservation()
+        TimelineCallbacks.completeWindowHintExit(
+            root.state,
+            root.host,
+            settledMainEvent,
+            retainedActiveEvent,
+            root.machine.resetTracks,
+            root.machine.syncOverlayExtensionReservation
+        )
         root.machine._logWindowHintReturn("completeWindowHintExit:afterReset", "steady-state restored", "post-reset")
 
         if (!root.state._overlaySessionActive
