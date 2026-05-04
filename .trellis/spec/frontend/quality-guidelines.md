@@ -135,6 +135,51 @@ function completeWindowHintExit() {
 }
 ```
 
+### Convention: Centralize shared return target ownership
+
+When a visual element crosses seam boundaries during return/handoff, use
+explicit resolve/latch/release helpers for its return target geometry instead
+of scattering target computation, locking, and clearing across property
+bindings, phase-change handlers, and visibility handlers.
+
+**Good**:
+- Use a single resolve function to compute the return target position.
+- Use a single latch function to lock the target at the start of a return.
+- Use a single release function to clear the target on completion or loss.
+- Keep timeline callbacks as thin triggers, not half-completers.
+
+**Avoid**:
+- Duplicating target computation inside property bindings and helper functions.
+- Locking or clearing target state directly in phase-change or visibility
+  handlers instead of through the owning helper.
+- Leaving non-full-hint collapse paths without cleanup of attached overlay
+  state, even when they do not call the full completion function.
+
+**Why**: when the return target is resolved, latched, and released through
+  three explicit helpers, the ownership model is easy to read and extend.
+  Splitting these responsibilities across host bindings, timeline callbacks,
+  and completion functions creates ambiguity about who owns the return target
+  at each step.
+
+**Example**:
+```qml
+// Resolve the target position through a single helper.
+readonly property real _returnTargetCenterY: _resolveReturnTargetCenterY()
+
+function _resolveReturnTargetCenterY() {
+    if (_latched > 0) return _latched
+    return _computeDefaultTarget()
+}
+
+function _latchReturnTarget() {
+    _latched = _resolveReturnTargetCenterY()
+}
+
+function _releaseReturnTarget() {
+    _latched = 0
+}
+```
+
 ---
 
 ## Testing Requirements
