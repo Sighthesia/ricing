@@ -9,7 +9,10 @@ import qs.services
 Singleton {
     id: root
 
-    readonly property bool _debugLogging: false
+    readonly property bool _debugLogging:
+        (Quickshell.env("DYMICSHELL_SUPERISLAND_DEBUG") || "").trim() === "1"
+    readonly property bool _debugMediaBaselineLogging:
+        (Quickshell.env("DYMICSHELL_SUPERISLAND_MEDIA_DEBUG") || "").trim() === "1"
     readonly property bool overlayVisible:
         IslandOverlayService.mode !== "none"
         && IslandOverlayService.state !== "closed"
@@ -21,6 +24,12 @@ Singleton {
     property string mode: "idle"
     property var activeEvent: _idleEvent()
     property var _suspendedEvent: _idleEvent()
+    property string _lastDebugSignature: ""
+    property string _lastMediaAnnouncementSignature: ""
+
+    Component.onCompleted: {
+        root.mainState = root._resolveBaselineState()
+    }
     function _isHintSuppressedPreviewType(type) {
         return type === "window" || type === "workspace"
     }
@@ -109,6 +118,22 @@ Singleton {
         if (!root._debugLogging)
             return
 
+        const signature = [
+            message,
+            event && event.id ? event.id : "",
+            event && event.type ? event.type : "",
+            root.activeEvent && root.activeEvent.type ? root.activeEvent.type : "",
+            root.mode || "",
+            root.overlayVisible ? "1" : "0",
+            root.queueLength.toString(),
+            root.mainState && root.mainState.type ? root.mainState.type : ""
+        ].join("|")
+
+        if (signature === root._lastDebugSignature)
+            return
+
+        root._lastDebugSignature = signature
+
         if (!event) {
             console.log("SuperIslandService:", message)
             return
@@ -120,6 +145,7 @@ Singleton {
             "type=", event.type || "",
             "priority=", event.priority || "",
             "groupKey=", event.groupKey || "",
+            "activeType=", root.activeEvent.type || "",
             "mode=", root.mode,
             "overlayVisible=", root.overlayVisible,
             "queueLength=", root._queue.length,
@@ -487,6 +513,8 @@ Singleton {
 
         if (root.activeEvent.type !== "idle" && !root._isEventEnabled(root.activeEvent.type))
             root._finishTransient()
+
+        root.mainState = root._resolveBaselineState()
     }
 
     function _idleEvent() {
@@ -624,14 +652,64 @@ Singleton {
     }
 
     function _resolveBaselineState() {
+        const mediaEvent = root._mediaBaselineEvent()
+        if (mediaEvent)
+            return mediaEvent
+
         if (root._baselineState && root._baselineState.presentation === "baseline")
             return root._baselineState
         return root._idleEvent()
     }
 
+    function _mediaBaselineEvent() {
+        const settings = root._settings()
+        if (!settings.showMedia || !MediaService.hasPlayer)
+            return null
+
+        return root._normalizeEvent({
+            id: "media:" + (MediaService.playerName || "player"),
+            type: "media",
+            groupKey: "media",
+            priority: "passive",
+            presentation: "baseline",
+            title: MediaControlService.compactPrimaryLyric !== ""
+                ? MediaControlService.compactPrimaryLyric
+                : (MediaControlService.title || MediaService.title || MediaService.playerName || "Media"),
+            subtitle: MediaControlService.compactPrimaryLyric !== ""
+                ? (MediaService.artist || MediaControlService.artist || MediaService.playbackState)
+                : (MediaControlService.artist || MediaService.artist || MediaService.playbackState),
+            icon: root._mediaIcon(),
+            urgency: 1,
+            revision: MediaControlService.eventRevision || 0,
+            timeoutMs: 0,
+            sticky: true
+        })
+    }
+
+    function _syncPersistentMediaState(reason) {
+        const signature = root._mediaAnnouncementSignature()
+        if (signature === root._lastMediaAnnouncementSignature)
+            return
+
+        root._lastMediaAnnouncementSignature = signature
+
+        if (root._debugMediaBaselineLogging) {
+            console.info(
+                "[DymicShell:SuperIsland:MediaBaseline]",
+                reason,
+                "signature=", signature,
+                "hasPlayer=", MediaService.hasPlayer,
+                "showMedia=", root._settings().showMedia
+            )
+        }
+
+        root.mainState = root._resolveBaselineState()
+    }
+
     function _activateEvent(event, preservePausedRemaining) {
         root._log("activateEvent", event)
         root.activeEvent = event
+        root._log("activeEventApplied", root.activeEvent)
         root.flashEvent = event
         root.mode = "hint"
         root.mainState = root._resolveBaselineState()
@@ -742,6 +820,27 @@ Singleton {
         return Quickshell.iconPath("audio-x-generic")
     }
 
+    function _mediaAnnouncementSignature() {
+        return [
+            MediaService.hasPlayer ? "1" : "0",
+            MediaService.playerName || "",
+            MediaService.title || "",
+            MediaService.artist || "",
+            MediaService.playbackState || "",
+            MediaControlService.eventRevision || 0,
+            MediaControlService.announcementState || "",
+            MediaControlService.compactPrimaryLyricKey || "",
+            MediaControlService.displayPrimaryLyricKey || ""
+        ].join("|")
+    }
+
+    function _pushMediaAnnouncement(reason) {
+        if (root._suppressExternalSources)
+            return
+
+        root._syncPersistentMediaState(reason)
+    }
+
     function _focusedWindowEvent(window) {
         if (!window)
             return null
@@ -837,12 +936,6 @@ Singleton {
     Connections {
         target: MediaService
         function onMediaChanged() {
-            if (root._suppressExternalSources || !root._settings().showMedia)
-                return
-
-            if (!MediaService.hasPlayer)
-                return
-
             const signature = [
                 MediaService.playerName,
                 MediaService.title,
@@ -850,19 +943,23 @@ Singleton {
                 MediaService.playbackState
             ].join("|")
 
-            if (signature === root._lastMediaSignature)
-                return
+            if (signature !== root._lastMediaSignature)
+                root._lastMediaSignature = signature
 
-            root._lastMediaSignature = signature
-            root.replaceEvent("media", {
-                id: "media:" + signature,
-                type: "media",
-                priority: "important",
-                title: MediaService.title || MediaService.playerName || "Media",
-                subtitle: MediaService.artist || MediaService.playbackState,
-                icon: root._mediaIcon(),
-                urgency: 1
-            })
+            root._pushMediaAnnouncement("mediaServiceChanged")
+        }
+    }
+
+    // Media control state can change without a raw MPRIS metadata change.
+    Connections {
+        target: MediaControlService
+
+        function onEventRevisionChanged() {
+            root._pushMediaAnnouncement("mediaControlRevision")
+        }
+
+        function onAnnouncementStateChanged() {
+            root._pushMediaAnnouncement("mediaControlAnnouncement")
         }
     }
 }

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.config
 import qs.services
+import "." as IslandCards
 import "../media" as MediaParts
 
 // Enhanced media card with artwork, progress bar, and transport controls for SuperIsland.
@@ -11,85 +12,31 @@ Item {
     required property var event
     required property string iconSource
     property bool compact: false
+    property date currentTime: new Date()
+    property bool hasPendingEvents: false
 
     readonly property int _contentInsetV: Theme.barWidget.contentPaddingV
-    readonly property int _artworkSize: root.compact
-        ? Math.max(Theme.barWidget.primaryIconSize, Theme.barWidget.primaryIconSize + root._contentInsetV * 2)
-        : Theme.barWidget.mediaPanelArtworkSize
     readonly property string _displayTitle: MediaControlService.title || root.event.title || "Media"
     readonly property string _displayArtist: MediaControlService.artist || root.event.subtitle || ""
     readonly property string _artUrl: MediaControlService.artUrl || root.iconSource || ""
     readonly property string _playbackState: MediaControlService.playbackState || "stopped"
+    readonly property string superIslandCardKind: "media"
+    readonly property int _artworkSize: root.compact
+        ? Theme.barWidget.pillHeight - root._contentInsetV * 2
+        : Theme.barWidget.mediaPanelArtworkSize
 
     implicitWidth: root.compact ? _compactLayout.implicitWidth : _expandedLayout.implicitWidth
     implicitHeight: root.compact
-        ? (Theme.fontSizeBody + root._contentInsetV * 2)
+        ? _compactLayout.implicitHeight
         : (_expandedLayout.implicitHeight + root._contentInsetV * 2)
 
-    // Compact mode: artwork + title + state badge (bar pill).
-    RowLayout {
+    // Compact mode: shared clock and persistent media row.
+    IslandCards.IslandClockMediaRow {
         id: _compactLayout
         anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: root.compact
-            ? Math.max(1, Math.round(Theme.barWidget.contentPaddingV / 2))
-            : 0
         visible: root.compact
-        spacing: Theme.barWidget.iconLabelSpacing
-
-        // Album artwork thumbnail.
-        MediaParts.MediaArtwork {
-            source: root._artUrl
-            size: Theme.barWidget.primaryIconSize + root._contentInsetV * 2
-            Layout.alignment: Qt.AlignVCenter
-        }
-
-        // Track metadata.
-        ColumnLayout {
-            spacing: 0
-            Layout.alignment: Qt.AlignVCenter
-
-            Text {
-                text: root._displayTitle
-                color: Colors.text
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeBody
-                font.bold: true
-                elide: Text.ElideRight
-                Layout.maximumWidth: Math.round(180 * Theme.uiScale)
-            }
-
-            Text {
-                visible: root._displayArtist !== ""
-                text: root._displayArtist
-                color: Colors.textMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSmall
-                elide: Text.ElideRight
-                Layout.maximumWidth: Math.round(180 * Theme.uiScale)
-            }
-        }
-
-        // Playback state badge.
-        Rectangle {
-            radius: Theme.cornerRadius
-            color: Colors.highlight
-            opacity: Colors.highlightAlpha + 0.1
-            implicitHeight: _compactStateText.implicitHeight + Theme.barWidget.badgePaddingV * 2
-            implicitWidth: _compactStateText.implicitWidth + Theme.barWidget.badgePaddingH * 2
-            Layout.alignment: Qt.AlignVCenter
-
-            Text {
-                id: _compactStateText
-                anchors.centerIn: parent
-                text: root._playbackState === "playing" ? "Playing"
-                    : root._playbackState === "paused" ? "Pause"
-                    : "Stopped"
-                color: Colors.text
-                font.family: Theme.fontMono
-                font.pixelSize: Theme.fontSizeSmall
-                font.bold: true
-            }
-        }
+        currentTime: root.currentTime
+        hasPendingEvents: root.hasPendingEvents
     }
 
     // Expanded mode: full media controls (flash/strip track).
@@ -111,7 +58,7 @@ Item {
         ColumnLayout {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
-            spacing: Math.max(2, Theme.barWidget.contentPaddingV)
+            spacing: ThemeSuperIsland.mediaExpandedMetadataSpacing
 
             // Track title.
             Text {
