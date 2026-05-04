@@ -21,8 +21,8 @@ Item {
     readonly property bool _fullScreenPage:
         root._presentedPage === "break-reminder"
         || root._presentedPage === "session-control"
-    readonly property real _deckMargins: root._fullScreenPage ? 0 : 12
-    readonly property real _deckSpacing: root._fullScreenPage ? 0 : 10
+    readonly property real _deckMargins: root._fullScreenPage ? 0 : ThemeSuperIsland.expandedDeckMargin
+    readonly property real _deckSpacing: root._fullScreenPage ? 0 : ThemeSuperIsland.expandedDeckSpacing
     readonly property real _headerHeight:
         root._showChrome
             ? Math.max(
@@ -284,7 +284,7 @@ Item {
             visible: root._showChrome
             Layout.fillWidth: true
             Layout.preferredHeight: visible ? implicitHeight : 0
-            spacing: 10
+            spacing: ThemeSuperIsland.expandedDeckSpacing
 
             BarComponents.StaggerItem {
                 id: _clockItem
@@ -305,8 +305,8 @@ Item {
 
             BarComponents.StaggerItem {
                 id: _navItem
-                Layout.preferredWidth: Math.round(420 * Theme.uiScale)
-                Layout.preferredHeight: 30
+                Layout.preferredWidth: ThemeSuperIsland.expandedDeckNavWidth
+                Layout.preferredHeight: ThemeSuperIsland.expandedDeckNavHeight
                 implicitWidth: _navRow.implicitWidth
                 implicitHeight: _navRow.implicitHeight
 
@@ -353,8 +353,8 @@ Item {
 
             BarComponents.StaggerItem {
                 id: _sessionItem
-                Layout.preferredWidth: Math.round(102 * Theme.uiScale)
-                Layout.preferredHeight: 30
+                Layout.preferredWidth: ThemeSuperIsland.expandedDeckSessionWidth
+                Layout.preferredHeight: ThemeSuperIsland.expandedDeckNavHeight
                 implicitWidth: _sessionButton.implicitWidth
                 implicitHeight: _sessionButton.implicitHeight
 
@@ -373,8 +373,8 @@ Item {
 
             BarComponents.StaggerItem {
                 id: _closeItem
-                width: 28
-                height: 28
+                width: ThemeSuperIsland.expandedDeckCloseSize
+                height: ThemeSuperIsland.expandedDeckCloseSize
 
                 Text {
                     anchors.centerIn: parent

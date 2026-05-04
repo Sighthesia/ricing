@@ -53,22 +53,22 @@ Item {
 
     readonly property int _padH: Theme.barWidget.contentPaddingH
     readonly property int _padV: Theme.barWidget.contentPaddingV
-    readonly property int _rowGap: Math.max(10, Math.round(12 * Theme.uiScale))
-    readonly property int _capsuleGap: Math.max(4, Math.round(5 * Theme.uiScale))
-    readonly property int _workspaceColumnGap: Math.max(10, Math.round(12 * Theme.uiScale))
-    readonly property int _stagePadH: Math.max(14, Math.round(18 * Theme.uiScale))
-    readonly property int _stagePadV: Math.max(14, Math.round(18 * Theme.uiScale))
+    readonly property int _rowGap: ThemeSuperIsland.windowHintRowGap
+    readonly property int _capsuleGap: ThemeSuperIsland.windowHintCapsuleGap
+    readonly property int _workspaceColumnGap: ThemeSuperIsland.windowHintWorkspaceColumnGap
+    readonly property int _stagePadH: ThemeSuperIsland.windowHintStagePadH
+    readonly property int _stagePadV: ThemeSuperIsland.windowHintStagePadV
     readonly property int _compactIcon: Math.max(10, Theme.barWidget.compactIconSize - 1)
     readonly property int _primaryIcon: Theme.barWidget.primaryIconSize
-    readonly property int _workspaceSideWidth: Math.round(164 * Theme.uiScale)
-    readonly property int _workspacePrimaryWidth: Math.round(300 * Theme.uiScale)
-    readonly property int _titleSideWidth: Math.round(132 * Theme.uiScale)
-    readonly property int _titlePrimaryWidth: Math.round(292 * Theme.uiScale)
-    readonly property int _workspaceSideHeight: Math.max(24, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV)
-    readonly property int _workspacePrimaryHeight: Math.max(54, Theme.barWidget.pillHeight + Theme.barWidget.contentPaddingV * 7)
-    readonly property int _titleCapsuleHeight: Math.max(30, Theme.fontSizeBody + Theme.barWidget.badgePaddingV * 6)
-    readonly property int _minPreviewWidth: Math.round(320 * Theme.uiScale)
-    readonly property int _maxPreviewWidth: Math.round(560 * Theme.uiScale)
+    readonly property int _workspaceSideWidth: ThemeSuperIsland.windowHintWorkspaceSideWidth
+    readonly property int _workspacePrimaryWidth: ThemeSuperIsland.windowHintWorkspacePrimaryWidth
+    readonly property int _titleSideWidth: ThemeSuperIsland.windowHintTitleSideWidth
+    readonly property int _titlePrimaryWidth: ThemeSuperIsland.windowHintTitlePrimaryWidth
+    readonly property int _workspaceSideHeight: ThemeSuperIsland.windowHintWorkspaceSideHeight
+    readonly property int _workspacePrimaryHeight: ThemeSuperIsland.windowHintWorkspacePrimaryHeight
+    readonly property int _titleCapsuleHeight: ThemeSuperIsland.windowHintTitleCapsuleHeight
+    readonly property int _minPreviewWidth: ThemeSuperIsland.windowHintMinPreviewWidth
+    readonly property int _maxPreviewWidth: ThemeSuperIsland.windowHintMaxPreviewWidth
     readonly property color _stageFill: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.02)
     readonly property color _stageBorder: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.035)
     readonly property color _primaryCapsuleFill: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.09)
@@ -110,9 +110,9 @@ Item {
     readonly property int _barExpandedDetachedContentHeight: root._workspaceVisibleStageHeight + root._rowGap + root._barExpandedDetachedClockHeight
     readonly property int _barExpandedCombinedHeight: Theme.barHeight + root._barExpandedDetachedContentHeight
     readonly property real _barExpandedShellRadius: Math.max(Theme.cornerRadius, Theme.screenCornerRadius)
-    readonly property int _barExpandedNotchRadius: Math.max(10, Math.round(16 * Theme.uiScale))
+    readonly property int _barExpandedNotchRadius: ThemeSuperIsland.windowHintNotchRadius
     readonly property int _barExpandedNotchHeight: root._barExpandedNotchRadius
-    readonly property int _barExpandedExclusivePushPadding: Math.max(0, Theme.widgetSpacing)
+    readonly property int _barExpandedExclusivePushPadding: ThemeSuperIsland.windowHintExclusivePushPadding
     readonly property int _barExpandedMainWidth:
         Math.max(
             root._barExpandedDetachedWidth,

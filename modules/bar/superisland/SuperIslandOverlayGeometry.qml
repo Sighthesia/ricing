@@ -47,11 +47,17 @@ QtObject {
 
     // Top-corner radius used when the bar host switches to rectangular mode.
     readonly property real barExpandedTopRadius:
-        Math.max(Theme.cornerRadius * 0.55, Math.round(Theme.barWidget.pillHeight * 0.28))
+        Math.max(
+            Theme.cornerRadius * ThemeSuperIsland.overlayTopRadiusCornerFactor,
+            Math.round(Theme.barWidget.pillHeight * ThemeSuperIsland.overlayTopRadiusPillFactor)
+        )
 
     // Lower-corner radius for the detached panel in bar-expanded mode.
     readonly property real barExpandedDetachedRadius:
-        Math.max(Theme.cornerRadius, Math.round(Theme.barWidget.pillHeight * 0.42))
+        Math.max(
+            Theme.cornerRadius * ThemeSuperIsland.overlayDetachedRadiusCornerFactor,
+            Math.round(Theme.barWidget.pillHeight * ThemeSuperIsland.overlayDetachedRadiusPillFactor)
+        )
 
     // Seam arc radius mirrors the detached panel corner radius.
     readonly property real barExpandedSeamArcRadius: root.barExpandedDetachedRadius
@@ -67,14 +73,19 @@ QtObject {
 
     // Depth of the inward corner notch that frames the attached panel seam.
     readonly property real overlayInwardCornerDepth:
-        Math.max(18, root.overlayInwardCornerRadius + (root.overlayInwardCornerRadius - 18) * 0.3)
+        Math.max(
+            ThemeSuperIsland.overlayInwardCornerDepthBase,
+            root.overlayInwardCornerRadius
+                + (root.overlayInwardCornerRadius - ThemeSuperIsland.overlayInwardCornerDepthBase)
+                    * ThemeSuperIsland.overlayInwardCornerDepthTension
+        )
 
     // Vertical lift applied when the attached panel first reveals.
     readonly property real overlayRevealLift:
-        Math.max(8, Theme.barWidget.contentPaddingV * 4)
+        ThemeSuperIsland.overlayRevealLift
 
     // Pixel overlap between the pill host and the attached panel seam.
-    readonly property real overlayAttachmentOverlap: 1
+    readonly property real overlayAttachmentOverlap: ThemeSuperIsland.overlayAttachmentOverlap
 
     // Bridge outset is reserved for future bridging; currently unused.
     readonly property real overlayBridgeOutset: 0
@@ -97,7 +108,7 @@ QtObject {
             : Math.round(900 * Theme.uiScale)
 
     // Fallback body height for the control-center overlay page.
-    readonly property real controlCenterFallbackBodyHeight: ThemeCards.superIslandControlCenterBodyHeight
+    readonly property real controlCenterFallbackBodyHeight: ThemeSuperIsland.superIslandControlCenterBodyHeight
 
     // Shell fill opacity drops for full-screen overlays to show the desktop behind.
     readonly property real attachedShellFillOpacity:
