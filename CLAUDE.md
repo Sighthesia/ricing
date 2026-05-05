@@ -21,6 +21,7 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | [qml-token-cleanup](.agents/skills/qml-token-cleanup/SKILL.md) | Use when consolidating visual tokens, extracting repeated QML geometry into `Theme*` singletons, or cleaning hardcoded spacing, radius, widths, and panel dimensions across related UI families. |
 | [qml-visual-language](.agents/skills/qml-visual-language/SKILL.md) | Use when defining or enforcing visual identity, motion language, and cross-component consistency. |
 | [multi-surface-semantic-ownership](.agents/skills/multi-surface-semantic-ownership/SKILL.md) | Use when one feature spans multiple roots or detached surfaces and geometry bugs stem from confusing host, shell, presentation, or content ownership. |
+| [runtime-cleanup-chain-interruptions](.agents/skills/runtime-cleanup-chain-interruptions/SKILL.md) | Use when local state resets correctly but stale reservation/geometry/shared state survives because a runtime error interrupts the cleanup chain. |
 
 ### Motion
 

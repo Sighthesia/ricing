@@ -46,6 +46,7 @@ Load skills on demand; see `.agents/skills/README.md` for grouping.
 | [qml-motion-debug](.agents/skills/qml-motion-debug/SKILL.md)                         | Motion looks wrong even though state changes              |
 | [exported-layout-width-ownership](.agents/skills/exported-layout-width-ownership/SKILL.md) | Visible width vs reserved layout width synchronization    |
 | [multi-surface-semantic-ownership](.agents/skills/multi-surface-semantic-ownership/SKILL.md) | Root, shell, and content ownership across attached surfaces |
+| [runtime-cleanup-chain-interruptions](.agents/skills/runtime-cleanup-chain-interruptions/SKILL.md) | Cleanup callbacks or imports break, so local state resets but stale outer reservation/state survives |
 | [single-instance-handoff-motion](.agents/skills/single-instance-handoff-motion/SKILL.md) | Teleport/duplicate-safe cross-host handoff motion         |
 | [split-host-exit-synchronization](.agents/skills/split-host-exit-synchronization/SKILL.md) | Synchronizing exit timing across separate geometry owners |
 | [list-transition-handoffs](.agents/skills/list-transition-handoffs/SKILL.md)         | Animated list replacement and filter handoffs             |

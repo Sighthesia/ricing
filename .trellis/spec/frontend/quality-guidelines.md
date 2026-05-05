@@ -54,6 +54,11 @@ considering a change done.
 - For `ListView` filter/reorder motion, prefer incremental model sync plus a detached outgoing
   layer, keep delegate reuse/state from collapsing the timeline, and sync suppressed delegates
   to their live viewport state before releasing transition ownership.
+- Keep pointer hit regions aligned with the visible shell when a clipped host leaves empty
+  geometry below or beside the rendered surface; do not let a host-wide transparent `MouseArea`
+  continue to intercept the unused area.
+- When a widget exports extra visual-only reveal height, also export a dedicated context-menu
+  hit height so wrapper-level right-click handlers can ignore non-interactive lower geometry.
 
 ### Convention: Keep shared media visibility source-driven
 
@@ -132,6 +137,36 @@ function completeWindowHintExit() {
     root.state._mainDisplayEvent = settledMainEvent
     root.machine.resetTracks()
     root.machine.syncOverlayExtensionReservation()
+}
+```
+
+### Convention: Verify cleanup callbacks before retuning stale geometry
+
+When a local visual/reset value already reaches its expected idle state but an outer reservation, window size, or shared service value stays stale, verify that the cleanup callback chain actually finishes before changing geometry formulas or hit regions.
+
+**Good**:
+- Log the local reset value, the cleanup callback entry/exit, and the outer shared value separately.
+- Check runtime warnings or missing JS namespace imports on the same phase transition where cleanup should complete.
+- Fix callback/import interruptions first, then re-check whether the stale outer state clears without more geometry changes.
+
+**Avoid**:
+- Retuning `layoutRevealHeight`, reservation math, or input intercept layers after logs already show the local owner reached `0` / `idle`.
+- Assuming a stale outer reservation must be caused by geometry formulas when the completion callback may have crashed before `sync*` runs.
+
+**Why**: in SuperIsland `window-hint` exit, the attached panel and local reservation values already collapsed correctly, but a missing `TimelineCallbacks` import interrupted the final cleanup path. The stale bar reservation survived because the propagation step never completed, not because the geometry reset was wrong.
+
+**Example**:
+```qml
+// Local reservation already reached zero, so next inspect the completion path.
+function completeWindowHintExit() {
+    TimelineCallbacks.completeWindowHintExit(
+        root.state,
+        root.host,
+        settledMainEvent,
+        retainedActiveEvent,
+        root.machine.resetTracks,
+        root.machine.syncOverlayExtensionReservation
+    )
 }
 ```
 
