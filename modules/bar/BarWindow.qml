@@ -9,12 +9,36 @@ import qs.modules.bar
 PanelWindow {
     id: barWindow
 
+    readonly property bool _debugLogging:
+        (Quickshell.env("DYMICSHELL_SUPERISLAND_DEBUG") || "").trim() === "1"
+
     anchors { left: true; top: true; right: true }
     color: "transparent"
 
     // Expand downward during widget flashes (non-exclusive zone).
     implicitHeight: Theme.barHeight + BarLayoutService.barTransientExtension
     exclusiveZone: Theme.barHeight
+
+    function _logBarHeightState(context) {
+        if (!barWindow._debugLogging)
+            return
+
+        console.log("[DymicShell:BarWindowHeight]", JSON.stringify({
+            context: context || "",
+            themeBarHeight: Math.round(Theme.barHeight || 0),
+            barTransientExtension: Math.round(BarLayoutService.barTransientExtension || 0),
+            implicitHeight: Math.round(barWindow.implicitHeight || 0),
+            exclusiveZone: Math.round(barWindow.exclusiveZone || 0)
+        }))
+    }
+
+    Component.onCompleted: _logBarHeightState("completed")
+    Connections {
+        target: BarLayoutService
+        function onBarTransientExtensionChanged() {
+            barWindow._logBarHeightState("barTransientExtensionChanged")
+        }
+    }
 
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus:

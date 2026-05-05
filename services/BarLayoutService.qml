@@ -19,6 +19,9 @@ import "barlayout/BarLayoutDragFacade.js" as DragFacadeUtils
 Singleton {
     id: root
 
+    readonly property bool _debugLogging:
+        (Quickshell.env("DYMICSHELL_SUPERISLAND_DEBUG") || "").trim() === "1"
+
     // Panel and overlay coordination state.
     // Panel state: "none" | "layout" | "config"
     property string activePanel: "none"
@@ -167,8 +170,27 @@ Singleton {
         )
     }
 
+    function _logTransientExtensionState(context, ownerKey, height, result) {
+        if (!root._debugLogging)
+            return
+
+        console.log("[DymicShell:BarLayoutTransient]", JSON.stringify({
+            context: context || "",
+            ownerKey: ownerKey || "",
+            incomingHeight: Math.round(Number(height) || 0),
+            accepted: result && result.accepted === false ? false : true,
+            changed: !!(result && result.changed),
+            barTransientExtension: Math.round(root.barTransientExtension || 0),
+            superIslandOverlayExtension: Math.round(
+                root._transientExtensions && root._transientExtensions["super-island-overlay"]
+                    ? root._transientExtensions["super-island-overlay"]
+                    : 0
+            )
+        }))
+    }
+
     function setTransientExtension(ownerKey, height) {
-        return MetricsFacadeUtils.setTransientExtension(
+        const result = MetricsFacadeUtils.setTransientExtension(
             _transientExtensions,
             ownerKey,
             height,
@@ -176,6 +198,8 @@ Singleton {
                 _transientExtensions = nextTransientExtensions
             }
         )
+        root._logTransientExtensionState("setTransientExtension", ownerKey, height, result)
+        return result
     }
 
     function _maxTransientExtension(transientExtensions) {
@@ -183,14 +207,21 @@ Singleton {
     }
 
     function clearTransientExtension(ownerKey) {
-        return MetricsFacadeUtils.clearTransientExtension(
+        const result = MetricsFacadeUtils.clearTransientExtension(
             _transientExtensions,
             ownerKey,
             function(nextTransientExtensions) {
                 _transientExtensions = nextTransientExtensions
             }
         )
+        root._logTransientExtensionState("clearTransientExtension", ownerKey, 0, result)
+        return result
     }
+
+    on_TransientExtensionsChanged: root._logTransientExtensionState("transientExtensionsChanged", "", 0, {
+        accepted: true,
+        changed: true
+    })
 
     onMediaControlFlashExtensionChanged: {
         setTransientExtension("mediaControlFlashExtension", mediaControlFlashExtension)
