@@ -306,6 +306,7 @@ Item {
     readonly property real _barExpandedHostFootprintWidth: WidthResolver.barExpandedHostFootprintWidth(root)
     readonly property real layoutReservationWidth: root._barExpandedHostFootprintWidth
     readonly property real layoutMeasurementWidth: root._barExpandedHostFootprintWidth
+    readonly property real layoutContextMenuHeight: Theme.barHeight
     readonly property real layoutRevealHeight: Math.max(
         Theme.barHeight,
         ((_overlayPanelHost ? _overlayPanelHost.y : 0) + root._attachedPanelVisibleHeight),
@@ -443,10 +444,14 @@ Item {
     readonly property real _transientAccentBaseOpacity: 0
     readonly property real _overlayReservedExtension:
         root._attachedPanelActive
-            ? root._overlayDetachedOffset
-                + (root._overlaySessionActive
-                    ? root._attachedPanelHeight
-                    : root._detachedHintReservedHeight)
+            ? ((root._barExpandedHintActive
+                    && root._phase === "hint-exit"
+                    && root._attachedPanelVisibleHeight <= 0)
+                ? 0
+                : root._overlayDetachedOffset
+                    + (root._overlaySessionActive
+                        ? root._attachedPanelHeight
+                        : root._detachedHintReservedHeight))
             : 0
     readonly property real _overlayShellY: _pillClip.y
     readonly property real _overlayShellHeight:
@@ -593,6 +598,7 @@ width: implicitWidth
             root._barExpandedTitleRevealLatched = false
             root._hintRevealSettled = false
             root._logWidthChain("barExpandedHintActive=true")
+            root._logReservationChain("barExpandedHintActiveChanged")
             return
         }
 
@@ -601,6 +607,7 @@ width: implicitWidth
         root._barExpandedTitleRevealLatched = false
         root._hintRevealSettled = false
         root._logWidthChain("barExpandedHintActive=false")
+        root._logReservationChain("barExpandedHintActiveChanged")
     }
     on_BarExpandedSharedClockVisibleChanged: {
         if (!root._barExpandedSharedClockVisible) {
@@ -622,6 +629,7 @@ width: implicitWidth
 
         root._syncBarExpandedExitBaseWidth()
         root._logWidthChain("phaseChanged")
+        root._logReservationChain("phaseChanged")
     }
     on_ExpandedWidthChanged: root._logWidthChain("expandedWidthChanged")
     on_CollapsedWidthChanged: root._logWidthChain("collapsedWidthChanged")
@@ -629,13 +637,31 @@ width: implicitWidth
     on_AttachedPanelHeightChanged: {
         _stateMachine.syncOverlayExtensionReservation()
         root._retargetAttachedPanelHeightIfNeeded()
+        root._logReservationChain("attachedPanelHeightChanged")
     }
-    on_AttachedPanelVisibleHeightChanged: _stateMachine.syncOverlayExtensionReservation()
+    on_AttachedPanelVisibleHeightChanged: {
+        _stateMachine.syncOverlayExtensionReservation()
+        root._logReservationChain("attachedPanelVisibleHeightChanged")
+    }
     on_AttachedPanelVisibleWidthChanged: root._syncBarExpandedExitBaseWidth()
-    on_DetachedHintActiveChanged: root._syncDetachedHintSessionHeight()
-    on_AttachedCollapseAnimatingChanged: root._syncDetachedHintSessionHeight()
-    on_DetachedHintHeightChanged: root._syncDetachedHintSessionHeight()
-    on_BarExpandedDetachedHintHeightChanged: root._syncDetachedHintSessionHeight()
+    on_DetachedHintActiveChanged: {
+        root._syncDetachedHintSessionHeight()
+        root._logReservationChain("detachedHintActiveChanged")
+    }
+    on_AttachedCollapseAnimatingChanged: {
+        root._syncDetachedHintSessionHeight()
+        root._logReservationChain("attachedCollapseAnimatingChanged")
+    }
+    on_DetachedHintHeightChanged: {
+        root._syncDetachedHintSessionHeight()
+        root._logReservationChain("detachedHintHeightChanged")
+    }
+    on_BarExpandedDetachedHintHeightChanged: {
+        root._syncDetachedHintSessionHeight()
+        root._logReservationChain("barExpandedDetachedHintHeightChanged")
+    }
+    on_OverlayReservedExtensionChanged: root._logReservationChain("overlayReservedExtensionChanged")
+    on_LatchedDetachedHintSessionHeightChanged: root._logReservationChain("latchedDetachedHintSessionHeightChanged")
 
     function _syncDetachedHintSessionHeight() {
         if (root._overlaySessionActive)
@@ -937,6 +963,28 @@ width: implicitWidth
 
         root._lastWindowHintReturnDebugSignature = signature
         console.log("[DymicShell:SuperIslandReturn]", signature)
+    }
+
+    function _logReservationChain(context) {
+        if (!root._debugLogging)
+            return
+
+        console.log("[DymicShell:SuperIslandReservation]", JSON.stringify({
+            label: root.debugInstanceLabel,
+            context: context || "",
+            phase: root._phase,
+            barExpandedHintActive: root._barExpandedHintActive,
+            overlaySessionActive: root._overlaySessionActive,
+            overlayClosing: root._overlayClosing,
+            overlayReservedExtension: Math.round(root._overlayReservedExtension || 0),
+            attachedPanelHeight: Math.round(root._attachedPanelHeight || 0),
+            attachedPanelVisibleHeight: Math.round(root._attachedPanelVisibleHeight || 0),
+            detachedHintReservedHeight: Math.round(root._detachedHintReservedHeight || 0),
+            latchedDetachedHintSessionHeight: Math.round(root._latchedDetachedHintSessionHeight || 0),
+            layoutRevealHeight: Math.round(root.layoutRevealHeight || 0),
+            layoutMeasurementWidth: Math.round(root.layoutMeasurementWidth || 0),
+            layoutContextMenuHeight: Math.round(root.layoutContextMenuHeight || 0)
+        }))
     }
 
     Timer {
@@ -1454,7 +1502,7 @@ width: implicitWidth
     }
 
     MouseArea {
-        anchors.fill: parent
+        anchors.fill: _pillClip
         z: -1
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor

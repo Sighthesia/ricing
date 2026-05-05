@@ -1,5 +1,6 @@
 import QtQuick
 import qs.services
+import "./SuperIslandStateMachineTimelineCallbacks.js" as TimelineCallbacks
 
 // Encapsulates transient and window-hint transition strategies for the state machine.
 Item {

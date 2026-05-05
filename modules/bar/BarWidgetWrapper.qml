@@ -63,6 +63,14 @@ Item {
 
         return Math.max(0, wrapper._naturalHeight)
     }
+    readonly property real _contextMenuHitHeight: {
+        let source = wrapper._measurementSource
+
+        if (source && source.layoutContextMenuHeight !== undefined)
+            return Math.max(0, Number(source.layoutContextMenuHeight) || 0)
+
+        return Math.max(0, Theme.barHeight)
+    }
     readonly property real _globalRevealHeight:
         Math.max(Theme.barHeight, Theme.barHeight + BarLayoutService.barTransientExtension)
     readonly property real _contentOffsetX:
@@ -377,6 +385,9 @@ Item {
         acceptedButtons: Qt.RightButton
         enabled: !BarLayoutService.isDragging
         onTapped: function(eventPoint) {
+            if (eventPoint.position.y > wrapper._contextMenuHitHeight)
+                return;
+
             let bc = wrapper.findBarContent();
             if (!bc) return;
             let centreInBar = wrapper.mapToItem(bc, wrapper.implicitWidth / 2, 0);
