@@ -13,6 +13,33 @@ QtObject {
     // Host-injected state: current pill height from the host widget.
     required property real pillHeight
 
+    // Host-injected state: current bar-expanded title clamp state.
+    required property bool barExpandedTitleWidthClamped
+
+    // Host-injected state: current pill background width from the visible surface.
+    required property real pillBackgroundWidth
+
+    // Host-injected state: detached hint width used by the seam arc clamp.
+    required property real barExpandedDetachedHintWidth
+
+    // Host-injected state: current hint phase used by the tail-release gate.
+    required property string phase
+
+    // Host-injected state: whether the attached panel is in closing cleanup.
+    required property bool overlayClosing
+
+    // Host-injected state: current reveal progress for the attached panel.
+    required property real attachedRevealProgress
+
+    // Host-injected state: current visible attached panel height.
+    required property real attachedPanelVisibleHeight
+
+    // Host-injected state: window-hint side height used by the tail-release gate.
+    required property real windowHintSideHeight
+
+    // Host-injected state: pulse opacity blended into the detached panel surface.
+    required property real attachedPulseOpacity
+
     // Whether the overlay fills the entire screen (break-reminder or session-control).
     readonly property bool fullScreenOverlayMode:
         IslandOverlayService.mode === "break-reminder"
@@ -61,6 +88,24 @@ QtObject {
 
     // Seam arc radius mirrors the detached panel corner radius.
     readonly property real barExpandedSeamArcRadius: root.barExpandedDetachedRadius
+
+    // The tail rectangle can release once exit cleanup has mostly completed.
+    readonly property bool barExpandedTailRectReleased:
+        root.barExpandedHintActive
+        && (root.phase === "hint-exit" || root.overlayClosing)
+        && (root.attachedRevealProgress <= 0.16
+            || root.attachedPanelVisibleHeight
+                <= Math.max(root.windowHintSideHeight, root.overlayAttachmentOverlap + 2))
+
+    // Decorative seam arcs shrink away once the title clamp has fully taken over.
+    readonly property real barExpandedSeamArcProgress: {
+        if (root.barExpandedTitleWidthClamped)
+            return 0
+
+        var widthDelta = Math.max(0, root.pillBackgroundWidth - root.barExpandedDetachedHintWidth)
+        var fullArcWidthDelta = Math.max(1, root.barExpandedDetachedRadius * 2)
+        return Math.max(0, Math.min(1, widthDelta / fullArcWidthDelta))
+    }
 
     // Effective outer shell corner radius depending on rectangular vs. pill mode.
     readonly property real overlayShellRadius:
@@ -113,4 +158,12 @@ QtObject {
     // Shell fill opacity drops for full-screen overlays to show the desktop behind.
     readonly property real attachedShellFillOpacity:
         root.fullScreenOverlayMode ? 0.78 : 1
+
+    // Detached panel surface tint blends the shared pulse into the shell fill.
+    readonly property color barExpandedPanelSurfaceColor: Qt.rgba(
+        Colors.surface.r * (1 - root.attachedPulseOpacity) + Colors.highlight.r * root.attachedPulseOpacity,
+        Colors.surface.g * (1 - root.attachedPulseOpacity) + Colors.highlight.g * root.attachedPulseOpacity,
+        Colors.surface.b * (1 - root.attachedPulseOpacity) + Colors.highlight.b * root.attachedPulseOpacity,
+        root.attachedShellFillOpacity
+    )
 }

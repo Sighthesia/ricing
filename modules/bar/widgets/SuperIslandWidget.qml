@@ -53,6 +53,51 @@ Item {
         id: _overlayGeometry
         barExpandedHintActive: root._barExpandedHintActive
         pillHeight: root._pillH
+        barExpandedTitleWidthClamped: root._barExpandedTitleWidthClamped
+        pillBackgroundWidth: root._pillSurface ? root._pillSurface.pillBackgroundWidth : 0
+        barExpandedDetachedHintWidth: root._barExpandedDetachedHintWidth
+        phase: root._phase
+        overlayClosing: root._overlayClosing
+        attachedRevealProgress: root._attachedRevealProgress
+        attachedPanelVisibleHeight: root._attachedPanelVisibleHeight
+        windowHintSideHeight: root._windowHintSideHeight
+        attachedPulseOpacity: root._attachedPulseOpacity
+    }
+
+    // Attached reveal geometry helper owns the derived reveal width, height, and offset progress.
+    IslandCards.SuperIslandAttachedRevealGeometry {
+        id: _attachedRevealGeometry
+
+        attachedPanelActive: root._attachedPanelActive
+        attachedRevealSeedWidth: root._attachedRevealSeedWidth
+        attachedPanelRevealWidth: root._attachedPanelRevealWidth
+        attachedPanelWidth: root._attachedPanelWidth
+        attachedRevealSeedHeight: root._attachedRevealSeedHeight
+        attachedPanelRevealHeight: root._attachedPanelRevealHeight
+        attachedPanelHeight: root._attachedPanelHeight
+        barExpandedHintActive: root._barExpandedHintActive
+        overlayRevealLift: root._overlayRevealLift
+    }
+
+    // Host measurement geometry helper keeps the exported reservation and reveal contract together.
+    IslandCards.SuperIslandHostGeometry {
+        id: _hostGeometry
+        host: root
+    }
+
+    // Track geometry helper keeps return-target and track centering math together.
+    IslandCards.SuperIslandTrackGeometry {
+        id: _trackGeometry
+
+        host: root
+        barExpandedSharedClockTargetCenterYLatched: root._barExpandedSharedClockTargetCenterYLatched
+    }
+
+    // Width-chain geometry helper keeps the pure derived width and debug cluster together.
+    IslandCards.SuperIslandWidthChainGeometry {
+        id: _widthChainGeometry
+
+        host: root
     }
 
     property alias currentTime: _viewState.currentTime
@@ -137,20 +182,13 @@ Item {
     property alias _overlayExpandedActive: _viewState._overlayExpandedActive
     readonly property real pillTopPadding: root._padV
 
-    readonly property real _mainTrackZoneHeight:
-        root._barExpandedHintActive ? Theme.barHeight : root._pillH
-    readonly property real _mainTrackCenterY:
-        root._trackCenterY(_mainLoader.item, root._mainTrackZoneHeight, root._mainDisplayEvent, true)
-    readonly property real _flashTrackCenterY:
-        root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
-    readonly property real _flashRowBaseY: root._pillH + root._flashGap
-    readonly property real _flashLaneCenterY: root._flashRowBaseY + root._flashRowH / 2
-    readonly property real _flashStripY:
-        root._flashRowBaseY
-        + root._trackCenterY(_stripLoader.item, root._flashRowH, root._flashSourceEvent, false)
-    readonly property real _mainFlashTrackY:
-        root._flashRowBaseY
-        + root._trackCenterY(_mainLoader.item, root._flashRowH, root._mainDisplayEvent, true)
+    readonly property alias _mainTrackZoneHeight: _trackGeometry.mainTrackZoneHeight
+    readonly property alias _mainTrackCenterY: _trackGeometry.mainTrackCenterY
+    readonly property alias _flashTrackCenterY: _trackGeometry.flashTrackCenterY
+    readonly property alias _flashRowBaseY: _trackGeometry.flashRowBaseY
+    readonly property alias _flashLaneCenterY: _trackGeometry.flashLaneCenterY
+    readonly property alias _flashStripY: _trackGeometry.flashStripY
+    readonly property alias _mainFlashTrackY: _trackGeometry.mainFlashTrackY
 
     readonly property int _windowHintStagePadV: ThemeSuperIsland.windowHintStagePadV
     readonly property int _windowHintRowGap: ThemeSuperIsland.windowHintRowGap
@@ -159,7 +197,7 @@ Item {
     readonly property int _windowHintPrimaryHeight: ThemeSuperIsland.windowHintWorkspacePrimaryHeight
     readonly property int _windowHintTitleHeight: ThemeSuperIsland.windowHintTitleCapsuleHeight
 
-    readonly property real _hintTrackY: root._mainTrackCenterY - root._hintLift
+    readonly property alias _hintTrackY: _trackGeometry.hintTrackY
     readonly property real _hintDividerY: root._pillH + Math.max(0, (root._flashGap - 1) / 2)
     readonly property real _hintBackgroundY: root._flashRowBaseY
     readonly property real _hintBackgroundHeight: root._flashRowH
@@ -167,10 +205,7 @@ Item {
         root._hintPhase && !root._isHintEventType(root._flashSourceEvent.type)
             ? root._sharedBackgroundPulseOpacity
             : 0
-    readonly property real _returnTrackCenterY:
-        root._barExpandedHintActive || root._phase === "hint-exit"
-            ? root._barExpandedSharedClockTargetCenterY
-            : root._trackCenterY(_stripLoader.item, root._pillH, root._flashSourceEvent, false)
+    readonly property alias _returnTrackCenterY: _trackGeometry.returnTrackCenterY
 
     // Overlay mode flags and screen geometry delegated to the geometry helper.
     readonly property alias _fullScreenOverlayMode: _overlayGeometry.fullScreenOverlayMode
@@ -213,22 +248,10 @@ Item {
     readonly property alias _barExpandedTopRadius: _overlayGeometry.barExpandedTopRadius
     readonly property alias _barExpandedDetachedRadius: _overlayGeometry.barExpandedDetachedRadius
     readonly property alias _barExpandedSeamArcRadius: _overlayGeometry.barExpandedSeamArcRadius
-    readonly property bool _barExpandedTailRectReleased:
-        root._barExpandedHintActive
-        && (root._phase === "hint-exit" || root._overlayClosing)
-        && (root._attachedRevealProgress <= 0.16
-            || root._attachedPanelVisibleHeight <= Math.max(root._windowHintSideHeight, root._overlayAttachmentOverlap + 2))
-    readonly property real _barExpandedSeamArcProgress: {
-        if (root._barExpandedTitleWidthClamped)
-            return 0
-
-        const widthDelta = Math.max(0, _pillBg.width - root._barExpandedDetachedHintWidth)
-        const fullArcWidthDelta = Math.max(1, root._barExpandedSeamArcRadius * 2)
-        return Math.max(0, Math.min(1, widthDelta / fullArcWidthDelta))
-    }
+    readonly property alias _barExpandedTailRectReleased: _overlayGeometry.barExpandedTailRectReleased
+    readonly property alias _barExpandedSeamArcProgress: _overlayGeometry.barExpandedSeamArcProgress
     // Shell shape properties delegated to the geometry helper.
     readonly property alias _overlayShellRadius: _overlayGeometry.overlayShellRadius
-    readonly property real _overlayPillBackgroundWidth: _pillBg.width
     readonly property alias _overlayBridgeOutset: _overlayGeometry.overlayBridgeOutset
     readonly property alias _overlayInwardCornerRadius: _overlayGeometry.overlayInwardCornerRadius
     readonly property alias _overlayInwardCornerDepth: _overlayGeometry.overlayInwardCornerDepth
@@ -292,26 +315,19 @@ Item {
             root._attachedHintSessionHeight,
             root._fullHintExpandedPillHeight + 2
         )
-    readonly property real _detachedHintWidth: WidthResolver.detachedHintWidth(root)
-    readonly property real _barExpandedMainHintWidthMeasured: WidthResolver.barExpandedMainHintWidthMeasured(root)
-    readonly property real _barExpandedMainHintWidth: WidthResolver.barExpandedMainHintWidth(root)
-    readonly property real _barExpandedDetachedHintWidth: WidthResolver.barExpandedDetachedHintWidth(root)
-    readonly property bool _barExpandedTitleWidthClamped:
-        root._barExpandedTitleRevealLatched
-        && !root._barExpandedTailRectReleased
-        && WidthResolver.barExpandedTitleWidthClamped(root)
+    readonly property alias _detachedHintWidth: _widthChainGeometry.detachedHintWidth
+    readonly property alias _barExpandedMainHintWidthMeasured: _widthChainGeometry.barExpandedMainHintWidthMeasured
+    readonly property alias _barExpandedMainHintWidth: _widthChainGeometry.barExpandedMainHintWidth
+    readonly property alias _barExpandedDetachedHintWidth: _widthChainGeometry.barExpandedDetachedHintWidth
+    readonly property alias _barExpandedTitleWidthClamped: _widthChainGeometry.barExpandedTitleWidthClamped
     readonly property bool _barExpandedHintActive:
         root._detachedHintActive && root._attachedHintEvent.presentation === "bar-expanded"
     // Bar reservation must follow only the top host footprint; the detached lower panel is visual-only.
-    readonly property real _barExpandedHostFootprintWidth: WidthResolver.barExpandedHostFootprintWidth(root)
-    readonly property real layoutReservationWidth: root._barExpandedHostFootprintWidth
-    readonly property real layoutMeasurementWidth: root._barExpandedHostFootprintWidth
-    readonly property real layoutContextMenuHeight: Theme.barHeight
-    readonly property real layoutRevealHeight: Math.max(
-        Theme.barHeight,
-        ((_overlayPanelHost ? _overlayPanelHost.y : 0) + root._attachedPanelVisibleHeight),
-        ((_pillClip ? _pillClip.y : 0) + (_pillClip ? _pillClip.height : Theme.barHeight))
-    )
+    readonly property real _barExpandedHostFootprintWidth: _hostGeometry.barExpandedHostFootprintWidth
+    readonly property real layoutReservationWidth: _hostGeometry.layoutReservationWidth
+    readonly property real layoutMeasurementWidth: _hostGeometry.layoutMeasurementWidth
+    readonly property real layoutContextMenuHeight: _hostGeometry.layoutContextMenuHeight
+    readonly property real layoutRevealHeight: _hostGeometry.layoutRevealHeight
     readonly property real _detachedHintHeight:
         Math.max(
             root._transientExpandedHeight,
@@ -349,12 +365,8 @@ Item {
                 root._barExpandedHintActive ? _attachedContentDeck.hintPulseOpacity : 0
             )
             : 0
-    readonly property color _barExpandedPanelSurfaceColor: Qt.rgba(
-        Colors.surface.r * (1 - root._attachedPulseOpacity) + Colors.highlight.r * root._attachedPulseOpacity,
-        Colors.surface.g * (1 - root._attachedPulseOpacity) + Colors.highlight.g * root._attachedPulseOpacity,
-        Colors.surface.b * (1 - root._attachedPulseOpacity) + Colors.highlight.b * root._attachedPulseOpacity,
-        root._attachedShellFillOpacity
-    )
+    readonly property alias _overlayPillBackgroundWidth: _pillSurface.pillBackgroundWidth
+    readonly property alias _barExpandedPanelSurfaceColor: _overlayGeometry.barExpandedPanelSurfaceColor
 
     readonly property real _transientExpandedHeight:
         root._pillH + root._flashGap + root._flashRowH
@@ -396,48 +408,18 @@ Item {
     property real _barExpandedEntryBaseWidth: 0
     property real _barExpandedExitBaseWidth: 0
     property bool _barExpandedTitleRevealLatched: false
-    readonly property real _collapsedWidthLive: WidthResolver.collapsedWidthLive(root)
-    readonly property real _idleCollapsedWidthLive:
-        (_idleMeasureLoader.item ? _idleMeasureLoader.item.implicitWidth : 0) + root._padH * 2
-    readonly property real _barExpandedTitleRevealProgress:
-        root._phase === "hint-exit"
-            ? root._attachedVerticalRevealProgress
-            : (root._barExpandedTitleRevealLatched ? 1 : root._attachedRevealProgress)
-    readonly property real _barExpandedTitleRevealWidthProgress:
-        root._barExpandedMainWidth > root._barExpandedEntryBaseWidth
-            ? Math.max(
-                0,
-                Math.min(
-                    1,
-                    (root._barExpandedHostFootprintWidth - root._barExpandedEntryBaseWidth)
-                        / (root._barExpandedMainWidth - root._barExpandedEntryBaseWidth)
-                )
-            )
-            : 1
-    readonly property bool _useAttachedCollapseBaseWidth:
-        root._attachedCollapseAnimating
-        || root._phase === "hint-exit"
-        || root._overlayClosing
-        || (root._barExpandedHintActive && !root._barExpandedTitleRevealLatched)
-    readonly property real _collapsedWidth: WidthResolver.collapsedWidth(root)
-    readonly property real _expandedWidth: WidthResolver.expandedWidth(root)
+    readonly property alias _collapsedWidthLive: _widthChainGeometry.collapsedWidthLive
+    readonly property alias _idleCollapsedWidthLive: _widthChainGeometry.idleCollapsedWidthLive
+    readonly property alias _barExpandedTitleRevealProgress: _widthChainGeometry.barExpandedTitleRevealProgress
+    readonly property alias _barExpandedTitleRevealWidthProgress: _widthChainGeometry.barExpandedTitleRevealWidthProgress
+    readonly property alias _useAttachedCollapseBaseWidth: _widthChainGeometry.useAttachedCollapseBaseWidth
+    readonly property alias _collapsedWidth: _widthChainGeometry.collapsedWidth
+    readonly property alias _expandedWidth: _widthChainGeometry.expandedWidth
 
-    readonly property real _mainTrackEnterY:
-        -Math.max(root._pillH, _mainLoader.item ? _mainLoader.item.implicitHeight : root._pillH)
-    readonly property real _returnWidthLive:
-        root._flashSourceEvent.type === "idle"
-            ? root._idleCollapsedWidthLive
-            : ((_stripLoader.item ? _stripLoader.item.implicitWidth : 0) + root._padH * 2)
-    readonly property real _returnWidth:
-        root._useAttachedCollapseBaseWidth && root._attachedCollapseBaseWidth > 0
-            ? root._attachedCollapseBaseWidth
-            : root._returnWidthLive
-    readonly property real _transitionCollapsedWidth:
-        root._phase === "exit"
-            ? root._returnWidth
-            : (root._barExpandedHintActive && root._phase === "hint-exit"
-                ? root._idleCollapsedWidthLive
-                : root._collapsedWidth)
+    readonly property alias _mainTrackEnterY: _trackGeometry.mainTrackEnterY
+    readonly property alias _returnWidthLive: _trackGeometry.returnWidthLive
+    readonly property alias _returnWidth: _trackGeometry.returnWidth
+    readonly property alias _transitionCollapsedWidth: _trackGeometry.transitionCollapsedWidth
     readonly property real _idleOpticalOffset: 0
     readonly property bool _hintPhase: root._phase === "hint" || root._phase === "hint-exit"
     readonly property bool _listensToService: true
@@ -492,47 +474,13 @@ Item {
     property alias _resolverBarExpandedMainMeasureLoader: _barExpandedMainMeasureLoader
     property alias _resolverDetachedHintDetachedMeasureLoader: _detachedHintDetachedMeasureLoader
 
-    readonly property real _attachedPanelVisibleWidth:
-        root._attachedPanelActive
-            ? Math.max(
-                root._attachedRevealSeedWidth,
-                Math.min(root._attachedPanelRevealWidth, root._attachedPanelWidth)
-            )
-            : root._attachedRevealSeedWidth
-    readonly property real _attachedPanelVisibleHeight:
-        root._attachedPanelActive
-            ? Math.max(0, Math.min(root._attachedPanelRevealHeight, root._attachedPanelHeight))
-            : 0
-    readonly property real _attachedWidthRevealProgress:
-        root._attachedPanelWidth > root._attachedRevealSeedWidth
-            ? Math.max(
-                0,
-                Math.min(
-                    1,
-                    (Math.min(root._attachedPanelRevealWidth, root._attachedPanelWidth) - root._attachedRevealSeedWidth)
-                        / (root._attachedPanelWidth - root._attachedRevealSeedWidth)
-                )
-            )
-            : 1
-    readonly property real _attachedHeightRevealProgress:
-        root._attachedPanelHeight > root._attachedRevealSeedHeight
-            ? Math.max(
-                0,
-                Math.min(
-                    1,
-                    (root._attachedPanelVisibleHeight - root._attachedRevealSeedHeight)
-                        / (root._attachedPanelHeight - root._attachedRevealSeedHeight)
-                )
-            )
-            : 1
-    readonly property real _attachedRevealProgress:
-        root._attachedPanelActive
-            ? Math.min(root._attachedWidthRevealProgress, root._attachedHeightRevealProgress)
-            : 0
-    readonly property real _attachedVerticalRevealProgress:
-        root._barExpandedHintActive ? root._attachedHeightRevealProgress : root._attachedRevealProgress
-    readonly property real _attachedRevealYOffset:
-        (1 - root._attachedVerticalRevealProgress) * root._overlayRevealLift
+    readonly property alias _attachedPanelVisibleWidth: _attachedRevealGeometry.attachedPanelVisibleWidth
+    readonly property alias _attachedPanelVisibleHeight: _attachedRevealGeometry.attachedPanelVisibleHeight
+    readonly property alias _attachedWidthRevealProgress: _attachedRevealGeometry.attachedWidthRevealProgress
+    readonly property alias _attachedHeightRevealProgress: _attachedRevealGeometry.attachedHeightRevealProgress
+    readonly property alias _attachedRevealProgress: _attachedRevealGeometry.attachedRevealProgress
+    readonly property alias _attachedVerticalRevealProgress: _attachedRevealGeometry.attachedVerticalRevealProgress
+    readonly property alias _attachedRevealYOffset: _attachedRevealGeometry.attachedRevealYOffset
     property bool _hintRevealSettled: false
     readonly property bool _barExpandedSharedClockVisible:
         root._barExpandedHintActive
@@ -551,24 +499,14 @@ Item {
     readonly property real _barExpandedSharedClockHeight: root._pillH
     readonly property real _pillAnimatedWidth: _pillTransitionControl.animatedWidth
     property var _barExpandedSharedClockEvent: root._baselineEvent
-    readonly property real _barExpandedSharedClockLandingY:
-        root._padV + root._trackCenterY(_idleMeasureLoader.item, root._pillH, null, true)
-    readonly property real _barExpandedSharedClockStartCenterY:
-        root._barExpandedSharedClockLandingY + root._barExpandedSharedClockHeight / 2
-    readonly property real _barExpandedSharedClockStartY:
-        root._barExpandedSharedClockLandingY
-    readonly property real _barExpandedSharedClockTargetCenterY:
-        root._resolveBarExpandedSharedClockTargetCenterY()
+    readonly property alias _barExpandedSharedClockLandingY: _trackGeometry.barExpandedSharedClockLandingY
+    readonly property alias _barExpandedSharedClockStartCenterY: _trackGeometry.barExpandedSharedClockStartCenterY
+    readonly property alias _barExpandedSharedClockStartY: _trackGeometry.barExpandedSharedClockStartY
+    readonly property alias _barExpandedSharedClockTargetCenterY: _trackGeometry.barExpandedSharedClockTargetCenterY
     property real _barExpandedSharedClockTargetCenterYLatched: 0
-    readonly property real _barExpandedSharedClockTargetY:
-        root._barExpandedSharedClockTargetCenterY - root._barExpandedSharedClockHeight / 2
-    readonly property real _barExpandedSharedClockBaseY:
-        root._barExpandedSharedClockStartCenterY
-        + (root._barExpandedSharedClockTargetCenterY - root._barExpandedSharedClockStartCenterY)
-            * root._attachedVerticalRevealProgress
-        - root._barExpandedSharedClockHeight / 2
-    readonly property real _barExpandedSharedClockY:
-        root._barExpandedSharedClockBaseY + root._pillThrowOffsetY
+    readonly property alias _barExpandedSharedClockTargetY: _trackGeometry.barExpandedSharedClockTargetY
+    readonly property alias _barExpandedSharedClockBaseY: _trackGeometry.barExpandedSharedClockBaseY
+    readonly property alias _barExpandedSharedClockY: _trackGeometry.barExpandedSharedClockY
     readonly property bool _showOverlayHandoffHint:
         root._overlayHintHandoffActive
         && root._overlaySessionActive
@@ -683,19 +621,8 @@ width: implicitWidth
         )
     }
 
-    function _resolveBarExpandedSharedClockTargetCenterY() {
-        if (root._barExpandedSharedClockTargetCenterYLatched > 0)
-            return root._barExpandedSharedClockTargetCenterYLatched
-
-        return (_overlayPanelHost ? _overlayPanelHost.y + 1 : 1)
-            + ((_attachedContentDeck && _attachedContentDeck.hintCardLoaderItem
-                    && _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY !== undefined)
-                ? _attachedContentDeck.hintCardLoaderItem.relocatedClockCenterY
-                : Math.max(root._pillH / 2, root._attachedPanelVisibleHeight - root._pillH / 2))
-    }
-
     function _latchBarExpandedSharedClockReturnTarget() {
-        root._barExpandedSharedClockTargetCenterYLatched = root._resolveBarExpandedSharedClockTargetCenterY()
+        root._barExpandedSharedClockTargetCenterYLatched = root._barExpandedSharedClockTargetCenterY
         root._barExpandedSharedClockEvent = root._baselineEvent
     }
 
@@ -827,14 +754,6 @@ width: implicitWidth
             return "notifications"
 
         return "launcher"
-    }
-
-    function _trackCenterY(item, zoneHeight, event, includeOpticalOffset) {
-        const itemHeight = item ? item.implicitHeight : zoneHeight
-        const opticalOffset = includeOpticalOffset && event && event.type === "idle"
-            ? root._idleOpticalOffset
-            : 0
-        return (zoneHeight - itemHeight) / 2 + opticalOffset
     }
 
     function _logWidthChain(context) {
@@ -1062,90 +981,11 @@ width: implicitWidth
         scale: root._pulseScale
         transformOrigin: Item.Center
 
-        // Main bar host becomes a slimmer rounded rectangle during bar-expanded window hint.
-        Rectangle {
-            id: _pillBg
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: root._verticalRevealSurfaceHeight
-            radius: root._barExpandedRectangularMode ? root._barExpandedTopRadius : root._pillH / 2
-            topLeftRadius: root._barExpandedRectangularMode ? root._barExpandedTopRadius : radius
-            topRightRadius: root._barExpandedRectangularMode ? root._barExpandedTopRadius : radius
-            bottomLeftRadius: root._barExpandedTitleWidthClamped ? 0 : radius
-            bottomRightRadius: root._barExpandedTitleWidthClamped ? 0 : radius
-            color: Colors.surface
-            border.color: Colors.border
-            border.width: root._attachedPanelActive ? 0 : 1
-        }
+        // Shared pill chrome keeps the visible bar surface and pulse layers together.
+        IslandCards.SuperIslandPillSurface {
+            id: _pillSurface
 
-        Rectangle {
-            anchors.left: _pillBg.left
-            anchors.right: _pillBg.right
-            anchors.bottom: _pillBg.bottom
-            height: _pillBg.radius
-            color: Colors.surface
-            visible: root._barExpandedTitleWidthClamped
-        }
-
-        Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: (root._phase === "hint" || root._phase === "hint-exit")
-                ? root._hintDividerY
-                : (root._pillH + Math.max(0, (root._flashGap - height) / 2))
-            width: Math.max(0, _pillBg.width - root._padH * 2)
-            height: 1
-            radius: height / 2
-            color: Colors.border
-            opacity: root._phase !== "idle"
-                && !root._barExpandedHintActive
-                && root._flashSourceEvent.type !== "window-hint"
-                    ? 0.35
-                    : 0
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Theme.anim.moveDuration
-                    easing.type: Theme.anim.moveType
-                }
-            }
-        }
-
-        // Highlight surface mirrors the host seam shape during bar-expanded clamping.
-        Rectangle {
-            anchors.fill: _pillBg
-            radius: _pillBg.radius
-            topLeftRadius: _pillBg.topLeftRadius
-            topRightRadius: _pillBg.topRightRadius
-            bottomLeftRadius: _pillBg.bottomLeftRadius
-            bottomRightRadius: _pillBg.bottomRightRadius
-            color: Colors.highlight
-            opacity: (root._transientPhase || root._overlaySessionActive)
-                ? Math.min(1, root._transientAccentBaseOpacity + root._sharedBackgroundPulseOpacity)
-                : 0
-        }
-
-        Rectangle {
-            anchors.left: _pillBg.left
-            anchors.right: _pillBg.right
-            anchors.bottom: _pillBg.bottom
-            height: _pillBg.radius
-            color: Colors.highlight
-            opacity: (root._transientPhase || root._overlaySessionActive)
-                ? Math.min(1, root._transientAccentBaseOpacity + root._sharedBackgroundPulseOpacity)
-                : 0
-            visible: root._barExpandedTitleWidthClamped && opacity > 0
-        }
-
-        Rectangle {
-            x: 0
-            y: root._hintBackgroundY
-            width: _pillBg.width
-            height: root._hintBackgroundHeight
-            radius: height / 2
-            color: Colors.highlight
-            opacity: root._hintBackgroundPulseOpacity
-            visible: root.flashTrackVisible && root._flashSourceEvent.type !== "window-hint"
+            host: root
         }
 
         Loader {
@@ -1355,76 +1195,11 @@ width: implicitWidth
     }
 
     // Non-clipped seam arc layer keeps the decorative outer corners visible.
-    Item {
-        x: _overlayPanelHost.x
-        y: _overlayPanelHost.y
-        width: _overlayPanelHost.width
-        height: root._barExpandedSeamArcRadius
-        visible: root._barExpandedHintActive
-            && !root._barExpandedTitleWidthClamped
-            && _overlayPanelHost.visible
-            && root._barExpandedSeamArcProgress > 0.01
-        z: _overlayPanelHost.z + 1
-        opacity: root._attachedPanelOpacity
-        scale: root._attachedSurfaceScale
-        transformOrigin: Item.Top
+    IslandCards.SuperIslandSeamArcLayer {
+        id: _seamArcLayer
 
-        // Left seam arc restores the outer silhouette without rounding the seam itself.
-        Canvas {
-            id: _leftSeamArcCanvas
-            x: -root._barExpandedSeamArcRadius * root._barExpandedSeamArcProgress
-                + (1 - root._barExpandedSeamArcProgress) * root._barExpandedTopRadius
-            y: 0
-            width: root._barExpandedSeamArcRadius
-            height: root._barExpandedSeamArcRadius
-            visible: root._barExpandedSeamArcProgress > 0.01
-            property color canvasFill: root._barExpandedPanelSurfaceColor
-
-            onCanvasFillChanged: requestPaint()
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
-
-            onPaint: {
-                var ctx = getContext("2d")
-                ctx.reset()
-                ctx.fillStyle = canvasFill
-                ctx.beginPath()
-                ctx.moveTo(0, 0)
-                ctx.lineTo(width, 0)
-                ctx.lineTo(width, height)
-                ctx.arc(0, height, width, 0, -Math.PI / 2, true)
-                ctx.fill()
-            }
-        }
-
-        // Right seam arc mirrors the same outer contour on the opposite side.
-        Canvas {
-            id: _rightSeamArcCanvas
-            x: parent.width
-                - root._barExpandedSeamArcRadius * (1 - root._barExpandedSeamArcProgress)
-                - (1 - root._barExpandedSeamArcProgress) * root._barExpandedTopRadius
-            y: 0
-            width: root._barExpandedSeamArcRadius
-            height: root._barExpandedSeamArcRadius
-            visible: root._barExpandedSeamArcProgress > 0.01
-            property color canvasFill: root._barExpandedPanelSurfaceColor
-
-            onCanvasFillChanged: requestPaint()
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
-
-            onPaint: {
-                var ctx = getContext("2d")
-                ctx.reset()
-                ctx.fillStyle = canvasFill
-                ctx.beginPath()
-                ctx.moveTo(width, 0)
-                ctx.lineTo(0, 0)
-                ctx.lineTo(0, height)
-                ctx.arc(width, height, width, Math.PI, Math.PI * 1.5, false)
-                ctx.fill()
-            }
-        }
+        host: root
+        panelHost: _overlayPanelHost
     }
 
     IslandCards.ExpandedPanelDeck {
