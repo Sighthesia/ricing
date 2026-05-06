@@ -113,6 +113,43 @@ QtObject {
 }
 ```
 
+### Convention: Keep host export contracts on the host during slimming
+
+When slimming a large composition root, it is safe to move pure derived
+geometry, width-chain, or reveal-chain calculations into feature-local helpers,
+but the root should keep owning any exported layout or measurement contracts
+consumed by wrapper-level infrastructure.
+
+**Good**:
+- Extract derived clusters such as track geometry, reveal progress, or width
+  decisions into focused helper `QtObject` / `Item` files.
+- Re-expose host-owned contracts like layout measurement or reservation widths
+  through host aliases/bindings after the calculation moves.
+- Keep visual leaf chrome, decorative canvases, and other non-owning surfaces in
+  separate child components when they do not own behavior.
+
+**Avoid**:
+- Moving wrapper-consumed exports directly into a helper and forcing outer
+  layout code to chase a new path.
+- Mixing helper extraction with loader ownership, state-machine rewrites, or
+  service ownership changes in the same slice.
+
+**Why**: this keeps host slimming low risk. The root becomes smaller, but the
+layout contract stays stable for `BarWidgetWrapper` and other downstream
+consumers.
+
+**Example**:
+```qml
+// Host still owns the exported contract even when a helper computes the value.
+readonly property real layoutMeasurementWidth: _hostGeometry.layoutMeasurementWidth
+
+// Helper owns the pure width-chain math only.
+FeatureWidthGeometry {
+    id: _hostGeometry
+    host: root
+}
+```
+
 ### Convention: Separate scene routing from surface ownership
 
 When one visual family supports multiple presentations of the same feature,
