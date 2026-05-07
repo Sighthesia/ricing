@@ -215,6 +215,44 @@ function _releaseReturnTarget() {
 }
 ```
 
+### Convention: Match collapse width targets to the owning visual lane
+
+When a SuperIsland return path collapses a title, workspace, or attached lane,
+choose the target width from the same visual lane that owns the collapsing
+surface. Do not reuse a smaller live text/content measurement unless that lane
+is explicitly intended to shrink to its content.
+
+**Good**:
+- Scope width-owner fixes to the exact mode and phase that shows the bug.
+- Use the normal collapsed SuperIsland width baseline when a title background
+  returns to the idle capsule shape.
+- Latch the normal idle width before entering a presentation that can replace
+  or weaken the live idle measurement.
+- Compare candidate widths against the lane that remains visible at the end of
+  the transition before retuning animation timing.
+
+**Avoid**:
+- Driving a title background collapse from an intermediate live text width when
+  the final visual target is the normal idle capsule.
+- Reading only a live idle measurement during hint exit after the visible card
+  has already switched to a transient presentation.
+- Broadening a `window-hint` fix to detached or non-`bar-expanded` paths without
+  proving they share the same width owner.
+- Fixing a tiny collapse target by changing duration, easing, or cleanup order
+  before verifying the target width source.
+
+**Why**: in SuperIsland `window-hint` exit, the animation was correct but chased
+  a weak collapsed-width source. Latching the title lane's normal collapsed
+  baseline before the hint presentation polluted live measurement fixed the
+  visible shrink without retiming unrelated paths.
+
+**Example**:
+```qml
+readonly property real titleCollapseTargetWidth: isBarExpandedHintExit
+    ? Math.max(host._latchedIdleCollapsedWidth, host._idleCollapsedWidthLive)
+    : root.transitionCollapsedWidth
+```
+
 ---
 
 ## Testing Requirements
