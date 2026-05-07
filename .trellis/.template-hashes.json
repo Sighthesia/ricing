@@ -47,8 +47,8 @@
     ".agents/skills/trellis-meta/SKILL.md": "942e898a6fd769a93a3ca6f43f9fe0412d0adae011654fd384e9cacbd2af4f34",
     ".trellis/scripts/common/tasks.py": "4436a8b0b53c270a35989e26d9dbd92669408c6562d88c02083a404562da85fe",
     ".trellis/scripts/common/task_store.py": "e3802a822dcd0a8005bac6ffe50af196944c2a42d56d70e68c622aaf9b1156e2",
-    ".trellis/scripts/task.py": "a07b33b519037aadabce00ea1a3d2bd309bcca881244d43c72fb50e51322e9ab",
-    ".trellis/workflow.md": "023621f1ac6852931e51fde33b6c8b1d18bd4ec2d224d88faacdcb360efe3e41",
+    ".trellis/scripts/task.py": "40abdd46f5c2b6837610429a38eef50f1fc783fb1852dc4f52a891205e42ab04",
+    ".trellis/workflow.md": "de17264a3404ae3d80c1a5feb1461996c7771e5a409b64b72378d2cea0ee1d70",
     "AGENTS.md": "63edc73af8097d664e58b354e345d181a33b95ecb0952e95ac9dd1cb12e8ba3c",
     ".opencode/plugins/inject-subagent-context.js": "c8c2a0a52a332b2a352202f5f36184881be66144bd5d3cd5c16f96e58e065b98",
     ".opencode/plugins/inject-workflow-state.js": "6cade6f6bbed92bd2555d57849aaeba573b54fef75f9763a778b4b6965080d9f",
@@ -63,12 +63,14 @@
     ".opencode/plugins/session-start.js": "c2da0b55ad5762327632280a2c6dd87210b15af831c70c54cacbdd4078d2755a",
     ".opencode/commands/trellis/continue.md": "37856640afa49207cf5b09f8a1cdf51d8d7c7de0b7d22ef88aaf65c51f9577be",
     ".agents/skills/trellis-continue/SKILL.md": "aba3e18dc4a4d893ab9b3e3bb830acd111c72aacf319a059955ef9e3097e1117",
-    ".codex/hooks/session-start.py": "d882e2f1387da3ad956e39664eb3d7adf9dae0bfc7d4a4c4a6d6991d051b3696",
+    ".codex/hooks/session-start.py": "11599c05601ccf510a8c4d6aedafeace28df141d84ce22a5d0a8ad3fc8cb40e5",
     ".trellis/scripts/common/active_task.py": "6c88ed40ef7289bca0f6d2ecba0f8b8aef46cd58788080fbeeea88de138a431f",
     ".opencode/package.json": "4b155e844fde1467e331e898b378e66820c323110ef1ecae6fce3844358535ea",
     ".agents/skills/trellis-update-spec/SKILL.md": "003ce08a3404aeb50998029392c4d4e57b626edf526d3ebd585032bb92dcbb96",
-    ".codex/agents/trellis-check.toml": "6b68180b28bbc63d2c84ecf89e02f897b3943c8e5d71449cee9a9e0a3c85b8e6",
-    ".codex/agents/trellis-implement.toml": "e93268c006794359d382f4ae3a9ebac62300d061ba8fd16d8b48bb1e5bd47bb5",
-    ".codex/config.toml": "3ea6518b87b8b6b44ed651df37de75f315df2ed7a527edeed093a798f96d6478"
+    ".codex/agents/trellis-check.toml": "c82cfffdc65cd599da04cceb2943601d37a3bda501ba687fcf78f9a97ffecaf6",
+    ".codex/agents/trellis-implement.toml": "7075352a95cc062702cc341c041c700cbd42cca8b27ea1626b856b5f648e6512",
+    ".codex/config.toml": "3ea6518b87b8b6b44ed651df37de75f315df2ed7a527edeed093a798f96d6478",
+    ".opencode/agents/trellis-check.md": "4b31ab1330403495f7a72efa9f5fe63d03d94d27b0be4a1274cd0ab38268a303",
+    ".opencode/agents/trellis-implement.md": "f5b0712186e4bf765a4a32acd46ae31699ebf8742e2a0afb733402994214f485"
   }
 }
