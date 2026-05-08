@@ -88,12 +88,23 @@ QtObject {
             ? root.host._attachedCollapseBaseWidth
             : root.returnWidthLive
 
-    // Transition collapsed width uses the return width only when exit mode owns the geometry.
+    // Window-hint collapse should always land on the steady idle pill width, not the live transient width source.
+    readonly property bool windowHintCollapseUsesIdleWidth:
+        root.host._barExpandedHintActive
+        && root.host._phase === "hint-exit"
+        && ((root.host._attachedHintEvent && root.host._attachedHintEvent.type === "window-hint")
+            || (root.host._mainDisplayEvent && root.host._mainDisplayEvent.type === "window-hint"))
+
+    // Window-hint exit must fall back to the stable normal idle pill width when the live idle-measure path is narrower or not ready yet.
+    readonly property real windowHintCollapseTargetWidth:
+        Math.max(root.host._latchedIdleCollapsedWidth, root.host._safeIdleCollapsedWidth)
+
+    // Transition collapsed width follows the attached height-collapse beat during bar-expanded hint exit so the upper host retreats with the lower workspace body.
     readonly property real transitionCollapsedWidth:
         root.host._phase === "exit"
             ? root.returnWidth
-            : (root.host._barExpandedHintActive && root.host._phase === "hint-exit"
-                ? root.host._idleCollapsedWidthLive
+            : (root.windowHintCollapseUsesIdleWidth
+                ? root.windowHintCollapseTargetWidth
                 : root.host._collapsedWidth)
 
     // Shared clock landing Y anchors the returned clock at the idle lane's visual center.

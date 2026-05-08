@@ -407,6 +407,8 @@ Item {
 
     property real _barExpandedEntryBaseWidth: 0
     property real _barExpandedExitBaseWidth: 0
+    property real _latchedIdleCollapsedWidth: 0
+    property real _safeIdleCollapsedWidth: 0
     property bool _barExpandedTitleRevealLatched: false
     readonly property alias _collapsedWidthLive: _widthChainGeometry.collapsedWidthLive
     readonly property alias _idleCollapsedWidthLive: _widthChainGeometry.idleCollapsedWidthLive
@@ -529,77 +531,68 @@ width: implicitWidth
         root._syncDetachedHintSessionHeight()
 
         if (root._barExpandedHintActive) {
+            root._latchIdleCollapsedWidthForBarExpandedHint()
             root._barExpandedSharedClockEvent = root._baselineEvent
             const baseWidth = Math.max(0, _pillTransitionControl.animatedWidth)
             root._barExpandedEntryBaseWidth = baseWidth
             root._barExpandedExitBaseWidth = baseWidth
             root._barExpandedTitleRevealLatched = false
             root._hintRevealSettled = false
-            root._logWidthChain("barExpandedHintActive=true")
-            root._logReservationChain("barExpandedHintActiveChanged")
             return
         }
 
+        root._latchedIdleCollapsedWidth = 0
         root._barExpandedEntryBaseWidth = 0
         root._barExpandedExitBaseWidth = 0
         root._barExpandedTitleRevealLatched = false
         root._hintRevealSettled = false
-        root._logWidthChain("barExpandedHintActive=false")
-        root._logReservationChain("barExpandedHintActiveChanged")
     }
     on_BarExpandedSharedClockVisibleChanged: {
         if (!root._barExpandedSharedClockVisible) {
             root._releaseBarExpandedSharedClockReturnTarget()
         }
     }
+    on_CollapsedWidthChanged: root._syncLatchedIdleCollapsedWidth(false)
+    on_IdleCollapsedWidthLiveChanged: root._syncLatchedIdleCollapsedWidth(false)
+    on_PillAnimatedWidthChanged: root._syncLatchedIdleCollapsedWidth(false)
+    on_MainDisplayEventChanged: root._syncLatchedIdleCollapsedWidth(false)
+    on_AttachedPanelActiveChanged: root._syncLatchedIdleCollapsedWidth(false)
     on_HintRevealSettledChanged: {
         if (!root._barExpandedHintActive || !root._hintRevealSettled)
             return
 
         root._barExpandedEntryBaseWidth = 0
         root._barExpandedTitleRevealLatched = true
-        root._logWidthChain("hintRevealSettled")
     }
     on_PhaseChanged: {
         if (root._phase === "hint-exit" && root._barExpandedHintActive) {
             root._latchBarExpandedSharedClockReturnTarget()
         }
 
+        root._syncLatchedIdleCollapsedWidth(false)
         root._syncBarExpandedExitBaseWidth()
-        root._logWidthChain("phaseChanged")
-        root._logReservationChain("phaseChanged")
     }
-    on_ExpandedWidthChanged: root._logWidthChain("expandedWidthChanged")
-    on_CollapsedWidthChanged: root._logWidthChain("collapsedWidthChanged")
     on_AttachedPanelWidthChanged: root._retargetAttachedPanelWidthIfNeeded()
     on_AttachedPanelHeightChanged: {
         _stateMachine.syncOverlayExtensionReservation()
         root._retargetAttachedPanelHeightIfNeeded()
-        root._logReservationChain("attachedPanelHeightChanged")
     }
     on_AttachedPanelVisibleHeightChanged: {
         _stateMachine.syncOverlayExtensionReservation()
-        root._logReservationChain("attachedPanelVisibleHeightChanged")
     }
     on_AttachedPanelVisibleWidthChanged: root._syncBarExpandedExitBaseWidth()
     on_DetachedHintActiveChanged: {
         root._syncDetachedHintSessionHeight()
-        root._logReservationChain("detachedHintActiveChanged")
     }
     on_AttachedCollapseAnimatingChanged: {
         root._syncDetachedHintSessionHeight()
-        root._logReservationChain("attachedCollapseAnimatingChanged")
     }
     on_DetachedHintHeightChanged: {
         root._syncDetachedHintSessionHeight()
-        root._logReservationChain("detachedHintHeightChanged")
     }
     on_BarExpandedDetachedHintHeightChanged: {
         root._syncDetachedHintSessionHeight()
-        root._logReservationChain("barExpandedDetachedHintHeightChanged")
     }
-    on_OverlayReservedExtensionChanged: root._logReservationChain("overlayReservedExtensionChanged")
-    on_LatchedDetachedHintSessionHeightChanged: root._logReservationChain("latchedDetachedHintSessionHeightChanged")
 
     function _syncDetachedHintSessionHeight() {
         if (root._overlaySessionActive)
@@ -619,6 +612,60 @@ width: implicitWidth
             root._latchedDetachedHintSessionHeight,
             root._liveDetachedHintSessionHeight
         )
+    }
+
+    function _safeIdleCollapsedWidthCandidate() {
+        const minimumUsefulWidth = root._padH * 2
+        const safeIdleState = root._phase === "idle"
+            && !root._barExpandedHintActive
+            && !root._attachedPanelActive
+            && (!root._mainDisplayEvent || root._mainDisplayEvent.type === "idle")
+
+        if (!safeIdleState)
+            return 0
+
+        return Math.max(
+            0,
+            root._collapsedWidth > minimumUsefulWidth ? root._collapsedWidth : 0,
+            root._pillAnimatedWidth > minimumUsefulWidth ? root._pillAnimatedWidth : 0
+        )
+    }
+
+    function _refreshSafeIdleCollapsedWidth() {
+        const candidateWidth = Math.max(0, root._safeIdleCollapsedWidthCandidate())
+
+        if (candidateWidth <= root._padH * 2)
+            return
+
+        root._safeIdleCollapsedWidth = candidateWidth
+    }
+
+    function _syncLatchedIdleCollapsedWidth(forceDuringHint) {
+        root._refreshSafeIdleCollapsedWidth()
+
+        const candidateWidth = Math.max(0, root._safeIdleCollapsedWidth)
+        const minimumUsefulWidth = root._padH * 2
+        const missingLatchedWidth = root._latchedIdleCollapsedWidth <= minimumUsefulWidth
+
+        if (candidateWidth <= minimumUsefulWidth)
+            return
+
+        if (root._barExpandedHintActive && !forceDuringHint && !missingLatchedWidth)
+            return
+
+        root._latchedIdleCollapsedWidth = candidateWidth
+    }
+
+    function _latchIdleCollapsedWidthForBarExpandedHint() {
+        root._syncLatchedIdleCollapsedWidth(true)
+
+        const fallbackThreshold = root._padH * 2
+        const candidateWidth = Math.max(0, root._safeIdleCollapsedWidth)
+
+        if (candidateWidth <= fallbackThreshold)
+            return
+
+        root._latchedIdleCollapsedWidth = Math.max(root._latchedIdleCollapsedWidth, candidateWidth)
     }
 
     function _latchBarExpandedSharedClockReturnTarget() {
@@ -735,6 +782,11 @@ width: implicitWidth
         })
     }
 
+    function _syncPillToCollapsed() {
+        if (root._pillTransition && typeof root._pillTransition.snapToCollapsed === "function")
+            root._pillTransition.snapToCollapsed()
+    }
+
     function _deferPillSnapToExpanded() {
         Qt.callLater(function() {
             if (root._pillTransition && typeof root._pillTransition.snapToExpanded === "function")
@@ -770,9 +822,17 @@ width: implicitWidth
             layoutReservationWidth: Math.round(root.layoutReservationWidth || 0),
             hostFootprintWidth: Math.round(root._barExpandedHostFootprintWidth || 0),
             animatedWidth: Math.round((_pillTransitionControl && _pillTransitionControl.animatedWidth) || 0),
+            pillExpanded: root._pillExpanded,
             collapsedWidthLive: Math.round(root._collapsedWidthLive || 0),
             collapsedWidth: Math.round(root._collapsedWidth || 0),
+            idleCollapsedWidthLive: Math.round(root._idleCollapsedWidthLive || 0),
+            safeIdleCollapsedWidth: Math.round(root._safeIdleCollapsedWidth || 0),
+            latchedIdleCollapsedWidth: Math.round(root._latchedIdleCollapsedWidth || 0),
+            transitionCollapsedWidth: Math.round(root._transitionCollapsedWidth || 0),
             expandedWidth: Math.round(root._expandedWidth || 0),
+            barExpandedExitBaseWidth: Math.round(root._barExpandedExitBaseWidth || 0),
+            barExpandedTitleRevealProgress: Number((root._barExpandedTitleRevealProgress || 0).toFixed(3)),
+            barExpandedTitleRevealWidthProgress: Number((root._barExpandedTitleRevealWidthProgress || 0).toFixed(3)),
             detachedHintWidth: Math.round(root._detachedHintWidth || 0),
             barExpandedMainHintWidthMeasured: Math.round(root._barExpandedMainHintWidthMeasured || 0),
             barExpandedMainHintWidth: Math.round(root._barExpandedMainHintWidth || 0),
@@ -818,62 +878,40 @@ width: implicitWidth
             label: root.debugInstanceLabel,
             context: context,
             note: note || "",
-            reason: note || "",
             source: source || "",
             returnSession: hasReturnSession ? root._windowHintReturnSession : 0,
             returnStep: returnStep,
             phase: root._phase,
             attachedHintType: root._attachedHintEvent && root._attachedHintEvent.type ? root._attachedHintEvent.type : "",
             attachedHintPresentation: root._attachedHintEvent && root._attachedHintEvent.presentation ? root._attachedHintEvent.presentation : "",
-            mainType: root._mainDisplayEvent && root._mainDisplayEvent.type ? root._mainDisplayEvent.type : "",
-            flashType: root._flashSourceEvent && root._flashSourceEvent.type ? root._flashSourceEvent.type : "",
             barExpandedHintActive: root._barExpandedHintActive,
-            barExpandedSharedClockVisible: root._barExpandedSharedClockVisible,
-            barExpandedSharedClockTargetCenterY: Math.round(root._barExpandedSharedClockTargetCenterY || 0),
-            barExpandedSharedClockTargetCenterYLatched: Math.round(root._barExpandedSharedClockTargetCenterYLatched || 0),
-            barExpandedSharedClockY: Math.round(root._barExpandedSharedClockY || 0),
-            mainTrackY: Math.round(root._mainTrackY || 0),
-            mainTrackScale: Math.round(root._mainTrackScale * 1000) / 1000,
-            mainTrackOpacity: Math.round(root._mainTrackOpacity * 1000) / 1000,
-            flashTrackY: Math.round(root._flashTrackY || 0),
-            flashTrackScale: Math.round(root._flashTrackScale * 1000) / 1000,
-            flashTrackOpacity: Math.round(root._flashTrackOpacity * 1000) / 1000,
-            attachedPanelRevealWidth: Math.round(root._attachedPanelRevealWidth || 0),
-            attachedPanelRevealHeight: Math.round(root._attachedPanelRevealHeight || 0),
-            attachedContentOpacity: Math.round(root._attachedContentOpacity * 1000) / 1000,
-            attachedCollapseAnimating: root._attachedCollapseAnimating,
-            implicitWidth: Math.round(root.implicitWidth || 0),
+            hostFootprintWidth: Math.round(root._barExpandedHostFootprintWidth || 0),
             layoutMeasurementWidth: Math.round(root.layoutMeasurementWidth || 0),
-            pillAnimatedWidth: Math.round(root._pillAnimatedWidth || 0)
+            layoutReservationWidth: Math.round(root.layoutReservationWidth || 0),
+            expandedWidth: Math.round(root._expandedWidth || 0),
+            collapsedWidth: Math.round(root._collapsedWidth || 0),
+            transitionCollapsedWidth: Math.round(root._transitionCollapsedWidth || 0),
+            collapsedWidthLive: Math.round(root._collapsedWidthLive || 0),
+            idleCollapsedWidthLive: Math.round(root._idleCollapsedWidthLive || 0),
+            safeIdleCollapsedWidth: Math.round(root._safeIdleCollapsedWidth || 0),
+            latchedIdleCollapsedWidth: Math.round(root._latchedIdleCollapsedWidth || 0),
+            barExpandedExitBaseWidth: Math.round(root._barExpandedExitBaseWidth || 0),
+            barExpandedTitleRevealProgress: Number((root._barExpandedTitleRevealProgress || 0).toFixed(3)),
+            barExpandedTitleRevealWidthProgress: Number((root._barExpandedTitleRevealWidthProgress || 0).toFixed(3)),
+            attachedPanelRevealWidth: Math.round(root._attachedPanelRevealWidth || 0),
+            attachedPanelVisibleWidth: Math.round(root._attachedPanelVisibleWidth || 0),
+            attachedCollapseAnimating: root._attachedCollapseAnimating,
+            barExpandedDetachedHintWidth: Math.round(root._barExpandedDetachedHintWidth || 0),
+            barExpandedMainHintWidth: Math.round(root._barExpandedMainHintWidth || 0),
+            barExpandedMainHintWidthMeasured: Math.round(root._barExpandedMainHintWidthMeasured || 0),
+            attachedCollapseBaseWidth: Math.round(root._attachedCollapseBaseWidth || 0),
+            pillAnimatedWidth: Math.round(root._pillAnimatedWidth || 0),
+            implicitWidth: Math.round(root.implicitWidth || 0),
+            mainType: root._mainDisplayEvent && root._mainDisplayEvent.type ? root._mainDisplayEvent.type : "",
+            flashType: root._flashSourceEvent && root._flashSourceEvent.type ? root._flashSourceEvent.type : ""
         }
 
-        const signature = JSON.stringify({
-            context: snapshot.context,
-            returnSession: snapshot.returnSession,
-            phase: snapshot.phase,
-            attachedHintType: snapshot.attachedHintType,
-            attachedHintPresentation: snapshot.attachedHintPresentation,
-            mainType: snapshot.mainType,
-            flashType: snapshot.flashType,
-            barExpandedHintActive: snapshot.barExpandedHintActive,
-            barExpandedSharedClockVisible: snapshot.barExpandedSharedClockVisible,
-            barExpandedSharedClockTargetCenterY: snapshot.barExpandedSharedClockTargetCenterY,
-            barExpandedSharedClockTargetCenterYLatched: snapshot.barExpandedSharedClockTargetCenterYLatched,
-            barExpandedSharedClockY: snapshot.barExpandedSharedClockY,
-            mainTrackY: snapshot.mainTrackY,
-            mainTrackScale: snapshot.mainTrackScale,
-            mainTrackOpacity: snapshot.mainTrackOpacity,
-            flashTrackY: snapshot.flashTrackY,
-            flashTrackScale: snapshot.flashTrackScale,
-            flashTrackOpacity: snapshot.flashTrackOpacity,
-            attachedPanelRevealWidth: snapshot.attachedPanelRevealWidth,
-            attachedPanelRevealHeight: snapshot.attachedPanelRevealHeight,
-            attachedContentOpacity: snapshot.attachedContentOpacity,
-            attachedCollapseAnimating: snapshot.attachedCollapseAnimating,
-            implicitWidth: snapshot.implicitWidth,
-            layoutMeasurementWidth: snapshot.layoutMeasurementWidth,
-            pillAnimatedWidth: snapshot.pillAnimatedWidth
-        })
+        const signature = JSON.stringify(snapshot)
         if (signature === root._lastWindowHintReturnDebugSignature)
             return
 

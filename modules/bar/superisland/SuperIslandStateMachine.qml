@@ -112,7 +112,8 @@ Item {
             return
 
         console.log(
-            "SuperIslandWidget[" + host.debugInstanceLabel + "]: pulse",
+            "SuperIslandWidget[" + host.debugInstanceLabel + "]:",
+            "pulse",
             message,
             "owner=", state._pulseOwner,
             "phase=", state._phase,
