@@ -100,6 +100,13 @@ Item {
         host: root
     }
 
+    // Attached panel geometry helper keeps detached-session sizing and surface state together.
+    IslandCards.SuperIslandAttachedPanelGeometry {
+        id: _attachedPanelGeometry
+
+        host: root
+    }
+
     property alias currentTime: _viewState.currentTime
 
     readonly property int _padV: Theme.iconPadding
@@ -269,52 +276,19 @@ Item {
     readonly property int _pillThrowDropDuration:
         Math.max(1, Math.round(Theme.anim.highlightDuration * 0.7))
 
-    readonly property bool _detachedHintActive:
-        root._isFullHintEventType(root._attachedHintEvent.type)
-        && (root._hintPhase || root._attachedCollapseAnimating)
-    readonly property bool _attachedHintVisible:
-        root._isFullHintEventType(root._attachedHintEvent.type)
-        && (root._hintPhase || root._attachedCollapseAnimating)
-    readonly property bool _attachedPanelActive:
-        root._overlaySessionActive || root._attachedHintVisible
-    readonly property bool _overlayClosing:
-        root._overlaySessionActive && IslandOverlayService.state === "closing"
-    readonly property bool _attachedPanelExpanded:
-        root._overlaySessionActive
-            ? (root._overlayExpandedActive || root._overlayClosing)
-            : (root._hintPhase || root._attachedCollapseAnimating)
-    readonly property bool _barExpandedHintLiveSizing:
-        root._barExpandedHintActive && root._phase === "hint" && !root._attachedCollapseAnimating
-    readonly property real _pillBaseTopMargin:
-        root._barExpandedHintActive && root._phase === "hint" ? 0 : root._padV
-    readonly property real _attachedPanelWidth:
-        root._overlaySessionActive
-            ? root._overlayExpandedWidth
-            : (root._barExpandedHintActive
-                ? Math.max(root._barExpandedMainHintWidth, root._barExpandedDetachedHintWidth)
-                : root._detachedHintWidth)
-    readonly property real _liveDetachedHintSessionHeight:
-        root._barExpandedHintActive ? root._barExpandedDetachedHintHeight : root._detachedHintHeight
-    readonly property real _attachedHintSessionHeight:
-        root._latchedDetachedHintSessionHeight > 0
-            ? Math.max(root._latchedDetachedHintSessionHeight, root._liveDetachedHintSessionHeight)
-            : root._liveDetachedHintSessionHeight
-    readonly property real _attachedPanelHeight:
-        root._overlaySessionActive
-            ? root._overlayBodyHeight
-            : (root._barExpandedHintLiveSizing ? root._liveDetachedHintSessionHeight : root._attachedHintSessionHeight)
-    readonly property real _attachedPanelBodyWidth:
-        root._overlaySessionActive
-            ? root._attachedPanelVisibleWidth
-            : (root._barExpandedHintActive
-                ? Math.min(root._barExpandedDetachedHintWidth, _pillTransitionControl.animatedWidth)
-                : root._attachedPanelVisibleWidth)
-    readonly property real _detachedHintReservedHeight:
-        Math.max(
-            root._transientExpandedHeight,
-            root._attachedHintSessionHeight,
-            root._fullHintExpandedPillHeight + 2
-        )
+    readonly property alias _detachedHintActive: _attachedPanelGeometry.detachedHintActive
+    readonly property alias _attachedHintVisible: _attachedPanelGeometry.attachedHintVisible
+    readonly property alias _attachedPanelActive: _attachedPanelGeometry.attachedPanelActive
+    readonly property alias _overlayClosing: _attachedPanelGeometry.overlayClosing
+    readonly property alias _attachedPanelExpanded: _attachedPanelGeometry.attachedPanelExpanded
+    readonly property alias _barExpandedHintLiveSizing: _attachedPanelGeometry.barExpandedHintLiveSizing
+    readonly property alias _pillBaseTopMargin: _attachedPanelGeometry.pillBaseTopMargin
+    readonly property alias _attachedPanelWidth: _attachedPanelGeometry.attachedPanelWidth
+    readonly property alias _liveDetachedHintSessionHeight: _attachedPanelGeometry.liveDetachedHintSessionHeight
+    readonly property alias _attachedHintSessionHeight: _attachedPanelGeometry.attachedHintSessionHeight
+    readonly property alias _attachedPanelHeight: _attachedPanelGeometry.attachedPanelHeight
+    readonly property alias _attachedPanelBodyWidth: _attachedPanelGeometry.attachedPanelBodyWidth
+    readonly property alias _detachedHintReservedHeight: _attachedPanelGeometry.detachedHintReservedHeight
     readonly property alias _detachedHintWidth: _widthChainGeometry.detachedHintWidth
     readonly property alias _barExpandedMainHintWidthMeasured: _widthChainGeometry.barExpandedMainHintWidthMeasured
     readonly property alias _barExpandedMainHintWidth: _widthChainGeometry.barExpandedMainHintWidth
@@ -328,52 +302,21 @@ Item {
     readonly property real layoutMeasurementWidth: _hostGeometry.layoutMeasurementWidth
     readonly property real layoutContextMenuHeight: _hostGeometry.layoutContextMenuHeight
     readonly property real layoutRevealHeight: _hostGeometry.layoutRevealHeight
-    readonly property real _detachedHintHeight:
-        Math.max(
-            root._transientExpandedHeight,
-            (_detachedHintMeasureLoader.item
-                ? _detachedHintMeasureLoader.item.implicitHeight
-                : root._fullHintExpandedPillHeight) + 2
-        )
-    readonly property real _barExpandedDetachedHintHeight:
-        Math.max(
-            root._transientExpandedHeight,
-            (_detachedHintDetachedMeasureLoader.item
-                ? _detachedHintDetachedMeasureLoader.item.implicitHeight
-                : root._fullHintExpandedPillHeight) + 2
-        )
-    readonly property real _attachedPanelOpacity:
-        root._overlaySessionActive
-            ? ((root._overlayExpandedActive || root._overlayClosing) ? 1 : 0)
-            : (root._attachedHintVisible ? 1 : 0)
-    readonly property real _attachedPanelScale:
-        root._overlaySessionActive
-            ? ((root._overlayExpandedActive || root._overlayClosing) ? 1 : 0.985)
-            : 1
-    readonly property real _attachedContentScale:
-        root._overlaySessionActive ? 1 : root._attachedPanelScale
-    readonly property real _attachedSurfaceScale:
-        root._pulseScale * root._attachedContentScale
-    readonly property real _barExpandedSharedClockScale:
-        root._attachedContentScale * root._flashScale
-    readonly property real _barExpandedSharedClockOpacity:
-        root._attachedPanelOpacity * root._flashScale
-    readonly property real _attachedPulseOpacity:
-        root._attachedPanelActive
-            ? Math.max(
-                root._sharedBackgroundPulseOpacity,
-                root._barExpandedHintActive ? _attachedContentDeck.hintPulseOpacity : 0
-            )
-            : 0
+    readonly property alias _detachedHintHeight: _attachedPanelGeometry.detachedHintHeight
+    readonly property alias _barExpandedDetachedHintHeight: _attachedPanelGeometry.barExpandedDetachedHintHeight
+    readonly property alias _attachedPanelOpacity: _attachedPanelGeometry.attachedPanelOpacity
+    readonly property alias _attachedPanelScale: _attachedPanelGeometry.attachedPanelScale
+    readonly property alias _attachedContentScale: _attachedPanelGeometry.attachedContentScale
+    readonly property alias _attachedSurfaceScale: _attachedPanelGeometry.attachedSurfaceScale
+    readonly property alias _barExpandedSharedClockScale: _attachedPanelGeometry.barExpandedSharedClockScale
+    readonly property alias _barExpandedSharedClockOpacity: _attachedPanelGeometry.barExpandedSharedClockOpacity
+    readonly property alias _attachedPulseOpacity: _attachedPanelGeometry.attachedPulseOpacity
     readonly property alias _overlayPillBackgroundWidth: _pillSurface.pillBackgroundWidth
     readonly property alias _barExpandedPanelSurfaceColor: _overlayGeometry.barExpandedPanelSurfaceColor
 
-    readonly property real _transientExpandedHeight:
-        root._pillH + root._flashGap + root._flashRowH
-    readonly property real _collapsedPillHeight: root._pillH
-    readonly property bool _pillExpanded:
-        (root._phase === "enter" || root._phase === "hold")
-        || (root._barExpandedHintActive && root._phase === "hint")
+    readonly property alias _transientExpandedHeight: _attachedPanelGeometry.transientExpandedHeight
+    readonly property alias _collapsedPillHeight: _attachedPanelGeometry.collapsedPillHeight
+    readonly property alias _pillExpanded: _attachedPanelGeometry.pillExpanded
 
     readonly property real _overlayExpandedWidth: {
         if (root._fullScreenOverlayMode)
@@ -388,20 +331,8 @@ Item {
     // Shell fill opacity delegated to the geometry helper.
     readonly property alias _attachedShellFillOpacity: _overlayGeometry.attachedShellFillOpacity
 
-    readonly property real _fullHintExpandedPillHeight:
-        root._pillH
-        + root._windowHintSideHeight * 2
-        + root._windowHintPrimaryHeight
-        + root._windowHintWorkspaceColumnGap * 2
-        + root._windowHintRowGap
-        + root._windowHintTitleHeight
-        + Theme.barWidget.contentPaddingV * 2
-        + root._windowHintStagePadV * 2
-
-    readonly property real _expandedPillHeight:
-        root._barExpandedHintActive
-            ? Theme.barHeight
-            : root._transientExpandedHeight
+    readonly property alias _fullHintExpandedPillHeight: _attachedPanelGeometry.fullHintExpandedPillHeight
+    readonly property alias _expandedPillHeight: _attachedPanelGeometry.expandedPillHeight
     readonly property real _verticalRevealSurfaceHeight: _verticalReveal.surfaceHeight
     readonly property real _verticalRevealClipHeight: _verticalReveal.clipHeight
 
@@ -475,6 +406,7 @@ Item {
     property alias _resolverDetachedHintMeasureLoader: _detachedHintMeasureLoader
     property alias _resolverBarExpandedMainMeasureLoader: _barExpandedMainMeasureLoader
     property alias _resolverDetachedHintDetachedMeasureLoader: _detachedHintDetachedMeasureLoader
+    property alias _resolverAttachedContentDeck: _attachedContentDeck
 
     readonly property alias _attachedPanelVisibleWidth: _attachedRevealGeometry.attachedPanelVisibleWidth
     readonly property alias _attachedPanelVisibleHeight: _attachedRevealGeometry.attachedPanelVisibleHeight
@@ -516,6 +448,7 @@ Item {
     readonly property bool _attachedCollapseTailHidden:
         root._attachedPanelActive
         && (root._phase === "hint-exit" || root._overlayClosing)
+        && root._attachedPanelVisibleHeight <= 0.5
 
 implicitHeight: Theme.barHeight
 implicitWidth: root._barExpandedHintActive
