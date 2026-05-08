@@ -47,6 +47,7 @@ Load skills on demand; see `.agents/skills/README.md` for grouping.
 | [exported-layout-width-ownership](.agents/skills/exported-layout-width-ownership/SKILL.md) | Visible width vs reserved layout width synchronization    |
 | [multi-surface-semantic-ownership](.agents/skills/multi-surface-semantic-ownership/SKILL.md) | Root, shell, and content ownership across attached surfaces |
 | [runtime-cleanup-chain-interruptions](.agents/skills/runtime-cleanup-chain-interruptions/SKILL.md) | Cleanup callbacks or imports break, so local state resets but stale outer reservation/state survives |
+| [baseline-cache-before-transition](.agents/skills/baseline-cache-before-transition/SKILL.md) | Cache a stable pre-transition baseline before live fallback values invalidate on mode entry |
 | [single-instance-handoff-motion](.agents/skills/single-instance-handoff-motion/SKILL.md) | Teleport/duplicate-safe cross-host handoff motion         |
 | [split-host-exit-synchronization](.agents/skills/split-host-exit-synchronization/SKILL.md) | Synchronizing exit timing across separate geometry owners |
 | [list-transition-handoffs](.agents/skills/list-transition-handoffs/SKILL.md)         | Animated list replacement and filter handoffs             |

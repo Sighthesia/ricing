@@ -22,6 +22,7 @@ Load these for detailed context on specific topics. See `.agents/skills/README.m
 | [qml-visual-language](.agents/skills/qml-visual-language/SKILL.md) | Use when defining or enforcing visual identity, motion language, and cross-component consistency. |
 | [multi-surface-semantic-ownership](.agents/skills/multi-surface-semantic-ownership/SKILL.md) | Use when one feature spans multiple roots or detached surfaces and geometry bugs stem from confusing host, shell, presentation, or content ownership. |
 | [runtime-cleanup-chain-interruptions](.agents/skills/runtime-cleanup-chain-interruptions/SKILL.md) | Use when local state resets correctly but stale reservation/geometry/shared state survives because a runtime error interrupts the cleanup chain. |
+| [baseline-cache-before-transition](.agents/skills/baseline-cache-before-transition/SKILL.md) | Use when a fallback or return measurement is computed live but becomes invalid at mode entry, so later transition phases need a cached pre-transition baseline instead. |
 
 ### Motion
 
