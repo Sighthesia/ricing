@@ -228,6 +228,9 @@ is explicitly intended to shrink to its content.
   returns to the idle capsule shape.
 - Latch the normal idle width before entering a presentation that can replace
   or weaken the live idle measurement.
+- If the first latch attempt happens before measurement is ready, allow a later
+  valid idle measurement to fill an empty latch without letting weaker values
+  overwrite it.
 - Compare candidate widths against the lane that remains visible at the end of
   the transition before retuning animation timing.
 
@@ -236,6 +239,8 @@ is explicitly intended to shrink to its content.
   the final visual target is the normal idle capsule.
 - Reading only a live idle measurement during hint exit after the visible card
   has already switched to a transient presentation.
+- Treating an empty latch as success; gated logs should expose both the latch
+  and the live/target widths before declaring the target path fixed.
 - Broadening a `window-hint` fix to detached or non-`bar-expanded` paths without
   proving they share the same width owner.
 - Fixing a tiny collapse target by changing duration, easing, or cleanup order
@@ -243,8 +248,8 @@ is explicitly intended to shrink to its content.
 
 **Why**: in SuperIsland `window-hint` exit, the animation was correct but chased
   a weak collapsed-width source. Latching the title lane's normal collapsed
-  baseline before the hint presentation polluted live measurement fixed the
-  visible shrink without retiming unrelated paths.
+  baseline, and allowing an initially empty latch to be filled by a later valid
+  measurement, fixed the visible shrink without retiming unrelated paths.
 
 **Example**:
 ```qml

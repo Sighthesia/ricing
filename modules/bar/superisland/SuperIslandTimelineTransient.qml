@@ -237,14 +237,6 @@ Item {
         id: _hintExitAnim
 
         onRunningChanged: {
-            if (!root.host._debugLogging)
-                return
-
-            root.host._logWindowHintReturn(
-                running ? "hintExitAnim:start" : "hintExitAnim:stop",
-                running ? "animation running=true" : "animation running=false",
-                "actual-return"
-            )
         }
 
         NumberAnimation {
@@ -300,8 +292,6 @@ Item {
         }
 
         onFinished: {
-            if (root.host._debugLogging)
-                root.host._logWindowHintReturn("hintExitAnim:finished", "animation finished", "actual-return")
             TimelineCallbacks.maybeCompleteHintExit(root.state, root.host, root.completeWindowHintExit)
         }
     }
