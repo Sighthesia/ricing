@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for the SuperIsland animated-width resync fix."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Keep the fix scoped to the current SuperIsland frontend ownership structure."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Preserve host-owned contracts and helper boundaries while fixing only the visible width owner resync."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Keep loader/state-machine/service ownership unchanged while repairing post-exit animated width resync."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Maintain single-owner motion semantics and validate the shell after the minimal width-owner fix."}

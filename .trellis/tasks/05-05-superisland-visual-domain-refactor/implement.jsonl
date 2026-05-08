@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for the host-slimming refactor slice."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Subdomain-first organization guidance for reorganizing SuperIsland ownership."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Host slimming must follow helper extraction and scene/surface ownership guidance."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Keep shared state and service ownership stable while slimming the host."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Preserve animation ownership and use the low-risk host-slimming conventions."}

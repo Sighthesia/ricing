@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for implementation review."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Verify the refactor keeps subdomain ownership clearer than the flat structure."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Verify extracted components/helpers preserve correct QML ownership and composition structure."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Verify state/service ownership stayed stable after host slimming."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify animation/property ownership and full-shell quality constraints."}

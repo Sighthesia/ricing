@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for check-time routing."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Verify component ownership and QML structure compliance."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify geometry, hit-region, and motion ownership against established rules."}
+{"file": ".trellis/tasks/05-04-superisland-step3-motion-geometry-ownership/research/persistent-bar-region-root-cause-reanalysis.md", "reason": "Check implementation against the latest reservation-chain root-cause analysis."}
+{"file": ".trellis/tasks/05-04-superisland-step3-motion-geometry-ownership/research/superisland-motion-geometry-ownership-analysis.md", "reason": "Check implementation against prior ownership analysis for reveal height and wrapper hit areas."}
