@@ -10,6 +10,7 @@ Variants {
 
     model: Quickshell.screens
 
+    // Group the four overlay windows for the current screen.
     Item {
         id: screenCorners
 
@@ -17,6 +18,7 @@ Variants {
 
         readonly property int cornerSize: Math.max(1, Math.round(root.screenCornerRadius))
 
+        // Render the top-left corner mask.
         PanelWindow {
             screen: screenCorners.modelData
             color: "transparent"
@@ -28,12 +30,14 @@ Variants {
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
+            // Draw the masked corner fill inside the overlay.
             ScreenCornerMask {
                 anchors.fill: parent
                 angle: 0
             }
         }
 
+        // Render the top-right corner mask.
         PanelWindow {
             screen: screenCorners.modelData
             color: "transparent"
@@ -45,12 +49,14 @@ Variants {
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
+            // Draw the masked corner fill inside the overlay.
             ScreenCornerMask {
                 anchors.fill: parent
                 angle: 90
             }
         }
 
+        // Render the bottom-left corner mask.
         PanelWindow {
             screen: screenCorners.modelData
             color: "transparent"
@@ -62,12 +68,14 @@ Variants {
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
+            // Draw the masked corner fill inside the overlay.
             ScreenCornerMask {
                 anchors.fill: parent
                 angle: 270
             }
         }
 
+        // Render the bottom-right corner mask.
         PanelWindow {
             screen: screenCorners.modelData
             color: "transparent"
@@ -79,6 +87,7 @@ Variants {
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
+            // Draw the masked corner fill inside the overlay.
             ScreenCornerMask {
                 anchors.fill: parent
                 angle: 180

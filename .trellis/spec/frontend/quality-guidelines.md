@@ -32,7 +32,22 @@ Questions to answer:
 
 <!-- Patterns that must always be used -->
 
-(To be filled by the team)
+### Convention: Comment Before Major Declarations
+
+**What**: In QML files, place a short descriptive English comment immediately before each major element declaration.
+
+**Why**: This keeps dense QML modules readable at a glance and makes the intent of each declaration obvious during future edits.
+
+**Example**:
+```qml
+// Keep the mask reusable across all screen corners.
+Item {
+    // Expose the current corner size to child items.
+    readonly property int cornerSize: 24
+}
+```
+
+**Related**: Use this convention in `modules/background` and any future QML modules that are expected to stay self-documenting.
 
 ---
 
