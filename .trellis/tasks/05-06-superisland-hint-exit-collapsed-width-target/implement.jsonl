@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for the SuperIsland hint-exit collapsed-width target fix."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Keep the fix scoped to the existing SuperIsland frontend ownership structure."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Preserve host-owned contracts and avoid bundling helper reshuffles with this width-target fix."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Keep loader/state-machine/service ownership unchanged while fixing the exit width target rule."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Maintain single-owner motion semantics and validate the full shell after the minimal target-width fix."}

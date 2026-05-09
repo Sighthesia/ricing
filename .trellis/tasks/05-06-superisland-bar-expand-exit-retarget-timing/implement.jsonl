@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for the SuperIsland bar-expand exit retarget timing fix."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Keep the fix anchored to the existing SuperIsland frontend ownership structure."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Preserve host-owned contracts and allow only the smallest owner-path timing fix."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Keep loader/state-machine/service ownership unchanged while fixing the upper host width owner timing."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Maintain single-owner motion semantics and validate the full shell after the retarget timing fix."}

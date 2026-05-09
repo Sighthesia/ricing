@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for layer guidance and checklist routing."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "QML component ownership and structure rules for bar and SuperIsland files."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Geometry, hit-region, and motion ownership conventions relevant to this bug."}
-{"file": ".trellis/tasks/05-04-superisland-step3-motion-geometry-ownership/research/persistent-bar-region-root-cause-reanalysis.md", "reason": "Latest root-cause analysis for the persistent lower bar region and reservation chain."}
-{"file": ".trellis/tasks/05-04-superisland-step3-motion-geometry-ownership/research/superisland-motion-geometry-ownership-analysis.md", "reason": "Background ownership analysis for layout reveal height, attached-panel height, and wrapper hit geometry."}

@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for reviewing the timing-owner fix."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Verify the repair stays within the existing SuperIsland ownership structure."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Verify host export contracts and helper boundaries stay stable after the fix."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Verify loader/state-machine/service ownership remains unchanged."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify the fix preserves single-owner motion and passes shell validation."}

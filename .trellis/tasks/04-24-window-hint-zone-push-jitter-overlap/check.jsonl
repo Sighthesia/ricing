@@ -1,5 +1,0 @@
-{"file": ".opencode/commands/trellis/finish-work.md", "reason": "Finish work checklist"}
-{"file": ".opencode/commands/trellis/check-frontend.md", "reason": "Frontend check spec"}
-{"file": ".agents/skills/superisland-window-hint-semantic-ownership/SKILL.md", "reason": "Verify window hint ownership semantics"}
-{"file": ".agents/skills/bar-widget-width-ownership/SKILL.md", "reason": "Verify bar width ownership"}
-{"file": ".agents/skills/qml-motion-debug/SKILL.md", "reason": "Verify transition synchronization"}

@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for the persistent hint-exit regression root-cause analysis."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Keep the root-cause analysis grounded in the current SuperIsland frontend ownership structure."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Preserve host-owned contracts and helper boundaries while tracing the remaining width-target mismatch."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Keep loader/state-machine/service ownership distinctions explicit during the analysis."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Apply single-owner motion reasoning while tracing the remaining exit-width mismatch."}

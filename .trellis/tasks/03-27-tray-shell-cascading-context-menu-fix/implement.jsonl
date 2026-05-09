@@ -1,6 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
-{"file": "modules/bar/tray/TrayIconButton.qml", "reason": "tray icon click routing for right click and onlyMenu"}
-{"file": "modules/bar/tray/TrayContextMenu.qml", "reason": "local tray menu controller and submenu path state"}
-{"file": "modules/bar/tray/TrayContextMenuColumn.qml", "reason": "tray menu entry rendering and root node filtering"}
-{"file": "modules/bar/widgets/SystemTrayWidget.qml", "reason": "tray menu controller wiring"}

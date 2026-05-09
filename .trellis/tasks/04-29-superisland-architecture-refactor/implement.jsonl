@@ -1,4 +1,0 @@
-{"file": ".trellis/tasks/04-29-superisland-architecture-refactor/prd.md", "reason": "Current task requirements, scope, and first-slice refactor decision."}
-{"file": ".trellis/spec/guides/index.md", "reason": "Shared thinking guides index for reuse and cross-layer checks."}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "SuperIsland spans services, host widgets, and leaf motion/presentation layers."}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Refactor should reduce flat duplication and preserve shared patterns."}

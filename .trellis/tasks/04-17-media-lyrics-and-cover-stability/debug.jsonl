@@ -1,5 +1,0 @@
-{"file": ".opencode/commands/trellis/check-frontend.md", "reason": "Frontend check spec"}
-{"file": "services/NeteaseWebLyricsService.qml", "reason": "debug lyrics flashback root cause"}
-{"file": "services/MediaControlService.qml", "reason": "debug media source switching"}
-{"file": "services/MediaService.qml", "reason": "debug artwork loss after reload"}
-{"file": "scripts/firefox-extensions/netease-web-lyrics/background.js", "reason": "debug weak payload selection"}

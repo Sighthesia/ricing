@@ -1,4 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for verifying the SuperIsland UI change."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Check that host-owned exports and helper boundaries stay consistent."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Check local state ownership for width and exit-path state."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Check motion ownership, cleanup completion, and regression safety."}

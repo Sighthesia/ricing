@@ -1,5 +1,0 @@
-{"file": ".opencode/commands/trellis/finish-work.md", "reason": "Finish work checklist"}
-{"file": ".opencode/commands/trellis/check-frontend.md", "reason": "Frontend check spec"}
-{"file": "modules/bar/ContextMenuBackdrop.qml", "reason": "outside click close behavior for tray and bar menus"}
-{"file": "modules/bar/BarContent.qml", "reason": "Escape close behavior for tray menus"}
-{"file": "services/BarLayoutService.qml", "reason": "shared tray menu open state"}

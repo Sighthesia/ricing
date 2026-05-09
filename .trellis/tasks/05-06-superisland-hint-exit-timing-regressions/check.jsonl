@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for reviewing the hint-exit timing regression fix."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Verify the regression fix does not broaden the refactor scope or blur ownership."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Verify timing-owner rewiring keeps host contracts stable and helper boundaries minimal."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Verify loader/state-machine/service ownership remains unchanged."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify the timing fix preserves single-owner motion and passes shell validation."}

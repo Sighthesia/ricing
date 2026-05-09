@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for the SuperIsland logging cleanup/debug trace task."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Keep the debug trace work scoped to the current SuperIsland frontend ownership structure."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Preserve host/helper boundaries while changing only debug output, not runtime behavior."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Keep loader/state-machine/service ownership unchanged while adjusting trace points."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Maintain clean debug output and validate the shell after logging-only changes."}

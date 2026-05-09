@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for the SuperIsland hint-exit timing regression fix."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Keep SuperIsland frontend ownership grouped by stable subdomain while fixing the regression."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Preserve host-owned contracts and helper extraction boundaries during the timing-owner fix."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Keep loader/state-machine/service ownership unchanged while fixing timing wiring."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Maintain single-owner motion semantics and validate the full shell after the fix."}

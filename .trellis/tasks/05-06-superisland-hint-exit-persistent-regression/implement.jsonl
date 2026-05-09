@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for the persistent SuperIsland hint-exit regression analysis."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Keep the debugging analysis grounded in the current SuperIsland frontend ownership structure."}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Preserve host-owned contracts and helper boundaries while tracing the real timing owner."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Keep loader/state-machine/service ownership distinctions explicit during analysis."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Use single-owner motion reasoning while tracing the title width and workspace collapse chains."}
