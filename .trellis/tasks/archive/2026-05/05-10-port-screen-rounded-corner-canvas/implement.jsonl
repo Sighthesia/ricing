@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Base frontend spec index for the target repo."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Component-level conventions for adding small reusable QML pieces."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Directory organization guidance for placing new frontend files."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality expectations for the implementation pass."}
+{"file": ".trellis/tasks/05-10-port-screen-rounded-corner-canvas/research/screen-corner-port.md", "reason": "Source feature structure and the agreed minimal port scope."}
