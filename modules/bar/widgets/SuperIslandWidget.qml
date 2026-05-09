@@ -48,7 +48,15 @@ Item {
         contentPaddingV: Theme.barWidget.contentPaddingV
     }
 
-    // Overlay geometry helper owns screen info, mode flags, and shell shape properties.
+    // Overlay session geometry helper owns overlay modes, screen fallbacks, and measured body sizing.
+    IslandCards.SuperIslandOverlaySessionGeometry {
+        id: _overlaySessionGeometry
+
+        host: root
+        overlayDetachedOffset: root._overlayDetachedOffset
+    }
+
+    // Overlay geometry helper owns shell shape and detached positioning properties.
     IslandCards.SuperIslandOverlayGeometry {
         id: _overlayGeometry
         barExpandedHintActive: root._barExpandedHintActive
@@ -62,6 +70,8 @@ Item {
         attachedPanelVisibleHeight: root._attachedPanelVisibleHeight
         windowHintSideHeight: root._windowHintSideHeight
         attachedPulseOpacity: root._attachedPulseOpacity
+        fullScreenOverlayMode: root._fullScreenOverlayMode
+        fullScreenSessionOverlayMode: root._fullScreenSessionOverlayMode
     }
 
     // Attached reveal geometry helper owns the derived reveal width, height, and offset progress.
@@ -214,30 +224,18 @@ Item {
             : 0
     readonly property alias _returnTrackCenterY: _trackGeometry.returnTrackCenterY
 
-    // Overlay mode flags and screen geometry delegated to the geometry helper.
-    readonly property alias _fullScreenOverlayMode: _overlayGeometry.fullScreenOverlayMode
-    readonly property alias _fullScreenSessionOverlayMode: _overlayGeometry.fullScreenSessionOverlayMode
-    readonly property alias _controlCenterOverlayMode: _overlayGeometry.controlCenterOverlayMode
-    readonly property alias _primaryScreen: _overlayGeometry.primaryScreen
-    readonly property alias _screenWidth: _overlayGeometry.screenWidth
-    readonly property alias _screenHeight: _overlayGeometry.screenHeight
-    readonly property alias _overlayAvailableBodyHeight: _overlayGeometry.overlayAvailableBodyHeight
-    readonly property alias _controlCenterFallbackBodyHeight: _overlayGeometry.controlCenterFallbackBodyHeight
-    readonly property real _controlCenterMeasuredBodyHeight: Math.max(
-        _overlayDeckMeasureLoader.item ? _overlayDeckMeasureLoader.item.implicitHeight : 0,
-        _overlayDeckHost.implicitHeight > 0 ? _overlayDeckHost.implicitHeight : 0
-    )
+    // Overlay session modes and screen geometry delegated to the session helper.
+    readonly property alias _fullScreenOverlayMode: _overlaySessionGeometry.fullScreenOverlayMode
+    readonly property alias _fullScreenSessionOverlayMode: _overlaySessionGeometry.fullScreenSessionOverlayMode
+    readonly property alias _controlCenterOverlayMode: _overlaySessionGeometry.controlCenterOverlayMode
+    readonly property alias _primaryScreen: _overlaySessionGeometry.primaryScreen
+    readonly property alias _screenWidth: _overlaySessionGeometry.screenWidth
+    readonly property alias _screenHeight: _overlaySessionGeometry.screenHeight
+    readonly property alias _overlayAvailableBodyHeight: _overlaySessionGeometry.overlayAvailableBodyHeight
+    readonly property alias _controlCenterFallbackBodyHeight: _overlaySessionGeometry.controlCenterFallbackBodyHeight
+    readonly property alias _controlCenterMeasuredBodyHeight: _overlaySessionGeometry.controlCenterMeasuredBodyHeight
     property real _overlayBodyHeight:
-        root._fullScreenOverlayMode
-            ? root._overlayAvailableBodyHeight
-            : (root._controlCenterOverlayMode
-                ? Math.min(
-                    root._overlayAvailableBodyHeight,
-                    root._controlCenterMeasuredBodyHeight > 0
-                        ? root._controlCenterMeasuredBodyHeight
-                        : root._controlCenterFallbackBodyHeight
-                )
-                : root._controlCenterFallbackBodyHeight)
+        _overlaySessionGeometry.overlayBodyHeight
     Behavior on _overlayBodyHeight {
         enabled: !root._fullScreenOverlayMode
 

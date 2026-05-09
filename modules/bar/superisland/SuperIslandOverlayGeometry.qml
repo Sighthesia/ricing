@@ -1,9 +1,7 @@
 import QtQuick
-import Quickshell
 import qs.config
-import qs.services
 
-// Overlay geometry cluster: screen info, mode flags, shell shape, and positioning constants.
+// Overlay geometry cluster: shell shape, positioning, and detached-panel surface constants.
 QtObject {
     id: root
 
@@ -40,34 +38,11 @@ QtObject {
     // Host-injected state: pulse opacity blended into the detached panel surface.
     required property real attachedPulseOpacity
 
-    // Whether the overlay fills the entire screen (break-reminder or session-control).
-    readonly property bool fullScreenOverlayMode:
-        IslandOverlayService.mode === "break-reminder"
-        || IslandOverlayService.mode === "session-control"
+    // Host-injected state: whether the overlay fills the full screen.
+    required property bool fullScreenOverlayMode
 
-    // Whether the overlay is in session-control full-screen mode specifically.
-    readonly property bool fullScreenSessionOverlayMode:
-        IslandOverlayService.mode === "session-control"
-
-    // Whether the overlay is in control-center mode.
-    readonly property bool controlCenterOverlayMode:
-        IslandOverlayService.mode === "control-center"
-
-    // Primary screen reference, falling back to null when no screens are available.
-    readonly property var primaryScreen:
-        Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
-
-    // Effective screen width with fallback chain: primary → Screen → bar content.
-    readonly property real screenWidth:
-        (primaryScreen && primaryScreen.width ? primaryScreen.width : 0)
-            || Screen.width
-            || BarLayoutService.barContentWidth
-
-    // Effective screen height with fallback chain: primary → Screen → 0.
-    readonly property real screenHeight:
-        (primaryScreen && primaryScreen.height ? primaryScreen.height : 0)
-            || Screen.height
-            || 0
+    // Host-injected state: whether the overlay is in session-control full-screen mode.
+    required property bool fullScreenSessionOverlayMode
 
     // Whether the detached panel uses a rectangular top seam instead of a pill shape.
     readonly property bool barExpandedRectangularMode: root.barExpandedHintActive
@@ -145,15 +120,6 @@ QtObject {
 
     // Alias used by downstream panel hosts to position the detached panel.
     readonly property real overlayDetachedY: root.overlayDetachedOffset
-
-    // Maximum body height available for the overlay, clamped by screen size and detached offset.
-    readonly property real overlayAvailableBodyHeight:
-        root.screenHeight > 0
-            ? Math.max(root.pillHeight, root.screenHeight - root.overlayDetachedOffset)
-            : Math.round(900 * Theme.uiScale)
-
-    // Fallback body height for the control-center overlay page.
-    readonly property real controlCenterFallbackBodyHeight: ThemeSuperIsland.superIslandControlCenterBodyHeight
 
     // Shell fill opacity drops for full-screen overlays to show the desktop behind.
     readonly property real attachedShellFillOpacity:
