@@ -29,6 +29,7 @@ Examples:
 
 * `BarLayoutService.qml` owns shared bar layout state
 * helper logic that transforms persisted layout data lives under `services/barlayout/`
+* picker visibility / target-section mode lives in the same service as the layout model so UI entry points can stay thin
 
 ### Persisted local state
 
@@ -71,6 +72,23 @@ QtObject {
 **Example**:
 ```qml
 readonly property var sectionModel: Services.BarLayoutService.sectionWidgets(sectionName)
+```
+
+### Convention: Keep shared picker mode in the layout service
+
+**What**: Temporary UI mode flags that affect the whole bar, such as picker visibility and target section, belong in `BarLayoutService` rather than in the picker window or shell root.
+
+**Why**: The service already owns the layout model and persistence, so keeping mode flags there preserves a single mutation boundary and makes the picker a thin view layer.
+
+**Example**:
+```qml
+property bool widgetPickerVisible: false
+property string widgetPickerSection: "center"
+
+function openWidgetPicker(sectionName) {
+    widgetPickerSection = typeof sectionName === "string" && sectionName ? sectionName : "center"
+    widgetPickerVisible = true
+}
 ```
 
 ---
