@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Check agent should review the new QML/module structure against frontend guidance."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Check declaration comments and visual-porting fidelity in the new bar modules."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Check the MVP did not duplicate more of DymicShell than necessary."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Check service-to-module contracts stay narrow and consistent."}
+{"file": ".trellis/tasks/05-10-port-bar-layout-system-mvp/research/bar-layout-mvp-reference.md", "reason": "Check the implementation stayed inside the intended MVP boundary."}
