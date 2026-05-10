@@ -138,3 +138,37 @@ Ported the minimum Quickshell bar layout kernel into afloat, moved the shell roo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Configurable bar layout data layer
+
+**Date**: 2026-05-10
+**Task**: Configurable bar layout data layer
+**Branch**: `afloat`
+
+### Summary
+
+Upgraded the Quickshell bar layout from a hard-coded MVP model into a configurable persisted data layer with stable widget identities, startup restore, and frontend state-management conventions for shared shell services.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `be93c68` | (see git log) |
+| `1fe6456` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
