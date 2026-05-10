@@ -4,7 +4,11 @@ import QtQuick
 Item {
     id: root
 
+    required property var widgetEntry
     required property string widgetSource
+
+    readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
+    objectName: widgetInstanceKey
 
     implicitHeight: loader.item ? loader.item.implicitHeight : 0
     implicitWidth: loader.item ? loader.item.implicitWidth : 0

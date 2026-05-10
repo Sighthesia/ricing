@@ -1,14 +1,29 @@
 pragma Singleton
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import "barlayout/BarLayoutLayoutModel.js" as BarLayoutModel
 import "barlayout/BarLayoutSections.js" as BarLayoutSections
+import "barlayout/BarLayoutPersistence.js" as BarLayoutPersistence
 
 // Own the default bar layout and expose section lookup helpers.
 QtObject {
     id: root
 
     readonly property int barHeight: 42
-    readonly property var layoutModel: BarLayoutModel.defaultLayoutModel()
+    readonly property var layoutModel: layoutAdapter.layoutModel
+
+    readonly property bool layoutReady: layoutFile.loaded
+
+    function saveLayoutModel(nextLayoutModel) {
+        layoutAdapter.layoutModel = BarLayoutModel.normalizeLayoutModel(nextLayoutModel)
+        layoutFile.writeAdapter()
+    }
+
+    function resetLayoutModel() {
+        layoutAdapter.layoutModel = BarLayoutModel.defaultLayoutModel()
+        layoutFile.writeAdapter()
+    }
 
     function sectionWidgets(sectionName) {
         return BarLayoutModel.sectionWidgets(layoutModel, sectionName);
@@ -16,6 +31,36 @@ QtObject {
 
     function sectionWidth(sectionModel) {
         return BarLayoutSections.sectionWidth(sectionModel);
+    }
+
+    // Persist the normalized layout model in the shell state directory.
+    property FileView layoutFile: FileView {
+        id: layoutFile
+
+        path: Quickshell.statePath(BarLayoutPersistence.defaultLayoutPath())
+        watchChanges: true
+        blockLoading: true
+        onFileChanged: reload()
+        onLoaded: {
+            var normalizedLayout = BarLayoutModel.normalizeLayoutModel(layoutAdapter.layoutModel)
+            if (JSON.stringify(normalizedLayout) !== JSON.stringify(layoutAdapter.layoutModel)) {
+                layoutAdapter.layoutModel = normalizedLayout
+                writeAdapter()
+            }
+        }
+        onLoadFailed: error => {
+            if (error === FileViewError.FileNotFound) {
+                layoutAdapter.layoutModel = BarLayoutModel.defaultLayoutModel()
+                writeAdapter()
+            }
+        }
+
+        JsonAdapter {
+            id: layoutAdapter
+
+            property var layoutModel: BarLayoutModel.defaultLayoutModel()
+        }
+
     }
 
 }

@@ -26,10 +26,12 @@ Item {
         Repeater {
             model: root.sectionModel.length
 
+            // Keep each widget wrapper as the delegate so its implicit size drives the row.
             BarWidgetWrapper {
                 required property int index
 
-                widgetSource: Qt.resolvedUrl(root.sectionModel[index].source)
+                widgetEntry: root.sectionModel[index]
+                widgetSource: Qt.resolvedUrl(widgetEntry.source)
             }
 
         }
