@@ -172,3 +172,37 @@ Upgraded the Quickshell bar layout from a hard-coded MVP model into a configurab
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Minimal bar widget picker
+
+**Date**: 2026-05-10
+**Task**: Minimal bar widget picker
+**Branch**: `afloat`
+
+### Summary
+
+Added a minimal picker flow for the bar system with a temporary fixed entry point, a thin panel UI, and service-backed layout updates that stay compatible with the persisted bar data model.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `431d1df` | (see git log) |
+| `c65bfed` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

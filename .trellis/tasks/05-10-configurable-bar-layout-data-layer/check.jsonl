@@ -1,6 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Check that the data-layer changes remain aligned with the project's frontend scope."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Check that shared state and persistence code stay in the expected service locations."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Check the new QML files for declaration comments and minimality."}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Check that the implementation does not over-port unrelated DymicShell logic."}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Check that persistence contracts and renderer contracts remain explicit and consistent."}
-{"file": ".trellis/tasks/05-10-configurable-bar-layout-data-layer/research/layout-data-layer-reference.md", "reason": "Check the implementation against the intended reduced reference boundary."}
