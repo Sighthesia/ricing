@@ -29,6 +29,18 @@ After motion continuity is satisfied, apply the project visual language.
 - Avoid generic Material Design visuals unless an existing component intentionally requires them.
 - Keep surfaces soft, layered, and fluid rather than rigid, rectangular, or heavily shadowed.
 
+## Top Status Bar Composition
+
+Use this model for top status bar designs unless a task explicitly asks for a different shell structure.
+
+- Treat individual status bar components as floating capsules by default.
+- Group components into three top dock zones: left, center, and right.
+- Give each dock zone a notch-like glass background: attached to the top screen edge, square at the top corners, rounded along the bottom edge.
+- Keep dock zones as adaptive containers whose width follows their current capsule contents.
+- Let components enter, leave, and move between zones through fluid motion; avoid recreating or hard-swapping the component when it changes zone.
+- Prefer zone background morphing over fixed-width bars: the background should expand, contract, and soften around the active components.
+- Keep visual hierarchy clear: capsules are the movable content units; dock-zone backgrounds are the stable top-edge anchors.
+
 ## QML Implementation Heuristics
 
 When changing QML:
@@ -38,6 +50,8 @@ When changing QML:
 - Prefer moving, resizing, changing radius, clipping, opacity, and blur over destroying and recreating panel-like items.
 - Avoid toggling `visible` without a matching opacity, scale, slide, or blur transition.
 - Keep `PanelWindow`, popup, island, and overlay surfaces visually related through shared radius, translucency, and motion timing.
+- For top bars, model left, center, and right dock zones as persistent containers whose width is animated from their contents.
+- Move capsule components between dock zones by animating position and opacity rather than destroying one instance and creating another.
 
 ## Anti-Patterns
 
@@ -49,3 +63,5 @@ Avoid:
 - Hard-edged rectangular panels.
 - Flat opaque Material-style cards.
 - Standard Material FAB, app-bar, or card compositions unless intentionally required.
+- A full-width opaque top bar when adaptive dock zones can express the same information.
+- Independent top-bar capsules with no shared dock-zone anchoring, unless the component is intentionally transient.
