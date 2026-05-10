@@ -1,24 +1,29 @@
 import QtQuick
 
-// Render the center dock zone as a reusable attached island surface.
-// Keep the label centered while the surface morphs around its contents.
+// Render a shared attached-island background for one bar section.
 Item {
     id: root
 
-    property string label: "QuickShell"
     property color fillColor: "#242424dd"
-    property color textColor: "#ffffff"
-    readonly property int horizontalPadding: 18
-    readonly property int verticalPadding: 8
-    readonly property int earRadius: 12
-    readonly property int bodyRadius: 14
-    readonly property int bodyWidth: labelText.implicitWidth + horizontalPadding * 2
-    readonly property int bodyHeight: Math.max(labelText.implicitHeight + verticalPadding * 2, 30)
+    property color borderColor: "#14ffffff"
+    property int horizontalPadding: 18
+    property int verticalPadding: 8
+    property int earRadius: 12
+    property int bodyRadius: 14
+    property real contentWidth: 0
+    property real contentHeight: 0
+    property int surfaceHeight: 0
 
-    implicitWidth: bodyWidth + earRadius * 2
-    implicitHeight: bodyHeight
+    readonly property bool hasContent: contentWidth > 0 && contentHeight > 0 && surfaceHeight > 0
+    readonly property int bodyWidth: hasContent ? Math.max(contentWidth + horizontalPadding * 2, 0) : 0
+    readonly property int bodyHeight: hasContent ? Math.max(contentHeight + verticalPadding * 2, surfaceHeight) : 0
 
-    // Paint the left attachment as a top-attached patch with an inner quarter-circle edge.
+    implicitWidth: hasContent ? bodyWidth + earRadius * 2 : 0
+    implicitHeight: hasContent ? bodyHeight : 0
+    width: implicitWidth
+    height: implicitHeight
+
+    // Paint the left attachment as an inner quarter-circle ear.
     Canvas {
         id: leftEar
 
@@ -27,6 +32,7 @@ Item {
         width: root.earRadius
         height: root.earRadius
         antialiasing: true
+        visible: root.hasContent
         onPaint: {
             var ctx = getContext("2d");
             var w = width;
@@ -34,7 +40,7 @@ Item {
             var curve = Math.min(w, h);
             ctx.clearRect(0, 0, w, h);
             ctx.fillStyle = root.fillColor;
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+            ctx.strokeStyle = root.borderColor;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -58,6 +64,7 @@ Item {
         width: root.bodyWidth
         height: root.bodyHeight
         antialiasing: true
+        visible: root.hasContent
         onPaint: {
             var ctx = getContext("2d");
             var w = width;
@@ -65,7 +72,7 @@ Item {
             var radius = Math.min(root.bodyRadius, w / 2, h / 2);
             ctx.clearRect(0, 0, w, h);
             ctx.fillStyle = root.fillColor;
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+            ctx.strokeStyle = root.borderColor;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -82,7 +89,7 @@ Item {
         onWidthChanged: requestPaint()
     }
 
-    // Paint the right attachment as a mirrored top-attached patch.
+    // Paint the right attachment as a mirrored inner quarter-circle ear.
     Canvas {
         id: rightEar
 
@@ -91,6 +98,7 @@ Item {
         width: root.earRadius
         height: root.earRadius
         antialiasing: true
+        visible: root.hasContent
         onPaint: {
             var ctx = getContext("2d");
             var w = width;
@@ -98,7 +106,7 @@ Item {
             var curve = Math.min(w, h);
             ctx.clearRect(0, 0, w, h);
             ctx.fillStyle = root.fillColor;
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+            ctx.strokeStyle = root.borderColor;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -110,20 +118,6 @@ Item {
         }
         onHeightChanged: requestPaint()
         onWidthChanged: requestPaint()
-    }
-
-    // Center the status label inside the adaptive island body.
-    Text {
-        id: labelText
-
-        anchors.centerIn: centerBody
-        text: root.label
-        color: root.textColor
-        font.pixelSize: 14
-        font.bold: true
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
     }
 
 }

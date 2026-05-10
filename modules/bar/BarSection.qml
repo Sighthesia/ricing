@@ -3,7 +3,7 @@ import "../../services" as Services
 import "../../services/barlayout/BarLayoutSections.js" as BarLayoutSections
 import QtQuick
 
-// Render a single ordered section from the shared layout model.
+// Render a single ordered section inside a shared attached-island surface.
 Item {
     id: root
 
@@ -11,27 +11,37 @@ Item {
     readonly property var sectionModel: Services.BarLayoutService.sectionWidgets(sectionName)
 
     implicitHeight: Services.BarLayoutService.barHeight
-    implicitWidth: sectionRow.implicitWidth
+    implicitWidth: sectionSurface.implicitWidth
     width: implicitWidth
     height: implicitHeight
 
-    // Lay out widgets for this section in order.
-    Row {
-        id: sectionRow
+    // Wrap the ordered widgets in the shared section background.
+    BarDockZoneBackground {
+        id: sectionSurface
 
-        anchors.fill: parent
-        spacing: BarLayoutSections.widgetSpacing
+        surfaceHeight: root.implicitHeight
+        contentWidth: sectionRow.implicitWidth
+        contentHeight: sectionRow.implicitHeight
 
-        // Instantiate each managed widget in sequence.
-        Repeater {
-            model: root.sectionModel.length
+        // Lay out widgets for this section in order.
+        Row {
+            id: sectionRow
 
-            // Keep each widget wrapper as the delegate so its implicit size drives the row.
-            BarWidgetWrapper {
-                required property int index
+            anchors.centerIn: parent
+            spacing: BarLayoutSections.widgetSpacing
 
-                widgetEntry: root.sectionModel[index]
-                widgetSource: Qt.resolvedUrl(widgetEntry.source)
+            // Instantiate each managed widget in sequence.
+            Repeater {
+                model: root.sectionModel.length
+
+                // Keep each widget wrapper as the delegate so its implicit size drives the row.
+                BarWidgetWrapper {
+                    required property int index
+
+                    widgetEntry: root.sectionModel[index]
+                    widgetSource: Qt.resolvedUrl(widgetEntry.source)
+                }
+
             }
 
         }
