@@ -29,16 +29,38 @@ After motion continuity is satisfied, apply the project visual language.
 - Avoid generic Material Design visuals unless an existing component intentionally requires them.
 - Keep surfaces soft, layered, and fluid rather than rigid, rectangular, or heavily shadowed.
 
+## Reusable Shape: Attached Island Surface
+
+Use this reusable shape for compact surfaces that must feel anchored to an edge.
+
+- Compose it as an adaptive center body plus edge-attached inner quarter-circle ear decorations.
+- Keep the body and ears visually attached to the top or screen edge.
+- Treat the ears as curved edge patches, not detached side bulbs.
+- Preserve continuous morphing when the body grows, shrinks, or changes contents.
+
+Use it for:
+
+- Dock zones
+- Dynamic islands
+- Edge-attached popups
+- Compact anchored status or notification surfaces
+
+Do not use it for:
+
+- Freely floating capsules or cards
+- Unanchored surfaces that should read as independent objects
+
 ## Top Status Bar Composition
 
 Use this model for top status bar designs unless a task explicitly asks for a different shell structure.
 
 - Treat individual status bar components as floating capsules by default.
 - Group components into three top dock zones: left, center, and right.
-- Give each dock zone a notch-like glass background: attached to the top screen edge, square at the top corners, rounded along the bottom edge.
+- Give each dock zone the reusable Attached Island Surface background.
+- For the visible center zone, prefer a transparent host window with a centered island surface rather than a full-width opaque bar.
 - Keep dock zones as adaptive containers whose width follows their current capsule contents.
 - Let components enter, leave, and move between zones through fluid motion; avoid recreating or hard-swapping the component when it changes zone.
-- Prefer zone background morphing over fixed-width bars: the background should expand, contract, and soften around the active components.
+- Prefer zone background morphing over fixed-width bars: the body should expand, contract, and soften around the active components while preserving the ear-attached outer silhouette.
 - Keep visual hierarchy clear: capsules are the movable content units; dock-zone backgrounds are the stable top-edge anchors.
 
 ## QML Implementation Heuristics

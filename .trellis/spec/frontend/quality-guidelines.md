@@ -49,6 +49,30 @@ Item {
 
 **Related**: Use this convention in `modules/background` and any future QML modules that are expected to stay self-documenting.
 
+### Convention: Preserve Canvas Path Semantics When Porting Visual Shapes
+
+**What**: When porting QML `Canvas` shapes from a reference project, preserve the source path semantics: anchor position, path order, arc center, radius, start/end angles, and clockwise/counterclockwise direction.
+
+**Why**: Small arc-direction changes can invert the visual meaning of a shape, such as turning an inner quarter-circle edge decoration into a convex side bulb.
+
+**Example**:
+```qml
+// Match the source inner corner arc instead of approximating the silhouette.
+Canvas {
+    onPaint: {
+        const ctx = getContext("2d")
+        ctx.beginPath()
+        ctx.moveTo(0, 0)
+        ctx.lineTo(width, 0)
+        ctx.lineTo(width, height)
+        ctx.arc(0, height, width, 0, -Math.PI / 2, true)
+        ctx.fill()
+    }
+}
+```
+
+**Related**: Use this convention when adapting dynamic-island ears, screen-corner masks, or any decorative QML geometry copied from another shell.
+
 ---
 
 ## Testing Requirements
