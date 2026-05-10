@@ -12,12 +12,37 @@ QtObject {
 
     readonly property int barHeight: 42
     readonly property var layoutModel: layoutAdapter.layoutModel
+    readonly property var availableWidgets: BarLayoutModel.availableWidgets()
 
     readonly property bool layoutReady: layoutFile.loaded
+    property bool widgetPickerVisible: false
+    property string widgetPickerSection: "center"
 
     function saveLayoutModel(nextLayoutModel) {
         layoutAdapter.layoutModel = BarLayoutModel.normalizeLayoutModel(nextLayoutModel)
         layoutFile.writeAdapter()
+    }
+
+    function addWidgetToSection(widgetId, sectionName) {
+        saveLayoutModel(BarLayoutModel.addWidgetToSection(layoutModel, widgetId, sectionName))
+    }
+
+    function openWidgetPicker(sectionName) {
+        widgetPickerSection = typeof sectionName === "string" && sectionName ? sectionName : "center"
+        widgetPickerVisible = true
+    }
+
+    function closeWidgetPicker() {
+        widgetPickerVisible = false
+    }
+
+    function toggleWidgetPicker(sectionName) {
+        if (widgetPickerVisible) {
+            closeWidgetPicker()
+            return
+        }
+
+        openWidgetPicker(sectionName)
     }
 
     function resetLayoutModel() {

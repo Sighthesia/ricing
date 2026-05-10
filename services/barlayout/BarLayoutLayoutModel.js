@@ -4,6 +4,16 @@ var DEFAULT_WIDGET_SOURCE_BY_ID = {
     "dynamic-island-dock-zone": "../../modules/background/DynamicIslandDockZone.qml",
 }
 
+var AVAILABLE_WIDGETS = [
+    {
+        id: "dynamic-island-dock-zone",
+        label: "Dynamic Island Dock Zone",
+        description: "Managed center dock zone widget.",
+        section: "center",
+        source: "../../modules/background/DynamicIslandDockZone.qml",
+    },
+]
+
 var DEFAULT_LAYOUT_MODEL = {
     version: 1,
     widgets: [
@@ -28,6 +38,74 @@ function defaultWidgetSource(widgetId) {
 
 function defaultLayoutModel() {
     return cloneLayoutModel(DEFAULT_LAYOUT_MODEL)
+}
+
+function availableWidgets() {
+    return cloneLayoutModel(AVAILABLE_WIDGETS)
+}
+
+function availableWidget(widgetId) {
+    for (var index = 0; index < AVAILABLE_WIDGETS.length; index += 1) {
+        if (AVAILABLE_WIDGETS[index].id === widgetId) {
+            return AVAILABLE_WIDGETS[index]
+        }
+    }
+
+    return null
+}
+
+function nextWidgetInstanceIndex(layoutModel, widgetId) {
+    var normalizedLayoutModel = normalizeLayoutModel(layoutModel)
+    var highestIndex = -1
+
+    for (var index = 0; index < normalizedLayoutModel.widgets.length; index += 1) {
+        var widgetEntry = normalizedLayoutModel.widgets[index]
+        if (widgetEntry.id !== widgetId) {
+            continue
+        }
+
+        var instanceParts = String(widgetEntry.instanceKey || "").split(":")
+        var parsedIndex = parseInt(instanceParts[instanceParts.length - 1], 10)
+        if (!isNaN(parsedIndex) && parsedIndex > highestIndex) {
+            highestIndex = parsedIndex
+        }
+    }
+
+    return highestIndex + 1
+}
+
+function createWidgetEntry(widgetId, sectionName, layoutModel) {
+    var widgetDefinition = availableWidget(widgetId)
+    if (!widgetDefinition) {
+        return null
+    }
+
+    var normalizedSection = typeof sectionName === "string" && SECTION_ORDER.indexOf(sectionName) !== -1
+        ? sectionName
+        : widgetDefinition.section
+    var nextIndex = nextWidgetInstanceIndex(layoutModel, widgetId)
+
+    return {
+        id: widgetDefinition.id,
+        instanceKey: widgetDefinition.id + ":" + nextIndex,
+        section: normalizedSection,
+        order: nextIndex,
+        enabled: true,
+        source: widgetDefinition.source,
+    }
+}
+
+function addWidgetToSection(layoutModel, widgetId, sectionName) {
+    var normalizedLayoutModel = normalizeLayoutModel(layoutModel)
+    var widgetEntry = createWidgetEntry(widgetId, sectionName, normalizedLayoutModel)
+
+    if (!widgetEntry) {
+        return normalizedLayoutModel
+    }
+
+    var nextLayoutModel = cloneLayoutModel(normalizedLayoutModel)
+    nextLayoutModel.widgets.push(widgetEntry)
+    return normalizeLayoutModel(nextLayoutModel)
 }
 
 function normalizeWidgetEntry(widgetEntry, sectionName, orderIndex) {

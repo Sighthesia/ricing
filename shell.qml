@@ -14,4 +14,8 @@ ShellRoot {
     Bar.BarWindow {
     }
 
+    // Keep the minimal widget picker available as a separate bar-owned window.
+    Bar.WidgetPickerWindow {
+    }
+
 }
