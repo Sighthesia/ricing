@@ -71,3 +71,36 @@ Completed the QML background comment cleanup and added the reusable comment-befo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Add dynamic island center dock zone
+
+**Date**: 2026-05-10
+**Task**: Add dynamic island center dock zone
+**Branch**: `afloat`
+
+### Summary
+
+Added a reusable attached-island shape, implemented the center top dock zone with inner quarter-circle ears, updated Glass Liquid design guidance, and recorded Canvas path porting rules.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0af81b5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
