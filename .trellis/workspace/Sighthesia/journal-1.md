@@ -104,3 +104,37 @@ Added a reusable attached-island shape, implemented the center top dock zone wit
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Port bar layout system MVP
+
+**Date**: 2026-05-10
+**Task**: Port bar layout system MVP
+**Branch**: `afloat`
+
+### Summary
+
+Ported the minimum Quickshell bar layout kernel into afloat, moved the shell root to a reusable bar module, and documented the resulting module/service structure in frontend specs.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2cc2788` | (see git log) |
+| `25e1233` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
