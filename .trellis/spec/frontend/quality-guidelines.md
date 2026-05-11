@@ -73,6 +73,29 @@ Canvas {
 
 **Related**: Use this convention when adapting dynamic-island ears, screen-corner masks, or any decorative QML geometry copied from another shell.
 
+### Convention: Normalize Legacy Widget IDs During Renames
+
+**What**: When a registered bar widget is renamed, keep the normalization path aware of the old `id`, `instanceKey`, and fallback `source` so persisted layouts can migrate without surfacing the legacy name at runtime.
+
+**Why**: Layout state may be stored on disk, so a direct rename without normalization can leave stale references in warnings, selectors, or restored widget entries.
+
+**Example**:
+```js
+// Accept old persisted entries, but emit only the new registry identity.
+function normalizeWidgetEntry(widgetEntry) {
+    const id = widgetEntry.id === "placeholder" ? "placeholder" : "placeholder"
+    return {
+        id,
+        instanceKey: id + ":0",
+        source: "../../modules/bar/widgets/Placeholder.qml",
+    }
+}
+```
+
+**Related**: Use this when bar widget registry entries, source paths, or labels are renamed in `services/barlayout/`.
+
+> **Warning**: Do not leave the legacy widget source string in the default registry after the runtime name changes. The warning output can still expose the old path even when the visible widget is already using the new component.
+
 ---
 
 ## Testing Requirements
