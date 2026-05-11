@@ -11,7 +11,7 @@ QtObject {
     id: root
 
     readonly property int barHeight: 42
-    readonly property var layoutModel: layoutAdapter.layoutModel
+    readonly property var layoutModel: BarLayoutModel.normalizeLayoutModel(layoutAdapter.layoutModel)
     readonly property var availableWidgets: BarLayoutModel.availableWidgets()
 
     readonly property bool layoutReady: layoutFile.loaded

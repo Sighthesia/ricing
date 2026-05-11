@@ -1,16 +1,66 @@
 var SECTION_ORDER = ["left", "center", "right"]
+var PLACEHOLDER_WIDGET_ID = "placeholder"
+var LEGACY_WIDGET_IDS = {
+    "dynamic-island-dock-zone": PLACEHOLDER_WIDGET_ID,
+    "DynamicIslandDockZone": PLACEHOLDER_WIDGET_ID,
+}
 
 var DEFAULT_WIDGET_SOURCE_BY_ID = {
-    "dynamic-island-dock-zone": "../../modules/background/DynamicIslandDockZone.qml",
+    "placeholder": "../../modules/bar/widgets/Placeholder.qml",
+}
+
+function normalizeWidgetId(widgetId, widgetSource) {
+    if (typeof widgetId === "string" && LEGACY_WIDGET_IDS[widgetId]) {
+        return LEGACY_WIDGET_IDS[widgetId]
+    }
+
+    if (typeof widgetSource === "string" && widgetSource.indexOf("DynamicIslandDockZone") !== -1) {
+        return PLACEHOLDER_WIDGET_ID
+    }
+
+    if (typeof widgetId === "string" && widgetId) {
+        return widgetId
+    }
+
+    return PLACEHOLDER_WIDGET_ID
+}
+
+function normalizeWidgetSource(widgetSource, widgetId) {
+    if (typeof widgetSource === "string" && widgetSource && widgetSource.indexOf("DynamicIslandDockZone") === -1) {
+        return widgetSource
+    }
+
+    return defaultWidgetSource(widgetId)
+}
+
+function normalizeWidgetInstanceKey(widgetEntry, widgetId, orderIndex) {
+    var existingInstanceKey = typeof widgetEntry.instanceKey === "string" && widgetEntry.instanceKey
+        ? widgetEntry.instanceKey
+        : ""
+
+    if (existingInstanceKey) {
+        var instanceParts = existingInstanceKey.split(":")
+        var instanceSuffix = instanceParts[instanceParts.length - 1]
+        var parsedIndex = parseInt(instanceSuffix, 10)
+        var normalizedIndex = !isNaN(parsedIndex) ? parsedIndex : orderIndex
+
+        if (existingInstanceKey.indexOf("DynamicIslandDockZone") === -1 && instanceParts[0] === widgetId) {
+            return existingInstanceKey
+        }
+
+        return widgetId + ":" + normalizedIndex
+    }
+
+    return widgetId + ":" + orderIndex
 }
 
 var AVAILABLE_WIDGETS = [
     {
-        id: "dynamic-island-dock-zone",
-        label: "Dynamic Island Dock Zone",
-        description: "Managed center dock zone widget.",
+        id: PLACEHOLDER_WIDGET_ID,
+        label: "Placeholder",
+        description: "Managed center placeholder widget.",
         section: "center",
-        source: "../../modules/background/DynamicIslandDockZone.qml",
+        source: "../../modules/bar/widgets/Placeholder.qml",
     },
 ]
 
@@ -18,12 +68,12 @@ var DEFAULT_LAYOUT_MODEL = {
     version: 1,
     widgets: [
         {
-            id: "dynamic-island-dock-zone",
-            instanceKey: "dynamic-island-dock-zone:0",
+            id: PLACEHOLDER_WIDGET_ID,
+            instanceKey: "placeholder:0",
             section: "center",
             order: 0,
             enabled: true,
-            source: "../../modules/background/DynamicIslandDockZone.qml",
+            source: "../../modules/bar/widgets/Placeholder.qml",
         },
     ],
 }
@@ -33,7 +83,8 @@ function cloneLayoutModel(layoutModel) {
 }
 
 function defaultWidgetSource(widgetId) {
-    return DEFAULT_WIDGET_SOURCE_BY_ID[widgetId] || ""
+    var normalizedWidgetId = normalizeWidgetId(widgetId)
+    return DEFAULT_WIDGET_SOURCE_BY_ID[normalizedWidgetId] || ""
 }
 
 function defaultLayoutModel() {
@@ -45,8 +96,10 @@ function availableWidgets() {
 }
 
 function availableWidget(widgetId) {
+    var normalizedWidgetId = normalizeWidgetId(widgetId)
+
     for (var index = 0; index < AVAILABLE_WIDGETS.length; index += 1) {
-        if (AVAILABLE_WIDGETS[index].id === widgetId) {
+        if (AVAILABLE_WIDGETS[index].id === normalizedWidgetId) {
             return AVAILABLE_WIDGETS[index]
         }
     }
@@ -57,10 +110,11 @@ function availableWidget(widgetId) {
 function nextWidgetInstanceIndex(layoutModel, widgetId) {
     var normalizedLayoutModel = normalizeLayoutModel(layoutModel)
     var highestIndex = -1
+    var normalizedWidgetId = normalizeWidgetId(widgetId)
 
     for (var index = 0; index < normalizedLayoutModel.widgets.length; index += 1) {
         var widgetEntry = normalizedLayoutModel.widgets[index]
-        if (widgetEntry.id !== widgetId) {
+        if (normalizeWidgetId(widgetEntry.id, widgetEntry.source) !== normalizedWidgetId) {
             continue
         }
 
@@ -75,7 +129,8 @@ function nextWidgetInstanceIndex(layoutModel, widgetId) {
 }
 
 function createWidgetEntry(widgetId, sectionName, layoutModel) {
-    var widgetDefinition = availableWidget(widgetId)
+    var normalizedWidgetId = normalizeWidgetId(widgetId)
+    var widgetDefinition = availableWidget(normalizedWidgetId)
     if (!widgetDefinition) {
         return null
     }
@@ -83,7 +138,7 @@ function createWidgetEntry(widgetId, sectionName, layoutModel) {
     var normalizedSection = typeof sectionName === "string" && SECTION_ORDER.indexOf(sectionName) !== -1
         ? sectionName
         : widgetDefinition.section
-    var nextIndex = nextWidgetInstanceIndex(layoutModel, widgetId)
+    var nextIndex = nextWidgetInstanceIndex(layoutModel, normalizedWidgetId)
 
     return {
         id: widgetDefinition.id,
@@ -113,13 +168,9 @@ function normalizeWidgetEntry(widgetEntry, sectionName, orderIndex) {
         return null
     }
 
-    var id = typeof widgetEntry.id === "string" && widgetEntry.id ? widgetEntry.id : "widget"
-    var instanceKey = typeof widgetEntry.instanceKey === "string" && widgetEntry.instanceKey
-        ? widgetEntry.instanceKey
-        : id + ":" + orderIndex
-    var source = typeof widgetEntry.source === "string" && widgetEntry.source
-        ? widgetEntry.source
-        : defaultWidgetSource(id)
+    var id = normalizeWidgetId(widgetEntry.id, widgetEntry.source)
+    var instanceKey = normalizeWidgetInstanceKey(widgetEntry, id, orderIndex)
+    var source = normalizeWidgetSource(widgetEntry.source, id)
 
     return {
         id: id,
@@ -149,7 +200,7 @@ function normalizeWidgets(widgets, sectionName) {
         }
     }
 
-    normalized.sort(function(leftWidget, rightWidget) {
+    normalized.sort(function (leftWidget, rightWidget) {
         if (leftWidget.order !== rightWidget.order) {
             return leftWidget.order - rightWidget.order
         }
@@ -210,7 +261,7 @@ function normalizeLayoutModel(layoutModel) {
 function sectionWidgets(layoutModel, sectionName) {
     var normalizedLayoutModel = normalizeLayoutModel(layoutModel)
 
-    return normalizedLayoutModel.widgets.filter(function(widgetEntry) {
+    return normalizedLayoutModel.widgets.filter(function (widgetEntry) {
         return widgetEntry.enabled && widgetEntry.section === sectionName
     })
 }

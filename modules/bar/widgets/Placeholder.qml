@@ -1,6 +1,6 @@
 import QtQuick
 
-// Keep the dock-zone widget as content only inside the shared section surface.
+// Keep the placeholder widget as content only inside the shared section surface.
 Text {
     id: root
 
