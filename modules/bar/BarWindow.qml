@@ -31,36 +31,6 @@ Variants {
             anchors.fill: parent
         }
 
-        // Temporary fixed inspect button for the bar element inspector MVP.
-        Rectangle {
-            id: inspectButton
-
-            anchors.right: widgetPickerButton.left
-            anchors.rightMargin: 8
-            anchors.top: parent.top
-            anchors.topMargin: 8
-
-            width: 52
-            height: 26
-            radius: 6
-            color: Services.InspectorService.enabled ? "#885588ff" : "#44ffffff"
-            border.color: Services.InspectorService.enabled ? "#cc5588ff" : "#66ffffff"
-            border.width: 1
-
-            Text {
-                anchors.centerIn: parent
-                text: "Inspect"
-                color: Services.InspectorService.enabled ? "#ffffffff" : "#ccffffff"
-                font.pixelSize: 10
-                font.bold: true
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: Services.InspectorService.toggleEnabled()
-            }
-        }
-
         // Keep the minimal widget picker attached to the shared dock zone surface.
         BarDockZoneBackground {
             id: widgetPickerButton

@@ -6,6 +6,7 @@ Item {
 
     required property var widgetEntry
     required property string widgetSource
+    required property string screenName
 
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     objectName: widgetInstanceKey

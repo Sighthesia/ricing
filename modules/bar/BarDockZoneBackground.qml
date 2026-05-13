@@ -1,4 +1,3 @@
-import "../../services" as Services
 import QtQuick
 
 // Render a shared attached-island background for one bar section.
@@ -34,73 +33,6 @@ Item {
     implicitHeight: hasContent ? bodyHeight : 0
     width: implicitWidth
     height: implicitHeight
-
-    // Inspector registration state for this background.
-    property string inspectorId: ""
-    readonly property bool isInspectorTarget: inspectorId !== "" &&
-        Services.InspectorService.enabled &&
-        ((Services.InspectorService.hoveredTarget && Services.InspectorService.hoveredTarget.id === inspectorId) ||
-         (Services.InspectorService.lockedTarget && Services.InspectorService.lockedTarget.id === inspectorId))
-    readonly property bool isInspectorHovered: inspectorId !== "" &&
-        Services.InspectorService.enabled &&
-        Services.InspectorService.hoveredTarget &&
-        Services.InspectorService.hoveredTarget.id === inspectorId
-    readonly property bool isInspectorLocked: inspectorId !== "" &&
-        Services.InspectorService.enabled &&
-        Services.InspectorService.lockedTarget &&
-        Services.InspectorService.lockedTarget.id === inspectorId
-
-    // Register this background with the inspector service on creation.
-    Component.onCompleted: {
-        inspectorId = Services.InspectorService.registerTarget(
-            "BarDockZoneBackground", sectionType, sectionType, root.screenName,
-            mapToItem(null, 0, 0).x, mapToItem(null, 0, 0).y,
-            width, height
-        )
-    }
-    Component.onDestruction: {
-        if (inspectorId) Services.InspectorService.unregisterTarget(inspectorId)
-    }
-
-    // Refresh inspector geometry when size or position changes.
-    onWidthChanged: _syncInspectorGeometry()
-    onHeightChanged: _syncInspectorGeometry()
-    onXChanged: _syncInspectorGeometry()
-    onYChanged: _syncInspectorGeometry()
-
-    function _syncInspectorGeometry() {
-        if (!inspectorId) return
-        Services.InspectorService.updateTargetGeometry(
-            inspectorId,
-            mapToItem(null, 0, 0).x, mapToItem(null, 0, 0).y,
-            width, height
-        )
-    }
-
-    // Highlight outline drawn when this background is inspected.
-    Rectangle {
-        anchors.fill: parent
-        visible: root.isInspectorTarget
-        color: "transparent"
-        border.color: root.isInspectorLocked ? "#ff8844" : "#4488ff"
-        border.width: 2
-        z: 100
-    }
-
-    // Transparent hover surface that intercepts pointer events only in inspector mode.
-    MouseArea {
-        anchors.fill: parent
-        enabled: Services.InspectorService.enabled
-        hoverEnabled: true
-        z: 101
-        propagateComposedEvents: true
-        onEntered: Services.InspectorService.setHovered(root.inspectorId)
-        onExited: Services.InspectorService.clearHovered(root.inspectorId)
-        onClicked: function(mouse) {
-            Services.InspectorService.selectTarget(root.inspectorId)
-            mouse.accepted = false
-        }
-    }
 
     // Paint the left attachment as an inner quarter-circle ear (center only).
     Canvas {
