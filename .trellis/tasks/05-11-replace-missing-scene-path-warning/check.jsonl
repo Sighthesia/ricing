@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Validate the final QML file layout and module naming against frontend organization rules."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Validate QML quality conventions and required patterns during review."}

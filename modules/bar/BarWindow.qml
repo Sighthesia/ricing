@@ -25,24 +25,61 @@ Variants {
         }
 
         BarContent {
+            id: barContent
+
+            screenName: modelData.name
             anchors.fill: parent
         }
 
-        // Keep a temporary fixed entry point for the minimal widget picker.
+        // Temporary fixed inspect button for the bar element inspector MVP.
         Rectangle {
+            id: inspectButton
+
+            anchors.right: widgetPickerButton.left
+            anchors.rightMargin: 8
+            anchors.top: parent.top
+            anchors.topMargin: 8
+
+            width: 52
+            height: 26
+            radius: 6
+            color: Services.InspectorService.enabled ? "#885588ff" : "#44ffffff"
+            border.color: Services.InspectorService.enabled ? "#cc5588ff" : "#66ffffff"
+            border.width: 1
+
+            Text {
+                anchors.centerIn: parent
+                text: "Inspect"
+                color: Services.InspectorService.enabled ? "#ffffffff" : "#ccffffff"
+                font.pixelSize: 10
+                font.bold: true
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: Services.InspectorService.toggleEnabled()
+            }
+        }
+
+        // Keep the minimal widget picker attached to the shared dock zone surface.
+        BarDockZoneBackground {
             id: widgetPickerButton
 
-            width: 26
-            height: 26
-            radius: 13
+            screenName: modelData.name
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.topMargin: 8
             anchors.rightMargin: 8
-            color: "#2b2b2b"
-            border.color: "#5a5a5a"
-            border.width: 1
 
+            surfaceHeight: Services.BarLayoutService.barHeight
+            contentWidth: 26
+            contentHeight: 26
+            horizontalPadding: 8
+            verticalPadding: 8
+            earRadius: 10
+            bodyRadius: 10
+
+            // Render the plus action on the background surface.
             Text {
                 anchors.centerIn: parent
                 text: "+"
@@ -50,6 +87,7 @@ Variants {
                 font.pixelSize: 18
             }
 
+            // Capture clicks across the shared surface so the picker still opens reliably.
             MouseArea {
                 anchors.fill: parent
                 onClicked: Services.BarLayoutService.toggleWidgetPicker("center")
