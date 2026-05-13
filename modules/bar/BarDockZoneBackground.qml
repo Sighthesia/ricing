@@ -1,3 +1,4 @@
+import "../../services" as Services
 import QtQuick
 
 // Render a shared attached-island background for one bar section.
@@ -13,17 +14,95 @@ Item {
     property real contentWidth: 0
     property real contentHeight: 0
     property int surfaceHeight: 0
+    property string screenName: ""
+
+    // Section type determines the ear layout: "center" keeps both ears,
+    // "left" and "right" use a single ear attached to the inner-bottom corner.
+    property string sectionType: "center"
 
     readonly property bool hasContent: contentWidth > 0 && contentHeight > 0 && surfaceHeight > 0
     readonly property int bodyWidth: hasContent ? Math.max(contentWidth + horizontalPadding * 2, 0) : 0
     readonly property int bodyHeight: hasContent ? Math.max(contentHeight + verticalPadding * 2, surfaceHeight) : 0
 
-    implicitWidth: hasContent ? bodyWidth + earRadius * 2 : 0
+    // Center keeps two ears; side sections drop the edge ear and shift width accordingly.
+    readonly property bool isCenter: sectionType === "center"
+    readonly property bool isLeft: sectionType === "left"
+    readonly property bool isRight: sectionType === "right"
+    readonly property int bodyX: isRight ? earRadius : (isCenter ? earRadius : 0)
+
+    implicitWidth: hasContent ? bodyWidth + (isCenter ? earRadius * 2 : earRadius) : 0
     implicitHeight: hasContent ? bodyHeight : 0
     width: implicitWidth
     height: implicitHeight
 
-    // Paint the left attachment as an inner quarter-circle ear.
+    // Inspector registration state for this background.
+    property string inspectorId: ""
+    readonly property bool isInspectorTarget: inspectorId !== "" &&
+        Services.InspectorService.enabled &&
+        ((Services.InspectorService.hoveredTarget && Services.InspectorService.hoveredTarget.id === inspectorId) ||
+         (Services.InspectorService.lockedTarget && Services.InspectorService.lockedTarget.id === inspectorId))
+    readonly property bool isInspectorHovered: inspectorId !== "" &&
+        Services.InspectorService.enabled &&
+        Services.InspectorService.hoveredTarget &&
+        Services.InspectorService.hoveredTarget.id === inspectorId
+    readonly property bool isInspectorLocked: inspectorId !== "" &&
+        Services.InspectorService.enabled &&
+        Services.InspectorService.lockedTarget &&
+        Services.InspectorService.lockedTarget.id === inspectorId
+
+    // Register this background with the inspector service on creation.
+    Component.onCompleted: {
+        inspectorId = Services.InspectorService.registerTarget(
+            "BarDockZoneBackground", sectionType, sectionType, root.screenName,
+            mapToItem(null, 0, 0).x, mapToItem(null, 0, 0).y,
+            width, height
+        )
+    }
+    Component.onDestruction: {
+        if (inspectorId) Services.InspectorService.unregisterTarget(inspectorId)
+    }
+
+    // Refresh inspector geometry when size or position changes.
+    onWidthChanged: _syncInspectorGeometry()
+    onHeightChanged: _syncInspectorGeometry()
+    onXChanged: _syncInspectorGeometry()
+    onYChanged: _syncInspectorGeometry()
+
+    function _syncInspectorGeometry() {
+        if (!inspectorId) return
+        Services.InspectorService.updateTargetGeometry(
+            inspectorId,
+            mapToItem(null, 0, 0).x, mapToItem(null, 0, 0).y,
+            width, height
+        )
+    }
+
+    // Highlight outline drawn when this background is inspected.
+    Rectangle {
+        anchors.fill: parent
+        visible: root.isInspectorTarget
+        color: "transparent"
+        border.color: root.isInspectorLocked ? "#ff8844" : "#4488ff"
+        border.width: 2
+        z: 100
+    }
+
+    // Transparent hover surface that intercepts pointer events only in inspector mode.
+    MouseArea {
+        anchors.fill: parent
+        enabled: Services.InspectorService.enabled
+        hoverEnabled: true
+        z: 101
+        propagateComposedEvents: true
+        onEntered: Services.InspectorService.setHovered(root.inspectorId)
+        onExited: Services.InspectorService.clearHovered(root.inspectorId)
+        onClicked: function(mouse) {
+            Services.InspectorService.selectTarget(root.inspectorId)
+            mouse.accepted = false
+        }
+    }
+
+    // Paint the left attachment as an inner quarter-circle ear (center only).
     Canvas {
         id: leftEar
 
@@ -32,7 +111,7 @@ Item {
         width: root.earRadius
         height: root.earRadius
         antialiasing: true
-        visible: root.hasContent
+        visible: root.hasContent && root.isCenter
         onPaint: {
             var ctx = getContext("2d");
             var w = width;
@@ -59,7 +138,7 @@ Item {
     Canvas {
         id: centerBody
 
-        x: root.earRadius
+        x: root.bodyX
         y: 0
         width: root.bodyWidth
         height: root.bodyHeight
@@ -89,16 +168,16 @@ Item {
         onWidthChanged: requestPaint()
     }
 
-    // Paint the right attachment as a mirrored inner quarter-circle ear.
+    // Paint the right attachment as a mirrored inner quarter-circle ear (center only).
     Canvas {
         id: rightEar
 
-        x: root.earRadius + root.bodyWidth
+        x: root.bodyX + root.bodyWidth
         y: 0
         width: root.earRadius
         height: root.earRadius
         antialiasing: true
-        visible: root.hasContent
+        visible: root.hasContent && root.isCenter
         onPaint: {
             var ctx = getContext("2d");
             var w = width;
@@ -112,6 +191,47 @@ Item {
             ctx.moveTo(0, 0);
             ctx.lineTo(0, h);
             ctx.arc(w, h, curve, Math.PI, -Math.PI / 2, false);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        onHeightChanged: requestPaint()
+        onWidthChanged: requestPaint()
+    }
+
+    // Paint the side ear attached to the inner-bottom corner (left/right only).
+    Canvas {
+        id: sideEar
+
+        x: root.isLeft ? root.bodyWidth : 0
+        y: root.bodyHeight - root.earRadius
+        width: root.earRadius
+        height: root.earRadius
+        antialiasing: true
+        visible: root.hasContent && !root.isCenter
+        onPaint: {
+            var ctx = getContext("2d");
+            var w = width;
+            var h = height;
+            var curve = Math.min(w, h);
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = root.fillColor;
+            ctx.strokeStyle = root.borderColor;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            if (root.isLeft) {
+                // Left section: ear at bottom-right corner, arc inward.
+                ctx.moveTo(w, 0);
+                ctx.lineTo(w, h);
+                ctx.lineTo(0, h);
+                ctx.arc(w, 0, curve, Math.PI / 2, Math.PI, false);
+            } else {
+                // Right section: ear at bottom-left corner, arc inward.
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, h);
+                ctx.lineTo(w, h);
+                ctx.arc(0, h, curve, 0, -Math.PI / 2, true);
+            }
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
