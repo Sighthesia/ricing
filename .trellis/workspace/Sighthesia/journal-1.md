@@ -239,3 +239,36 @@ Adjusted bar dockzone geometry, moved bottom ears into dedicated overlay windows
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: Update repository AGENTS.md
+
+**Date**: 2026-05-14
+**Task**: Update repository AGENTS.md
+**Branch**: `afloat`
+
+### Summary
+
+Updated the root AGENTS.md with compact, verified guidance for the Quickshell app structure and the local Trellis/OpenCode workflow layer.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4f29362` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
