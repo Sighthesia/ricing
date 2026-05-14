@@ -206,3 +206,36 @@ Added a minimal picker flow for the bar system with a temporary fixed entry poin
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Refine bar dockzone ears and overlay windows
+
+**Date**: 2026-05-14
+**Task**: Refine bar dockzone ears and overlay windows
+**Branch**: `afloat`
+
+### Summary
+
+Adjusted bar dockzone geometry, moved bottom ears into dedicated overlay windows, and wired the widget picker into the bar layout flow.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `689ed33` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
