@@ -7,6 +7,7 @@ var LEGACY_WIDGET_IDS = {
 
 var DEFAULT_WIDGET_SOURCE_BY_ID = {
     "placeholder": "../../modules/bar/widgets/Placeholder.qml",
+    "widget-picker-button": "../../modules/bar/widgets/WidgetPickerButton.qml",
 }
 
 function normalizeWidgetId(widgetId, widgetSource) {
@@ -62,6 +63,13 @@ var AVAILABLE_WIDGETS = [
         section: "center",
         source: "../../modules/bar/widgets/Placeholder.qml",
     },
+    {
+        id: "widget-picker-button",
+        label: "Widget Picker",
+        description: "Opens the widget picker panel.",
+        section: "right",
+        source: "../../modules/bar/widgets/WidgetPickerButton.qml",
+    },
 ]
 
 var DEFAULT_LAYOUT_MODEL = {
@@ -74,6 +82,14 @@ var DEFAULT_LAYOUT_MODEL = {
             order: 0,
             enabled: true,
             source: "../../modules/bar/widgets/Placeholder.qml",
+        },
+        {
+            id: "widget-picker-button",
+            instanceKey: "widget-picker-button:0",
+            section: "right",
+            order: 0,
+            enabled: true,
+            source: "../../modules/bar/widgets/WidgetPickerButton.qml",
         },
     ],
 }

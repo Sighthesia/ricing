@@ -30,8 +30,9 @@ Item {
         Row {
             id: sectionRow
 
+            z: 1
             x: sectionSurface.bodyX + (sectionSurface.bodyWidth - width) / 2
-            anchors.verticalCenter: parent.verticalCenter
+            y: sectionSurface.bodyY + (sectionSurface.bodyHeight - height) / 2
             spacing: BarLayoutSections.widgetSpacing
 
             // Instantiate each managed widget in sequence.

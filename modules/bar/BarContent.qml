@@ -15,7 +15,7 @@ Item {
         screenName: root.screenName
         anchors.left: parent.left
         anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        height: Services.BarLayoutService.barHeight
     }
 
     // Keep the center zone aligned to the screen midpoint.
@@ -24,7 +24,7 @@ Item {
         screenName: root.screenName
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        height: Services.BarLayoutService.barHeight
     }
 
     // Keep the right zone anchored to the screen edge.
@@ -33,7 +33,7 @@ Item {
         screenName: root.screenName
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        height: Services.BarLayoutService.barHeight
     }
 
 }
