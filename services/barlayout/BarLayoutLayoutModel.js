@@ -8,6 +8,7 @@ var LEGACY_WIDGET_IDS = {
 var DEFAULT_WIDGET_SOURCE_BY_ID = {
     "placeholder": "../../modules/bar/widgets/Placeholder.qml",
     "widget-picker-button": "../../modules/bar/widgets/WidgetPickerButton.qml",
+    "clock": "../../modules/bar/widgets/Clock.qml",
 }
 
 function normalizeWidgetId(widgetId, widgetSource) {
@@ -69,6 +70,13 @@ var AVAILABLE_WIDGETS = [
         description: "Opens the widget picker panel.",
         section: "right",
         source: "../../modules/bar/widgets/WidgetPickerButton.qml",
+    },
+    {
+        id: "clock",
+        label: "Clock",
+        description: "Compact date and time display.",
+        section: "right",
+        source: "../../modules/bar/widgets/Clock.qml",
     },
 ]
 

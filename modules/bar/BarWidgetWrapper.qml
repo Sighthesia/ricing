@@ -91,13 +91,25 @@ Item {
         visible: !root._isDragging
     }
 
-    // Track passive pointer presence for dockzone floating intent.
+    // Track passive pointer presence and right-click for context menu.
     MouseArea {
         id: pointerArea
 
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.NoButton
+        acceptedButtons: Qt.RightButton
+        propagateComposedEvents: true
+        onClicked: (mouse) => {
+            // Forward right-click to BarContent's context menu with widget context.
+            var barPos = root.mapToItem(null, mouse.x, mouse.y)
+            var barContent = root.parent
+            while (barContent && !barContent.openWidgetContextMenu) {
+                barContent = barContent.parent
+            }
+            if (barContent && barContent.openWidgetContextMenu) {
+                barContent.openWidgetContextMenu(root.widgetInstanceKey, root.widgetId, barPos.x)
+            }
+        }
     }
 
     // --- Drag support (only in settings mode) ---
