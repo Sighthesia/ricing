@@ -72,4 +72,14 @@ Singleton {
             }
         }
     }
+
+    function reloadConfig() {
+        _configReloader.running = true
+    }
+
+    // Trigger niri to reload its config after binds.kdl is written.
+    property Process _configReloader: Process {
+        command: ["niri", "msg", "action", "load-config-file"]
+        running: false
+    }
 }
