@@ -272,3 +272,38 @@ Updated the root AGENTS.md with compact, verified guidance for the Quickshell ap
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Bar Widget Layout System
+
+**Date**: 2026-05-15
+**Task**: Bar Widget Layout System
+**Branch**: `afloat`
+
+### Summary
+
+Implemented full bar widget layout system: settingsMode toggle, drag-and-drop reorder within/across sections, widget removal, DragOverlay insertion indicator, enhanced WidgetPickerWindow with search, right-click context menu (overlay PanelWindow, per-section Add Widget), Clock widget, and extensible widget registry.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `65a853a` | (see git log) |
+| `578be16` | (see git log) |
+| `76a3e6f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
