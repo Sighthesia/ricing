@@ -42,22 +42,25 @@ QtObject {
     Behavior on mOutline { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
     Behavior on mShadow { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
 
-    // Apply loaded colors from adapter (imperative assignment triggers Behavior)
+    // Apply loaded colors from adapter (imperative assignment triggers Behavior).
+    // Use Qt.colorEqual guard: unset color properties default to transparent (#00000000),
+    // so we fall back to defaults only when the adapter value is fully transparent.
     function applyColors() {
-        root.mPrimary = adapter.mPrimary || defaults.mPrimary
-        root.mOnPrimary = adapter.mOnPrimary || defaults.mOnPrimary
-        root.mSecondary = adapter.mSecondary || defaults.mSecondary
-        root.mOnSecondary = adapter.mOnSecondary || defaults.mOnSecondary
-        root.mTertiary = adapter.mTertiary || defaults.mTertiary
-        root.mOnTertiary = adapter.mOnTertiary || defaults.mOnTertiary
-        root.mError = adapter.mError || defaults.mError
-        root.mOnError = adapter.mOnError || defaults.mOnError
-        root.mSurface = adapter.mSurface || defaults.mSurface
-        root.mOnSurface = adapter.mOnSurface || defaults.mOnSurface
-        root.mSurfaceVariant = adapter.mSurfaceVariant || defaults.mSurfaceVariant
-        root.mOnSurfaceVariant = adapter.mOnSurfaceVariant || defaults.mOnSurfaceVariant
-        root.mOutline = adapter.mOutline || defaults.mOutline
-        root.mShadow = adapter.mShadow || defaults.mShadow
+        var d = adapter.dark
+        root.mPrimary = Qt.colorEqual(d.primary, "transparent") ? defaults.mPrimary : d.primary
+        root.mOnPrimary = Qt.colorEqual(d.on_primary, "transparent") ? defaults.mOnPrimary : d.on_primary
+        root.mSecondary = Qt.colorEqual(d.secondary, "transparent") ? defaults.mSecondary : d.secondary
+        root.mOnSecondary = Qt.colorEqual(d.on_secondary, "transparent") ? defaults.mOnSecondary : d.on_secondary
+        root.mTertiary = Qt.colorEqual(d.tertiary, "transparent") ? defaults.mTertiary : d.tertiary
+        root.mOnTertiary = Qt.colorEqual(d.on_tertiary, "transparent") ? defaults.mOnTertiary : d.on_tertiary
+        root.mError = Qt.colorEqual(d.error, "transparent") ? defaults.mError : d.error
+        root.mOnError = Qt.colorEqual(d.on_error, "transparent") ? defaults.mOnError : d.on_error
+        root.mSurface = Qt.colorEqual(d.surface, "transparent") ? defaults.mSurface : d.surface
+        root.mOnSurface = Qt.colorEqual(d.on_surface, "transparent") ? defaults.mOnSurface : d.on_surface
+        root.mSurfaceVariant = Qt.colorEqual(d.surface_variant, "transparent") ? defaults.mSurfaceVariant : d.surface_variant
+        root.mOnSurfaceVariant = Qt.colorEqual(d.on_surface_variant, "transparent") ? defaults.mOnSurfaceVariant : d.on_surface_variant
+        root.mOutline = Qt.colorEqual(d.outline, "transparent") ? defaults.mOutline : d.outline
+        root.mShadow = Qt.colorEqual(d.shadow, "transparent") ? defaults.mShadow : d.shadow
     }
 
     // Debounce reload for atomic file replacements
@@ -109,20 +112,24 @@ QtObject {
 
         JsonAdapter {
             id: adapter
-            property color mPrimary
-            property color mOnPrimary
-            property color mSecondary
-            property color mOnSecondary
-            property color mTertiary
-            property color mOnTertiary
-            property color mError
-            property color mOnError
-            property color mSurface
-            property color mOnSurface
-            property color mSurfaceVariant
-            property color mOnSurfaceVariant
-            property color mOutline
-            property color mShadow
+            // Read the nested "dark" object from colors.json via JsonObject.
+            // Property names must match JSON keys exactly (snake_case).
+            property JsonObject dark: JsonObject {
+                property color primary
+                property color on_primary
+                property color secondary
+                property color on_secondary
+                property color tertiary
+                property color on_tertiary
+                property color error
+                property color on_error
+                property color surface
+                property color on_surface
+                property color surface_variant
+                property color on_surface_variant
+                property color outline
+                property color shadow
+            }
         }
     }
 }

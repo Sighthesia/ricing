@@ -151,8 +151,6 @@ function deriveRendererMetrics(model) {
         bottomEarY: bottomEarY,
         bottomLeftEarX: bottomLeftEarX,
         bottomRightEarX: bottomRightEarX,
-        fillColor: "#ffa742",
-        borderColor: "#14ffffff",
         bodyRadius: g.bodyRadius,
         earRadius: g.earRadius
     };

@@ -127,8 +127,8 @@ Item {
     height: implicitHeight
 
     // Visual constants from model metrics.
-    readonly property color fillColor: Services.Color.mPrimary
-    readonly property color borderColor: metrics.borderColor
+    readonly property color fillColor: Services.Color.mSurface
+    readonly property color borderColor: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.3)
     readonly property int earRadius: metrics.earRadius
     readonly property int bodyRadius: metrics.bodyRadius
     readonly property bool isLeftSection: root.section === "left"
