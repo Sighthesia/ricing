@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Verify the trigger stays localized to wrapper/section composition rather than leaking into services."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that the shared wrapper path is used instead of widget-specific duplication."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Confirm clear responsibility boundaries between wrapper interaction, section mapping, and dockzone owner state."}
+{"file":".trellis/tasks/05-15-center-local-floating-trigger/prd.md","reason":"Validate the implementation against the approved local-trigger scope."}

@@ -38,6 +38,15 @@ Use this reusable shape for compact surfaces that must feel anchored to an edge.
 - Treat the ears as curved edge patches, not detached side bulbs.
 - Preserve continuous morphing when the body grows, shrinks, or changes contents.
 
+### Ear-Body Motion Rules
+
+- Treat each ear as subordinate geometry of its dockzone body, not as an independent decorative object.
+- Ears must inherit the body's global motion by default: translation, scale, opacity, visibility-state, and color-state changes should remain synchronized.
+- If an ear needs a local effect such as detach, exit, or morph, layer that effect on top of the inherited body motion instead of replacing it.
+- When a surface state change removes the need for ears, prefer a continuous ear exit transition over an instant disappearance.
+- If future large-scale motion requires strict ear-body continuity, treat separate overlay-ear ownership as a transitional workaround rather than the final architecture.
+- For ambitious ear/body morphing, prefer one shared geometry owner and one shared parameter model over multiple windows or independently animated shape owners.
+
 Use it for:
 
 - Dock zones
@@ -74,6 +83,7 @@ When changing QML:
 - Keep `PanelWindow`, popup, island, and overlay surfaces visually related through shared radius, translucency, and motion timing.
 - For top bars, model left, center, and right dock zones as persistent containers whose width is animated from their contents.
 - Move capsule components between dock zones by animating position and opacity rather than destroying one instance and creating another.
+- For dockzone ears, centralize shared geometry state before adding large-scale motion so ear/body transforms do not drift apart across states.
 
 ## Anti-Patterns
 
