@@ -7,3 +7,6 @@ singleton NotificationService 1.0 NotificationService.qml
 singleton VolumeService 1.0 VolumeService.qml
 singleton WallpaperService 1.0 WallpaperService.qml
 singleton SettingsService 1.0 SettingsService.qml
+singleton ClipboardService 1.0 ClipboardService.qml
+singleton LauncherService 1.0 LauncherService.qml
+singleton NiriShortcutService 1.0 NiriShortcutService.qml

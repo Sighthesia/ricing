@@ -110,6 +110,24 @@ Variants {
                         Services.BarLayoutService.closeContextMenu()
                     }
                 }
+
+                // Divider before launcher.
+                Rectangle {
+                    width: parent.width - 8
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    height: 1
+                    color: "#333333"
+                }
+
+                // Open launcher overlay.
+                ContextMenuRow {
+                    label: "Launcher"
+                    icon: "\u2315"
+                    onClicked: {
+                        Services.LauncherService.toggle()
+                        Services.BarLayoutService.closeContextMenu()
+                    }
+                }
             }
         }
 

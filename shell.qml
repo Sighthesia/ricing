@@ -5,6 +5,7 @@ import "modules/background" as Background
 import "modules/bar" as Bar
 import "modules/notification" as Notification
 import "modules/settings" as Settings
+import "modules/launcher" as Launcher
 
 // Keep the shell root minimal while layering reusable screen surfaces.
 ShellRoot {
@@ -30,6 +31,10 @@ ShellRoot {
 
     // Settings panel popup triggered from bar right-click.
     Settings.SettingsWindow {
+    }
+
+    // Full-screen launcher overlay triggered from context menu.
+    Launcher.LauncherWindow {
     }
 
 }
