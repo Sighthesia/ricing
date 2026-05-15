@@ -1,6 +1,7 @@
 import "."
 import "DockzoneSurfaceModel.js" as Model
 import QtQuick
+import "../../services" as Services
 
 // Surface-local owner for a dockzone path — first validated on center.
 // Owns semantic state input and animated canonical progress drivers.
@@ -126,7 +127,7 @@ Item {
     height: implicitHeight
 
     // Visual constants from model metrics.
-    readonly property color fillColor: metrics.fillColor
+    readonly property color fillColor: Services.Color.mPrimary
     readonly property color borderColor: metrics.borderColor
     readonly property int earRadius: metrics.earRadius
     readonly property int bodyRadius: metrics.bodyRadius

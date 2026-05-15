@@ -1,14 +1,18 @@
 var SECTION_ORDER = ["left", "center", "right"]
-var PLACEHOLDER_WIDGET_ID = "placeholder"
 var LEGACY_WIDGET_IDS = {
-    "dynamic-island-dock-zone": PLACEHOLDER_WIDGET_ID,
-    "DynamicIslandDockZone": PLACEHOLDER_WIDGET_ID,
+    "dynamic-island-dock-zone": "clock",
+    "DynamicIslandDockZone": "clock",
+    "placeholder": "clock",
+    "widget-picker-button": "clock",
+    "settings": "clock",
 }
 
 var DEFAULT_WIDGET_SOURCE_BY_ID = {
-    "placeholder": "../../modules/bar/widgets/Placeholder.qml",
-    "widget-picker-button": "../../modules/bar/widgets/WidgetPickerButton.qml",
     "clock": "../../modules/bar/widgets/Clock.qml",
+    "tray": "../../modules/bar/widgets/Tray.qml",
+    "active-window": "../../modules/bar/widgets/ActiveWindow.qml",
+    "brightness": "../../modules/bar/widgets/Brightness.qml",
+    "volume": "../../modules/bar/widgets/Volume.qml",
 }
 
 function normalizeWidgetId(widgetId, widgetSource) {
@@ -17,14 +21,14 @@ function normalizeWidgetId(widgetId, widgetSource) {
     }
 
     if (typeof widgetSource === "string" && widgetSource.indexOf("DynamicIslandDockZone") !== -1) {
-        return PLACEHOLDER_WIDGET_ID
+        return "clock"
     }
 
     if (typeof widgetId === "string" && widgetId) {
         return widgetId
     }
 
-    return PLACEHOLDER_WIDGET_ID
+    return "clock"
 }
 
 function normalizeWidgetSource(widgetSource, widgetId) {
@@ -58,25 +62,39 @@ function normalizeWidgetInstanceKey(widgetEntry, widgetId, orderIndex) {
 
 var AVAILABLE_WIDGETS = [
     {
-        id: PLACEHOLDER_WIDGET_ID,
-        label: "Placeholder",
-        description: "Managed center placeholder widget.",
-        section: "center",
-        source: "../../modules/bar/widgets/Placeholder.qml",
-    },
-    {
-        id: "widget-picker-button",
-        label: "Widget Picker",
-        description: "Opens the widget picker panel.",
-        section: "right",
-        source: "../../modules/bar/widgets/WidgetPickerButton.qml",
-    },
-    {
         id: "clock",
         label: "Clock",
         description: "Compact date and time display.",
         section: "right",
         source: "../../modules/bar/widgets/Clock.qml",
+    },
+    {
+        id: "tray",
+        label: "System Tray",
+        description: "System tray icons with menu support.",
+        section: "right",
+        source: "../../modules/bar/widgets/Tray.qml",
+    },
+    {
+        id: "active-window",
+        label: "Active Window",
+        description: "Focused window title.",
+        section: "left",
+        source: "../../modules/bar/widgets/ActiveWindow.qml",
+    },
+    {
+        id: "brightness",
+        label: "Brightness",
+        description: "Screen brightness with scroll control.",
+        section: "right",
+        source: "../../modules/bar/widgets/Brightness.qml",
+    },
+    {
+        id: "volume",
+        label: "Volume",
+        description: "Audio volume with scroll and mute.",
+        section: "right",
+        source: "../../modules/bar/widgets/Volume.qml",
     },
 ]
 
@@ -84,20 +102,12 @@ var DEFAULT_LAYOUT_MODEL = {
     version: 1,
     widgets: [
         {
-            id: PLACEHOLDER_WIDGET_ID,
-            instanceKey: "placeholder:0",
+            id: "clock",
+            instanceKey: "clock:0",
             section: "center",
             order: 0,
             enabled: true,
-            source: "../../modules/bar/widgets/Placeholder.qml",
-        },
-        {
-            id: "widget-picker-button",
-            instanceKey: "widget-picker-button:0",
-            section: "right",
-            order: 0,
-            enabled: true,
-            source: "../../modules/bar/widgets/WidgetPickerButton.qml",
+            source: "../../modules/bar/widgets/Clock.qml",
         },
     ],
 }

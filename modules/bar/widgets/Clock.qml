@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import "../../../services" as Services
 
 // Compact bar clock showing date and time.
 Item {
@@ -23,7 +24,7 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(systemClock.date, "MMM d")
-            color: "#aaaaaa"
+            color: Services.Color.mOnSurfaceVariant
             font.pixelSize: 11
         }
 
@@ -32,14 +33,14 @@ Item {
             width: 1
             height: 12
             anchors.verticalCenter: parent.verticalCenter
-            color: "#555555"
+            color: Services.Color.mOutline
         }
 
         // Time: HH:mm
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(systemClock.date, "hh:mm")
-            color: "#ffffff"
+            color: Services.Color.mOnSurface
             font.pixelSize: 12
             font.bold: true
         }

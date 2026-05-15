@@ -72,16 +72,6 @@ Variants {
                     }
                 }
 
-                // Widget picker entry — opens for the section where right-click occurred.
-                ContextMenuRow {
-                    label: "Add Widget to " + Services.BarLayoutService.contextMenuSection
-                    icon: "+"
-                    onClicked: {
-                        Services.BarLayoutService.openWidgetPicker(Services.BarLayoutService.contextMenuSection)
-                        Services.BarLayoutService.closeContextMenu()
-                    }
-                }
-
                 // Divider before widget-specific actions.
                 Rectangle {
                     width: parent.width - 8
@@ -99,6 +89,24 @@ Variants {
                     destructive: true
                     onClicked: {
                         Services.BarLayoutService.removeWidget(Services.BarLayoutService.contextMenuWidgetKey)
+                        Services.BarLayoutService.closeContextMenu()
+                    }
+                }
+
+                // Divider before settings.
+                Rectangle {
+                    width: parent.width - 8
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    height: 1
+                    color: "#333333"
+                }
+
+                // Open settings panel.
+                ContextMenuRow {
+                    label: "Settings"
+                    icon: "\u2699"
+                    onClicked: {
+                        Services.SettingsService.togglePanel()
                         Services.BarLayoutService.closeContextMenu()
                     }
                 }
