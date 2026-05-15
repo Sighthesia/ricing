@@ -51,9 +51,9 @@ noctalia combines theme mode switching, color scheme selection, and extraction t
 
 This keeps each service focused and testable independently.
 
-### D2: Reuse noctalia Python scripts via symlink
+### D2: Copy noctalia Python scripts (independent maintenance)
 
-The Python color extraction pipeline (`Scripts/python/src/theming/`) is self-contained. Rather than copying, symlink it into afloat's `scripts/` directory. The Process invocation will be:
+The Python color extraction pipeline (`Scripts/python/src/theming/`) is self-contained. Copied into afloat's `scripts/theming/` directory (only `template-processor.py` + `lib/`). The Process invocation will be:
 ```
 python3 <project>/scripts/theming/template-processor.py <wallpaper_path> --dark -o <cache>/colors.json
 ```
@@ -125,7 +125,7 @@ Unlike noctalia's per-screen wallpaper map, V1 uses one wallpaper path for all s
 
 | Choice | Gains | Costs |
 |--------|-------|-------|
-| Symlink Python scripts | Zero maintenance, stays in sync with noctalia | Requires noctalia checkout at known path |
+| Copy Python scripts | Independent, no external path dependency | Must manually sync upstream improvements |
 | File-based color passing | Decoupled, debuggable, external tool compatible | Extra disk I/O, 150ms+ latency |
 | Single wallpaper V1 | Simpler state model | No per-monitor customization |
 | Opacity crossfade V1 | No GLSL complexity | Less visually impressive transitions |

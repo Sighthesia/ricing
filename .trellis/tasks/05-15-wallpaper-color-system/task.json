@@ -3,7 +3,7 @@
   "name": "wallpaper-color-system",
   "title": "Wallpaper Rendering and Material You Color System",
   "description": "Complete wallpaper rendering layer with PanelWindow + WlrLayer.Background, Material You color extraction via noctalia Python scripts, and Color singleton exposing M3 tokens to all QML components.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
