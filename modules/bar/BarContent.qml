@@ -88,17 +88,9 @@ Item {
     DragOverlay {
     }
 
-    // Right-click context menu for bar background and widgets.
-    BarContextMenu {
-        id: contextMenu
-
-        anchors.fill: parent
-        anchorTarget: root
-    }
-
     // Open context menu on widget right-click (called from BarWidgetWrapper).
     function openWidgetContextMenu(instanceKey, widgetId, clickX) {
-        contextMenu.showAt(clickX, instanceKey, widgetId)
+        Services.BarLayoutService.openContextMenu(clickX, instanceKey, widgetId)
     }
 
     // Right-click on empty bar area opens the context menu.
@@ -107,16 +99,16 @@ Item {
         z: -1
         acceptedButtons: Qt.RightButton
         propagateComposedEvents: true
-        onClicked: (mouse) => contextMenu.showAt(mouse.x, "", "")
+        onClicked: (mouse) => Services.BarLayoutService.openContextMenu(mouse.x, "", "")
     }
 
     // Escape key exits settings mode and closes context menu.
     Shortcut {
         sequence: "Escape"
         context: Qt.ApplicationShortcut
-        enabled: Services.BarLayoutService.settingsMode || contextMenu._active
+        enabled: Services.BarLayoutService.settingsMode || Services.BarLayoutService.contextMenuVisible
         onActivated: {
-            contextMenu.dismiss()
+            Services.BarLayoutService.closeContextMenu()
             Services.BarLayoutService.exitSettingsMode()
         }
     }

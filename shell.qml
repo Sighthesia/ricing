@@ -18,4 +18,8 @@ ShellRoot {
     Bar.WidgetPickerWindow {
     }
 
+    // Context menu rendered in its own window to avoid bar-height clipping.
+    Bar.BarContextMenu {
+    }
+
 }

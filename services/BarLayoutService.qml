@@ -33,6 +33,7 @@ QtObject {
     function exitSettingsMode() {
         settingsMode = false
         closeWidgetPicker()
+        closeContextMenu()
         endDrag()
     }
 
@@ -121,6 +122,36 @@ QtObject {
     function resetLayoutModel() {
         layoutAdapter.layoutModel = BarLayoutModel.defaultLayoutModel()
         layoutFile.writeAdapter()
+    }
+
+    // --- Context menu state ---
+    property bool contextMenuVisible: false
+    property real contextMenuX: 0
+    property string contextMenuWidgetKey: ""
+    property string contextMenuWidgetId: ""
+    property string contextMenuSection: "center"
+
+    function openContextMenu(x, instanceKey, widgetId) {
+        contextMenuX = x
+        contextMenuWidgetKey = instanceKey || ""
+        contextMenuWidgetId = widgetId || ""
+        contextMenuSection = _sectionForX(x)
+        contextMenuVisible = true
+    }
+
+    // Determine which section a bar-local X coordinate falls in.
+    function _sectionForX(x) {
+        for (var i = 0; i < sectionBounds.length; i++) {
+            if (x >= sectionBounds[i].left && x <= sectionBounds[i].right)
+                return sectionBounds[i].name
+        }
+        return "center"
+    }
+
+    function closeContextMenu() {
+        contextMenuVisible = false
+        contextMenuWidgetKey = ""
+        contextMenuWidgetId = ""
     }
 
     // --- Widget picker ---
