@@ -1,7 +1,7 @@
 import QtQuick
 import "../../../services" as Services
 
-// Present the widget picker trigger as content inside the shared right dock zone.
+// Toggle layout editing mode and widget picker from the bar.
 Item {
     id: root
 
@@ -10,18 +10,29 @@ Item {
     width: implicitWidth
     height: implicitHeight
 
-    // Keep the add action centered in the dock zone body.
+    // Visual indicator: icon changes based on settings mode state.
     Text {
         anchors.centerIn: parent
-        text: "+"
-        color: "white"
+        text: Services.BarLayoutService.settingsMode ? "\u2715" : "+"
+        color: Services.BarLayoutService.settingsMode ? "#ff8888" : "white"
         font.pixelSize: 18
+
+        Behavior on color {
+            ColorAnimation { duration: 150 }
+        }
     }
 
-    // Open the widget picker on click.
+    // Toggle settings mode on click; if entering, also open picker.
     MouseArea {
         anchors.fill: parent
-        onClicked: Services.BarLayoutService.toggleWidgetPicker("center")
+        cursorShape: Qt.PointingHandCursor
+        onClicked: {
+            if (Services.BarLayoutService.settingsMode) {
+                Services.BarLayoutService.exitSettingsMode()
+            } else {
+                Services.BarLayoutService.openWidgetPicker("center")
+            }
+        }
     }
 
 }

@@ -5,8 +5,9 @@ import Quickshell.Io
 import "barlayout/BarLayoutLayoutModel.js" as BarLayoutModel
 import "barlayout/BarLayoutSections.js" as BarLayoutSections
 import "barlayout/BarLayoutPersistence.js" as BarLayoutPersistence
+import "barlayout/BarLayoutDrag.js" as BarLayoutDrag
 
-// Own the default bar layout and expose section lookup helpers.
+// Own the bar layout state: model, editing mode, drag, persistence.
 QtObject {
     id: root
 
@@ -18,6 +19,88 @@ QtObject {
     property bool widgetPickerVisible: false
     property string widgetPickerSection: "center"
 
+    // --- Layout editing mode ---
+    property bool settingsMode: false
+
+    function toggleSettingsMode() {
+        settingsMode = !settingsMode
+        if (!settingsMode) {
+            closeWidgetPicker()
+            endDrag()
+        }
+    }
+
+    function exitSettingsMode() {
+        settingsMode = false
+        closeWidgetPicker()
+        endDrag()
+    }
+
+    // --- Drag state ---
+    property bool isDragging: false
+    property string draggedInstanceKey: ""
+    property string draggedWidgetId: ""
+    property real dragVisualCenterX: 0
+    property string ghostSection: ""
+    property int ghostIndex: -1
+
+    // Section pixel bounds — updated by BarContent when layout changes.
+    // Format: [{name: "left", left: 0, right: 200}, ...]
+    property var sectionBounds: []
+
+    // Widget centers per section — updated by BarContent on geometry changes.
+    // Format: {sectionName: [{instanceKey, centerX}]}
+    property var widgetCentersBySection: ({})
+
+    function beginDrag(instanceKey, widgetId, startCenterX) {
+        if (!settingsMode) return
+        var state = BarLayoutDrag.beginDragState(instanceKey, widgetId, startCenterX)
+        isDragging = state.active
+        draggedInstanceKey = state.instanceKey
+        draggedWidgetId = state.widgetId
+        dragVisualCenterX = state.visualCenterX
+        ghostSection = ""
+        ghostIndex = -1
+    }
+
+    function updateDrag(visualCenterX) {
+        if (!isDragging) return
+        var state = BarLayoutDrag.updateDragState(
+            visualCenterX, sectionBounds, widgetCentersBySection, draggedInstanceKey
+        )
+        dragVisualCenterX = state.visualCenterX
+        ghostSection = state.ghostSection
+        ghostIndex = state.ghostIndex
+    }
+
+    function endDrag() {
+        if (!isDragging) {
+            draggedInstanceKey = ""
+            return
+        }
+
+        var result = BarLayoutDrag.endDragResult(ghostSection, ghostIndex, draggedInstanceKey)
+        isDragging = false
+
+        if (result.section && result.instanceKey) {
+            moveWidget(result.instanceKey, result.section, result.index)
+        }
+
+        draggedInstanceKey = ""
+        draggedWidgetId = ""
+        ghostSection = ""
+        ghostIndex = -1
+    }
+
+    function cancelDrag() {
+        isDragging = false
+        draggedInstanceKey = ""
+        draggedWidgetId = ""
+        ghostSection = ""
+        ghostIndex = -1
+    }
+
+    // --- Mutations ---
     function saveLayoutModel(nextLayoutModel) {
         layoutAdapter.layoutModel = BarLayoutModel.normalizeLayoutModel(nextLayoutModel)
         layoutFile.writeAdapter()
@@ -27,9 +110,24 @@ QtObject {
         saveLayoutModel(BarLayoutModel.addWidgetToSection(layoutModel, widgetId, sectionName))
     }
 
+    function removeWidget(instanceKey) {
+        saveLayoutModel(BarLayoutModel.removeWidgetByKey(layoutModel, instanceKey))
+    }
+
+    function moveWidget(instanceKey, toSection, toOrder) {
+        saveLayoutModel(BarLayoutModel.moveWidgetToSection(layoutModel, instanceKey, toSection, toOrder))
+    }
+
+    function resetLayoutModel() {
+        layoutAdapter.layoutModel = BarLayoutModel.defaultLayoutModel()
+        layoutFile.writeAdapter()
+    }
+
+    // --- Widget picker ---
     function openWidgetPicker(sectionName) {
         widgetPickerSection = typeof sectionName === "string" && sectionName ? sectionName : "center"
         widgetPickerVisible = true
+        if (!settingsMode) settingsMode = true
     }
 
     function closeWidgetPicker() {
@@ -41,21 +139,16 @@ QtObject {
             closeWidgetPicker()
             return
         }
-
         openWidgetPicker(sectionName)
     }
 
-    function resetLayoutModel() {
-        layoutAdapter.layoutModel = BarLayoutModel.defaultLayoutModel()
-        layoutFile.writeAdapter()
-    }
-
+    // --- Query helpers ---
     function sectionWidgets(sectionName) {
-        return BarLayoutModel.sectionWidgets(layoutModel, sectionName);
+        return BarLayoutModel.sectionWidgets(layoutModel, sectionName)
     }
 
     function sectionWidth(sectionModel) {
-        return BarLayoutSections.sectionWidth(sectionModel);
+        return BarLayoutSections.sectionWidth(sectionModel)
     }
 
     // Persist the normalized layout model in the shell state directory.

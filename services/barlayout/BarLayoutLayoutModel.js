@@ -281,3 +281,142 @@ function sectionWidgets(layoutModel, sectionName) {
         return widgetEntry.enabled && widgetEntry.section === sectionName
     })
 }
+
+// Remove a widget by instanceKey and return the updated layout model.
+function removeWidgetByKey(layoutModel, instanceKey) {
+    var normalizedLayoutModel = normalizeLayoutModel(layoutModel)
+
+    var nextWidgets = normalizedLayoutModel.widgets.filter(function (widgetEntry) {
+        return widgetEntry.instanceKey !== instanceKey
+    })
+
+    if (nextWidgets.length === normalizedLayoutModel.widgets.length) {
+        return normalizedLayoutModel
+    }
+
+    return normalizeLayoutModel({ version: 1, widgets: nextWidgets })
+}
+
+// Move a widget to a new position within the same section (reorder).
+// toOrder is the target index among same-section widgets.
+function moveWidgetInSection(layoutModel, instanceKey, toOrder) {
+    var normalizedLayoutModel = normalizeLayoutModel(layoutModel)
+    var widgets = normalizedLayoutModel.widgets
+
+    var movingWidget = null
+    var sectionWidgetsList = []
+
+    for (var i = 0; i < widgets.length; i++) {
+        if (widgets[i].instanceKey === instanceKey) {
+            movingWidget = cloneLayoutModel(widgets[i])
+        }
+        if (movingWidget && widgets[i].section === movingWidget.section && widgets[i].instanceKey !== instanceKey) {
+            sectionWidgetsList.push(cloneLayoutModel(widgets[i]))
+        }
+    }
+
+    // Second pass if movingWidget was found late
+    if (movingWidget) {
+        sectionWidgetsList = []
+        for (var j = 0; j < widgets.length; j++) {
+            if (widgets[j].section === movingWidget.section && widgets[j].instanceKey !== instanceKey) {
+                sectionWidgetsList.push(cloneLayoutModel(widgets[j]))
+            }
+        }
+    }
+
+    if (!movingWidget) {
+        return normalizedLayoutModel
+    }
+
+    // Clamp toOrder
+    var clampedOrder = Math.max(0, Math.min(toOrder, sectionWidgetsList.length))
+
+    // Insert at the target position
+    sectionWidgetsList.splice(clampedOrder, 0, movingWidget)
+
+    // Reassign order values
+    for (var k = 0; k < sectionWidgetsList.length; k++) {
+        sectionWidgetsList[k].order = k
+    }
+
+    // Rebuild full widget list: keep other sections unchanged, replace this section
+    var otherWidgets = widgets.filter(function (w) {
+        return w.section !== movingWidget.section
+    }).map(function (w) { return cloneLayoutModel(w) })
+
+    var allWidgets = otherWidgets.concat(sectionWidgetsList)
+    return normalizeLayoutModel({ version: 1, widgets: allWidgets })
+}
+
+// Move a widget to a different section at a given order position.
+function moveWidgetToSection(layoutModel, instanceKey, toSection, toOrder) {
+    var normalizedLayoutModel = normalizeLayoutModel(layoutModel)
+    var widgets = normalizedLayoutModel.widgets
+
+    var movingWidget = null
+    for (var i = 0; i < widgets.length; i++) {
+        if (widgets[i].instanceKey === instanceKey) {
+            movingWidget = cloneLayoutModel(widgets[i])
+            break
+        }
+    }
+
+    if (!movingWidget) {
+        return normalizedLayoutModel
+    }
+
+    // If same section, delegate to in-section reorder
+    if (movingWidget.section === toSection) {
+        return moveWidgetInSection(layoutModel, instanceKey, toOrder)
+    }
+
+    // Collect target section widgets (excluding the moving one)
+    var targetSectionWidgets = []
+    for (var j = 0; j < widgets.length; j++) {
+        if (widgets[j].section === toSection && widgets[j].instanceKey !== instanceKey) {
+            targetSectionWidgets.push(cloneLayoutModel(widgets[j]))
+        }
+    }
+
+    // Update moving widget's section
+    movingWidget.section = toSection
+
+    // Insert at target position
+    var clampedOrder = Math.max(0, Math.min(toOrder, targetSectionWidgets.length))
+    targetSectionWidgets.splice(clampedOrder, 0, movingWidget)
+
+    // Reassign order values for target section
+    for (var k = 0; k < targetSectionWidgets.length; k++) {
+        targetSectionWidgets[k].order = k
+    }
+
+    // Rebuild: keep widgets from other sections (excluding moving widget), add target section
+    var otherWidgets = widgets.filter(function (w) {
+        return w.section !== toSection && w.instanceKey !== instanceKey
+    }).map(function (w) { return cloneLayoutModel(w) })
+
+    // Renormalize source section orders
+    var sourceSection = movingWidget.section
+    // Actually the source section is the original section before move
+    var originalSection = null
+    for (var m = 0; m < widgets.length; m++) {
+        if (widgets[m].instanceKey === instanceKey) {
+            originalSection = widgets[m].section
+            break
+        }
+    }
+
+    if (originalSection && originalSection !== toSection) {
+        var sourceSectionWidgets = otherWidgets.filter(function (w) {
+            return w.section === originalSection
+        })
+        sourceSectionWidgets.sort(function (a, b) { return a.order - b.order })
+        for (var n = 0; n < sourceSectionWidgets.length; n++) {
+            sourceSectionWidgets[n].order = n
+        }
+    }
+
+    var allWidgets = otherWidgets.concat(targetSectionWidgets)
+    return normalizeLayoutModel({ version: 1, widgets: allWidgets })
+}
