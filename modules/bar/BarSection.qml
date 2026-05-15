@@ -11,27 +11,30 @@ Item {
     required property string screenName
     property bool floatingValidationIntent: false
     readonly property var sectionModel: Services.BarLayoutService.sectionWidgets(sectionName)
-    readonly property string centerSurfaceState: root.sectionName === "center" && root.sectionModel.length > 0 ? (root.floatingValidationIntent ? "floating" : "attached") : "hidden"
+    readonly property bool hasSectionContent: root.sectionModel.length > 0
+    readonly property string surfaceState: root.sectionName === "center"
+        ? (root.hasSectionContent ? (root.floatingValidationIntent ? "floating" : "attached") : "hidden")
+        : (root.hasSectionContent ? "attached" : "hidden")
 
-    implicitHeight: Services.BarLayoutService.barHeight
+    implicitHeight: surfaceLoader.item ? surfaceLoader.item.implicitHeight : Services.BarLayoutService.barHeight
     implicitWidth: surfaceLoader.item ? surfaceLoader.item.implicitWidth : 0
     width: implicitWidth
     height: implicitHeight
 
-    // Route center through the new surface owner; left/right keep the legacy path.
+    // Route every section through the unified surface owner.
     Loader {
         id: surfaceLoader
 
         active: true
-        sourceComponent: root.sectionName === "center" ? centerSurface : legacySurface
+        sourceComponent: surfaceShell
     }
 
-    // Center path: owner-managed surface with model-driven rendering.
+    // Unified path: owner-managed surface with section-aware model-driven rendering.
     Component {
-        id: centerSurface
+        id: surfaceShell
 
         Item {
-            id: centerSurfaceRoot
+            id: surfaceRoot
 
             implicitWidth: dockzone.implicitWidth
             implicitHeight: dockzone.implicitHeight
@@ -39,10 +42,13 @@ Item {
             height: implicitHeight
 
             function syncCenterFloatingValidationIntent() {
+                if (root.sectionName !== "center")
+                    return;
+
                 var hasLocalPointerIntent = false;
 
-                for (var i = 0; i < centerRow.children.length; ++i) {
-                    var child = centerRow.children[i];
+                for (var i = 0; i < sectionRow.children.length; ++i) {
+                    var child = sectionRow.children[i];
                     if (child && child.localPointerIntent) {
                         hasLocalPointerIntent = true;
                         break;
@@ -59,15 +65,15 @@ Item {
 
                 section: root.sectionName
                 screenName: root.screenName
-                surfaceHeight: root.implicitHeight
-                contentWidth: centerRow.implicitWidth
-                contentHeight: centerRow.implicitHeight
-                surfaceState: root.centerSurfaceState
+                surfaceHeight: Services.BarLayoutService.barHeight
+                contentWidth: sectionRow.implicitWidth
+                contentHeight: sectionRow.implicitHeight
+                surfaceState: root.surfaceState
                 anchors.fill: parent
 
                 // Lay out widgets for this section in order.
                 Row {
-                    id: centerRow
+                    id: sectionRow
 
                     z: 1
                     x: parent.bodyX + (parent.bodyWidth - width) / 2
@@ -86,52 +92,9 @@ Item {
                             widgetEntry: root.sectionModel[index]
                             widgetSource: Qt.resolvedUrl(widgetEntry.source)
 
-                            onLocalPointerIntentChanged: centerSurfaceRoot.syncCenterFloatingValidationIntent()
+                            onLocalPointerIntentChanged: surfaceRoot.syncCenterFloatingValidationIntent()
                         }
 
-                    }
-
-                }
-
-            }
-
-        }
-
-    }
-
-    // Left/right path: legacy background kept until full migration.
-    Component {
-        id: legacySurface
-
-        BarDockZoneBackground {
-            screenName: root.screenName
-            sectionType: root.sectionName
-            surfaceHeight: root.implicitHeight
-            contentWidth: legacyRow.implicitWidth
-            contentHeight: legacyRow.implicitHeight
-
-            // Lay out widgets for this section in order.
-            Row {
-                id: legacyRow
-
-                z: 1
-                x: parent.bodyX + (parent.bodyWidth - width) / 2
-                y: parent.bodyY + (parent.bodyHeight - height) / 2
-                spacing: BarLayoutSections.widgetSpacing
-
-                // Instantiate each managed widget in sequence.
-                Repeater {
-                    id: legacyRepeater
-
-                    model: root.sectionModel.length
-
-                    // Keep each widget wrapper as the delegate so its implicit size drives the row.
-                    BarWidgetWrapper {
-                        required property int index
-
-                        screenName: root.screenName
-                        widgetEntry: root.sectionModel[index]
-                        widgetSource: Qt.resolvedUrl(widgetEntry.source)
                     }
 
                 }

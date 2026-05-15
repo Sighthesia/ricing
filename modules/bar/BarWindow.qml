@@ -1,5 +1,4 @@
 import "."
-import "../../services" as Services
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
@@ -16,7 +15,7 @@ Variants {
 
         screen: modelData
         color: "transparent"
-        implicitHeight: Services.BarLayoutService.barHeight
+        implicitHeight: barContent.implicitHeight
 
         anchors {
             top: true

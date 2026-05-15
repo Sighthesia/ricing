@@ -26,6 +26,9 @@ function buildModel(inputs) {
     var surfaceHeight = inputs.surfaceHeight || 0;
     var contentWidth = inputs.contentWidth || 0;
     var contentHeight = inputs.contentHeight || 0;
+    var isCenter = section === "center";
+    var isLeft = section === "left";
+    var isRight = section === "right";
 
     // Owner-supplied canonical progress drivers — fall back to state-derived
     // defaults when the owner has not yet wired real animated values.
@@ -43,15 +46,16 @@ function buildModel(inputs) {
     var bodyRadius = 14;
     var horizontalPadding = 18;
     var verticalPadding = 8;
+    var bottomEarEnvelope = isCenter ? 0 : earRadius;
 
     var hasContent = contentWidth > 0 && contentHeight > 0 && surfaceHeight > 0;
     var bodyWidth = hasContent ? Math.max(contentWidth + horizontalPadding * 2, 0) : 0;
     var totalHeight = hasContent ? Math.max(contentHeight + verticalPadding * 2, surfaceHeight) : 0;
     var bodyHeight = hasContent ? totalHeight : 0;
-    var bodyX = earRadius;
+    var bodyX = isLeft ? 0 : earRadius;
     var bodyY = 0;
-    var containerWidth = hasContent ? bodyWidth + earRadius * 2 : 0;
-    var containerHeight = hasContent ? totalHeight : 0;
+    var containerWidth = hasContent ? bodyWidth + (isCenter ? earRadius * 2 : earRadius) : 0;
+    var containerHeight = hasContent ? totalHeight + bottomEarEnvelope : 0;
 
     var floatingBlend = surfaceState === "floating" ? Math.max(detachProgress, morphProgress) : 0;
 
@@ -78,6 +82,7 @@ function buildModel(inputs) {
             visibleBodyHeight: bodyHeight,
             containerWidth: containerWidth,
             containerHeight: containerHeight,
+            bottomEarEnvelope: bottomEarEnvelope,
             bodyRadius: bodyRadius,
             earRadius: earRadius
         },
@@ -123,6 +128,14 @@ function deriveRendererMetrics(model) {
 
     var hasLeftTopEar = section === "center" || section === "right";
     var hasTopRightEar = section === "center" || section === "left";
+    var hasBottomLeftEar = section === "left";
+    var hasBottomRightEar = section === "right";
+    var bottomEarY = g.visibleBodyHeight;
+    var bodyX = hasLeftTopEar ? g.earRadius : 0;
+    // Left bottom ear attaches at the body's inner edge (earRadius from left).
+    var bottomLeftEarX = hasBottomLeftEar ? g.earRadius : 0;
+    // Right bottom ear attaches at the body's right edge.
+    var bottomRightEarX = hasBottomRightEar ? bodyX + g.visibleBodyWidth - g.earRadius : 0;
 
     return {
         bodyX: hasLeftTopEar ? g.earRadius : 0,
@@ -133,6 +146,11 @@ function deriveRendererMetrics(model) {
         containerHeight: g.containerHeight,
         hasLeftTopEar: hasLeftTopEar,
         hasTopRightEar: hasTopRightEar,
+        hasBottomLeftEar: hasBottomLeftEar,
+        hasBottomRightEar: hasBottomRightEar,
+        bottomEarY: bottomEarY,
+        bottomLeftEarX: bottomLeftEarX,
+        bottomRightEarX: bottomRightEarX,
         fillColor: "#ffa742",
         borderColor: "#14ffffff",
         bodyRadius: g.bodyRadius,

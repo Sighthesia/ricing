@@ -130,6 +130,8 @@ Item {
     readonly property color borderColor: metrics.borderColor
     readonly property int earRadius: metrics.earRadius
     readonly property int bodyRadius: metrics.bodyRadius
+    readonly property bool isLeftSection: root.section === "left"
+    readonly property bool isRightSection: root.section === "right"
 
     // Root-level global motion envelope — body and ears inherit these so
     // the entire surface moves as one continuous object.
@@ -194,13 +196,62 @@ Item {
             ctx.strokeStyle = root.borderColor;
             ctx.lineWidth = 1;
             ctx.beginPath();
-            // Center: both bottom corners rounded.
-            ctx.moveTo(0, 0);
-            ctx.lineTo(w, 0);
-            ctx.lineTo(w, h - radius);
-            ctx.quadraticCurveTo(w, h, w - radius, h);
-            ctx.lineTo(radius, h);
-            ctx.quadraticCurveTo(0, h, 0, h - radius);
+            if (root.isRightSection) {
+                // Right: only the bottom-left corner stays rounded.
+                ctx.moveTo(0, 0);
+                ctx.lineTo(w, 0);
+                ctx.lineTo(w, h);
+                ctx.lineTo(radius, h);
+                ctx.quadraticCurveTo(0, h, 0, h - radius);
+            } else if (root.isLeftSection) {
+                // Left: only the bottom-right corner stays rounded.
+                ctx.moveTo(0, 0);
+                ctx.lineTo(w, 0);
+                ctx.lineTo(w, h - radius);
+                ctx.quadraticCurveTo(w, h, w - radius, h);
+                ctx.lineTo(0, h);
+            } else {
+                // Center: both bottom corners rounded.
+                ctx.moveTo(0, 0);
+                ctx.lineTo(w, 0);
+                ctx.lineTo(w, h - radius);
+                ctx.quadraticCurveTo(w, h, w - radius, h);
+                ctx.lineTo(radius, h);
+                ctx.quadraticCurveTo(0, h, 0, h - radius);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        onHeightChanged: requestPaint()
+        onWidthChanged: requestPaint()
+    }
+
+    // Paint the left-side bottom ear inside the unified surface tree.
+    Canvas {
+        id: leftBottomEar
+
+        z: 0
+        x: root.metrics.bottomLeftEarX
+        y: root.metrics.bottomEarY
+        width: root.earRadius
+        height: root.earRadius
+        antialiasing: true
+        visible: root.model.state.visibilityProgress > 0 && root.metrics.hasBottomLeftEar
+        onPaint: {
+            var ctx = getContext("2d");
+            var w = width;
+            var h = height;
+            var curve = Math.min(w, h);
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = root.fillColor;
+            ctx.strokeStyle = root.borderColor;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(w, h);
+            ctx.lineTo(0, h);
+            ctx.lineTo(0, 0);
+            ctx.arc(w, 0, curve, Math.PI, Math.PI / 2, true);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
@@ -233,6 +284,38 @@ Item {
             ctx.moveTo(0, 0);
             ctx.lineTo(0, h);
             ctx.arc(w, h, curve, Math.PI, -Math.PI / 2, false);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        onHeightChanged: requestPaint()
+        onWidthChanged: requestPaint()
+    }
+
+    // Paint the right-side bottom ear inside the unified surface tree.
+    Canvas {
+        id: rightBottomEar
+
+        z: 0
+        x: root.metrics.bottomRightEarX
+        y: root.metrics.bottomEarY - 1
+        width: root.earRadius
+        height: root.earRadius
+        antialiasing: true
+        visible: root.model.state.visibilityProgress > 0 && root.metrics.hasBottomRightEar
+        onPaint: {
+            var ctx = getContext("2d");
+            var w = width;
+            var h = height;
+            var curve = Math.min(w, h);
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = root.fillColor;
+            ctx.strokeStyle = root.borderColor;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(w, 0);
+            ctx.lineTo(0, 0);
+            ctx.arc(0, h, curve, -Math.PI / 2, 0, false);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();

@@ -14,10 +14,6 @@ ShellRoot {
     Bar.BarWindow {
     }
 
-    // Render dedicated overlay windows for the side dockzone bottom ears.
-    Bar.BarBottomEarWindow {
-    }
-
     // Keep the minimal widget picker available as a separate bar-owned window.
     Bar.WidgetPickerWindow {
     }
