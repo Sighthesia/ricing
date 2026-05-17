@@ -148,6 +148,10 @@ function _extractShellIpcActionId(normalized) {
         return "shell.launcher.toggle"
     if (normalized.indexOf("afloat-ipc\" \"openclipboard") >= 0)
         return "shell.launcher.openClipboard"
+    if (normalized.indexOf("afloat-ipc\" \"openshortcuts") >= 0)
+        return "shell.launcher.openShortcuts"
+    if (normalized.indexOf("afloat-ipc\" \"settings\" \"toggle") >= 0)
+        return "shell.settings.toggle"
 
     return ""
 }

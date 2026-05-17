@@ -16,6 +16,13 @@ QtObject {
     function togglePanel() { panelVisible = !panelVisible }
     function closePanel() { panelVisible = false }
 
+    // Expose settings visibility over Quickshell IPC for compositor-managed hotkeys.
+    property IpcHandler ipc: IpcHandler {
+        target: "settings"
+
+        function toggle() { root.togglePanel() }
+    }
+
     function save() {
         debounce.restart()
     }

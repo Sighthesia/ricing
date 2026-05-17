@@ -5,6 +5,8 @@ import Quickshell.Io
 
 // Manages launcher visibility, query input, and mode derivation.
 Singleton {
+    id: root
+
     property bool visible: false
     property string query: ""
 
@@ -14,6 +16,8 @@ Singleton {
         if (query.startsWith(">key ")) return "shortcuts"
         return "apps"
     }
+
+    Component.onCompleted: NiriService.syncManagedHotkeys()
 
     function open() { visible = true }
     function close() { visible = false; query = "" }

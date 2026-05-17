@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -eu
+
+if [ "$#" -lt 2 ]; then
+    printf 'usage: %s <target> <function> [args...]\n' "$0" >&2
+    exit 64
+fi
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+CONFIG_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+
+exec qs ipc -p "$CONFIG_DIR" call "$@"
