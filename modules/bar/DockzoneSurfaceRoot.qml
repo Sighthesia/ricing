@@ -234,7 +234,7 @@ Item {
 
         z: 0
         x: root.metrics.bottomLeftEarX
-        y: root.metrics.bottomEarY
+        y: root.metrics.bottomEarY - 1
         width: root.earRadius
         height: root.earRadius
         antialiasing: true
@@ -245,6 +245,10 @@ Item {
             var h = height;
             var curve = Math.min(w, h);
             ctx.clearRect(0, 0, w, h);
+            ctx.save();
+            ctx.translate(w / 2, h / 2);
+            ctx.rotate(Math.PI / 2);
+            ctx.translate(-w / 2, -h / 2);
             ctx.fillStyle = root.fillColor;
             ctx.strokeStyle = root.borderColor;
             ctx.lineWidth = 1;
@@ -256,6 +260,7 @@ Item {
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
+            ctx.restore();
         }
         onHeightChanged: requestPaint()
         onWidthChanged: requestPaint()

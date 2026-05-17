@@ -132,8 +132,8 @@ function deriveRendererMetrics(model) {
     var hasBottomRightEar = section === "right";
     var bottomEarY = g.visibleBodyHeight;
     var bodyX = hasLeftTopEar ? g.earRadius : 0;
-    // Left bottom ear attaches at the body's inner edge (earRadius from left).
-    var bottomLeftEarX = hasBottomLeftEar ? g.earRadius : 0;
+    // Left bottom ear now anchors flush to the screen edge.
+    var bottomLeftEarX = 0;
     // Right bottom ear attaches at the body's right edge.
     var bottomRightEarX = hasBottomRightEar ? bodyX + g.visibleBodyWidth - g.earRadius : 0;
 
