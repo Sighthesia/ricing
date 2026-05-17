@@ -84,6 +84,16 @@ Item {
 
             Component.onCompleted: syncCenterFloatingValidationIntent()
 
+            // Track hover across the full center dockzone, not only on widget delegates.
+            MouseArea {
+                id: sectionHoverArea
+
+                anchors.fill: surfaceRoot
+                enabled: root.sectionName === "center" && root.hasSectionContent
+                hoverEnabled: enabled
+                acceptedButtons: Qt.NoButton
+            }
+
             DockzoneSurfaceRoot {
                 id: dockzone
 
@@ -93,6 +103,7 @@ Item {
                 contentWidth: sectionRow.implicitWidth
                 contentHeight: sectionRow.implicitHeight
                 surfaceState: root.surfaceState
+                hoverIntent: sectionHoverArea.containsMouse
                 anchors.fill: parent
 
                 // Lay out widgets for this section in order.

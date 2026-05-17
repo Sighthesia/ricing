@@ -18,6 +18,7 @@ var _hiddenOffsetY = -4;
  * @param {number} [inputs.stateTransitionProgress] - Owner-supplied canonical transition driver (0..1)
  * @param {number} [inputs.detachProgress] - Owner-supplied ear detach driver (0..1)
  * @param {number} [inputs.morphProgress] - Owner-supplied morph driver (0..1)
+ * @param {number} [inputs.hoverProgress] - Owner-supplied hover driver (0..1)
  * @returns {Object} Contract-shaped model object
  */
 function buildModel(inputs) {
@@ -40,6 +41,7 @@ function buildModel(inputs) {
         : 0;
     var detachProgress = inputs.detachProgress !== undefined ? inputs.detachProgress : 0;
     var morphProgress = inputs.morphProgress !== undefined ? inputs.morphProgress : 0;
+    var hoverProgress = inputs.hoverProgress !== undefined ? inputs.hoverProgress : 0;
 
     // Geometry baselines — match current BarDockZoneBackground defaults.
     var earRadius = 24;
@@ -58,12 +60,14 @@ function buildModel(inputs) {
     var containerHeight = hasContent ? totalHeight + bottomEarEnvelope : 0;
 
     var floatingBlend = surfaceState === "floating" ? Math.max(detachProgress, morphProgress) : 0;
+    var hoverBlend = section === "center" ? hoverProgress : 0;
+    var motionBlend = Math.max(floatingBlend, hoverBlend);
 
     // Derive global motion from visibility and floating semantics — body and ears stay continuous.
     var opacity = visibilityProgress;
-    var scale = _hiddenScale + (1 - _hiddenScale) * visibilityProgress + floatingBlend * 0.02;
-    var translateX = floatingBlend * 1.5;
-    var translateY = _hiddenOffsetY * (1 - visibilityProgress) - floatingBlend * 1.5;
+    var scale = _hiddenScale + (1 - _hiddenScale) * visibilityProgress + motionBlend * 0.03;
+    var translateX = 0;
+    var translateY = _hiddenOffsetY * (1 - visibilityProgress);
 
     return {
         identity: {
@@ -75,7 +79,8 @@ function buildModel(inputs) {
             visibilityProgress: visibilityProgress,
             stateTransitionProgress: stateTransitionProgress,
             morphProgress: morphProgress,
-            detachProgress: detachProgress
+            detachProgress: detachProgress,
+            hoverProgress: hoverProgress
         },
         geometry: {
             visibleBodyWidth: bodyWidth,
@@ -91,12 +96,13 @@ function buildModel(inputs) {
             translateY: translateY,
             scale: scale,
             opacity: opacity,
-            colorProgress: floatingBlend
+            colorProgress: motionBlend
         },
         leftEar: {
             presence: 1 - floatingBlend * 0.05,
             morphProgress: morphProgress,
             detachProgress: detachProgress,
+            hoverProgress: hoverProgress,
             offsetX: floatingBlend * -0.5,
             offsetY: floatingBlend * -1
         },
@@ -104,6 +110,7 @@ function buildModel(inputs) {
             presence: 1 - floatingBlend * 0.05,
             morphProgress: morphProgress,
             detachProgress: detachProgress,
+            hoverProgress: hoverProgress,
             offsetX: floatingBlend * 0.5,
             offsetY: floatingBlend * -1
         },

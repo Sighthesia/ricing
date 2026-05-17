@@ -12,6 +12,7 @@ Item {
     required property string section
     required property string screenName
     property string surfaceState: "attached"
+    property bool hoverIntent: false
     required property real surfaceHeight
     required property real contentWidth
     required property real contentHeight
@@ -23,6 +24,7 @@ Item {
     property real _stateTransitionProgress: 1
     property real _detachProgress: 0
     property real _morphProgress: 0
+    property real _hoverProgress: 0
 
     // Map a target semantic state to canonical progress targets.
     function _targetsForState(state) {
@@ -32,6 +34,12 @@ Item {
             return {v: 1, t: 1, d: 1, m: 1};
         // "entering" and "attached" both target full visibility.
         return {v: 1, t: 1, d: 0, m: 0};
+    }
+
+    function _targetHoverProgress() {
+        if (section !== "center")
+            return 0;
+        return hoverIntent ? 1 : 0;
     }
 
     // Trigger a transition to the given semantic state.
@@ -58,10 +66,18 @@ Item {
         _stateTransitionProgress = targets.t;
         _detachProgress = targets.d;
         _morphProgress = targets.m;
+        _hoverProgress = _targetHoverProgress();
     }
 
     // React to external surfaceState changes.
     onSurfaceStateChanged: transitionTo(surfaceState)
+
+    // Keep center hover intent on the floating path even before the semantic state flips.
+    onHoverIntentChanged: {
+        if (section !== "center")
+            return;
+        _hoverAnim.restart();
+    }
 
     NumberAnimation {
         id: _visAnim
@@ -99,6 +115,19 @@ Item {
         easing.type: Easing.InOutQuad
     }
 
+    Behavior on _hoverProgress {
+        SpringAnimation { spring: 6.5; damping: 0.88; mass: 1.0; epsilon: 0.01 }
+    }
+
+    NumberAnimation {
+        id: _hoverAnim
+
+        target: root
+        property: "_hoverProgress"
+        duration: 180
+        easing.type: Easing.OutQuad
+    }
+
     // Build the contract model from semantic inputs plus owner progress.
     readonly property var model: Model.buildModel({
         section: root.section,
@@ -109,7 +138,8 @@ Item {
         visibilityProgress: root._visibilityProgress,
         stateTransitionProgress: root._stateTransitionProgress,
         detachProgress: root._detachProgress,
-        morphProgress: root._morphProgress
+        morphProgress: root._morphProgress,
+        hoverProgress: root._hoverProgress
     })
 
     // Derive renderer-facing metrics from the contract model.
