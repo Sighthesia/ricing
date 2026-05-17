@@ -103,6 +103,7 @@ Item {
 
             anchors.verticalCenter: parent.verticalCenter
             width: Math.min(titleText.implicitWidth, 184)
+            height: titleText.implicitHeight
             opacity: 1
 
             Behavior on width {
