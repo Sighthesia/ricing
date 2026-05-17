@@ -25,6 +25,10 @@ ShellRoot {
     Bar.BarContextMenu {
     }
 
+    // Widget picker rendered in its own window so empty sections can recover widgets.
+    Bar.WidgetPickerWindow {
+    }
+
     // Transient notification popups on overlay layer.
     Notification.NotificationWindow {
     }

@@ -16,6 +16,8 @@ QtObject {
     readonly property var availableWidgets: BarLayoutModel.availableWidgets()
 
     readonly property bool layoutReady: layoutFile.loaded
+    property bool widgetPickerVisible: false
+    property string widgetPickerSection: "center"
 
     // --- Layout editing mode ---
     property bool settingsMode: false
@@ -29,6 +31,7 @@ QtObject {
 
     function exitSettingsMode() {
         settingsMode = false
+        closeWidgetPicker()
         closeContextMenu()
         endDrag()
     }
@@ -148,6 +151,27 @@ QtObject {
         contextMenuVisible = false
         contextMenuWidgetKey = ""
         contextMenuWidgetId = ""
+    }
+
+    // --- Widget picker ---
+    function openWidgetPicker(sectionName) {
+        widgetPickerSection = typeof sectionName === "string" && sectionName ? sectionName : "center"
+        widgetPickerVisible = true
+        if (!settingsMode)
+            settingsMode = true
+    }
+
+    function closeWidgetPicker() {
+        widgetPickerVisible = false
+    }
+
+    function toggleWidgetPicker(sectionName) {
+        if (widgetPickerVisible) {
+            closeWidgetPicker()
+            return
+        }
+
+        openWidgetPicker(sectionName)
     }
 
     // --- Query helpers ---

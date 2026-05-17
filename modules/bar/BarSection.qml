@@ -12,14 +12,38 @@ Item {
     property bool floatingValidationIntent: false
     readonly property var sectionModel: Services.BarLayoutService.sectionWidgets(sectionName)
     readonly property bool hasSectionContent: root.sectionModel.length > 0
+    readonly property bool canOpenWidgetPicker: Services.BarLayoutService.layoutReady
     readonly property string surfaceState: root.sectionName === "center"
         ? (root.hasSectionContent ? (root.floatingValidationIntent ? "floating" : "attached") : "hidden")
         : (root.hasSectionContent ? "attached" : "hidden")
 
     implicitHeight: surfaceLoader.item ? surfaceLoader.item.implicitHeight : Services.BarLayoutService.barHeight
-    implicitWidth: surfaceLoader.item ? surfaceLoader.item.implicitWidth : 0
+    implicitWidth: root.hasSectionContent
+        ? (surfaceLoader.item ? surfaceLoader.item.implicitWidth : 0)
+        : (root.canOpenWidgetPicker ? 72 : 0)
     width: implicitWidth
     height: implicitHeight
+
+    // Preserve a small hit target so an empty dockzone can still reopen the widget picker.
+    MouseArea {
+        anchors.fill: parent
+        enabled: !root.hasSectionContent && root.canOpenWidgetPicker
+        acceptedButtons: Qt.RightButton
+        hoverEnabled: enabled
+        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+        onClicked: (mouse) => {
+            var barPos = root.mapToItem(root.parent, mouse.x, mouse.y)
+            var barContent = root.parent
+
+            while (barContent && !barContent.openWidgetContextMenu) {
+                barContent = barContent.parent
+            }
+
+            if (barContent && barContent.openWidgetContextMenu) {
+                barContent.openWidgetContextMenu("", "", barPos.x)
+            }
+        }
+    }
 
     // Route every section through the unified surface owner.
     Loader {

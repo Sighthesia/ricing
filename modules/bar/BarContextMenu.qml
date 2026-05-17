@@ -72,6 +72,16 @@ Variants {
                     }
                 }
 
+                // Widget picker entry for the clicked dockzone section.
+                ContextMenuRow {
+                    label: "Add Widget to " + Services.BarLayoutService.contextMenuSection
+                    icon: "+"
+                    onClicked: {
+                        Services.BarLayoutService.openWidgetPicker(Services.BarLayoutService.contextMenuSection)
+                        Services.BarLayoutService.closeContextMenu()
+                    }
+                }
+
                 // Divider before widget-specific actions.
                 Rectangle {
                     width: parent.width - 8
