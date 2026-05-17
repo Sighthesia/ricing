@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
-- **Last Active**: 2026-05-15
+- **Total Sessions**: 10
+- **Last Active**: 2026-05-17
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~309 | Active |
+| `journal-1.md` | ~342 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-05-17 | Fix empty dockzone widget picker | `0b3658d` | `main` |
 | 9 | 2026-05-15 | Bar Widget Layout System | `65a853a`, `578be16`, `76a3e6f` | `afloat` |
 | 8 | 2026-05-14 | Update repository AGENTS.md | `4f29362` | `afloat` |
 | 7 | 2026-05-14 | Refine bar dockzone ears and overlay windows | `689ed33` | `afloat` |

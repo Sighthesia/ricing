@@ -307,3 +307,36 @@ Implemented full bar widget layout system: settingsMode toggle, drag-and-drop re
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: Fix empty dockzone widget picker
+
+**Date**: 2026-05-17
+**Task**: Fix empty dockzone widget picker
+**Branch**: `main`
+
+### Summary
+
+Restored per-section widget picker entry and empty dockzone right-click hit target so cleared sections can reopen the picker and add widgets back.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0b3658d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
