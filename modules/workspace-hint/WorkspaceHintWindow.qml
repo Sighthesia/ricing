@@ -3,8 +3,8 @@ import Quickshell.Wayland
 import QtQuick
 import "../../services" as Services
 
-// OSD popup showing workspace list and window hints while mod key is held.
-// Two capsules split apart from a shared center origin with staggered timing.
+// OSD popup: two capsules emerge from center dockzone at zero width,
+// expand outward to full size while sliding to final positions with stagger.
 Variants {
     id: root
 
@@ -32,10 +32,9 @@ Variants {
 
         visible: Services.WindowHintService.hintVisible
 
-        // Stagger state machine
-        property bool _showActive: Services.WindowHintService.hintVisible
-        property bool _stage1: false // workspace capsule
-        property bool _stage2: false // window title capsule
+        // Stagger state: each stage drives one capsule from collapsed to expanded
+        property bool _stage1: false
+        property bool _stage2: false
 
         onVisibleChanged: {
             if (visible) {
@@ -48,10 +47,10 @@ Variants {
             }
         }
 
-        // Stagger delay timers for split-apart entrance
+        // Stagger timers: workspace capsule first, then window capsule
         Timer {
             id: _staggerTimer1
-            interval: 30
+            interval: 20
             onTriggered: {
                 hintWindow._stage1 = true
                 _staggerTimer2.restart()
@@ -60,7 +59,7 @@ Variants {
 
         Timer {
             id: _staggerTimer2
-            interval: 60
+            interval: 70
             onTriggered: hintWindow._stage2 = true
         }
 
@@ -68,25 +67,30 @@ Variants {
         Item {
             anchors.fill: parent
 
-            // Shared origin point: center-top below bar
-            readonly property real _originX: width / 2
-            readonly property real _originY: Services.BarLayoutService.barHeight + 12
+            // Origin: center of screen horizontally, at bar bottom edge vertically
+            // This is where both capsules "emerge from" — the center dockzone midpoint.
+            readonly property real _originY: Services.BarLayoutService.barHeight
+            readonly property real _splitGap: 8
+            // Final resting positions
+            readonly property real _wsTargetY: _originY + 10
+            readonly property real _winTargetY: _wsTargetY + 44 + _splitGap
 
-            // Split distance: how far each capsule travels from origin
-            readonly property real _splitGap: 6
-            readonly property real _workspaceCapsuleHeight: workspaceCapsule.implicitHeight
-            readonly property real _windowCapsuleHeight: windowCapsule.implicitHeight
-
-            // Workspace capsule (upper, splits upward from origin)
+            // ─── Workspace capsule ───────────────────────────────────────────
             Rectangle {
                 id: workspaceCapsule
+
+                // Horizontal: always centered
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: hintWindow._stage1
-                    ? parent._originY
-                    : parent._originY + parent._splitGap + 4
-                width: workspaceContent.implicitWidth + 32
-                implicitHeight: 44
+
+                // Vertical: starts at origin, slides to final position
+                y: hintWindow._stage1 ? parent._wsTargetY : parent._originY
+
+                // Width: starts at 0, expands to content width
+                width: hintWindow._stage1 ? (workspaceContent.implicitWidth + 32) : 0
+                height: 44
                 radius: 22
+                clip: true
+
                 color: Qt.rgba(
                     Services.Color.mSurface.r,
                     Services.Color.mSurface.g,
@@ -100,34 +104,28 @@ Variants {
                     0.25
                 )
                 border.width: 1
-
-                // Split-apart animation: y offset + scale + opacity
                 opacity: hintWindow._stage1 ? 1.0 : 0.0
-                scale: hintWindow._stage1 ? 1.0 : 0.85
-                transformOrigin: Item.Bottom
 
+                Behavior on width {
+                    NumberAnimation {
+                        duration: 260
+                        easing.type: Easing.OutCubic
+                    }
+                }
                 Behavior on y {
                     NumberAnimation {
-                        duration: 200
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 0.6
+                        duration: 220
+                        easing.type: Easing.OutCubic
                     }
                 }
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: Services.Motion.popup.opacityDuration
-                        easing.type: Services.Motion.popup.opacityEasing
-                    }
-                }
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: 180
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 0.4
+                        duration: 100
+                        easing.type: Easing.OutQuad
                     }
                 }
 
-                // Workspace capsule content: horizontal workspace indicators
+                // Content: centered inside, unaffected by width animation
                 Row {
                     id: workspaceContent
                     anchors.centerIn: parent
@@ -195,16 +193,21 @@ Variants {
                 }
             }
 
-            // Window title capsule (lower, splits downward from origin)
+            // ─── Window title capsule ────────────────────────────────────────
             Rectangle {
                 id: windowCapsule
+
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: hintWindow._stage2
-                    ? (workspaceCapsule.y + workspaceCapsule.implicitHeight + parent._splitGap)
-                    : (parent._originY + 4)
-                width: windowContent.implicitWidth + 32
-                implicitHeight: windowContent.implicitHeight + 20
+
+                // Vertical: starts at origin, slides to final position
+                y: hintWindow._stage2 ? parent._winTargetY : parent._originY
+
+                // Width: starts at 0, expands to content width
+                width: hintWindow._stage2 ? (windowContent.implicitWidth + 32) : 0
+                height: windowContent.implicitHeight + 20
                 radius: 18
+                clip: true
+
                 color: Qt.rgba(
                     Services.Color.mSurface.r,
                     Services.Color.mSurface.g,
@@ -218,34 +221,28 @@ Variants {
                     0.2
                 )
                 border.width: 1
-
-                // Split-apart animation: y offset + scale + opacity
                 opacity: hintWindow._stage2 ? 1.0 : 0.0
-                scale: hintWindow._stage2 ? 1.0 : 0.8
-                transformOrigin: Item.Top
 
+                Behavior on width {
+                    NumberAnimation {
+                        duration: 300
+                        easing.type: Easing.OutCubic
+                    }
+                }
                 Behavior on y {
                     NumberAnimation {
-                        duration: 240
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 0.5
+                        duration: 260
+                        easing.type: Easing.OutCubic
                     }
                 }
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: 140
-                        easing.type: Services.Motion.popup.opacityEasing
-                    }
-                }
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: 220
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 0.35
+                        duration: 120
+                        easing.type: Easing.OutQuad
                     }
                 }
 
-                // Window title capsule content
+                // Content: centered, clips during width expansion
                 Column {
                     id: windowContent
                     anchors.centerIn: parent
