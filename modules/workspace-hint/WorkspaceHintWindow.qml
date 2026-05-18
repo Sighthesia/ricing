@@ -41,11 +41,15 @@ Variants {
         // Stagger state: each stage drives one capsule from collapsed to expanded
         property bool _stage1: false
         property bool _stage2: false
+        // Exit state: true when playing exit animation (disables clip so content stays visible)
+        property bool _exiting: false
 
         on_HintActiveChanged: {
             if (_hintActive) {
                 // Enter: show window, then stagger capsules open
                 _hideTimer.stop()
+                _exitTimer1.stop()
+                _exiting = false
                 _windowVisible = true
                 _stage1 = false
                 _stage2 = false
@@ -54,6 +58,7 @@ Variants {
                 // Exit: reverse stagger — window title first, then workspace
                 _staggerTimer1.stop()
                 _staggerTimer2.stop()
+                _exiting = true
                 _stage2 = false
                 _exitTimer1.restart()
             }
@@ -118,8 +123,8 @@ Variants {
                 width: hintWindow._stage1 ? (workspaceContent.implicitWidth + 32) : 0
                 height: 44
                 radius: 22
-                // Only clip during entrance so content emerges; on exit content stays visible
-                clip: hintWindow._stage1
+                // Clip during entrance/idle to hide overflow; disable on exit so content stays visible
+                clip: !hintWindow._exiting
 
                 color: Qt.rgba(
                     Services.Color.mSurface.r,
@@ -229,8 +234,8 @@ Variants {
                 width: hintWindow._stage2 ? (windowContent.implicitWidth + 32) : 0
                 height: windowContent.implicitHeight + 20
                 radius: 18
-                // Only clip during entrance so content emerges; on exit content stays visible
-                clip: hintWindow._stage2
+                // Clip during entrance/idle to hide overflow; disable on exit so content stays visible
+                clip: !hintWindow._exiting
 
                 color: Qt.rgba(
                     Services.Color.mSurface.r,
