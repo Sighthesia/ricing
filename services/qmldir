@@ -1,5 +1,6 @@
 singleton BarLayoutService 1.0 BarLayoutService.qml
 singleton BrightnessService 1.0 BrightnessService.qml
+singleton Motion 1.0 Motion.qml
 singleton Color 1.0 Color.qml
 singleton ColorService 1.0 ColorService.qml
 singleton NiriService 1.0 NiriService.qml

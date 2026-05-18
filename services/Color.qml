@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "./" as Services
 
 // Expose Material You color tokens loaded from colors.json with animated transitions.
 QtObject {
@@ -27,20 +28,20 @@ QtObject {
     property color mShadow: defaults.mShadow
 
     // --- Transition Behaviors ---
-    Behavior on mPrimary { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mOnPrimary { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mSecondary { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mOnSecondary { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mTertiary { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mOnTertiary { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mError { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mOnError { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mSurface { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mOnSurface { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mSurfaceVariant { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mOnSurfaceVariant { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mOutline { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on mShadow { enabled: !root.skipTransition; ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
+    Behavior on mPrimary { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mOnPrimary { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mSecondary { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mOnSecondary { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mTertiary { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mOnTertiary { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mError { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mOnError { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mSurface { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mOnSurface { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mSurfaceVariant { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mOnSurfaceVariant { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mOutline { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mShadow { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
 
     // Apply loaded colors from adapter (imperative assignment triggers Behavior).
     // Use Qt.colorEqual guard: unset color properties default to transparent (#00000000),

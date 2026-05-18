@@ -69,8 +69,8 @@ Variants {
             target: nextImage
             property: "opacity"
             from: 0; to: 1
-            duration: 400
-            easing.type: Easing.OutCubic
+            duration: Services.Motion.number.crossfadeDuration
+            easing.type: Services.Motion.number.crossfadeEasing
             onFinished: {
                 currentImage.source = nextImage.source
                 nextImage.opacity = 0

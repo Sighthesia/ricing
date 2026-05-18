@@ -5,6 +5,14 @@
 var _hiddenScale = 0.95;
 var _hiddenOffsetY = -4;
 
+// Hover geometry lifts are intentionally modest so the dockzone breathes
+// without forcing large layout jumps.
+var _centerHoverWidthLift = 20;
+var _edgeHoverWidthLift = 12;
+var _centerHoverHeightLift = 8;
+var _edgeHoverHeightLift = 6;
+var _hoverRadiusLift = 6;
+
 /**
  * Build a contract-shaped model from semantic inputs.
  *
@@ -42,6 +50,9 @@ function buildModel(inputs) {
     var detachProgress = inputs.detachProgress !== undefined ? inputs.detachProgress : 0;
     var morphProgress = inputs.morphProgress !== undefined ? inputs.morphProgress : 0;
     var hoverProgress = inputs.hoverProgress !== undefined ? inputs.hoverProgress : 0;
+    var hoverBlend = Math.max(0, Math.min(1, hoverProgress));
+    var hoverWidthLift = isCenter ? _centerHoverWidthLift : _edgeHoverWidthLift;
+    var hoverHeightLift = isCenter ? _centerHoverHeightLift : _edgeHoverHeightLift;
 
     // Geometry baselines — match current BarDockZoneBackground defaults.
     var earRadius = 24;
@@ -51,8 +62,8 @@ function buildModel(inputs) {
     var bottomEarEnvelope = isCenter ? 0 : earRadius;
 
     var hasContent = contentWidth > 0 && contentHeight > 0 && surfaceHeight > 0;
-    var bodyWidth = hasContent ? Math.max(contentWidth + horizontalPadding * 2, 0) : 0;
-    var totalHeight = hasContent ? Math.max(contentHeight + verticalPadding * 2, surfaceHeight) : 0;
+    var bodyWidth = hasContent ? Math.max(contentWidth + horizontalPadding * 2 + (hoverWidthLift * hoverBlend), 0) : 0;
+    var totalHeight = hasContent ? Math.max(contentHeight + verticalPadding * 2 + (hoverHeightLift * hoverBlend), surfaceHeight + (hoverHeightLift * hoverBlend)) : 0;
     var bodyHeight = hasContent ? totalHeight : 0;
     var bodyX = isLeft ? 0 : earRadius;
     var bodyY = 0;
@@ -60,8 +71,8 @@ function buildModel(inputs) {
     var containerHeight = hasContent ? totalHeight + bottomEarEnvelope : 0;
 
     var floatingBlend = surfaceState === "floating" ? Math.max(detachProgress, morphProgress) : 0;
-    var hoverBlend = section === "center" ? hoverProgress : 0;
     var motionBlend = Math.max(floatingBlend, hoverBlend);
+    var bodyRadius = Math.min(24, bodyHeight / 2, 14 + (_hoverRadiusLift * hoverBlend));
 
     // Derive global motion from visibility and floating semantics — body and ears stay continuous.
     var opacity = visibilityProgress;

@@ -115,7 +115,7 @@ Variants {
 
             // Fade animation
             Behavior on opacity {
-                NumberAnimation { duration: 150 }
+                NumberAnimation { duration: Services.Motion.number.settleDuration; easing.type: Services.Motion.number.settleEasing }
             }
 
             Column {
@@ -160,7 +160,7 @@ Variants {
 
                         // Smooth progress animation
                         Behavior on width {
-                            NumberAnimation { duration: 100 }
+                            NumberAnimation { duration: Services.Motion.number.shortDuration; easing.type: Services.Motion.number.shortEasing }
                         }
                     }
                 }

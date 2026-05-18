@@ -47,6 +47,14 @@ Use this reusable shape for compact surfaces that must feel anchored to an edge.
 - If future large-scale motion requires strict ear-body continuity, treat separate overlay-ear ownership as a transitional workaround rather than the final architecture.
 - For ambitious ear/body morphing, prefer one shared geometry owner and one shared parameter model over multiple windows or independently animated shape owners.
 
+### Background Hover Expand / Reset Pattern
+
+- For dockzone-adjacent backgrounds, treat hover as a geometry expansion first and a visual highlight second.
+- On hover enter, let the surface expand or lift its silhouette modestly instead of only scaling the contents.
+- On hover leave, spring the surface back to its resting shape so the object reads as the same anchored background returning home.
+- Keep the hover region passive and stable so moving within the surface does not retrigger the expansion.
+- Use this pattern for attached backgrounds, edge anchors, and other hoverable shells that should stay layout-stable while still feeling alive.
+
 Use it for:
 
 - Dock zones

@@ -26,7 +26,7 @@ Item {
 
     Behavior on implicitWidth {
         enabled: root._isDragging
-        NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+        NumberAnimation { duration: Services.Motion.number.settleDuration; easing.type: Services.Motion.number.settleEasing }
     }
 
     // --- Settings mode visual outline ---
@@ -43,7 +43,7 @@ Item {
         visible: opacity > 0
 
         Behavior on opacity {
-            NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+            NumberAnimation { duration: Services.Motion.number.settleDuration; easing.type: Services.Motion.number.settleEasing }
         }
     }
 
@@ -61,8 +61,13 @@ Item {
         color: removeArea.containsMouse ? "#ff4444" : "#aa333333"
         border.color: "#66ffffff"
         border.width: 1
-        visible: Services.BarLayoutService.settingsMode && !root._isDragging
+        opacity: Services.BarLayoutService.settingsMode && !root._isDragging ? 1 : 0
+        visible: opacity > 0
         z: 10
+
+        Behavior on opacity {
+            NumberAnimation { duration: Services.Motion.number.settleDuration; easing.type: Services.Motion.number.settleEasing }
+        }
 
         Text {
             anchors.centerIn: parent

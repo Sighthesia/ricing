@@ -37,8 +37,6 @@ Item {
     }
 
     function _targetHoverProgress() {
-        if (section !== "center")
-            return 0;
         return hoverIntent ? 1 : 0;
     }
 
@@ -72,20 +70,16 @@ Item {
     // React to external surfaceState changes.
     onSurfaceStateChanged: transitionTo(surfaceState)
 
-    // Keep center hover intent on the floating path even before the semantic state flips.
-    onHoverIntentChanged: {
-        if (section !== "center")
-            return;
-        _hoverAnim.restart();
-    }
+    // Let the shared spring behavior absorb hover changes without retrigger loops.
+    onHoverIntentChanged: _hoverProgress = _targetHoverProgress()
 
     NumberAnimation {
         id: _visAnim
 
         target: root
         property: "_visibilityProgress"
-        duration: 250
-        easing.type: Easing.InOutQuad
+        duration: Services.Motion.number.surfaceDuration
+        easing.type: Services.Motion.number.surfaceEasing
     }
 
     NumberAnimation {
@@ -93,8 +87,8 @@ Item {
 
         target: root
         property: "_stateTransitionProgress"
-        duration: 250
-        easing.type: Easing.InOutQuad
+        duration: Services.Motion.number.surfaceDuration
+        easing.type: Services.Motion.number.surfaceEasing
     }
 
     NumberAnimation {
@@ -102,8 +96,8 @@ Item {
 
         target: root
         property: "_detachProgress"
-        duration: 250
-        easing.type: Easing.InOutQuad
+        duration: Services.Motion.number.surfaceDuration
+        easing.type: Services.Motion.number.surfaceEasing
     }
 
     NumberAnimation {
@@ -111,21 +105,17 @@ Item {
 
         target: root
         property: "_morphProgress"
-        duration: 250
-        easing.type: Easing.InOutQuad
+        duration: Services.Motion.number.surfaceDuration
+        easing.type: Services.Motion.number.surfaceEasing
     }
 
     Behavior on _hoverProgress {
-        SpringAnimation { spring: 6.5; damping: 0.88; mass: 1.0; epsilon: 0.01 }
-    }
-
-    NumberAnimation {
-        id: _hoverAnim
-
-        target: root
-        property: "_hoverProgress"
-        duration: 180
-        easing.type: Easing.OutQuad
+        SpringAnimation {
+            spring: Services.Motion.hover.spring
+            damping: Services.Motion.hover.damping
+            mass: Services.Motion.hover.mass
+            epsilon: Services.Motion.hover.epsilon
+        }
     }
 
     // Build the contract model from semantic inputs plus owner progress.

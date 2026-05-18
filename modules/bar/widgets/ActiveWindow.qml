@@ -16,7 +16,7 @@ Item {
     implicitHeight: 26
 
     Behavior on implicitWidth {
-        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
     }
 
     function syncFocusedWindow() {
@@ -54,8 +54,8 @@ Item {
                 property: "opacity"
                 from: 1
                 to: 0
-                duration: 100
-                easing.type: Easing.OutCubic
+                duration: Services.Motion.number.shortDuration
+                easing.type: Services.Motion.number.shortEasing
             }
 
             NumberAnimation {
@@ -63,8 +63,8 @@ Item {
                 property: "opacity"
                 from: 0
                 to: 1
-                duration: 140
-                easing.type: Easing.OutCubic
+                duration: Services.Motion.number.enterDuration
+                easing.type: Services.Motion.number.enterEasing
             }
         }
 
@@ -112,11 +112,11 @@ Item {
                 opacity: root.currentAppId !== "" ? 1 : 0
 
                 Behavior on width {
-                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
                 Behavior on opacity {
-                    NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: Services.Motion.number.snugDuration; easing.type: Services.Motion.number.snugEasing }
                 }
 
                 IconImage {
@@ -136,7 +136,7 @@ Item {
                 height: currentTitleText.implicitHeight
 
                 Behavior on width {
-                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
                 Text {
@@ -182,11 +182,11 @@ Item {
                 opacity: root.pendingAppId !== "" ? 1 : 0
 
                 Behavior on width {
-                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
                 Behavior on opacity {
-                    NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: Services.Motion.number.snugDuration; easing.type: Services.Motion.number.snugEasing }
                 }
 
                 IconImage {
@@ -206,7 +206,7 @@ Item {
                 height: nextTitleText.implicitHeight
 
                 Behavior on width {
-                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
                 Text {

@@ -48,8 +48,8 @@ Variants {
             scale: Services.BarLayoutService.widgetPickerVisible ? 1 : 0.96
             transformOrigin: Item.Top
 
-            Behavior on opacity { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
-            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack; easing.overshoot: 0.3 } }
+            Behavior on opacity { NumberAnimation { duration: Services.Motion.popup.opacityDuration; easing.type: Services.Motion.popup.opacityEasing } }
+            Behavior on scale { NumberAnimation { duration: Services.Motion.popup.scaleDuration; easing.type: Services.Motion.popup.scaleEasing; easing.overshoot: Services.Motion.popup.scaleOvershoot } }
 
             Column {
                 id: contentColumn
