@@ -12,3 +12,5 @@ singleton ClipboardService 1.0 ClipboardService.qml
 singleton LauncherService 1.0 LauncherService.qml
 singleton MediaService 1.0 MediaService.qml
 singleton NiriShortcutService 1.0 NiriShortcutService.qml
+singleton WindowHintTriggerService 1.0 WindowHintTriggerService.qml
+singleton WindowHintService 1.0 WindowHintService.qml

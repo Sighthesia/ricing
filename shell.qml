@@ -7,6 +7,7 @@ import "modules/notification" as Notification
 import "modules/osd" as Osd
 import "modules/settings" as Settings
 import "modules/launcher" as Launcher
+import "modules/workspace-hint" as WorkspaceHint
 
 // Keep the shell root minimal while layering reusable screen surfaces.
 ShellRoot {
@@ -44,6 +45,10 @@ ShellRoot {
 
     // Full-screen launcher overlay triggered from context menu.
     Launcher.LauncherWindow {
+    }
+
+    // Workspace/window hint OSD shown while mod key is held.
+    WorkspaceHint.WorkspaceHintWindow {
     }
 
 }

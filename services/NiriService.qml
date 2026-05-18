@@ -7,7 +7,10 @@ import Quickshell.Io
 Singleton {
     id: root
 
+    property ListModel workspaces: ListModel {}
     property ListModel windows: ListModel {}
+    signal workspacesUpdated()
+    signal workspaceActivated()
     signal windowsUpdated()
 
     readonly property string _homeDir: {
@@ -116,14 +119,80 @@ Singleton {
         windows.clear()
         for (let i = 0; i < windowListArray.length; i++) {
             let win = windowListArray[i]
+            const rawPos = win.layout ? win.layout.pos_in_scrolling_layout : null
+            const pos = (Array.isArray(rawPos) && rawPos.length >= 2) ? rawPos : null
             windows.append({
                 winId: String(win.id),
                 title: win.title || "",
                 appId: win.app_id || "",
-                isFocused: win.is_focused || false
+                isFocused: win.is_focused || false,
+                workspaceId: win.workspace_id != null ? String(win.workspace_id) : "",
+                colIdx: pos ? pos[0] : 9999,
+                rowIdx: pos ? pos[1] : 9999
             })
         }
         windowsUpdated()
+    }
+
+    function updateWorkspaces(workspacesEvent) {
+        const list = (workspacesEvent.workspaces || []).slice()
+        list.sort((a, b) => a.idx - b.idx)
+
+        const activeWorkspaceIds = ({})
+
+        for (let targetIndex = 0; targetIndex < list.length; targetIndex++) {
+            const ws = list[targetIndex]
+            const workspaceId = String(ws.id)
+            activeWorkspaceIds[workspaceId] = true
+
+            let currentIndex = -1
+            for (let scanIndex = 0; scanIndex < workspaces.count; scanIndex++) {
+                if (workspaces.get(scanIndex).wsId === workspaceId) {
+                    currentIndex = scanIndex
+                    break
+                }
+            }
+
+            if (currentIndex < 0) {
+                workspaces.insert(targetIndex, {
+                    wsId: workspaceId,
+                    idx: ws.idx,
+                    isActive: ws.is_active || false,
+                    name: ws.name || ""
+                })
+                continue
+            }
+
+            if (currentIndex !== targetIndex)
+                workspaces.move(currentIndex, targetIndex, 1)
+
+            const currentItem = workspaces.get(targetIndex)
+            if (currentItem.idx !== ws.idx)
+                workspaces.setProperty(targetIndex, "idx", ws.idx)
+            if (currentItem.isActive !== (ws.is_active || false))
+                workspaces.setProperty(targetIndex, "isActive", ws.is_active || false)
+            if (currentItem.name !== (ws.name || ""))
+                workspaces.setProperty(targetIndex, "name", ws.name || "")
+        }
+
+        for (let index = workspaces.count - 1; index >= 0; index--) {
+            if (activeWorkspaceIds[workspaces.get(index).wsId])
+                continue
+            workspaces.remove(index, 1)
+        }
+
+        workspacesUpdated()
+    }
+
+    function activateWorkspace(event) {
+        const activeId = String(event.id)
+        for (let i = 0; i < workspaces.count; i++) {
+            const item = workspaces.get(i)
+            const isNowActive = (item.wsId === activeId)
+            if (item.isActive !== isNowActive)
+                workspaces.setProperty(i, "isActive", isNowActive)
+        }
+        workspaceActivated()
     }
 
     // Initial fetch
@@ -139,6 +208,21 @@ Singleton {
         }
     }
 
+    // Initial workspace fetch
+    property Process _workspaceFetcher: Process {
+        id: workspaceFetcher
+        running: true
+        command: ["niri", "msg", "-j", "workspaces"]
+        stdout: SplitParser {
+            onRead: data => {
+                try {
+                    const parsed = JSON.parse(data.trim())
+                    root.updateWorkspaces({ workspaces: parsed })
+                } catch (e) {}
+            }
+        }
+    }
+
     function reloadWindows() { fetcher.running = true }
 
     // Event stream for live updates
@@ -150,7 +234,11 @@ Singleton {
             onRead: data => {
                 try {
                     let event = JSON.parse(data.trim())
-                    if (event.WindowOpenedOrChanged || event.WindowClosed || event.WindowFocusChanged)
+                    if (event.WorkspacesChanged)
+                        root.updateWorkspaces(event.WorkspacesChanged)
+                    else if (event.WorkspaceActivated)
+                        root.activateWorkspace(event.WorkspaceActivated)
+                    else if (event.WindowOpenedOrChanged || event.WindowClosed || event.WindowFocusChanged)
                         root.reloadWindows()
                 } catch (e) {}
             }
