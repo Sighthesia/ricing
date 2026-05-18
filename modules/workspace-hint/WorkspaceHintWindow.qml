@@ -101,9 +101,7 @@ Variants {
         Item {
             anchors.fill: parent
 
-            // Origin: center dockzone vertical midpoint.
-            // Capsules start with their center aligned to bar's vertical center.
-            readonly property real _barCenterY: Services.BarLayoutService.barHeight / 2
+            // Origin: y=0 (top screen edge), capsules slide down to final positions.
             readonly property real _splitGap: 8
             // Final resting positions: below bar
             readonly property real _wsTargetY: Services.BarLayoutService.barHeight + 16
@@ -116,13 +114,14 @@ Variants {
                 // Horizontal: always centered
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                // Vertical: center-aligned to bar center when collapsed, target when expanded
-                y: hintWindow._stage1 ? parent._wsTargetY : (parent._barCenterY - height / 2)
+                // Vertical: collapsed at y=0 (top edge), expanded at target
+                y: hintWindow._stage1 ? parent._wsTargetY : -height / 2
 
-                // Width: starts at 0, expands to content width
-                width: hintWindow._stage1 ? (workspaceContent.implicitWidth + 32) : 0
+                // Width: collapses to a circle (height), expands to content width
+                width: hintWindow._stage1 ? (workspaceContent.implicitWidth + 32) : height
                 height: 44
-                radius: 22
+                // Radius: full circle when collapsed, pill when expanded
+                radius: hintWindow._stage1 ? 22 : height / 2
                 clip: true
 
                 color: Qt.rgba(
@@ -148,6 +147,12 @@ Variants {
                 Behavior on y {
                     NumberAnimation {
                         duration: 350
+                        easing.type: Easing.OutCubic
+                    }
+                }
+                Behavior on radius {
+                    NumberAnimation {
+                        duration: 320
                         easing.type: Easing.OutCubic
                     }
                 }
@@ -226,13 +231,14 @@ Variants {
 
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                // Vertical: center-aligned to bar center when collapsed, target when expanded
-                y: hintWindow._stage2 ? parent._winTargetY : (parent._barCenterY - height / 2)
+                // Vertical: collapsed at y=0 (top edge), expanded at target
+                y: hintWindow._stage2 ? parent._winTargetY : -height / 2
 
-                // Width: starts at 0, expands to content width
-                width: hintWindow._stage2 ? (windowContent.implicitWidth + 32) : 0
+                // Width: collapses to a circle (height), expands to content width
+                width: hintWindow._stage2 ? (windowContent.implicitWidth + 32) : height
                 height: windowContent.implicitHeight + 20
-                radius: 18
+                // Radius: full circle when collapsed, pill when expanded
+                radius: hintWindow._stage2 ? 18 : height / 2
                 clip: true
 
                 color: Qt.rgba(
@@ -258,6 +264,12 @@ Variants {
                 Behavior on y {
                     NumberAnimation {
                         duration: 400
+                        easing.type: Easing.OutCubic
+                    }
+                }
+                Behavior on radius {
+                    NumberAnimation {
+                        duration: 360
                         easing.type: Easing.OutCubic
                     }
                 }
