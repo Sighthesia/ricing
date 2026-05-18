@@ -343,37 +343,6 @@ Variants {
                             opacity: 0.5
                         }
                     }
-
-                    // Previous/Next window hints
-                    Row {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        spacing: 20
-                        visible: hintWindow._windowVisible
-                            && (Services.WindowHintService.activeHint.previousWindow.windowId !== ""
-                                || Services.WindowHintService.activeHint.nextWindow.windowId !== "")
-
-                        Text {
-                            visible: hintWindow._windowVisible
-                                && Services.WindowHintService.activeHint.previousWindow.windowId !== ""
-                            text: "← " + Services.WindowHintService.activeHint.previousWindow.title
-                            font.pixelSize: 10
-                            color: Services.Color.mOnSurfaceVariant
-                            opacity: 0.45
-                            elide: Text.ElideRight
-                            width: Math.min(implicitWidth, 110)
-                        }
-
-                        Text {
-                            visible: hintWindow._windowVisible
-                                && Services.WindowHintService.activeHint.nextWindow.windowId !== ""
-                            text: Services.WindowHintService.activeHint.nextWindow.title + " →"
-                            font.pixelSize: 10
-                            color: Services.Color.mOnSurfaceVariant
-                            opacity: 0.45
-                            elide: Text.ElideRight
-                            width: Math.min(implicitWidth, 110)
-                        }
-                    }
                 }
             }
         }
