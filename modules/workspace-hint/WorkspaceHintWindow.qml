@@ -160,7 +160,7 @@ Variants {
                     spacing: 6
 
                     Repeater {
-                        model: Services.WindowHintService.hintVisible
+                        model: hintWindow._windowVisible
                             ? Services.WindowHintService.activeHint.workspaces
                             : []
 
@@ -277,7 +277,7 @@ Variants {
                         spacing: 6
 
                         Repeater {
-                            model: Services.WindowHintService.hintVisible
+                            model: hintWindow._windowVisible
                                 ? Services.WindowHintService.activeHint.windows
                                 : []
 
@@ -337,7 +337,7 @@ Variants {
 
                         // Empty state
                         Text {
-                            visible: Services.WindowHintService.hintVisible
+                            visible: hintWindow._windowVisible
                                 && Services.WindowHintService.activeHint.windows.length === 0
                             text: "空工作区"
                             font.pixelSize: 12
@@ -350,12 +350,12 @@ Variants {
                     Row {
                         anchors.horizontalCenter: parent.horizontalCenter
                         spacing: 20
-                        visible: Services.WindowHintService.hintVisible
+                        visible: hintWindow._windowVisible
                             && (Services.WindowHintService.activeHint.previousWindow.windowId !== ""
                                 || Services.WindowHintService.activeHint.nextWindow.windowId !== "")
 
                         Text {
-                            visible: Services.WindowHintService.hintVisible
+                            visible: hintWindow._windowVisible
                                 && Services.WindowHintService.activeHint.previousWindow.windowId !== ""
                             text: "← " + Services.WindowHintService.activeHint.previousWindow.title
                             font.pixelSize: 10
@@ -366,7 +366,7 @@ Variants {
                         }
 
                         Text {
-                            visible: Services.WindowHintService.hintVisible
+                            visible: hintWindow._windowVisible
                                 && Services.WindowHintService.activeHint.nextWindow.windowId !== ""
                             text: Services.WindowHintService.activeHint.nextWindow.title + " →"
                             font.pixelSize: 10
