@@ -61,6 +61,7 @@ Item {
     }
 
     // Keep the center zone aligned to the screen midpoint.
+    // Hidden: island module now owns center content.
     BarSection {
         id: centerSection
 
@@ -68,6 +69,7 @@ Item {
         screenName: root.screenName
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
+        visible: false
         onWidthChanged: root._updateSectionBounds()
         onXChanged: root._updateSectionBounds()
     }

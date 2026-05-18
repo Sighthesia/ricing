@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 
 // Manages launcher visibility, query input, and mode derivation.
+// Now delegates to IslandService for the primary toggle path.
 Singleton {
     id: root
 
@@ -21,9 +22,9 @@ Singleton {
 
     function open() { visible = true }
     function close() { visible = false; query = "" }
-    function toggle() { visible ? close() : open() }
+    function toggle() { IslandService.toggle() }
 
-    function openClipboard() { query = ">clip "; open() }
+    function openClipboard() { IslandService.query = ">clip "; IslandService.open() }
     function openShortcuts() { query = ">key "; open() }
 
     // IPC surface for niri keybind integration.

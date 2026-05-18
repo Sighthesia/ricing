@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import "modules/background" as Background
 import "modules/bar" as Bar
+import "modules/island" as Island
 import "modules/notification" as Notification
 import "modules/osd" as Osd
 import "modules/settings" as Settings
@@ -21,6 +22,10 @@ ShellRoot {
 
     // Render the reusable bar window for each screen.
     Bar.BarWindow {
+    }
+
+    // Dynamic Island: center content owner (collapsed clock + expanded launcher).
+    Island.IslandWindow {
     }
 
     // Context menu rendered in its own window to avoid bar-height clipping.
