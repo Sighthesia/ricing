@@ -30,20 +30,31 @@ Variants {
             right: true
         }
 
-        visible: Services.WindowHintService.hintVisible
+        // Decouple window visibility from hint state to allow exit animation.
+        // Window stays visible during exit, then hides after animation completes.
+        visible: hintWindow._windowVisible
+
+        property bool _windowVisible: false
+        property bool _hintActive: Services.WindowHintService.hintVisible
 
         // Stagger state: each stage drives one capsule from collapsed to expanded
         property bool _stage1: false
         property bool _stage2: false
 
-        onVisibleChanged: {
-            if (visible) {
+        on_HintActiveChanged: {
+            if (_hintActive) {
+                // Enter: show window, then stagger capsules open
+                _hideTimer.stop()
+                _windowVisible = true
                 _stage1 = false
                 _stage2 = false
                 _staggerTimer1.restart()
             } else {
-                _stage1 = false
+                // Exit: reverse stagger — window title first, then workspace
+                _staggerTimer1.stop()
+                _staggerTimer2.stop()
                 _stage2 = false
+                _exitTimer1.restart()
             }
         }
 
@@ -61,6 +72,23 @@ Variants {
             id: _staggerTimer2
             interval: 70
             onTriggered: hintWindow._stage2 = true
+        }
+
+        // Exit stagger: window capsule collapses first, then workspace, then hide
+        Timer {
+            id: _exitTimer1
+            interval: 50
+            onTriggered: {
+                hintWindow._stage1 = false
+                _hideTimer.restart()
+            }
+        }
+
+        // Hide window after exit animations complete
+        Timer {
+            id: _hideTimer
+            interval: 380
+            onTriggered: hintWindow._windowVisible = false
         }
 
         // Full-screen transparent container
