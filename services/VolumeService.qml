@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.Pipewire
 
 // Pipewire audio state: default sink/source volume and mute control.
@@ -41,5 +42,13 @@ Singleton {
     function toggleSourceMute() {
         if (Pipewire.defaultAudioSource)
             Pipewire.defaultAudioSource.audio.muted = !Pipewire.defaultAudioSource.audio.muted
+    }
+
+    // IPC surface for niri keybind integration.
+    property IpcHandler ipc: IpcHandler {
+        target: "VolumeService"
+        function setSinkVolume(volume: real) { root.setSinkVolume(root.sinkVolume + volume) }
+        function toggleSinkMute() { root.toggleSinkMute() }
+        function toggleSourceMute() { root.toggleSourceMute() }
     }
 }

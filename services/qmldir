@@ -9,4 +9,5 @@ singleton WallpaperService 1.0 WallpaperService.qml
 singleton SettingsService 1.0 SettingsService.qml
 singleton ClipboardService 1.0 ClipboardService.qml
 singleton LauncherService 1.0 LauncherService.qml
+singleton MediaService 1.0 MediaService.qml
 singleton NiriShortcutService 1.0 NiriShortcutService.qml

@@ -15,6 +15,12 @@ Singleton {
         root.brightness = val
     }
 
+    // IPC surface for niri keybind integration.
+    property IpcHandler ipc: IpcHandler {
+        target: "BrightnessService"
+        function setBrightness(delta: real) { root.setBrightness(root.brightness + delta) }
+    }
+
     // Poll brightnessctl -m for current value
     property Process _poller: Process {
         id: poller

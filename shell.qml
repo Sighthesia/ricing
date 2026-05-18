@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import "modules/background" as Background
 import "modules/bar" as Bar
 import "modules/notification" as Notification
+import "modules/osd" as Osd
 import "modules/settings" as Settings
 import "modules/launcher" as Launcher
 
@@ -31,6 +32,10 @@ ShellRoot {
 
     // Transient notification popups on overlay layer.
     Notification.NotificationWindow {
+    }
+
+    // OSD popup for volume/brightness/media feedback.
+    Osd.OsdWindow {
     }
 
     // Settings panel popup triggered from bar right-click.
