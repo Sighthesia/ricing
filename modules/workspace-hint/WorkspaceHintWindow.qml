@@ -123,8 +123,7 @@ Variants {
                 width: hintWindow._stage1 ? (workspaceContent.implicitWidth + 32) : 0
                 height: 44
                 radius: 22
-                // Clip during entrance/idle to hide overflow; disable on exit so content stays visible
-                clip: !hintWindow._exiting
+                clip: true
 
                 color: Qt.rgba(
                     Services.Color.mSurface.r,
@@ -234,8 +233,7 @@ Variants {
                 width: hintWindow._stage2 ? (windowContent.implicitWidth + 32) : 0
                 height: windowContent.implicitHeight + 20
                 radius: 18
-                // Clip during entrance/idle to hide overflow; disable on exit so content stays visible
-                clip: !hintWindow._exiting
+                clip: true
 
                 color: Qt.rgba(
                     Services.Color.mSurface.r,
