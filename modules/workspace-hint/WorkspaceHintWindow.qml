@@ -19,7 +19,8 @@ Variants {
         screen: modelData
         color: "transparent"
         exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.layer: WlrLayer.Overlay
+        // Below bar/dockzone background layer
+        WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         WlrLayershell.exclusiveZone: -1
 
@@ -117,7 +118,8 @@ Variants {
                 width: hintWindow._stage1 ? (workspaceContent.implicitWidth + 32) : 0
                 height: 44
                 radius: 22
-                clip: true
+                // Only clip during entrance so content emerges; on exit content stays visible
+                clip: hintWindow._stage1
 
                 color: Qt.rgba(
                     Services.Color.mSurface.r,
@@ -227,7 +229,8 @@ Variants {
                 width: hintWindow._stage2 ? (windowContent.implicitWidth + 32) : 0
                 height: windowContent.implicitHeight + 20
                 radius: 18
-                clip: true
+                // Only clip during entrance so content emerges; on exit content stays visible
+                clip: hintWindow._stage2
 
                 color: Qt.rgba(
                     Services.Color.mSurface.r,
