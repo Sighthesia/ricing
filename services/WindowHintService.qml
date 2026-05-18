@@ -14,13 +14,14 @@ Singleton {
     readonly property bool hintVisible: root.hintHeld
 
     // Pull progress for dockzone background deformation (0=idle, 1=fully pulled).
-    property real pullProgress: root.hintHeld ? 1.0 : 0.0
+    property real pullProgress: 0.0
     Behavior on pullProgress {
         NumberAnimation {
             duration: 300
             easing.type: Easing.OutCubic
         }
     }
+    onHintHeldChanged: root.pullProgress = root.hintHeld ? 1.0 : 0.0
 
     property int _revision: 0
 

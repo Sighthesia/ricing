@@ -137,8 +137,8 @@ Item {
 
     // Hint pull deformation for center dockzone: shrink width, stretch height.
     readonly property real _hintPull: root.section === "center" ? Services.WindowHintService.pullProgress : 0
-    readonly property real _pullWidthShrink: 24
-    readonly property real _pullHeightStretch: 6
+    readonly property real _pullWidthShrink: 30
+    readonly property real _pullHeightStretch: 8
 
     // Expose body geometry for child content positioning (with pull deformation applied).
     readonly property real bodyX: metrics.bodyX
