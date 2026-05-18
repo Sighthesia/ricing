@@ -10,7 +10,8 @@ Singleton {
 
     property bool hintHeld: false
     property var activeHint: _emptyHint()
-    readonly property bool hintVisible: activeHint.visible === true
+    // hintVisible driven directly by hintHeld so activeHint data is never cleared during exit.
+    readonly property bool hintVisible: root.hintHeld
 
     property int _revision: 0
 
@@ -38,11 +39,9 @@ Singleton {
             return
         }
 
-        // Release: mark hint as not visible but preserve data for exit animation.
+        // Release: stop refresh timer. Do NOT clear activeHint —
+        // the UI exit animation still needs the data.
         _hintRefreshCoalesceTimer.stop()
-        if (root.activeHint && root.activeHint.visible) {
-            root.activeHint = Object.assign({}, root.activeHint, { visible: false })
-        }
     }
 
     function _scheduleHintRefresh(immediate) {
