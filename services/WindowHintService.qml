@@ -38,8 +38,11 @@ Singleton {
             return
         }
 
+        // Release: mark hint as not visible but preserve data for exit animation.
         _hintRefreshCoalesceTimer.stop()
-        root.activeHint = root._emptyHint()
+        if (root.activeHint && root.activeHint.visible) {
+            root.activeHint = Object.assign({}, root.activeHint, { visible: false })
+        }
     }
 
     function _scheduleHintRefresh(immediate) {
