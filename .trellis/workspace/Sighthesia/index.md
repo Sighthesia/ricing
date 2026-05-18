@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
-- **Last Active**: 2026-05-17
+- **Total Sessions**: 11
+- **Last Active**: 2026-05-18
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~342 | Active |
+| `journal-1.md` | ~386 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 11 | 2026-05-18 | Mod键工作区/窗口提示OSD弹窗 | `8f25648`, `2903743`, `fee5614`, `55ea926`, `c005413`, `40c5ed8`, `cab8179`, `12ab23a`, `15b3468`, `7652f6f`, `edf00d4`, `6ba5483` | `main` |
 | 10 | 2026-05-17 | Fix empty dockzone widget picker | `0b3658d` | `main` |
 | 9 | 2026-05-15 | Bar Widget Layout System | `65a853a`, `578be16`, `76a3e6f` | `afloat` |
 | 8 | 2026-05-14 | Update repository AGENTS.md | `4f29362` | `afloat` |

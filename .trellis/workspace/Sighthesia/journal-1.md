@@ -340,3 +340,47 @@ Restored per-section widget picker entry and empty dockzone right-click hit targ
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: Mod键工作区/窗口提示OSD弹窗
+
+**Date**: 2026-05-18
+**Task**: Mod键工作区/窗口提示OSD弹窗
+**Branch**: `main`
+
+### Summary
+
+实现 mod 键按住时的工作区/窗口提示 OSD 弹窗。移植 window_hint_trigger.py 检测 Super 键；增强 NiriService 添加 workspaces 模型；新建 WindowHintTriggerService 和 WindowHintService；实现双胶囊 OSD UI，从 center dockzone 中心以零宽度展开，stagger 时序入场，反向收缩退场。修复多轮动画问题：起始位置对齐、退场内容保留、clip 行为、hintVisible 绑定。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8f25648` | (see git log) |
+| `2903743` | (see git log) |
+| `fee5614` | (see git log) |
+| `55ea926` | (see git log) |
+| `c005413` | (see git log) |
+| `40c5ed8` | (see git log) |
+| `cab8179` | (see git log) |
+| `12ab23a` | (see git log) |
+| `15b3468` | (see git log) |
+| `7652f6f` | (see git log) |
+| `edf00d4` | (see git log) |
+| `6ba5483` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
