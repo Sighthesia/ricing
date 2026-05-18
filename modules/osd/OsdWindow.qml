@@ -21,6 +21,13 @@ Variants {
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
+        // Center on screen using WlrLayershell positioning
+        WlrLayershell.exclusiveZone: -1
+
+        // Fixed OSD size
+        implicitWidth: 200
+        implicitHeight: 120
+
         // Center on screen
         anchors {
             top: true
@@ -29,15 +36,15 @@ Variants {
             right: true
         }
 
-        implicitWidth: 200
-        implicitHeight: 120
-
         // OSD state
         property bool osdVisible: false
         property string icon: ""
         property string valueText: ""
         property real progress: 0
         property string osdType: "" // "volume", "brightness", "media"
+
+        // Make window click-through when not visible
+        visible: osdWindow.osdVisible
 
         // Auto-hide timer
         Timer {
