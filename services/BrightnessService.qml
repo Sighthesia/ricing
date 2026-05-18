@@ -29,11 +29,11 @@ Singleton {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                // Format: device,class,current,max,percentage%
+                // Format: device,class,current,percentage%,max
                 let parts = this.text.trim().split(",")
-                if (parts.length >= 4) {
+                if (parts.length >= 5) {
                     let current = parseInt(parts[2])
-                    let max = parseInt(parts[3])
+                    let max = parseInt(parts[4])
                     if (max > 0) root.brightness = current / max
                 }
             }
