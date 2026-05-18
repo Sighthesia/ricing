@@ -20,20 +20,16 @@ Variants {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-
-        // Center on screen using WlrLayershell positioning
         WlrLayershell.exclusiveZone: -1
 
-        // Fixed OSD size
+        // OSD size
         implicitWidth: 200
         implicitHeight: 120
 
-        // Center on screen
+        // Position at top-left corner
         anchors {
             top: true
-            bottom: true
             left: true
-            right: true
         }
 
         // OSD state
