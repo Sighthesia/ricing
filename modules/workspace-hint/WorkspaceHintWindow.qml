@@ -95,11 +95,11 @@ Variants {
         Item {
             anchors.fill: parent
 
-            // Origin: center of screen horizontally, at bar bottom edge vertically
-            // This is where both capsules "emerge from" — the center dockzone midpoint.
-            readonly property real _originY: Services.BarLayoutService.barHeight / 2
+            // Origin: center dockzone vertical midpoint.
+            // Capsules start with their center aligned to bar's vertical center.
+            readonly property real _barCenterY: Services.BarLayoutService.barHeight / 2
             readonly property real _splitGap: 8
-            // Final resting positions: well below bar to make the travel visible
+            // Final resting positions: below bar
             readonly property real _wsTargetY: Services.BarLayoutService.barHeight + 16
             readonly property real _winTargetY: _wsTargetY + 44 + _splitGap
 
@@ -110,8 +110,8 @@ Variants {
                 // Horizontal: always centered
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                // Vertical: starts at origin, slides to final position
-                y: hintWindow._stage1 ? parent._wsTargetY : parent._originY
+                // Vertical: center-aligned to bar center when collapsed, target when expanded
+                y: hintWindow._stage1 ? parent._wsTargetY : (parent._barCenterY - height / 2)
 
                 // Width: starts at 0, expands to content width
                 width: hintWindow._stage1 ? (workspaceContent.implicitWidth + 32) : 0
@@ -132,7 +132,6 @@ Variants {
                     0.25
                 )
                 border.width: 1
-                opacity: hintWindow._stage1 ? 1.0 : 0.0
 
                 Behavior on width {
                     NumberAnimation {
@@ -144,12 +143,6 @@ Variants {
                     NumberAnimation {
                         duration: 350
                         easing.type: Easing.OutCubic
-                    }
-                }
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 60
-                        easing.type: Easing.Linear
                     }
                 }
 
@@ -227,8 +220,8 @@ Variants {
 
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                // Vertical: starts at origin, slides to final position
-                y: hintWindow._stage2 ? parent._winTargetY : parent._originY
+                // Vertical: center-aligned to bar center when collapsed, target when expanded
+                y: hintWindow._stage2 ? parent._winTargetY : (parent._barCenterY - height / 2)
 
                 // Width: starts at 0, expands to content width
                 width: hintWindow._stage2 ? (windowContent.implicitWidth + 32) : 0
@@ -249,7 +242,6 @@ Variants {
                     0.2
                 )
                 border.width: 1
-                opacity: hintWindow._stage2 ? 1.0 : 0.0
 
                 Behavior on width {
                     NumberAnimation {
@@ -261,12 +253,6 @@ Variants {
                     NumberAnimation {
                         duration: 400
                         easing.type: Easing.OutCubic
-                    }
-                }
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 60
-                        easing.type: Easing.Linear
                     }
                 }
 
