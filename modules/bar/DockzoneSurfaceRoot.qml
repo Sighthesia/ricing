@@ -135,14 +135,19 @@ Item {
     // Derive renderer-facing metrics from the contract model.
     readonly property var metrics: Model.deriveRendererMetrics(root.model)
 
-    // Expose body geometry for child content positioning.
+    // Hint pull deformation for center dockzone: shrink width, stretch height.
+    readonly property real _hintPull: root.section === "center" ? Services.WindowHintService.pullProgress : 0
+    readonly property real _pullWidthShrink: 24
+    readonly property real _pullHeightStretch: 6
+
+    // Expose body geometry for child content positioning (with pull deformation applied).
     readonly property real bodyX: metrics.bodyX
     readonly property real bodyY: metrics.bodyY
-    readonly property real bodyWidth: metrics.bodyWidth
-    readonly property real bodyHeight: metrics.bodyHeight
+    readonly property real bodyWidth: metrics.bodyWidth - (root._hintPull * root._pullWidthShrink)
+    readonly property real bodyHeight: metrics.bodyHeight + (root._hintPull * root._pullHeightStretch)
 
-    implicitWidth: metrics.containerWidth
-    implicitHeight: metrics.containerHeight
+    implicitWidth: metrics.containerWidth - (root._hintPull * root._pullWidthShrink)
+    implicitHeight: metrics.containerHeight + (root._hintPull * root._pullHeightStretch)
     width: implicitWidth
     height: implicitHeight
 

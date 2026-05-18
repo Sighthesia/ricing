@@ -13,6 +13,15 @@ Singleton {
     // hintVisible driven directly by hintHeld so activeHint data is never cleared during exit.
     readonly property bool hintVisible: root.hintHeld
 
+    // Pull progress for dockzone background deformation (0=idle, 1=fully pulled).
+    property real pullProgress: root.hintHeld ? 1.0 : 0.0
+    Behavior on pullProgress {
+        NumberAnimation {
+            duration: 300
+            easing.type: Easing.OutCubic
+        }
+    }
+
     property int _revision: 0
 
     Timer {
