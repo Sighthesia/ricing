@@ -69,10 +69,10 @@ Variants {
 
             // Origin: center of screen horizontally, at bar bottom edge vertically
             // This is where both capsules "emerge from" — the center dockzone midpoint.
-            readonly property real _originY: Services.BarLayoutService.barHeight
+            readonly property real _originY: Services.BarLayoutService.barHeight / 2
             readonly property real _splitGap: 8
-            // Final resting positions
-            readonly property real _wsTargetY: _originY + 10
+            // Final resting positions: well below bar to make the travel visible
+            readonly property real _wsTargetY: Services.BarLayoutService.barHeight + 16
             readonly property real _winTargetY: _wsTargetY + 44 + _splitGap
 
             // ─── Workspace capsule ───────────────────────────────────────────
@@ -108,20 +108,20 @@ Variants {
 
                 Behavior on width {
                     NumberAnimation {
-                        duration: 260
+                        duration: 320
                         easing.type: Easing.OutCubic
                     }
                 }
                 Behavior on y {
                     NumberAnimation {
-                        duration: 220
+                        duration: 350
                         easing.type: Easing.OutCubic
                     }
                 }
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: 100
-                        easing.type: Easing.OutQuad
+                        duration: 60
+                        easing.type: Easing.Linear
                     }
                 }
 
@@ -225,20 +225,20 @@ Variants {
 
                 Behavior on width {
                     NumberAnimation {
-                        duration: 300
+                        duration: 360
                         easing.type: Easing.OutCubic
                     }
                 }
                 Behavior on y {
                     NumberAnimation {
-                        duration: 260
+                        duration: 400
                         easing.type: Easing.OutCubic
                     }
                 }
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: 120
-                        easing.type: Easing.OutQuad
+                        duration: 60
+                        easing.type: Easing.Linear
                     }
                 }
 
