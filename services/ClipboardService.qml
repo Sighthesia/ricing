@@ -22,6 +22,8 @@ Singleton {
 
         onExited: code => {
             root.available = (code === 0)
+            // Pre-fetch history immediately so the first panel open is not blank.
+            if (root.available) root.list()
         }
     }
 
