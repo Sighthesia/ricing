@@ -16,13 +16,21 @@ Singleton {
         return "apps"
     }
 
+    // Delay query reset so mode stays stable during the collapse animation.
+    property Timer _closeTimer: Timer {
+        interval: 250
+        repeat: false
+        onTriggered: root.query = ""
+    }
+
     function open() {
+        _closeTimer.stop()
         expanded = true
     }
 
     function close() {
         expanded = false
-        query = ""
+        _closeTimer.restart()
     }
 
     function toggle() {
