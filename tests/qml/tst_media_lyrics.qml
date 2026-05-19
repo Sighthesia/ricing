@@ -1,0 +1,90 @@
+import QtQuick
+import QtTest
+import Quickshell.Services.Mpris
+import "../../services" as Services
+
+// Exercise lyric timeline fallback and compact lyric updates.
+TestCase {
+    name: "MediaLyrics"
+
+    function makePlayer(positionMs) {
+        return {
+            identity: "Firefox",
+            desktopEntry: "firefox",
+            trackTitle: "Song",
+            trackArtist: "Artist",
+            trackAlbum: "Album",
+            trackArtUrl: "",
+            positionSupported: true,
+            position: positionMs / 1000,
+            lengthSupported: true,
+            length: 5,
+            canControl: true,
+            canGoPrevious: true,
+            canTogglePlaying: true,
+            canGoNext: true,
+            canSeek: true,
+            playbackState: MprisPlaybackState.Playing,
+            isPlaying: true,
+            play: function() {},
+            pause: function() {},
+            previous: function() {},
+            next: function() {}
+        }
+    }
+
+    function resetState() {
+        Services.MediaService._activePlayerRef = null
+        Services.MediaService._preferredPlayerKey = ""
+        Services.MediaService._positionTick = 0
+        Services.MediaService.artUrl = ""
+        Services.MediaService._lastArtKey = ""
+        Services.MediaService._lastArtPlayerKey = ""
+        Services.MediaService._lastArtTitle = ""
+        Services.MediaService._lastArtArtist = ""
+        Services.MediaService._artRecoveryPending = false
+        Services.MediaService._artRecoveryStartedAt = 0
+
+        Services.NeteaseWebLyricsService._resetState()
+        Services.MediaControlService._resetLyricsLatch()
+    }
+
+    function test_compact_lyric_updates_when_current_line_changes() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.currentLyric = "Line one"
+        Services.NeteaseWebLyricsService.nextLyric = "Line two"
+        Services.NeteaseWebLyricsService.hasLyrics = true
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactPrimaryLyric === "Line one"
+        }, 1000)
+
+        Services.NeteaseWebLyricsService.currentLyric = "Line two"
+        Services.NeteaseWebLyricsService.nextLyric = "Line three"
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactPrimaryLyric === "Line two"
+        }, 1000)
+    }
+
+    function test_lyric_window_falls_back_to_media_position_when_web_timeline_stalls() {
+        resetState()
+
+        Services.MediaService._activePlayerRef = makePlayer(1200)
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.MediaService._positionTick += 1
+
+        Services.NeteaseWebLyricsService._applyPayload({
+            songId: "1",
+            title: "Song",
+            artist: "Artist",
+            playbackState: "paused",
+            positionMs: 0,
+            durationMs: 5000,
+            rawLyric: "[00:00.00]Line one\n[00:01.00]Line two"
+        })
+
+        compare(Services.NeteaseWebLyricsService.currentLyric, "Line two")
+    }
+}

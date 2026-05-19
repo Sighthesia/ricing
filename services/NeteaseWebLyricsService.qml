@@ -3,6 +3,7 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import "./" as Services
 
 // Bridge NetEase web lyric payloads into a shared QML lyric timeline.
 Singleton {
@@ -67,6 +68,27 @@ Singleton {
     property int _positionAnchorMs: 0
     property string _lastPayloadSignature: ""
     property bool _restartPending: false
+
+    function _normalizedTrackKey(trackTitle, trackArtist) {
+        const normalizedTitle = root._normalizeText(trackTitle)
+        const normalizedArtist = root._normalizeText(trackArtist)
+        if (normalizedTitle === "" || normalizedArtist === "")
+            return ""
+
+        return [normalizedTitle, normalizedArtist].join("|")
+    }
+
+    function _shouldUseMediaTimeline() {
+        if (!Services.MediaService.hasPlayer)
+            return false
+
+        const lyricTrackKey = root._normalizedTrackKey(root.title, root.artist)
+        const mediaTrackKey = root._normalizedTrackKey(Services.MediaService.title, Services.MediaService.artist)
+        if (lyricTrackKey === "" || mediaTrackKey === "")
+            return false
+
+        return lyricTrackKey === mediaTrackKey
+    }
 
     function _normalizeText(value) {
         return value != null ? String(value).trim() : ""
@@ -134,6 +156,15 @@ Singleton {
     }
 
     function _effectivePositionMs() {
+        if (root._shouldUseMediaTimeline()) {
+            const mediaPositionMs = Math.max(0, Services.MediaService.positionMs)
+            const resolvedPositionMs = Math.max(0, Math.max(root.positionMs, mediaPositionMs))
+            if (root.durationMs <= 0)
+                return resolvedPositionMs
+
+            return Math.min(root.durationMs, resolvedPositionMs)
+        }
+
         if (root.playbackState !== "playing")
             return Math.max(0, root.positionMs)
 

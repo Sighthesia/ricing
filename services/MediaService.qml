@@ -89,6 +89,9 @@ Singleton {
 
         for (let index = 0; index < players.length; index += 1) {
             const player = players[index]
+            if (!player)
+                continue
+
             const playerKey = root._artPlayerKey(player)
 
             if (playerKey !== "" && playerKey === root._preferredPlayerKey)
@@ -127,6 +130,13 @@ Singleton {
         }
 
         const player = root.activePlayer
+        if (!player) {
+            root.artUrl = ""
+            root._artRecoveryPending = false
+            root._artRecoveryStartedAt = 0
+            return
+        }
+
         const playerKey = root._artPlayerKey(player)
         const artKey = root._artKey(player)
         const trackTitle = player.trackTitle || ""

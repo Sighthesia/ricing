@@ -30,11 +30,6 @@ Singleton {
                 || Services.NeteaseWebLyricsService.nextLyric !== ""
                 || Services.NeteaseWebLyricsService.currentTranslatedLyric !== ""
                 || Services.NeteaseWebLyricsService.nextTranslatedLyric !== "")
-    readonly property bool _freezeLyricsOnPause:
-        root._lyricsSourceLatched
-            && Services.MediaService.hasPlayer
-            && Services.MediaService.playbackState === "paused"
-            && root._hasStableLyricsCache()
     readonly property bool _preferLyricsMediaSource: root._lyricsSourceLatched
 
     property bool _lyricsSourceLatched: false
@@ -90,45 +85,37 @@ Singleton {
     readonly property bool canGoNext: Services.MediaService.hasPlayer ? Services.MediaService.canGoNext : false
     readonly property bool canSeek: Services.MediaService.hasPlayer ? Services.MediaService.canSeek : false
     readonly property string currentLyric:
-        root._freezeLyricsOnPause
-            ? root._stableCurrentLyric
-            : (Services.NeteaseWebLyricsService.currentLyric !== ""
-                ? Services.NeteaseWebLyricsService.currentLyric
-                : ((Services.NeteaseWebLyricsService.currentLyric === ""
-                        && Services.NeteaseWebLyricsService.nextLyric === ""
-                        && root._preferLyricsMediaSource)
-                    ? root._stableCurrentLyric
-                    : ""))
+        Services.NeteaseWebLyricsService.currentLyric !== ""
+            ? Services.NeteaseWebLyricsService.currentLyric
+            : ((Services.NeteaseWebLyricsService.currentLyric === ""
+                    && Services.NeteaseWebLyricsService.nextLyric === ""
+                    && root._preferLyricsMediaSource)
+                ? root._stableCurrentLyric
+                : "")
     readonly property string nextLyric:
-        root._freezeLyricsOnPause
-            ? root._stableNextLyric
-            : (Services.NeteaseWebLyricsService.nextLyric !== ""
-                ? Services.NeteaseWebLyricsService.nextLyric
-                : ((Services.NeteaseWebLyricsService.currentLyric === ""
-                        && Services.NeteaseWebLyricsService.nextLyric === ""
-                        && root._preferLyricsMediaSource)
-                    ? root._stableNextLyric
-                    : ""))
+        Services.NeteaseWebLyricsService.nextLyric !== ""
+            ? Services.NeteaseWebLyricsService.nextLyric
+            : ((Services.NeteaseWebLyricsService.currentLyric === ""
+                    && Services.NeteaseWebLyricsService.nextLyric === ""
+                    && root._preferLyricsMediaSource)
+                ? root._stableNextLyric
+                : "")
     readonly property string currentTranslatedLyric:
-        root._freezeLyricsOnPause
-            ? root._stableCurrentTranslatedLyric
-            : (Services.NeteaseWebLyricsService.currentTranslatedLyric !== ""
-                ? Services.NeteaseWebLyricsService.currentTranslatedLyric
-                : ((Services.NeteaseWebLyricsService.currentTranslatedLyric === ""
-                        && Services.NeteaseWebLyricsService.nextTranslatedLyric === ""
-                        && root._preferLyricsMediaSource)
-                    ? root._stableCurrentTranslatedLyric
-                    : ""))
+        Services.NeteaseWebLyricsService.currentTranslatedLyric !== ""
+            ? Services.NeteaseWebLyricsService.currentTranslatedLyric
+            : ((Services.NeteaseWebLyricsService.currentTranslatedLyric === ""
+                    && Services.NeteaseWebLyricsService.nextTranslatedLyric === ""
+                    && root._preferLyricsMediaSource)
+                ? root._stableCurrentTranslatedLyric
+                : "")
     readonly property string nextTranslatedLyric:
-        root._freezeLyricsOnPause
-            ? root._stableNextTranslatedLyric
-            : (Services.NeteaseWebLyricsService.nextTranslatedLyric !== ""
-                ? Services.NeteaseWebLyricsService.nextTranslatedLyric
-                : ((Services.NeteaseWebLyricsService.currentTranslatedLyric === ""
-                        && Services.NeteaseWebLyricsService.nextTranslatedLyric === ""
-                        && root._preferLyricsMediaSource)
-                    ? root._stableNextTranslatedLyric
-                    : ""))
+        Services.NeteaseWebLyricsService.nextTranslatedLyric !== ""
+            ? Services.NeteaseWebLyricsService.nextTranslatedLyric
+            : ((Services.NeteaseWebLyricsService.currentTranslatedLyric === ""
+                    && Services.NeteaseWebLyricsService.nextTranslatedLyric === ""
+                    && root._preferLyricsMediaSource)
+                ? root._stableNextTranslatedLyric
+                : "")
     readonly property bool hasLyrics:
         !!Services.NeteaseWebLyricsService.hasLyrics
             || (root._preferLyricsMediaSource && root._hasStableLyricsCache())
@@ -254,16 +241,14 @@ Singleton {
         if (playerTrackKey !== "")
             root._latchedPlayerTrackKey = playerTrackKey
 
-        if (!root._freezeLyricsOnPause) {
-            if (Services.NeteaseWebLyricsService.currentLyric !== "")
-                root._stableCurrentLyric = Services.NeteaseWebLyricsService.currentLyric
-            if (Services.NeteaseWebLyricsService.nextLyric !== "")
-                root._stableNextLyric = Services.NeteaseWebLyricsService.nextLyric
-            if (Services.NeteaseWebLyricsService.currentTranslatedLyric !== "")
-                root._stableCurrentTranslatedLyric = Services.NeteaseWebLyricsService.currentTranslatedLyric
-            if (Services.NeteaseWebLyricsService.nextTranslatedLyric !== "")
-                root._stableNextTranslatedLyric = Services.NeteaseWebLyricsService.nextTranslatedLyric
-        }
+        if (Services.NeteaseWebLyricsService.currentLyric !== "")
+            root._stableCurrentLyric = Services.NeteaseWebLyricsService.currentLyric
+        if (Services.NeteaseWebLyricsService.nextLyric !== "")
+            root._stableNextLyric = Services.NeteaseWebLyricsService.nextLyric
+        if (Services.NeteaseWebLyricsService.currentTranslatedLyric !== "")
+            root._stableCurrentTranslatedLyric = Services.NeteaseWebLyricsService.currentTranslatedLyric
+        if (Services.NeteaseWebLyricsService.nextTranslatedLyric !== "")
+            root._stableNextTranslatedLyric = Services.NeteaseWebLyricsService.nextTranslatedLyric
 
         if (!root._lyricsSignalActive && !(currentTrackMatchesLatched && hasStableLyrics)) {
             root._updateCompactDisplayedLyric()

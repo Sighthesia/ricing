@@ -10,6 +10,8 @@ Item {
     property string currentTextKey: root._displayTextKey
     property string pendingTextKey: root._displayTextKey
     property bool transitioning: false
+    property string _stableArtUrl: ""
+    property real _progressValue: Services.MediaControlService.progress
 
     readonly property string _fallbackTitle: Services.MediaControlService.title !== ""
         ? Services.MediaControlService.title
@@ -34,11 +36,29 @@ Item {
         Services.Color.mSurfaceVariant.b,
         0.9
     )
+    readonly property string _displayArtUrl:
+        root._stableArtUrl !== "" ? root._stableArtUrl : Services.MediaControlService.artUrl
+    readonly property color _ringTrackColor: Qt.rgba(
+        Services.Color.mOutline.r,
+        Services.Color.mOutline.g,
+        Services.Color.mOutline.b,
+        0.3
+    )
+    readonly property color _ringProgressColor: Qt.rgba(
+        Services.Color.mPrimary.r,
+        Services.Color.mPrimary.g,
+        Services.Color.mPrimary.b,
+        0.95
+    )
 
     implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 12, 220)
     implicitHeight: 26
 
     Behavior on implicitWidth {
+        NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
+    }
+
+    Behavior on _progressValue {
         NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
     }
 
@@ -58,7 +78,21 @@ Item {
         fadeTransition.restart()
     }
 
-    Component.onCompleted: syncDisplayText()
+    function syncArtwork() {
+        if (Services.MediaControlService.artUrl !== "") {
+            root._stableArtUrl = Services.MediaControlService.artUrl
+            return
+        }
+
+        if (Services.MediaControlService.title === "" && Services.MediaControlService.artist === "")
+            root._stableArtUrl = ""
+    }
+
+    Component.onCompleted: {
+        syncDisplayText()
+        syncArtwork()
+        root._progressValue = Services.MediaControlService.progress
+    }
 
     on_DisplayTextChanged: syncDisplayText()
     on_DisplayTextKeyChanged: syncDisplayText()
@@ -76,6 +110,19 @@ Item {
 
         function onTitleChanged() {
             root.syncDisplayText()
+            root.syncArtwork()
+        }
+
+        function onArtistChanged() {
+            root.syncArtwork()
+        }
+
+        function onArtUrlChanged() {
+            root.syncArtwork()
+        }
+
+        function onProgressChanged() {
+            root._progressValue = Services.MediaControlService.progress
         }
     }
 
@@ -135,34 +182,87 @@ Item {
             anchors.centerIn: parent
             spacing: 6
 
-            // Draw the current album artwork slot.
-            Rectangle {
+            // Draw the current circular artwork with a progress ring.
+            Item {
                 id: currentArtworkSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: 18
-                height: 18
-                radius: 9
-                color: root._artFallbackColor
-                border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.45)
-                border.width: 1
-                clip: true
+                width: 20
+                height: 20
 
-                Image {
+                // Paint the circular progress track and active progress arc.
+                Canvas {
+                    id: currentProgressRing
+
                     anchors.fill: parent
-                    source: Services.MediaControlService.artUrl
-                    fillMode: Image.PreserveAspectCrop
-                    visible: source !== ""
-                    asynchronous: true
-                    cache: false
+                    antialiasing: true
+
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        const size = Math.min(width, height)
+                        const center = size / 2
+                        const radius = (size / 2) - 1.25
+                        const startAngle = -Math.PI / 2
+                        const sweep = Math.max(0, Math.min(1, root._progressValue)) * Math.PI * 2
+
+                        ctx.reset()
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.lineCap = "round"
+                        ctx.lineWidth = 2
+
+                        ctx.beginPath()
+                        ctx.strokeStyle = root._ringTrackColor
+                        ctx.arc(center, center, radius, 0, Math.PI * 2, false)
+                        ctx.stroke()
+
+                        if (sweep <= 0)
+                            return
+
+                        ctx.beginPath()
+                        ctx.strokeStyle = root._ringProgressColor
+                        ctx.arc(center, center, radius, startAngle, startAngle + sweep, false)
+                        ctx.stroke()
+                    }
+
+                    Connections {
+                        target: root
+                        function on_ProgressValueChanged() { currentProgressRing.requestPaint() }
+                    }
+
+                    Connections {
+                        target: Services.Color
+                        function onMPrimaryChanged() { currentProgressRing.requestPaint() }
+                        function onMOutlineChanged() { currentProgressRing.requestPaint() }
+                    }
                 }
 
-                Text {
+                // Mask the artwork into a persistent circular badge.
+                Rectangle {
                     anchors.centerIn: parent
-                    text: "♪"
-                    color: Services.Color.mOnSurfaceVariant
-                    font.pixelSize: 10
-                    visible: Services.MediaControlService.artUrl === ""
+                    width: 16
+                    height: 16
+                    radius: width / 2
+                    color: root._artFallbackColor
+                    border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.45)
+                    border.width: 1
+                    clip: true
+
+                    Image {
+                        anchors.fill: parent
+                        source: root._displayArtUrl
+                        fillMode: Image.PreserveAspectCrop
+                        visible: source !== ""
+                        asynchronous: true
+                        cache: true
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "♪"
+                        color: Services.Color.mOnSurfaceVariant
+                        font.pixelSize: 10
+                        visible: root._displayArtUrl === ""
+                    }
                 }
             }
 
@@ -214,34 +314,87 @@ Item {
             anchors.centerIn: parent
             spacing: 6
 
-            // Keep the artwork stable across text transitions.
-            Rectangle {
+            // Keep the circular artwork and progress ring stable across text transitions.
+            Item {
                 id: nextArtworkSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: 18
-                height: 18
-                radius: 9
-                color: root._artFallbackColor
-                border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.45)
-                border.width: 1
-                clip: true
+                width: 20
+                height: 20
 
-                Image {
+                // Paint the same progress ring for the outgoing and incoming text layers.
+                Canvas {
+                    id: nextProgressRing
+
                     anchors.fill: parent
-                    source: Services.MediaControlService.artUrl
-                    fillMode: Image.PreserveAspectCrop
-                    visible: source !== ""
-                    asynchronous: true
-                    cache: false
+                    antialiasing: true
+
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        const size = Math.min(width, height)
+                        const center = size / 2
+                        const radius = (size / 2) - 1.25
+                        const startAngle = -Math.PI / 2
+                        const sweep = Math.max(0, Math.min(1, root._progressValue)) * Math.PI * 2
+
+                        ctx.reset()
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.lineCap = "round"
+                        ctx.lineWidth = 2
+
+                        ctx.beginPath()
+                        ctx.strokeStyle = root._ringTrackColor
+                        ctx.arc(center, center, radius, 0, Math.PI * 2, false)
+                        ctx.stroke()
+
+                        if (sweep <= 0)
+                            return
+
+                        ctx.beginPath()
+                        ctx.strokeStyle = root._ringProgressColor
+                        ctx.arc(center, center, radius, startAngle, startAngle + sweep, false)
+                        ctx.stroke()
+                    }
+
+                    Connections {
+                        target: root
+                        function on_ProgressValueChanged() { nextProgressRing.requestPaint() }
+                    }
+
+                    Connections {
+                        target: Services.Color
+                        function onMPrimaryChanged() { nextProgressRing.requestPaint() }
+                        function onMOutlineChanged() { nextProgressRing.requestPaint() }
+                    }
                 }
 
-                Text {
+                // Reuse the same circular badge inside the progress ring.
+                Rectangle {
                     anchors.centerIn: parent
-                    text: "♪"
-                    color: Services.Color.mOnSurfaceVariant
-                    font.pixelSize: 10
-                    visible: Services.MediaControlService.artUrl === ""
+                    width: 16
+                    height: 16
+                    radius: width / 2
+                    color: root._artFallbackColor
+                    border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.45)
+                    border.width: 1
+                    clip: true
+
+                    Image {
+                        anchors.fill: parent
+                        source: root._displayArtUrl
+                        fillMode: Image.PreserveAspectCrop
+                        visible: source !== ""
+                        asynchronous: true
+                        cache: true
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "♪"
+                        color: Services.Color.mOnSurfaceVariant
+                        font.pixelSize: 10
+                        visible: root._displayArtUrl === ""
+                    }
                 }
             }
 
