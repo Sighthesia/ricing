@@ -20,7 +20,6 @@ Item {
     readonly property int hoverRadiusLift: 2
     readonly property var centerWidgets: Services.BarLayoutService.sectionWidgets("center")
     readonly property bool showManagedCenterWidgets: !Services.IslandService.expanded
-        && Services.BarLayoutService.settingsMode
         && root.centerWidgets.length > 0
     readonly property real collapsedContentWidth: collapsedContentLoader.item
         ? collapsedContentLoader.item.implicitWidth + collapsedHorizontalPadding
@@ -129,7 +128,7 @@ Item {
             color: parent.color
         }
 
-        // --- Collapsed content: clock ---
+        // --- Collapsed content: center widgets or fallback clock ---
         Item {
             id: collapsedContent
             anchors.fill: parent
@@ -148,7 +147,7 @@ Item {
                 sourceComponent: root.showManagedCenterWidgets ? managedCenterWidgets : fallbackClock
             }
 
-            // Render the actual center widget row while layout mode is active.
+            // Render the actual managed center widgets in collapsed mode.
             Component {
                 id: managedCenterWidgets
 
@@ -171,7 +170,7 @@ Item {
                 }
             }
 
-            // Keep the normal collapsed clock when layout mode is inactive.
+            // Keep the clock as the fallback when no center widgets exist.
             Component {
                 id: fallbackClock
 
@@ -199,10 +198,12 @@ Item {
             }
         }
 
-        // Click to toggle while collapsed.
+        // Click to toggle only when the collapsed island is still a passive clock surface.
         MouseArea {
             anchors.fill: parent
-            enabled: !Services.IslandService.expanded && !Services.BarLayoutService.settingsMode
+            enabled: !Services.IslandService.expanded
+                && !Services.BarLayoutService.settingsMode
+                && !root.showManagedCenterWidgets
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton
