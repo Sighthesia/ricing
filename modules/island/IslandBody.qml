@@ -198,12 +198,11 @@ Item {
             }
         }
 
-        // Click to toggle only when the collapsed island is still a passive clock surface.
+        // Keep left-click expansion on the whole collapsed island surface.
         MouseArea {
             anchors.fill: parent
             enabled: !Services.IslandService.expanded
                 && !Services.BarLayoutService.settingsMode
-                && !root.showManagedCenterWidgets
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton
