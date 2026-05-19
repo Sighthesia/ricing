@@ -1,9 +1,12 @@
 import QtQuick
+import "../bar" as Bar
 import "../../services" as Services
 
 // Animated island body: expands from collapsed clock to full launcher panel.
 Item {
     id: root
+
+    required property string screenName
 
     // Geometry constants.
     readonly property int collapsedW: 220
@@ -11,11 +14,28 @@ Item {
     readonly property int expandedW: 480
     readonly property int expandedH: 420
     readonly property int earRadius: 24
+    readonly property int collapsedHorizontalPadding: 16
+    readonly property int hoverWLift: 12
+    readonly property int hoverHLift: 4
+    readonly property int hoverRadiusLift: 2
+    readonly property var centerWidgets: Services.BarLayoutService.sectionWidgets("center")
+    readonly property bool showManagedCenterWidgets: !Services.IslandService.expanded
+        && Services.BarLayoutService.settingsMode
+        && root.centerWidgets.length > 0
+    readonly property real collapsedContentWidth: collapsedContentLoader.item
+        ? collapsedContentLoader.item.implicitWidth + collapsedHorizontalPadding
+        : collapsedW
 
-    // Animated dimensions driven by IslandService state.
-    property int targetW: Services.IslandService.expanded ? expandedW : collapsedW
-    property int targetH: Services.IslandService.expanded ? expandedH : collapsedH
-    property int targetR: Services.IslandService.expanded ? 24 : 14
+    // Animated dimensions driven by island state and passive hover intent.
+    property int targetW: Services.IslandService.expanded
+        ? expandedW
+        : collapsedContentWidth + (hoverHandler.hovered ? hoverWLift : 0)
+    property int targetH: Services.IslandService.expanded
+        ? expandedH
+        : collapsedH + (hoverHandler.hovered ? hoverHLift : 0)
+    property int targetR: Services.IslandService.expanded
+        ? 24
+        : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0)
 
     width: targetW + earRadius * 2
     height: targetH
@@ -24,15 +44,40 @@ Item {
 
     property real bodyRadius: targetR
 
+    // Forward widget-aware context menu requests from center widget wrappers.
+    function openWidgetContextMenu(instanceKey, widgetId, clickX) {
+        Services.BarLayoutService.openContextMenu(clickX, instanceKey, widgetId)
+    }
+
     // SpringAnimation for organic feel (reference project values).
     Behavior on width {
-        SpringAnimation { spring: 5.0; mass: 3.6; damping: 0.75; epsilon: 0.5 }
+        SpringAnimation {
+            spring: Services.Motion.hover.spring
+            mass: Services.Motion.hover.mass
+            damping: Services.Motion.hover.damping
+            epsilon: Services.Motion.hover.epsilon
+        }
     }
     Behavior on height {
-        SpringAnimation { spring: 5.0; mass: 3.6; damping: 0.75; epsilon: 0.5 }
+        SpringAnimation {
+            spring: Services.Motion.hover.spring
+            mass: Services.Motion.hover.mass
+            damping: Services.Motion.hover.damping
+            epsilon: Services.Motion.hover.epsilon
+        }
     }
     Behavior on bodyRadius {
-        SpringAnimation { spring: 5.0; mass: 3.6; damping: 0.75; epsilon: 0.1 }
+        SpringAnimation {
+            spring: Services.Motion.hover.spring
+            mass: Services.Motion.hover.mass
+            damping: Services.Motion.hover.damping
+            epsilon: Services.Motion.hover.epsilon
+        }
+    }
+
+    // Passive hover tracking for the collapsed island geometry.
+    HoverHandler {
+        id: hoverHandler
     }
 
     // --- Left ear (connects body to screen top-left) ---
@@ -95,8 +140,43 @@ Item {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
             }
 
-            IslandClock {
+            // Switch collapsed content between the real center widgets and the fallback clock.
+            Loader {
+                id: collapsedContentLoader
+
                 anchors.centerIn: parent
+                sourceComponent: root.showManagedCenterWidgets ? managedCenterWidgets : fallbackClock
+            }
+
+            // Render the actual center widget row while layout mode is active.
+            Component {
+                id: managedCenterWidgets
+
+                Row {
+                    id: centerWidgetsRow
+
+                    spacing: 8
+
+                    Repeater {
+                        model: root.centerWidgets.length
+
+                        Bar.BarWidgetWrapper {
+                            required property int index
+
+                            screenName: root.screenName
+                            widgetEntry: root.centerWidgets[index]
+                            widgetSource: Qt.resolvedUrl(widgetEntry.source)
+                        }
+                    }
+                }
+            }
+
+            // Keep the normal collapsed clock when layout mode is inactive.
+            Component {
+                id: fallbackClock
+
+                IslandClock {
+                }
             }
         }
 
@@ -119,12 +199,26 @@ Item {
             }
         }
 
-        // Click to toggle (only when collapsed).
+        // Click to toggle while collapsed.
         MouseArea {
             anchors.fill: parent
-            enabled: !Services.IslandService.expanded
+            enabled: !Services.IslandService.expanded && !Services.BarLayoutService.settingsMode
+            hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
+            acceptedButtons: Qt.LeftButton
             onClicked: Services.IslandService.toggle()
+        }
+
+    }
+
+    // Right-click opens the center layout menu across the collapsed island.
+    MouseArea {
+        anchors.fill: parent
+        enabled: !Services.IslandService.expanded && !root.showManagedCenterWidgets
+        acceptedButtons: Qt.RightButton
+        onClicked: (mouse) => {
+            var scenePos = root.mapToItem(null, mouse.x, mouse.y)
+            Services.BarLayoutService.openContextMenu(scenePos.x, "", "")
         }
     }
 

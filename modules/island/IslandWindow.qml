@@ -61,6 +61,7 @@ Variants {
         IslandBody {
             id: islandBody
             z: 1
+            screenName: modelData.name
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
         }
