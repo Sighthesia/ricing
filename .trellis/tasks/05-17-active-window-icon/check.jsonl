@@ -1,3 +1,0 @@
-{"file":"modules/bar/DockzoneSurfaceRoot.qml","reason":"Primary implementation file for the center dockzone hover motion."}
-{"file":"modules/bar/DockzoneSurfaceModel.js","reason":"Geometry contract consumed by the dockzone renderer and motion envelopes."}
-{"file":"modules/bar/BarSection.qml","reason":"Owns the center section surface state selection and hover intent wiring."}

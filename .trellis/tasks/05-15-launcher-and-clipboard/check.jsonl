@@ -1,6 +1,0 @@
-{"type":"spec","path":".trellis/tasks/05-15-launcher-and-clipboard/prd.md","summary":"Acceptance criteria to verify against"}
-{"type":"spec","path":".trellis/spec/frontend/directory-structure.md","summary":"Directory conventions to verify compliance"}
-{"type":"context","path":"services/qmldir","summary":"Verify new singletons are registered"}
-{"type":"context","path":"shell.qml","summary":"Verify LauncherWindow is instantiated"}
-{"type":"context","path":"services/NiriService.qml","summary":"Verify reloadConfig() exists"}
-{"type":"context","path":"services/nirishortcuts/NiriShortcutParser.js","summary":"Verify parser handles afloat IPC patterns"}

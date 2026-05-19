@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend scope and spec entry point for new QML modules and services."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "QML declaration comment convention and visual-porting rules apply to the new bar modules."}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "The task ports a subset of a larger reference system and should avoid unnecessary copy-paste breadth."}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "The shell root, bar modules, and layout service need a clean contract between composition and state."}
-{"file": ".trellis/tasks/05-10-port-bar-layout-system-mvp/research/bar-layout-mvp-reference.md", "reason": "Defines the exact reference files reviewed and the MVP port boundary."}

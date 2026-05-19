@@ -1,5 +1,0 @@
-{"file":".trellis/spec/frontend/directory-structure.md","reason":"Verify the migration keeps responsibilities aligned within the bar module boundary."}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that side sections truly reuse the unified owner/model path instead of partially duplicating legacy logic."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Confirm container sizing, section composition, owner state, and model derivation remain cleanly separated."}
-{"file":".trellis/tasks/05-14-author-dockzone-surface-model-contract-spec/contract-spec.md","reason":"Validate that side migration still honors the agreed dockzone contract and larger transparent container semantics."}
-{"file":".trellis/tasks/05-15-side-dockzone-unified-surface/prd.md","reason":"Check shipped behavior against the approved side migration scope and exclusions."}

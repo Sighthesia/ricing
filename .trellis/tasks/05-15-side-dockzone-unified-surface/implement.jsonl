@@ -1,5 +1,0 @@
-{"file":".trellis/spec/frontend/directory-structure.md","reason":"Keep the side migration localized to the bar module structure while touching the right owner/render files."}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the center owner/model path instead of building a second side-specific architecture."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Preserve the boundary between shared layout state, section composition, owner-local dockzone state, and pure model derivation."}
-{"file":".trellis/tasks/05-14-author-dockzone-surface-model-contract-spec/contract-spec.md","reason":"Apply the existing dockzone contract to side sections, especially around larger transparent geometry containers and ear-local state."}
-{"file":".trellis/tasks/05-15-side-dockzone-unified-surface/prd.md","reason":"Implement the approved side migration scope, including overlay removal and larger transparent geometry container allowance."}
