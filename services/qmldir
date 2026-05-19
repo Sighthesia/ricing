@@ -12,6 +12,8 @@ singleton SettingsService 1.0 SettingsService.qml
 singleton ClipboardService 1.0 ClipboardService.qml
 singleton LauncherService 1.0 LauncherService.qml
 singleton MediaService 1.0 MediaService.qml
+singleton MediaControlService 1.0 MediaControlService.qml
+singleton NeteaseWebLyricsService 1.0 NeteaseWebLyricsService.qml
 singleton NiriShortcutService 1.0 NiriShortcutService.qml
 singleton WindowHintTriggerService 1.0 WindowHintTriggerService.qml
 singleton WindowHintService 1.0 WindowHintService.qml

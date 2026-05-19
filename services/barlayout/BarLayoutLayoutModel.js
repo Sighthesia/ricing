@@ -13,6 +13,7 @@ var DEFAULT_WIDGET_SOURCE_BY_ID = {
     "active-window": "../../modules/bar/widgets/ActiveWindow.qml",
     "brightness": "../../modules/bar/widgets/Brightness.qml",
     "volume": "../../modules/bar/widgets/Volume.qml",
+    "media": "../../modules/bar/widgets/Media.qml",
 }
 
 function normalizeWidgetId(widgetId, widgetSource) {
@@ -95,6 +96,13 @@ var AVAILABLE_WIDGETS = [
         description: "Audio volume with scroll and mute.",
         section: "right",
         source: "../../modules/bar/widgets/Volume.qml",
+    },
+    {
+        id: "media",
+        label: "Media",
+        description: "Compact now playing with lyric priority.",
+        section: "left",
+        source: "../../modules/bar/widgets/Media.qml",
     },
 ]
 
