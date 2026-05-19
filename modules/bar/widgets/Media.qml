@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import "../../../services" as Services
 
 // Render a compact now-playing pill for the bar.
@@ -236,7 +237,40 @@ Item {
                     }
                 }
 
-                // Mask the artwork into a persistent circular badge.
+                // Keep a reusable mask source for the circular artwork crop.
+                Item {
+                    id: currentArtworkMaskContainer
+
+                    anchors.centerIn: parent
+                    width: 16
+                    height: 16
+                    layer.enabled: true
+                    visible: false
+
+                    // Define the circular crop shape.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: "white"
+                    }
+                }
+
+                // Keep the raw artwork source separate from the masked output.
+                Image {
+                    id: currentArtworkSource
+
+                    anchors.centerIn: parent
+                    width: 16
+                    height: 16
+                    visible: false
+                    source: root._displayArtUrl
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: true
+                    smooth: true
+                }
+
+                // Frame the circular artwork badge.
                 Rectangle {
                     anchors.centerIn: parent
                     width: 16
@@ -245,15 +279,13 @@ Item {
                     color: root._artFallbackColor
                     border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.45)
                     border.width: 1
-                    clip: true
 
-                    Image {
+                    // Render the masked circular artwork.
+                    OpacityMask {
                         anchors.fill: parent
-                        source: root._displayArtUrl
-                        fillMode: Image.PreserveAspectCrop
-                        visible: source !== ""
-                        asynchronous: true
-                        cache: true
+                        visible: root._displayArtUrl !== ""
+                        source: currentArtworkSource
+                        maskSource: currentArtworkMaskContainer
                     }
 
                     Text {
@@ -368,6 +400,39 @@ Item {
                     }
                 }
 
+                // Keep a reusable mask source for the next-layer artwork crop.
+                Item {
+                    id: nextArtworkMaskContainer
+
+                    anchors.centerIn: parent
+                    width: 16
+                    height: 16
+                    layer.enabled: true
+                    visible: false
+
+                    // Define the circular crop shape.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: "white"
+                    }
+                }
+
+                // Keep the raw artwork source for the next layer separate.
+                Image {
+                    id: nextArtworkSource
+
+                    anchors.centerIn: parent
+                    width: 16
+                    height: 16
+                    visible: false
+                    source: root._displayArtUrl
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: true
+                    smooth: true
+                }
+
                 // Reuse the same circular badge inside the progress ring.
                 Rectangle {
                     anchors.centerIn: parent
@@ -377,15 +442,13 @@ Item {
                     color: root._artFallbackColor
                     border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.45)
                     border.width: 1
-                    clip: true
 
-                    Image {
+                    // Render the masked circular artwork.
+                    OpacityMask {
                         anchors.fill: parent
-                        source: root._displayArtUrl
-                        fillMode: Image.PreserveAspectCrop
-                        visible: source !== ""
-                        asynchronous: true
-                        cache: true
+                        visible: root._displayArtUrl !== ""
+                        source: nextArtworkSource
+                        maskSource: nextArtworkMaskContainer
                     }
 
                     Text {
