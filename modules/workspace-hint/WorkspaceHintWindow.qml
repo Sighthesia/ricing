@@ -31,6 +31,9 @@ Variants {
             right: true
         }
 
+        // Restrict input to visible capsule area so clicks pass through to windows behind.
+        mask: Region { item: hintHitRegion }
+
         // Decouple window visibility from hint state to allow exit animation.
         // Window stays visible during exit, then hides after animation completes.
         visible: hintWindow._windowVisible
@@ -99,6 +102,7 @@ Variants {
 
         // Full-screen transparent container
         Item {
+            id: hintContainer
             anchors.fill: parent
 
             // Origin: y=0 (top screen edge), capsules slide down to final positions.
@@ -106,6 +110,21 @@ Variants {
             // Final resting positions: below bar
             readonly property real _wsTargetY: Services.BarLayoutService.barHeight + 16
             readonly property real _winTargetY: _wsTargetY + 44 + _splitGap
+
+            // Input mask bounding both capsules to avoid covering the whole screen.
+            Item {
+                id: hintHitRegion
+                x: Math.min(workspaceCapsule.x, windowCapsule.x)
+                y: Math.min(workspaceCapsule.y, windowCapsule.y)
+                width: Math.max(
+                    workspaceCapsule.x + workspaceCapsule.width,
+                    windowCapsule.x + windowCapsule.width
+                ) - Math.min(workspaceCapsule.x, windowCapsule.x)
+                height: Math.max(
+                    workspaceCapsule.y + workspaceCapsule.height,
+                    windowCapsule.y + windowCapsule.height
+                ) - Math.min(workspaceCapsule.y, windowCapsule.y)
+            }
 
             // ─── Workspace capsule ───────────────────────────────────────────
             Rectangle {
