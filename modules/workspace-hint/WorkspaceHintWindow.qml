@@ -2,9 +2,9 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import "../../services" as Services
+import "."
 
-// OSD popup: two capsules emerge from center dockzone at zero width,
-// expand outward to full size while sliding to final positions with stagger.
+// OSD popup: a compact stack of workspace capsules drops from the top edge.
 Variants {
     id: root
 
@@ -40,60 +40,112 @@ Variants {
 
         property bool _windowVisible: false
         property bool _hintActive: Services.WindowHintService.hintVisible
+        readonly property var _activeHint: Services.WindowHintService.activeHint
+        readonly property int _activeWorkspacePosition: _activeHint.activeWorkspacePosition
+        readonly property var _visibleWorkspaces: {
+            const items = []
+            const allWorkspaces = _activeHint.workspaces || []
+            const positions = [
+                _activeWorkspacePosition - 1,
+                _activeWorkspacePosition,
+                _activeWorkspacePosition + 1
+            ]
 
-        // Stagger state: each stage drives one capsule from collapsed to expanded
-        property bool _stage1: false
-        property bool _stage2: false
-        // Exit state: true when playing exit animation (disables clip so content stays visible)
-        property bool _exiting: false
+            for (let index = 0; index < positions.length; index++) {
+                const position = positions[index]
+                if (position < 0 || position >= allWorkspaces.length)
+                    continue
+
+                const workspace = allWorkspaces[position]
+                items.push({
+                    position: position,
+                    workspaceIndex: workspace.workspaceIndex,
+                    icons: workspace.icons || [],
+                    windows: position === _activeWorkspacePosition ? (_activeHint.windows || []) : [],
+                    isActive: position === _activeWorkspacePosition
+                })
+            }
+
+            return items
+        }
+        readonly property var _topWorkspace: _visibleWorkspaces.length > 0 ? _visibleWorkspaces[0] : null
+        readonly property var _middleWorkspace: _visibleWorkspaces.length > 1 ? _visibleWorkspaces[1] : null
+        readonly property var _bottomWorkspace: _visibleWorkspaces.length > 2 ? _visibleWorkspaces[2] : null
+
+        // Drive top-to-bottom entry and reverse exit for the three capsules.
+        property bool _stageTop: false
+        property bool _stageMiddle: false
+        property bool _stageBottom: false
 
         on_HintActiveChanged: {
             if (_hintActive) {
-                // Enter: show window, then stagger capsules open
+                // Enter: show window, then open the stacked workspace capsules.
                 _hideTimer.stop()
-                _exitTimer1.stop()
-                _exiting = false
+                _exitBottomTimer.stop()
+                _exitMiddleTimer.stop()
+                _exitTopTimer.stop()
                 _windowVisible = true
-                _stage1 = false
-                _stage2 = false
-                _staggerTimer1.restart()
+                _stageTop = false
+                _stageMiddle = false
+                _stageBottom = false
+                _enterTopTimer.restart()
+                _enterMiddleTimer.restart()
+                _enterBottomTimer.restart()
             } else {
-                // Exit: reverse stagger — window title first, then workspace
-                _staggerTimer1.stop()
-                _staggerTimer2.stop()
-                _exiting = true
-                _stage2 = false
-                _exitTimer1.restart()
-            }
-        }
-
-        // Stagger timers: workspace capsule first, then window capsule
-        Timer {
-            id: _staggerTimer1
-            interval: 20
-            onTriggered: {
-                hintWindow._stage1 = true
-                _staggerTimer2.restart()
-            }
-        }
-
-        Timer {
-            id: _staggerTimer2
-            interval: 70
-            onTriggered: hintWindow._stage2 = true
-        }
-
-        // Exit stagger: window capsule collapses first, then workspace, then hide
-        Timer {
-            id: _exitTimer1
-            interval: 50
-            onTriggered: {
-                hintWindow._stage1 = false
+                // Exit: collapse the full stack, then hide the window.
+                _enterTopTimer.stop()
+                _enterMiddleTimer.stop()
+                _enterBottomTimer.stop()
+                _exitBottomTimer.restart()
+                _exitMiddleTimer.restart()
+                _exitTopTimer.restart()
                 _hideTimer.restart()
             }
         }
 
-        // Hide window after exit animations complete
+        // Drive the top capsule entry.
+        Timer {
+            id: _enterTopTimer
+            interval: 20
+            onTriggered: hintWindow._stageTop = true
+        }
+
+        // Drive the middle capsule entry.
+        Timer {
+            id: _enterMiddleTimer
+            interval: 70
+            onTriggered: hintWindow._stageMiddle = true
+        }
+
+        // Drive the bottom capsule entry.
+        Timer {
+            id: _enterBottomTimer
+            interval: 100
+            onTriggered: hintWindow._stageBottom = true
+        }
+
+        // Collapse the bottom capsule first on exit.
+        Timer {
+            id: _exitBottomTimer
+            interval: 0
+            onTriggered: hintWindow._stageBottom = false
+        }
+
+        // Collapse the middle capsule second on exit.
+        Timer {
+            id: _exitMiddleTimer
+            interval: 55
+            onTriggered: hintWindow._stageMiddle = false
+        }
+
+        // Collapse the top capsule last on exit.
+        Timer {
+            id: _exitTopTimer
+            interval: 110
+            onTriggered: hintWindow._stageTop = false
+        }
+
+        // Hide window after exit animations complete.
         Timer {
             id: _hideTimer
             interval: 380
@@ -105,276 +157,85 @@ Variants {
             id: hintContainer
             anchors.fill: parent
 
-            // Origin: y=0 (top screen edge), capsules slide down to final positions.
-            readonly property real _splitGap: 8
-            // Final resting positions: below bar
+            // Keep the stacked hint below the bar while it drops from the top edge.
             readonly property real _wsTargetY: Services.BarLayoutService.barHeight + 16
-            readonly property real _winTargetY: _wsTargetY + 44 + _splitGap
 
-            // Input mask bounding both capsules to avoid covering the whole screen.
+            // Bound input to the stacked workspace hint surface.
             Item {
                 id: hintHitRegion
-                x: Math.min(workspaceCapsule.x, windowCapsule.x)
-                y: Math.min(workspaceCapsule.y, windowCapsule.y)
-                width: Math.max(
-                    workspaceCapsule.x + workspaceCapsule.width,
-                    windowCapsule.x + windowCapsule.width
-                ) - Math.min(workspaceCapsule.x, windowCapsule.x)
-                height: Math.max(
-                    workspaceCapsule.y + workspaceCapsule.height,
-                    windowCapsule.y + windowCapsule.height
-                ) - Math.min(workspaceCapsule.y, windowCapsule.y)
+                readonly property real _left: Math.min(
+                    topCapsule.visible ? topCapsule.x : hintContainer.width,
+                    middleCapsule.visible ? middleCapsule.x : hintContainer.width,
+                    bottomCapsule.visible ? bottomCapsule.x : hintContainer.width
+                )
+                readonly property real _top: Math.min(
+                    topCapsule.visible ? topCapsule.y : hintContainer.height,
+                    middleCapsule.visible ? middleCapsule.y : hintContainer.height,
+                    bottomCapsule.visible ? bottomCapsule.y : hintContainer.height
+                )
+                readonly property real _right: Math.max(
+                    topCapsule.visible ? topCapsule.x + topCapsule.width : 0,
+                    middleCapsule.visible ? middleCapsule.x + middleCapsule.width : 0,
+                    bottomCapsule.visible ? bottomCapsule.x + bottomCapsule.width : 0
+                )
+                readonly property real _bottom: Math.max(
+                    topCapsule.visible ? topCapsule.y + topCapsule.height : 0,
+                    middleCapsule.visible ? middleCapsule.y + middleCapsule.height : 0,
+                    bottomCapsule.visible ? bottomCapsule.y + bottomCapsule.height : 0
+                )
+
+                x: _left < hintContainer.width ? _left : 0
+                y: _top < hintContainer.height ? _top : 0
+                width: Math.max(0, _right - x)
+                height: Math.max(0, _bottom - y)
             }
 
-            // ─── Workspace capsule ───────────────────────────────────────────
-            Rectangle {
-                id: workspaceCapsule
+            // Render the top capsule as the first staggered item.
+            WorkspaceHintCapsule {
+                id: topCapsule
 
-                // Horizontal: always centered
+                visible: hintWindow._windowVisible && hintWindow._topWorkspace !== null
+                workspaceIndex: hintWindow._topWorkspace ? hintWindow._topWorkspace.workspaceIndex : -1
+                active: hintWindow._topWorkspace ? !!hintWindow._topWorkspace.isActive : false
+                icons: hintWindow._topWorkspace && hintWindow._topWorkspace.icons ? hintWindow._topWorkspace.icons : []
+                windows: hintWindow._topWorkspace && hintWindow._topWorkspace.windows ? hintWindow._topWorkspace.windows : []
                 anchors.horizontalCenter: parent.horizontalCenter
-
-                // Vertical: collapsed at y=0 (top edge), expanded at target
-                y: hintWindow._stage1 ? parent._wsTargetY : -height / 2
-
-                // Width: collapses to a circle (height), expands to content width
-                width: hintWindow._stage1 ? (workspaceContent.implicitWidth + 32) : height
-                height: 44
-                // Radius: full circle when collapsed, pill when expanded
-                radius: hintWindow._stage1 ? 22 : height / 2
-                clip: true
-
-                color: Qt.rgba(
-                    Services.Color.mSurface.r,
-                    Services.Color.mSurface.g,
-                    Services.Color.mSurface.b,
-                    0.92
-                )
-                border.color: Qt.rgba(
-                    Services.Color.mOutline.r,
-                    Services.Color.mOutline.g,
-                    Services.Color.mOutline.b,
-                    0.25
-                )
-                border.width: 1
-
-                Behavior on width {
-                    NumberAnimation {
-                        duration: 320
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                Behavior on y {
-                    NumberAnimation {
-                        duration: 350
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                Behavior on radius {
-                    NumberAnimation {
-                        duration: 320
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                // Content: centered inside, unaffected by width animation
-                Row {
-                    id: workspaceContent
-                    anchors.centerIn: parent
-                    spacing: 6
-
-                    Repeater {
-                        model: hintWindow._windowVisible
-                            ? Services.WindowHintService.activeHint.workspaces
-                            : []
-
-                        // Individual workspace pill
-                        Rectangle {
-                            required property var modelData
-                            required property int index
-
-                            width: Math.max(wsPillContent.implicitWidth + 14, 36)
-                            height: 28
-                            radius: 14
-                            color: modelData.isActive
-                                ? Services.Color.mPrimary
-                                : Qt.rgba(
-                                    Services.Color.mSurfaceVariant.r,
-                                    Services.Color.mSurfaceVariant.g,
-                                    Services.Color.mSurfaceVariant.b,
-                                    0.6
-                                )
-
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: Services.Motion.number.shortDuration
-                                    easing.type: Services.Motion.number.shortEasing
-                                }
-                            }
-
-                            Row {
-                                id: wsPillContent
-                                anchors.centerIn: parent
-                                spacing: 3
-
-                                // Workspace index
-                                Text {
-                                    text: String(modelData.workspaceIndex)
-                                    font.pixelSize: 12
-                                    font.bold: modelData.isActive
-                                    color: modelData.isActive
-                                        ? Services.Color.mOnPrimary
-                                        : Services.Color.mOnSurfaceVariant
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-
-                                // Window count
-                                Text {
-                                    visible: modelData.icons.length > 0
-                                    text: "·" + modelData.icons.length
-                                    font.pixelSize: 10
-                                    color: modelData.isActive
-                                        ? Services.Color.mOnPrimary
-                                        : Services.Color.mOnSurfaceVariant
-                                    opacity: 0.7
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                            }
-                        }
-                    }
-                }
+                expanded: hintWindow._stageTop
+                baseY: parent._wsTargetY
+                currentWindowTitle: hintWindow._activeHint.currentWindowTitle
+                currentWindowIcon: hintWindow._activeHint.currentWindowIcon
             }
 
-            // ─── Window title capsule ────────────────────────────────────────
-            Rectangle {
-                id: windowCapsule
+            // Render the middle capsule as the second staggered item.
+            WorkspaceHintCapsule {
+                id: middleCapsule
 
+                visible: hintWindow._windowVisible && hintWindow._middleWorkspace !== null
+                workspaceIndex: hintWindow._middleWorkspace ? hintWindow._middleWorkspace.workspaceIndex : -1
+                active: hintWindow._middleWorkspace ? !!hintWindow._middleWorkspace.isActive : false
+                icons: hintWindow._middleWorkspace && hintWindow._middleWorkspace.icons ? hintWindow._middleWorkspace.icons : []
+                windows: hintWindow._middleWorkspace && hintWindow._middleWorkspace.windows ? hintWindow._middleWorkspace.windows : []
                 anchors.horizontalCenter: parent.horizontalCenter
+                expanded: hintWindow._stageMiddle
+                baseY: parent._wsTargetY + topCapsule.expandedHeightHint + 8
+                currentWindowTitle: hintWindow._activeHint.currentWindowTitle
+                currentWindowIcon: hintWindow._activeHint.currentWindowIcon
+            }
 
-                // Vertical: collapsed at y=0 (top edge), expanded at target
-                y: hintWindow._stage2 ? parent._winTargetY : -height / 2
+            // Render the bottom capsule as the final staggered item.
+            WorkspaceHintCapsule {
+                id: bottomCapsule
 
-                // Width: collapses to a circle (height), expands to content width
-                width: hintWindow._stage2 ? (windowContent.implicitWidth + 32) : height
-                height: windowContent.implicitHeight + 20
-                // Radius: full circle when collapsed, pill when expanded
-                radius: hintWindow._stage2 ? 18 : height / 2
-                clip: true
-
-                color: Qt.rgba(
-                    Services.Color.mSurface.r,
-                    Services.Color.mSurface.g,
-                    Services.Color.mSurface.b,
-                    0.88
-                )
-                border.color: Qt.rgba(
-                    Services.Color.mOutline.r,
-                    Services.Color.mOutline.g,
-                    Services.Color.mOutline.b,
-                    0.2
-                )
-                border.width: 1
-
-                Behavior on width {
-                    NumberAnimation {
-                        duration: 360
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                Behavior on y {
-                    NumberAnimation {
-                        duration: 400
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                Behavior on radius {
-                    NumberAnimation {
-                        duration: 360
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                // Content: centered, clips during width expansion
-                Column {
-                    id: windowContent
-                    anchors.centerIn: parent
-                    spacing: 8
-
-                    // Horizontal row of window title cards
-                    Row {
-                        id: windowTitleRow
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        spacing: 6
-
-                        Repeater {
-                            model: hintWindow._windowVisible
-                                ? Services.WindowHintService.activeHint.windows
-                                : []
-
-                            // Individual window title card
-                            Rectangle {
-                                required property var modelData
-                                required property int index
-
-                                width: Math.max(winCardRow.implicitWidth + 14, 100)
-                                height: 28
-                                radius: 8
-                                color: modelData.isFocused
-                                    ? Qt.rgba(
-                                        Services.Color.mPrimary.r,
-                                        Services.Color.mPrimary.g,
-                                        Services.Color.mPrimary.b,
-                                        0.18
-                                    )
-                                    : Qt.rgba(
-                                        Services.Color.mSurfaceVariant.r,
-                                        Services.Color.mSurfaceVariant.g,
-                                        Services.Color.mSurfaceVariant.b,
-                                        0.35
-                                    )
-
-                                Row {
-                                    id: winCardRow
-                                    anchors.centerIn: parent
-                                    spacing: 5
-
-                                    // Focus dot
-                                    Rectangle {
-                                        width: 5
-                                        height: 5
-                                        radius: 2.5
-                                        color: Services.Color.mPrimary
-                                        visible: modelData.isFocused
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-
-                                    // Window title
-                                    Text {
-                                        text: modelData.title
-                                        font.pixelSize: 11
-                                        font.bold: modelData.isFocused
-                                        color: modelData.isFocused
-                                            ? Services.Color.mOnSurface
-                                            : Services.Color.mOnSurfaceVariant
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                        width: Math.min(implicitWidth, 140)
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-                                }
-                            }
-                        }
-
-                        // Empty state
-                        Text {
-                            visible: hintWindow._windowVisible
-                                && Services.WindowHintService.activeHint.windows.length === 0
-                            text: "空工作区"
-                            font.pixelSize: 12
-                            color: Services.Color.mOnSurfaceVariant
-                            opacity: 0.5
-                        }
-                    }
-                }
+                visible: hintWindow._windowVisible && hintWindow._bottomWorkspace !== null
+                workspaceIndex: hintWindow._bottomWorkspace ? hintWindow._bottomWorkspace.workspaceIndex : -1
+                active: hintWindow._bottomWorkspace ? !!hintWindow._bottomWorkspace.isActive : false
+                icons: hintWindow._bottomWorkspace && hintWindow._bottomWorkspace.icons ? hintWindow._bottomWorkspace.icons : []
+                windows: hintWindow._bottomWorkspace && hintWindow._bottomWorkspace.windows ? hintWindow._bottomWorkspace.windows : []
+                anchors.horizontalCenter: parent.horizontalCenter
+                expanded: hintWindow._stageBottom
+                baseY: parent._wsTargetY + topCapsule.expandedHeightHint + middleCapsule.expandedHeightHint + 16
+                currentWindowTitle: hintWindow._activeHint.currentWindowTitle
+                currentWindowIcon: hintWindow._activeHint.currentWindowIcon
             }
         }
     }
