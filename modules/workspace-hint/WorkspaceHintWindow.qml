@@ -169,9 +169,9 @@ Variants {
                     bottomCapsule.visible ? bottomCapsule.x : hintContainer.width
                 )
                 readonly property real _top: Math.min(
-                    topCapsule.visible ? topCapsule.y : hintContainer.height,
-                    middleCapsule.visible ? middleCapsule.y : hintContainer.height,
-                    bottomCapsule.visible ? bottomCapsule.y : hintContainer.height
+                    topCapsule.visible ? topCapsule.visibleY : hintContainer.height,
+                    middleCapsule.visible ? middleCapsule.visibleY : hintContainer.height,
+                    bottomCapsule.visible ? bottomCapsule.visibleY : hintContainer.height
                 )
                 readonly property real _right: Math.max(
                     topCapsule.visible ? topCapsule.x + topCapsule.width : 0,
@@ -179,9 +179,9 @@ Variants {
                     bottomCapsule.visible ? bottomCapsule.x + bottomCapsule.width : 0
                 )
                 readonly property real _bottom: Math.max(
-                    topCapsule.visible ? topCapsule.y + topCapsule.height : 0,
-                    middleCapsule.visible ? middleCapsule.y + middleCapsule.height : 0,
-                    bottomCapsule.visible ? bottomCapsule.y + bottomCapsule.height : 0
+                    topCapsule.visible ? topCapsule.visibleY + topCapsule.height : 0,
+                    middleCapsule.visible ? middleCapsule.visibleY + middleCapsule.height : 0,
+                    bottomCapsule.visible ? bottomCapsule.visibleY + bottomCapsule.height : 0
                 )
 
                 x: _left < hintContainer.width ? _left : 0
