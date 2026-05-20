@@ -1,2 +1,0 @@
-{"file":".trellis/spec/frontend/directory-structure.md","reason":"Confirms bar QML belongs under modules/ with shared state in services/ and keeps the edit within the frontend layer."}
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Contains the QML declaration-comment convention and canvas-shape guidance relevant to the touched files."}

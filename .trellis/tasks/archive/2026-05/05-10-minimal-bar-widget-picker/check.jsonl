@@ -1,7 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Check the picker implementation against the frontend task scope."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Check that the picker lands in the expected module/service layout."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Check that shared layout mutations stay inside the singleton service boundary."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Check comments and visual minimality in the new QML files."}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Check that the picker does not duplicate the full DymicShell panel architecture."}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Check picker UI to layout-service contracts and persisted layout behavior."}
-{"file": ".trellis/tasks/05-10-minimal-bar-widget-picker/research/widget-picker-reference.md", "reason": "Check the implementation against the reduced reference picker boundary."}

@@ -1,7 +1,0 @@
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Verify new files follow module organization rules"}
-{"file": "services/qmldir", "reason": "Verify all new singletons are registered"}
-{"file": "services/Color.qml", "reason": "Check M3 color properties, FileView watcher, animation behaviors"}
-{"file": "services/ColorService.qml", "reason": "Check Process invocation, debounce, error handling"}
-{"file": "services/WallpaperService.qml", "reason": "Check persistence, signal emission, integration with ColorService"}
-{"file": "modules/background/BackgroundWindow.qml", "reason": "Check PanelWindow setup, WlrLayer, image transitions, Variants pattern"}
-{"file": "shell.qml", "reason": "Check BackgroundWindow instantiation"}

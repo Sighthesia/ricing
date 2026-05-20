@@ -1,5 +1,0 @@
-{"file":".trellis/spec/frontend/directory-structure.md","reason":"Keep the bar feature changes aligned with the project's frontend module layout conventions."}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check whether new progress or motion helpers should extend the existing owner/model split instead of duplicating logic."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Preserve the state boundary between BarSection, DockzoneSurfaceRoot, DockzoneSurfaceModel, and BarLayoutService."}
-{"file":".trellis/tasks/05-14-author-dockzone-surface-model-contract-spec/contract-spec.md","reason":"Use the canonical dockzone contract and transition semantics while implementing real center progress drivers."}
-{"file":".trellis/tasks/05-14-finalize-dockzone-surface-code-structure/design.md","reason":"Preserve the agreed owner/model boundary and keep state ownership inside DockzoneSurfaceRoot."}

@@ -1,6 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec entry point for the bar data-layer and service work."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "The new persistence bridge and helpers must fit the shell/modules/services structure already established."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "New QML modules should follow the comment-before-major-declarations convention."}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "This task ports only the smallest reusable subset of the reference service and persistence logic."}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Persistence crosses service, disk, and renderer boundaries and needs explicit contracts."}
-{"file": ".trellis/tasks/05-10-configurable-bar-layout-data-layer/research/layout-data-layer-reference.md", "reason": "Contains the reduced reference patterns for instance identity and persistence."}

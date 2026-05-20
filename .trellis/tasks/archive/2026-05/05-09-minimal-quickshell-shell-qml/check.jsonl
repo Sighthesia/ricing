@@ -1,3 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index for validating the QML change against local guidance."}
-{"file": ".trellis/tasks/05-09-minimal-quickshell-shell-qml/prd.md", "reason": "Task scope and acceptance criteria for review."}
-{"file": ".trellis/tasks/05-09-minimal-quickshell-shell-qml/research/quickshell-minimal-top-bar.md", "reason": "Reference the documented Quickshell top-bar pattern during verification."}

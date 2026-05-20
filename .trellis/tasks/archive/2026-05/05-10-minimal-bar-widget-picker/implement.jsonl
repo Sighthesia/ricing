@@ -1,7 +1,0 @@
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend entry point for the bar picker UI and service changes."}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "The picker should fit the project's shell/modules/services layout conventions."}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Picker actions mutate shared bar state through the singleton service contract."}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "New QML files should follow comment-before-major-declarations and minimal visual-porting rules."}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "The picker should reuse the existing layout service and avoid copying the DymicShell panel wholesale."}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Picker UI, bar service, and persisted layout state form a cross-layer contract."}
-{"file": ".trellis/tasks/05-10-minimal-bar-widget-picker/research/widget-picker-reference.md", "reason": "Summarizes the reduced reference picker subset and MVP boundary."}

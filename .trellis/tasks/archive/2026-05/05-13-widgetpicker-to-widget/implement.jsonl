@@ -1,4 +1,0 @@
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Picker mode flags convention — widgetPickerVisible/widgetPickerSection in BarLayoutService"}
-{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Widget file placement under modules/bar/widgets/"}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Comment conventions and legacy widget ID handling"}
-{"file": ".trellis/tasks/archive/2026-05/05-10-minimal-bar-widget-picker/research/widget-picker-reference.md", "reason": "Reference picker architecture and MVP boundary"}

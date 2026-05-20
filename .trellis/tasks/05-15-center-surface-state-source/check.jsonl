@@ -1,4 +1,0 @@
-{"file":".trellis/spec/frontend/directory-structure.md","reason":"Verify the final implementation keeps the change localized to the bar module."}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that the implementation reuses existing section-content semantics rather than duplicating unrelated state logic."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Confirm that the semantic mapping stays in BarSection and does not leak new responsibilities into services."}
-{"file":".trellis/tasks/05-15-center-surface-state-source/prd.md","reason":"Validate the shipped behavior against the approved planning scope."}

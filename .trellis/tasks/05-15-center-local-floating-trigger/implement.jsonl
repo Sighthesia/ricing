@@ -1,5 +1,0 @@
-{"file":".trellis/spec/frontend/directory-structure.md","reason":"Keep the trigger implementation localized to the bar module and wrapper layer."}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Prefer the shared wrapper boundary over widget-specific trigger duplication."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Preserve the boundary between wrapper interaction, section semantic mapping, and downstream dockzone state ownership."}
-{"file":".trellis/tasks/05-15-center-floating-detach-morph/design.md","reason":"Keep the already-implemented floating semantics and only replace the trigger source."}
-{"file":".trellis/tasks/05-15-center-local-floating-trigger/prd.md","reason":"Implement the approved wrapper-level local trigger scope."}
