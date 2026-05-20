@@ -3,6 +3,7 @@ import Quickshell.Wayland
 import QtQuick
 import "../../services" as Services
 import "."
+import "WorkspaceHintViewportModel.js" as ViewportModel
 
 // OSD popup: a compact stack of workspace capsules drops from the top edge.
 Variants {
@@ -15,6 +16,11 @@ Variants {
         id: hintWindow
 
         required property var modelData
+
+        // Hold the per-window viewport transition state close to the consumer scope.
+        WorkspaceHintViewportState {
+            id: viewportState
+        }
 
         screen: modelData
         color: "transparent"
@@ -39,51 +45,50 @@ Variants {
         visible: hintWindow._windowVisible
 
         property bool _windowVisible: false
-        property bool _hintActive: Services.WindowHintService.hintVisible
-        readonly property var _activeHint: Services.WindowHintService.activeHint
-        readonly property int _activeWorkspacePosition: _activeHint.activeWorkspacePosition
-        readonly property var _visibleWorkspaces: {
-            const items = []
-            const allWorkspaces = _activeHint.workspaces || []
-            const positions = [
-                _activeWorkspacePosition - 1,
-                _activeWorkspacePosition,
-                _activeWorkspacePosition + 1
-            ]
 
-            for (let index = 0; index < positions.length; index++) {
-                const position = positions[index]
-                if (position < 0 || position >= allWorkspaces.length)
-                    continue
+        // Test override: non-null means "use this value instead of service".
+        property var testHintHeld: null
 
-                const workspace = allWorkspaces[position]
-                items.push({
-                    position: position,
-                    workspaceIndex: workspace.workspaceIndex,
-                    icons: workspace.icons || [],
-                    windows: position === _activeWorkspacePosition ? (_activeHint.windows || []) : [],
-                    isActive: position === _activeWorkspacePosition
-                })
-            }
+        // Test override: non-null means "use this data instead of service".
+        property var testHintData: null
 
-            return items
-        }
-        readonly property var _topWorkspace: _visibleWorkspaces.length > 0 ? _visibleWorkspaces[0] : null
-        readonly property var _middleWorkspace: _visibleWorkspaces.length > 1 ? _visibleWorkspaces[1] : null
-        readonly property var _bottomWorkspace: _visibleWorkspaces.length > 2 ? _visibleWorkspaces[2] : null
+        // Hint active state: testHintHeld overrides when non-null.
+        property bool _hintActive: testHintHeld !== null ? testHintHeld : Services.WindowHintService.hintVisible
 
-        // Drive top-to-bottom entry and reverse exit for the three capsules.
+        // Hint data: testHintData overrides when non-null.
+        property var _hintData: testHintData !== null ? testHintData : Services.WindowHintService.activeHint
+
+        // Count of capsules currently rendered by the Repeater.
+        property int renderedCapsuleCount: _hintData.workspaces ? _hintData.workspaces.length : 0
+
+        readonly property int _activeWorkspacePosition: _hintData.activeWorkspacePosition
+
+        // Track the last revision consumed by the viewport queue.
+        property int _lastConsumedTransitionRevision: 0
+        property int _previousVisualWorkspacePosition: -1
+        property var _previousVisualWindows: []
+        property string _previousVisualWindowTitle: ""
+        property string _previousVisualWindowIcon: ""
+
+        // Restore the original top-down staged entry for the first three capsules.
         property bool _stageTop: false
         property bool _stageMiddle: false
         property bool _stageBottom: false
 
+        function _advanceViewportStepNow() {
+            if (viewportState.pendingWorkspaceSteps.length === 0)
+                return
+
+            viewportState.advancePendingWorkspaceStep()
+            if (viewportState.pendingWorkspaceSteps.length > 0)
+                _stepAdvanceTimer.restart()
+        }
+
+        // Viewport-level enter/exit: show immediately on hold, fade out after delay on release.
         on_HintActiveChanged: {
             if (_hintActive) {
-                // Enter: show window, then open the stacked workspace capsules.
+                // Enter: show window and sync viewport focus.
                 _hideTimer.stop()
-                _exitBottomTimer.stop()
-                _exitMiddleTimer.stop()
-                _exitTopTimer.stop()
                 _windowVisible = true
                 _stageTop = false
                 _stageMiddle = false
@@ -91,65 +96,98 @@ Variants {
                 _enterTopTimer.restart()
                 _enterMiddleTimer.restart()
                 _enterBottomTimer.restart()
+
+                // Sync viewport focus once when the hint first becomes visible.
+                viewportState.visualFocusPosition = _activeWorkspacePosition
+                viewportState.animatedVisualFocusPosition = _activeWorkspacePosition
+                viewportState.settledWorkspacePosition = _activeWorkspacePosition
+                viewportState.targetWorkspacePosition = _activeWorkspacePosition
+                viewportState.pendingWorkspaceSteps = []
+                _lastConsumedTransitionRevision = _hintData.workspaceTransitionRevision || 0
+                _previousVisualWorkspacePosition = _activeWorkspacePosition
+                _previousVisualWindows = _hintData.windows || []
+                _previousVisualWindowTitle = _hintData.currentWindowTitle || ""
+                _previousVisualWindowIcon = _hintData.currentWindowIcon || ""
             } else {
-                // Exit: collapse the full stack, then hide the window.
-                _enterTopTimer.stop()
-                _enterMiddleTimer.stop()
-                _enterBottomTimer.stop()
-                _exitBottomTimer.restart()
-                _exitMiddleTimer.restart()
-                _exitTopTimer.restart()
+                // Release: start hide timer. Window stays visible until timer fires.
                 _hideTimer.restart()
             }
         }
 
-        // Drive the top capsule entry.
+        // Restore the top capsule staged entry from y = 0.
         Timer {
             id: _enterTopTimer
             interval: 20
             onTriggered: hintWindow._stageTop = true
         }
 
-        // Drive the middle capsule entry.
+        // Restore the middle capsule staged entry from y = 0.
         Timer {
             id: _enterMiddleTimer
             interval: 70
             onTriggered: hintWindow._stageMiddle = true
         }
 
-        // Drive the bottom capsule entry.
+        // Restore the bottom capsule staged entry from y = 0.
         Timer {
             id: _enterBottomTimer
             interval: 100
             onTriggered: hintWindow._stageBottom = true
         }
 
-        // Collapse the bottom capsule first on exit.
-        Timer {
-            id: _exitBottomTimer
-            interval: 0
-            onTriggered: hintWindow._stageBottom = false
+        on_ActiveWorkspacePositionChanged: {
+            if (_hintActive && !_windowVisible)
+                _windowVisible = true
+
+            if (!_hintActive)
+                return
+
+            if (viewportState.pendingWorkspaceSteps.length === 0
+                    && viewportState.targetWorkspacePosition === viewportState.settledWorkspacePosition
+                    && viewportState.settledWorkspacePosition === _activeWorkspacePosition) {
+                viewportState.visualFocusPosition = _activeWorkspacePosition
+            }
         }
 
-        // Collapse the middle capsule second on exit.
-        Timer {
-            id: _exitMiddleTimer
-            interval: 55
-            onTriggered: hintWindow._stageMiddle = false
+        on_HintDataChanged: {
+            const nextRevision = _hintData && _hintData.workspaceTransitionRevision
+                ? _hintData.workspaceTransitionRevision
+                : 0
+
+            if (!_hintActive)
+                return
+            if (nextRevision <= _lastConsumedTransitionRevision)
+                return
+
+            viewportState.enqueueWorkspaceTransition(
+                _hintData.previousActiveWorkspacePosition,
+                _hintData.activeWorkspacePosition
+            )
+            _previousVisualWorkspacePosition = _hintData.previousActiveWorkspacePosition
+            _previousVisualWindows = _hintData.windows || []
+            _previousVisualWindowTitle = _hintData.currentWindowTitle || ""
+            _previousVisualWindowIcon = _hintData.currentWindowIcon || ""
+            _lastConsumedTransitionRevision = nextRevision
+
+            if (viewportState.targetWorkspacePosition === viewportState.settledWorkspacePosition)
+                _advanceViewportStepNow()
         }
 
-        // Collapse the top capsule last on exit.
-        Timer {
-            id: _exitTopTimer
-            interval: 110
-            onTriggered: hintWindow._stageTop = false
-        }
-
-        // Hide window after exit animations complete.
+        // Hide window after release delay completes.
         Timer {
             id: _hideTimer
             interval: 380
             onTriggered: hintWindow._windowVisible = false
+        }
+
+        // Advance the next queued workspace hop after the current motion settles.
+        Timer {
+            id: _stepAdvanceTimer
+            interval: Services.Motion.number.surfaceDuration
+            repeat: false
+            onTriggered: {
+                hintWindow._advanceViewportStepNow()
+            }
         }
 
         // Full-screen transparent container
@@ -163,26 +201,38 @@ Variants {
             // Bound input to the stacked workspace hint surface.
             Item {
                 id: hintHitRegion
-                readonly property real _left: Math.min(
-                    topCapsule.visible ? topCapsule.x : hintContainer.width,
-                    middleCapsule.visible ? middleCapsule.x : hintContainer.width,
-                    bottomCapsule.visible ? bottomCapsule.x : hintContainer.width
-                )
-                readonly property real _top: Math.min(
-                    topCapsule.visible ? topCapsule.visibleY : hintContainer.height,
-                    middleCapsule.visible ? middleCapsule.visibleY : hintContainer.height,
-                    bottomCapsule.visible ? bottomCapsule.visibleY : hintContainer.height
-                )
-                readonly property real _right: Math.max(
-                    topCapsule.visible ? topCapsule.x + topCapsule.width : 0,
-                    middleCapsule.visible ? middleCapsule.x + middleCapsule.width : 0,
-                    bottomCapsule.visible ? bottomCapsule.x + bottomCapsule.width : 0
-                )
-                readonly property real _bottom: Math.max(
-                    topCapsule.visible ? topCapsule.visibleY + topCapsule.height : 0,
-                    middleCapsule.visible ? middleCapsule.visibleY + middleCapsule.height : 0,
-                    bottomCapsule.visible ? bottomCapsule.visibleY + bottomCapsule.height : 0
-                )
+                readonly property real _left: {
+                    var min = hintContainer.width
+                    for (var i = 0; i < capsuleRepeater.count; i++) {
+                        var item = capsuleRepeater.itemAt(i)
+                        if (item && item.visible) min = Math.min(min, item.x)
+                    }
+                    return min
+                }
+                readonly property real _top: {
+                    var min = hintContainer.height
+                    for (var i = 0; i < capsuleRepeater.count; i++) {
+                        var item = capsuleRepeater.itemAt(i)
+                        if (item && item.visible) min = Math.min(min, item.visibleY)
+                    }
+                    return min
+                }
+                readonly property real _right: {
+                    var max = 0
+                    for (var i = 0; i < capsuleRepeater.count; i++) {
+                        var item = capsuleRepeater.itemAt(i)
+                        if (item && item.visible) max = Math.max(max, item.x + item.width)
+                    }
+                    return max
+                }
+                readonly property real _bottom: {
+                    var max = 0
+                    for (var i = 0; i < capsuleRepeater.count; i++) {
+                        var item = capsuleRepeater.itemAt(i)
+                        if (item && item.visible) max = Math.max(max, item.visibleY + item.height)
+                    }
+                    return max
+                }
 
                 x: _left < hintContainer.width ? _left : 0
                 y: _top < hintContainer.height ? _top : 0
@@ -190,52 +240,69 @@ Variants {
                 height: Math.max(0, _bottom - y)
             }
 
-            // Render the top capsule as the first staggered item.
-            WorkspaceHintCapsule {
-                id: topCapsule
+            // Render capsules dynamically from the workspace list.
+            Repeater {
+                id: capsuleRepeater
 
-                visible: hintWindow._windowVisible && hintWindow._topWorkspace !== null
-                workspaceIndex: hintWindow._topWorkspace ? hintWindow._topWorkspace.workspaceIndex : -1
-                active: hintWindow._topWorkspace ? !!hintWindow._topWorkspace.isActive : false
-                icons: hintWindow._topWorkspace && hintWindow._topWorkspace.icons ? hintWindow._topWorkspace.icons : []
-                windows: hintWindow._topWorkspace && hintWindow._topWorkspace.windows ? hintWindow._topWorkspace.windows : []
-                anchors.horizontalCenter: parent.horizontalCenter
-                expanded: hintWindow._stageTop
-                baseY: parent._wsTargetY
-                currentWindowTitle: hintWindow._activeHint.currentWindowTitle
-                currentWindowIcon: hintWindow._activeHint.currentWindowIcon
-            }
+                model: hintWindow._hintData.workspaces || []
 
-            // Render the middle capsule as the second staggered item.
-            WorkspaceHintCapsule {
-                id: middleCapsule
+                // Delegate: one WorkspaceHintCapsule per workspace entry.
+                WorkspaceHintCapsule {
+                    id: capsule
 
-                visible: hintWindow._windowVisible && hintWindow._middleWorkspace !== null
-                workspaceIndex: hintWindow._middleWorkspace ? hintWindow._middleWorkspace.workspaceIndex : -1
-                active: hintWindow._middleWorkspace ? !!hintWindow._middleWorkspace.isActive : false
-                icons: hintWindow._middleWorkspace && hintWindow._middleWorkspace.icons ? hintWindow._middleWorkspace.icons : []
-                windows: hintWindow._middleWorkspace && hintWindow._middleWorkspace.windows ? hintWindow._middleWorkspace.windows : []
-                anchors.horizontalCenter: parent.horizontalCenter
-                expanded: hintWindow._stageMiddle
-                baseY: parent._wsTargetY + topCapsule.expandedHeightHint + 8
-                currentWindowTitle: hintWindow._activeHint.currentWindowTitle
-                currentWindowIcon: hintWindow._activeHint.currentWindowIcon
-            }
+                    required property var modelData
+                    required property int index
 
-            // Render the bottom capsule as the final staggered item.
-            WorkspaceHintCapsule {
-                id: bottomCapsule
+                    readonly property real _relativeOffset:
+                        ViewportModel.relativeOffset(index, viewportState.animatedVisualFocusPosition)
+                    readonly property bool _staggerVisible:
+                        ViewportModel.staggerVisibilityForIndex(
+                            index,
+                            hintWindow._stageTop,
+                            hintWindow._stageMiddle,
+                            hintWindow._stageBottom
+                        )
+                    readonly property bool _usesPreviousVisualContent:
+                        index === hintWindow._previousVisualWorkspacePosition
+                        && index !== hintWindow._activeWorkspacePosition
+                        && focusProgress > 0
 
-                visible: hintWindow._windowVisible && hintWindow._bottomWorkspace !== null
-                workspaceIndex: hintWindow._bottomWorkspace ? hintWindow._bottomWorkspace.workspaceIndex : -1
-                active: hintWindow._bottomWorkspace ? !!hintWindow._bottomWorkspace.isActive : false
-                icons: hintWindow._bottomWorkspace && hintWindow._bottomWorkspace.icons ? hintWindow._bottomWorkspace.icons : []
-                windows: hintWindow._bottomWorkspace && hintWindow._bottomWorkspace.windows ? hintWindow._bottomWorkspace.windows : []
-                anchors.horizontalCenter: parent.horizontalCenter
-                expanded: hintWindow._stageBottom
-                baseY: parent._wsTargetY + topCapsule.expandedHeightHint + middleCapsule.expandedHeightHint + 16
-                currentWindowTitle: hintWindow._activeHint.currentWindowTitle
-                currentWindowIcon: hintWindow._activeHint.currentWindowIcon
+                    visible: hintWindow._windowVisible && _staggerVisible
+                    workspacePosition: index
+                    workspaceIndex: modelData.workspaceIndex
+                    relativeOffset: _relativeOffset
+                    focusProgress: ViewportModel.focusProgressForOffset(_relativeOffset)
+                    cameraDistance: Math.abs(_relativeOffset)
+                    active: index === hintWindow._activeWorkspacePosition
+                    useFocusedGeometry: ViewportModel.useFocusedWidthForCapsule(
+                        index === hintWindow._activeWorkspacePosition,
+                        _usesPreviousVisualContent,
+                        focusProgress
+                    )
+                    icons: modelData.icons || []
+                    windows: index === hintWindow._activeWorkspacePosition
+                        ? (_hintData.windows || [])
+                        : (_usesPreviousVisualContent ? (hintWindow._previousVisualWindows || []) : [])
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    expanded: ViewportModel.shouldExpandCapsule(
+                        _staggerVisible,
+                        hintWindow._hintActive
+                    )
+                    baseY: {
+                        var y = hintContainer._wsTargetY
+                        for (var i = 0; i < capsule.index; i++) {
+                            var prev = capsuleRepeater.itemAt(i)
+                            if (prev) y += prev.expandedHeightHint + 8
+                        }
+                        return y
+                    }
+                    currentWindowTitle: _usesPreviousVisualContent
+                        ? hintWindow._previousVisualWindowTitle
+                        : hintWindow._hintData.currentWindowTitle
+                    currentWindowIcon: _usesPreviousVisualContent
+                        ? hintWindow._previousVisualWindowIcon
+                        : hintWindow._hintData.currentWindowIcon
+                }
             }
         }
     }

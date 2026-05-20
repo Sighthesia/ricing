@@ -24,6 +24,8 @@ Singleton {
     onHintHeldChanged: root.pullProgress = root.hintHeld ? 1.0 : 0.0
 
     property int _revision: 0
+    property int _lastActiveWorkspacePosition: -1
+    property int _workspaceTransitionRevision: 0
 
     Timer {
         id: _hintRefreshCoalesceTimer
@@ -100,6 +102,8 @@ Singleton {
             workspaceId: "",
             workspaceIndex: -1,
             activeWorkspacePosition: -1,
+            previousActiveWorkspacePosition: -1,
+            workspaceTransitionRevision: 0,
             currentWindowTitle: "",
             currentWindowAppId: "",
             currentWindowIcon: "",
@@ -247,8 +251,13 @@ Singleton {
         const currentIndex = root._currentIndex(windows)
         const currentWindow = root._windowAt(windows, currentIndex)
         const activePosition = root._activeWorkspacePosition()
+        const prevPosition = root._lastActiveWorkspacePosition
         const nextRevision = root._revision + 1
 
+        if (activePosition !== prevPosition)
+            root._workspaceTransitionRevision += 1
+
+        root._lastActiveWorkspacePosition = activePosition
         root._revision = nextRevision
 
         return {
@@ -257,6 +266,8 @@ Singleton {
             workspaceId: workspace.wsId,
             workspaceIndex: workspace.idx,
             activeWorkspacePosition: activePosition,
+            previousActiveWorkspacePosition: prevPosition,
+            workspaceTransitionRevision: root._workspaceTransitionRevision,
             currentWindowTitle: currentWindow.title || workspace.name || ("Workspace " + workspace.idx),
             currentWindowAppId: currentWindow.appId,
             currentWindowIcon: currentWindow.icon,

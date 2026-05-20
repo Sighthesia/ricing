@@ -1,12 +1,17 @@
 import QtQuick
 import Quickshell.Widgets
 import "../../services" as Services
+import "WorkspaceHintViewportModel.js" as ViewportModel
 
-// Render one workspace hint capsule in active or neighbor mode.
+// Render one workspace hint capsule driven by continuous focus-morphing values.
 Item {
     id: root
 
     property int workspaceIndex: -1
+    property int workspacePosition: -1
+    property real relativeOffset: 0
+    property real focusProgress: 0
+    property real cameraDistance: 0
     property bool active: false
     property bool expanded: false
     property real baseY: 0
@@ -14,20 +19,35 @@ Item {
     property var windows: []
     property string currentWindowTitle: ""
     property string currentWindowIcon: ""
+    property bool useFocusedGeometry: false
     readonly property real _collapsedSize: 28
-    readonly property real _expandedWidth: root.active
+    readonly property real _capsulePitch: 36
+    readonly property real _fadeDistance: _capsulePitch * 3
+    readonly property real _focusCenterY: baseY + 36
+    readonly property real _distanceCompression: Math.min(10, Math.abs(root.relativeOffset) * 4)
+    readonly property real _directionOffset: root.relativeOffset === 0 ? 0 : (root.relativeOffset > 0 ? _distanceCompression : -_distanceCompression)
+    readonly property real _animatedY: _focusCenterY + (root.relativeOffset * _capsulePitch) + _directionOffset
+    readonly property real _collapsedWidth: ViewportModel.neighborBaseWidth(_collapsedSize, 72)
+    readonly property real _focusedWidth: root.useFocusedGeometry
         ? Math.max(activeContent.implicitWidth + 20, _collapsedSize)
         : Math.max(neighborContent.implicitWidth + 28, 72)
-    readonly property real _expandedHeight: root.active
+    readonly property real _focusWidth: ViewportModel.focusWidth(
+        _collapsedWidth, _focusedWidth, root.focusProgress)
+    readonly property real _focusOpacity: ViewportModel.opacityForDistance(
+        Math.abs(root.relativeOffset), _capsulePitch, _fadeDistance)
+    readonly property real _expandedWidth: root.useFocusedGeometry
+        ? Math.max(activeContent.implicitWidth + 20, _collapsedSize)
+        : Math.max(neighborContent.implicitWidth + 28, 72)
+    readonly property real _expandedHeight: root.useFocusedGeometry
         ? Math.max(root._contentHeight + 16, root._collapsedSize)
         : root._collapsedSize
     readonly property real expandedHeightHint: root._expandedHeight
     readonly property real visibleY: root.y < 0 ? 0 : root.y
     readonly property real _surfaceOffsetY: root.visibleY - root.y
-    readonly property real _contentHeight: root.active
+    readonly property real _contentHeight: root.useFocusedGeometry
         ? activeContent.implicitHeight
         : neighborContent.implicitHeight
-    readonly property color _surfaceColor: root.active
+    readonly property color _surfaceColor: root.useFocusedGeometry
         ? Qt.rgba(
             Services.Color.mSurface.r,
             Services.Color.mSurface.g,
@@ -40,7 +60,7 @@ Item {
             Services.Color.mSurface.b,
             0.82
         )
-    readonly property color _outlineColor: root.active
+    readonly property color _outlineColor: root.useFocusedGeometry
         ? Qt.rgba(
             Services.Color.mOutline.r,
             Services.Color.mOutline.g,
@@ -54,12 +74,19 @@ Item {
             0.28
         )
 
-    y: root.expanded ? root.baseY : 0
-    width: root.expanded ? root._expandedWidth : root._collapsedSize
-    height: root.expanded ? root._expandedHeight : root._collapsedSize
+    y: root.expanded ? root._animatedY : 0
+    width: root.expanded ? root._focusWidth : root._collapsedSize
+    height: root.expanded ? (_collapsedSize + ((_expandedHeight - _collapsedSize) * root.focusProgress)) : root._collapsedSize
+    opacity: root.expanded ? root._focusOpacity : 1
     clip: false
 
     Behavior on width {
+        NumberAnimation {
+            duration: Services.Motion.number.surfaceDuration
+            easing.type: Services.Motion.number.surfaceEasing
+        }
+    }
+    Behavior on opacity {
         NumberAnimation {
             duration: Services.Motion.number.surfaceDuration
             easing.type: Services.Motion.number.surfaceEasing
@@ -115,7 +142,14 @@ Item {
                 id: activeContent
                 anchors.centerIn: contentMask
                 spacing: 8
-                visible: root.active
+                opacity: root.focusProgress
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Services.Motion.number.shortDuration
+                        easing.type: Services.Motion.number.shortEasing
+                    }
+                }
 
                 // Keep the active workspace number pinned to the left.
                 Text {
@@ -235,7 +269,14 @@ Item {
                 id: neighborContent
                 anchors.centerIn: contentMask
                 spacing: 6
-                visible: !root.active
+                opacity: 1 - root.focusProgress
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Services.Motion.number.shortDuration
+                        easing.type: Services.Motion.number.shortEasing
+                    }
+                }
 
                 // Show the neighbor workspace number.
                 Text {
