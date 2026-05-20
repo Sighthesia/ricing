@@ -1,0 +1,13 @@
+{"type":"spec","path":".trellis/tasks/05-15-launcher-and-clipboard/prd.md","summary":"Requirements and acceptance criteria for launcher, clipboard, and shortcut management"}
+{"type":"spec","path":".trellis/tasks/05-15-launcher-and-clipboard/design.md","summary":"Architecture, data flow, key decisions for launcher, clipboard, and niri shortcuts"}
+{"type":"spec","path":".trellis/tasks/05-15-launcher-and-clipboard/implement.md","summary":"Phased implementation checklist"}
+{"type":"spec","path":".trellis/spec/frontend/directory-structure.md","summary":"Afloat directory conventions: modules/ for UI, services/ for singletons"}
+{"type":"reference","path":"/home/Sighthesia/0_Files/Producing/Software/Quickshell/DymicShell/services/nirishortcuts/NiriShortcutParser.js","summary":"Reference: DymicShell KDL binds parser — port to afloat with adapted IPC patterns"}
+{"type":"reference","path":"/home/Sighthesia/0_Files/Producing/Software/Quickshell/DymicShell/services/NiriShortcutService.qml","summary":"Reference: DymicShell shortcut service — FileView + validate + atomic write pattern"}
+{"type":"reference","path":"/home/Sighthesia/0_Files/Producing/Software/Quickshell/DymicShell/services/LauncherService.qml","summary":"Reference: DymicShell launcher service — IpcHandler + overlay toggle pattern"}
+{"type":"reference","path":"/home/Sighthesia/0_Files/Producing/Software/Quickshell/DymicShell/services/ClipboardService.qml","summary":"Reference: DymicShell clipboard service — cliphist + wl-copy integration"}
+{"type":"reference","path":"/home/Sighthesia/0_Files/Producing/Software/Quickshell/DymicShell/modules/launcher/providers/ClipboardProvider.qml","summary":"Reference: DymicShell clipboard provider — search/filter pattern for launcher"}
+{"type":"reference","path":"/home/Sighthesia/0_Files/Producing/Software/Quickshell/noctalia-shell/Modules/Panels/Launcher/LauncherOverlayWindow.qml","summary":"Reference: noctalia-shell launcher overlay window pattern"}
+{"type":"context","path":"services/qmldir","summary":"Current service registry — must add new singletons here"}
+{"type":"context","path":"services/NiriService.qml","summary":"Existing NiriService — add reloadConfig() if missing"}
+{"type":"context","path":"shell.qml","summary":"Shell root — must add LauncherWindow instantiation"}

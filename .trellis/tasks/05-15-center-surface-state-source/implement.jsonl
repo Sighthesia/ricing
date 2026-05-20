@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Keep the semantic mapping change inside the existing bar feature module boundary."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the existing section-content presence pattern instead of introducing a parallel state mechanism."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Preserve the boundary between service-owned layout data, section-level semantic mapping, and owner-local animation state."}
+{"file":".trellis/tasks/05-14-center-surface-progress-drivers/design.md","reason":"Build on the already-approved center owner/progress design without moving animation ownership upstream."}
+{"file":".trellis/tasks/05-15-center-surface-state-source/prd.md","reason":"Implement the agreed center-content presence mapping scope."}

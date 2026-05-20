@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Base frontend spec index for validation context."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Check new QML component structure against frontend conventions."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality review baseline for the check pass."}
+{"file": ".trellis/tasks/05-10-port-screen-rounded-corner-canvas/research/screen-corner-port.md", "reason": "Validate the final code against the agreed minimal port scope."}

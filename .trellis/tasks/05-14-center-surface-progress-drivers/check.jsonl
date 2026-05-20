@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Verify final changes still respect the project's QML module structure and boundaries."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Review whether the implementation introduced avoidable duplicated geometry or state logic."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check that state ownership did not leak into BarLayoutService or legacy renderers."}
+{"file":".trellis/tasks/05-14-author-dockzone-surface-model-contract-spec/contract-spec.md","reason":"Validate that implemented drivers and state semantics match the agreed contract rules."}

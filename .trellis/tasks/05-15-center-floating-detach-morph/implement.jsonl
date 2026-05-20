@@ -1,0 +1,6 @@
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Keep the temporary floating validation input localized to the bar feature module structure."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the existing center owner/model flow instead of creating a parallel floating implementation path."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Preserve the boundary between BarContent/BarSection semantic input mapping, DockzoneSurfaceRoot owner state, and DockzoneSurfaceModel pure derivation."}
+{"file":".trellis/tasks/05-14-author-dockzone-surface-model-contract-spec/contract-spec.md","reason":"Implement floating, detach, and morph according to the agreed contract transition semantics."}
+{"file":".trellis/tasks/05-14-center-surface-progress-drivers/design.md","reason":"Build on the existing center owner-local progress architecture rather than replacing it."}
+{"file":".trellis/tasks/05-15-center-floating-detach-morph/prd.md","reason":"Implement the agreed explicit local validation path for center floating semantics."}

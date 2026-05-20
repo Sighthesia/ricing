@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Module organization rules: services/ for singletons, modules/ for features, shell.qml as composition root"}
+{"file": "services/qmldir", "reason": "Singleton registration contract — must update when adding new services"}
+{"file": "services/BarLayoutService.qml", "reason": "Reference pattern for FileView + JsonAdapter persistence in a singleton service"}
+{"file": "shell.qml", "reason": "Composition root — must add BackgroundWindow here"}
+{"file": "modules/background/ScreenCornerWindow.qml", "reason": "Existing background module pattern — Variants + PanelWindow per screen"}

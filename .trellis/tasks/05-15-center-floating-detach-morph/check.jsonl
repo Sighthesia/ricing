@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Verify the final implementation keeps floating validation changes inside the bar feature boundary."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that the implementation extends the existing center path rather than duplicating geometry or state logic."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Confirm responsibilities stay separated across BarContent/BarSection, DockzoneSurfaceRoot, and DockzoneSurfaceModel."}
+{"file":".trellis/tasks/05-14-author-dockzone-surface-model-contract-spec/contract-spec.md","reason":"Validate that detach/morph/floating semantics match the agreed contract constraints."}
+{"file":".trellis/tasks/05-15-center-floating-detach-morph/prd.md","reason":"Check shipped behavior against the approved scope and exclusions."}
