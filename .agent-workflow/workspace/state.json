@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "current_intake_id": null,
+  "current_task_id": null,
+  "active_task_ids": [],
+  "active_sessions": {
+    "session-main": {
+      "current_intake_id": null,
+      "current_task_id": null,
+      "updated_at": "2026-05-21T05:58:06+00:00"
+    }
+  },
+  "last_event_seq": 2,
+  "locks_summary": [],
+  "updated_at": "2026-05-21T05:58:20+00:00"
+}
