@@ -1,221 +1,144 @@
 import QtQuick
 import QtTest
-import "../../modules/workspace-hint/WorkspaceHintViewportModel.js" as Model
-import "../../modules/workspace-hint" as WH
+import "../../modules/workspace-hint/WorkspaceHintStage.js" as Stage
+import "../../modules/workspace-hint/WorkspaceHintMotion.js" as Motion
 
 Item {
-    // Exercise workspace-hint viewport model helpers.
+    // Exercise workspace-hint stage helpers.
     TestCase {
         name: "WorkspaceHint"
 
-        function test_buildStepQueue_forward() {
-            var q = Model.buildStepQueue(1, 3)
-            compare(q.length, 2)
-            compare(q[0], 2)
-            compare(q[1], 3)
+        function _summary(workspaceId, workspaceIndex, iconCount) {
+            var icons = []
+            for (var i = 0; i < iconCount; i++)
+                icons.push({ icon: "app-" + i, isFocused: i === 0 })
+
+            return {
+                workspaceId: workspaceId,
+                workspaceIndex: workspaceIndex,
+                icons: icons
+            }
         }
 
-        function test_buildStepQueue_backward() {
-            var q = Model.buildStepQueue(3, 1)
-            compare(q.length, 2)
-            compare(q[0], 2)
-            compare(q[1], 1)
+        function test_workspaceDisplayLayout_prefers_nearest_neighbors() {
+            const layout = Stage.workspaceDisplayLayoutForAnchor([
+                _summary("ws-1", 1, 1),
+                _summary("ws-2", 2, 0),
+                _summary("ws-3", 3, 2),
+                _summary("ws-4", 4, 1)
+            ], 2)
+
+            compare(layout.first, 0)
+            compare(layout.last, 3)
+            compare(layout.count, 3)
+            compare(layout.hasBefore, true)
+            compare(layout.hasAfter, true)
         }
 
-        function test_buildStepQueue_same() {
-            var q = Model.buildStepQueue(2, 2)
-            compare(q.length, 0)
+        function test_workspaceCapsuleForAbsolute_uses_active_windows_for_current_workspace() {
+            const capsule = Stage.workspaceCapsuleForAbsolute(1, {
+                visible: true,
+                activeWorkspacePosition: 1,
+                workspaceIndex: 2,
+                currentWindowTitle: "Editor",
+                windows: [
+                    { icon: "editor", isFocused: true },
+                    { icon: "browser", isFocused: false }
+                ],
+                workspaces: [
+                    _summary("ws-1", 1, 1),
+                    _summary("ws-2", 2, 1),
+                    _summary("ws-3", 3, 1)
+                ]
+            })
+
+            compare(capsule.isCurrent, true)
+            compare(capsule.icons.length, 2)
+            compare(capsule.currentWindowTitle, "Editor")
         }
 
-        function test_opacityAtDistance_zero() {
-            compare(Model.opacityForDistance(0, 72, 216), 1)
+        function test_workspaceStageCapsulesForHint_merges_current_and_target_windows() {
+            const host = {
+                _animatedWorkspaceAnchor: 1,
+                _workspaceStageSlots: [
+                    { absoluteIndex: 0, capsule: { visible: true } },
+                    { absoluteIndex: 1, capsule: { visible: true } },
+                    { absoluteIndex: 2, capsule: { visible: true } }
+                ]
+            }
+
+            const items = Stage.workspaceStageCapsulesForHint(host, {
+                visible: true,
+                activeWorkspacePosition: 2,
+                workspaceIndex: 3,
+                windows: [{ icon: "terminal", isFocused: true }],
+                workspaces: [
+                    _summary("ws-1", 1, 1),
+                    _summary("ws-2", 2, 1),
+                    _summary("ws-3", 3, 1),
+                    _summary("ws-4", 4, 1)
+                ]
+            }, true)
+
+            compare(items.length, 4)
+            compare(items[0].absoluteIndex, 0)
+            compare(items[3].absoluteIndex, 3)
         }
 
-        function test_opacityAtDistance_one() {
-            compare(Model.opacityForDistance(1, 72, 216), 1)
-        }
+        function test_workspaceStageSlotPosition_tracks_anchor_delta() {
+            const host = {
+                _animatedWorkspaceAnchor: 2,
+                _overflowSlotPosition: 1.18,
+                _workspaceStageSlots: [
+                    { absoluteIndex: 1, capsule: { visible: true } },
+                    { absoluteIndex: 2, capsule: { visible: true } }
+                ]
+            }
 
-        function test_opacityAtDistance_halfStep_staysOpaque() {
-            compare(Model.opacityForDistance(0.5, 72, 216), 1)
-        }
-
-        function test_opacityAtDistance_zero_with_threeStepFade_staysOpaque() {
-            compare(Model.opacityForDistance(0, 28, 108), 1)
-        }
-
-        function test_opacityAtDistance_two_fades() {
-            verify(Model.opacityForDistance(2, 72, 216) < 1)
-        }
-
-        function test_opacityAtDistance_far_zero() {
-            compare(Model.opacityForDistance(5, 72, 216), 0)
-        }
-
-        function test_boundaryBounce_leftEdge() {
-            compare(Model.boundaryBounceTarget(0, -1, 0.18), -0.18)
-        }
-
-        function test_boundaryBounce_rightEdge() {
-            compare(Model.boundaryBounceTarget(4, 1, 0.18), 4.18)
-        }
-
-        function test_relativeOffset_positive() {
-            compare(Model.relativeOffset(3, 1), 2)
-        }
-
-        function test_relativeOffset_negative() {
-            compare(Model.relativeOffset(1, 3), -2)
-        }
-
-        function test_relativeOffset_zero() {
-            compare(Model.relativeOffset(2, 2), 0)
-        }
-
-        function test_relativeOffset_nonInteger() {
-            compare(Model.relativeOffset(1.5, 0.3), 1.2)
-        }
-
-        function test_focusWidth_atZero() {
-            compare(Model.focusWidth(28, 200, 0), 28)
-        }
-
-        function test_focusWidth_atOne() {
-            compare(Model.focusWidth(28, 200, 1), 200)
-        }
-
-        function test_focusWidth_atHalf() {
-            compare(Model.focusWidth(28, 200, 0.5), 114)
-        }
-
-        function test_focusWidth_clampsBelowZero() {
-            compare(Model.focusWidth(28, 200, -0.5), 28)
-        }
-
-        function test_focusWidth_clampsAboveOne() {
-            compare(Model.focusWidth(28, 200, 1.5), 200)
-        }
-
-        function test_neighborBaseWidth_keeps_capsule_readable() {
-            compare(Model.neighborBaseWidth(28, 72), 72)
-        }
-
-        function test_staggerVisibility_for_first_three_capsules() {
-            compare(Model.staggerVisibilityForIndex(0, true, false, false), true)
-            compare(Model.staggerVisibilityForIndex(1, true, false, false), false)
-            compare(Model.staggerVisibilityForIndex(2, true, true, false), false)
-        }
-
-        function test_staggerVisibility_keeps_later_capsules_visible() {
-            compare(Model.staggerVisibilityForIndex(3, false, false, false), true)
-        }
-
-        function test_focusProgress_atCenter() {
-            compare(Model.focusProgressForOffset(0), 1)
-        }
-
-        function test_focusProgress_half_step() {
-            compare(Model.focusProgressForOffset(0.5), 0.5)
-        }
-
-        function test_focusProgress_far_step_clamps_to_zero() {
-            compare(Model.focusProgressForOffset(2), 0)
-        }
-
-        function test_focusProgress_outgoing_workspace_still_visible() {
-            verify(Model.focusProgressForOffset(-0.4) > 0)
-        }
-
-        function test_useFocusedWidthForCapsule_keeps_outgoing_focus_geometry() {
-            compare(Model.useFocusedWidthForCapsule(false, true, 0.4), true)
-        }
-
-        function test_shouldExpandCapsule_collapses_after_release() {
-            compare(Model.shouldExpandCapsule(true, false), false)
+            compare(Stage.workspaceStageSlotPositionAt(host, 0), -1)
+            compare(Stage.workspaceStageSlotPositionAt(host, 1), 0)
         }
     }
 
-    // Non-visual state object under test.
-    WH.WorkspaceHintViewportState {
-        id: viewportState
-    }
-
-    // Exercise WorkspaceHintViewportState properties and functions.
+    // Exercise workspace-hint motion helpers.
     TestCase {
-        name: "ViewportState"
+        name: "WorkspaceHintMotion"
 
-        function init() {
-            viewportState.visualFocusPosition = 0
-            viewportState.settledWorkspacePosition = 0
-            viewportState.targetWorkspacePosition = 0
-            viewportState.pendingWorkspaceSteps = []
+        function test_emptyStageSlots_initializes_placeholder_slots() {
+            const slots = Motion.emptyStageSlots([0, 1, 2], "workspace-slot")
+            compare(slots.length, 3)
+            compare(slots[0].absoluteIndex, -1)
+            compare(slots[0].slotId, "workspace-slot-0")
         }
 
-        // Verify enqueueWorkspaceTransition fills pending queue correctly.
-        function test_enqueueWorkspaceTransition_fillsQueue() {
-            viewportState.enqueueWorkspaceTransition(1, 3)
-            compare(viewportState.pendingWorkspaceSteps.length, 2)
-            compare(viewportState.pendingWorkspaceSteps[0], 2)
-            compare(viewportState.pendingWorkspaceSteps[1], 3)
+        function test_workspaceMetrics_center_slot_uses_primary_size() {
+            const metrics = Motion.workspaceMetrics({
+                _workspaceStageWidth: 132,
+                _workspaceSideWidth: 90,
+                _workspacePrimaryWidth: 132,
+                _workspaceSideHeight: 28,
+                _workspacePrimaryHeight: 40,
+                _workspaceColumnGap: 8
+            }, 0)
+
+            compare(metrics.width, 132)
+            compare(metrics.height, 40)
+            compare(metrics.opacity, 1)
         }
 
-        function test_enqueueWorkspaceTransition_appends_to_existing_queue() {
-            viewportState.pendingWorkspaceSteps = [2]
-            viewportState.enqueueWorkspaceTransition(2, 4)
-            compare(viewportState.pendingWorkspaceSteps.length, 3)
-            compare(viewportState.pendingWorkspaceSteps[0], 2)
-            compare(viewportState.pendingWorkspaceSteps[1], 3)
-            compare(viewportState.pendingWorkspaceSteps[2], 4)
-        }
+        function test_workspaceMetrics_neighbor_slot_uses_side_metrics() {
+            const metrics = Motion.workspaceMetrics({
+                _workspaceStageWidth: 132,
+                _workspaceSideWidth: 90,
+                _workspacePrimaryWidth: 132,
+                _workspaceSideHeight: 28,
+                _workspacePrimaryHeight: 40,
+                _workspaceColumnGap: 8
+            }, -1)
 
-        // Verify advancePendingWorkspaceStep pops first step and sets target.
-        function test_advancePendingWorkspaceStep_popsFirst() {
-            viewportState.enqueueWorkspaceTransition(1, 3)
-            viewportState.advancePendingWorkspaceStep()
-            compare(viewportState.targetWorkspacePosition, 2)
-            compare(viewportState.pendingWorkspaceSteps.length, 1)
-            compare(viewportState.pendingWorkspaceSteps[0], 3)
-            compare(viewportState.visualFocusPosition, 2)
-            compare(viewportState.settledWorkspacePosition, 2)
-        }
-
-        // Verify edgeBounceTargetForTest returns expected bounce offset.
-        function test_edgeBounceTargetForTest_leftEdge() {
-            compare(viewportState.edgeBounceTargetForTest(0, -1), -0.18)
-        }
-
-        // Verify edgeBounceTargetForTest for right edge.
-        function test_edgeBounceTargetForTest_rightEdge() {
-            compare(viewportState.edgeBounceTargetForTest(4, 1), 4.18)
-        }
-
-        // Verify settleEdgeBounce updates visualFocusPosition.
-        function test_settleEdgeBounce_updatesFocus() {
-            viewportState.settleEdgeBounce(-0.18)
-            compare(viewportState.visualFocusPosition, -0.18)
-        }
-
-        // Verify settleEdgeBounce also sets target and settled positions.
-        function test_settleEdgeBounce_setsAllPositions() {
-            viewportState.enqueueWorkspaceTransition(0, 3)
-            viewportState.advancePendingWorkspaceStep()
-            viewportState.settleEdgeBounce(2.5)
-            compare(viewportState.visualFocusPosition, 2.5)
-            compare(viewportState.targetWorkspacePosition, 2.5)
-            compare(viewportState.settledWorkspacePosition, 2.5)
-        }
-
-        function test_consumeTransitionRevision_ignores_stale_revision() {
-            var lastConsumedTransitionRevision = 2
-            var nextRevision = 2
-            var shouldConsume = nextRevision > lastConsumedTransitionRevision
-            compare(shouldConsume, false)
-        }
-
-        function test_consumeTransitionRevision_accepts_new_revision() {
-            var lastConsumedTransitionRevision = 2
-            var nextRevision = 3
-            var shouldConsume = nextRevision > lastConsumedTransitionRevision
-            compare(shouldConsume, true)
+            compare(metrics.width, 90)
+            compare(metrics.height, 28)
+            compare(metrics.opacity, 0.5)
         }
     }
 }
