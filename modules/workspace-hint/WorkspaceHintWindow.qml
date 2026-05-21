@@ -288,14 +288,7 @@ Variants {
                         _staggerVisible,
                         hintWindow._hintActive
                     )
-                    baseY: {
-                        var y = hintContainer._wsTargetY
-                        for (var i = 0; i < capsule.index; i++) {
-                            var prev = capsuleRepeater.itemAt(i)
-                            if (prev) y += prev.expandedHeightHint + 8
-                        }
-                        return y
-                    }
+                    baseY: hintContainer._wsTargetY + (index * 36)
                     currentWindowTitle: _usesPreviousVisualContent
                         ? hintWindow._previousVisualWindowTitle
                         : hintWindow._hintData.currentWindowTitle
