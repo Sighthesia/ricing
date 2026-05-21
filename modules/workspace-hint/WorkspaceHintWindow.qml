@@ -72,6 +72,27 @@ Variants {
             return Motion.workspaceMetrics(hintWindow, slotPosition, absoluteIndex)
         }
 
+        function _workspacePrimaryWidthForAbsoluteIndex(absoluteIndex) {
+            const currentHint = _renderHint || _hintData
+            const currentWidth = _workspacePrimaryWidthForHint(currentHint)
+
+            if (_workspaceSettlePending && _transitionSourceHint) {
+                const previousPosition = _transitionSourceHint.activeWorkspacePosition !== undefined
+                    ? _transitionSourceHint.activeWorkspacePosition
+                    : -1
+                const currentPosition = currentHint && currentHint.activeWorkspacePosition !== undefined
+                    ? currentHint.activeWorkspacePosition
+                    : -1
+
+                if (absoluteIndex === previousPosition && absoluteIndex !== currentPosition)
+                    return _workspacePrimaryWidthForHint(_transitionSourceHint)
+                if (absoluteIndex === currentPosition)
+                    return currentWidth
+            }
+
+            return currentWidth
+        }
+
         function _workspacePrimaryWidthForHint(hint) {
             const safeHint = hint || {}
             const windows = safeHint.windows || []
@@ -88,8 +109,7 @@ Variants {
                 const title = windowData.title || ""
                 const titleWidth = Math.min(140, Math.max(24, title.length * 7))
                 const iconWidth = windowData.icon ? 19 : 0
-                const focusWidth = windowData.isFocused ? 11 : 0
-                const cardWidth = Math.max(100, titleWidth + iconWidth + focusWidth + 24)
+                const cardWidth = Math.max(100, titleWidth + iconWidth + 24)
                 width += cardWidth
                 if (index < windows.length - 1)
                     width += 6

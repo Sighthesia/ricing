@@ -15,8 +15,28 @@ Item {
     readonly property real _emphasis: root._metrics.emphasis
     readonly property real _revealProgress: host._stageRevealForSlot(root.slotPosition)
     readonly property real _detailProgress: Math.max(0, Math.min(1, (root._emphasis - 0.28) / 0.72))
-    readonly property bool _isPrimaryCapsule: root.capsule && (root.capsule.isCurrent || root.capsule.isTransitionCurrent)
-    readonly property bool _isEmptyWorkspace: root.capsule && (root.capsule.icons || []).length === 0
+    readonly property real _outgoingHandoffProgress: root._isOutgoingPrimaryCapsule
+        ? Math.max(0, Math.min(1, (0.18 - root._detailProgress) / 0.18))
+        : 0
+    readonly property bool _isOutgoingPrimaryCapsule: !!(
+        host._workspaceSettlePending
+        && host._transitionSourceHint
+        && root.absoluteIndex === host._transitionSourceHint.activeWorkspacePosition
+        && !(root.capsule && root.capsule.isCurrent)
+    )
+    readonly property bool _isPrimaryCapsule: !!(
+        (root.capsule && (root.capsule.isCurrent || root.capsule.isTransitionCurrent))
+        || root._isOutgoingPrimaryCapsule
+    )
+    readonly property var _activeWindows: root._isOutgoingPrimaryCapsule
+        ? ((host._transitionSourceHint && host._transitionSourceHint.windows) || [])
+        : ((root.capsule && root.capsule.icons) || [])
+    readonly property int _activeWorkspaceIndex: root._isOutgoingPrimaryCapsule
+        ? ((host._transitionSourceHint && host._transitionSourceHint.workspaceIndex) || -1)
+        : (root.capsule ? root.capsule.workspaceIndex : -1)
+    readonly property bool _isEmptyWorkspace: root._isPrimaryCapsule
+        ? root._activeWindows.length === 0
+        : (root.capsule && (root.capsule.icons || []).length === 0)
     readonly property real _visualEmphasis: root._isEmptyWorkspace
         ? Math.max(root._isPrimaryCapsule ? 0.56 : 0.42, root._emphasis)
         : Math.max(root._isPrimaryCapsule ? 0.74 : 0, root._emphasis)
@@ -49,7 +69,7 @@ Item {
     readonly property real _iconSpacing: 4
     readonly property int _visibleIconCount: Math.min(3, root.capsule && root.capsule.icons ? root.capsule.icons.length : 0)
     readonly property int _focusedIconIndex: {
-        const items = root.capsule && root.capsule.icons ? root.capsule.icons : []
+        const items = root._isPrimaryCapsule ? root._activeWindows : ((root.capsule && root.capsule.icons) || [])
         for (let index = 0; index < items.length; index++) {
             if (items[index] && items[index].isFocused)
                 return index
@@ -105,12 +125,14 @@ Item {
                 id: activeContent
                 anchors.centerIn: parent
                 spacing: 8
-                opacity: root._isPrimaryCapsule ? root._detailProgress : 0
+                opacity: root._isOutgoingPrimaryCapsule
+                    ? (1 - root._outgoingHandoffProgress)
+                    : (root._isPrimaryCapsule ? root._detailProgress : 0)
                 visible: opacity > 0
 
                 // Keep the active workspace number pinned to the left.
                 Text {
-                    text: root.capsule ? String(root.capsule.workspaceIndex) : ""
+                    text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
                     color: Services.Color.mOnSurface
                     font.pixelSize: 12
                     font.bold: true
@@ -123,7 +145,7 @@ Item {
                     spacing: 6
 
                     Repeater {
-                        model: root._isPrimaryCapsule && root.capsule && root.capsule.icons ? root.capsule.icons : []
+                        model: root._isPrimaryCapsule ? root._activeWindows : []
 
                         delegate: Rectangle {
                             required property var modelData
@@ -131,9 +153,12 @@ Item {
 
                             readonly property real _cardProgress: root._detailProgress
                             readonly property real _collapsedCardWidth: modelData.icon ? 28 : 14
-                            readonly property real _expandedTitleWidth: Math.min(titleText.implicitWidth, 140)
+                            readonly property real _expandedTitleWidth: Math.min(
+                                140,
+                                Math.max(24, ((modelData.title || "").length * 7))
+                            )
                             readonly property real _expandedCardWidth: Math.max(
-                                _expandedTitleWidth + (modelData.icon ? 19 : 0) + (modelData.isFocused ? 11 : 0) + 24,
+                                _expandedTitleWidth + (modelData.icon ? 19 : 0) + 24,
                                 100
                             )
 
@@ -187,16 +212,6 @@ Item {
                                     }
                                 }
 
-                                // Mark the focused window card.
-                                Rectangle {
-                                    width: 5
-                                    height: 5
-                                    radius: 2.5
-                                    color: Services.Color.mPrimary
-                                    opacity: modelData.isFocused ? root._detailProgress : 0
-                                    visible: opacity > 0
-                                }
-
                                 // Show one window title using the old elide rules.
                                 Text {
                                     id: titleText
@@ -233,7 +248,9 @@ Item {
                 id: neighborContent
                 anchors.centerIn: parent
                 spacing: 6
-                opacity: root._isPrimaryCapsule ? (1 - root._detailProgress) : 1
+                opacity: root._isOutgoingPrimaryCapsule
+                    ? root._outgoingHandoffProgress
+                    : (root._isPrimaryCapsule ? (1 - root._detailProgress) : 1)
                 visible: opacity > 0
 
                 // Show the workspace number as the capsule label.

@@ -244,13 +244,21 @@ function handleHintChange(host, liveHint, workspaceAnimation, stageApi) {
     var nextHint = liveHint || null
     var immediate = !host._renderHint || !host._renderHint.visible || host._animatedWorkspaceAnchor < 0
     var previousHint = host._renderHint || null
+    var nextTarget = stageApi.workspaceAnchorForHint(nextHint)
+
+    if (host._workspaceSettlePending
+            && host._transitionSourceHint
+            && nextTarget === host._workspaceAnchorTarget) {
+        host._renderHint = nextHint
+        return
+    }
 
     host._transitionSourceHint = immediate ? null : previousHint
+    if (!immediate)
+        host._workspaceSettlePending = true
     host._renderHint = nextHint
     refreshStageSlots(host, nextHint, !immediate, true, stageApi)
-    if (!immediate)
-        retireWorkspaceStageSlots(host, nextHint, stageApi)
-    retargetWorkspaceAnchor(host, stageApi.workspaceAnchorForHint(nextHint), immediate, workspaceAnimation)
+    retargetWorkspaceAnchor(host, nextTarget, immediate, workspaceAnimation)
     if (immediate) {
         settleWorkspaceStageSlots(host, nextHint, stageApi)
         host._transitionSourceHint = null
@@ -262,6 +270,9 @@ function _lerp(from, to, progress) {
 }
 
 function workspaceMetrics(host, slotPosition) {
+    var primaryWidth = host && host._workspacePrimaryWidthForAbsoluteIndex
+        ? host._workspacePrimaryWidthForAbsoluteIndex(arguments.length > 2 ? arguments[2] : -1)
+        : host._workspacePrimaryWidth
     var topY = 0
     var centerY = host._workspaceSideHeight + host._workspaceColumnGap
     var bottomY = centerY + host._workspacePrimaryHeight + host._workspaceColumnGap
@@ -294,7 +305,7 @@ function workspaceMetrics(host, slotPosition) {
 
     if (clamped <= 0) {
         var leftProgress = clamped + 1
-        var leftWidth = _lerp(host._workspaceSideWidth, host._workspacePrimaryWidth, leftProgress)
+        var leftWidth = _lerp(host._workspaceSideWidth, primaryWidth, leftProgress)
         return {
             x: (host._workspaceStageWidth - leftWidth) / 2,
             y: _lerp(topY, centerY, leftProgress),
@@ -306,7 +317,7 @@ function workspaceMetrics(host, slotPosition) {
     }
 
     var rightProgress = clamped
-    var rightWidth = _lerp(host._workspacePrimaryWidth, host._workspaceSideWidth, rightProgress)
+    var rightWidth = _lerp(primaryWidth, host._workspaceSideWidth, rightProgress)
     return {
         x: (host._workspaceStageWidth - rightWidth) / 2,
         y: _lerp(centerY, bottomY, rightProgress),
