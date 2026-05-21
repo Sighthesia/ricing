@@ -55,6 +55,14 @@ Variants {
         readonly property int _activeWorkspacePosition: _hintData.activeWorkspacePosition
         readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         readonly property real _overflowSlotPosition: 1.18
+        readonly property int _workspaceCapsuleMaxWidth: {
+            const activeScreen = hintWindow.screen
+            const screenWidth = activeScreen && activeScreen.width !== undefined
+                ? Math.floor(activeScreen.width)
+                : Math.floor(hintWindow.width)
+
+            return Math.max(1, screenWidth)
+        }
         readonly property int _workspaceSideWidth: 90
         readonly property real _workspaceMeasuredPrimaryWidth: {
             let width = 0
@@ -164,7 +172,7 @@ Variants {
             const iconWidth = iconCount > 0 ? (iconCount * 16) + Math.max(0, iconCount - 1) * 4 : 0
             const gap = labelWidth > 0 && iconWidth > 0 ? 6 : 0
 
-            return Math.max(_workspaceSideWidth, labelWidth + iconWidth + gap + 24)
+            return Math.min(_workspaceCapsuleMaxWidth, Math.max(_workspaceSideWidth, labelWidth + iconWidth + gap + 24))
         }
 
         function _titleDisplayWidth(title) {
@@ -217,7 +225,7 @@ Variants {
                     width += 6
             }
 
-            return Math.max(132, width)
+            return Math.min(_workspaceCapsuleMaxWidth, Math.max(132, width))
         }
 
         function _refreshWorkspaceStage(hint, includeCurrentAnchor, preserveUnassigned) {

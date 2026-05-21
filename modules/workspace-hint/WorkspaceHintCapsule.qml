@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Widgets
 import "../../services" as Services
+import "WorkspaceHintCapsule.js" as Capsule
 
 // Render one workspace capsule using the shared slot-stage metrics.
 Item {
@@ -66,7 +67,18 @@ Item {
         ? Math.max(root._metrics.opacity, 0.62)
         : root._metrics.opacity
     readonly property bool providesPrimaryWidth: !!(root.capsule && root.capsule.isCurrent)
-    readonly property real preferredPrimaryWidth: Math.max(132, primaryMeasureRow.implicitWidth + 24)
+    readonly property real _maxCapsuleWidth: Math.max(
+        root._metrics.height,
+        host && host._workspaceCapsuleMaxWidth !== undefined ? host._workspaceCapsuleMaxWidth : 1
+    )
+    readonly property real _primaryHorizontalPadding: 24
+    readonly property real _primaryOuterSpacing: 8
+    readonly property real _primaryCardSpacing: 6
+    readonly property real _activeWorkspaceLabelWidth: primaryMeasureWorkspaceLabel.visible
+        ? primaryMeasureWorkspaceLabel.implicitWidth
+        : 0
+    readonly property real preferredPrimaryWidth: Math.min(root._maxCapsuleWidth, root._naturalPrimaryWidth)
+    readonly property int _cardCount: root._isPrimaryCapsule ? root._activeWindows.length : 0
     readonly property real _iconSize: 14 + (2 * root._emphasis)
     readonly property real _iconSpacing: 4
     readonly property int _visibleIconCount: root.capsule && root.capsule.icons ? root.capsule.icons.length : 0
@@ -83,10 +95,55 @@ Item {
         : root.y
     readonly property real _surfaceOffsetY: root.visibleY - root.y
 
+    readonly property real _naturalPrimaryWidth: {
+        let width = root._primaryHorizontalPadding
+        if (root._activeWorkspaceLabelWidth > 0)
+            width += root._activeWorkspaceLabelWidth + root._primaryOuterSpacing
+
+        for (let index = 0; index < root._cardCount; index++) {
+            const item = primaryMeasureRepeater.itemAt(index)
+            width += item ? item.naturalCardWidth : 56
+            if (index < root._cardCount - 1)
+                width += root._primaryCardSpacing
+        }
+
+        return Math.max(132, width)
+    }
+
+    // Shared title-width cap derived from the actual capsule width after clamping.
+    readonly property real _cardTitleWidthCap: {
+        if (root._cardCount <= 0)
+            return Infinity
+
+        const availableForRow = Math.max(
+            0,
+            root.width - root._primaryHorizontalPadding
+                - (root._activeWorkspaceLabelWidth > 0 ? root._activeWorkspaceLabelWidth + root._primaryOuterSpacing : 0)
+        )
+        const titleWidths = []
+        const baseWidths = []
+
+        for (let index = 0; index < root._cardCount; index++) {
+            const item = primaryMeasureRepeater.itemAt(index)
+            titleWidths.push(item ? item.naturalTitleWidth : 24)
+            baseWidths.push(item ? item.baseCardWidth : 24)
+        }
+
+        return Capsule.computeCardTitleWidthCap(
+            titleWidths,
+            baseWidths,
+            availableForRow,
+            root._primaryCardSpacing
+        )
+    }
+
     x: (host._workspaceStageWidth - width) / 2
     y: (-host._workspaceStageTargetY)
         + ((host._workspaceStageTargetY + root._metrics.y) * root._revealProgress)
-    width: root._metrics.height + ((root._metrics.width - root._metrics.height) * root._revealProgress)
+    width: Math.min(
+        root._maxCapsuleWidth,
+        root._metrics.height + ((root._metrics.width - root._metrics.height) * root._revealProgress)
+    )
     height: root._metrics.height
     opacity: root.capsule && root.capsule.visible ? root._capsuleOpacity : 0
     visible: root.capsule !== null && opacity > 0
@@ -134,6 +191,8 @@ Item {
 
                 // Keep the active workspace number pinned to the left.
                 Text {
+                    id: activeWorkspaceLabel
+
                     text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
                     color: Services.Color.mOnSurface
                     font.pixelSize: 12
@@ -155,11 +214,13 @@ Item {
 
                             readonly property real _cardProgress: root._detailProgress
                             readonly property real _collapsedCardWidth: modelData.icon ? 28 : 14
-                            readonly property real _expandedTitleWidth: Math.max(24, Math.ceil(titleText.implicitWidth))
-                            readonly property real _expandedCardWidth: Math.max(
-                                _expandedTitleWidth + (modelData.icon ? 19 : 0) + 24,
-                                56
+                            readonly property real _naturalTitleWidth: Math.max(24, Math.ceil(titleText.implicitWidth))
+                            readonly property real _cardBaseWidth: (modelData.icon ? 19 : 0) + 24
+                            readonly property real _expandedTitleWidth: Math.min(
+                                root._cardTitleWidthCap,
+                                _naturalTitleWidth
                             )
+                            readonly property real _expandedCardWidth: _cardBaseWidth + _expandedTitleWidth
 
                             width: _collapsedCardWidth + ((_expandedCardWidth - _collapsedCardWidth) * _cardProgress)
                             height: 28
@@ -249,6 +310,8 @@ Item {
                 spacing: 8
 
                 Text {
+                    id: primaryMeasureWorkspaceLabel
+
                     text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
                     font.pixelSize: 12
                     font.bold: true
@@ -259,12 +322,18 @@ Item {
                     spacing: 6
 
                     Repeater {
+                        id: primaryMeasureRepeater
+
                         model: root._activeWindows
 
                         delegate: Item {
                             required property var modelData
 
-                            implicitWidth: Math.max(measureCardRow.implicitWidth + 14, 56)
+                            readonly property real naturalTitleWidth: Math.max(24, Math.ceil(measureTitleText.implicitWidth))
+                            readonly property real baseCardWidth: (modelData.icon ? 19 : 0) + 24
+                            readonly property real naturalCardWidth: baseCardWidth + naturalTitleWidth
+
+                            implicitWidth: naturalCardWidth
                             implicitHeight: 28
 
                             Row {
@@ -277,6 +346,8 @@ Item {
                                 }
 
                                 Text {
+                                    id: measureTitleText
+
                                     text: modelData.title || ""
                                     font.pixelSize: 11
                                     font.bold: modelData.isFocused

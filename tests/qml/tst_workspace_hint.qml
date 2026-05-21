@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import "../../modules/workspace-hint/WorkspaceHintStage.js" as Stage
 import "../../modules/workspace-hint/WorkspaceHintMotion.js" as Motion
+import "../../modules/workspace-hint/WorkspaceHintCapsule.js" as Capsule
 
 Item {
     // Exercise workspace-hint stage helpers.
@@ -139,6 +140,36 @@ Item {
             compare(metrics.width, 90)
             compare(metrics.height, 28)
             compare(metrics.opacity, 0.5)
+        }
+
+    }
+
+    // Exercise capsule card-width cap distribution.
+    TestCase {
+        name: "WorkspaceHintCapsule"
+
+        function test_computeCardTitleWidthCap_returns_infinity_when_content_fits() {
+            compare(Capsule.computeCardTitleWidthCap([40, 32], [43, 24], 160, 6), Infinity)
+        }
+
+        function test_computeCardTitleWidthCap_returns_infinity_for_zero_cards() {
+            compare(Capsule.computeCardTitleWidthCap([], [], 200, 6), Infinity)
+        }
+
+        function test_computeCardTitleWidthCap_returns_zero_for_no_title_space() {
+            compare(Capsule.computeCardTitleWidthCap([40, 32], [43, 24], 73, 6), 0)
+        }
+
+        function test_computeCardTitleWidthCap_distributes_remaining_space_after_small_titles() {
+            compare(Capsule.computeCardTitleWidthCap([90, 90, 20], [43, 43, 24], 240, 6), 49)
+        }
+
+        function test_computeCardTitleWidthCap_caps_single_card_to_available_space() {
+            compare(Capsule.computeCardTitleWidthCap([120], [43], 100, 6), 57)
+        }
+
+        function test_computeCardTitleWidthCap_keeps_exact_natural_width_when_only_one_card_overflows() {
+            compare(Capsule.computeCardTitleWidthCap([20, 120], [24, 43], 180, 6), 87)
         }
     }
 }
