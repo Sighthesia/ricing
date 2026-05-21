@@ -273,6 +273,9 @@ function workspaceMetrics(host, slotPosition) {
     var primaryWidth = host && host._workspacePrimaryWidthForAbsoluteIndex
         ? host._workspacePrimaryWidthForAbsoluteIndex(arguments.length > 2 ? arguments[2] : -1)
         : host._workspacePrimaryWidth
+    var sideWidth = host && host._workspaceSideWidthForAbsoluteIndex
+        ? host._workspaceSideWidthForAbsoluteIndex(arguments.length > 2 ? arguments[2] : -1)
+        : host._workspaceSideWidth
     var topY = 0
     var centerY = host._workspaceSideHeight + host._workspaceColumnGap
     var bottomY = centerY + host._workspacePrimaryHeight + host._workspaceColumnGap
@@ -280,9 +283,9 @@ function workspaceMetrics(host, slotPosition) {
     if (slotPosition < -1) {
         var beforeOverflow = Math.min(1, -1 - slotPosition)
         return {
-            x: (host._workspaceStageWidth - host._workspaceSideWidth) / 2,
+            x: (host._workspaceStageWidth - sideWidth) / 2,
             y: topY - beforeOverflow * (host._workspaceSideHeight + host._workspaceColumnGap),
-            width: host._workspaceSideWidth,
+            width: sideWidth,
             height: host._workspaceSideHeight,
             emphasis: 0,
             opacity: 0.45
@@ -292,9 +295,9 @@ function workspaceMetrics(host, slotPosition) {
     if (slotPosition > 1) {
         var afterOverflow = Math.min(1, slotPosition - 1)
         return {
-            x: (host._workspaceStageWidth - host._workspaceSideWidth) / 2,
+            x: (host._workspaceStageWidth - sideWidth) / 2,
             y: bottomY + afterOverflow * (host._workspaceSideHeight + host._workspaceColumnGap),
-            width: host._workspaceSideWidth,
+            width: sideWidth,
             height: host._workspaceSideHeight,
             emphasis: 0,
             opacity: 0.45
@@ -305,7 +308,7 @@ function workspaceMetrics(host, slotPosition) {
 
     if (clamped <= 0) {
         var leftProgress = clamped + 1
-        var leftWidth = _lerp(host._workspaceSideWidth, primaryWidth, leftProgress)
+        var leftWidth = _lerp(sideWidth, primaryWidth, leftProgress)
         return {
             x: (host._workspaceStageWidth - leftWidth) / 2,
             y: _lerp(topY, centerY, leftProgress),
@@ -317,7 +320,7 @@ function workspaceMetrics(host, slotPosition) {
     }
 
     var rightProgress = clamped
-    var rightWidth = _lerp(primaryWidth, host._workspaceSideWidth, rightProgress)
+    var rightWidth = _lerp(primaryWidth, sideWidth, rightProgress)
     return {
         x: (host._workspaceStageWidth - rightWidth) / 2,
         y: _lerp(centerY, bottomY, rightProgress),

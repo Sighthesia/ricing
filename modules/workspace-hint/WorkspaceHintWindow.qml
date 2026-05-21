@@ -56,17 +56,39 @@ Variants {
         readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         readonly property real _overflowSlotPosition: 1.18
         readonly property int _workspaceSideWidth: 90
-        property int _workspacePrimaryWidth: _workspacePrimaryWidthForHint(_renderHint || _hintData)
+        readonly property real _workspaceMeasuredPrimaryWidth: {
+            let width = 0
+            for (let index = 0; index < stageRepeater.count; index++) {
+                const item = stageRepeater.itemAt(index)
+                if (item && item.providesPrimaryWidth)
+                    width = Math.max(width, item.preferredPrimaryWidth)
+            }
+            return width
+        }
+        property int _workspacePrimaryWidth: {
+            const measured = Math.ceil(_workspaceMeasuredPrimaryWidth)
+            return measured > 0 ? measured : _workspacePrimaryWidthForHint(_renderHint || _hintData)
+        }
         readonly property int _workspaceSideHeight: 28
         readonly property int _workspacePrimaryHeight: 40
         readonly property int _workspaceColumnGap: 8
-        readonly property int _workspaceStageWidth: _workspacePrimaryWidth
+        readonly property int _workspaceStageWidth: Math.max(_workspacePrimaryWidth, _workspaceMaxSideWidth)
         readonly property int _workspaceStageHeight: _workspaceSideHeight * 2 + _workspacePrimaryHeight + _workspaceColumnGap * 2
         readonly property real _workspaceStageTargetY: Services.BarLayoutService.barHeight + 16
         readonly property int _workspaceAnchorBaseDuration: Math.max(150, Services.Motion.number.surfaceDuration)
         property int _workspaceCapsuleOpacityDuration: Math.max(90, Services.Motion.number.surfaceDuration)
         readonly property int _anchorDurationStep: 24
         readonly property int _anchorMaximumDuration: 240
+        readonly property int _workspaceMaxSideWidth: {
+            const currentHint = _renderHint || _hintData
+            const workspaces = currentHint && currentHint.workspaces ? currentHint.workspaces : []
+            let width = _workspaceSideWidth
+
+            for (let index = 0; index < workspaces.length; index++)
+                width = Math.max(width, _workspaceSideWidthForAbsoluteIndex(index))
+
+            return width
+        }
 
         function _workspaceMetricsForSlot(slotPosition, absoluteIndex) {
             return Motion.workspaceMetrics(hintWindow, slotPosition, absoluteIndex)
@@ -93,6 +115,86 @@ Variants {
             return currentWidth
         }
 
+        function _workspaceIndexForAbsoluteIndex(absoluteIndex) {
+            const currentHint = _renderHint || _hintData
+            const currentPosition = currentHint && currentHint.activeWorkspacePosition !== undefined
+                ? currentHint.activeWorkspacePosition
+                : -1
+            if (absoluteIndex === currentPosition)
+                return currentHint && currentHint.workspaceIndex !== undefined ? currentHint.workspaceIndex : -1
+
+            if (_workspaceSettlePending && _transitionSourceHint) {
+                const previousPosition = _transitionSourceHint.activeWorkspacePosition !== undefined
+                    ? _transitionSourceHint.activeWorkspacePosition
+                    : -1
+                if (absoluteIndex === previousPosition)
+                    return _transitionSourceHint.workspaceIndex !== undefined ? _transitionSourceHint.workspaceIndex : -1
+            }
+
+            const workspaces = currentHint && currentHint.workspaces ? currentHint.workspaces : []
+            const summary = absoluteIndex >= 0 && absoluteIndex < workspaces.length ? workspaces[absoluteIndex] : null
+            return summary && summary.workspaceIndex !== undefined ? summary.workspaceIndex : -1
+        }
+
+        function _workspaceIconCountForAbsoluteIndex(absoluteIndex) {
+            const currentHint = _renderHint || _hintData
+            const currentPosition = currentHint && currentHint.activeWorkspacePosition !== undefined
+                ? currentHint.activeWorkspacePosition
+                : -1
+            if (absoluteIndex === currentPosition)
+                return currentHint && currentHint.windows ? currentHint.windows.length : 0
+
+            if (_workspaceSettlePending && _transitionSourceHint) {
+                const previousPosition = _transitionSourceHint.activeWorkspacePosition !== undefined
+                    ? _transitionSourceHint.activeWorkspacePosition
+                    : -1
+                if (absoluteIndex === previousPosition)
+                    return _transitionSourceHint.windows ? _transitionSourceHint.windows.length : 0
+            }
+
+            const workspaces = currentHint && currentHint.workspaces ? currentHint.workspaces : []
+            const summary = absoluteIndex >= 0 && absoluteIndex < workspaces.length ? workspaces[absoluteIndex] : null
+            return summary && summary.icons ? summary.icons.length : 0
+        }
+
+        function _workspaceSideWidthForAbsoluteIndex(absoluteIndex) {
+            const workspaceIndex = _workspaceIndexForAbsoluteIndex(absoluteIndex)
+            const labelWidth = workspaceIndex > 0 ? String(workspaceIndex).length * 7 : 0
+            const iconCount = _workspaceIconCountForAbsoluteIndex(absoluteIndex)
+            const iconWidth = iconCount > 0 ? (iconCount * 16) + Math.max(0, iconCount - 1) * 4 : 0
+            const gap = labelWidth > 0 && iconWidth > 0 ? 6 : 0
+
+            return Math.max(_workspaceSideWidth, labelWidth + iconWidth + gap + 24)
+        }
+
+        function _titleDisplayWidth(title) {
+            const text = title || ""
+            let width = 0
+
+            for (let index = 0; index < text.length; index++) {
+                const code = text.charCodeAt(index)
+                const ch = text[index]
+
+                if (ch === " ") {
+                    width += 4
+                } else if (/[.,:;!'|`]/.test(ch)) {
+                    width += 3.5
+                } else if (/[ilI1\[\]()]/.test(ch)) {
+                    width += 4.5
+                } else if (/[mwMW@#%&]/.test(ch)) {
+                    width += 8.2
+                } else if (/[A-Z0-9]/.test(ch)) {
+                    width += 7.1
+                } else if (code <= 0x7f) {
+                    width += 6.1
+                } else {
+                    width += 11
+                }
+            }
+
+            return Math.max(24, Math.ceil(width))
+        }
+
         function _workspacePrimaryWidthForHint(hint) {
             const safeHint = hint || {}
             const windows = safeHint.windows || []
@@ -107,15 +209,15 @@ Variants {
             for (let index = 0; index < windows.length; index++) {
                 const windowData = windows[index] || {}
                 const title = windowData.title || ""
-                const titleWidth = Math.min(140, Math.max(24, title.length * 7))
+                const titleWidth = _titleDisplayWidth(title)
                 const iconWidth = windowData.icon ? 19 : 0
-                const cardWidth = Math.max(100, titleWidth + iconWidth + 24)
+                const cardWidth = Math.max(56, titleWidth + iconWidth + 24)
                 width += cardWidth
                 if (index < windows.length - 1)
                     width += 6
             }
 
-            return Math.max(132, Math.min(520, width))
+            return Math.max(132, width)
         }
 
         function _refreshWorkspaceStage(hint, includeCurrentAnchor, preserveUnassigned) {
