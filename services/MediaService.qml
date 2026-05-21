@@ -19,6 +19,9 @@ Singleton {
     property string _lastArtArtist: ""
     property bool _artRecoveryPending: false
     property int _artRecoveryStartedAt: 0
+    property var _artUrlCache: ({})
+    property string _lastSeenArtKey: ""
+    property int _cacheVersion: 0
 
     readonly property var activePlayer: root._activePlayerRef
     readonly property bool hasPlayer: activePlayer !== null
@@ -82,6 +85,45 @@ Singleton {
         ].join("|")
     }
 
+    function _isBrowserPlayer(player) {
+        if (!player)
+            return false
+        const identity = (player.identity || "").toLowerCase()
+        const desktopEntry = (player.desktopEntry || "").toLowerCase()
+        return identity.indexOf("firefox") !== -1
+            || identity.indexOf("chromium") !== -1
+            || identity.indexOf("chrome") !== -1
+            || desktopEntry.indexOf("firefox") !== -1
+            || desktopEntry.indexOf("chromium") !== -1
+            || desktopEntry.indexOf("chrome") !== -1
+    }
+
+    function _artRecoveryTimeout(player) {
+        return root._isBrowserPlayer(player) ? 30000 : 15000
+    }
+
+    function _cacheArtUrl(artKey, artUrl) {
+        if (!artKey || !artUrl)
+            return
+        const cache = root._artUrlCache
+        const keys = Object.keys(cache)
+        if (keys.length >= 200) {
+            const oldestKey = keys[0]
+            delete cache[oldestKey]
+        }
+        cache[artKey] = artUrl
+        root._artUrlCache = cache
+        root._cacheVersion += 1
+        artCacheAdapter.artUrlCache = cache
+        artCacheSaveTimer.restart()
+    }
+
+    function _lookupCachedArtUrl(artKey) {
+        if (!artKey)
+            return ""
+        return root._artUrlCache[artKey] || ""
+    }
+
     function _selectActivePlayer() {
         const players = Mpris.players.values
         let preferredPlayer = null
@@ -126,6 +168,7 @@ Singleton {
             root._lastArtArtist = ""
             root._artRecoveryPending = false
             root._artRecoveryStartedAt = 0
+            root._lastSeenArtKey = ""
             return
         }
 
@@ -143,6 +186,13 @@ Singleton {
         const trackArtist = player.trackArtist || ""
         const nextArtUrl = player.trackArtUrl || ""
 
+        // Track changed: reset recovery timer so new track gets full window.
+        if (artKey !== root._lastSeenArtKey) {
+            root._lastSeenArtKey = artKey
+            root._artRecoveryStartedAt = 0
+        }
+
+        // Player provides art URL directly: use and cache it.
         if (nextArtUrl !== "") {
             root._lastArtPlayerKey = playerKey
             root._lastArtKey = artKey
@@ -151,15 +201,31 @@ Singleton {
             root.artUrl = nextArtUrl
             root._artRecoveryPending = false
             root._artRecoveryStartedAt = 0
+            root._cacheArtUrl(artKey, nextArtUrl)
             return
         }
 
+        // Art URL empty: check track-level cache for previously seen art.
+        const cachedArt = root._lookupCachedArtUrl(artKey)
+        if (cachedArt !== "") {
+            root._lastArtPlayerKey = playerKey
+            root._lastArtKey = artKey
+            root._lastArtTitle = trackTitle
+            root._lastArtArtist = trackArtist
+            root.artUrl = cachedArt
+            root._artRecoveryPending = false
+            root._artRecoveryStartedAt = 0
+            return
+        }
+
+        // No cache hit: enter recovery mode to wait for delayed art URL.
         if (root.artUrl !== "" && playerKey === root._lastArtPlayerKey) {
             if (root._artRecoveryStartedAt === 0)
                 root._artRecoveryStartedAt = Date.now()
 
+            const timeout = root._artRecoveryTimeout(player)
             root._artRecoveryPending = true
-            if (Date.now() - root._artRecoveryStartedAt <= 15000)
+            if (Date.now() - root._artRecoveryStartedAt <= timeout)
                 return
 
             root.artUrl = ""
@@ -186,7 +252,8 @@ Singleton {
         if (root._artRecoveryStartedAt === 0)
             return true
 
-        return Date.now() - root._artRecoveryStartedAt <= 15000
+        const timeout = root._artRecoveryTimeout(root.activePlayer)
+        return Date.now() - root._artRecoveryStartedAt <= timeout
     }
 
     function playPause() {
@@ -252,6 +319,14 @@ Singleton {
         repeat: true
         running: root._shouldRetryArtRecovery()
         onTriggered: root._syncArtUrl()
+    }
+
+    // Debounce saving the art URL cache to disk.
+    Timer {
+        id: artCacheSaveTimer
+        interval: 500
+        repeat: false
+        onTriggered: artCacheFile.writeAdapter()
     }
 
     Connections {
@@ -341,7 +416,25 @@ Singleton {
     }
 
     Component.onCompleted: {
+        if (Object.keys(artCacheAdapter.artUrlCache).length > 0)
+            root._artUrlCache = artCacheAdapter.artUrlCache
         root._syncActivePlayer()
         root._syncArtUrl()
+    }
+
+    // Persist the art URL cache across shell reloads.
+    property FileView artCacheFile: FileView {
+        id: artCacheFile
+        path: Quickshell.cacheDir + "/media-art-cache.json"
+        blockLoading: true
+        onLoadFailed: error => {
+            if (error === FileViewError.FileNotFound)
+                artCacheFile.writeAdapter()
+        }
+
+        JsonAdapter {
+            id: artCacheAdapter
+            property var artUrlCache: ({})
+        }
     }
 }
