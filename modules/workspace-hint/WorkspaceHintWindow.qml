@@ -53,7 +53,7 @@ Variants {
         property real _stageBottomProgress: 0
 
         readonly property int _activeWorkspacePosition: _hintData.activeWorkspacePosition
-        readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4]
+        readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         readonly property real _overflowSlotPosition: 1.18
         readonly property int _workspaceSideWidth: 90
         readonly property int _workspacePrimaryWidth: 132
@@ -64,7 +64,7 @@ Variants {
         readonly property int _workspaceStageHeight: _workspaceSideHeight * 2 + _workspacePrimaryHeight + _workspaceColumnGap * 2
         readonly property real _workspaceStageTargetY: Services.BarLayoutService.barHeight + 16
         readonly property int _workspaceAnchorBaseDuration: Math.max(150, Services.Motion.number.surfaceDuration)
-        readonly property int _workspaceCapsuleOpacityDuration: Math.max(90, Services.Motion.number.surfaceDuration)
+        property int _workspaceCapsuleOpacityDuration: Math.max(90, Services.Motion.number.surfaceDuration)
         readonly property int _anchorDurationStep: 24
         readonly property int _anchorMaximumDuration: 240
 
@@ -191,21 +191,8 @@ Variants {
                 }
 
                 hintWindow._workspaceSettlePending = false
-                if (Motion.retireWorkspaceStageSlots(hintWindow, hintWindow._renderHint, Stage)) {
-                    _workspaceStageCleanupTimer.interval = hintWindow._workspaceCapsuleOpacityDuration + 16
-                    _workspaceStageCleanupTimer.restart()
-                    return
-                }
-
                 hintWindow._settleWorkspaceStage(hintWindow._renderHint)
             }
-        }
-
-        // Cleanup retired stage slots after the fade-out completes.
-        Timer {
-            id: _workspaceStageCleanupTimer
-            repeat: false
-            onTriggered: hintWindow._settleWorkspaceStage(hintWindow._renderHint)
         }
 
         // Keep workspace switching on a smooth anchor tween like DymicShell.
@@ -305,15 +292,19 @@ Variants {
                 Repeater {
                     id: stageRepeater
 
-                    model: hintWindow._workspaceStageSlots
+                    model: hintWindow._persistentStageSlotIndices.length
 
                     delegate: WorkspaceHint.WorkspaceHintCapsule {
-                        required property var modelData
                         required property int index
 
+                        readonly property var _slotData:
+                            index >= 0 && index < hintWindow._workspaceStageSlots.length
+                                ? hintWindow._workspaceStageSlots[index]
+                                : null
+
                         host: hintWindow
-                        capsule: modelData.capsule
-                        absoluteIndex: modelData.absoluteIndex
+                        capsule: _slotData ? _slotData.capsule : null
+                        absoluteIndex: _slotData ? _slotData.absoluteIndex : -1
                         slotPosition: Stage.workspaceStageSlotPositionAt(hintWindow, index)
                     }
                 }

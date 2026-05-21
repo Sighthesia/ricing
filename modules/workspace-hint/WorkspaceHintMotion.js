@@ -212,6 +212,7 @@ function retargetWorkspaceAnchor(host, target, immediate, workspaceAnimation) {
     if (immediate || target < 0 || host._animatedWorkspaceAnchor < 0) {
         host._workspaceAnchorAnimationEnabled = false
         host._workspaceAnchorDuration = host._workspaceAnchorBaseDuration
+        host._workspaceCapsuleOpacityDuration = host._workspaceAnchorBaseDuration
         host._workspaceAnchorTarget = target
         host._animatedWorkspaceAnchor = target
         host._workspaceAnchorAnimationEnabled = true
@@ -223,6 +224,7 @@ function retargetWorkspaceAnchor(host, target, immediate, workspaceAnimation) {
     if (duration === 0) {
         host._workspaceAnchorAnimationEnabled = false
         host._workspaceAnchorDuration = host._workspaceAnchorBaseDuration
+        host._workspaceCapsuleOpacityDuration = host._workspaceAnchorBaseDuration
         host._workspaceAnchorTarget = target
         host._animatedWorkspaceAnchor = target
         host._workspaceAnchorAnimationEnabled = true
@@ -230,6 +232,7 @@ function retargetWorkspaceAnchor(host, target, immediate, workspaceAnimation) {
     }
 
     host._workspaceAnchorDuration = duration
+    host._workspaceCapsuleOpacityDuration = duration
     host._workspaceSettlePending = true
     host._workspaceAnchorTarget = target
     host._animatedWorkspaceAnchor = target
@@ -245,6 +248,8 @@ function handleHintChange(host, liveHint, workspaceAnimation, stageApi) {
     host._transitionSourceHint = immediate ? null : previousHint
     host._renderHint = nextHint
     refreshStageSlots(host, nextHint, !immediate, true, stageApi)
+    if (!immediate)
+        retireWorkspaceStageSlots(host, nextHint, stageApi)
     retargetWorkspaceAnchor(host, stageApi.workspaceAnchorForHint(nextHint), immediate, workspaceAnimation)
     if (immediate) {
         settleWorkspaceStageSlots(host, nextHint, stageApi)
