@@ -65,9 +65,11 @@ Item {
     readonly property real _capsuleOpacity: root._isEmptyWorkspace
         ? Math.max(root._metrics.opacity, 0.62)
         : root._metrics.opacity
+    readonly property bool providesPrimaryWidth: !!(root.capsule && root.capsule.isCurrent)
+    readonly property real preferredPrimaryWidth: Math.max(132, primaryMeasureRow.implicitWidth + 24)
     readonly property real _iconSize: 14 + (2 * root._emphasis)
     readonly property real _iconSpacing: 4
-    readonly property int _visibleIconCount: Math.min(3, root.capsule && root.capsule.icons ? root.capsule.icons.length : 0)
+    readonly property int _visibleIconCount: root.capsule && root.capsule.icons ? root.capsule.icons.length : 0
     readonly property int _focusedIconIndex: {
         const items = root._isPrimaryCapsule ? root._activeWindows : ((root.capsule && root.capsule.icons) || [])
         for (let index = 0; index < items.length; index++) {
@@ -153,13 +155,10 @@ Item {
 
                             readonly property real _cardProgress: root._detailProgress
                             readonly property real _collapsedCardWidth: modelData.icon ? 28 : 14
-                            readonly property real _expandedTitleWidth: Math.min(
-                                140,
-                                Math.max(24, ((modelData.title || "").length * 7))
-                            )
+                            readonly property real _expandedTitleWidth: Math.max(24, Math.ceil(titleText.implicitWidth))
                             readonly property real _expandedCardWidth: Math.max(
                                 _expandedTitleWidth + (modelData.icon ? 19 : 0) + 24,
-                                100
+                                56
                             )
 
                             width: _collapsedCardWidth + ((_expandedCardWidth - _collapsedCardWidth) * _cardProgress)
@@ -243,6 +242,57 @@ Item {
                 }
             }
 
+            // Measure the focused workspace content with real implicit widths.
+            Row {
+                id: primaryMeasureRow
+                visible: false
+                spacing: 8
+
+                Text {
+                    text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
+                    font.pixelSize: 12
+                    font.bold: true
+                    visible: text !== ""
+                }
+
+                Row {
+                    spacing: 6
+
+                    Repeater {
+                        model: root._activeWindows
+
+                        delegate: Item {
+                            required property var modelData
+
+                            implicitWidth: Math.max(measureCardRow.implicitWidth + 14, 56)
+                            implicitHeight: 28
+
+                            Row {
+                                id: measureCardRow
+                                spacing: 5
+
+                                Item {
+                                    width: modelData.icon ? 14 : 0
+                                    height: 14
+                                }
+
+                                Text {
+                                    text: modelData.title || ""
+                                    font.pixelSize: 11
+                                    font.bold: modelData.isFocused
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        visible: root._isEmptyWorkspace
+                        text: "空工作区"
+                        font.pixelSize: 12
+                    }
+                }
+            }
+
             // Keep neighbor workspaces compact with only number and icons.
             Row {
                 id: neighborContent
@@ -308,7 +358,7 @@ Item {
                         spacing: root._iconSpacing
 
                         Repeater {
-                            model: root.capsule && root.capsule.icons ? root.capsule.icons.slice(0, 3) : []
+                            model: root.capsule && root.capsule.icons ? root.capsule.icons : []
 
                             delegate: Item {
                                 required property var modelData
