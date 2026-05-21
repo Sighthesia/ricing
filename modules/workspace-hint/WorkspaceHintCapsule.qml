@@ -13,6 +13,7 @@ Item {
 
     readonly property var _metrics: host._workspaceMetricsForSlot(root.slotPosition, root.absoluteIndex)
     readonly property real _emphasis: root._metrics.emphasis
+    readonly property real _revealProgress: host._stageRevealForSlot(root.slotPosition)
     readonly property bool _isPrimaryCapsule: root.capsule && (root.capsule.isCurrent || root.capsule.isTransitionCurrent)
     readonly property bool _isEmptyWorkspace: root.capsule && (root.capsule.icons || []).length === 0
     readonly property real _visualEmphasis: root._isEmptyWorkspace
@@ -54,12 +55,15 @@ Item {
         }
         return -1
     }
-    readonly property real visibleY: root.y < 0 ? 0 : root.y
+    readonly property real visibleY: root.y < (-host._workspaceStageTargetY)
+        ? (-host._workspaceStageTargetY)
+        : root.y
     readonly property real _surfaceOffsetY: root.visibleY - root.y
 
-    x: root._metrics.x
-    y: root._metrics.y
-    width: root._metrics.width
+    x: (host._workspaceStageWidth - width) / 2
+    y: (-host._workspaceStageTargetY)
+        + ((host._workspaceStageTargetY + root._metrics.y) * root._revealProgress)
+    width: root._metrics.height + ((root._metrics.width - root._metrics.height) * root._revealProgress)
     height: root._metrics.height
     opacity: root.capsule && root.capsule.visible ? root._capsuleOpacity : 0
     visible: root.capsule !== null && opacity > 0

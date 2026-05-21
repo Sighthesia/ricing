@@ -48,6 +48,9 @@ Variants {
         property int _workspaceAnchorDuration: _workspaceAnchorBaseDuration
         property bool _workspaceAnchorAnimationEnabled: true
         property bool _workspaceSettlePending: false
+        property real _stageTopProgress: 0
+        property real _stageMiddleProgress: 0
+        property real _stageBottomProgress: 0
 
         readonly property int _activeWorkspacePosition: _hintData.activeWorkspacePosition
         readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4]
@@ -59,6 +62,7 @@ Variants {
         readonly property int _workspaceColumnGap: 8
         readonly property int _workspaceStageWidth: _workspacePrimaryWidth
         readonly property int _workspaceStageHeight: _workspaceSideHeight * 2 + _workspacePrimaryHeight + _workspaceColumnGap * 2
+        readonly property real _workspaceStageTargetY: Services.BarLayoutService.barHeight + 16
         readonly property int _workspaceAnchorBaseDuration: Math.max(150, Services.Motion.number.surfaceDuration)
         readonly property int _workspaceCapsuleOpacityDuration: Math.max(90, Services.Motion.number.surfaceDuration)
         readonly property int _anchorDurationStep: 24
@@ -76,14 +80,41 @@ Variants {
             Motion.settleWorkspaceStageSlots(hintWindow, hint, Stage)
         }
 
+        function _stageRevealForSlot(slotPosition) {
+            if (slotPosition <= -0.5)
+                return _stageTopProgress
+            if (slotPosition < 0.5)
+                return _stageMiddleProgress
+            return _stageBottomProgress
+        }
+
+        function _setStageRevealProgress(top, middle, bottom) {
+            _stageTopProgress = top
+            _stageMiddleProgress = middle
+            _stageBottomProgress = bottom
+        }
+
         on_HintActiveChanged: {
             if (_hintActive) {
                 _hideTimer.stop()
                 _windowVisible = true
+                _exitTopTimer.stop()
+                _exitMiddleTimer.stop()
+                _exitBottomTimer.stop()
+                _setStageRevealProgress(0, 0, 0)
+                _enterTopTimer.restart()
+                _enterMiddleTimer.restart()
+                _enterBottomTimer.restart()
                 Motion.handleHintChange(hintWindow, _hintData, _workspaceAnchorSettleTimer, Stage)
                 return
             }
 
+            _enterTopTimer.stop()
+            _enterMiddleTimer.stop()
+            _enterBottomTimer.stop()
+            _exitBottomTimer.restart()
+            _exitMiddleTimer.restart()
+            _exitTopTimer.restart()
             _hideTimer.restart()
         }
 
@@ -102,6 +133,48 @@ Variants {
             id: _hideTimer
             interval: 380
             onTriggered: hintWindow._windowVisible = false
+        }
+
+        // Stagger the top capsule into view from y = 0.
+        Timer {
+            id: _enterTopTimer
+            interval: 20
+            onTriggered: hintWindow._stageTopProgress = 1
+        }
+
+        // Stagger the center capsule into view after the top slot.
+        Timer {
+            id: _enterMiddleTimer
+            interval: 70
+            onTriggered: hintWindow._stageMiddleProgress = 1
+        }
+
+        // Stagger the bottom capsule into view last.
+        Timer {
+            id: _enterBottomTimer
+            interval: 100
+            onTriggered: hintWindow._stageBottomProgress = 1
+        }
+
+        // Reverse the bottom capsule back toward y = 0 first.
+        Timer {
+            id: _exitBottomTimer
+            interval: 20
+            onTriggered: hintWindow._stageBottomProgress = 0
+        }
+
+        // Reverse the center capsule after the bottom slot.
+        Timer {
+            id: _exitMiddleTimer
+            interval: 50
+            onTriggered: hintWindow._stageMiddleProgress = 0
+        }
+
+        // Reverse the top capsule last to mirror the old staging.
+        Timer {
+            id: _exitTopTimer
+            interval: 80
+            onTriggered: hintWindow._stageTopProgress = 0
         }
 
         // Wait for the workspace anchor motion to settle before cleaning stage slots.
@@ -145,11 +218,35 @@ Variants {
             }
         }
 
+        // Animate the top staged reveal progress.
+        Behavior on _stageTopProgress {
+            NumberAnimation {
+                duration: Services.Motion.number.surfaceDuration
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        // Animate the center staged reveal progress.
+        Behavior on _stageMiddleProgress {
+            NumberAnimation {
+                duration: Services.Motion.number.surfaceDuration
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        // Animate the bottom staged reveal progress.
+        Behavior on _stageBottomProgress {
+            NumberAnimation {
+                duration: Services.Motion.number.surfaceDuration
+                easing.type: Easing.OutCubic
+            }
+        }
+
         // Own the centered stage and hit region inside the transparent overlay.
         Item {
             id: hintContainer
             anchors.fill: parent
-            readonly property real _wsTargetY: Services.BarLayoutService.barHeight + 16
+            readonly property real _wsTargetY: hintWindow._workspaceStageTargetY
 
             // Restrict input to the visible stage capsules.
             Item {
