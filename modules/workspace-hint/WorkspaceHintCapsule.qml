@@ -14,6 +14,7 @@ Item {
     readonly property var _metrics: host._workspaceMetricsForSlot(root.slotPosition, root.absoluteIndex)
     readonly property real _emphasis: root._metrics.emphasis
     readonly property real _revealProgress: host._stageRevealForSlot(root.slotPosition)
+    readonly property real _detailProgress: Math.max(0, Math.min(1, (root._emphasis - 0.28) / 0.72))
     readonly property bool _isPrimaryCapsule: root.capsule && (root.capsule.isCurrent || root.capsule.isTransitionCurrent)
     readonly property bool _isEmptyWorkspace: root.capsule && (root.capsule.icons || []).length === 0
     readonly property real _visualEmphasis: root._isEmptyWorkspace
@@ -99,9 +100,181 @@ Item {
             anchors.rightMargin: 12
             clip: true
 
+            // Restore the focused workspace title-card row inside the primary capsule.
             Row {
+                id: activeContent
+                anchors.centerIn: parent
+                spacing: 8
+                opacity: root._isPrimaryCapsule ? root._detailProgress : 0
+                visible: opacity > 0
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Services.Motion.number.shortDuration
+                        easing.type: Services.Motion.number.shortEasing
+                    }
+                }
+
+                // Keep the active workspace number pinned to the left.
+                Text {
+                    text: root.capsule ? String(root.capsule.workspaceIndex) : ""
+                    color: Services.Color.mOnSurface
+                    font.pixelSize: 12
+                    font.bold: true
+                    visible: text !== ""
+                }
+
+                // Show all window titles for the focused workspace.
+                Row {
+                    id: windowTitleRow
+                    spacing: 6
+
+                    Repeater {
+                        model: root._isPrimaryCapsule && root.capsule && root.capsule.icons ? root.capsule.icons : []
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+
+                            readonly property real _cardProgress: root._detailProgress
+                            readonly property real _collapsedCardWidth: modelData.icon ? 28 : 14
+                            readonly property real _expandedTitleWidth: Math.min(titleText.implicitWidth, 140)
+                            readonly property real _expandedCardWidth: Math.max(
+                                _expandedTitleWidth + (modelData.icon ? 19 : 0) + (modelData.isFocused ? 11 : 0) + 24,
+                                100
+                            )
+
+                            width: _collapsedCardWidth + ((_expandedCardWidth - _collapsedCardWidth) * _cardProgress)
+                            height: 28
+                            radius: 8
+                            color: modelData.isFocused
+                                ? Qt.rgba(
+                                    Services.Color.mPrimary.r,
+                                    Services.Color.mPrimary.g,
+                                    Services.Color.mPrimary.b,
+                                    0.18
+                                )
+                                : Qt.rgba(
+                                    Services.Color.mSurfaceVariant.r,
+                                    Services.Color.mSurfaceVariant.g,
+                                    Services.Color.mSurfaceVariant.b,
+                                    0.35
+                                )
+
+                            Behavior on width {
+                                NumberAnimation {
+                                    duration: Services.Motion.number.contentDuration
+                                    easing.type: Services.Motion.number.contentEasing
+                                }
+                            }
+                            Behavior on color {
+                                ColorAnimation {
+                                    duration: Services.Motion.number.shortDuration
+                                    easing.type: Services.Motion.number.shortEasing
+                                }
+                            }
+
+                            // Keep the focus dot and title aligned like the original hint.
+                            Row {
+                                id: winCardRow
+                                anchors.centerIn: parent
+                                spacing: 5
+
+                                // Show the window icon inside each title card.
+                                Item {
+                                    width: modelData.icon ? 14 : 0
+                                    height: 14
+
+                                    Behavior on width {
+                                        NumberAnimation {
+                                            duration: Services.Motion.number.contentDuration
+                                            easing.type: Services.Motion.number.contentEasing
+                                        }
+                                    }
+
+                                    IconImage {
+                                        anchors.fill: parent
+                                        source: modelData.icon || ""
+                                        implicitSize: 14
+                                        visible: parent.width > 0
+                                    }
+                                }
+
+                                // Mark the focused window card.
+                                Rectangle {
+                                    width: 5
+                                    height: 5
+                                    radius: 2.5
+                                    color: Services.Color.mPrimary
+                                    opacity: modelData.isFocused ? root._detailProgress : 0
+                                    visible: opacity > 0
+
+                                    Behavior on opacity {
+                                        NumberAnimation {
+                                            duration: Services.Motion.number.shortDuration
+                                            easing.type: Services.Motion.number.shortEasing
+                                        }
+                                    }
+                                }
+
+                                // Show one window title using the old elide rules.
+                                Text {
+                                    id: titleText
+
+                                    text: modelData.title || ""
+                                    font.pixelSize: 11
+                                    font.bold: modelData.isFocused
+                                    color: modelData.isFocused
+                                        ? Services.Color.mOnSurface
+                                        : Services.Color.mOnSurfaceVariant
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                    width: _expandedTitleWidth * root._detailProgress
+                                    opacity: root._detailProgress
+                                    visible: width > 0.5 || opacity > 0.01
+
+                                    Behavior on width {
+                                        NumberAnimation {
+                                            duration: Services.Motion.number.contentDuration
+                                            easing.type: Services.Motion.number.contentEasing
+                                        }
+                                    }
+                                    Behavior on opacity {
+                                        NumberAnimation {
+                                            duration: Services.Motion.number.shortDuration
+                                            easing.type: Services.Motion.number.shortEasing
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Preserve the empty focused-workspace fallback.
+                    Text {
+                        visible: root._isPrimaryCapsule && root._isEmptyWorkspace
+                        text: "空工作区"
+                        font.pixelSize: 12
+                        color: Services.Color.mOnSurfaceVariant
+                        opacity: 0.5
+                    }
+                }
+            }
+
+            // Keep neighbor workspaces compact with only number and icons.
+            Row {
+                id: neighborContent
                 anchors.centerIn: parent
                 spacing: 6
+                opacity: root._isPrimaryCapsule ? (1 - root._detailProgress) : 1
+                visible: opacity > 0
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Services.Motion.number.shortDuration
+                        easing.type: Services.Motion.number.shortEasing
+                    }
+                }
 
                 // Show the workspace number as the capsule label.
                 Text {

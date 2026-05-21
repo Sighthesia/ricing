@@ -56,7 +56,7 @@ Variants {
         readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         readonly property real _overflowSlotPosition: 1.18
         readonly property int _workspaceSideWidth: 90
-        readonly property int _workspacePrimaryWidth: 132
+        property int _workspacePrimaryWidth: _workspacePrimaryWidthForHint(_renderHint || _hintData)
         readonly property int _workspaceSideHeight: 28
         readonly property int _workspacePrimaryHeight: 40
         readonly property int _workspaceColumnGap: 8
@@ -70,6 +70,32 @@ Variants {
 
         function _workspaceMetricsForSlot(slotPosition, absoluteIndex) {
             return Motion.workspaceMetrics(hintWindow, slotPosition, absoluteIndex)
+        }
+
+        function _workspacePrimaryWidthForHint(hint) {
+            const safeHint = hint || {}
+            const windows = safeHint.windows || []
+            let width = 24
+
+            if (safeHint.workspaceIndex !== undefined && safeHint.workspaceIndex > 0)
+                width += 20
+
+            if (windows.length === 0)
+                return 132
+
+            for (let index = 0; index < windows.length; index++) {
+                const windowData = windows[index] || {}
+                const title = windowData.title || ""
+                const titleWidth = Math.min(140, Math.max(24, title.length * 7))
+                const iconWidth = windowData.icon ? 19 : 0
+                const focusWidth = windowData.isFocused ? 11 : 0
+                const cardWidth = Math.max(100, titleWidth + iconWidth + focusWidth + 24)
+                width += cardWidth
+                if (index < windows.length - 1)
+                    width += 6
+            }
+
+            return Math.max(132, Math.min(520, width))
         }
 
         function _refreshWorkspaceStage(hint, includeCurrentAnchor, preserveUnassigned) {
