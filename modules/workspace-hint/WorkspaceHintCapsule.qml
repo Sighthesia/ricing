@@ -108,13 +108,6 @@ Item {
                 opacity: root._isPrimaryCapsule ? root._detailProgress : 0
                 visible: opacity > 0
 
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: Services.Motion.number.shortDuration
-                        easing.type: Services.Motion.number.shortEasing
-                    }
-                }
-
                 // Keep the active workspace number pinned to the left.
                 Text {
                     text: root.capsule ? String(root.capsule.workspaceIndex) : ""
@@ -161,12 +154,6 @@ Item {
                                     0.35
                                 )
 
-                            Behavior on width {
-                                NumberAnimation {
-                                    duration: Services.Motion.number.contentDuration
-                                    easing.type: Services.Motion.number.contentEasing
-                                }
-                            }
                             Behavior on color {
                                 ColorAnimation {
                                     duration: Services.Motion.number.shortDuration
@@ -208,13 +195,6 @@ Item {
                                     color: Services.Color.mPrimary
                                     opacity: modelData.isFocused ? root._detailProgress : 0
                                     visible: opacity > 0
-
-                                    Behavior on opacity {
-                                        NumberAnimation {
-                                            duration: Services.Motion.number.shortDuration
-                                            easing.type: Services.Motion.number.shortEasing
-                                        }
-                                    }
                                 }
 
                                 // Show one window title using the old elide rules.
@@ -232,19 +212,6 @@ Item {
                                     width: _expandedTitleWidth * root._detailProgress
                                     opacity: root._detailProgress
                                     visible: width > 0.5 || opacity > 0.01
-
-                                    Behavior on width {
-                                        NumberAnimation {
-                                            duration: Services.Motion.number.contentDuration
-                                            easing.type: Services.Motion.number.contentEasing
-                                        }
-                                    }
-                                    Behavior on opacity {
-                                        NumberAnimation {
-                                            duration: Services.Motion.number.shortDuration
-                                            easing.type: Services.Motion.number.shortEasing
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -268,13 +235,6 @@ Item {
                 spacing: 6
                 opacity: root._isPrimaryCapsule ? (1 - root._detailProgress) : 1
                 visible: opacity > 0
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: Services.Motion.number.shortDuration
-                        easing.type: Services.Motion.number.shortEasing
-                    }
-                }
 
                 // Show the workspace number as the capsule label.
                 Text {
