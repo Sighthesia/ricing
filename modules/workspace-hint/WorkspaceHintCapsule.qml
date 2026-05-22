@@ -183,7 +183,8 @@ Item {
             // Restore the focused workspace title-card row inside the primary capsule.
             Row {
                 id: activeContent
-                anchors.centerIn: parent
+                x: Math.max(0, (parent.width - implicitWidth) / 2)
+                y: (parent.height - height) / 2
                 spacing: CapsuleMetrics.groupGap
                 opacity: root._isOutgoingPrimaryCapsule
                     ? (1 - root._outgoingHandoffProgress)
