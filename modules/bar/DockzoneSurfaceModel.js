@@ -1,6 +1,8 @@
 // Pure derivation helper for dockzone surface state.
 // No lifecycle, no mutable state — only normalization and geometry derivation.
 
+.import "../../services/CapsuleMetrics.js" as CapsuleMetrics
+
 // Motion baselines for the hidden state — owner animates between these and attached.
 var _hiddenScale = 0.95;
 var _hiddenOffsetY = -4;
@@ -57,8 +59,8 @@ function buildModel(inputs) {
     // Geometry baselines — match current BarDockZoneBackground defaults.
     var earRadius = 24;
     var bodyRadius = 14;
-    var horizontalPadding = 18;
-    var verticalPadding = 8;
+    var horizontalPadding = CapsuleMetrics.regularSidePadding;
+    var verticalPadding = CapsuleMetrics.regularVerticalPadding;
     var bottomEarEnvelope = isCenter ? 0 : earRadius;
 
     var hasContent = contentWidth > 0 && contentHeight > 0 && surfaceHeight > 0;

@@ -50,7 +50,9 @@ QtObject {
             id: adapter
 
             property JsonObject bar: JsonObject {
-                property int height: 42
+                // Size scale nudged toward the local quickshell bar reference while
+                // keeping afloat's roomier capsule geometry and padding language.
+                property int height: 48
                 property string position: "top"
                 property bool floating: false
                 property int floatingMargin: 4

@@ -12,8 +12,8 @@ Item {
     property string pendingAppId: currentAppId
     property bool transitioning: false
 
-    implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 16, 220)
-    implicitHeight: 26
+    implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 20, 240)
+    implicitHeight: 30
 
     Behavior on implicitWidth {
         NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
@@ -107,8 +107,8 @@ Item {
                 id: currentIconSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: root.currentAppId !== "" ? 16 : 0
-                height: 16
+                width: root.currentAppId !== "" ? 18 : 0
+                height: 18
                 opacity: root.currentAppId !== "" ? 1 : 0
 
                 Behavior on width {
@@ -122,7 +122,7 @@ Item {
                 IconImage {
                     anchors.fill: parent
                     source: "image://icon/" + (root.currentAppId || "application-x-executable")
-                    implicitSize: 16
+                    implicitSize: 18
                     visible: currentIconSlot.width > 0
                 }
             }
@@ -132,7 +132,7 @@ Item {
                 id: currentTitleSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(currentTitleText.implicitWidth, 184)
+                width: Math.min(currentTitleText.implicitWidth, 200)
                 height: currentTitleText.implicitHeight
 
                 Behavior on width {
@@ -145,7 +145,7 @@ Item {
                     width: parent.width
                     text: root.currentTitle
                     color: Services.Color.mOnSurface
-                    font.pixelSize: 12
+                    font.pixelSize: Services.TextSize.barContent
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -177,8 +177,8 @@ Item {
                 id: nextIconSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: root.pendingAppId !== "" ? 16 : 0
-                height: 16
+                width: root.pendingAppId !== "" ? 18 : 0
+                height: 18
                 opacity: root.pendingAppId !== "" ? 1 : 0
 
                 Behavior on width {
@@ -192,7 +192,7 @@ Item {
                 IconImage {
                     anchors.fill: parent
                     source: "image://icon/" + (root.pendingAppId || "application-x-executable")
-                    implicitSize: 16
+                    implicitSize: 18
                     visible: nextIconSlot.width > 0
                 }
             }
@@ -202,7 +202,7 @@ Item {
                 id: nextTitleSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(nextTitleText.implicitWidth, 184)
+                width: Math.min(nextTitleText.implicitWidth, 200)
                 height: nextTitleText.implicitHeight
 
                 Behavior on width {
@@ -215,7 +215,7 @@ Item {
                     width: parent.width
                     text: root.pendingTitle
                     color: Services.Color.mOnSurface
-                    font.pixelSize: 12
+                    font.pixelSize: Services.TextSize.barContent
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }

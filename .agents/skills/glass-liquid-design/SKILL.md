@@ -29,6 +29,43 @@ After motion continuity is satisfied, apply the project visual language.
 - Avoid generic Material Design visuals unless an existing component intentionally requires them.
 - Keep surfaces soft, layered, and fluid rather than rigid, rectangular, or heavily shadowed.
 
+## Capsule & Rounded-Rectangle Internal Spacing Language
+
+Use this spacing system for pill-shaped capsules, rounded-rectangle chips, and nested rounded containers across all surfaces (bar, widget, window hint capsule, etc.).
+
+### Two-Tier Capsule Insets
+
+| Tier | Use case | Vertical inset | Horizontal inset (per side) |
+|------|----------|---------------|---------------------------|
+| Compact | Narrow status pills, icon-only or icon+short-label capsules | 6px | 12px |
+| Regular | Wider content capsules, workspace hints, widget containers | 8px | 16px |
+
+- Maintain roughly a **1:2 vertical-to-horizontal inset ratio** so content clears corners without feeling loose.
+- Compact tier total horizontal inset: 24px. Regular tier total horizontal inset: 32px.
+- Choose the tier by capsule width and content density, not by arbitrary surface identity.
+
+### Gap Hierarchy
+
+| Context | Gap |
+|---------|-----|
+| Group-level spacing between adjacent capsules/widgets | 8px |
+| Tighter inline gaps inside a capsule (e.g., icon–text) | 6px |
+| Icon-to-icon or icon-to-edge gaps in dense layouts | 4–5px |
+
+### Corner Tension Rule
+
+- Content must stay clear of capsule corners. The inset ensures the content bounding box does not visually collide with the curved corner geometry.
+- For nested rounded surfaces (e.g., a capsule inside a dockzone background), keep them **concentric**: `innerRadius = outerRadius − inset`. This preserves visual alignment of concentric curves.
+
+### Icon–Text Balance
+
+- When icon and text are paired inside a capsule, text size may match or sit close to the icon size if that improves visual balance.
+- This is a balance heuristic, not a blanket rule: do not make dense labels comically large or cause truncation regressions.
+
+### Source Basis
+
+These rules are derived from Apple WWDC23 Dynamic Island fit guidance (concentric margins, avoid corner tension) and Material chip spacing norms (compact pill horizontal dominance, asymmetric vertical compression). Use them as a starting point; adjust only with visual evidence on the actual surface.
+
 ## Reusable Shape: Attached Island Surface
 
 Use this reusable shape for compact surfaces that must feel anchored to an edge.

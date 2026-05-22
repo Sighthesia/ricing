@@ -6,8 +6,8 @@ import "../../../services" as Services
 Item {
     id: root
 
-    implicitWidth: clockRow.implicitWidth + 16
-    implicitHeight: 26
+    implicitWidth: clockRow.implicitWidth + 20
+    implicitHeight: 30
 
     SystemClock {
         id: systemClock
@@ -25,13 +25,13 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(systemClock.date, "MMM d")
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: 11
+            font.pixelSize: Services.TextSize.barContent
         }
 
         // Separator
         Rectangle {
             width: 1
-            height: 12
+            height: 14
             anchors.verticalCenter: parent.verticalCenter
             color: Services.Color.mOutline
         }
@@ -41,7 +41,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(systemClock.date, "hh:mm")
             color: Services.Color.mOnSurface
-            font.pixelSize: 12
+            font.pixelSize: Services.TextSize.barContent
             font.bold: true
         }
     }

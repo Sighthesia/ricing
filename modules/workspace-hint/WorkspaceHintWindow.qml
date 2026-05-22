@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import "../../services" as Services
+import "../../services/CapsuleMetrics.js" as CapsuleMetrics
 import "." as WorkspaceHint
 import "WorkspaceHintStage.js" as Stage
 import "WorkspaceHintMotion.js" as Motion
@@ -63,7 +64,7 @@ Variants {
 
             return Math.max(1, screenWidth)
         }
-        readonly property int _workspaceSideWidth: 90
+        readonly property int _workspaceSideWidth: 96
         readonly property real _workspaceMeasuredPrimaryWidth: {
             let width = 0
             for (let index = 0; index < stageRepeater.count; index++) {
@@ -167,12 +168,17 @@ Variants {
 
         function _workspaceSideWidthForAbsoluteIndex(absoluteIndex) {
             const workspaceIndex = _workspaceIndexForAbsoluteIndex(absoluteIndex)
-            const labelWidth = workspaceIndex > 0 ? String(workspaceIndex).length * 7 : 0
+            const labelWidth = workspaceIndex > 0 ? String(workspaceIndex).length * 7.5 : 0
             const iconCount = _workspaceIconCountForAbsoluteIndex(absoluteIndex)
-            const iconWidth = iconCount > 0 ? (iconCount * 16) + Math.max(0, iconCount - 1) * 4 : 0
-            const gap = labelWidth > 0 && iconWidth > 0 ? 6 : 0
+            const iconWidth = iconCount > 0
+                ? (iconCount * 18) + Math.max(0, iconCount - 1) * CapsuleMetrics.iconGap
+                : 0
+            const gap = labelWidth > 0 && iconWidth > 0 ? CapsuleMetrics.inlineGap : 0
 
-            return Math.min(_workspaceCapsuleMaxWidth, Math.max(_workspaceSideWidth, labelWidth + iconWidth + gap + 24))
+            return Math.min(
+                _workspaceCapsuleMaxWidth,
+                Math.max(_workspaceSideWidth, labelWidth + iconWidth + gap + CapsuleMetrics.compactInnerHorizontal)
+            )
         }
 
         function _titleDisplayWidth(title) {
@@ -184,19 +190,19 @@ Variants {
                 const ch = text[index]
 
                 if (ch === " ") {
-                    width += 4
+                    width += 4.7
                 } else if (/[.,:;!'|`]/.test(ch)) {
-                    width += 3.5
+                    width += 4.1
                 } else if (/[ilI1\[\]()]/.test(ch)) {
-                    width += 4.5
+                    width += 5.3
                 } else if (/[mwMW@#%&]/.test(ch)) {
-                    width += 8.2
+                    width += 9.6
                 } else if (/[A-Z0-9]/.test(ch)) {
-                    width += 7.1
+                    width += 8.3
                 } else if (code <= 0x7f) {
-                    width += 6.1
+                    width += 7.1
                 } else {
-                    width += 11
+                    width += 12.8
                 }
             }
 
@@ -206,26 +212,26 @@ Variants {
         function _workspacePrimaryWidthForHint(hint) {
             const safeHint = hint || {}
             const windows = safeHint.windows || []
-            let width = 24
+            let width = CapsuleMetrics.compactInnerHorizontal
 
             if (safeHint.workspaceIndex !== undefined && safeHint.workspaceIndex > 0)
-                width += 20
+                width += 22
 
             if (windows.length === 0)
-                return 132
+                return 144
 
             for (let index = 0; index < windows.length; index++) {
                 const windowData = windows[index] || {}
                 const title = windowData.title || ""
                 const titleWidth = _titleDisplayWidth(title)
-                const iconWidth = windowData.icon ? 19 : 0
-                const cardWidth = Math.max(56, titleWidth + iconWidth + 24)
+                const iconWidth = windowData.icon ? 21 : 0
+                const cardWidth = Math.max(60, titleWidth + iconWidth + CapsuleMetrics.compactInnerHorizontal)
                 width += cardWidth
                 if (index < windows.length - 1)
-                    width += 6
+                    width += CapsuleMetrics.inlineGap
             }
 
-            return Math.min(_workspaceCapsuleMaxWidth, Math.max(132, width))
+            return Math.min(_workspaceCapsuleMaxWidth, Math.max(144, width))
         }
 
         function _refreshWorkspaceStage(hint, includeCurrentAnchor, preserveUnassigned) {

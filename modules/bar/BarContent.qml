@@ -36,6 +36,7 @@ Item {
 
     function _collectCenters(section, sectionName, centers) {
         var model = Services.BarLayoutService.sectionWidgets(sectionName)
+        var spacing = BarLayoutSections.widgetSpacing
         // Approximate centers from section x + cumulative widths
         var offset = section.x
         for (var i = 0; i < model.length; i++) {
@@ -45,6 +46,8 @@ Item {
                 centerX: offset + w / 2
             })
             offset += w
+            if (i < model.length - 1)
+                offset += spacing
         }
     }
 

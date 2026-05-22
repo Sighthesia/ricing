@@ -7,28 +7,28 @@ import "../../../services" as Services
 Item {
     id: root
 
-    implicitWidth: trayRow.implicitWidth + 12
-    implicitHeight: 26
+    implicitWidth: trayRow.implicitWidth + 16
+    implicitHeight: 30
 
     Row {
         id: trayRow
         anchors.centerIn: parent
-        spacing: 4
+        spacing: 6
 
         Repeater {
             model: SystemTray.items
 
             // Individual tray icon
             Item {
-                width: 20
-                height: 20
+                width: 22
+                height: 22
                 anchors.verticalCenter: parent.verticalCenter
 
                 Image {
                     anchors.fill: parent
                     anchors.margins: 1
                     source: modelData.icon
-                    sourceSize: Qt.size(18, 18)
+                    sourceSize: Qt.size(20, 20)
                     smooth: true
                 }
 

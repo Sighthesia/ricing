@@ -52,8 +52,8 @@ Item {
         0.95
     )
 
-    implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 12, 220)
-    implicitHeight: 26
+    implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 16, 240)
+    implicitHeight: 30
 
     Behavior on implicitWidth {
         NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
@@ -188,8 +188,8 @@ Item {
                 id: currentArtworkSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: 20
-                height: 20
+                width: 24
+                height: 24
 
                 // Paint the circular progress track and active progress arc.
                 Canvas {
@@ -242,8 +242,8 @@ Item {
                     id: currentArtworkMaskContainer
 
                     anchors.centerIn: parent
-                    width: 16
-                    height: 16
+                    width: 18
+                    height: 18
                     layer.enabled: true
                     visible: false
 
@@ -260,8 +260,8 @@ Item {
                     id: currentArtworkSource
 
                     anchors.centerIn: parent
-                    width: 16
-                    height: 16
+                    width: 18
+                    height: 18
                     visible: false
                     source: root._displayArtUrl
                     fillMode: Image.PreserveAspectCrop
@@ -273,8 +273,8 @@ Item {
                 // Frame the circular artwork badge.
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 16
-                    height: 16
+                    width: 18
+                    height: 18
                     radius: width / 2
                     color: root._artFallbackColor
                     border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.45)
@@ -303,7 +303,7 @@ Item {
                 id: currentTextSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(currentTextLabel.implicitWidth, 184)
+                width: Math.min(currentTextLabel.implicitWidth, 200)
                 height: currentTextLabel.implicitHeight
 
                 Behavior on width {
@@ -319,7 +319,7 @@ Item {
                     color: Services.MediaControlService.showCompactLyric
                         ? Services.Color.mPrimary
                         : Services.Color.mOnSurface
-                    font.pixelSize: 12
+                    font.pixelSize: Services.TextSize.barContent
                     font.bold: Services.MediaControlService.showCompactLyric
                     elide: Text.ElideRight
                     maximumLineCount: 1
@@ -351,8 +351,8 @@ Item {
                 id: nextArtworkSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: 20
-                height: 20
+                width: 24
+                height: 24
 
                 // Paint the same progress ring for the outgoing and incoming text layers.
                 Canvas {
@@ -405,8 +405,8 @@ Item {
                     id: nextArtworkMaskContainer
 
                     anchors.centerIn: parent
-                    width: 16
-                    height: 16
+                    width: 18
+                    height: 18
                     layer.enabled: true
                     visible: false
 
@@ -423,8 +423,8 @@ Item {
                     id: nextArtworkSource
 
                     anchors.centerIn: parent
-                    width: 16
-                    height: 16
+                    width: 18
+                    height: 18
                     visible: false
                     source: root._displayArtUrl
                     fillMode: Image.PreserveAspectCrop
@@ -436,8 +436,8 @@ Item {
                 // Reuse the same circular badge inside the progress ring.
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 16
-                    height: 16
+                    width: 18
+                    height: 18
                     radius: width / 2
                     color: root._artFallbackColor
                     border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.45)
@@ -466,7 +466,7 @@ Item {
                 id: nextTextSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(nextTextLabel.implicitWidth, 184)
+                width: Math.min(nextTextLabel.implicitWidth, 200)
                 height: nextTextLabel.implicitHeight
 
                 Behavior on width {
@@ -482,7 +482,7 @@ Item {
                     color: Services.MediaControlService.showCompactLyric
                         ? Services.Color.mPrimary
                         : Services.Color.mOnSurface
-                    font.pixelSize: 12
+                    font.pixelSize: Services.TextSize.barContent
                     font.bold: Services.MediaControlService.showCompactLyric
                     elide: Text.ElideRight
                     maximumLineCount: 1

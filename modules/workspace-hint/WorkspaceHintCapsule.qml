@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Widgets
 import "../../services" as Services
+import "../../services/CapsuleMetrics.js" as CapsuleMetrics
 import "WorkspaceHintCapsule.js" as Capsule
 
 // Render one workspace capsule using the shared slot-stage metrics.
@@ -71,16 +72,16 @@ Item {
         root._metrics.height,
         host && host._workspaceCapsuleMaxWidth !== undefined ? host._workspaceCapsuleMaxWidth : 1
     )
-    readonly property real _primaryHorizontalPadding: 24
-    readonly property real _primaryOuterSpacing: 8
-    readonly property real _primaryCardSpacing: 6
+    readonly property real _primaryHorizontalPadding: CapsuleMetrics.compactInnerHorizontal
+    readonly property real _primaryOuterSpacing: CapsuleMetrics.groupGap
+    readonly property real _primaryCardSpacing: CapsuleMetrics.inlineGap
     readonly property real _activeWorkspaceLabelWidth: primaryMeasureWorkspaceLabel.visible
         ? primaryMeasureWorkspaceLabel.implicitWidth
         : 0
     readonly property real preferredPrimaryWidth: Math.min(root._maxCapsuleWidth, root._naturalPrimaryWidth)
     readonly property int _cardCount: root._isPrimaryCapsule ? root._activeWindows.length : 0
-    readonly property real _iconSize: 14 + (2 * root._emphasis)
-    readonly property real _iconSpacing: 4
+    readonly property real _iconSize: 16 + (2 * root._emphasis)
+    readonly property real _iconSpacing: 5
     readonly property int _visibleIconCount: root.capsule && root.capsule.icons ? root.capsule.icons.length : 0
     readonly property int _focusedIconIndex: {
         const items = root._isPrimaryCapsule ? root._activeWindows : ((root.capsule && root.capsule.icons) || [])
@@ -107,7 +108,7 @@ Item {
                 width += root._primaryCardSpacing
         }
 
-        return Math.max(132, width)
+        return Math.max(144, width)
     }
 
     // Shared title-width cap derived from the actual capsule width after clamping.
@@ -126,7 +127,7 @@ Item {
         for (let index = 0; index < root._cardCount; index++) {
             const item = primaryMeasureRepeater.itemAt(index)
             titleWidths.push(item ? item.naturalTitleWidth : 24)
-            baseWidths.push(item ? item.baseCardWidth : 24)
+            baseWidths.push(item ? item.baseCardWidth : CapsuleMetrics.compactInnerHorizontal)
         }
 
         return Capsule.computeCardTitleWidthCap(
@@ -175,15 +176,15 @@ Item {
         // Center the workspace label and icon strip inside the capsule.
         Item {
             anchors.fill: parent
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
+            anchors.leftMargin: CapsuleMetrics.compactSidePadding
+            anchors.rightMargin: CapsuleMetrics.compactSidePadding
             clip: true
 
             // Restore the focused workspace title-card row inside the primary capsule.
             Row {
                 id: activeContent
                 anchors.centerIn: parent
-                spacing: 8
+                spacing: CapsuleMetrics.groupGap
                 opacity: root._isOutgoingPrimaryCapsule
                     ? (1 - root._outgoingHandoffProgress)
                     : (root._isPrimaryCapsule ? root._detailProgress : 0)
@@ -195,7 +196,7 @@ Item {
 
                     text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
                     color: Services.Color.mOnSurface
-                    font.pixelSize: 12
+                    font.pixelSize: Services.TextSize.barContent
                     font.bold: true
                     visible: text !== ""
                 }
@@ -203,7 +204,7 @@ Item {
                 // Show all window titles for the focused workspace.
                 Row {
                     id: windowTitleRow
-                    spacing: 6
+                    spacing: CapsuleMetrics.inlineGap
 
                     Repeater {
                         model: root._isPrimaryCapsule ? root._activeWindows : []
@@ -213,9 +214,9 @@ Item {
                             required property int index
 
                             readonly property real _cardProgress: root._detailProgress
-                            readonly property real _collapsedCardWidth: modelData.icon ? 28 : 14
+                            readonly property real _collapsedCardWidth: modelData.icon ? 30 : 16
                             readonly property real _naturalTitleWidth: Math.max(24, Math.ceil(titleText.implicitWidth))
-                            readonly property real _cardBaseWidth: (modelData.icon ? 19 : 0) + 24
+                            readonly property real _cardBaseWidth: (modelData.icon ? 21 : 0) + CapsuleMetrics.compactInnerHorizontal
                             readonly property real _expandedTitleWidth: Math.min(
                                 root._cardTitleWidthCap,
                                 _naturalTitleWidth
@@ -223,7 +224,7 @@ Item {
                             readonly property real _expandedCardWidth: _cardBaseWidth + _expandedTitleWidth
 
                             width: _collapsedCardWidth + ((_expandedCardWidth - _collapsedCardWidth) * _cardProgress)
-                            height: 28
+                            height: 32
                             radius: 8
                             color: modelData.isFocused
                                 ? Qt.rgba(
@@ -250,12 +251,12 @@ Item {
                             Row {
                                 id: winCardRow
                                 anchors.centerIn: parent
-                                spacing: 5
+                                spacing: 6
 
                                 // Show the window icon inside each title card.
                                 Item {
-                                    width: modelData.icon ? 14 : 0
-                                    height: 14
+                                    width: modelData.icon ? 16 : 0
+                                    height: 16
 
                                     Behavior on width {
                                         NumberAnimation {
@@ -267,7 +268,7 @@ Item {
                                     IconImage {
                                         anchors.fill: parent
                                         source: modelData.icon || ""
-                                        implicitSize: 14
+                                        implicitSize: 16
                                         visible: parent.width > 0
                                     }
                                 }
@@ -277,7 +278,7 @@ Item {
                                     id: titleText
 
                                     text: modelData.title || ""
-                                    font.pixelSize: 11
+                                    font.pixelSize: Services.TextSize.barContent
                                     font.bold: modelData.isFocused
                                     color: modelData.isFocused
                                         ? Services.Color.mOnSurface
@@ -296,105 +297,105 @@ Item {
                     Text {
                         visible: root._isPrimaryCapsule && root._isEmptyWorkspace
                         text: "空工作区"
-                        font.pixelSize: 12
+                        font.pixelSize: Services.TextSize.barContent
                         color: Services.Color.mOnSurfaceVariant
                         opacity: 0.5
                     }
                 }
             }
 
-            // Measure the focused workspace content with real implicit widths.
-            Row {
-                id: primaryMeasureRow
-                visible: false
-                spacing: 8
-
-                Text {
-                    id: primaryMeasureWorkspaceLabel
-
-                    text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
-                    font.pixelSize: 12
-                    font.bold: true
-                    visible: text !== ""
-                }
-
+                // Measure the focused workspace content with real implicit widths.
                 Row {
-                    spacing: 6
+                    id: primaryMeasureRow
+                    visible: false
+                    spacing: CapsuleMetrics.groupGap
 
-                    Repeater {
-                        id: primaryMeasureRepeater
+                    Text {
+                        id: primaryMeasureWorkspaceLabel
 
-                        model: root._activeWindows
+                        text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
+                        font.pixelSize: Services.TextSize.barContent
+                        font.bold: true
+                        visible: text !== ""
+                    }
 
-                        delegate: Item {
-                            required property var modelData
+                    Row {
+                        spacing: CapsuleMetrics.inlineGap
 
-                            readonly property real naturalTitleWidth: Math.max(24, Math.ceil(measureTitleText.implicitWidth))
-                            readonly property real baseCardWidth: (modelData.icon ? 19 : 0) + 24
-                            readonly property real naturalCardWidth: baseCardWidth + naturalTitleWidth
+                        Repeater {
+                            id: primaryMeasureRepeater
 
-                            implicitWidth: naturalCardWidth
-                            implicitHeight: 28
+                            model: root._activeWindows
 
-                            Row {
-                                id: measureCardRow
-                                spacing: 5
+                            delegate: Item {
+                                required property var modelData
 
-                                Item {
-                                    width: modelData.icon ? 14 : 0
-                                    height: 14
-                                }
+                                readonly property real naturalTitleWidth: Math.max(24, Math.ceil(measureTitleText.implicitWidth))
+                                readonly property real baseCardWidth: (modelData.icon ? 21 : 0) + CapsuleMetrics.compactInnerHorizontal
+                                readonly property real naturalCardWidth: baseCardWidth + naturalTitleWidth
 
-                                Text {
-                                    id: measureTitleText
+                                implicitWidth: naturalCardWidth
+                                implicitHeight: 32
 
-                                    text: modelData.title || ""
-                                    font.pixelSize: 11
-                                    font.bold: modelData.isFocused
+                                Row {
+                                    id: measureCardRow
+                                    spacing: 6
+
+                                    Item {
+                                        width: modelData.icon ? 16 : 0
+                                        height: 16
+                                    }
+
+                                    Text {
+                                        id: measureTitleText
+
+                                        text: modelData.title || ""
+                                        font.pixelSize: Services.TextSize.barContent
+                                        font.bold: modelData.isFocused
+                                    }
                                 }
                             }
                         }
-                    }
 
+                        Text {
+                            visible: root._isEmptyWorkspace
+                            text: "空工作区"
+                            font.pixelSize: Services.TextSize.barContent
+                        }
+                    }
+                }
+
+                // Keep neighbor workspaces compact with only number and icons.
+                Row {
+                    id: neighborContent
+                    anchors.centerIn: parent
+                    spacing: CapsuleMetrics.inlineGap
+                    opacity: root._isOutgoingPrimaryCapsule
+                        ? root._outgoingHandoffProgress
+                        : (root._isPrimaryCapsule ? (1 - root._detailProgress) : 1)
+                    visible: opacity > 0
+
+                    // Show the workspace number as the capsule label.
                     Text {
-                        visible: root._isEmptyWorkspace
-                        text: "空工作区"
-                        font.pixelSize: 12
+                        text: root.capsule ? String(root.capsule.workspaceIndex) : ""
+                        color: root._textColor
+                        font.pixelSize: Services.TextSize.barContent
+                        font.bold: root._emphasis >= 0.5
+                        visible: text !== ""
                     }
-                }
-            }
-
-            // Keep neighbor workspaces compact with only number and icons.
-            Row {
-                id: neighborContent
-                anchors.centerIn: parent
-                spacing: 6
-                opacity: root._isOutgoingPrimaryCapsule
-                    ? root._outgoingHandoffProgress
-                    : (root._isPrimaryCapsule ? (1 - root._detailProgress) : 1)
-                visible: opacity > 0
-
-                // Show the workspace number as the capsule label.
-                Text {
-                    text: root.capsule ? String(root.capsule.workspaceIndex) : ""
-                    color: root._textColor
-                    font.pixelSize: 12
-                    font.bold: root._emphasis >= 0.5
-                    visible: text !== ""
-                }
 
                 // Keep the workspace icon strip aligned like DymicShell's stage capsules.
                 Item {
                     implicitWidth: root._visibleIconCount > 0
                         ? root._visibleIconCount * root._iconSize + Math.max(0, root._visibleIconCount - 1) * root._iconSpacing
                         : 0
-                    implicitHeight: root._iconSize + 8
+                    implicitHeight: root._iconSize + 10
                     width: implicitWidth
                     height: implicitHeight
                     visible: width > 0
 
                     Rectangle {
-                        width: root._iconSize + 8
+                        width: root._iconSize + 10
                         height: width
                         radius: height / 2
                         color: Qt.rgba(
@@ -406,7 +407,7 @@ Item {
                         opacity: root._focusedIconIndex >= 0 ? 1 : 0
                         visible: opacity > 0
                         x: root._focusedIconIndex >= 0
-                            ? root._focusedIconIndex * (root._iconSize + root._iconSpacing) - 4
+                            ? root._focusedIconIndex * (root._iconSize + root._iconSpacing) - 5
                             : 0
                         y: (parent.height - height) / 2
 
@@ -452,7 +453,7 @@ Item {
                 Text {
                     text: root._isEmptyWorkspace ? "空工作区" : ""
                     color: Services.Color.mOnSurfaceVariant
-                    font.pixelSize: 11
+                    font.pixelSize: Services.TextSize.barContent
                     opacity: 0.75
                     visible: text !== "" && root._emphasis >= 0.35
                 }

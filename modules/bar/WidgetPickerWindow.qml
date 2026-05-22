@@ -1,5 +1,6 @@
 import "."
 import "../../services" as Services
+import "../../services/CapsuleMetrics.js" as CapsuleMetrics
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
@@ -37,7 +38,7 @@ Variants {
             id: pickerFrame
 
             width: 320
-            height: contentColumn.implicitHeight + 24
+            height: contentColumn.implicitHeight + CapsuleMetrics.compactInnerVertical
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             radius: 12
@@ -55,7 +56,7 @@ Variants {
                 id: contentColumn
 
                 anchors.fill: parent
-                anchors.margins: 12
+                anchors.margins: CapsuleMetrics.compactSidePadding
                 spacing: 10
 
                 // Show which dockzone section will receive the new widget.
@@ -78,7 +79,7 @@ Variants {
                         id: searchInput
 
                         anchors.fill: parent
-                        anchors.margins: 6
+                        anchors.margins: CapsuleMetrics.compactVerticalPadding
                         color: "white"
                         font.pixelSize: 12
                         clip: true
@@ -118,9 +119,9 @@ Variants {
                             Column {
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.left: parent.left
-                                anchors.leftMargin: 10
+                                anchors.leftMargin: CapsuleMetrics.compactSidePadding
                                 anchors.right: parent.right
-                                anchors.rightMargin: 10
+                                anchors.rightMargin: CapsuleMetrics.compactSidePadding
                                 spacing: 2
 
                                 // Show the widget label prominently.

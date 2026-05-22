@@ -5,8 +5,8 @@ import "../../../services" as Services
 Item {
     id: root
 
-    implicitWidth: volumeRow.implicitWidth + 16
-    implicitHeight: 26
+    implicitWidth: volumeRow.implicitWidth + 20
+    implicitHeight: 30
 
     WheelHandler {
         onWheel: event => {
@@ -29,7 +29,7 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: Services.VolumeService.sinkMuted ? "🔇" : "🔊"
-            font.pixelSize: 14
+            font.pixelSize: 16
             color: Services.Color.mOnSurface
         }
 
@@ -40,7 +40,7 @@ Item {
             color: Services.VolumeService.sinkMuted
                 ? Services.Color.mOutline
                 : Services.Color.mOnSurfaceVariant
-            font.pixelSize: 11
+            font.pixelSize: Services.TextSize.barContent
         }
     }
 }

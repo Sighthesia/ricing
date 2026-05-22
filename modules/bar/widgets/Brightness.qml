@@ -5,8 +5,8 @@ import "../../../services" as Services
 Item {
     id: root
 
-    implicitWidth: brightnessRow.implicitWidth + 16
-    implicitHeight: 26
+    implicitWidth: brightnessRow.implicitWidth + 20
+    implicitHeight: 30
 
     WheelHandler {
         onWheel: event => {
@@ -24,7 +24,7 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "☀"
-            font.pixelSize: 14
+            font.pixelSize: 16
             color: Services.Color.mOnSurface
         }
 
@@ -33,7 +33,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: Math.round(Services.BrightnessService.brightness * 100) + "%"
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: 11
+            font.pixelSize: Services.TextSize.barContent
         }
     }
 }
