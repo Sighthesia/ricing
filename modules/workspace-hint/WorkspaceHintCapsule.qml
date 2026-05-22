@@ -192,13 +192,20 @@ Item {
                 visible: opacity > 0
 
                 // Keep the active workspace number pinned to the left.
-                Item {
-                    width: activeWorkspaceLabel.visible ? activeWorkspaceLabel.implicitWidth : 0
+                Rectangle {
+                    width: activeWorkspaceLabel.visible ? activeWorkspaceLabel.implicitWidth + CapsuleMetrics.compactInnerHorizontal : 0
                     height: 32
+                    radius: height / 2
+                    color: Qt.rgba(
+                        Services.Color.mSurfaceVariant.r,
+                        Services.Color.mSurfaceVariant.g,
+                        Services.Color.mSurfaceVariant.b,
+                        0.35
+                    )
 
                     Text {
                         id: activeWorkspaceLabel
-                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.centerIn: parent
 
                         text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
                         color: Services.Color.mOnSurface
