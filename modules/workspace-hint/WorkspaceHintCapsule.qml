@@ -191,14 +191,20 @@ Item {
                 visible: opacity > 0
 
                 // Keep the active workspace number pinned to the left.
-                Text {
-                    id: activeWorkspaceLabel
+                Item {
+                    width: activeWorkspaceLabel.visible ? activeWorkspaceLabel.implicitWidth : 0
+                    height: 32
 
-                    text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
-                    color: Services.Color.mOnSurface
-                    font.pixelSize: Services.TextSize.barContent
-                    font.bold: true
-                    visible: text !== ""
+                    Text {
+                        id: activeWorkspaceLabel
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
+                        color: Services.Color.mOnSurface
+                        font.pixelSize: Services.TextSize.barContent
+                        font.bold: true
+                        visible: text !== ""
+                    }
                 }
 
                 // Show all window titles for the focused workspace.
@@ -228,7 +234,7 @@ Item {
 
                             width: _collapsedCardWidth + ((_expandedCardWidth - _collapsedCardWidth) * _cardProgress)
                             height: 32
-                            radius: 8
+                            radius: height / 2
                             color: modelData.isFocused
                                 ? Qt.rgba(
                                     Services.Color.mPrimary.r,
@@ -378,12 +384,20 @@ Item {
                     visible: opacity > 0
 
                     // Show the workspace number as the capsule label.
-                    Text {
-                        text: root.capsule ? String(root.capsule.workspaceIndex) : ""
-                        color: root._textColor
-                        font.pixelSize: Services.TextSize.barContent
-                        font.bold: root._emphasis >= 0.5
-                        visible: text !== ""
+                    Item {
+                        width: neighborWorkspaceLabel.visible ? neighborWorkspaceLabel.implicitWidth : 0
+                        height: root._iconSize + 10
+
+                        Text {
+                            id: neighborWorkspaceLabel
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            text: root.capsule ? String(root.capsule.workspaceIndex) : ""
+                            color: root._textColor
+                            font.pixelSize: Services.TextSize.barContent
+                            font.bold: root._emphasis >= 0.5
+                            visible: text !== ""
+                        }
                     }
 
                 // Keep the workspace icon strip aligned like DymicShell's stage capsules.
