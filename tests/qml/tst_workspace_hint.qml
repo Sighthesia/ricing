@@ -118,12 +118,12 @@ Item {
                 _workspaceSideWidth: 90,
                 _workspacePrimaryWidth: 132,
                 _workspaceSideHeight: 28,
-                _workspacePrimaryHeight: 40,
+                _workspacePrimaryHeight: 44,
                 _workspaceColumnGap: 8
             }, 0)
 
             compare(metrics.width, 132)
-            compare(metrics.height, 40)
+            compare(metrics.height, 44)
             compare(metrics.opacity, 1)
         }
 

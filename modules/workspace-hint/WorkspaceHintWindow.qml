@@ -79,7 +79,7 @@ Variants {
             return measured > 0 ? measured : _workspacePrimaryWidthForHint(_renderHint || _hintData)
         }
         readonly property int _workspaceSideHeight: 28
-        readonly property int _workspacePrimaryHeight: 40
+        readonly property int _workspacePrimaryHeight: 44
         readonly property int _workspaceColumnGap: 8
         readonly property int _workspaceStageWidth: Math.max(_workspacePrimaryWidth, _workspaceMaxSideWidth)
         readonly property int _workspaceStageHeight: _workspaceSideHeight * 2 + _workspacePrimaryHeight + _workspaceColumnGap * 2
@@ -215,7 +215,9 @@ Variants {
             let width = CapsuleMetrics.compactInnerHorizontal
 
             if (safeHint.workspaceIndex !== undefined && safeHint.workspaceIndex > 0)
-                width += 22
+                width += _titleDisplayWidth(String(safeHint.workspaceIndex))
+                    + CapsuleMetrics.compactInnerHorizontal
+                    + CapsuleMetrics.groupGap
 
             if (windows.length === 0)
                 return 144
@@ -230,6 +232,8 @@ Variants {
                 if (index < windows.length - 1)
                     width += CapsuleMetrics.inlineGap
             }
+
+            width += CapsuleMetrics.compactSidePadding
 
             return Math.min(_workspaceCapsuleMaxWidth, Math.max(144, width))
         }

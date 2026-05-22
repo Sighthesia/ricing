@@ -75,8 +75,9 @@ Item {
     readonly property real _primaryHorizontalPadding: CapsuleMetrics.compactInnerHorizontal
     readonly property real _primaryOuterSpacing: CapsuleMetrics.groupGap
     readonly property real _primaryCardSpacing: CapsuleMetrics.inlineGap
-    readonly property real _activeWorkspaceLabelWidth: primaryMeasureWorkspaceLabel.visible
-        ? primaryMeasureWorkspaceLabel.implicitWidth
+    readonly property real _primaryTrailingPadding: CapsuleMetrics.compactSidePadding
+    readonly property real _activeWorkspaceLabelWidth: activeWorkspaceLabel.text !== ""
+        ? Math.ceil(activeWorkspaceLabel.implicitWidth) + CapsuleMetrics.compactInnerHorizontal
         : 0
     readonly property real preferredPrimaryWidth: Math.min(root._maxCapsuleWidth, root._naturalPrimaryWidth)
     readonly property int _cardCount: root._isPrimaryCapsule ? root._activeWindows.length : 0
@@ -108,6 +109,8 @@ Item {
                 width += root._primaryCardSpacing
         }
 
+        width += root._primaryTrailingPadding
+
         return Math.max(144, width)
     }
 
@@ -119,6 +122,7 @@ Item {
         const availableForRow = Math.max(
             0,
             root.width - root._primaryHorizontalPadding
+                - root._primaryTrailingPadding
                 - (root._activeWorkspaceLabelWidth > 0 ? root._activeWorkspaceLabelWidth + root._primaryOuterSpacing : 0)
         )
         const titleWidths = []
@@ -193,7 +197,7 @@ Item {
 
                 // Keep the active workspace number pinned to the left.
                 Rectangle {
-                    width: activeWorkspaceLabel.visible ? activeWorkspaceLabel.implicitWidth + CapsuleMetrics.compactInnerHorizontal : 0
+                    width: activeWorkspaceLabel.visible ? root._activeWorkspaceLabelWidth : 0
                     height: 32
                     radius: height / 2
                     color: Qt.rgba(
@@ -208,7 +212,7 @@ Item {
                         anchors.centerIn: parent
 
                         text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
-                        color: Services.Color.mOnSurface
+                        color: Services.Color.mPrimary
                         font.pixelSize: Services.TextSize.barContent
                         font.bold: true
                         visible: text !== ""
@@ -308,6 +312,12 @@ Item {
                                 }
                             }
                         }
+                    }
+
+                    Item {
+                        width: root._primaryTrailingPadding
+                        height: 1
+                        visible: width > 0
                     }
 
                     // Preserve the empty focused-workspace fallback.
