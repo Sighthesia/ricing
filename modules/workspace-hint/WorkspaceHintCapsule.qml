@@ -215,7 +215,10 @@ Item {
 
                             readonly property real _cardProgress: root._detailProgress
                             readonly property real _collapsedCardWidth: modelData.icon ? 30 : 16
-                            readonly property real _naturalTitleWidth: Math.max(24, Math.ceil(titleText.implicitWidth))
+                            readonly property real _naturalTitleWidth: {
+                                const measureItem = primaryMeasureRepeater.itemAt(index)
+                                return measureItem ? measureItem.naturalTitleWidth : Math.max(24, Math.ceil(titleText.implicitWidth))
+                            }
                             readonly property real _cardBaseWidth: (modelData.icon ? 21 : 0) + CapsuleMetrics.compactInnerHorizontal
                             readonly property real _expandedTitleWidth: Math.min(
                                 root._cardTitleWidthCap,
@@ -351,7 +354,6 @@ Item {
 
                                         text: modelData.title || ""
                                         font.pixelSize: Services.TextSize.barContent
-                                        font.bold: modelData.isFocused
                                     }
                                 }
                             }
