@@ -11,6 +11,7 @@ This repo is an OpenCode-first local agent workflow runtime: Python scripts own 
 - Inject rich context only for the subagent actively executing a formal task.
 - Long-context-consumption work must be delegated to subagents. If a task needs broad code reading, multi-file implementation, extended verification, or any context that would bloat the main session, the main agent should shape and dispatch it instead of doing it inline.
 - Before modifying code, or before dispatching any subagent that may modify or verify code, there must be a current formal task and its required task context files must already exist.
+- Invisible closure: completed verified tasks should be archived, not left active. Positive user acceptance after a change authorizes a safe local commit (status/diff/log check, scoped staging, no auto-push). Non-trivial debugging triggers automatic lesson capture into skills. The user judges product-level quality; the agent handles engineering closure.
 
 ## Ideal Workflow
 
@@ -32,6 +33,8 @@ This repo is an OpenCode-first local agent workflow runtime: Python scripts own 
 - Create intake manually: `python3 .agent-workflow/scripts/task.py --root . create-intake "<title>" "<raw request>" --session <session-id>`
 - Promote intake manually: `python3 .agent-workflow/scripts/task.py --root . promote <intake-id> "<title>" "<goal>" --type design --acceptance "<criterion>"`
 - List unfinished tasks: `python3 .agent-workflow/scripts/task.py --root . list-active`
+- Mark task status/progress/impact: `python3 .agent-workflow/scripts/task.py --root . mark <task-id> <status> [--progress N] [--impact PATH] [--note TEXT]`
+- Archive completed task: `python3 .agent-workflow/scripts/task.py --root . archive-task <task-id>`
 - Clean up completed task: `python3 .agent-workflow/scripts/task.py --root . cleanup-task <task-id>`
 
 Run Python and Node tests after changing `.agent-workflow/scripts/`, `.opencode/plugins/`, `.opencode/agent/`, or `.opencode/skills/`.
@@ -51,7 +54,7 @@ Run Python and Node tests after changing `.agent-workflow/scripts/`, `.opencode/
 
 - Do not hand-edit `.agent-workflow/workspace/state.json`, `locks.json`, or event logs except through `.agent-workflow/scripts/` code.
 - Main-session plugins should not inject anything when there is no active unfinished formal task.
-- `agent-workflow-state.js` injects only a short `<workflow-state>` for active tasks whose status is not `done`.
+- `agent-workflow-state.js` does not inject any `<workflow-state>` into main-session messages. Tasks should be inspected explicitly via list-active scripts.
 - `agent-workflow-subagent-context.js` injects task context only when dispatching supported `workflow-*` subagents.
 - `workflow-implement` requires `context.md` and `implement.md`; `workflow-check` requires `context.md` and `verify.md`; `workflow-docs` requires `context.md` and `decisions.md`; `workflow-research` requires `context.md`.
 - If required task context files are missing, implementation or verification must not proceed. The plugin intentionally injects a blocking notice instead of silent fallback.
