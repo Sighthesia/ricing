@@ -12,7 +12,7 @@ Item {
         const q = root.query;
         const all = DesktopEntries.applications.values;
         if (!all || all.length === 0) return [];
-        return all.filter(a => {
+        const filtered = all.filter(a => {
             if (!q) return true;
             const name = (a.name || "").toLowerCase();
             const comment = (a.comment || "").toLowerCase();
@@ -23,9 +23,15 @@ Item {
                 || genericName.includes(q) || id.includes(q)
                 || keywords.includes(q);
         });
+        return filtered.sort((a, b) => {
+            const ca = Services.LaunchCountService.getLaunchCount(a.id || "");
+            const cb = Services.LaunchCountService.getLaunchCount(b.id || "");
+            return cb - ca;
+        });
     }
 
     function launchApp(app) {
+        Services.LaunchCountService.recordLaunch(app.id || "");
         app.execute();
         Services.LauncherService.close();
     }

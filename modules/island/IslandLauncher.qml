@@ -52,6 +52,7 @@ Item {
                         if (Services.IslandService.mode === "clipboard") {
                             Services.ClipboardService.copyItem(loader.item.currentItem.modelData.id)
                         } else {
+                            Services.LaunchCountService.recordLaunch(loader.item.currentItem.modelData.id || "")
                             loader.item.currentItem.modelData.execute()
                         }
                         Services.IslandService.close()
@@ -143,11 +144,21 @@ Item {
                 const q = query
                 const all = DesktopEntries.applications.values
                 if (!all || all.length === 0) return []
-                return all.filter(a => {
+                const filtered = all.filter(a => {
                     if (!q) return true
                     const name = (a.name || "").toLowerCase()
                     const comment = (a.comment || "").toLowerCase()
+                    const genericName = (a.genericName || "").toLowerCase()
+                    const id = (a.id || "").toLowerCase()
+                    const keywords = (a.keywords || []).join(" ").toLowerCase()
                     return name.includes(q) || comment.includes(q)
+                        || genericName.includes(q) || id.includes(q)
+                        || keywords.includes(q)
+                })
+                return filtered.sort((a, b) => {
+                    const ca = Services.LaunchCountService.getLaunchCount(a.id || "")
+                    const cb = Services.LaunchCountService.getLaunchCount(b.id || "")
+                    return cb - ca
                 })
             }
 
@@ -175,13 +186,28 @@ Item {
                         implicitSize: 32
                     }
 
-                    Text {
+                    Column {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: modelData.name || ""
-                        color: Services.Color.mOnSurface
-                        font.pixelSize: 13
-                        elide: Text.ElideRight
                         width: parent.width - 32
+                        spacing: 2
+
+                        Text {
+                            text: modelData.name || ""
+                            color: Services.Color.mOnSurface
+                            font.pixelSize: 13
+                            elide: Text.ElideRight
+                            width: parent.width
+                        }
+
+                        Text {
+                            text: modelData.comment || modelData.genericName || ""
+                            color: Services.Color.mOnSurfaceVariant
+                            font.pixelSize: 11
+                            opacity: 0.7
+                            elide: Text.ElideRight
+                            width: parent.width
+                            visible: text.length > 0
+                        }
                     }
                 }
 
@@ -192,6 +218,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         ListView.view.currentIndex = index
+                        Services.LaunchCountService.recordLaunch(modelData.id || "")
                         modelData.execute()
                         Services.IslandService.close()
                     }
