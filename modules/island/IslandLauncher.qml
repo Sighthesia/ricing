@@ -210,7 +210,25 @@ Item {
             anchors.margins: 4
             clip: true
             spacing: 4
-            model: Services.ClipboardService.items
+
+            property string query: {
+                var q = Services.IslandService.query.toLowerCase()
+                if (q.startsWith(">clip")) return q.slice(5).trim()
+                return q.startsWith(">") ? "" : q
+            }
+
+            property var filteredItems: {
+                const q = query
+                const all = Services.ClipboardService.items
+                if (!all || all.length === 0) return []
+                if (!q) return all
+                return all.filter(item => {
+                    const preview = (item.preview || "").toLowerCase()
+                    return preview.includes(q)
+                })
+            }
+
+            model: filteredItems
 
             Component.onCompleted: Services.ClipboardService.list()
 
