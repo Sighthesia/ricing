@@ -16,7 +16,12 @@ Item {
             if (!q) return true;
             const name = (a.name || "").toLowerCase();
             const comment = (a.comment || "").toLowerCase();
-            return name.includes(q) || comment.includes(q);
+            const genericName = (a.genericName || "").toLowerCase();
+            const id = (a.id || "").toLowerCase();
+            const keywords = (a.keywords || []).join(" ").toLowerCase();
+            return name.includes(q) || comment.includes(q)
+                || genericName.includes(q) || id.includes(q)
+                || keywords.includes(q);
         });
     }
 
