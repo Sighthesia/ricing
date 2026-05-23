@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Widgets
 import "../../services" as Services
 
-// Expanded island content: search input + app grid or clipboard list.
+// Expanded island content: search input + app list or clipboard list.
 Item {
     id: root
 
@@ -33,6 +33,32 @@ Item {
                 text: Services.IslandService.query
                 onTextChanged: Services.IslandService.query = text
 
+                // Navigate list with Up/Down keys.
+                Keys.onUpPressed: {
+                    var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
+                    if (loader.item && loader.item.count > 0) {
+                        loader.item.currentIndex = Math.max(0, loader.item.currentIndex - 1)
+                    }
+                }
+                Keys.onDownPressed: {
+                    var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
+                    if (loader.item && loader.item.count > 0) {
+                        loader.item.currentIndex = Math.min(loader.item.count - 1, loader.item.currentIndex + 1)
+                    }
+                }
+                Keys.onReturnPressed: {
+                    var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
+                    if (loader.item && loader.item.currentItem) {
+                        if (Services.IslandService.mode === "clipboard") {
+                            Services.ClipboardService.copyItem(loader.item.currentItem.modelData.id)
+                        } else {
+                            loader.item.currentItem.modelData.execute()
+                        }
+                        Services.IslandService.close()
+                    }
+                }
+                Keys.onEnterPressed: Keys.onReturnPressed(null)
+
                 // Placeholder text.
                 Text {
                     text: "Search apps or >clip for clipboard..."
@@ -51,18 +77,32 @@ Item {
             anchors.right: parent.right
             height: root.height - searchBar.height - 8
 
-            // App grid mode.
+            // App list mode.
             Loader {
+                id: appLoader
                 anchors.fill: parent
                 active: Services.IslandService.mode === "apps"
-                sourceComponent: islandAppGrid
+                sourceComponent: islandAppList
+
+                onLoaded: {
+                    if (item) {
+                        item.currentIndex = 0
+                    }
+                }
             }
 
             // Clipboard mode.
             Loader {
+                id: clipLoader
                 anchors.fill: parent
                 active: Services.IslandService.mode === "clipboard"
                 sourceComponent: islandClipboard
+
+                onLoaded: {
+                    if (item) {
+                        item.currentIndex = 0
+                    }
+                }
             }
         }
     }
@@ -82,14 +122,19 @@ Item {
             searchInput.forceActiveFocus()
     }
 
-    // --- App grid component ---
+    // --- App list component ---
     Component {
-        id: islandAppGrid
+        id: islandAppList
 
-        Item {
+        ListView {
+            id: appListView
+            anchors.fill: parent
+            anchors.margins: 4
+            clip: true
+            spacing: 4
+
             property string query: {
                 var q = Services.IslandService.query.toLowerCase()
-                // Strip mode prefix if any
                 if (q.startsWith(">")) return ""
                 return q
             }
@@ -106,57 +151,49 @@ Item {
                 })
             }
 
-            GridView {
-                anchors.fill: parent
-                anchors.margins: 4
-                cellWidth: 100
-                cellHeight: 100
-                clip: true
-                model: parent.filteredApps
+            model: filteredApps
 
-                delegate: Item {
-                    required property var modelData
-                    width: GridView.view ? GridView.view.cellWidth : 100
-                    height: GridView.view ? GridView.view.cellHeight : 100
+            delegate: Rectangle {
+                required property var modelData
+                required property int index
+                width: ListView.view ? ListView.view.width : 200
+                height: 48
+                radius: 6
+                color: delegateMouse.containsMouse || ListView.view.currentIndex === index
+                    ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
+                    : "transparent"
 
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        radius: 8
-                        color: delegateMouse.containsMouse
-                            ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
-                            : "transparent"
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    spacing: 12
+
+                    IconImage {
+                        anchors.verticalCenter: parent.verticalCenter
+                        source: "image://icon/" + (modelData.icon || "application-x-executable")
+                        implicitSize: 32
                     }
 
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: 6
-
-                        IconImage {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            source: "image://icon/" + (modelData.icon || "application-x-executable")
-                            implicitSize: 40
-                        }
-
-                        Text {
-                            text: modelData.name || ""
-                            color: Services.Color.mOnSurface
-                            font.pixelSize: 11
-                            elide: Text.ElideRight
-                            horizontalAlignment: Text.AlignHCenter
-                            width: 88
-                        }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: modelData.name || ""
+                        color: Services.Color.mOnSurface
+                        font.pixelSize: 13
+                        elide: Text.ElideRight
+                        width: parent.width - 32
                     }
+                }
 
-                    MouseArea {
-                        id: delegateMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            modelData.execute()
-                            Services.IslandService.close()
-                        }
+                MouseArea {
+                    id: delegateMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        ListView.view.currentIndex = index
+                        modelData.execute()
+                        Services.IslandService.close()
                     }
                 }
             }
@@ -167,46 +204,46 @@ Item {
     Component {
         id: islandClipboard
 
-        Item {
+        ListView {
+            id: clipListView
+            anchors.fill: parent
+            anchors.margins: 4
+            clip: true
+            spacing: 4
+            model: Services.ClipboardService.items
+
             Component.onCompleted: Services.ClipboardService.list()
 
-            ListView {
-                anchors.fill: parent
-                anchors.margins: 4
-                clip: true
-                spacing: 4
-                model: Services.ClipboardService.items
+            delegate: Rectangle {
+                required property var modelData
+                required property int index
+                width: ListView.view ? ListView.view.width : 200
+                height: 48
+                radius: 6
+                color: clipMouse.containsMouse || clipListView.currentIndex === index
+                    ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
+                    : "transparent"
 
-                delegate: Rectangle {
-                    required property var modelData
-                    required property int index
-                    width: ListView.view ? ListView.view.width : 200
-                    height: 36
-                    radius: 8
-                    color: clipMouse.containsMouse
-                        ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
-                        : "transparent"
+                Text {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    verticalAlignment: Text.AlignVCenter
+                    text: modelData.isImage ? "[Image]" : (modelData.preview || "")
+                    color: Services.Color.mOnSurface
+                    font.pixelSize: 13
+                    elide: Text.ElideRight
+                }
 
-                    Text {
-                        anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        verticalAlignment: Text.AlignVCenter
-                        text: modelData.isImage ? "[Image]" : (modelData.preview || "")
-                        color: Services.Color.mOnSurface
-                        font.pixelSize: 12
-                        elide: Text.ElideRight
-                    }
-
-                    MouseArea {
-                        id: clipMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            Services.ClipboardService.copyItem(modelData.id)
-                            Services.IslandService.close()
-                        }
+                MouseArea {
+                    id: clipMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        clipListView.currentIndex = index
+                        Services.ClipboardService.copyItem(modelData.id)
+                        Services.IslandService.close()
                     }
                 }
             }
