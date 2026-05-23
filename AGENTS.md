@@ -71,6 +71,7 @@ Run Python and Node tests after changing `.agent-workflow/scripts/`, `.opencode/
 | `.opencode/skills/workflow-execution/SKILL.md` | A formal work item is ready to execute or workflow subagents are being dispatched. |
 | `.opencode/skills/workflow-verification/SKILL.md` | Reporting completion, handling failed verification, or processing user correction feedback. |
 | `.opencode/skills/workflow-memory/SKILL.md` | Recording durable decisions, preferences, facts, open questions, or deferred options. |
+| `.agents/skills/reactive-measurement-layout-debugging/SKILL.md` | Diagnosing UI layout bugs where measured, preferred, target, actual, animated, or clipped sizes diverge. |
 
 ## Subagent Boundaries
 
