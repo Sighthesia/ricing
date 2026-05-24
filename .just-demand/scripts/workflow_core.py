@@ -195,6 +195,12 @@ def default_task_json(
             "actual_behavior": "",
             "reproduction": "",
             "scope": "",
+            "final_expected_effect": "",
+            "approach_options": "",
+            "chosen_approach": "",
+            "final_implementation_plan": "",
+            "validation": "",
+            "approval": "",
             "blocking_questions": [],
             "non_blocking_questions": [],
         },
@@ -224,6 +230,12 @@ INTAKE_SECTION_ORDER = [
     "Reproduction",
     "Scope",
     "Anti-Outcome",
+    "Final Expected Effect",
+    "Approach Options",
+    "Chosen Approach",
+    "Final Implementation Plan",
+    "Validation",
+    "Approval",
     "Decisions",
     "Deferred Options",
     "Blocking Questions",
@@ -301,6 +313,12 @@ def build_clarification_payload(root: Path, intake_id: str, task_type: str) -> d
         "actual_behavior": sections.get("Actual Behavior", ""),
         "reproduction": sections.get("Reproduction", ""),
         "scope": sections.get("Scope", ""),
+        "final_expected_effect": sections.get("Final Expected Effect", ""),
+        "approach_options": sections.get("Approach Options", ""),
+        "chosen_approach": sections.get("Chosen Approach", ""),
+        "final_implementation_plan": sections.get("Final Implementation Plan", ""),
+        "validation": sections.get("Validation", ""),
+        "approval": sections.get("Approval", ""),
         "blocking_questions": blocking_questions,
         "non_blocking_questions": non_blocking_questions,
         "needs_bug_clarification": intake_needs_bug_clarification(task_type, raw_request, sections),
@@ -319,6 +337,18 @@ def intake_readiness_errors(root: Path, intake_id: str, task_type: str) -> list[
             errors.append("Actual Behavior is required for bug or mismatch work before promotion.")
         if not clarification["reproduction"].strip():
             errors.append("Reproduction is required for bug or mismatch work before promotion.")
+    # Hard gate for design and implementation tasks: final expected effect,
+    # chosen approach, final implementation plan, and approval are required.
+    design_impl_types = {"design", "implementation", "feature", "feat", "refactor", "architecture"}
+    if task_type.strip().lower() in design_impl_types:
+        if not clarification["final_expected_effect"].strip():
+            errors.append("Final Expected Effect is required for design or implementation work before promotion.")
+        if not clarification["chosen_approach"].strip():
+            errors.append("Chosen Approach is required for design or implementation work before promotion.")
+        if not clarification["final_implementation_plan"].strip():
+            errors.append("Final Implementation Plan is required for design or implementation work before promotion.")
+        if not clarification["approval"].strip():
+            errors.append("Approval is required for design or implementation work before promotion.")
     if clarification["blocking_questions"]:
         errors.append("Blocking Questions must be cleared before promotion.")
     return errors
@@ -452,6 +482,18 @@ def create_intake(root: Path, title: str, raw_request: str, session_id: str) -> 
                 "## Scope",
                 "",
                 "## Anti-Outcome",
+                "",
+                "## Final Expected Effect",
+                "",
+                "## Approach Options",
+                "",
+                "## Chosen Approach",
+                "",
+                "## Final Implementation Plan",
+                "",
+                "## Validation",
+                "",
+                "## Approval",
                 "",
                 "## Decisions",
                 "",
@@ -634,6 +676,16 @@ def mark_task(
         updates["last_note"] = note
 
     task = update_task(root, task_id, updates)
+
+    state_path = workspace_dir(root) / "state.json"
+    state = read_json(state_path)
+    if status in {"planning", "executing", "verifying", "changes_requested", "tweaking", "debugging"}:
+        state["current_intake_id"] = None
+        state["current_task_id"] = task_id
+    elif status in {"paused", "blocked"} and state.get("current_task_id") == task_id:
+        state["current_task_id"] = None
+    state["updated_at"] = utc_now()
+    write_json_atomic(state_path, state)
 
     summary_parts = [f"status={status}"]
     if progress is not None:
@@ -1202,6 +1254,14 @@ def start_execution(root: Path, task_id: str, subagents: list[str]) -> dict[str,
     }
 
     task = update_task(root, task_id, updates)
+
+    state_path = workspace_dir(root) / "state.json"
+    state = read_json(state_path)
+    state["current_intake_id"] = None
+    state["current_task_id"] = task_id
+    state["updated_at"] = utc_now()
+    write_json_atomic(state_path, state)
+
     append_task_event(
         root,
         task_id,
