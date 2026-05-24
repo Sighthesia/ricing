@@ -30,12 +30,26 @@ Variants {
 
         BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? islandBlurRegion : null
 
-        // Keep the blur envelope attached to the animated island surface.
+        // Track blur to visible island geometry parts instead of the body-only envelope.
+        property Variants islandBlurRegions: Variants {
+            model: islandBody.blurParts
+
+            Region {
+                required property var modelData
+
+                item: modelData.item && modelData.item.visible ? modelData.item : null
+                radius: modelData.radius
+                topLeftRadius: modelData.topLeftRadius ?? modelData.radius
+                topRightRadius: modelData.topRightRadius ?? modelData.radius
+                bottomLeftRadius: modelData.bottomLeftRadius ?? modelData.radius
+                bottomRightRadius: modelData.bottomRightRadius ?? modelData.radius
+            }
+        }
+
         Region {
             id: islandBlurRegion
 
-            item: islandBody.blurRegionSource
-            radius: Math.max(0, islandBody.bodyRadius - Services.SettingsService.blurRegionInset)
+            regions: islandBlurRegions.instances
         }
 
         // Mask: when collapsed only the island body receives input;

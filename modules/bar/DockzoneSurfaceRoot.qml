@@ -136,8 +136,6 @@ Item {
     readonly property var metrics: Model.deriveRendererMetrics(root.model)
 
     // Expose body geometry for child content positioning.
-    readonly property Item blurRegionSource: centerBodyBlurInset
-    readonly property real blurRegionRadius: Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset)
     readonly property real bodyX: metrics.bodyX
     readonly property real bodyY: metrics.bodyY
     readonly property real bodyWidth: metrics.bodyWidth
@@ -155,6 +153,58 @@ Item {
     readonly property int bodyRadius: metrics.bodyRadius
     readonly property bool isLeftSection: root.section === "left"
     readonly property bool isRightSection: root.section === "right"
+    readonly property int earBlurStripCount: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset * 2)
+
+    function _earCutX(localY) {
+        var radius = Math.max(1, root.earRadius)
+        var clampedY = Math.max(0, Math.min(radius, localY))
+        var dy = radius - clampedY
+
+        return Math.sqrt(Math.max(0, radius * radius - dy * dy))
+    }
+
+    function _stripParts(repeater, active) {
+        var parts = []
+
+        if (!active)
+            return parts
+
+        for (var i = 0; i < repeater.count; ++i) {
+            var item = repeater.itemAt(i)
+
+            if (item && item.width > 0 && item.height > 0) {
+                parts.push({
+                    item: item,
+                    radius: 0,
+                    topLeftRadius: 0,
+                    topRightRadius: 0,
+                    bottomLeftRadius: 0,
+                    bottomRightRadius: 0
+                })
+            }
+        }
+
+        return parts
+    }
+
+    // Blur source parts for body and ears.
+    // Ear parts are one-pixel strips so wl_region can approximate the concave arcs
+    // without unsupported subtract/ellipse composition.
+    readonly property var blurParts: [
+        {
+            item: centerBodyBlurInset,
+            radius: Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset),
+            topLeftRadius: 0,
+            topRightRadius: 0,
+            bottomLeftRadius: root.isRightSection || (!root.isLeftSection && !root.isRightSection) ? Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset) : 0,
+            bottomRightRadius: root.isLeftSection || (!root.isLeftSection && !root.isRightSection) ? Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset) : 0
+        }
+    ].concat(
+        root._stripParts(leftEarBlurStrips, leftEar.visible),
+        root._stripParts(rightEarBlurStrips, rightEar.visible),
+        root._stripParts(leftBottomEarBlurStrips, leftBottomEar.visible),
+        root._stripParts(rightBottomEarBlurStrips, rightBottomEar.visible)
+    )
 
     onFillColorChanged: {
         leftEar.requestPaint()
@@ -266,6 +316,80 @@ Item {
         y: centerBody.y + Services.SettingsService.blurRegionInset
         width: Math.max(0, centerBody.width - Services.SettingsService.blurRegionInset * 2)
         height: Math.max(0, centerBody.height - Services.SettingsService.blurRegionInset * 2)
+    }
+
+    // Blur strips for the left top ear; each strip follows the Canvas arc math.
+    Repeater {
+        id: leftEarBlurStrips
+
+        model: root.earBlurStripCount
+
+        Item {
+            required property int index
+            readonly property real localY: Services.SettingsService.blurRegionInset + index
+            readonly property real cutX: root._earCutX(localY)
+
+            x: leftEar.x + cutX
+            y: leftEar.y + localY
+            width: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset - cutX)
+            height: 1
+        }
+    }
+
+    // Blur strips for the right top ear; mirrored from the left top ear.
+    Repeater {
+        id: rightEarBlurStrips
+
+        model: root.earBlurStripCount
+
+        Item {
+            required property int index
+            readonly property real localY: Services.SettingsService.blurRegionInset + index
+            readonly property real cutX: root._earCutX(localY)
+            readonly property real fillRight: root.earRadius - cutX
+
+            x: rightEar.x + Services.SettingsService.blurRegionInset
+            y: rightEar.y + localY
+            width: Math.max(0, fillRight - Services.SettingsService.blurRegionInset)
+            height: 1
+        }
+    }
+
+    // Blur strips for the left bottom ear; this matches its rotated Canvas path.
+    Repeater {
+        id: leftBottomEarBlurStrips
+
+        model: root.earBlurStripCount
+
+        Item {
+            required property int index
+            readonly property real localY: Services.SettingsService.blurRegionInset + index
+            readonly property real cutX: root._earCutX(localY)
+            readonly property real fillRight: root.earRadius - cutX
+
+            x: leftBottomEar.x + Services.SettingsService.blurRegionInset
+            y: leftBottomEar.y + localY
+            width: Math.max(0, fillRight - Services.SettingsService.blurRegionInset)
+            height: 1
+        }
+    }
+
+    // Blur strips for the right bottom ear; same orientation as the left top ear.
+    Repeater {
+        id: rightBottomEarBlurStrips
+
+        model: root.earBlurStripCount
+
+        Item {
+            required property int index
+            readonly property real localY: Services.SettingsService.blurRegionInset + index
+            readonly property real cutX: root._earCutX(localY)
+
+            x: rightBottomEar.x + cutX
+            y: rightBottomEar.y + localY
+            width: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset - cutX)
+            height: 1
+        }
     }
 
     // Paint the left-side bottom ear inside the unified surface tree.

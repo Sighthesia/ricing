@@ -28,19 +28,26 @@ Variants {
 
         BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? barBlurRegion : null
 
-        // Blur only the occupied dockzone surfaces instead of the full transparent bar window.
+        // Track blur to visible dockzone geometry parts instead of the full transparent bar window.
+        property Variants barBlurRegions: Variants {
+            model: barContent.leftSectionBlurParts.concat(barContent.rightSectionBlurParts)
+
+            Region {
+                required property var modelData
+
+                item: modelData.item && modelData.item.visible ? modelData.item : null
+                radius: modelData.radius
+                topLeftRadius: modelData.topLeftRadius ?? modelData.radius
+                topRightRadius: modelData.topRightRadius ?? modelData.radius
+                bottomLeftRadius: modelData.bottomLeftRadius ?? modelData.radius
+                bottomRightRadius: modelData.bottomRightRadius ?? modelData.radius
+            }
+        }
+
         Region {
             id: barBlurRegion
 
-            Region {
-                item: barContent.leftSectionItem
-                radius: barContent.leftSectionRadius
-            }
-
-            Region {
-                item: barContent.rightSectionItem
-                radius: barContent.rightSectionRadius
-            }
+            regions: barBlurRegions.instances
         }
 
         BarContent {
