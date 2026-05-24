@@ -18,6 +18,8 @@ Item {
     readonly property int hoverWLift: 12
     readonly property int hoverHLift: 4
     readonly property int hoverRadiusLift: 2
+    readonly property Item blurRegionSource: bodyBlurInset
+    readonly property color surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
     readonly property var centerWidgets: Services.BarLayoutService.sectionWidgets("center")
     readonly property bool showManagedCenterWidgets: !Services.IslandService.expanded
         && root.centerWidgets.length > 0
@@ -40,6 +42,11 @@ Item {
     height: targetH
     implicitWidth: width
     implicitHeight: height
+
+    onSurfaceColorChanged: {
+        leftEar.requestPaint()
+        rightEar.requestPaint()
+    }
 
     property real bodyRadius: targetR
 
@@ -92,7 +99,7 @@ Item {
         onPaint: {
             var ctx = getContext("2d")
             ctx.clearRect(0, 0, width, height)
-            ctx.fillStyle = Services.Color.mSurface
+            ctx.fillStyle = root.surfaceColor
             ctx.beginPath()
             ctx.moveTo(0, 0)
             ctx.lineTo(width, 0)
@@ -115,9 +122,16 @@ Item {
         y: 0
         width: root.width - root.earRadius * 2
         height: root.height
-        color: Services.Color.mSurface
+        color: root.surfaceColor
         radius: root.bodyRadius
         clip: true
+
+        Item {
+            id: bodyBlurInset
+
+            anchors.fill: parent
+            anchors.margins: Services.SettingsService.blurRegionInset
+        }
 
         // Flatten top corners (body connects to screen edge via ears).
         Rectangle {
@@ -235,7 +249,7 @@ Item {
         onPaint: {
             var ctx = getContext("2d")
             ctx.clearRect(0, 0, width, height)
-            ctx.fillStyle = Services.Color.mSurface
+            ctx.fillStyle = root.surfaceColor
             ctx.beginPath()
             ctx.moveTo(width, 0)
             ctx.lineTo(0, 0)

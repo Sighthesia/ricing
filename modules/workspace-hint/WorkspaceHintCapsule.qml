@@ -67,6 +67,15 @@ Item {
     readonly property real _capsuleOpacity: root._isEmptyWorkspace
         ? Math.max(root._metrics.opacity, 0.62)
         : root._metrics.opacity
+    readonly property bool blurActive: !!(
+        root.capsule
+        && root.capsule.isCurrent
+        && !root.capsule.isTransitionCurrent
+        && !host._workspaceSettlePending
+        && root._detailProgress >= 0.999
+        && root._revealProgress >= 0.999
+    )
+    readonly property Item blurSourceItem: surfaceBlurInset
     readonly property bool providesPrimaryWidth: !!(root.capsule && root.capsule.isCurrent)
     readonly property real _maxCapsuleWidth: Math.max(
         root._metrics.height,
@@ -176,6 +185,13 @@ Item {
         border.color: root._outlineColor
         border.width: 1
         antialiasing: true
+
+        Item {
+            id: surfaceBlurInset
+
+            anchors.fill: parent
+            anchors.margins: Services.SettingsService.blurRegionInset
+        }
 
         // Center the workspace label and icon strip inside the capsule.
         Item {

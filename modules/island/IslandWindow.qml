@@ -28,6 +28,16 @@ Variants {
             ? WlrKeyboardFocus.Exclusive
             : WlrKeyboardFocus.None
 
+        BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? islandBlurRegion : null
+
+        // Keep the blur envelope attached to the animated island surface.
+        Region {
+            id: islandBlurRegion
+
+            item: islandBody.blurRegionSource
+            radius: Math.max(0, islandBody.bodyRadius - Services.SettingsService.blurRegionInset)
+        }
+
         // Mask: when collapsed only the island body receives input;
         // when expanded the full window receives input (for click-away dismiss).
         mask: Region {

@@ -29,6 +29,16 @@ Variants {
             bottom: true
         }
 
+        BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? contextMenuBlurRegion : null
+
+        // Match blur to the floating menu card, not the full-screen click-away layer.
+        Region {
+            id: contextMenuBlurRegion
+
+            item: Services.BarLayoutService.contextMenuVisible ? menuSurfaceBlurInset : null
+            radius: Math.max(0, menuSurface.radius - Services.SettingsService.blurRegionInset)
+        }
+
         // Menu surface positioned below the bar at the click X.
         Rectangle {
             id: menuSurface
@@ -42,12 +52,19 @@ Variants {
             width: 180
             height: menuColumn.implicitHeight + 16
             radius: 10
-            color: "#1a1a1a"
+            color: Qt.rgba(0.10, 0.10, 0.10, Services.SettingsService.panelSurfaceOpacity)
             border.color: "#3a3a3a"
             border.width: 1
             opacity: Services.BarLayoutService.contextMenuVisible ? 1 : 0
             scale: Services.BarLayoutService.contextMenuVisible ? 1 : 0.92
             transformOrigin: Item.Top
+
+            Item {
+                id: menuSurfaceBlurInset
+
+                anchors.fill: parent
+                anchors.margins: Services.SettingsService.blurRegionInset
+            }
 
             Behavior on opacity { NumberAnimation { duration: Services.Motion.popup.opacityDuration; easing.type: Services.Motion.popup.opacityEasing } }
             Behavior on scale { NumberAnimation { duration: Services.Motion.popup.scaleDuration; easing.type: Services.Motion.popup.scaleEasing; easing.overshoot: Services.Motion.popup.scaleOvershoot } }

@@ -10,6 +10,10 @@ QtObject {
     readonly property alias bar: adapter.bar
     readonly property alias appearance: adapter.appearance
     readonly property alias notifications: adapter.notifications
+    readonly property real panelSurfaceOpacity: appearance.enableBlur
+        ? Math.min(appearance.panelOpacity, 0.62)
+        : appearance.panelOpacity
+    readonly property int blurRegionInset: 2
 
     // Panel visibility state (driven by bar widget, consumed by SettingsWindow)
     property bool panelVisible: false

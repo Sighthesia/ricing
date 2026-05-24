@@ -7,6 +7,10 @@ Item {
     id: root
 
     required property string screenName
+    readonly property Item leftSectionItem: leftSection.blurSourceItem
+    readonly property Item rightSectionItem: rightSection.blurSourceItem
+    readonly property real leftSectionRadius: leftSection.blurSourceRadius
+    readonly property real rightSectionRadius: rightSection.blurSourceRadius
 
     // Keep the transparent container tall enough for unified side bottom ears.
     implicitHeight: Math.max(

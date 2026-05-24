@@ -42,6 +42,16 @@ Variants {
         // Make window click-through when not visible
         visible: osdWindow.osdVisible
 
+        BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? osdBlurRegion : null
+
+        // Bind blur to the transient OSD card rather than the whole overlay surface.
+        Region {
+            id: osdBlurRegion
+
+            item: osdWindow.osdVisible ? osdBlurInset : null
+            radius: Math.max(0, osdContainer.radius - Services.SettingsService.blurRegionInset)
+        }
+
         // Auto-hide timer
         Timer {
             id: hideTimer
@@ -104,10 +114,17 @@ Variants {
             width: 180
             height: 100
             radius: 16
-            color: Services.Color.mSurface
+            color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
             border.color: Services.Color.mOutline
             border.width: 1
             opacity: osdWindow.osdVisible ? 1 : 0
+
+            Item {
+                id: osdBlurInset
+
+                anchors.fill: parent
+                anchors.margins: Services.SettingsService.blurRegionInset
+            }
 
             // Fade animation
             Behavior on opacity {

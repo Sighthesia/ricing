@@ -136,6 +136,8 @@ Item {
     readonly property var metrics: Model.deriveRendererMetrics(root.model)
 
     // Expose body geometry for child content positioning.
+    readonly property Item blurRegionSource: centerBodyBlurInset
+    readonly property real blurRegionRadius: Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset)
     readonly property real bodyX: metrics.bodyX
     readonly property real bodyY: metrics.bodyY
     readonly property real bodyWidth: metrics.bodyWidth
@@ -147,12 +149,20 @@ Item {
     height: implicitHeight
 
     // Visual constants from model metrics.
-    readonly property color fillColor: Services.Color.mSurface
+    readonly property color fillColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
     readonly property color borderColor: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.3)
     readonly property int earRadius: metrics.earRadius
     readonly property int bodyRadius: metrics.bodyRadius
     readonly property bool isLeftSection: root.section === "left"
     readonly property bool isRightSection: root.section === "right"
+
+    onFillColorChanged: {
+        leftEar.requestPaint()
+        centerBody.requestPaint()
+        leftBottomEar.requestPaint()
+        rightEar.requestPaint()
+        rightBottomEar.requestPaint()
+    }
 
     // Root-level global motion envelope — body and ears inherit these so
     // the entire surface moves as one continuous object.
@@ -246,6 +256,16 @@ Item {
         }
         onHeightChanged: requestPaint()
         onWidthChanged: requestPaint()
+    }
+
+    // Keep the bar blur source in normal item geometry, not inside Canvas paint nodes.
+    Item {
+        id: centerBodyBlurInset
+
+        x: centerBody.x + Services.SettingsService.blurRegionInset
+        y: centerBody.y + Services.SettingsService.blurRegionInset
+        width: Math.max(0, centerBody.width - Services.SettingsService.blurRegionInset * 2)
+        height: Math.max(0, centerBody.height - Services.SettingsService.blurRegionInset * 2)
     }
 
     // Paint the left-side bottom ear inside the unified surface tree.

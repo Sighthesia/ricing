@@ -33,6 +33,16 @@ Variants {
             top: Services.BarLayoutService.barHeight + 8
         }
 
+        BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? pickerBlurRegion : null
+
+        // Keep picker blur constrained to the rounded picker card.
+        Region {
+            id: pickerBlurRegion
+
+            item: Services.BarLayoutService.widgetPickerVisible ? pickerBlurInset : null
+            radius: Math.max(0, pickerFrame.radius - Services.SettingsService.blurRegionInset)
+        }
+
         // Render the picker card centered below the bar.
         Rectangle {
             id: pickerFrame
@@ -42,12 +52,19 @@ Variants {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             radius: 12
-            color: "#1a1a1a"
+            color: Qt.rgba(0.10, 0.10, 0.10, Services.SettingsService.panelSurfaceOpacity)
             border.color: "#333333"
             border.width: 1
             opacity: Services.BarLayoutService.widgetPickerVisible ? 1 : 0
             scale: Services.BarLayoutService.widgetPickerVisible ? 1 : 0.96
             transformOrigin: Item.Top
+
+            Item {
+                id: pickerBlurInset
+
+                anchors.fill: parent
+                anchors.margins: Services.SettingsService.blurRegionInset
+            }
 
             Behavior on opacity { NumberAnimation { duration: Services.Motion.popup.opacityDuration; easing.type: Services.Motion.popup.opacityEasing } }
             Behavior on scale { NumberAnimation { duration: Services.Motion.popup.scaleDuration; easing.type: Services.Motion.popup.scaleEasing; easing.overshoot: Services.Motion.popup.scaleOvershoot } }

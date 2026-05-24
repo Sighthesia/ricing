@@ -476,5 +476,25 @@ Variants {
                 }
             }
         }
+
+        BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? hintBlurRegion : null
+
+        // Track blur to each visible hint capsule instead of the bounding envelope.
+        property Variants hintBlurRegions: Variants {
+            model: workspaceStage.children
+
+            Region {
+                required property Item modelData
+
+                item: modelData.visible && modelData.blurActive && modelData.blurSourceItem ? modelData.blurSourceItem : null
+                radius: Math.max(0, (modelData.height / 2) - Services.SettingsService.blurRegionInset)
+            }
+        }
+
+        Region {
+            id: hintBlurRegion
+
+            regions: hintBlurRegions.instances
+        }
     }
 }

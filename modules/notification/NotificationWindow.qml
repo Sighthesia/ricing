@@ -32,6 +32,26 @@ Variants {
         // Hide window when no notifications
         visible: Services.NotificationService.popupList.count > 0
 
+        BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? notificationBlurRegion : null
+
+        // Track blur to each notification card to avoid stack-gap overflow.
+        property Variants notificationBlurRegions: Variants {
+            model: Services.SettingsService.appearance.enableBlur ? notifColumn.children : []
+
+            Region {
+                required property Item modelData
+
+                item: modelData.visible && modelData.blurSourceItem ? modelData.blurSourceItem : null
+                radius: Math.max(0, 12 - Services.SettingsService.blurRegionInset)
+            }
+        }
+
+        Region {
+            id: notificationBlurRegion
+
+            regions: notificationBlurRegions.instances
+        }
+
         // Notification card stack
         Column {
             id: notifColumn
@@ -48,13 +68,23 @@ Variants {
                 // Single notification card
                 Rectangle {
                     id: card
+
+                    readonly property Item blurSourceItem: cardBlurInset
+
                     width: 344
                     height: 64
                     radius: 12
-                    color: Services.Color.mSurface
+                    color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
                     border.color: Services.Color.mOutline
                     border.width: 1
                     opacity: 1
+
+                    Item {
+                        id: cardBlurInset
+
+                        anchors.fill: parent
+                        anchors.margins: Services.SettingsService.blurRegionInset
+                    }
 
                     // Auto-dismiss timer
                     Timer {

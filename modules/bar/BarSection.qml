@@ -13,6 +13,8 @@ Item {
     readonly property var sectionModel: Services.BarLayoutService.sectionWidgets(sectionName)
     readonly property bool hasSectionContent: root.sectionModel.length > 0
     readonly property bool canOpenWidgetPicker: Services.BarLayoutService.layoutReady
+    readonly property Item blurSourceItem: surfaceLoader.item ? surfaceLoader.item.blurSourceItem : null
+    readonly property real blurSourceRadius: surfaceLoader.item ? surfaceLoader.item.blurSourceRadius : 0
     readonly property string surfaceState: root.sectionName === "center"
         ? (root.hasSectionContent ? (root.floatingValidationIntent ? "floating" : "attached") : "hidden")
         : (root.hasSectionContent ? "attached" : "hidden")
@@ -59,6 +61,9 @@ Item {
 
         Item {
             id: surfaceRoot
+
+            readonly property Item blurSourceItem: dockzone.blurRegionSource
+            readonly property real blurSourceRadius: dockzone.blurRegionRadius
 
             implicitWidth: dockzone.implicitWidth
             implicitHeight: dockzone.implicitHeight

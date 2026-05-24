@@ -32,6 +32,16 @@ Variants {
         // Panel open state — driven by SettingsService
         visible: Services.SettingsService.panelVisible
 
+        BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? settingsBlurRegion : null
+
+        // Match compositor blur to the rounded settings panel.
+        Region {
+            id: settingsBlurRegion
+
+            item: Services.SettingsService.panelVisible ? settingsSurfaceBlurInset : null
+            radius: Math.max(0, settingsSurface.radius - Services.SettingsService.blurRegionInset)
+        }
+
         function toggle() { Services.SettingsService.togglePanel() }
         function close() { Services.SettingsService.closePanel() }
 
@@ -40,12 +50,21 @@ Variants {
 
         // Semi-transparent rounded panel surface
         Rectangle {
+            id: settingsSurface
+
             anchors.fill: parent
             anchors.margins: 8
             radius: 12
-            color: Qt.alpha(Services.Color.mSurface, 0.95)
+            color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
             border.color: Services.Color.mOutline
             border.width: 1
+
+            Item {
+                id: settingsSurfaceBlurInset
+
+                anchors.fill: parent
+                anchors.margins: Services.SettingsService.blurRegionInset
+            }
 
             // Inner padding wrapper
             Item {

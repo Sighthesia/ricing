@@ -26,6 +26,23 @@ Variants {
             right: true
         }
 
+        BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? barBlurRegion : null
+
+        // Blur only the occupied dockzone surfaces instead of the full transparent bar window.
+        Region {
+            id: barBlurRegion
+
+            Region {
+                item: barContent.leftSectionItem
+                radius: barContent.leftSectionRadius
+            }
+
+            Region {
+                item: barContent.rightSectionItem
+                radius: barContent.rightSectionRadius
+            }
+        }
+
         BarContent {
             id: barContent
 
