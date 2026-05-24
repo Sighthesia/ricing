@@ -44,9 +44,12 @@ Item {
     implicitHeight: height
 
     onSurfaceColorChanged: {
+        bodyFill.requestPaint()
         leftEar.requestPaint()
         rightEar.requestPaint()
     }
+
+    onBodyRadiusChanged: bodyFill.requestPaint()
 
     property real bodyRadius: targetR
 
@@ -115,31 +118,50 @@ Item {
         }
     }
 
-    // --- Body rectangle ---
-    Rectangle {
+    // --- Body shell ---
+    Item {
         id: bodyRect
         x: root.earRadius
         y: 0
         width: root.width - root.earRadius * 2
         height: root.height
-        color: root.surfaceColor
-        radius: root.bodyRadius
         clip: true
+
+        // Paint the center body in one pass so semi-transparent fill does not self-overlap.
+        Canvas {
+            id: bodyFill
+
+            anchors.fill: parent
+            antialiasing: true
+
+            onPaint: {
+                var ctx = getContext("2d")
+                var w = width
+                var h = height
+                var radius = Math.min(root.bodyRadius, w / 2, h / 2)
+
+                ctx.clearRect(0, 0, w, h)
+                ctx.fillStyle = root.surfaceColor
+                ctx.beginPath()
+                ctx.moveTo(0, 0)
+                ctx.lineTo(w, 0)
+                ctx.lineTo(w, h - radius)
+                ctx.quadraticCurveTo(w, h, w - radius, h)
+                ctx.lineTo(radius, h)
+                ctx.quadraticCurveTo(0, h, 0, h - radius)
+                ctx.closePath()
+                ctx.fill()
+            }
+
+            onHeightChanged: requestPaint()
+            onWidthChanged: requestPaint()
+        }
 
         Item {
             id: bodyBlurInset
 
             anchors.fill: parent
             anchors.margins: Services.SettingsService.blurRegionInset
-        }
-
-        // Flatten top corners (body connects to screen edge via ears).
-        Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: parent.radius
-            color: parent.color
         }
 
         // --- Collapsed content: center widgets or fallback clock ---

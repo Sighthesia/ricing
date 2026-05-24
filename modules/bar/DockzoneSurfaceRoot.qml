@@ -178,7 +178,7 @@ Item {
         id: leftEar
 
         z: 0
-        x: 0
+        x: root.metrics.hasLeftTopEar ? root.bodyX - root.earRadius : 0
         y: 0
         width: root.earRadius
         height: root.earRadius
@@ -311,7 +311,7 @@ Item {
         id: rightEar
 
         z: 0
-        x: root.bodyX + root.bodyWidth - 1
+        x: root.bodyX + root.bodyWidth
         y: 0
         width: root.earRadius
         height: root.earRadius
