@@ -39,8 +39,8 @@ Variants {
         Region {
             id: pickerBlurRegion
 
-            item: Services.BarLayoutService.widgetPickerVisible ? pickerBlurInset : null
-            radius: Math.max(0, pickerFrame.radius - Services.SettingsService.blurRegionInset)
+            item: Services.BarLayoutService.widgetPickerVisible ? pickerBlurSource : null
+            radius: pickerFrame.radius
         }
 
         // Render the picker card centered below the bar.
@@ -53,17 +53,15 @@ Variants {
             anchors.top: parent.top
             radius: 12
             color: Qt.rgba(0.10, 0.10, 0.10, Services.SettingsService.panelSurfaceOpacity)
-            border.color: "#333333"
-            border.width: 1
             opacity: Services.BarLayoutService.widgetPickerVisible ? 1 : 0
             scale: Services.BarLayoutService.widgetPickerVisible ? 1 : 0.96
             transformOrigin: Item.Top
 
+            // Full-size blur source — covers the entire visible fill geometry.
             Item {
-                id: pickerBlurInset
+                id: pickerBlurSource
 
                 anchors.fill: parent
-                anchors.margins: Services.SettingsService.blurRegionInset
             }
 
             Behavior on opacity { NumberAnimation { duration: Services.Motion.popup.opacityDuration; easing.type: Services.Motion.popup.opacityEasing } }
@@ -177,6 +175,15 @@ Variants {
                         }
                     }
                 }
+            }
+
+            // Border overlay rendered above all content.
+            Rectangle {
+                anchors.fill: parent
+                radius: pickerFrame.radius
+                color: "transparent"
+                border.color: "#333333"
+                border.width: 1
             }
         }
 

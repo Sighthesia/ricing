@@ -25,6 +25,7 @@ Item {
     readonly property real collapsedContentWidth: collapsedContentLoader.item
         ? collapsedContentLoader.item.implicitWidth + collapsedHorizontalPadding
         : collapsedW
+    readonly property int seamOverlap: 1
 
     // Animated dimensions driven by island state and passive hover intent.
     property int targetW: Services.IslandService.expanded
@@ -88,12 +89,12 @@ Item {
     // Blur source parts for the center island body and top ears.
     readonly property var blurParts: [
         {
-            item: bodyBlurInset,
-            radius: Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset),
+            item: bodyBlurSource,
+            radius: root.bodyRadius,
             topLeftRadius: 0,
             topRightRadius: 0,
-            bottomLeftRadius: Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset),
-            bottomRightRadius: Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset)
+            bottomLeftRadius: root.bodyRadius,
+            bottomRightRadius: root.bodyRadius
         }
     ].concat(
         root._stripParts(leftEarBlurStrips, leftEar.visible),
@@ -222,11 +223,31 @@ Item {
             onWidthChanged: requestPaint()
         }
 
+        // Overlap the left ear/body join by one pixel so antialiasing does not leave a seam.
+        Rectangle {
+            visible: leftEar.visible
+            x: 0
+            y: 0
+            width: root.seamOverlap
+            height: Math.min(root.earRadius, parent.height)
+            color: root.surfaceColor
+        }
+
+        // Overlap the right ear/body join by one pixel so antialiasing does not leave a seam.
+        Rectangle {
+            visible: rightEar.visible
+            x: parent.width - root.seamOverlap
+            y: 0
+            width: root.seamOverlap
+            height: Math.min(root.earRadius, parent.height)
+            color: root.surfaceColor
+        }
+
+        // Full-size blur source — covers the entire body geometry for complete blur edge coverage.
         Item {
-            id: bodyBlurInset
+            id: bodyBlurSource
 
             anchors.fill: parent
-            anchors.margins: Services.SettingsService.blurRegionInset
         }
 
         // --- Collapsed content: center widgets or fallback clock ---

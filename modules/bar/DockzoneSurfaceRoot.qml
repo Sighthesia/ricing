@@ -154,6 +154,7 @@ Item {
     readonly property bool isLeftSection: root.section === "left"
     readonly property bool isRightSection: root.section === "right"
     readonly property int earBlurStripCount: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset * 2)
+    readonly property int seamOverlap: 1
 
     function _earCutX(localY) {
         var radius = Math.max(1, root.earRadius)
@@ -192,12 +193,12 @@ Item {
     // without unsupported subtract/ellipse composition.
     readonly property var blurParts: [
         {
-            item: centerBodyBlurInset,
-            radius: Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset),
+            item: centerBodyBlurSource,
+            radius: root.bodyRadius,
             topLeftRadius: 0,
             topRightRadius: 0,
-            bottomLeftRadius: root.isRightSection || (!root.isLeftSection && !root.isRightSection) ? Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset) : 0,
-            bottomRightRadius: root.isLeftSection || (!root.isLeftSection && !root.isRightSection) ? Math.max(0, root.bodyRadius - Services.SettingsService.blurRegionInset) : 0
+            bottomLeftRadius: root.isRightSection || (!root.isLeftSection && !root.isRightSection) ? root.bodyRadius : 0,
+            bottomRightRadius: root.isLeftSection || (!root.isLeftSection && !root.isRightSection) ? root.bodyRadius : 0
         }
     ].concat(
         root._stripParts(leftEarBlurStrips, leftEar.visible),
@@ -308,14 +309,37 @@ Item {
         onWidthChanged: requestPaint()
     }
 
-    // Keep the bar blur source in normal item geometry, not inside Canvas paint nodes.
-    Item {
-        id: centerBodyBlurInset
+    // Overlap the left top ear/body join by one pixel so antialiasing does not leave a seam.
+    Rectangle {
+        z: 0.5
+        visible: leftEar.visible
+        x: centerBody.x
+        y: centerBody.y
+        width: root.seamOverlap
+        height: Math.min(root.earRadius, centerBody.height)
+        color: root.fillColor
+    }
 
-        x: centerBody.x + Services.SettingsService.blurRegionInset
-        y: centerBody.y + Services.SettingsService.blurRegionInset
-        width: Math.max(0, centerBody.width - Services.SettingsService.blurRegionInset * 2)
-        height: Math.max(0, centerBody.height - Services.SettingsService.blurRegionInset * 2)
+    // Overlap the right top ear/body join by one pixel so antialiasing does not leave a seam.
+    Rectangle {
+        z: 0.5
+        visible: rightEar.visible
+        x: centerBody.x + centerBody.width - root.seamOverlap
+        y: centerBody.y
+        width: root.seamOverlap
+        height: Math.min(root.earRadius, centerBody.height)
+        color: root.fillColor
+    }
+
+    // Keep the bar blur source in normal item geometry, not inside Canvas paint nodes.
+    // Full-size: covers the entire body geometry for complete blur edge coverage.
+    Item {
+        id: centerBodyBlurSource
+
+        x: centerBody.x
+        y: centerBody.y
+        width: centerBody.width
+        height: centerBody.height
     }
 
     // Blur strips for the left top ear; each strip follows the Canvas arc math.

@@ -48,8 +48,8 @@ Variants {
         Region {
             id: osdBlurRegion
 
-            item: osdWindow.osdVisible ? osdBlurInset : null
-            radius: Math.max(0, osdContainer.radius - Services.SettingsService.blurRegionInset)
+            item: osdWindow.osdVisible ? osdBlurSource : null
+            radius: osdContainer.radius
         }
 
         // Auto-hide timer
@@ -115,15 +115,13 @@ Variants {
             height: 100
             radius: 16
             color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
-            border.color: Services.Color.mOutline
-            border.width: 1
             opacity: osdWindow.osdVisible ? 1 : 0
 
+            // Full-size blur source — covers the entire visible fill geometry.
             Item {
-                id: osdBlurInset
+                id: osdBlurSource
 
                 anchors.fill: parent
-                anchors.margins: Services.SettingsService.blurRegionInset
             }
 
             // Fade animation
@@ -177,6 +175,15 @@ Variants {
                         }
                     }
                 }
+            }
+
+            // Border overlay rendered above all content.
+            Rectangle {
+                anchors.fill: parent
+                radius: osdContainer.radius
+                color: "transparent"
+                border.color: Services.Color.mOutline
+                border.width: 1
             }
         }
     }

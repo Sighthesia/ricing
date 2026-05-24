@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "id": "2026-05-24-center-dockzone-ear-task",
+  "source_intake_id": "2026-05-24-center-dockzone-ear-intake",
+  "title": "修复 center dockzone ear 内部重叠",
+  "type": "bugfix",
+  "status": "tweaking",
+  "current_step": "clarify",
+  "owner_session": "main",
+  "assigned_subagents": [],
+  "goal": "让 center dockzone 的左右 ear 不再在主体内部连成倒梯形，消除半透明叠色，同时不改变 left/right 现有外轮廓行为",
+  "constraints": [],
+  "acceptance_criteria": [
+    "center dockzone 内部不再出现由 ear 叠加导致的加深区域；left/right 外观保持不变"
+  ],
+  "clarification": {
+    "current_understanding": "Fix the center dockzone ear geometry so the left and right top ears no longer extend inward and connect through the body area. The center surface should keep the intended outer silhouette without semi-transparent self-overlap inside the visible body.",
+    "expected_behavior": "The center dockzone should render like a single continuous surface whose top ears only contribute to the outer contour. Inside the body area there should be no extra ear fill layered on top of the body fill.",
+    "actual_behavior": "The center dockzone currently renders its left and right ear regions differently from left and right dockzones: both ears extend inward inside the body height and visually connect into an inverted trapezoid. Because the surface is semi-transparent, the overlapped region appears darker than the surrounding body.",
+    "reproduction": "1. Show a center dockzone surface with visible content.\n2. Observe the top-left and top-right ear regions where they meet the center body.\n3. Notice that both ears extend inward inside the body area and connect visually.\n4. With the current semi-transparent surface fill, the overlapped region appears darker than the surrounding body.",
+    "scope": "Adjust the center dockzone ear/body rendering so the internal overlap is removed. Keep the existing left and right dockzone rendering behavior unchanged unless a minimal shared rendering change is required to preserve the same outer result.",
+    "blocking_questions": [],
+    "non_blocking_questions": [],
+    "needs_bug_clarification": true
+  },
+  "validation_revision": null,
+  "verification_status": "not_started",
+  "related_files": [],
+  "context_sources": [],
+  "decision_refs": [],
+  "deferred_option_refs": [],
+  "subtasks": [],
+  "locks": [],
+  "progress": 99,
+  "impact": [
+    "modules/island/IslandBody.qml,modules/bar/DockzoneSurfaceRoot.qml"
+  ],
+  "last_note": "Applied 1px ear/body seam overlap on island and shared dockzone paths; static verification running.",
+  "last_event_seq": 1,
+  "created_at": "2026-05-24T01:16:27+00:00",
+  "updated_at": "2026-05-24T11:57:05+00:00"
+}

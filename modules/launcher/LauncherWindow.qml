@@ -27,8 +27,8 @@ Variants {
         Region {
             id: launcherBlurRegion
 
-            item: Services.LauncherService.visible ? launcherPanelBlurInset : null
-            radius: Math.max(0, launcherPanelSurface.radius - Services.SettingsService.blurRegionInset)
+            item: Services.LauncherService.visible ? launcherPanelBlurSource : null
+            radius: launcherPanelSurface.radius
         }
 
         // Dim backdrop
@@ -56,19 +56,26 @@ Variants {
             height: parent.height * 0.7
             radius: 18
             color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
-            border.color: Services.Color.mOutline
-            border.width: 1
 
+            // Full-size blur source — covers the entire visible fill geometry.
             Item {
-                id: launcherPanelBlurInset
+                id: launcherPanelBlurSource
 
                 anchors.fill: parent
-                anchors.margins: Services.SettingsService.blurRegionInset
             }
 
             LauncherContent {
                 anchors.fill: parent
                 anchors.margins: 12
+            }
+
+            // Border overlay rendered above all content.
+            Rectangle {
+                anchors.fill: parent
+                radius: launcherPanelSurface.radius
+                color: "transparent"
+                border.color: Services.Color.mOutline
+                border.width: 1
             }
         }
     }

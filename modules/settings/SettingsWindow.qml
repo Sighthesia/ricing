@@ -38,8 +38,8 @@ Variants {
         Region {
             id: settingsBlurRegion
 
-            item: Services.SettingsService.panelVisible ? settingsSurfaceBlurInset : null
-            radius: Math.max(0, settingsSurface.radius - Services.SettingsService.blurRegionInset)
+            item: Services.SettingsService.panelVisible ? settingsSurfaceBlurSource : null
+            radius: settingsSurface.radius
         }
 
         function toggle() { Services.SettingsService.togglePanel() }
@@ -56,14 +56,12 @@ Variants {
             anchors.margins: 8
             radius: 12
             color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
-            border.color: Services.Color.mOutline
-            border.width: 1
 
+            // Full-size blur source — covers the entire visible fill geometry.
             Item {
-                id: settingsSurfaceBlurInset
+                id: settingsSurfaceBlurSource
 
                 anchors.fill: parent
-                anchors.margins: Services.SettingsService.blurRegionInset
             }
 
             // Inner padding wrapper
@@ -74,6 +72,15 @@ Variants {
                 SettingsContent {
                     anchors.fill: parent
                 }
+            }
+
+            // Border overlay rendered above all content.
+            Rectangle {
+                anchors.fill: parent
+                radius: settingsSurface.radius
+                color: "transparent"
+                border.color: Services.Color.mOutline
+                border.width: 1
             }
         }
     }

@@ -75,7 +75,7 @@ Item {
         && root._detailProgress >= 0.999
         && root._revealProgress >= 0.999
     )
-    readonly property Item blurSourceItem: surfaceBlurInset
+    readonly property Item blurSourceItem: surfaceBlurSource
     readonly property bool providesPrimaryWidth: !!(root.capsule && root.capsule.isCurrent)
     readonly property real _maxCapsuleWidth: Math.max(
         root._metrics.height,
@@ -182,15 +182,13 @@ Item {
         height: root.height
         radius: height / 2
         color: root._surfaceColor
-        border.color: root._outlineColor
-        border.width: 1
         antialiasing: true
 
+        // Full-size blur source — covers the entire visible fill geometry.
         Item {
-            id: surfaceBlurInset
+            id: surfaceBlurSource
 
             anchors.fill: parent
-            anchors.margins: Services.SettingsService.blurRegionInset
         }
 
         // Center the workspace label and icon strip inside the capsule.
@@ -508,6 +506,15 @@ Item {
                     visible: text !== "" && root._emphasis >= 0.35
                 }
             }
+        }
+
+        // Border overlay rendered above all content.
+        Rectangle {
+            anchors.fill: parent
+            radius: surface.radius
+            color: "transparent"
+            border.color: root._outlineColor
+            border.width: 1
         }
     }
 }

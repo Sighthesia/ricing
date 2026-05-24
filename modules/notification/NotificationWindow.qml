@@ -42,7 +42,7 @@ Variants {
                 required property Item modelData
 
                 item: modelData.visible && modelData.blurSourceItem ? modelData.blurSourceItem : null
-                radius: Math.max(0, 12 - Services.SettingsService.blurRegionInset)
+                radius: 12
             }
         }
 
@@ -69,21 +69,19 @@ Variants {
                 Rectangle {
                     id: card
 
-                    readonly property Item blurSourceItem: cardBlurInset
+                    readonly property Item blurSourceItem: cardBlurSource
 
                     width: 344
                     height: 64
                     radius: 12
                     color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
-                    border.color: Services.Color.mOutline
-                    border.width: 1
                     opacity: 1
 
+                    // Full-size blur source — covers the entire visible fill geometry.
                     Item {
-                        id: cardBlurInset
+                        id: cardBlurSource
 
                         anchors.fill: parent
-                        anchors.margins: Services.SettingsService.blurRegionInset
                     }
 
                     // Auto-dismiss timer
@@ -161,6 +159,15 @@ Variants {
                             duration: 5000
                             running: true
                         }
+                    }
+
+                    // Border overlay rendered above all content.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: card.radius
+                        color: "transparent"
+                        border.color: Services.Color.mOutline
+                        border.width: 1
                     }
                 }
             }

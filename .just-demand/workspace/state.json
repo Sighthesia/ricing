@@ -2,9 +2,23 @@
   "schema_version": "1.0",
   "current_intake_id": null,
   "current_task_id": null,
-  "active_task_ids": [],
-  "active_sessions": {},
-  "last_event_seq": 0,
+  "active_task_ids": [
+    "2026-05-24-center-dockzone-ear-task",
+    "2026-05-24-blur-task"
+  ],
+  "active_sessions": {
+    "main": {
+      "current_intake_id": "2026-05-24-blur-intake",
+      "current_task_id": null,
+      "updated_at": "2026-05-24T12:40:44+00:00"
+    },
+    "opencode-main": {
+      "current_intake_id": "2026-05-24-dockzone-blur-geometry-refactor-intake",
+      "current_task_id": null,
+      "updated_at": "2026-05-24T10:10:49+00:00"
+    }
+  },
+  "last_event_seq": 47,
   "locks_summary": [],
-  "updated_at": ""
+  "updated_at": "2026-05-24T13:22:04+00:00"
 }

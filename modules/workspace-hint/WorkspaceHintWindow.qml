@@ -487,7 +487,7 @@ Variants {
                 required property Item modelData
 
                 item: modelData.visible && modelData.blurActive && modelData.blurSourceItem ? modelData.blurSourceItem : null
-                radius: Math.max(0, (modelData.height / 2) - Services.SettingsService.blurRegionInset)
+                radius: modelData.height / 2
             }
         }
 

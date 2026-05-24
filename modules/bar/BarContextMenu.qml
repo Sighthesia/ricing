@@ -35,8 +35,8 @@ Variants {
         Region {
             id: contextMenuBlurRegion
 
-            item: Services.BarLayoutService.contextMenuVisible ? menuSurfaceBlurInset : null
-            radius: Math.max(0, menuSurface.radius - Services.SettingsService.blurRegionInset)
+            item: Services.BarLayoutService.contextMenuVisible ? menuSurfaceBlurSource : null
+            radius: menuSurface.radius
         }
 
         // Menu surface positioned below the bar at the click X.
@@ -53,17 +53,15 @@ Variants {
             height: menuColumn.implicitHeight + 16
             radius: 10
             color: Qt.rgba(0.10, 0.10, 0.10, Services.SettingsService.panelSurfaceOpacity)
-            border.color: "#3a3a3a"
-            border.width: 1
             opacity: Services.BarLayoutService.contextMenuVisible ? 1 : 0
             scale: Services.BarLayoutService.contextMenuVisible ? 1 : 0.92
             transformOrigin: Item.Top
 
+            // Full-size blur source — covers the entire visible fill geometry.
             Item {
-                id: menuSurfaceBlurInset
+                id: menuSurfaceBlurSource
 
                 anchors.fill: parent
-                anchors.margins: Services.SettingsService.blurRegionInset
             }
 
             Behavior on opacity { NumberAnimation { duration: Services.Motion.popup.opacityDuration; easing.type: Services.Motion.popup.opacityEasing } }
@@ -155,6 +153,15 @@ Variants {
                         Services.BarLayoutService.closeContextMenu()
                     }
                 }
+            }
+
+            // Border overlay rendered above all content.
+            Rectangle {
+                anchors.fill: parent
+                radius: menuSurface.radius
+                color: "transparent"
+                border.color: "#3a3a3a"
+                border.width: 1
             }
         }
 
