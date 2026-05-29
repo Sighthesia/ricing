@@ -126,12 +126,16 @@ Singleton {
         : (root.currentLyric !== ""
             ? root.currentLyric
             : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : ""))
-    readonly property string compactPrimaryLyric: root._compactDisplayedLyric
-    readonly property string compactPrimaryLyricKey: root._compactDisplayedLyricKey
+    readonly property string compactPrimaryLyric: root._isInstrumentalLyric(root._compactDisplayedLyric) ? "" : root._compactDisplayedLyric
+    readonly property string compactPrimaryLyricKey: root._isInstrumentalLyric(root._compactDisplayedLyric) ? "" : root._compactDisplayedLyricKey
     readonly property bool showCompactLyric:
         root.preferLyrics && root.compactPrimaryLyric !== ""
     readonly property real progress:
         root.lengthMs > 0 ? Math.max(0, Math.min(1, root.positionMs / root.lengthMs)) : 0
+
+    function _isInstrumentalLyric(text) {
+        return text === "纯音乐，请欣赏" || text === "纯音乐，请欣赏。"
+    }
 
     function _lyricKey(prefix, phase, index, text) {
         if (text === "")

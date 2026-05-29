@@ -87,4 +87,17 @@ TestCase {
 
         compare(Services.NeteaseWebLyricsService.currentLyric, "Line two")
     }
+
+    function test_instrumental_lyric_should_not_display_compact_lyric() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.currentLyric = "纯音乐，请欣赏"
+        Services.NeteaseWebLyricsService.hasLyrics = true
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactPrimaryLyric === ""
+        }, 1000)
+
+        compare(Services.MediaControlService.showCompactLyric, false)
+    }
 }
