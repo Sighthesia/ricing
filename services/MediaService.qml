@@ -67,6 +67,27 @@ Singleton {
 
     signal mediaChanged()
 
+    function _cloneArtCache(cache) {
+        if (!cache || typeof cache !== "object")
+            return ({})
+
+        return Object.assign({}, cache)
+    }
+
+    function _rememberArtContext(playerKey, artKey, trackTitle, trackArtist) {
+        root._lastArtPlayerKey = playerKey
+        root._lastArtKey = artKey
+        root._lastArtTitle = trackTitle
+        root._lastArtArtist = trackArtist
+    }
+
+    function _applyLoadedArtCache(cache) {
+        root._artUrlCache = root._cloneArtCache(cache)
+
+        if (root.hasPlayer)
+            root._syncArtUrl()
+    }
+
     function _artPlayerKey(player) {
         if (!player)
             return ""
@@ -105,7 +126,8 @@ Singleton {
     function _cacheArtUrl(artKey, artUrl) {
         if (!artKey || !artUrl)
             return
-        const cache = root._artUrlCache
+
+        const cache = root._cloneArtCache(root._artUrlCache)
         const keys = Object.keys(cache)
         if (keys.length >= 200) {
             const oldestKey = keys[0]
@@ -185,19 +207,17 @@ Singleton {
         const trackTitle = player.trackTitle || ""
         const trackArtist = player.trackArtist || ""
         const nextArtUrl = player.trackArtUrl || ""
+        const trackChanged = artKey !== root._lastSeenArtKey
 
         // Track changed: reset recovery timer so new track gets full window.
-        if (artKey !== root._lastSeenArtKey) {
+        if (trackChanged) {
             root._lastSeenArtKey = artKey
             root._artRecoveryStartedAt = 0
         }
 
         // Player provides art URL directly: use and cache it.
         if (nextArtUrl !== "") {
-            root._lastArtPlayerKey = playerKey
-            root._lastArtKey = artKey
-            root._lastArtTitle = trackTitle
-            root._lastArtArtist = trackArtist
+            root._rememberArtContext(playerKey, artKey, trackTitle, trackArtist)
             root.artUrl = nextArtUrl
             root._artRecoveryPending = false
             root._artRecoveryStartedAt = 0
@@ -208,18 +228,25 @@ Singleton {
         // Art URL empty: check track-level cache for previously seen art.
         const cachedArt = root._lookupCachedArtUrl(artKey)
         if (cachedArt !== "") {
-            root._lastArtPlayerKey = playerKey
-            root._lastArtKey = artKey
-            root._lastArtTitle = trackTitle
-            root._lastArtArtist = trackArtist
+            root._rememberArtContext(playerKey, artKey, trackTitle, trackArtist)
             root.artUrl = cachedArt
             root._artRecoveryPending = false
             root._artRecoveryStartedAt = 0
             return
         }
 
+        // New track without art yet: clear the previous track's cover immediately.
+        if (trackChanged) {
+            root._rememberArtContext(playerKey, artKey, trackTitle, trackArtist)
+            root.artUrl = ""
+            root._artRecoveryPending = artKey !== ""
+            root._artRecoveryStartedAt = root._artRecoveryPending ? Date.now() : 0
+            return
+        }
+
         // No cache hit: enter recovery mode to wait for delayed art URL.
-        if (root.artUrl !== "" && playerKey === root._lastArtPlayerKey) {
+        if (root.artUrl !== "" && artKey !== "" && artKey === root._lastArtKey
+                && playerKey === root._lastArtPlayerKey) {
             if (root._artRecoveryStartedAt === 0)
                 root._artRecoveryStartedAt = Date.now()
 
@@ -231,13 +258,12 @@ Singleton {
             root.artUrl = ""
         }
 
-        root._lastArtPlayerKey = playerKey
-        root._lastArtKey = artKey
-        root._lastArtTitle = trackTitle
-        root._lastArtArtist = trackArtist
+        root._rememberArtContext(playerKey, artKey, trackTitle, trackArtist)
         if (root.artUrl === "") {
-            root._artRecoveryPending = false
-            root._artRecoveryStartedAt = 0
+            root._artRecoveryPending = artKey !== ""
+            root._artRecoveryStartedAt = root._artRecoveryPending && root._artRecoveryStartedAt === 0
+                ? Date.now()
+                : root._artRecoveryStartedAt
         } else {
             root._artRecoveryPending = true
             if (root._artRecoveryStartedAt === 0)
@@ -416,8 +442,6 @@ Singleton {
     }
 
     Component.onCompleted: {
-        if (Object.keys(artCacheAdapter.artUrlCache).length > 0)
-            root._artUrlCache = artCacheAdapter.artUrlCache
         root._syncActivePlayer()
         root._syncArtUrl()
     }
@@ -425,11 +449,18 @@ Singleton {
     // Persist the art URL cache across shell reloads.
     property FileView artCacheFile: FileView {
         id: artCacheFile
+
         path: Quickshell.cacheDir + "/media-art-cache.json"
+        watchChanges: true
         blockLoading: true
+        onFileChanged: reload()
+        onLoaded: root._applyLoadedArtCache(artCacheAdapter.artUrlCache)
         onLoadFailed: error => {
-            if (error === FileViewError.FileNotFound)
+            if (error === FileViewError.FileNotFound) {
                 artCacheFile.writeAdapter()
+            } else {
+                console.warn("MediaService: failed to load media-art-cache.json, error =", error)
+            }
         }
 
         JsonAdapter {
