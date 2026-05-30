@@ -233,114 +233,260 @@ Item {
                     }
                 }
 
-                // Show all window titles for the focused workspace.
-                Row {
+                // Host the moving focus indicator and the title cards in one layer.
+                Item {
                     id: windowTitleRow
-                    spacing: CapsuleMetrics.inlineGap
 
-                    Repeater {
-                        model: root._isPrimaryCapsule ? root._activeWindows : []
+                    property real focusedIndicatorX: 0
+                    property real focusedIndicatorY: 0
+                    property real focusedIndicatorWidth: 0
+                    property real focusedIndicatorHeight: 32
+                    property bool focusedIndicatorVisible: false
 
-                        delegate: Rectangle {
-                            required property var modelData
-                            required property int index
+                    function syncFocusedIndicatorGeometry() {
+                        for (let index = 0; index < titleCardRepeater.count; index++) {
+                            const item = titleCardRepeater.itemAt(index)
+                            if (!item || !item.isFocusedCard)
+                                continue
 
-                            readonly property real _cardProgress: root._detailProgress
-                            readonly property real _collapsedCardWidth: modelData.icon ? 30 : 16
-                            readonly property real _naturalTitleWidth: {
-                                const measureItem = primaryMeasureRepeater.itemAt(index)
-                                return measureItem ? measureItem.naturalTitleWidth : Math.max(24, Math.ceil(titleText.implicitWidth))
+                            focusedIndicatorX = item.x
+                            focusedIndicatorY = item.y
+                            focusedIndicatorWidth = item.width
+                            focusedIndicatorHeight = item.height
+                            focusedIndicatorVisible = root._detailProgress > 0.01
+                            return
+                        }
+
+                        focusedIndicatorVisible = false
+                    }
+
+                    width: titleCardContent.implicitWidth
+                    height: Math.max(titleCardContent.implicitHeight, 32)
+
+                    onWidthChanged: focusedIndicatorSync.restart()
+                    onHeightChanged: focusedIndicatorSync.restart()
+
+                    // Defer geometry sampling until the row layout has settled.
+                    Timer {
+                        id: focusedIndicatorSync
+
+                        interval: 0
+                        repeat: false
+                        onTriggered: windowTitleRow.syncFocusedIndicatorGeometry()
+                    }
+
+                    // Move one persistent highlight surface between focused title cards.
+                    Rectangle {
+                        id: focusedTitleIndicator
+
+                        x: windowTitleRow.focusedIndicatorX
+                        y: windowTitleRow.focusedIndicatorY
+                        width: windowTitleRow.focusedIndicatorWidth
+                        height: windowTitleRow.focusedIndicatorHeight
+                        radius: height / 2
+                        color: Qt.rgba(
+                            Services.Color.mPrimary.r,
+                            Services.Color.mPrimary.g,
+                            Services.Color.mPrimary.b,
+                            0.28 + (0.12 * root._detailProgress)
+                        )
+                        border.width: 0
+                        opacity: windowTitleRow.focusedIndicatorVisible ? 1 : 0
+                        visible: opacity > 0
+                        z: 0
+                        scale: 1
+                        antialiasing: true
+
+                        Behavior on x {
+                            NumberAnimation {
+                                duration: Services.Motion.number.contentDuration + 40
+                                easing.type: Services.Motion.number.contentEasing
                             }
-                            readonly property real _cardBaseWidth: (modelData.icon ? 21 : 0) + CapsuleMetrics.compactInnerHorizontal
-                            readonly property real _expandedTitleWidth: Math.min(
-                                root._cardTitleWidthCap,
-                                _naturalTitleWidth
-                            )
-                            readonly property real _expandedCardWidth: _cardBaseWidth + _expandedTitleWidth
+                        }
 
-                            width: _collapsedCardWidth + ((_expandedCardWidth - _collapsedCardWidth) * _cardProgress)
-                            height: 32
-                            radius: height / 2
-                            color: modelData.isFocused
-                                ? Qt.rgba(
-                                    Services.Color.mPrimary.r,
-                                    Services.Color.mPrimary.g,
-                                    Services.Color.mPrimary.b,
-                                    0.18
-                                )
-                                : Qt.rgba(
-                                    Services.Color.mSurfaceVariant.r,
-                                    Services.Color.mSurfaceVariant.g,
-                                    Services.Color.mSurfaceVariant.b,
-                                    0.35
-                                )
+                        Behavior on y {
+                            NumberAnimation {
+                                duration: Services.Motion.number.contentDuration + 40
+                                easing.type: Services.Motion.number.contentEasing
+                            }
+                        }
 
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: Services.Motion.number.shortDuration
-                                    easing.type: Services.Motion.number.shortEasing
+                        Behavior on width {
+                            NumberAnimation {
+                                duration: Services.Motion.number.contentDuration + 60
+                                easing.type: Services.Motion.number.contentEasing
+                            }
+                        }
+
+                        Behavior on height {
+                            NumberAnimation {
+                                duration: Services.Motion.number.contentDuration + 60
+                                easing.type: Services.Motion.number.contentEasing
+                            }
+                        }
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: Services.Motion.number.shortDuration
+                                easing.type: Services.Motion.number.shortEasing
+                            }
+                        }
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Services.Motion.number.shortDuration
+                                easing.type: Services.Motion.number.shortEasing
+                            }
+                        }
+
+                    }
+
+                    // Keep the title-card row geometry stable above the moving indicator.
+                    Row {
+                        id: titleCardContent
+
+                        spacing: CapsuleMetrics.inlineGap
+                        z: 1
+
+                        Repeater {
+                            id: titleCardRepeater
+
+                            model: root._isPrimaryCapsule ? root._activeWindows : []
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                required property int index
+                                property bool isFocusedCard: !!modelData.isFocused
+
+                                readonly property real _cardProgress: root._detailProgress
+                                readonly property real _collapsedCardWidth: modelData.icon ? 30 : 16
+                                readonly property real _naturalTitleWidth: {
+                                    const measureItem = primaryMeasureRepeater.itemAt(index)
+                                    return measureItem ? measureItem.naturalTitleWidth : Math.max(24, Math.ceil(titleText.implicitWidth))
                                 }
-                            }
+                                readonly property real _cardBaseWidth: (modelData.icon ? 21 : 0) + CapsuleMetrics.compactInnerHorizontal
+                                readonly property real _expandedTitleWidth: Math.min(
+                                    root._cardTitleWidthCap,
+                                    _naturalTitleWidth
+                                )
+                                readonly property real _expandedCardWidth: _cardBaseWidth + _expandedTitleWidth
 
-                            // Keep the focus dot and title aligned like the original hint.
-                            Row {
-                                id: winCardRow
-                                anchors.centerIn: parent
-                                spacing: 6
+                                width: _collapsedCardWidth + ((_expandedCardWidth - _collapsedCardWidth) * _cardProgress)
+                                height: 32
+                                radius: height / 2
+                                color: modelData.isFocused
+                                    ? "transparent"
+                                    : Qt.rgba(
+                                        Services.Color.mSurfaceVariant.r,
+                                        Services.Color.mSurfaceVariant.g,
+                                        Services.Color.mSurfaceVariant.b,
+                                        0.35
+                                    )
+                                border.width: modelData.isFocused ? 0 : 1
+                                border.color: Qt.rgba(
+                                    Services.Color.mOutline.r,
+                                    Services.Color.mOutline.g,
+                                    Services.Color.mOutline.b,
+                                    0.08 + (0.06 * root._detailProgress)
+                                )
+                                z: 1
 
-                                // Show the window icon inside each title card.
-                                Item {
-                                    width: modelData.icon ? 16 : 0
-                                    height: 16
+                                Behavior on color {
+                                    ColorAnimation {
+                                        duration: Services.Motion.number.shortDuration
+                                        easing.type: Services.Motion.number.shortEasing
+                                    }
+                                }
 
-                                    Behavior on width {
-                                        NumberAnimation {
-                                            duration: Services.Motion.number.contentDuration
-                                            easing.type: Services.Motion.number.contentEasing
+                                Behavior on border.width {
+                                    NumberAnimation {
+                                        duration: Services.Motion.number.shortDuration
+                                        easing.type: Services.Motion.number.shortEasing
+                                    }
+                                }
+
+                                Behavior on border.color {
+                                    ColorAnimation {
+                                        duration: Services.Motion.number.shortDuration
+                                        easing.type: Services.Motion.number.shortEasing
+                                    }
+                                }
+
+                                onIsFocusedCardChanged: focusedIndicatorSync.restart()
+                                onXChanged: if (isFocusedCard) focusedIndicatorSync.restart()
+                                onYChanged: if (isFocusedCard) focusedIndicatorSync.restart()
+                                onWidthChanged: if (isFocusedCard) focusedIndicatorSync.restart()
+                                onHeightChanged: if (isFocusedCard) focusedIndicatorSync.restart()
+                                Component.onCompleted: focusedIndicatorSync.restart()
+
+                                // Keep the focus dot and title aligned like the original hint.
+                                Row {
+                                    id: winCardRow
+                                    anchors.centerIn: parent
+                                    spacing: 6
+
+                                    // Show the window icon inside each title card.
+                                    Item {
+                                        width: modelData.icon ? 16 : 0
+                                        height: 16
+
+                                        Behavior on width {
+                                            NumberAnimation {
+                                                duration: Services.Motion.number.contentDuration
+                                                easing.type: Services.Motion.number.contentEasing
+                                            }
+                                        }
+
+                                        IconImage {
+                                            anchors.fill: parent
+                                            source: modelData.icon || ""
+                                            implicitSize: 16
+                                            visible: parent.width > 0
                                         }
                                     }
 
-                                    IconImage {
-                                        anchors.fill: parent
-                                        source: modelData.icon || ""
-                                        implicitSize: 16
-                                        visible: parent.width > 0
+                                    // Show one window title using the old elide rules.
+                                    Text {
+                                        id: titleText
+
+                                        text: modelData.title || ""
+                                        font.pixelSize: Services.TextSize.barContent
+                                        font.bold: modelData.isFocused
+                                        color: modelData.isFocused
+                                            ? Services.Color.mOnSurface
+                                            : Services.Color.mOnSurfaceVariant
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                        width: _expandedTitleWidth * root._detailProgress
+                                        opacity: root._detailProgress
+                                        visible: width > 0.5 || opacity > 0.01
+
+                                        Behavior on color {
+                                            ColorAnimation {
+                                                duration: Services.Motion.number.shortDuration
+                                                easing.type: Services.Motion.number.shortEasing
+                                            }
+                                        }
                                     }
-                                }
-
-                                // Show one window title using the old elide rules.
-                                Text {
-                                    id: titleText
-
-                                    text: modelData.title || ""
-                                    font.pixelSize: Services.TextSize.barContent
-                                    font.bold: modelData.isFocused
-                                    color: modelData.isFocused
-                                        ? Services.Color.mOnSurface
-                                        : Services.Color.mOnSurfaceVariant
-                                    elide: Text.ElideRight
-                                    maximumLineCount: 1
-                                    width: _expandedTitleWidth * root._detailProgress
-                                    opacity: root._detailProgress
-                                    visible: width > 0.5 || opacity > 0.01
                                 }
                             }
                         }
-                    }
 
-                    Item {
-                        width: root._primaryTrailingPadding
-                        height: 1
-                        visible: width > 0
-                    }
+                        // Keep the trailing content padding inside the measured row.
+                        Item {
+                            width: root._primaryTrailingPadding
+                            height: 1
+                            visible: width > 0
+                        }
 
-                    // Preserve the empty focused-workspace fallback.
-                    Text {
-                        visible: root._isPrimaryCapsule && root._isEmptyWorkspace
-                        text: "空工作区"
-                        font.pixelSize: Services.TextSize.barContent
-                        color: Services.Color.mOnSurfaceVariant
-                        opacity: 0.5
+                        // Preserve the empty focused-workspace fallback.
+                        Text {
+                            visible: root._isPrimaryCapsule && root._isEmptyWorkspace
+                            text: "空工作区"
+                            font.pixelSize: Services.TextSize.barContent
+                            color: Services.Color.mOnSurfaceVariant
+                            opacity: 0.5
+                        }
                     }
                 }
             }
