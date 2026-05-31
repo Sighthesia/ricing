@@ -78,7 +78,10 @@ Item {
         return parts
     }
 
-    // Blur source parts for the center island body and top ears.
+    // Blur source parts for the center island body and top ears. The body
+    // source leads inward during collapse (see bodyBlurSource) so the async,
+    // polish-coalesced compositor blur region never spills past the silhouette
+    // while it lags the per-frame size.
     readonly property var blurParts: [
         {
             item: bodyBlurSource,
@@ -246,11 +249,38 @@ Item {
         height: root.height
         clip: true
 
-        // Full-size blur source — covers the entire body geometry for complete blur edge coverage.
+        // Velocity-based shrink lead for the blur source. The async,
+        // polish-coalesced compositor blur region trails the per-frame body
+        // size, so during a fast collapse the lagged region would spill past
+        // the shrinking silhouette. We lead the blur inward by an amount
+        // proportional to the current per-frame shrink speed: zero at rest and
+        // at motion onset (no sudden jump), largest mid-collapse (absorbs the
+        // lag), zero again once settled (blur sits flush). Expansion never
+        // overflows, so growth produces no lead.
+        readonly property real blurLeadFactor: 3
+        property real blurLeadW: 0
+        property real blurLeadH: 0
+        property real _lastW: width
+        property real _lastH: height
+        onWidthChanged: {
+            blurLeadW = Math.max(0, _lastW - width) * blurLeadFactor
+            _lastW = width
+        }
+        onHeightChanged: {
+            blurLeadH = Math.max(0, _lastH - height) * blurLeadFactor
+            _lastH = height
+        }
+
+        // Blur source for the body. Follows the live body size continuously so
+        // the blur shrinks smoothly with the silhouette, inset by the velocity
+        // lead on the three edges that move during collapse (bottom, left,
+        // right); the top edge is pinned to the screen and never overflows.
         Item {
             id: bodyBlurSource
-
-            anchors.fill: parent
+            x: Math.min(bodyRect.blurLeadW / 2, bodyRect.width / 2)
+            y: 0
+            width: Math.max(0, bodyRect.width - bodyRect.blurLeadW)
+            height: Math.max(0, bodyRect.height - bodyRect.blurLeadH)
         }
 
         // --- Collapsed content: center widgets or fallback clock ---
