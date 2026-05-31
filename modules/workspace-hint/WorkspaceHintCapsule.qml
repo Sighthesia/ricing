@@ -482,7 +482,7 @@ Item {
 
                                         text: modelData.title || ""
                                         font.pixelSize: Services.TextSize.barContent
-                                        font.bold: modelData.isFocused
+                                        font.bold: false
                                         color: modelData.isFocused
                                             ? Services.Color.mOnSurface
                                             : Services.Color.mOnSurfaceVariant
