@@ -25,7 +25,6 @@ Item {
     readonly property real collapsedContentWidth: collapsedContentLoader.item
         ? collapsedContentLoader.item.implicitWidth + collapsedHorizontalPadding
         : collapsedW
-    readonly property int seamOverlap: 1
 
     // Animated dimensions driven by island state and passive hover intent.
     property int targetW: Services.IslandService.expanded
@@ -43,13 +42,9 @@ Item {
     implicitWidth: width
     implicitHeight: height
 
-    onSurfaceColorChanged: {
-        bodyFill.requestPaint()
-        leftEar.requestPaint()
-        rightEar.requestPaint()
-    }
+    onSurfaceColorChanged: silhouetteFill.requestPaint()
 
-    onBodyRadiusChanged: bodyFill.requestPaint()
+    onBodyRadiusChanged: silhouetteFill.requestPaint()
 
     property real bodyRadius: targetR
     readonly property int earBlurStripCount: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset * 2)
@@ -137,33 +132,84 @@ Item {
         id: hoverHandler
     }
 
-    // --- Left ear (connects body to screen top-left) ---
+    // --- Unified silhouette fill ---
+    // Paint the body and both top ears as one continuous path in a single
+    // fill() pass. A single fill applies the semi-transparent surface alpha
+    // exactly once per pixel even where subpaths meet, so the ear/body joins
+    // have no double-blended seam or sub-pixel gap.
     Canvas {
+        id: silhouetteFill
+        anchors.fill: parent
+        antialiasing: true
+
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.clearRect(0, 0, width, height)
+
+            var er = root.earRadius
+            var bodyX = bodyRect.x
+            var bodyW = bodyRect.width
+            var bodyH = bodyRect.height
+
+            if (bodyW <= 0 || bodyH <= 0)
+                return
+
+            var bodyRightX = bodyX + bodyW
+            var radius = Math.min(root.bodyRadius, bodyW / 2, bodyH / 2)
+            var hasEars = leftEar.visible && rightEar.visible
+
+            ctx.fillStyle = root.surfaceColor
+            ctx.beginPath()
+
+            if (hasEars) {
+                // One continuous outline: left ear -> top -> right ear -> body
+                // -> rounded bottom -> body left -> back into left ear. A single
+                // closed path filled once means the ear/body joins are interior
+                // edges with no antialiased seam and no sub-pixel gap.
+                ctx.moveTo(leftEar.x, 0)
+                ctx.lineTo(bodyRightX + er, 0)
+                // Right ear concave fillet: (bodyRightX + er, 0) -> (bodyRightX, er).
+                ctx.arc(bodyRightX + er, er, er, 1.5 * Math.PI, Math.PI, true)
+                ctx.lineTo(bodyRightX, bodyH - radius)
+                ctx.quadraticCurveTo(bodyRightX, bodyH, bodyRightX - radius, bodyH)
+                ctx.lineTo(bodyX + radius, bodyH)
+                ctx.quadraticCurveTo(bodyX, bodyH, bodyX, bodyH - radius)
+                ctx.lineTo(bodyX, er)
+                // Left ear concave fillet: (bodyX, er) -> (leftEar.x, 0).
+                ctx.arc(leftEar.x, er, er, 0, -0.5 * Math.PI, true)
+                ctx.closePath()
+            } else {
+                // Body only: square top, rounded bottom corners.
+                ctx.moveTo(bodyX, 0)
+                ctx.lineTo(bodyRightX, 0)
+                ctx.lineTo(bodyRightX, bodyH - radius)
+                ctx.quadraticCurveTo(bodyRightX, bodyH, bodyRightX - radius, bodyH)
+                ctx.lineTo(bodyX + radius, bodyH)
+                ctx.quadraticCurveTo(bodyX, bodyH, bodyX, bodyH - radius)
+                ctx.closePath()
+            }
+
+            ctx.fill()
+        }
+
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+
+        Connections {
+            target: Services.Color
+            function onMSurfaceChanged() { silhouetteFill.requestPaint() }
+        }
+    }
+
+    // --- Left ear geometry (connects body to screen top-left) ---
+    // Geometry-only marker: positions the blur strips and the silhouette path.
+    Item {
         id: leftEar
         x: bodyRect.x - earRadius
         y: 0
         width: earRadius
         height: earRadius
-        antialiasing: true
         visible: root.height > 0
-
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
-            ctx.fillStyle = root.surfaceColor
-            ctx.beginPath()
-            ctx.moveTo(0, 0)
-            ctx.lineTo(width, 0)
-            ctx.lineTo(width, height)
-            ctx.arc(0, height, width, 0, -Math.PI / 2, true)
-            ctx.closePath()
-            ctx.fill()
-        }
-
-        Connections {
-            target: Services.Color
-            function onMSurfaceChanged() { leftEar.requestPaint() }
-        }
     }
 
     // Blur strips for the left top ear; each strip follows the Canvas arc math.
@@ -185,6 +231,7 @@ Item {
     }
 
     // --- Body shell ---
+    // Transparent clip container; the actual fill is painted by silhouetteFill.
     Item {
         id: bodyRect
         x: root.earRadius
@@ -192,56 +239,6 @@ Item {
         width: root.width - root.earRadius * 2
         height: root.height
         clip: true
-
-        // Paint the center body in one pass so semi-transparent fill does not self-overlap.
-        Canvas {
-            id: bodyFill
-
-            anchors.fill: parent
-            antialiasing: true
-
-            onPaint: {
-                var ctx = getContext("2d")
-                var w = width
-                var h = height
-                var radius = Math.min(root.bodyRadius, w / 2, h / 2)
-
-                ctx.clearRect(0, 0, w, h)
-                ctx.fillStyle = root.surfaceColor
-                ctx.beginPath()
-                ctx.moveTo(0, 0)
-                ctx.lineTo(w, 0)
-                ctx.lineTo(w, h - radius)
-                ctx.quadraticCurveTo(w, h, w - radius, h)
-                ctx.lineTo(radius, h)
-                ctx.quadraticCurveTo(0, h, 0, h - radius)
-                ctx.closePath()
-                ctx.fill()
-            }
-
-            onHeightChanged: requestPaint()
-            onWidthChanged: requestPaint()
-        }
-
-        // Overlap the left ear/body join by one pixel so antialiasing does not leave a seam.
-        Rectangle {
-            visible: leftEar.visible
-            x: 0
-            y: 0
-            width: root.seamOverlap
-            height: Math.min(root.earRadius, parent.height)
-            color: root.surfaceColor
-        }
-
-        // Overlap the right ear/body join by one pixel so antialiasing does not leave a seam.
-        Rectangle {
-            visible: rightEar.visible
-            x: parent.width - root.seamOverlap
-            y: 0
-            width: root.seamOverlap
-            height: Math.min(root.earRadius, parent.height)
-            color: root.surfaceColor
-        }
 
         // Full-size blur source — covers the entire body geometry for complete blur edge coverage.
         Item {
@@ -363,32 +360,14 @@ Item {
         }
     }
 
-    // --- Right ear (connects body to screen top-right) ---
-    Canvas {
+    // --- Right ear geometry (connects body to screen top-right) ---
+    // Geometry-only marker: positions the blur strips and the silhouette path.
+    Item {
         id: rightEar
         x: bodyRect.x + bodyRect.width
         y: 0
         width: earRadius
         height: earRadius
-        antialiasing: true
         visible: root.height > 0
-
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
-            ctx.fillStyle = root.surfaceColor
-            ctx.beginPath()
-            ctx.moveTo(width, 0)
-            ctx.lineTo(0, 0)
-            ctx.lineTo(0, height)
-            ctx.arc(width, height, width, Math.PI, Math.PI * 1.5, false)
-            ctx.closePath()
-            ctx.fill()
-        }
-
-        Connections {
-            target: Services.Color
-            function onMSurfaceChanged() { rightEar.requestPaint() }
-        }
     }
 }

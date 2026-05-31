@@ -154,7 +154,6 @@ Item {
     readonly property bool isLeftSection: root.section === "left"
     readonly property bool isRightSection: root.section === "right"
     readonly property int earBlurStripCount: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset * 2)
-    readonly property int seamOverlap: 1
 
     function _earCutX(localY) {
         var radius = Math.max(1, root.earRadius)
@@ -207,13 +206,9 @@ Item {
         root._stripParts(rightBottomEarBlurStrips, rightBottomEar.visible)
     )
 
-    onFillColorChanged: {
-        leftEar.requestPaint()
-        centerBody.requestPaint()
-        leftBottomEar.requestPaint()
-        rightEar.requestPaint()
-        rightBottomEar.requestPaint()
-    }
+    onFillColorChanged: silhouetteFill.requestPaint()
+    onBorderColorChanged: silhouetteFill.requestPaint()
+    onMetricsChanged: silhouetteFill.requestPaint()
 
     // Root-level global motion envelope — body and ears inherit these so
     // the entire surface moves as one continuous object.
@@ -224,8 +219,92 @@ Item {
         y: root.model.globalMotion.translateY
     }
 
-    // Paint the shared left top ear for center and right sections.
+    // --- Unified silhouette fill + border ---
+    // Trace the whole section (body + its two ears) as ONE continuous outer
+    // contour, then fill once and stroke once. A single fill applies the
+    // semi-transparent surface alpha exactly once per pixel, so the ear/body
+    // joins have no double-blended seam. A single stroke follows only the true
+    // outer edge, so the border never paints a highlight line along the joins.
     Canvas {
+        id: silhouetteFill
+
+        z: 0
+        anchors.fill: parent
+        antialiasing: true
+        visible: root.model.state.visibilityProgress > 0
+
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.clearRect(0, 0, width, height)
+
+            var er = root.earRadius
+            var bx = root.bodyX
+            var by = root.bodyY
+            var bw = root.bodyWidth
+            var bh = root.bodyHeight
+
+            if (bw <= 0 || bh <= 0)
+                return
+
+            var bodyRightX = bx + bw
+            var radius = Math.min(root.bodyRadius, bw / 2, bh / 2)
+
+            ctx.fillStyle = root.fillColor
+            ctx.strokeStyle = root.borderColor
+            ctx.lineWidth = 1
+            ctx.beginPath()
+
+            if (root.isLeftSection) {
+                // Body (bodyX=0) + top-right ear + bottom-left ear.
+                ctx.moveTo(0, 0)
+                ctx.lineTo(bodyRightX + er, 0)
+                // Top-right ear concave fillet -> (bodyRightX, er).
+                ctx.arc(bodyRightX + er, er, er, -Math.PI / 2, -Math.PI, true)
+                ctx.lineTo(bodyRightX, bh - radius)
+                ctx.quadraticCurveTo(bodyRightX, bh, bodyRightX - radius, bh)
+                ctx.lineTo(er, bh)
+                // Bottom-left ear concave fillet centered at (er, bh + er):
+                // from (er, bh) down/out to (0, bh + er) at the screen edge.
+                ctx.arc(er, bh + er, er, -Math.PI / 2, -Math.PI, true)
+                ctx.lineTo(0, 0)
+            } else if (root.isRightSection) {
+                // Body (bodyX=er) + top-left ear + bottom-right ear.
+                ctx.moveTo(0, 0)
+                ctx.lineTo(bodyRightX, 0)
+                ctx.lineTo(bodyRightX, bh + er)
+                // Bottom-right ear concave fillet -> (bottomRightEarX, bh).
+                ctx.arc(bodyRightX - er, bh + er, er, 0, -Math.PI / 2, true)
+                ctx.lineTo(bx + radius, bh)
+                ctx.quadraticCurveTo(bx, bh, bx, bh - radius)
+                ctx.lineTo(bx, er)
+                // Top-left ear concave fillet -> (0, 0).
+                ctx.arc(0, er, er, 0, -Math.PI / 2, true)
+            } else {
+                // Center section (currently hidden): body with both bottom
+                // corners rounded and both top ears.
+                ctx.moveTo(0, 0)
+                ctx.lineTo(bodyRightX + er, 0)
+                ctx.arc(bodyRightX + er, er, er, -Math.PI / 2, -Math.PI, true)
+                ctx.lineTo(bodyRightX, bh - radius)
+                ctx.quadraticCurveTo(bodyRightX, bh, bodyRightX - radius, bh)
+                ctx.lineTo(bx + radius, bh)
+                ctx.quadraticCurveTo(bx, bh, bx, bh - radius)
+                ctx.lineTo(bx, er)
+                ctx.arc(bx - er, er, er, 0, -Math.PI / 2, true)
+            }
+
+            ctx.closePath()
+            ctx.fill()
+            ctx.stroke()
+        }
+
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+    }
+
+    // --- Left top ear geometry (center and right sections) ---
+    // Geometry-only marker: positions the blur strips and the silhouette path.
+    Item {
         id: leftEar
 
         z: 0
@@ -233,32 +312,11 @@ Item {
         y: 0
         width: root.earRadius
         height: root.earRadius
-        antialiasing: true
         visible: root.model.state.visibilityProgress > 0 && root.metrics.hasLeftTopEar
-        onPaint: {
-            var ctx = getContext("2d");
-            var w = width;
-            var h = height;
-            var curve = Math.min(w, h);
-            ctx.clearRect(0, 0, w, h);
-            ctx.fillStyle = root.fillColor;
-            ctx.strokeStyle = root.borderColor;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(w, 0);
-            ctx.lineTo(w, h);
-            ctx.arc(0, h, curve, 0, -Math.PI / 2, true);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        }
-        onHeightChanged: requestPaint()
-        onWidthChanged: requestPaint()
     }
 
-    // Paint the adaptive body between the edge decorations.
-    Canvas {
+    // Body geometry marker — drives the blur source and content positioning.
+    Item {
         id: centerBody
 
         z: 0
@@ -266,73 +324,12 @@ Item {
         y: root.bodyY
         width: root.bodyWidth
         height: root.bodyHeight
-        antialiasing: true
         visible: root.model.state.visibilityProgress > 0
-        onPaint: {
-            var ctx = getContext("2d");
-            var w = width;
-            var h = height;
-            var radius = Math.min(root.bodyRadius, w / 2, h / 2);
-            ctx.clearRect(0, 0, w, h);
-            ctx.fillStyle = root.fillColor;
-            ctx.strokeStyle = root.borderColor;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            if (root.isRightSection) {
-                // Right: only the bottom-left corner stays rounded.
-                ctx.moveTo(0, 0);
-                ctx.lineTo(w, 0);
-                ctx.lineTo(w, h);
-                ctx.lineTo(radius, h);
-                ctx.quadraticCurveTo(0, h, 0, h - radius);
-            } else if (root.isLeftSection) {
-                // Left: only the bottom-right corner stays rounded.
-                ctx.moveTo(0, 0);
-                ctx.lineTo(w, 0);
-                ctx.lineTo(w, h - radius);
-                ctx.quadraticCurveTo(w, h, w - radius, h);
-                ctx.lineTo(0, h);
-            } else {
-                // Center: both bottom corners rounded.
-                ctx.moveTo(0, 0);
-                ctx.lineTo(w, 0);
-                ctx.lineTo(w, h - radius);
-                ctx.quadraticCurveTo(w, h, w - radius, h);
-                ctx.lineTo(radius, h);
-                ctx.quadraticCurveTo(0, h, 0, h - radius);
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        }
-        onHeightChanged: requestPaint()
-        onWidthChanged: requestPaint()
-    }
-
-    // Overlap the left top ear/body join by one pixel so antialiasing does not leave a seam.
-    Rectangle {
-        z: 0.5
-        visible: leftEar.visible
-        x: centerBody.x
-        y: centerBody.y
-        width: root.seamOverlap
-        height: Math.min(root.earRadius, centerBody.height)
-        color: root.fillColor
-    }
-
-    // Overlap the right top ear/body join by one pixel so antialiasing does not leave a seam.
-    Rectangle {
-        z: 0.5
-        visible: rightEar.visible
-        x: centerBody.x + centerBody.width - root.seamOverlap
-        y: centerBody.y
-        width: root.seamOverlap
-        height: Math.min(root.earRadius, centerBody.height)
-        color: root.fillColor
     }
 
     // Keep the bar blur source in normal item geometry, not inside Canvas paint nodes.
-    // Full-size: covers the entire body geometry for complete blur edge coverage.
+    // Full-size: the blur region matches the painted body edge so the acrylic
+    // covers the fill completely with no un-blurred semi-transparent rim.
     Item {
         id: centerBodyBlurSource
 
@@ -416,8 +413,9 @@ Item {
         }
     }
 
-    // Paint the left-side bottom ear inside the unified surface tree.
-    Canvas {
+    // --- Left bottom ear geometry (left section) ---
+    // Geometry-only marker for the blur strips and silhouette path.
+    Item {
         id: leftBottomEar
 
         z: 0
@@ -425,37 +423,12 @@ Item {
         y: root.metrics.bottomEarY - 1
         width: root.earRadius
         height: root.earRadius
-        antialiasing: true
         visible: root.model.state.visibilityProgress > 0 && root.metrics.hasBottomLeftEar
-        onPaint: {
-            var ctx = getContext("2d");
-            var w = width;
-            var h = height;
-            var curve = Math.min(w, h);
-            ctx.clearRect(0, 0, w, h);
-            ctx.save();
-            ctx.translate(w / 2, h / 2);
-            ctx.rotate(Math.PI / 2);
-            ctx.translate(-w / 2, -h / 2);
-            ctx.fillStyle = root.fillColor;
-            ctx.strokeStyle = root.borderColor;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(w, h);
-            ctx.lineTo(0, h);
-            ctx.lineTo(0, 0);
-            ctx.arc(w, 0, curve, Math.PI, Math.PI / 2, true);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
-        }
-        onHeightChanged: requestPaint()
-        onWidthChanged: requestPaint()
     }
 
-    // Paint the shared right top ear for center and left sections.
-    Canvas {
+    // --- Right top ear geometry (center and left sections) ---
+    // Geometry-only marker for the blur strips and silhouette path.
+    Item {
         id: rightEar
 
         z: 0
@@ -463,31 +436,12 @@ Item {
         y: 0
         width: root.earRadius
         height: root.earRadius
-        antialiasing: true
         visible: root.model.state.visibilityProgress > 0 && root.metrics.hasTopRightEar
-        onPaint: {
-            var ctx = getContext("2d");
-            var w = width;
-            var h = height;
-            var curve = Math.min(w, h);
-            ctx.clearRect(0, 0, w, h);
-            ctx.fillStyle = root.fillColor;
-            ctx.strokeStyle = root.borderColor;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(0, h);
-            ctx.arc(w, h, curve, Math.PI, -Math.PI / 2, false);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        }
-        onHeightChanged: requestPaint()
-        onWidthChanged: requestPaint()
     }
 
-    // Paint the right-side bottom ear inside the unified surface tree.
-    Canvas {
+    // --- Right bottom ear geometry (right section) ---
+    // Geometry-only marker for the blur strips and silhouette path.
+    Item {
         id: rightBottomEar
 
         z: 0
@@ -495,26 +449,6 @@ Item {
         y: root.metrics.bottomEarY - 1
         width: root.earRadius
         height: root.earRadius
-        antialiasing: true
         visible: root.model.state.visibilityProgress > 0 && root.metrics.hasBottomRightEar
-        onPaint: {
-            var ctx = getContext("2d");
-            var w = width;
-            var h = height;
-            var curve = Math.min(w, h);
-            ctx.clearRect(0, 0, w, h);
-            ctx.fillStyle = root.fillColor;
-            ctx.strokeStyle = root.borderColor;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(w, 0);
-            ctx.lineTo(0, 0);
-            ctx.arc(0, h, curve, -Math.PI / 2, 0, false);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        }
-        onHeightChanged: requestPaint()
-        onWidthChanged: requestPaint()
     }
 }

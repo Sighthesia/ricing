@@ -13,7 +13,10 @@ QtObject {
     readonly property real panelSurfaceOpacity: appearance.enableBlur
         ? Math.min(appearance.panelOpacity, 0.62)
         : appearance.panelOpacity
-    readonly property int blurRegionInset: 2
+    // Blur-region edge inset for attached surfaces (bar dockzones, island).
+    // Zero so the hard-edged wl_region reaches the painted arc/edge and the
+    // acrylic covers the fill completely, with no un-blurred transparent rim.
+    readonly property int blurRegionInset: 0
 
     // Panel visibility state (driven by bar widget, consumed by SettingsWindow)
     property bool panelVisible: false
