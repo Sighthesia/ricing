@@ -48,6 +48,7 @@ Load these for detailed context on specific topics:
 | [comment-before-declarations](.agents/skills/comment-before-declarations/SKILL.md) | Editing QML modules that should stay self-documenting. |
 | [reactive-measurement-layout-debugging](.agents/skills/reactive-measurement-layout-debugging/SKILL.md) | Diagnosing layout bugs where measured, preferred, target, actual, or clipped sizes diverge. |
 | [surface-owner-split-debugging](.agents/skills/surface-owner-split-debugging/SKILL.md) | Debugging regressions after moving a UI surface's visible owner (hover, editing, content, geometry ownership). |
+| [async-layer-sync-lag-debugging](.agents/skills/async-layer-sync-lag-debugging/SKILL.md) | A secondary layer on an async/coalesced commit path (compositor blur/mask region, cached copy) lags, stutters, overflows, or pops behind a per-frame main layer during fast animations. |
 
 ## Workflow Runtime
 

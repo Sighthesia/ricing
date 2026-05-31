@@ -6,6 +6,7 @@ Load these for detailed context on specific topics:
 
 | Skill | When to use |
 |---|---|
+| [async-layer-sync-lag-debugging](.agents/skills/async-layer-sync-lag-debugging/SKILL.md) | When a secondary layer on an async/coalesced commit path (compositor blur/mask region, cached/mirror copy) lags, stutters, overflows, or pops behind a per-frame main layer during fast animations. |
 | [comment-before-declarations](.agents/skills/comment-before-declarations/SKILL.md) | When editing QML modules that should stay self-documenting and easy to scan. |
 | [glass-liquid-design](.agents/skills/glass-liquid-design/SKILL.md) | When designing or modifying visible QML/Quickshell surfaces, motion, states, or interaction feedback. |
 | [reactive-measurement-layout-debugging](.agents/skills/reactive-measurement-layout-debugging/SKILL.md) | When diagnosing UI layout bugs where measured, preferred, target, actual, animated, or clipped sizes diverge. |
