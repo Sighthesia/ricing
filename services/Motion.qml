@@ -13,6 +13,18 @@ QtObject {
         readonly property real epsilon: 0.01
     }
 
+    // Drive the center island expand/collapse with a heavier, smoother spring.
+    // Higher mass yields more even per-frame displacement than the hover spring,
+    // and direction-aware damping makes expansion lively while collapse settles
+    // cleanly. Tuned against the reference dynamic-island feel.
+    property QtObject islandExpand: QtObject {
+        readonly property real spring: 5.0
+        readonly property real mass: 3.0
+        readonly property real dampingExpand: 0.7
+        readonly property real dampingCollapse: 0.8
+        readonly property real epsilon: 0.01
+    }
+
     // Group common number transition timings used across visible surfaces.
     property QtObject number: QtObject {
         readonly property int shortDuration: 100

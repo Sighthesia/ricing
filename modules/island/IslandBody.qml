@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import "../bar" as Bar
 import "../../services" as Services
 
@@ -41,10 +42,6 @@ Item {
     height: targetH
     implicitWidth: width
     implicitHeight: height
-
-    onSurfaceColorChanged: silhouetteFill.requestPaint()
-
-    onBodyRadiusChanged: silhouetteFill.requestPaint()
 
     property real bodyRadius: targetR
     readonly property int earBlurStripCount: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset * 2)
@@ -101,29 +98,45 @@ Item {
         Services.BarLayoutService.openContextMenu(clickX, instanceKey, widgetId)
     }
 
-    // SpringAnimation for organic feel (reference project values).
+    // SpringAnimation for organic feel. Direction-aware damping makes the
+    // expand lively (lower damping) and the collapse settle cleanly (higher
+    // damping), driven off the dedicated island-expand spring profile.
+    property real wDamping: Services.Motion.islandExpand.dampingCollapse
+    property real hDamping: Services.Motion.islandExpand.dampingCollapse
+    property real rDamping: Services.Motion.islandExpand.dampingCollapse
+
+    onTargetWChanged: wDamping = (targetW + earRadius * 2 > width)
+        ? Services.Motion.islandExpand.dampingExpand
+        : Services.Motion.islandExpand.dampingCollapse
+    onTargetHChanged: hDamping = (targetH > height)
+        ? Services.Motion.islandExpand.dampingExpand
+        : Services.Motion.islandExpand.dampingCollapse
+    onTargetRChanged: rDamping = (targetR > bodyRadius)
+        ? Services.Motion.islandExpand.dampingExpand
+        : Services.Motion.islandExpand.dampingCollapse
+
     Behavior on width {
         SpringAnimation {
-            spring: Services.Motion.hover.spring
-            mass: Services.Motion.hover.mass
-            damping: Services.Motion.hover.damping
-            epsilon: Services.Motion.hover.epsilon
+            spring: Services.Motion.islandExpand.spring
+            mass: Services.Motion.islandExpand.mass
+            damping: root.wDamping
+            epsilon: Services.Motion.islandExpand.epsilon
         }
     }
     Behavior on height {
         SpringAnimation {
-            spring: Services.Motion.hover.spring
-            mass: Services.Motion.hover.mass
-            damping: Services.Motion.hover.damping
-            epsilon: Services.Motion.hover.epsilon
+            spring: Services.Motion.islandExpand.spring
+            mass: Services.Motion.islandExpand.mass
+            damping: root.hDamping
+            epsilon: Services.Motion.islandExpand.epsilon
         }
     }
     Behavior on bodyRadius {
         SpringAnimation {
-            spring: Services.Motion.hover.spring
-            mass: Services.Motion.hover.mass
-            damping: Services.Motion.hover.damping
-            epsilon: Services.Motion.hover.epsilon
+            spring: Services.Motion.islandExpand.spring
+            mass: Services.Motion.islandExpand.mass
+            damping: root.rDamping
+            epsilon: Services.Motion.islandExpand.epsilon
         }
     }
 
@@ -133,71 +146,64 @@ Item {
     }
 
     // --- Unified silhouette fill ---
-    // Paint the body and both top ears as one continuous path in a single
-    // fill() pass. A single fill applies the semi-transparent surface alpha
-    // exactly once per pixel even where subpaths meet, so the ear/body joins
-    // have no double-blended seam or sub-pixel gap.
-    Canvas {
+    // Paint the body and both top ears as one continuous closed path. A single
+    // fill applies the semi-transparent surface alpha exactly once per pixel
+    // even where subpaths meet, so the ear/body joins have no double-blended
+    // seam or sub-pixel gap. Rendered via QtQuick.Shapes so geometry changes
+    // during the expand spring are GPU-tessellated each frame instead of
+    // CPU-repainted like the previous Canvas.
+    Shape {
         id: silhouetteFill
         anchors.fill: parent
+        preferredRendererType: Shape.CurveRenderer
         antialiasing: true
 
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
-
+        // Build the same outline the Canvas drew, as an SVG path string. Ears
+        // present: left ear -> top -> right ear concave fillet -> body right
+        // -> rounded bottom -> body left -> left ear concave fillet -> close.
+        readonly property string outline: {
             var er = root.earRadius
             var bodyX = bodyRect.x
             var bodyW = bodyRect.width
             var bodyH = bodyRect.height
 
             if (bodyW <= 0 || bodyH <= 0)
-                return
+                return ""
 
             var bodyRightX = bodyX + bodyW
             var radius = Math.min(root.bodyRadius, bodyW / 2, bodyH / 2)
             var hasEars = leftEar.visible && rightEar.visible
 
-            ctx.fillStyle = root.surfaceColor
-            ctx.beginPath()
-
             if (hasEars) {
-                // One continuous outline: left ear -> top -> right ear -> body
-                // -> rounded bottom -> body left -> back into left ear. A single
-                // closed path filled once means the ear/body joins are interior
-                // edges with no antialiased seam and no sub-pixel gap.
-                ctx.moveTo(leftEar.x, 0)
-                ctx.lineTo(bodyRightX + er, 0)
-                // Right ear concave fillet: (bodyRightX + er, 0) -> (bodyRightX, er).
-                ctx.arc(bodyRightX + er, er, er, 1.5 * Math.PI, Math.PI, true)
-                ctx.lineTo(bodyRightX, bodyH - radius)
-                ctx.quadraticCurveTo(bodyRightX, bodyH, bodyRightX - radius, bodyH)
-                ctx.lineTo(bodyX + radius, bodyH)
-                ctx.quadraticCurveTo(bodyX, bodyH, bodyX, bodyH - radius)
-                ctx.lineTo(bodyX, er)
-                // Left ear concave fillet: (bodyX, er) -> (leftEar.x, 0).
-                ctx.arc(leftEar.x, er, er, 0, -0.5 * Math.PI, true)
-                ctx.closePath()
-            } else {
-                // Body only: square top, rounded bottom corners.
-                ctx.moveTo(bodyX, 0)
-                ctx.lineTo(bodyRightX, 0)
-                ctx.lineTo(bodyRightX, bodyH - radius)
-                ctx.quadraticCurveTo(bodyRightX, bodyH, bodyRightX - radius, bodyH)
-                ctx.lineTo(bodyX + radius, bodyH)
-                ctx.quadraticCurveTo(bodyX, bodyH, bodyX, bodyH - radius)
-                ctx.closePath()
+                return "M " + leftEar.x + " 0"
+                    + " L " + (bodyRightX + er) + " 0"
+                    + " A " + er + " " + er + " 0 0 0 " + bodyRightX + " " + er
+                    + " L " + bodyRightX + " " + (bodyH - radius)
+                    + " Q " + bodyRightX + " " + bodyH + " " + (bodyRightX - radius) + " " + bodyH
+                    + " L " + (bodyX + radius) + " " + bodyH
+                    + " Q " + bodyX + " " + bodyH + " " + bodyX + " " + (bodyH - radius)
+                    + " L " + bodyX + " " + er
+                    + " A " + er + " " + er + " 0 0 0 " + leftEar.x + " 0"
+                    + " Z"
             }
 
-            ctx.fill()
+            // Body only: square top, rounded bottom corners.
+            return "M " + bodyX + " 0"
+                + " L " + bodyRightX + " 0"
+                + " L " + bodyRightX + " " + (bodyH - radius)
+                + " Q " + bodyRightX + " " + bodyH + " " + (bodyRightX - radius) + " " + bodyH
+                + " L " + (bodyX + radius) + " " + bodyH
+                + " Q " + bodyX + " " + bodyH + " " + bodyX + " " + (bodyH - radius)
+                + " Z"
         }
 
-        onWidthChanged: requestPaint()
-        onHeightChanged: requestPaint()
+        ShapePath {
+            fillColor: root.surfaceColor
+            strokeWidth: 0
 
-        Connections {
-            target: Services.Color
-            function onMSurfaceChanged() { silhouetteFill.requestPaint() }
+            PathSvg {
+                path: silhouetteFill.outline
+            }
         }
     }
 
