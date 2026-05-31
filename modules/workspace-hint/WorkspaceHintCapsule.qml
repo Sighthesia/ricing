@@ -275,13 +275,60 @@ Item {
                         onTriggered: windowTitleRow.syncFocusedIndicatorGeometry()
                     }
 
-                    // Move one persistent highlight surface between focused title cards.
+                    // Track both card edges at two speeds so the rectangle stretches
+                    // toward travel direction regardless of left/right movement.
+                    Item {
+                        id: focusedEdgeTracker
+
+                        readonly property real _targetLeft: windowTitleRow.focusedIndicatorX
+                        readonly property real _targetRight: windowTitleRow.focusedIndicatorX + windowTitleRow.focusedIndicatorWidth
+
+                        // Fast pair snaps to the target; slow pair lags to form the trail.
+                        property real leftFast: _targetLeft
+                        property real leftSlow: _targetLeft
+                        property real rightFast: _targetRight
+                        property real rightSlow: _targetRight
+
+                        // Rectangle spans the outermost of each pair, so it is direction-symmetric.
+                        readonly property real rectLeft: Math.min(leftFast, leftSlow)
+                        readonly property real rectRight: Math.max(rightFast, rightSlow)
+
+                        Behavior on leftFast {
+                            NumberAnimation {
+                                duration: Services.Motion.number.contentDuration
+                                easing.type: Easing.OutSine
+                            }
+                        }
+
+                        Behavior on rightFast {
+                            NumberAnimation {
+                                duration: Services.Motion.number.contentDuration
+                                easing.type: Easing.OutSine
+                            }
+                        }
+
+                        Behavior on leftSlow {
+                            NumberAnimation {
+                                duration: Services.Motion.number.contentDuration + 220
+                                easing.type: Easing.OutSine
+                            }
+                        }
+
+                        Behavior on rightSlow {
+                            NumberAnimation {
+                                duration: Services.Motion.number.contentDuration + 220
+                                easing.type: Easing.OutSine
+                            }
+                        }
+                    }
+
+                    // Single persistent highlight; trail comes from edge desync, not a second layer.
                     Rectangle {
                         id: focusedTitleIndicator
 
-                        x: windowTitleRow.focusedIndicatorX
+                        x: focusedEdgeTracker.rectLeft
                         y: windowTitleRow.focusedIndicatorY
-                        width: windowTitleRow.focusedIndicatorWidth
+                        width: Math.max(0, focusedEdgeTracker.rectRight - focusedEdgeTracker.rectLeft)
                         height: windowTitleRow.focusedIndicatorHeight
                         radius: height / 2
                         color: Qt.rgba(
@@ -293,27 +340,12 @@ Item {
                         border.width: 0
                         opacity: windowTitleRow.focusedIndicatorVisible ? 1 : 0
                         visible: opacity > 0
-                        z: 0
-                        scale: 1
+                        z: 1
                         antialiasing: true
-
-                        Behavior on x {
-                            NumberAnimation {
-                                duration: Services.Motion.number.contentDuration + 40
-                                easing.type: Services.Motion.number.contentEasing
-                            }
-                        }
 
                         Behavior on y {
                             NumberAnimation {
                                 duration: Services.Motion.number.contentDuration + 40
-                                easing.type: Services.Motion.number.contentEasing
-                            }
-                        }
-
-                        Behavior on width {
-                            NumberAnimation {
-                                duration: Services.Motion.number.contentDuration + 60
                                 easing.type: Services.Motion.number.contentEasing
                             }
                         }
@@ -338,7 +370,6 @@ Item {
                                 easing.type: Services.Motion.number.shortEasing
                             }
                         }
-
                     }
 
                     // Keep the title-card row geometry stable above the moving indicator.
@@ -346,7 +377,7 @@ Item {
                         id: titleCardContent
 
                         spacing: CapsuleMetrics.inlineGap
-                        z: 1
+                        z: 2
 
                         Repeater {
                             id: titleCardRepeater
