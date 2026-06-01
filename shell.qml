@@ -17,6 +17,10 @@ ShellRoot {
     Background.BackgroundWindow {
     }
 
+    // Blurred/tinted wallpaper niri renders inside its overview backdrop.
+    Background.OverviewBackgroundWindow {
+    }
+
     // Preserve the screen-corner overlays alongside the new center island.
     Background.ScreenCornerWindow {
     }

@@ -76,6 +76,12 @@ QtObject {
                 // Window hint layout: "attached-island" extends from the island,
           // "floating-capsule" keeps the legacy independent floating popup.
                 property string windowHintMode: "attached-island"
+                // niri overview background: master toggle, solid-color method,
+                // blur strength (0 = static wallpaper), and theme tint opacity.
+                property bool overviewBackground: false
+                property bool overviewBackgroundSolid: false
+                property real overviewBackgroundBlur: 0.4
+                property real overviewBackgroundTint: 0.5
      }
 
             property JsonObject notifications: JsonObject {

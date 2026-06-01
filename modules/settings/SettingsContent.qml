@@ -127,7 +127,9 @@ Item {
                 font.pixelSize: 14
                 topPadding: 8
                 visible: appWallpaper.visible || appColorScheme.visible || appPanelOpacity.visible ||
-                         appCornerRadius.visible || appBlur.visible
+                         appCornerRadius.visible || appBlur.visible ||
+                         appOverviewBg.visible || appOverviewSolid.visible ||
+                         appOverviewBlur.visible || appOverviewTint.visible
             }
 
             SettingText {
@@ -178,6 +180,48 @@ Item {
                 width: parent.width
                 visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
                 onToggled: v => { Services.SettingsService.appearance.enableBlur = v }
+            }
+
+            SettingToggle {
+                id: appOverviewBg
+                settingLabel: "Overview Background"
+                checked: Services.SettingsService.appearance.overviewBackground
+                width: parent.width
+                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                onToggled: v => { Services.SettingsService.appearance.overviewBackground = v }
+            }
+
+            SettingToggle {
+                id: appOverviewSolid
+                settingLabel: "Overview Solid Color"
+                checked: Services.SettingsService.appearance.overviewBackgroundSolid
+                width: parent.width
+                visible: Services.SettingsService.appearance.overviewBackground &&
+                         settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                onToggled: v => { Services.SettingsService.appearance.overviewBackgroundSolid = v }
+            }
+
+            SettingSlider {
+                id: appOverviewBlur
+                settingLabel: "Overview Blur"
+                from: 0; to: 1; stepSize: 0.05
+                value: Services.SettingsService.appearance.overviewBackgroundBlur
+                width: parent.width
+                visible: Services.SettingsService.appearance.overviewBackground &&
+                         !Services.SettingsService.appearance.overviewBackgroundSolid &&
+                         settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                onMoved: v => { Services.SettingsService.appearance.overviewBackgroundBlur = v }
+            }
+
+            SettingSlider {
+                id: appOverviewTint
+                settingLabel: "Overview Tint"
+                from: 0; to: 1; stepSize: 0.05
+                value: Services.SettingsService.appearance.overviewBackgroundTint
+                width: parent.width
+                visible: Services.SettingsService.appearance.overviewBackground &&
+                         settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                onMoved: v => { Services.SettingsService.appearance.overviewBackgroundTint = v }
             }
 
             // ── Notifications ─────────────────────────────────────────────────

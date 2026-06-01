@@ -95,6 +95,12 @@ Singleton {
         }
 
         lines.push("}")
+        // Render afloat's overview-backdrop surface inside niri's overview backdrop
+        // (below the scaled workspace tiles), not scaled into the tiles.
+        lines.push("layer-rule {")
+        lines.push('    match namespace="^afloat-overview-backdrop$"')
+        lines.push("    place-within-backdrop true")
+        lines.push("}")
         return lines.join("\n") + "\n"
     }
 
