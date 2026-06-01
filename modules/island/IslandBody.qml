@@ -1,5 +1,6 @@
 import QtQuick
 import "../bar" as Bar
+import "../workspace-hint" as WorkspaceHint
 import "../../services" as Services
 
 // Animated island body: expands from collapsed clock to full launcher panel.
@@ -29,11 +30,14 @@ Item {
         ? collapsedContentLoader.item.implicitWidth + collapsedHorizontalPadding
         : collapsedW
 
-    // Placeholder window-hint extension geometry (Slice 2a). Real hint content
-    // and sizing arrive in Slice 2b; for now the island simply morphs to a
-    // visibly larger silhouette while the hint is held in attached-island mode.
-    readonly property int windowHintW: 360
-    readonly property int windowHintH: collapsedH + 120
+    // Window-hint extension geometry, sized to the live stage. When the hint is
+    // held without the launcher, the island grows to wrap the full vertical
+    // workspace stage; when the launcher is also open, the island keeps its
+    // expanded size and only the title row overlays the launcher's lower half.
+    readonly property bool hintLauncherConflict: Services.IslandService.expanded
+        && Services.IslandService.windowHintActive
+    readonly property int windowHintW: hintStage.stageWidth + 32
+    readonly property int windowHintH: hintStage.stageHeight + 24
 
     // Target dimensions driven by island state and passive hover intent;
     // fed into the surface which owns the spring deformation. Launcher expansion
@@ -90,7 +94,10 @@ Item {
         Item {
             id: collapsedContent
             anchors.fill: parent
-            opacity: Services.IslandService.expanded ? 0 : 1
+            // Fade the clock/center widgets out whenever the body morphs into
+            // either the launcher or the window-hint stage, so the collapsed
+            // content never overlaps the extended panel.
+            opacity: (Services.IslandService.expanded || Services.IslandService.windowHintActive) ? 0 : 1
             visible: opacity > 0.01
 
             Behavior on opacity {
@@ -153,6 +160,40 @@ Item {
             IslandLauncher {
                 anchors.fill: parent
                 visible: parent.visible
+            }
+        }
+
+        // --- Window-hint extension: the workspace stage rendered inside the
+        // island body. In the launcher-conflict case only the title row shows
+        // (titleRowOnly) and overlays the launcher's lower half; otherwise the
+        // full vertical workspace stage fills the extended body. ---
+        Item {
+            id: windowHintContent
+            anchors.fill: parent
+            opacity: Services.IslandService.windowHintActive ? 1 : 0
+            visible: opacity > 0.01
+
+            Behavior on opacity {
+                NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+            }
+
+            WorkspaceHint.WorkspaceHintStageView {
+                id: hintStage
+
+                // Center the stage; align it to the bottom of the body during
+                // the launcher conflict so the title row sits below the launcher.
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: root.hintLauncherConflict
+                    ? parent.height - height - 12
+                    : (parent.height - height) / 2
+                width: stageWidth
+                height: stageHeight
+
+                hintData: Services.WindowHintService.activeHint
+                active: Services.IslandService.windowHintActive
+                titleRowOnly: root.hintLauncherConflict
+                stageTargetY: 12
+                screenWidth: Screen.width
             }
         }
 
