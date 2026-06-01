@@ -91,17 +91,6 @@ Item {
         : 0
     readonly property real preferredPrimaryWidth: Math.min(root._maxCapsuleWidth, root._naturalPrimaryWidth)
 
-    // Notify the stage when this capsule's measured primary width changes so
-    // the stage's imperative width measurement (which cannot reactively track
-    // nested delegate measurement) recomputes instead of staying stale.
-    onPreferredPrimaryWidthChanged: {
-        if (providesPrimaryWidth && host && host.bumpMeasureRevision)
-            host.bumpMeasureRevision()
-    }
-    onProvidesPrimaryWidthChanged: {
-        if (host && host.bumpMeasureRevision)
-            host.bumpMeasureRevision()
-    }
     readonly property int _cardCount: root._isPrimaryCapsule ? root._activeWindows.length : 0
     readonly property real _iconSize: 16 + (2 * root._emphasis)
     readonly property real _iconSpacing: 5
@@ -160,7 +149,8 @@ Item {
             titleWidths,
             baseWidths,
             availableForRow,
-            root._primaryCardSpacing
+            root._primaryCardSpacing,
+            root._focusedIconIndex
         )
     }
 
@@ -399,11 +389,20 @@ Item {
                         Repeater {
                             id: titleCardRepeater
 
-                            model: root._isPrimaryCapsule ? root._activeWindows : []
+                            // Use a stable count as the model (not the array
+                            // itself) so a focus change — which rebuilds the
+                            // _activeWindows array but keeps the same window
+                            // count — updates each delegate's bindings in place
+                            // instead of destroying and recreating every card.
+                            // Recreation reset card x to 0 and made the focus
+                            // indicator jump to the left and lag a step behind.
+                            model: root._isPrimaryCapsule ? root._activeWindows.length : 0
 
                             delegate: Rectangle {
-                                required property var modelData
                                 required property int index
+                                readonly property var modelData: (root._activeWindows && index >= 0 && index < root._activeWindows.length)
+                                    ? root._activeWindows[index]
+                                    : ({})
                                 property bool isFocusedCard: !!modelData.isFocused
 
                                 readonly property real _cardProgress: root._detailProgress
@@ -413,9 +412,14 @@ Item {
                                     return measureItem ? measureItem.naturalTitleWidth : Math.max(24, Math.ceil(titleText.implicitWidth))
                                 }
                                 readonly property real _cardBaseWidth: (modelData.icon ? 21 : 0) + CapsuleMetrics.compactInnerHorizontal
-                                readonly property real _expandedTitleWidth: Math.min(
-                                    root._cardTitleWidthCap,
-                                    _naturalTitleWidth
+                                // Focused card keeps its full natural title;
+                                // non-focused cards yield to the shared cap so
+                                // the row fits within the clamped capsule width.
+                                readonly property real _expandedTitleWidth: isFocusedCard
+                                    ? _naturalTitleWidth
+                                    : Math.min(
+                                        root._cardTitleWidthCap,
+                                        _naturalTitleWidth
                                 )
                                 readonly property real _expandedCardWidth: _cardBaseWidth + _expandedTitleWidth
 
@@ -460,12 +464,32 @@ Item {
                                     }
                                 }
 
-                                onIsFocusedCardChanged: focusedIndicatorSync.restart()
-                                onXChanged: if (isFocusedCard) focusedIndicatorSync.restart()
-                                onYChanged: if (isFocusedCard) focusedIndicatorSync.restart()
-                                onWidthChanged: if (isFocusedCard) focusedIndicatorSync.restart()
-                                onHeightChanged: if (isFocusedCard) focusedIndicatorSync.restart()
-                                Component.onCompleted: focusedIndicatorSync.restart()
+                                // Push this card's geometry to the indicator
+                                // directly when focused, instead of the indicator
+                                // imperatively scanning itemAt() (which returns
+                                // stale geometry on the first focus switch). This
+                                // is the same imperative-lookup pitfall that made
+                                // the stage width unstable.
+                                function _pushFocusGeometryIfFocused() {
+                                    if (!isFocusedCard)
+                                        return
+                                    windowTitleRow.focusedIndicatorX = x
+                                    windowTitleRow.focusedIndicatorY = y
+                                    windowTitleRow.focusedIndicatorWidth = width
+                                    windowTitleRow.focusedIndicatorHeight = height
+                                    windowTitleRow.focusedIndicatorVisible = root._detailProgress > 0.01
+                                }
+                                onIsFocusedCardChanged: {
+                                    if (isFocusedCard)
+                                        _pushFocusGeometryIfFocused()
+                                    else
+                                        focusedIndicatorSync.restart()
+                                }
+                                onXChanged: _pushFocusGeometryIfFocused()
+                                onYChanged: _pushFocusGeometryIfFocused()
+                                onWidthChanged: _pushFocusGeometryIfFocused()
+                                onHeightChanged: _pushFocusGeometryIfFocused()
+                                Component.onCompleted: _pushFocusGeometryIfFocused()
 
                                 // Keep the focus dot and title aligned like the original hint.
                                 Row {
@@ -560,10 +584,16 @@ Item {
                         Repeater {
                             id: primaryMeasureRepeater
 
-                            model: root._activeWindows
+                            // Stable count model (see titleCardRepeater) so a
+                            // focus change reuses delegates instead of
+                            // rebuilding the measurement items.
+                            model: root._activeWindows ? root._activeWindows.length : 0
 
                             delegate: Item {
-                                required property var modelData
+                                required property int index
+                                readonly property var modelData: (root._activeWindows && index >= 0 && index < root._activeWindows.length)
+                                    ? root._activeWindows[index]
+                                    : ({})
 
                                 readonly property real naturalTitleWidth: Math.max(24, Math.ceil(measureTitleText.implicitWidth))
                                 readonly property real baseCardWidth: (modelData.icon ? 21 : 0) + CapsuleMetrics.compactInnerHorizontal

@@ -56,29 +56,13 @@ Item {
     readonly property real _overflowSlotPosition: 1.18
   readonly property int _workspaceCapsuleMaxWidth: Math.max(1, Math.floor(stageView.screenWidth))
   readonly property int _workspaceSideWidth: 96
-    // Explicit revision bumped whenever a capsule reports a new measured
-    // primary width. Imperative `itemAt()` traversal does NOT establish a
-    // reactive dependency on nested delegate measurement, so without this
-    // token the measured width stays stale (0 / undersized) and the capsule
-    // truncates its titles. Capsules call bumpMeasureRevision() on change.
-    property int _measureRevision: 0
-    function bumpMeasureRevision() {
-        _measureRevision = _measureRevision + 1
-    }
-    readonly property real _workspaceMeasuredPrimaryWidth: {
-        void _measureRevision
-        let width = 0
-        for (let index = 0; index < stageRepeater.count; index++) {
-            const item = stageRepeater.itemAt(index)
-            if (item && item.providesPrimaryWidth)
-                width = Math.max(width, item.preferredPrimaryWidth)
-        }
-        return width
-    }
-    property int _workspacePrimaryWidth: {
-    const measured = Math.ceil(_workspaceMeasuredPrimaryWidth)
-        return measured > 0 ? measured : _workspacePrimaryWidthForHint(_renderHint || _hintData)
-    }
+    // Deterministic primary width from the hint data (character-metric
+    // estimate). Same data always yields the same width, so the stage size is
+    // stable and available immediately — unlike imperative itemAt() delegate
+    // measurement, which resolves asynchronously and produced unstable widths
+    // (0 / 746 / 1646 / 2546 for the same workspace). The focused card keeps its
+    // full title via the per-card cap; non-focused titles are clamped to fit.
+    readonly property int _workspacePrimaryWidth: _workspacePrimaryWidthForHint(_renderHint || _hintData)
     readonly property int _workspaceSideHeight: 28
     readonly property int _workspacePrimaryHeight: 44
     readonly property int _workspaceColumnGap: 8
@@ -107,7 +91,12 @@ Item {
 
     function _workspacePrimaryWidthForAbsoluteIndex(absoluteIndex) {
         const currentHint = _renderHint || _hintData
-  const currentWidth = _workspacePrimaryWidthForHint(currentHint)
+        // Use the measured primary width (same source as the stage container)
+        // so the capsule's metrics width matches the stage width. The character
+        // estimate from _workspacePrimaryWidthForHint over-estimates badly
+        // (clamped to screen width), which overflows the clipped island body.
+        // Fall back to the estimate only before measurement is ready.
+        const currentWidth = _workspacePrimaryWidth
 
         if (_workspaceSettlePending && _transitionSourceHint) {
      const previousPosition = _transitionSourceHint.activeWorkspacePosition !== undefined
@@ -287,7 +276,7 @@ _enterTopTimer.stop()
         Motion.handleHintChange(stageView, _hintData, _workspaceAnchorSettleTimer, Stage)
     }
 
-// Stagger the top capsule into view from y = 0.
+    // Stagger the top capsule into view from y = 0.
   Timer {
         id: _enterTopTimer
         interval: 20
