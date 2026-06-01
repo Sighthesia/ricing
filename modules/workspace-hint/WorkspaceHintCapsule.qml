@@ -90,6 +90,18 @@ Item {
         ? Math.ceil(activeWorkspaceLabel.implicitWidth) + CapsuleMetrics.compactInnerHorizontal
         : 0
     readonly property real preferredPrimaryWidth: Math.min(root._maxCapsuleWidth, root._naturalPrimaryWidth)
+
+    // Notify the stage when this capsule's measured primary width changes so
+    // the stage's imperative width measurement (which cannot reactively track
+    // nested delegate measurement) recomputes instead of staying stale.
+    onPreferredPrimaryWidthChanged: {
+        if (providesPrimaryWidth && host && host.bumpMeasureRevision)
+            host.bumpMeasureRevision()
+    }
+    onProvidesPrimaryWidthChanged: {
+        if (host && host.bumpMeasureRevision)
+            host.bumpMeasureRevision()
+    }
     readonly property int _cardCount: root._isPrimaryCapsule ? root._activeWindows.length : 0
     readonly property real _iconSize: 16 + (2 * root._emphasis)
     readonly property real _iconSpacing: 5
@@ -261,6 +273,15 @@ Item {
 
                     onWidthChanged: focusedIndicatorSync.restart()
                     onHeightChanged: focusedIndicatorSync.restart()
+
+                    // Resample on first reveal and on focus changes too: card
+                    // delegates may not exist yet when the row first sizes, so
+                    // width/height alone miss the initial focused-card geometry
+                    // (indicator otherwise appears only after a workspace switch).
+                    readonly property real _revealDetail: root._detailProgress
+                    readonly property int _focusedCard: root._focusedIconIndex
+                    on_RevealDetailChanged: focusedIndicatorSync.restart()
+                    on_FocusedCardChanged: focusedIndicatorSync.restart()
 
                     // Defer geometry sampling until the row layout has settled.
                     Timer {

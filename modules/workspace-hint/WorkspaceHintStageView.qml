@@ -56,14 +56,24 @@ Item {
     readonly property real _overflowSlotPosition: 1.18
   readonly property int _workspaceCapsuleMaxWidth: Math.max(1, Math.floor(stageView.screenWidth))
   readonly property int _workspaceSideWidth: 96
+    // Explicit revision bumped whenever a capsule reports a new measured
+    // primary width. Imperative `itemAt()` traversal does NOT establish a
+    // reactive dependency on nested delegate measurement, so without this
+    // token the measured width stays stale (0 / undersized) and the capsule
+    // truncates its titles. Capsules call bumpMeasureRevision() on change.
+    property int _measureRevision: 0
+    function bumpMeasureRevision() {
+        _measureRevision = _measureRevision + 1
+    }
     readonly property real _workspaceMeasuredPrimaryWidth: {
-      let width = 0
- for (let index = 0; index < stageRepeater.count; index++) {
+        void _measureRevision
+        let width = 0
+        for (let index = 0; index < stageRepeater.count; index++) {
             const item = stageRepeater.itemAt(index)
-    if (item && item.providesPrimaryWidth)
-         width = Math.max(width, item.preferredPrimaryWidth)
+            if (item && item.providesPrimaryWidth)
+                width = Math.max(width, item.preferredPrimaryWidth)
         }
-  return width
+        return width
     }
     property int _workspacePrimaryWidth: {
     const measured = Math.ceil(_workspaceMeasuredPrimaryWidth)
