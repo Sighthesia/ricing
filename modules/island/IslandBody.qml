@@ -29,17 +29,30 @@ Item {
         ? collapsedContentLoader.item.implicitWidth + collapsedHorizontalPadding
         : collapsedW
 
+    // Placeholder window-hint extension geometry (Slice 2a). Real hint content
+    // and sizing arrive in Slice 2b; for now the island simply morphs to a
+    // visibly larger silhouette while the hint is held in attached-island mode.
+    readonly property int windowHintW: 360
+    readonly property int windowHintH: collapsedH + 120
+
     // Target dimensions driven by island state and passive hover intent;
-    // fed into the surface which owns the spring deformation.
+    // fed into the surface which owns the spring deformation. Launcher expansion
+    // takes priority; the window hint only extends the resting island.
     property int targetW: Services.IslandService.expanded
         ? expandedW
-        : collapsedContentWidth + (hoverHandler.hovered ? hoverWLift : 0)
+        : (Services.IslandService.windowHintActive
+            ? windowHintW
+            : collapsedContentWidth + (hoverHandler.hovered ? hoverWLift : 0))
     property int targetH: Services.IslandService.expanded
         ? expandedH
-        : collapsedH + (hoverHandler.hovered ? hoverHLift : 0)
+        : (Services.IslandService.windowHintActive
+            ? windowHintH
+            : collapsedH + (hoverHandler.hovered ? hoverHLift : 0))
     property int targetR: Services.IslandService.expanded
         ? 24
-        : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0)
+        : (Services.IslandService.windowHintActive
+            ? 24
+            : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0))
 
     // Size mirrors the surface's animated geometry so external consumers
     // (IslandWindow hit region) keep tracking the live island bounds.
