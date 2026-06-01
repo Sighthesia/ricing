@@ -64,9 +64,20 @@ function buildModel(inputs) {
     var bottomEarEnvelope = isCenter ? 0 : earRadius;
 
     var hasContent = contentWidth > 0 && contentHeight > 0 && surfaceHeight > 0;
-    var bodyWidth = hasContent ? Math.max(contentWidth + horizontalPadding * 2 + (hoverWidthLift * hoverBlend), 0) : 0;
-    var totalHeight = hasContent ? Math.max(contentHeight + verticalPadding * 2 + (hoverHeightLift * hoverBlend), surfaceHeight + (hoverHeightLift * hoverBlend)) : 0;
+    var naturalBodyWidth = hasContent ? Math.max(contentWidth + horizontalPadding * 2 + (hoverWidthLift * hoverBlend), 0) : 0;
+    var naturalHeight = hasContent ? Math.max(contentHeight + verticalPadding * 2 + (hoverHeightLift * hoverBlend), surfaceHeight + (hoverHeightLift * hoverBlend)) : 0;
+
+    // NOTE: vertical/horizontal popup expansion (the tray menu) is NOT applied
+    // here. Feeding the per-frame spring value through this model would rebuild
+    // the whole contract object every animation frame and thrash the GC. The
+    // owner (DockzoneSurfaceRoot) instead applies the animated expand as a
+    // lightweight additive geometry override on top of this resting model, so
+    // buildModel only re-runs when resting inputs change.
+    var bodyWidth = naturalBodyWidth;
+    var totalHeight = naturalHeight;
     var bodyHeight = hasContent ? totalHeight : 0;
+    var topBandHeight = naturalHeight;
+    var contentShiftX = 0;
     var bodyX = isLeft ? 0 : earRadius;
     var bodyY = 0;
     var containerWidth = hasContent ? bodyWidth + (isCenter ? earRadius * 2 : earRadius) : 0;
@@ -98,6 +109,9 @@ function buildModel(inputs) {
         geometry: {
             visibleBodyWidth: bodyWidth,
             visibleBodyHeight: bodyHeight,
+            naturalBodyWidth: naturalBodyWidth,
+            topBandHeight: topBandHeight,
+            contentShiftX: contentShiftX,
             containerWidth: containerWidth,
             containerHeight: containerHeight,
             bottomEarEnvelope: bottomEarEnvelope,
@@ -162,6 +176,9 @@ function deriveRendererMetrics(model) {
         bodyY: 0,
         bodyWidth: g.visibleBodyWidth,
         bodyHeight: g.visibleBodyHeight,
+        naturalBodyWidth: g.naturalBodyWidth,
+        topBandHeight: g.topBandHeight,
+        contentShiftX: g.contentShiftX,
         containerWidth: g.containerWidth,
         containerHeight: g.containerHeight,
         hasLeftTopEar: hasLeftTopEar,

@@ -49,6 +49,8 @@ Load these for detailed context on specific topics:
 | [reactive-measurement-layout-debugging](.agents/skills/reactive-measurement-layout-debugging/SKILL.md) | Diagnosing layout bugs where measured, preferred, target, actual, or clipped sizes diverge. |
 | [surface-owner-split-debugging](.agents/skills/surface-owner-split-debugging/SKILL.md) | Debugging regressions after moving a UI surface's visible owner (hover, editing, content, geometry ownership). |
 | [async-layer-sync-lag-debugging](.agents/skills/async-layer-sync-lag-debugging/SKILL.md) | A secondary layer on an async/coalesced commit path (compositor blur/mask region, cached copy) lags, stutters, overflows, or pops behind a per-frame main layer during fast animations. |
+| [overlay-pointer-event-starvation](.agents/skills/overlay-pointer-event-starvation/SKILL.md) | An inner/lower element stops getting hover/pointer events (no hover, hover popup never opens, or popup flickers open/closed) because an overlapping upper element or fullscreen overlay consumes them. |
+| [per-frame-surface-resize-jank](.agents/skills/per-frame-surface-resize-jank/SKILL.md) | An expand/collapse animation stutters because a per-frame size drives an expensive commit boundary (top-level/layer-shell window resize, compositor region, or per-frame model rebuild). Fix: fixed outer surface, animate clipped inner content. |
 
 ## Workflow Runtime
 

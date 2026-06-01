@@ -16,8 +16,14 @@ Variants {
 
         screen: modelData
         color: "transparent"
-        implicitHeight: barContent.implicitHeight
-        // Reserve only the body height, excluding bottom ears.
+        // Fixed tall height (like IslandWindow) so the window never resizes per
+        // frame while the tray dockzone expands its menu downward — resizing a
+        // layer-shell surface every animation frame forces a compositor
+        // reconfigure roundtrip and stutters the expand. The dockzone grows
+        // inside this constant-size transparent window; the mask keeps input
+        // restricted to the visible shapes.
+        implicitHeight: modelData.height
+        // Reserve only the bar body height, excluding the expanded menu area.
         exclusiveZone: Services.BarLayoutService.barHeight
 
         anchors {
@@ -27,6 +33,41 @@ Variants {
         }
 
         BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? barBlurRegion : null
+
+        // The window is a fixed tall transparent surface. Restrict input to the
+        // bar-height band at the top while idle (so the empty area below never
+        // blocks other windows); when the tray menu is open take the whole
+        // window so a click anywhere outside the menu dismisses it (island-
+        // style). exclusiveZone stays pinned to the bar height regardless.
+        mask: Region {
+            item: Services.TrayMenuService.visible ? fullHit : barBandHit
+        }
+
+        Item {
+            id: fullHit
+            anchors.fill: parent
+        }
+
+        // Top bar-height band: the resting interactive bar area. Tall enough to
+        // include the bottom-ear envelope so edge dockzone ears stay clickable.
+        Item {
+            id: barBandHit
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: barContent.implicitHeight
+        }
+
+        // Click-away dismiss: active only while the tray menu is open, so a
+        // click anywhere outside the menu closes it (island-style). Disabled
+        // otherwise so normal bar clicks are unaffected.
+        MouseArea {
+            anchors.fill: parent
+            z: -1
+            enabled: Services.TrayMenuService.visible
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onPressed: Services.TrayMenuService.close()
+        }
 
         // Track blur to visible dockzone geometry parts instead of the full transparent bar window.
         property Variants barBlurRegions: Variants {

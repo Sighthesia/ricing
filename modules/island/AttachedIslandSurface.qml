@@ -31,10 +31,23 @@ Item {
     // Animated corner radius, exposed so callers can read the live value.
     property real bodyRadius: targetRadius
 
-    readonly property int earBlurStripCount: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset * 2)
+    // Live ear radius used for the DRAWN ear geometry. The outer footprint
+    // (width == targetBodyWidth + earRadius*2) keeps using the static earRadius
+    // so caller centering math is unchanged, but the visible ears scale down as
+    // the body collapses toward zero so they shrink in sync instead of staying
+    // full-size until the body vanishes. Ramps to full radius well before any
+    // normal resting size (e.g. the island never collapses this small), so it
+    // is a no-op for existing callers and only affects collapse-to-zero popups.
+    readonly property real liveEarRadius: {
+        var bodySpan = Math.min(root.width - root.earRadius * 2, root.height)
+        var ramp = Math.max(0, Math.min(1, bodySpan / (root.earRadius * 2)))
+        return root.earRadius * ramp
+    }
+
+    readonly property int earBlurStripCount: Math.max(0, root.liveEarRadius - Services.SettingsService.blurRegionInset * 2)
 
     function _earCutX(localY) {
-        var radius = Math.max(1, root.earRadius)
+        var radius = Math.max(1, root.liveEarRadius)
         var clampedY = Math.max(0, Math.min(radius, localY))
         var dy = radius - clampedY
 
@@ -142,7 +155,7 @@ Item {
         // present: left ear -> top -> right ear concave fillet -> body right
         // -> rounded bottom -> body left -> left ear concave fillet -> close.
         readonly property string outline: {
-            var er = root.earRadius
+            var er = root.liveEarRadius
             var bodyX = bodyRect.x
             var bodyW = bodyRect.width
             var bodyH = bodyRect.height
@@ -191,10 +204,10 @@ Item {
     // Geometry-only marker: positions the blur strips and the silhouette path.
     Item {
         id: leftEar
-        x: bodyRect.x - root.earRadius
+        x: bodyRect.x - root.liveEarRadius
         y: 0
-        width: root.earRadius
-        height: root.earRadius
+        width: root.liveEarRadius
+        height: root.liveEarRadius
         visible: root.height > 0
     }
 
@@ -211,7 +224,7 @@ Item {
 
             x: leftEar.x + cutX
             y: leftEar.y + localY
-            width: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset - cutX)
+            width: Math.max(0, root.liveEarRadius - Services.SettingsService.blurRegionInset - cutX)
             height: 1
         }
     }
@@ -272,7 +285,7 @@ Item {
             required property int index
             readonly property real localY: Services.SettingsService.blurRegionInset + index
             readonly property real cutX: root._earCutX(localY)
-            readonly property real fillRight: root.earRadius - cutX
+            readonly property real fillRight: root.liveEarRadius - cutX
 
             x: rightEar.x + Services.SettingsService.blurRegionInset
             y: rightEar.y + localY
@@ -287,8 +300,8 @@ Item {
         id: rightEar
         x: bodyRect.x + bodyRect.width
         y: 0
-        width: root.earRadius
-        height: root.earRadius
+        width: root.liveEarRadius
+        height: root.liveEarRadius
         visible: root.height > 0
     }
 }

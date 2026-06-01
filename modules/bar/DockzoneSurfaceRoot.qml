@@ -1,6 +1,7 @@
 import "."
 import "DockzoneSurfaceModel.js" as Model
 import QtQuick
+import QtQuick.Shapes
 import "../../services" as Services
 
 // Surface-local owner for a dockzone path — first validated on center.
@@ -16,6 +17,12 @@ Item {
     required property real surfaceHeight
     required property real contentWidth
     required property real contentHeight
+
+    // Optional vertical expansion (island-style): the body grows downward by
+    // expandHeight and widens to expandWidth to host an attached popup (the tray
+    // menu) inside this same surface. Zero is a no-op for normal dockzones.
+    property real expandHeight: 0
+    property real expandWidth: 0
 
     // Owner-local animated canonical progress drivers.
     // Initialized from the initial surfaceState so stable "attached" starts
@@ -135,14 +142,22 @@ Item {
     // Derive renderer-facing metrics from the contract model.
     readonly property var metrics: Model.deriveRendererMetrics(root.model)
 
-    // Expose body geometry for child content positioning.
+    // Expose body geometry for child content positioning. The animated popup
+    // expansion is applied here as a lightweight additive override on top of the
+    // resting model geometry, so the per-frame spring never re-runs the JS
+    // model (which would thrash the GC and stutter the animation).
     readonly property real bodyX: metrics.bodyX
     readonly property real bodyY: metrics.bodyY
-    readonly property real bodyWidth: metrics.bodyWidth
-    readonly property real bodyHeight: metrics.bodyHeight
+    readonly property real bodyWidth: Math.max(metrics.bodyWidth, root.expandWidth)
+    readonly property real bodyHeight: metrics.bodyHeight + root.expandHeight
+    // Natural (un-extended) body width and the resting top-band height, so
+    // callers can lay popup content beneath the widget row.
+    readonly property real naturalBodyWidth: metrics.naturalBodyWidth
+    readonly property real topBandHeight: metrics.topBandHeight
+    readonly property real contentShiftX: metrics.contentShiftX
 
-    implicitWidth: metrics.containerWidth
-    implicitHeight: metrics.containerHeight
+    implicitWidth: metrics.containerWidth + Math.max(0, root.expandWidth - metrics.bodyWidth)
+    implicitHeight: metrics.containerHeight + root.expandHeight
     width: implicitWidth
     height: implicitHeight
 
@@ -206,10 +221,6 @@ Item {
         root._stripParts(rightBottomEarBlurStrips, rightBottomEar.visible)
     )
 
-    onFillColorChanged: silhouetteFill.requestPaint()
-    onBorderColorChanged: silhouetteFill.requestPaint()
-    onMetricsChanged: silhouetteFill.requestPaint()
-
     // Root-level global motion envelope — body and ears inherit these so
     // the entire surface moves as one continuous object.
     opacity: root.model.globalMotion.opacity
@@ -225,81 +236,78 @@ Item {
     // semi-transparent surface alpha exactly once per pixel, so the ear/body
     // joins have no double-blended seam. A single stroke follows only the true
     // outer edge, so the border never paints a highlight line along the joins.
-    Canvas {
+    // --- Unified silhouette fill + border ---
+    // Trace the whole section (body + its two ears) as ONE continuous outer
+    // contour, then fill once and stroke once. Rendered via QtQuick.Shapes so
+    // geometry changes during the expand spring are GPU-tessellated each frame
+    // instead of CPU-repainted like the previous Canvas (which re-rasterized the
+    // whole outline every frame and made the expand animation stutter).
+    Shape {
         id: silhouetteFill
 
         z: 0
         anchors.fill: parent
+        preferredRendererType: Shape.CurveRenderer
         antialiasing: true
         visible: root.model.state.visibilityProgress > 0
 
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
-
+        // SVG outline mirroring the previous Canvas paths. Concave ear fillets
+        // are quarter-circle arcs (sweep flag 0, matching AttachedIslandSurface).
+        readonly property string outline: {
             var er = root.earRadius
             var bx = root.bodyX
-            var by = root.bodyY
             var bw = root.bodyWidth
             var bh = root.bodyHeight
 
             if (bw <= 0 || bh <= 0)
-                return
+                return ""
 
             var bodyRightX = bx + bw
             var radius = Math.min(root.bodyRadius, bw / 2, bh / 2)
 
-            ctx.fillStyle = root.fillColor
-            ctx.strokeStyle = root.borderColor
-            ctx.lineWidth = 1
-            ctx.beginPath()
-
             if (root.isLeftSection) {
                 // Body (bodyX=0) + top-right ear + bottom-left ear.
-                ctx.moveTo(0, 0)
-                ctx.lineTo(bodyRightX + er, 0)
-                // Top-right ear concave fillet -> (bodyRightX, er).
-                ctx.arc(bodyRightX + er, er, er, -Math.PI / 2, -Math.PI, true)
-                ctx.lineTo(bodyRightX, bh - radius)
-                ctx.quadraticCurveTo(bodyRightX, bh, bodyRightX - radius, bh)
-                ctx.lineTo(er, bh)
-                // Bottom-left ear concave fillet centered at (er, bh + er):
-                // from (er, bh) down/out to (0, bh + er) at the screen edge.
-                ctx.arc(er, bh + er, er, -Math.PI / 2, -Math.PI, true)
-                ctx.lineTo(0, 0)
+                return "M 0 0"
+                    + " L " + (bodyRightX + er) + " 0"
+                    + " A " + er + " " + er + " 0 0 0 " + bodyRightX + " " + er
+                    + " L " + bodyRightX + " " + (bh - radius)
+                    + " Q " + bodyRightX + " " + bh + " " + (bodyRightX - radius) + " " + bh
+                    + " L " + er + " " + bh
+                    + " A " + er + " " + er + " 0 0 0 0 " + (bh + er)
+                    + " L 0 0 Z"
             } else if (root.isRightSection) {
                 // Body (bodyX=er) + top-left ear + bottom-right ear.
-                ctx.moveTo(0, 0)
-                ctx.lineTo(bodyRightX, 0)
-                ctx.lineTo(bodyRightX, bh + er)
-                // Bottom-right ear concave fillet -> (bottomRightEarX, bh).
-                ctx.arc(bodyRightX - er, bh + er, er, 0, -Math.PI / 2, true)
-                ctx.lineTo(bx + radius, bh)
-                ctx.quadraticCurveTo(bx, bh, bx, bh - radius)
-                ctx.lineTo(bx, er)
-                // Top-left ear concave fillet -> (0, 0).
-                ctx.arc(0, er, er, 0, -Math.PI / 2, true)
-            } else {
-                // Center section (currently hidden): body with both bottom
-                // corners rounded and both top ears.
-                ctx.moveTo(0, 0)
-                ctx.lineTo(bodyRightX + er, 0)
-                ctx.arc(bodyRightX + er, er, er, -Math.PI / 2, -Math.PI, true)
-                ctx.lineTo(bodyRightX, bh - radius)
-                ctx.quadraticCurveTo(bodyRightX, bh, bodyRightX - radius, bh)
-                ctx.lineTo(bx + radius, bh)
-                ctx.quadraticCurveTo(bx, bh, bx, bh - radius)
-                ctx.lineTo(bx, er)
-                ctx.arc(bx - er, er, er, 0, -Math.PI / 2, true)
+                return "M 0 0"
+                    + " L " + bodyRightX + " 0"
+                    + " L " + bodyRightX + " " + (bh + er)
+                    + " A " + er + " " + er + " 0 0 0 " + (bodyRightX - er) + " " + bh
+                    + " L " + (bx + radius) + " " + bh
+                    + " Q " + bx + " " + bh + " " + bx + " " + (bh - radius)
+                    + " L " + bx + " " + er
+                    + " A " + er + " " + er + " 0 0 0 0 0 Z"
             }
 
-            ctx.closePath()
-            ctx.fill()
-            ctx.stroke()
+            // Center: both top ears + both rounded bottom corners.
+            return "M 0 0"
+                + " L " + (bodyRightX + er) + " 0"
+                + " A " + er + " " + er + " 0 0 0 " + bodyRightX + " " + er
+                + " L " + bodyRightX + " " + (bh - radius)
+                + " Q " + bodyRightX + " " + bh + " " + (bodyRightX - radius) + " " + bh
+                + " L " + (bx + radius) + " " + bh
+                + " Q " + bx + " " + bh + " " + bx + " " + (bh - radius)
+                + " L " + bx + " " + er
+                + " A " + er + " " + er + " 0 0 0 " + (bx - er) + " 0 Z"
         }
 
-        onWidthChanged: requestPaint()
-        onHeightChanged: requestPaint()
+        ShapePath {
+            fillColor: root.fillColor
+            strokeColor: root.borderColor
+            strokeWidth: 1
+
+            PathSvg {
+                path: silhouetteFill.outline
+            }
+        }
     }
 
     // --- Left top ear geometry (center and right sections) ---
@@ -420,7 +428,7 @@ Item {
 
         z: 0
         x: root.metrics.bottomLeftEarX
-        y: root.metrics.bottomEarY - 1
+        y: root.bodyHeight - 1
         width: root.earRadius
         height: root.earRadius
         visible: root.model.state.visibilityProgress > 0 && root.metrics.hasBottomLeftEar
@@ -445,8 +453,8 @@ Item {
         id: rightBottomEar
 
         z: 0
-        x: root.metrics.bottomRightEarX
-        y: root.metrics.bottomEarY - 1
+        x: root.bodyX + root.bodyWidth - root.earRadius
+        y: root.bodyHeight - 1
         width: root.earRadius
         height: root.earRadius
         visible: root.model.state.visibilityProgress > 0 && root.metrics.hasBottomRightEar

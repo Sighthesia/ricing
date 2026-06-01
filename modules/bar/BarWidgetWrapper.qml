@@ -11,7 +11,7 @@ Item {
 
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     readonly property string widgetId: widgetEntry && widgetEntry.id ? widgetEntry.id : ""
-    readonly property bool localPointerIntent: pointerArea.containsMouse
+    readonly property bool localPointerIntent: pointerHover.hovered
     objectName: widgetInstanceKey
 
     implicitHeight: loader.item ? loader.item.implicitHeight : 0
@@ -96,17 +96,20 @@ Item {
         visible: !root._isDragging
     }
 
-    // Track passive pointer presence and right-click for context menu.
-    MouseArea {
+    // Passive right-click + hover detection via pointer handlers so they do not
+    // consume hover events that inner widgets (e.g. Tray icons) rely on.
+    HoverHandler {
+        id: pointerHover
+    }
+
+    TapHandler {
         id: pointerArea
 
-        anchors.fill: parent
-        hoverEnabled: true
         acceptedButtons: Qt.RightButton
-        propagateComposedEvents: true
-        onClicked: (mouse) => {
+        gesturePolicy: TapHandler.ReleaseWithinBounds
+        onTapped: (eventPoint) => {
             // Forward right-click to BarContent's context menu with widget context.
-            var barPos = root.mapToItem(null, mouse.x, mouse.y)
+            var barPos = root.mapToItem(null, eventPoint.position.x, eventPoint.position.y)
             var barContent = root.parent
             while (barContent && !barContent.openWidgetContextMenu) {
                 barContent = barContent.parent

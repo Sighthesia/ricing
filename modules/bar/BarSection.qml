@@ -1,4 +1,5 @@
 import "."
+import "./tray" as Tray
 import "../../services" as Services
 import "../../services/barlayout/BarLayoutSections.js" as BarLayoutSections
 import QtQuick
@@ -106,13 +107,75 @@ Item {
                 hoverIntent: sectionHoverHandler.hovered
                 anchors.fill: parent
 
+                // Host the tray DBus menu by expanding this dockzone downward
+                // (island-style) when the menu is open and its anchor icon lives
+                // in this section. The body grows by the menu height and widens
+                // to the menu width; the menu renders in the body below the icon
+                // row. expandHeight/expandWidth are zero for every other section
+                // and when closed, so normal dockzones are unaffected.
+                readonly property real rowScreenLeft: sectionRow.mapToItem(null, 0, 0).x
+                readonly property real rowScreenRight: sectionRow.mapToItem(null, sectionRow.width, 0).x
+                readonly property bool hostsTrayMenu: root.hasSectionContent
+                    && Services.TrayMenuService.visible
+                    && Services.TrayMenuService.anchorX >= rowScreenLeft - 24
+                    && Services.TrayMenuService.anchorX <= rowScreenRight + 24
+                readonly property real menuW: trayMenuLoader.item ? trayMenuLoader.item.implicitWidth : 0
+                readonly property real menuH: trayMenuLoader.item ? trayMenuLoader.item.implicitHeight : 0
+
+                expandHeight: hostsTrayMenu ? (menuH + 8) : 0
+                expandWidth: hostsTrayMenu ? menuW : 0
+
+                Behavior on expandHeight {
+                    SpringAnimation {
+                        spring: Services.Motion.islandExpand.spring
+                        mass: Services.Motion.islandExpand.mass
+                        damping: Services.Motion.islandExpand.dampingExpand
+                        epsilon: Services.Motion.islandExpand.epsilon
+                    }
+                }
+                Behavior on expandWidth {
+                    SpringAnimation {
+                        spring: Services.Motion.islandExpand.spring
+                        mass: Services.Motion.islandExpand.mass
+                        damping: Services.Motion.islandExpand.dampingExpand
+                        epsilon: Services.Motion.islandExpand.epsilon
+                    }
+                }
+
+                // Tray DBus menu rendered inside the expanded body, beneath the
+                // icon row. Kept loaded while the body is still collapsing so the
+                // shrink animation has content to clip.
+                Loader {
+                    id: trayMenuLoader
+
+                    active: dockzone.hostsTrayMenu || dockzone.bodyHeight > dockzone.topBandHeight + 1
+                    z: 2
+                    x: parent.bodyX + (parent.bodyWidth - width) / 2
+                    y: parent.bodyY + parent.topBandHeight
+                    width: dockzone.menuW
+                    clip: true
+                    height: Math.max(0, dockzone.bodyHeight - parent.topBandHeight)
+
+                    sourceComponent: Tray.TrayMenuView {
+                        rootHandle: Services.TrayMenuService.menuHandle
+                    }
+
+                    // Keep the menu open while the pointer rests on it.
+                    HoverHandler {
+                        id: trayMenuHover
+                        onHoveredChanged: Services.TrayMenuService.pointerInMenu = hovered
+                    }
+                }
+
                 // Lay out widgets for this section in order.
                 Row {
                     id: sectionRow
 
                     z: 1
+                    // Center horizontally in the body; vertically in the resting
+                    // top band so it stays put when the body expands downward.
                     x: parent.bodyX + (parent.bodyWidth - width) / 2
-                    y: parent.bodyY + (parent.bodyHeight - height) / 2
+                    y: parent.bodyY + (parent.topBandHeight - height) / 2
                     spacing: BarLayoutSections.widgetSpacing
 
                     // Instantiate each managed widget in sequence.
