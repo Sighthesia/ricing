@@ -69,11 +69,14 @@ QtObject {
 
             property JsonObject appearance: JsonObject {
                 property string wallpaperPath: ""
-                property string colorScheme: "auto"
-                property real panelOpacity: 0.9
-                property int cornerRadius: 12
-                property bool enableBlur: true
-            }
+       property string colorScheme: "auto"
+   property real panelOpacity: 0.9
+             property int cornerRadius: 12
+        property bool enableBlur: true
+                // Window hint layout: "attached-island" extends from the island,
+          // "floating-capsule" keeps the legacy independent floating popup.
+                property string windowHintMode: "attached-island"
+     }
 
             property JsonObject notifications: JsonObject {
                 property int maxVisible: 3

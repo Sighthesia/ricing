@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import "modules/background" as Background
 import "modules/bar" as Bar
+import "modules/bar/tray" as TrayMenu
 import "modules/island" as Island
 import "modules/notification" as Notification
 import "modules/osd" as Osd
@@ -34,6 +35,10 @@ ShellRoot {
 
     // Widget picker rendered in its own window so empty sections can recover widgets.
     Bar.WidgetPickerWindow {
+    }
+
+    // Hover-driven system tray DBus menu in its own overlay window.
+    TrayMenu.TrayMenuWindow {
     }
 
     // Transient notification popups on overlay layer.
