@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import "../common" as Common
 import "../../services" as Services
 
 // OSD popup for volume/brightness/media feedback, centered on screen.
@@ -25,6 +26,7 @@ Variants {
         // OSD size
         implicitWidth: 200
         implicitHeight: 120
+        visible: osdSurface.opacity > 0 || osdWindow.osdVisible
 
         // Position at top-left corner
         anchors {
@@ -39,17 +41,14 @@ Variants {
         property real progress: 0
         property string osdType: "" // "volume", "brightness", "media"
 
-        // Make window click-through when not visible
-        visible: osdWindow.osdVisible
-
         BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? osdBlurRegion : null
 
         // Bind blur to the transient OSD card rather than the whole overlay surface.
         Region {
             id: osdBlurRegion
 
-            item: osdWindow.osdVisible ? osdBlurSource : null
-            radius: osdContainer.radius
+            item: osdWindow.osdVisible ? osdContainer.blurSourceItem : null
+            radius: osdContainer.blurRadius
         }
 
         // Auto-hide timer
@@ -107,83 +106,73 @@ Variants {
             hideTimer.restart()
         }
 
-        // OSD content container
-        Rectangle {
-            id: osdContainer
-            anchors.centerIn: parent
-            width: 180
-            height: 100
-            radius: 16
-            color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
-            opacity: osdWindow.osdVisible ? 1 : 0
+        // OSD surface content.
+        Common.PopupSurface {
+            id: osdSurface
 
-            // Full-size blur source — covers the entire visible fill geometry.
-            Item {
-                id: osdBlurSource
+            anchors.fill: parent
+            transformOrigin: Item.Center
+            shown: osdWindow.osdVisible
 
-                anchors.fill: parent
-            }
-
-            // Fade animation
-            Behavior on opacity {
-                NumberAnimation { duration: Services.Motion.number.settleDuration; easing.type: Services.Motion.number.settleEasing }
-            }
-
-            Column {
+            // OSD content container.
+            Common.GlassCapsule {
+                id: osdContainer
                 anchors.centerIn: parent
-                spacing: 12
+                width: 180
+                height: 100
+                radius: height / 2
+                surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
+                outlineColor: Services.Color.mOutline
+                borderWidth: 1
 
-                // Icon and value row
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                // Stack icon, value, and progress inside the capsule.
+                Column {
+                    anchors.centerIn: parent
                     spacing: 12
 
-                    // Icon
-                    Text {
-                        text: osdWindow.icon
-                        font.pixelSize: 28
-                        color: Services.Color.mOnSurface
-                        anchors.verticalCenter: parent.verticalCenter
+                    // Icon and value row
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 12
+
+                        // Icon
+                        Text {
+                            text: osdWindow.icon
+                            font.pixelSize: 28
+                            color: Services.Color.mOnSurface
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        // Value
+                        Text {
+                            text: osdWindow.valueText
+                            font.pixelSize: 18
+                            font.bold: true
+                            color: Services.Color.mOnSurface
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
                     }
 
-                    // Value
-                    Text {
-                        text: osdWindow.valueText
-                        font.pixelSize: 18
-                        font.bold: true
-                        color: Services.Color.mOnSurface
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-
-                // Progress bar
-                Rectangle {
-                    width: 140
-                    height: 6
-                    radius: 3
-                    color: Services.Color.mSurfaceVariant
-
+                    // Progress bar
                     Rectangle {
-                        width: parent.width * osdWindow.progress
-                        height: parent.height
+                        width: 140
+                        height: 6
                         radius: 3
-                        color: Services.Color.mPrimary
+                        color: Services.Color.mSurfaceVariant
 
-                        // Smooth progress animation
-                        Behavior on width {
-                            NumberAnimation { duration: Services.Motion.number.shortDuration; easing.type: Services.Motion.number.shortEasing }
+                        Rectangle {
+                            width: parent.width * osdWindow.progress
+                            height: parent.height
+                            radius: 3
+                            color: Services.Color.mPrimary
+
+                            // Smooth progress animation
+                            Behavior on width {
+                                NumberAnimation { duration: Services.Motion.number.shortDuration; easing.type: Services.Motion.number.shortEasing }
+                            }
                         }
                     }
                 }
-            }
-
-            // Border overlay rendered above all content.
-            Rectangle {
-                anchors.fill: parent
-                radius: osdContainer.radius
-                color: "transparent"
-                border.color: Services.Color.mOutline
-                border.width: 1
             }
         }
     }

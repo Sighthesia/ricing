@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Widgets
+import "../common" as Common
 import "../../services" as Services
 import "../../services/CapsuleMetrics.js" as CapsuleMetrics
 import "WorkspaceHintCapsule.js" as Capsule
@@ -75,7 +76,7 @@ Item {
         && root._detailProgress >= 0.999
         && root._revealProgress >= 0.999
     )
-    readonly property Item blurSourceItem: surfaceBlurSource
+    readonly property Item blurSourceItem: surface.blurSourceItem
     readonly property bool providesPrimaryWidth: !!(root.capsule && root.capsule.isCurrent)
     readonly property real _maxCapsuleWidth: Math.max(
         root._metrics.height,
@@ -173,23 +174,18 @@ Item {
     }
 
     // Keep the visible capsule surface attached to the stage even near the top edge.
-    Rectangle {
-        id: surface
+        Common.GlassCapsule {
+            id: surface
 
         x: 0
         y: root._surfaceOffsetY
         width: root.width
         height: root.height
         radius: height / 2
-        color: root._surfaceColor
-        antialiasing: true
-
-        // Full-size blur source — covers the entire visible fill geometry.
-        Item {
-            id: surfaceBlurSource
-
-            anchors.fill: parent
-        }
+        surfaceColor: root._surfaceColor
+        outlineColor: root._outlineColor
+        borderWidth: 1
+        clipContent: true
 
         // Center the workspace label and icon strip inside the capsule.
         Item {
@@ -318,9 +314,9 @@ Item {
                             NumberAnimation {
                                 duration: Services.Motion.number.contentDuration + 220
                                 easing.type: Easing.OutSine
-                            }
-                        }
-                    }
+        }
+    }
+}
 
                     // Single persistent highlight; trail comes from edge desync, not a second layer.
                     Rectangle {
@@ -685,13 +681,5 @@ Item {
             }
         }
 
-        // Border overlay rendered above all content.
-        Rectangle {
-            anchors.fill: parent
-            radius: surface.radius
-            color: "transparent"
-            border.color: root._outlineColor
-            border.width: 1
-        }
     }
 }

@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import "../common" as Common
 import "../../services" as Services
 
 // Transient notification popups anchored to top-right, auto-dismiss after 5s.
@@ -26,23 +27,21 @@ Variants {
             right: true
         }
 
-        width: 360
-        height: notifColumn.implicitHeight + 16
-
-        // Hide window when no notifications
-        visible: Services.NotificationService.popupList.count > 0
+        implicitWidth: 360
+        implicitHeight: notifList.contentHeight + 16
+        visible: notifSurface.opacity > 0 || Services.NotificationService.popupList.count > 0
 
         BackgroundEffect.blurRegion: Services.SettingsService.appearance.enableBlur ? notificationBlurRegion : null
 
         // Track blur to each notification card to avoid stack-gap overflow.
         property Variants notificationBlurRegions: Variants {
-            model: Services.SettingsService.appearance.enableBlur ? notifColumn.children : []
+            model: Services.SettingsService.appearance.enableBlur && notifList.contentItem ? notifList.contentItem.children : []
 
             Region {
                 required property Item modelData
 
-                item: modelData.visible && modelData.blurSourceItem ? modelData.blurSourceItem : null
-                radius: 12
+                item: modelData.blurSourceItem ? modelData.blurSourceItem : null
+                radius: modelData.blurRadius !== undefined ? modelData.blurRadius : 0
             }
         }
 
@@ -52,39 +51,102 @@ Variants {
             regions: notificationBlurRegions.instances
         }
 
-        // Notification card stack
-        Column {
-            id: notifColumn
-            anchors.top: parent.top
-            anchors.right: parent.right
-            anchors.topMargin: 8
-            anchors.rightMargin: 8
-            width: 344
-            spacing: 8
+        // Notification surface content.
+        Common.PopupSurface {
+            id: notifSurface
 
-            Repeater {
+            anchors.fill: parent
+            transformOrigin: Item.TopRight
+            shown: Services.NotificationService.popupList.count > 0
+
+            // Notification card stack.
+            ListView {
+                id: notifList
+
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.topMargin: 8
+                anchors.rightMargin: 8
+                width: 344
+                height: contentHeight
+                spacing: 8
+                clip: false
+                interactive: false
                 model: Services.NotificationService.popupList
 
-                // Single notification card
-                Rectangle {
+                add: Transition {
+                    ParallelAnimation {
+                        NumberAnimation {
+                            properties: "opacity"
+                            from: 0
+                            to: 1
+                            duration: Services.Motion.popup.opacityDuration
+                            easing.type: Services.Motion.popup.opacityEasing
+                        }
+
+                        NumberAnimation {
+                            properties: "scale"
+                            from: 0.96
+                            to: 1
+                            duration: Services.Motion.popup.scaleDuration
+                            easing.type: Services.Motion.popup.scaleEasing
+                            easing.overshoot: Services.Motion.popup.scaleOvershoot
+                        }
+                    }
+                }
+
+                remove: Transition {
+                    SequentialAnimation {
+                        PropertyAction { property: "ListView.delayRemove"; value: true }
+
+                        ParallelAnimation {
+                            NumberAnimation {
+                                properties: "opacity"
+                                to: 0
+                                duration: Services.Motion.popup.opacityDuration
+                                easing.type: Services.Motion.popup.opacityEasing
+                            }
+
+                            NumberAnimation {
+                                properties: "scale"
+                                to: 0.96
+                                duration: Services.Motion.popup.scaleDuration
+                                easing.type: Services.Motion.popup.scaleEasing
+                                easing.overshoot: Services.Motion.popup.scaleOvershoot
+                            }
+
+                            NumberAnimation {
+                                properties: "height"
+                                to: 0
+                                duration: Services.Motion.number.settleDuration
+                                easing.type: Services.Motion.number.settleEasing
+                            }
+                        }
+
+                        PropertyAction { property: "ListView.delayRemove"; value: false }
+                    }
+                }
+
+                displaced: Transition {
+                    NumberAnimation {
+                        properties: "y"
+                        duration: Services.Motion.number.contentDuration
+                        easing.type: Services.Motion.number.contentEasing
+                    }
+                }
+
+                // Single notification card.
+                delegate: Common.GlassCapsule {
                     id: card
 
-                    readonly property Item blurSourceItem: cardBlurSource
-
-                    width: 344
+                    width: ListView.view ? ListView.view.width : 344
                     height: 64
-                    radius: 12
-                    color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
-                    opacity: 1
+                    radius: height / 2
+                    surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
+                    outlineColor: Services.Color.mOutline
+                    scale: 1
 
-                    // Full-size blur source — covers the entire visible fill geometry.
-                    Item {
-                        id: cardBlurSource
-
-                        anchors.fill: parent
-                    }
-
-                    // Auto-dismiss timer
+                    // Auto-dismiss timer.
                     Timer {
                         id: dismissTimer
                         interval: 5000
@@ -92,7 +154,7 @@ Variants {
                         onTriggered: Services.NotificationService.removeNotification(model.notifId)
                     }
 
-                    // Click to dismiss
+                    // Click to dismiss.
                     MouseArea {
                         anchors.fill: parent
                         onClicked: Services.NotificationService.removeNotification(model.notifId)
@@ -100,10 +162,12 @@ Variants {
 
                     Row {
                         anchors.fill: parent
-                        anchors.margins: 10
-                        spacing: 10
+                        anchors.margins: 8
+                        anchors.leftMargin: 16
+                        anchors.rightMargin: 16
+                        spacing: 12
 
-                        // App icon
+                        // App icon.
                         Image {
                             width: 40
                             height: 40
@@ -113,13 +177,13 @@ Variants {
                             visible: source.toString() !== ""
                         }
 
-                        // Text content
+                        // Text content.
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width - 60
+                            width: parent.width - 56
                             spacing: 2
 
-                            // Summary
+                            // Summary.
                             Text {
                                 width: parent.width
                                 text: model.summary || ""
@@ -130,7 +194,7 @@ Variants {
                                 maximumLineCount: 1
                             }
 
-                            // Body
+                            // Body.
                             Text {
                                 width: parent.width
                                 text: model.body || ""
@@ -142,33 +206,26 @@ Variants {
                         }
                     }
 
-                    // Countdown progress bar
+                    // Countdown progress bar.
                     Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.left: parent.left
                         anchors.bottomMargin: 2
-                        anchors.leftMargin: 12
+                        anchors.leftMargin: 16
                         height: 2
                         radius: 1
                         color: Services.Color.mPrimary
-                        width: 320
+                        width: 312
 
                         NumberAnimation on width {
-                            from: 320
+                            from: 312
                             to: 0
                             duration: 5000
                             running: true
                         }
                     }
 
-                    // Border overlay rendered above all content.
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: card.radius
-                        color: "transparent"
-                        border.color: Services.Color.mOutline
-                        border.width: 1
-                    }
+                    transformOrigin: Item.Center
                 }
             }
         }
