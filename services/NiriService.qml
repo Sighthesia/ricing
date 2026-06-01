@@ -231,6 +231,18 @@ Singleton {
 
     function reloadWindows() { fetcher.running = true }
 
+    // Sync isFocused from the WindowFocusChanged event's own id, avoiding an
+    // async windows re-pull so the hint indicator tracks focus without lag.
+    function setFocusedWindow(focusedId) {
+        const target = focusedId != null ? String(focusedId) : ""
+        for (let i = 0; i < windows.count; i++) {
+            const isNow = (windows.get(i).winId === target)
+            if (windows.get(i).isFocused !== isNow)
+                windows.setProperty(i, "isFocused", isNow)
+        }
+        windowsUpdated()
+    }
+
     // Event stream for live updates
     property Process _eventStream: Process {
         id: eventStream
@@ -244,7 +256,9 @@ Singleton {
                         root.updateWorkspaces(event.WorkspacesChanged)
                     else if (event.WorkspaceActivated)
                         root.activateWorkspace(event.WorkspaceActivated)
-                    else if (event.WindowOpenedOrChanged || event.WindowClosed || event.WindowFocusChanged)
+                    else if (event.WindowFocusChanged)
+                        root.setFocusedWindow(event.WindowFocusChanged.id)
+                    else if (event.WindowOpenedOrChanged || event.WindowClosed)
                         root.reloadWindows()
                 } catch (e) {}
             }

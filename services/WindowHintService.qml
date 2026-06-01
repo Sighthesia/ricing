@@ -74,18 +74,17 @@ Singleton {
             return
 
         const nextHint = root._buildHint(true)
-        // Cold-start guard: if niri data is not ready yet the build yields an
-        // empty hint (no active workspace / no windows). Do not overwrite a
-        // previously valid snapshot with emptiness — keep showing the last good
-        // data and schedule a retry so the stage fills once niri data lands,
-        // instead of rendering a blank panel on the first hold.
-        if ((!nextHint.windows || nextHint.windows.length === 0)
-                && nextHint.activeWorkspacePosition < 0
-                && root.activeHint
-                && root.activeHint.windows
-                && root.activeHint.windows.length > 0) {
+        // Cold-start guard: on the very first hold niri data may not be loaded
+        // yet, so the build yields an empty hint. Do not commit emptiness while
+        // held — actively re-pull niri windows and keep retrying until data
+        // lands. This covers the first-ever hold (when activeHint is still the
+        // initial empty snapshot) as well as transient empties, instead of
+        // rendering a blank panel. Any previously valid snapshot stays visible.
+        if (!nextHint.windows || nextHint.windows.length === 0) {
+            Services.NiriService.reloadWindows()
             _hintRefreshCoalesceTimer.restart()
-            return
+            if (root.activeHint && root.activeHint.windows && root.activeHint.windows.length > 0)
+                return
         }
         root.activeHint = nextHint
     }

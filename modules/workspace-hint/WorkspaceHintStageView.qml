@@ -257,7 +257,7 @@ for (let index = 0; index < text.length; index++) {
             _enterTopTimer.restart()
         _enterMiddleTimer.restart()
         _enterBottomTimer.restart()
-     Motion.handleHintChange(stageView, _hintData, _workspaceAnchorSettleTimer, Stage)
+     Motion.handleHintChange(stageView, stageView.hintData, _workspaceAnchorSettleTimer, Stage)
      return
         }
 
@@ -270,10 +270,10 @@ _enterTopTimer.stop()
     }
 
     onHintDataChanged: {
-    if (!active)
+     if (!active)
           return
 
-        Motion.handleHintChange(stageView, _hintData, _workspaceAnchorSettleTimer, Stage)
+        Motion.handleHintChange(stageView, stageView.hintData, _workspaceAnchorSettleTimer, Stage)
     }
 
     // Stagger the top capsule into view from y = 0.
