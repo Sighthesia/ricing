@@ -2,9 +2,14 @@ import QtQuick
 import Qt5Compat.GraphicalEffects
 import "../../../services" as Services
 
-// Render a compact now-playing pill for the bar.
+// Render a compact now-playing pill for the bar. While a transient message is
+// active the text collapses away so the widget simplifies to its artwork icon,
+// yielding attention to the interrupting message.
 Item {
     id: root
+
+    // Simplify to icon-only during transient messages (hardcoded on for now).
+    readonly property bool simplified: Services.TransientMessageService.active
 
     property string currentText: root._displayText
     property string pendingText: root._displayText
@@ -303,7 +308,8 @@ Item {
                 id: currentTextSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(currentTextLabel.implicitWidth, 200)
+                visible: !root.simplified
+                width: root.simplified ? 0 : Math.min(currentTextLabel.implicitWidth, 200)
                 height: currentTextLabel.implicitHeight
 
                 Behavior on width {
@@ -466,7 +472,8 @@ Item {
                 id: nextTextSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(nextTextLabel.implicitWidth, 200)
+                visible: !root.simplified
+                width: root.simplified ? 0 : Math.min(nextTextLabel.implicitWidth, 200)
                 height: nextTextLabel.implicitHeight
 
                 Behavior on width {

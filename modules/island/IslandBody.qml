@@ -26,9 +26,14 @@ Item {
     readonly property var centerWidgets: Services.BarLayoutService.sectionWidgets("center")
     readonly property bool showManagedCenterWidgets: !Services.IslandService.expanded
         && root.centerWidgets.length > 0
-    readonly property real collapsedContentWidth: collapsedContentLoader.item
-        ? collapsedContentLoader.item.implicitWidth + collapsedHorizontalPadding
+    readonly property real collapsedContentWidth: collapsedRow.implicitWidth > 0
+        ? collapsedRow.implicitWidth + collapsedHorizontalPadding
         : collapsedW
+    // When a transient message is active the collapsed body grows downward to
+    // fit the message card (clock stays in the top row); height tracks the card.
+    readonly property real messageContentHeight: Services.TransientMessageService.active
+        ? Math.max(collapsedH, collapsedRow.implicitHeight + 12)
+        : collapsedH
 
     // Window-hint extension geometry, sized to the live stage. When the hint is
     // held without the launcher, the island grows to wrap the full vertical
@@ -51,7 +56,7 @@ Item {
         ? expandedH
         : (Services.IslandService.windowHintActive
             ? windowHintH
-            : collapsedH + (hoverHandler.hovered ? hoverHLift : 0))
+            : messageContentHeight + (hoverHandler.hovered ? hoverHLift : 0))
     property int targetR: Services.IslandService.expanded
         ? 24
         : (Services.IslandService.windowHintActive
@@ -104,12 +109,35 @@ Item {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
             }
 
-            // Switch collapsed content between the real center widgets and the fallback clock.
-            Loader {
-                id: collapsedContentLoader
+            // Switch collapsed content between the real center widgets and the
+            // fallback clock, with the transient message card adjacent so an
+            // active message grows the island (layout push, no overlap). The
+            // row is pinned to the top band so the clock and the message head
+            // align while the body grows downward for long bodies.
+            Row {
+                id: collapsedRow
 
-                anchors.centerIn: parent
-                sourceComponent: root.showManagedCenterWidgets ? managedCenterWidgets : fallbackClock
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                // Center the row's top item in the bar-height band so the clock
+                // stays vertically centered while the body grows downward for
+                // long message bodies.
+                anchors.topMargin: Math.max(0, (root.collapsedH - childHeightHint) / 2)
+                readonly property real childHeightHint: Math.max(
+                    collapsedContentLoader.height, 18)
+                spacing: 8
+
+                Loader {
+                    id: collapsedContentLoader
+
+                    anchors.top: parent.top
+                    sourceComponent: root.showManagedCenterWidgets ? managedCenterWidgets : fallbackClock
+                }
+
+                // Transient message card beside the clock; zero size when idle.
+                TransientMessageBand {
+                    anchors.top: parent.top
+                }
             }
 
             // Render the actual managed center widgets in collapsed mode.

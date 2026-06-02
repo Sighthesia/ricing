@@ -66,7 +66,7 @@ Item {
     }
 
     // Keep the center zone aligned to the screen midpoint.
-    // Hidden: island module now owns center content.
+    // Hidden: island module now owns center content (and the transient message band).
     BarSection {
         id: centerSection
 

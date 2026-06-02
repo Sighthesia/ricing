@@ -5,8 +5,6 @@ import "services" as Services
 import "modules/background" as Background
 import "modules/bar" as Bar
 import "modules/island" as Island
-import "modules/notification" as Notification
-import "modules/osd" as Osd
 import "modules/settings" as Settings
 import "modules/launcher" as Launcher
 import "modules/workspace-hint" as WorkspaceHint
@@ -39,14 +37,6 @@ ShellRoot {
 
     // Widget picker rendered in its own window so empty sections can recover widgets.
     Bar.WidgetPickerWindow {
-    }
-
-    // Transient notification popups on overlay layer.
-    Notification.NotificationWindow {
-    }
-
-    // OSD popup for volume/brightness/media feedback.
-    Osd.OsdWindow {
     }
 
     // Settings panel popup triggered from bar right-click.
