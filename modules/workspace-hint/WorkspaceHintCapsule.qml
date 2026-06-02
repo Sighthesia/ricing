@@ -316,14 +316,14 @@ Item {
 
                         Behavior on leftSlow {
                             NumberAnimation {
-                                duration: Services.Motion.number.contentDuration + 220
+                                duration: Services.Motion.number.contentDuration + 60
                                 easing.type: Easing.OutSine
                             }
                         }
 
                         Behavior on rightSlow {
                             NumberAnimation {
-                                duration: Services.Motion.number.contentDuration + 220
+                                duration: Services.Motion.number.contentDuration + 60
                                 easing.type: Easing.OutSine
         }
     }
