@@ -51,7 +51,7 @@ Load these for detailed context on specific topics:
 | [async-layer-sync-lag-debugging](.agents/skills/async-layer-sync-lag-debugging/SKILL.md) | A secondary layer on an async/coalesced commit path (compositor blur/mask region, cached copy) lags, stutters, overflows, or pops behind a per-frame main layer during fast animations. |
 | [overlay-pointer-event-starvation](.agents/skills/overlay-pointer-event-starvation/SKILL.md) | An inner/lower element stops getting hover/pointer events (no hover, hover popup never opens, or popup flickers open/closed) because an overlapping upper element or fullscreen overlay consumes them. |
 | [per-frame-surface-resize-jank](.agents/skills/per-frame-surface-resize-jank/SKILL.md) | An expand/collapse animation stutters because a per-frame size drives an expensive commit boundary (top-level/layer-shell window resize, compositor region, or per-frame model rebuild). Fix: fixed outer surface, animate clipped inner content. |
-| [reveal-before-clip](.agents/skills/reveal-before-clip/SKILL.md) | Content inside an expanding/contracting surface overflows or reads as harshly cut during the host's grow/shrink. Drive content reveal (opacity, slide, anchor edge) from the host's reveal progress before relying on a clip mask. |
+| [reveal-before-clip](.agents/skills/reveal-before-clip/SKILL.md) | When content inside an expanding/contracting surface (dockzone, island, drawer, menu) overflows or reads as harshly cut during the host's grow/shrink. Drive content reveal (opacity, slide, anchor edge) from the host's reveal progress before relying on a clip mask. |
 
 ## Workflow Runtime
 

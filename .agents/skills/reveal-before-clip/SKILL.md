@@ -1,6 +1,6 @@
 ---
 name: reveal-before-clip
-description: Use when content inside an expanding/contracting surface (dockzone, island, drawer, accordion, panel, menu) overflows or feels harshly cut during the parent's grow/shrink animation. Trigger signs include rows partially revealed, text bleeding through transparent corners, a rectangular clip cutting non-rectangular silhouettes, or per-frame efforts to keep content in bounds. The fix shape is to reveal content (opacity, slide, scale) in sync with the parent's reveal progress so content never has to be clipped. Not for fixed-size layout bugs → use `reactive-measurement-layout-debugging`; not for per-frame resize jank → use `per-frame-surface-resize-jank`.
+description: Use when content inside an expanding/contracting surface (dockzone, island, drawer, menu) overflows or reads as harshly cut during the host's grow/shrink. Drive content reveal (opacity, slide, anchor edge) from the host's reveal progress before relying on a clip mask. 
 ---
 
 # Reveal Before Clip
