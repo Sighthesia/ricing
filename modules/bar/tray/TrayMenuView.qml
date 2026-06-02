@@ -6,41 +6,75 @@ import Quickshell
 import "../../../services" as Services
 
 // Multi-level DBus menu renderer for the system tray, ported from the reference
-// shell's TrayMenu but restyled in afloat's glass language. A StackView pushes a
-// fresh SubMenu page for every entry that has children and pops on Back.
-StackView {
+// shell's TrayMenu but restyled in afloat's glass language. The root owns two
+// height domains: the menu's full natural content height and the currently
+// visible viewport height while the dockzone is still expanding.
+Item {
     id: root
 
     // Fixed menu width; rows elide their labels to fit.
     readonly property real menuWidth: 220
     // The top-level DBus menu handle (QsMenuHandle) for the hovered tray item.
     property var rootHandle: null
+    // The currently visible height provided by the host while the dockzone
+    // expands. Default to the full content height for measurement-only uses.
+    property real viewportHeight: contentHeight
+    // The currently visible width provided by the host while the dockzone
+    // expands. The menu keeps its natural width for measurement and eliding,
+    // but the rendered viewport is clipped to this live width.
+    property real viewportWidth: menuWidth
+    readonly property real contentHeight: menuStack.implicitHeight
+    readonly property real widthProgress: menuWidth > 0 ? Math.max(0, Math.min(1, width / menuWidth)) : 1
+    // Only reveal complete rows. Partial rows are where text/icons become
+    // visible before the dockzone glass has expanded enough to contain them.
+    readonly property real revealHeight: Math.max(0, height - 1)
 
     implicitWidth: menuWidth
-    implicitHeight: currentItem ? currentItem.implicitHeight : 0
-    // Clip so that while the hosting dockzone is still expanding (the view is
-    // taller than the visible body area), the lower rows are cut at the body
-    // edge instead of spilling below the glass.
-    clip: true
-
-    initialItem: subMenuComp.createObject(null, { handle: root.rootHandle, isSubMenu: false })
+    implicitHeight: contentHeight
+    width: Math.min(viewportWidth, menuWidth)
+    height: Math.min(viewportHeight, contentHeight)
 
     // Rebuild from scratch whenever the hovered item (its menu handle) changes.
     onRootHandleChanged: resetToRoot(true)
 
     // Collapse any open submenus back to the top level.
     function resetToRoot(rebuild) {
-        while (depth > 1)
-            pop(StackView.Immediate)
-        if (rebuild && currentItem)
-            currentItem.handle = root.rootHandle
+        while (menuStack.depth > 1)
+            menuStack.pop(StackView.Immediate)
+        if (rebuild && menuStack.currentItem)
+            menuStack.currentItem.handle = root.rootHandle
     }
 
-    // Push/pop carry no StackView transition; each page animates its own fade+scale.
-    pushEnter: Transition { NumberAnimation { duration: 0 } }
-    pushExit: Transition { NumberAnimation { duration: 0 } }
-    popEnter: Transition { NumberAnimation { duration: 0 } }
-    popExit: Transition { NumberAnimation { duration: 0 } }
+    // Clip the full-size menu content to the host-provided viewport so rows
+    // never paint outside the still-expanding glass body.
+    Item {
+        id: viewport
+
+        width: root.width
+        height: root.height
+        clip: true
+
+        // Host the logical page stack at full natural height; only the viewport
+        // above is height-clamped during the expand animation.
+        StackView {
+            id: menuStack
+
+            width: root.menuWidth
+            implicitHeight: currentItem ? currentItem.implicitHeight : 0
+            x: 0
+            anchors.top: parent.top
+            clip: true
+            opacity: Math.min(1, root.widthProgress * 1.25)
+
+            initialItem: subMenuComp.createObject(null, { handle: root.rootHandle, isSubMenu: false })
+
+            // Push/pop carry no StackView transition; each page animates its own fade.
+            pushEnter: Transition { NumberAnimation { duration: 0 } }
+            pushExit: Transition { NumberAnimation { duration: 0 } }
+            popEnter: Transition { NumberAnimation { duration: 0 } }
+            popExit: Transition { NumberAnimation { duration: 0 } }
+        }
+    }
 
     // One menu page: opens the handle, lists entries, optional Back header.
     Component {
@@ -60,10 +94,9 @@ StackView {
             bottomPadding: 6
             spacing: 2
 
-            // Animate page entry/exit so navigation feels like one moving surface.
+            // Animate page entry/exit with opacity only so foreground text/icons
+            // never overshoot the host clip during the dockzone expand.
             opacity: shown ? 1 : 0
-            scale: shown ? 1 : 0.92
-            transformOrigin: Item.Top
 
             Component.onCompleted: shown = true
             StackView.onActivating: shown = true
@@ -71,7 +104,6 @@ StackView {
             StackView.onRemoved: destroy()
 
             Behavior on opacity { NumberAnimation { duration: Services.Motion.popup.opacityDuration; easing.type: Services.Motion.popup.opacityEasing } }
-            Behavior on scale { NumberAnimation { duration: Services.Motion.popup.scaleDuration; easing.type: Services.Motion.popup.scaleEasing; easing.overshoot: Services.Motion.popup.scaleOvershoot } }
 
             // Pull live children for this handle.
             QsMenuOpener {
@@ -82,9 +114,14 @@ StackView {
 
             // Back header for nested pages; pops one level.
             Item {
+                id: backHeader
+
+                readonly property bool fullyRevealed: y + height <= root.revealHeight
+
                 width: root.menuWidth - 12
                 height: 30
                 visible: page.isSubMenu
+                opacity: fullyRevealed ? 1 : 0
 
                 Rectangle {
                     anchors.fill: parent
@@ -122,18 +159,22 @@ StackView {
 
                     anchors.fill: parent
                     hoverEnabled: true
+                    enabled: backHeader.fullyRevealed
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.pop()
+                    onClicked: menuStack.pop()
                 }
             }
 
             // Thin divider under the Back header.
             Rectangle {
+                readonly property bool fullyRevealed: y + height <= root.revealHeight
+
                 width: root.menuWidth - 16
                 anchors.horizontalCenter: parent.horizontalCenter
                 height: 1
                 color: Qt.alpha(Services.Color.mOutline, 0.4)
                 visible: page.isSubMenu
+                opacity: fullyRevealed ? 1 : 0
             }
 
             // One row per DBus menu entry.
@@ -144,9 +185,11 @@ StackView {
                     id: entry
 
                     required property var modelData
+                    readonly property bool fullyRevealed: y + implicitHeight <= root.revealHeight
 
                     width: root.menuWidth - 12
                     implicitHeight: modelData.isSeparator ? 7 : 32
+                    opacity: fullyRevealed ? 1 : 0
 
                     // Separator: centered hairline, no interaction.
                     Rectangle {
@@ -236,12 +279,12 @@ StackView {
 
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                enabled: entry.modelData.enabled
+                                enabled: entry.modelData.enabled && entry.fullyRevealed
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     var e = entry.modelData
                                     if (e.hasChildren) {
-                                        root.push(subMenuComp.createObject(null, {
+                                        menuStack.push(subMenuComp.createObject(null, {
                                             handle: e,
                                             isSubMenu: true
                                         }))

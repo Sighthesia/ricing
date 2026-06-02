@@ -119,8 +119,22 @@ Item {
                     && Services.TrayMenuService.visible
                     && Services.TrayMenuService.anchorX >= rowScreenLeft - 24
                     && Services.TrayMenuService.anchorX <= rowScreenRight + 24
-                readonly property real menuW: trayMenuLoader.item ? trayMenuLoader.item.implicitWidth : 0
-                readonly property real menuH: trayMenuLoader.item ? trayMenuLoader.item.implicitHeight : 0
+                // Natural menu size measured by a hidden, unclipped instance so
+                // it is independent of the clipped render tree below (whose size
+                // is driven by the Loader, not the content).
+                readonly property real menuW: trayMenuMeasure.implicitWidth
+                readonly property real menuH: trayMenuMeasure.implicitHeight
+                // Keep the menu a little inside the lower glass contour during
+                // the expand so foreground text/icons cannot peek through the
+                // transparent rounded corners before the body reaches full size.
+                readonly property real menuClipInset: Math.max(10, dockzone.bodyRadius * 0.75)
+
+                Tray.TrayMenuView {
+                    id: trayMenuMeasure
+                    visible: false
+                    enabled: false
+                    rootHandle: Services.TrayMenuService.menuHandle
+                }
 
                 expandHeight: hostsTrayMenu ? (menuH + 8) : 0
                 expandWidth: hostsTrayMenu ? menuW : 0
@@ -143,8 +157,8 @@ Item {
                 }
 
                 // Tray DBus menu rendered inside the expanded body, beneath the
-                // icon row. Kept loaded while the body is still collapsing so the
-                // shrink animation has content to clip.
+                // icon row. The view owns its own viewport clipping, so the host
+                // passes down the currently visible body width and height.
                 Loader {
                     id: trayMenuLoader
 
@@ -152,12 +166,13 @@ Item {
                     z: 2
                     x: parent.bodyX + (parent.bodyWidth - width) / 2
                     y: parent.bodyY + parent.topBandHeight
-                    width: dockzone.menuW
-                    clip: true
-                    height: Math.max(0, dockzone.bodyHeight - parent.topBandHeight)
+                    width: Math.min(dockzone.menuW, dockzone.bodyWidth)
+                    height: Math.max(0, dockzone.bodyHeight - parent.topBandHeight - dockzone.menuClipInset)
 
                     sourceComponent: Tray.TrayMenuView {
                         rootHandle: Services.TrayMenuService.menuHandle
+                        viewportWidth: trayMenuLoader.width
+                        viewportHeight: trayMenuLoader.height
                     }
 
                     // Keep the menu open while the pointer rests on it.
@@ -166,6 +181,7 @@ Item {
                         onHoveredChanged: Services.TrayMenuService.pointerInMenu = hovered
                     }
                 }
+
 
                 // Lay out widgets for this section in order.
                 Row {
