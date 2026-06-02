@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../../../services" as Services
+import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 
 // Compact bar clock showing date and time. While a transient message is
 // active the date collapses away so the clock simplifies to time-only,
@@ -10,6 +11,14 @@ Item {
 
     // Simplify to time-only during transient messages (hardcoded on for now).
     readonly property bool simplified: Services.TransientMessageService.active
+    readonly property var clockSettings: WidgetSettingsRegistry.settingsObject(
+        "clock",
+        Services.SettingsService.widgetSettings
+    )
+    readonly property bool showDate: clockSettings ? clockSettings.showDate : true
+    readonly property bool showDateWhenSimplified: clockSettings ? clockSettings.showDateWhenSimplified : false
+    readonly property bool use24Hour: clockSettings ? clockSettings.timeFormat === "24h" : false
+    readonly property bool dateVisible: root.showDate && (!root.simplified || root.showDateWhenSimplified)
 
     implicitWidth: clockRow.implicitWidth + 20
     implicitHeight: 30
@@ -28,7 +37,7 @@ Item {
         // Date: MMM d
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            visible: !root.simplified
+            visible: root.dateVisible
             text: Qt.formatDateTime(systemClock.date, "MMM d")
             color: Services.Color.mOnSurfaceVariant
             font.pixelSize: Services.TextSize.barContent
@@ -39,14 +48,14 @@ Item {
             width: 1
             height: 14
             anchors.verticalCenter: parent.verticalCenter
-            visible: !root.simplified
+            visible: root.dateVisible
             color: Services.Color.mOutline
         }
 
         // Time: HH:mm
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: Qt.formatDateTime(systemClock.date, "hh:mm")
+            text: Qt.formatDateTime(systemClock.date, root.use24Hour ? "HH:mm" : "hh:mm")
             color: Services.Color.mOnSurface
             font.pixelSize: Services.TextSize.barContent
             font.bold: true

@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 import "barlayout/BarLayoutLayoutModel.js" as BarLayoutModel
 import "barlayout/BarLayoutSections.js" as BarLayoutSections
 import "barlayout/BarLayoutPersistence.js" as BarLayoutPersistence
@@ -18,6 +19,11 @@ QtObject {
     readonly property bool layoutReady: layoutFile.loaded
     property bool widgetPickerVisible: false
     property string widgetPickerSection: "center"
+    property bool widgetSettingsVisible: false
+    property real widgetSettingsX: 0
+    property string activeWidgetSettingsKey: ""
+    property string activeWidgetSettingsId: ""
+    property string widgetSettingsScreenName: ""
 
     // --- Layout editing mode ---
     property bool settingsMode: false
@@ -33,6 +39,7 @@ QtObject {
         settingsMode = false
         closeWidgetPicker()
         closeContextMenu()
+        closeWidgetSettings()
         endDrag()
     }
 
@@ -129,11 +136,13 @@ QtObject {
     property string contextMenuWidgetKey: ""
     property string contextMenuWidgetId: ""
     property string contextMenuSection: "center"
+    property string contextMenuScreenName: ""
 
-    function openContextMenu(x, instanceKey, widgetId) {
+    function openContextMenu(x, instanceKey, widgetId, screenName) {
         contextMenuX = x
         contextMenuWidgetKey = instanceKey || ""
         contextMenuWidgetId = widgetId || ""
+        contextMenuScreenName = screenName || ""
         contextMenuSection = _sectionForX(x)
         contextMenuVisible = true
     }
@@ -151,6 +160,34 @@ QtObject {
         contextMenuVisible = false
         contextMenuWidgetKey = ""
         contextMenuWidgetId = ""
+        contextMenuScreenName = ""
+    }
+
+    function widgetSupportsSettings(widgetId) {
+        return WidgetSettingsRegistry.hasSettings(widgetId)
+    }
+
+    function openWidgetSettings(instanceKey, widgetId, centerX, screenName) {
+        if (!widgetSupportsSettings(widgetId))
+            return
+
+        SettingsService.ensureWidgetSettingDefaults(widgetId)
+        activeWidgetSettingsKey = instanceKey || ""
+        activeWidgetSettingsId = widgetId || ""
+        widgetSettingsX = centerX || 0
+        widgetSettingsScreenName = screenName || ""
+        widgetSettingsVisible = true
+
+        if (!settingsMode)
+            settingsMode = true
+    }
+
+    function closeWidgetSettings() {
+        widgetSettingsVisible = false
+        activeWidgetSettingsKey = ""
+        activeWidgetSettingsId = ""
+        widgetSettingsX = 0
+        widgetSettingsScreenName = ""
     }
 
     // --- Widget picker ---

@@ -1,5 +1,6 @@
 import "."
 import "../../services" as Services
+import "../../services/barlayout/BarLayoutSections.js" as BarLayoutSections
 import QtQuick
 
 // Compose the left, center, and right bar zones with drag overlay.
@@ -96,8 +97,9 @@ Item {
     }
 
     // Open context menu on widget right-click (called from BarWidgetWrapper).
-    function openWidgetContextMenu(instanceKey, widgetId, clickX) {
-        Services.BarLayoutService.openContextMenu(clickX, instanceKey, widgetId)
+    function openWidgetContextMenu(instanceKey, widgetId, clickX, screenName, widgetCenterX) {
+        Services.BarLayoutService.openContextMenu(clickX, instanceKey, widgetId, screenName || root.screenName)
+        Services.BarLayoutService.widgetSettingsX = widgetCenterX || clickX
     }
 
     // Right-click on empty bar area opens the context menu.
@@ -106,16 +108,17 @@ Item {
         z: -1
         acceptedButtons: Qt.RightButton
         propagateComposedEvents: true
-        onClicked: (mouse) => Services.BarLayoutService.openContextMenu(mouse.x, "", "")
+        onClicked: (mouse) => Services.BarLayoutService.openContextMenu(mouse.x, "", "", root.screenName)
     }
 
     // Escape key exits settings mode and closes context menu.
     Shortcut {
         sequence: "Escape"
         context: Qt.ApplicationShortcut
-        enabled: Services.BarLayoutService.settingsMode || Services.BarLayoutService.contextMenuVisible
+        enabled: Services.BarLayoutService.settingsMode || Services.BarLayoutService.contextMenuVisible || Services.BarLayoutService.widgetSettingsVisible
         onActivated: {
             Services.BarLayoutService.closeContextMenu()
+            Services.BarLayoutService.closeWidgetSettings()
             Services.BarLayoutService.exitSettingsMode()
         }
     }

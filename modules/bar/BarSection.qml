@@ -42,7 +42,7 @@ Item {
             }
 
             if (barContent && barContent.openWidgetContextMenu) {
-                barContent.openWidgetContextMenu("", "", barPos.x)
+                barContent.openWidgetContextMenu("", "", barPos.x, root.screenName, barPos.x)
             }
         }
     }

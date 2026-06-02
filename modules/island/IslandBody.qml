@@ -11,6 +11,7 @@ Item {
     id: root
 
     required property string screenName
+    property bool _spectrumRegistered: false
 
     // Geometry constants.
     readonly property int collapsedW: 220
@@ -26,6 +27,8 @@ Item {
     readonly property var centerWidgets: Services.BarLayoutService.sectionWidgets("center")
     readonly property bool showManagedCenterWidgets: !Services.IslandService.expanded
         && root.centerWidgets.length > 0
+    readonly property bool showCenterSpectrum: root.showManagedCenterWidgets
+        && !Services.IslandService.windowHintActive
     readonly property real collapsedContentWidth: collapsedRow.implicitWidth > 0
         ? collapsedRow.implicitWidth + collapsedHorizontalPadding
         : collapsedW
@@ -74,9 +77,29 @@ Item {
     readonly property var blurParts: surface.blurParts
 
     // Forward widget-aware context menu requests from center widget wrappers.
-    function openWidgetContextMenu(instanceKey, widgetId, clickX) {
-        Services.BarLayoutService.openContextMenu(clickX, instanceKey, widgetId)
+    function openWidgetContextMenu(instanceKey, widgetId, clickX, screenName, widgetCenterX) {
+        Services.BarLayoutService.openContextMenu(clickX, instanceKey, widgetId, screenName || root.screenName)
+        Services.BarLayoutService.widgetSettingsX = widgetCenterX || clickX
     }
+
+    function syncSpectrumRegistration() {
+        if (root.showCenterSpectrum === root._spectrumRegistered)
+            return
+
+        if (root.showCenterSpectrum)
+            Services.SpectrumService.registerComponent("island-center:" + root.screenName)
+        else
+            Services.SpectrumService.unregisterComponent("island-center:" + root.screenName)
+
+        root._spectrumRegistered = root.showCenterSpectrum
+    }
+
+    Component.onCompleted: syncSpectrumRegistration()
+    Component.onDestruction: {
+        if (root._spectrumRegistered)
+            Services.SpectrumService.unregisterComponent("island-center:" + root.screenName)
+    }
+    onShowCenterSpectrumChanged: syncSpectrumRegistration()
 
     // Passive hover tracking for the collapsed island geometry.
     HoverHandler {
@@ -127,11 +150,39 @@ Item {
                     collapsedContentLoader.height, 18)
                 spacing: 8
 
-                Loader {
-                    id: collapsedContentLoader
+                // Wrap the collapsed center content so the spectrum can size to the managed widget block.
+                Item {
+                    id: collapsedContentFrame
 
                     anchors.top: parent.top
-                    sourceComponent: root.showManagedCenterWidgets ? managedCenterWidgets : fallbackClock
+                    width: collapsedContentLoader.width
+                    height: collapsedContentLoader.height
+
+                    // Keep the spectrum behind the managed center widgets inside the collapsed island band.
+                    Item {
+                        anchors.fill: parent
+                        visible: root.showCenterSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
+                        z: -1
+                        clip: true
+                        opacity: Services.SpectrumService.isIdle ? 0 : 1
+
+                        Behavior on opacity {
+                            NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
+                        }
+
+                        Bar.DockzoneSpectrum {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            values: Services.SpectrumService.values
+                        }
+                    }
+
+                    Loader {
+                        id: collapsedContentLoader
+
+                        anchors.top: parent.top
+                        sourceComponent: root.showManagedCenterWidgets ? managedCenterWidgets : fallbackClock
+                    }
                 }
 
                 // Transient message card beside the clock; zero size when idle.
@@ -243,7 +294,7 @@ Item {
             acceptedButtons: Qt.RightButton
             onClicked: (mouse) => {
                 var scenePos = root.mapToItem(null, mouse.x, mouse.y)
-                Services.BarLayoutService.openContextMenu(scenePos.x, "", "")
+                Services.BarLayoutService.openContextMenu(scenePos.x, "", "", root.screenName)
             }
         }
     }

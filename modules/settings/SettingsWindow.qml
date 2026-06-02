@@ -26,8 +26,8 @@ Variants {
             right: true
         }
 
-        width: 480
-        height: 600
+        implicitWidth: 480
+        implicitHeight: 600
 
         // Panel open state — driven by SettingsService
         visible: Services.SettingsService.panelVisible
@@ -44,9 +44,6 @@ Variants {
 
         function toggle() { Services.SettingsService.togglePanel() }
         function close() { Services.SettingsService.closePanel() }
-
-        // Close on Escape
-        Keys.onEscapePressed: close()
 
         // Semi-transparent rounded panel surface
         Rectangle {
@@ -68,6 +65,10 @@ Variants {
             Item {
                 anchors.fill: parent
                 anchors.margins: 16
+
+                focus: Services.SettingsService.panelVisible
+
+                Keys.onEscapePressed: settingsWindow.close()
 
                 SettingsContent {
                     anchors.fill: parent

@@ -16,6 +16,8 @@ Variants {
 
         screen: modelData
         visible: Services.BarLayoutService.contextMenuVisible
+            && (Services.BarLayoutService.contextMenuScreenName === ""
+                || Services.BarLayoutService.contextMenuScreenName === modelData.name)
         color: "transparent"
 
         // Overlay: no exclusive zone so it floats without pushing other windows.
@@ -118,12 +120,31 @@ Variants {
                     }
                 }
 
+                // Open widget-specific settings when the widget supports them.
+                ContextMenuRow {
+                    visible: Services.BarLayoutService.contextMenuWidgetKey !== ""
+                    label: "Widget Settings"
+                    icon: "\u2699"
+                    enabled: Services.BarLayoutService.widgetSupportsSettings(
+                        Services.BarLayoutService.contextMenuWidgetId)
+                    onClicked: {
+                        Services.BarLayoutService.openWidgetSettings(
+                            Services.BarLayoutService.contextMenuWidgetKey,
+                            Services.BarLayoutService.contextMenuWidgetId,
+                            Services.BarLayoutService.contextMenuX,
+                            Services.BarLayoutService.contextMenuScreenName
+                        )
+                        Services.BarLayoutService.closeContextMenu()
+                    }
+                }
+
                 // Divider before settings.
                 Rectangle {
                     width: parent.width - 8
                     anchors.horizontalCenter: parent.horizontalCenter
                     height: 1
                     color: "#333333"
+                    visible: true
                 }
 
                 // Open settings panel.

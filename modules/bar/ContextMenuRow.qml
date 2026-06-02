@@ -8,6 +8,7 @@ Item {
     property string icon: ""
     property bool highlighted: false
     property bool destructive: false
+    property bool enabled: true
 
     signal clicked()
 
@@ -18,7 +19,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: rowMouse.containsMouse ? "#333333" : "transparent"
+        color: rowMouse.containsMouse && root.enabled ? "#333333" : "transparent"
 
         Behavior on color { ColorAnimation { duration: 100 } }
     }
@@ -32,7 +33,8 @@ Item {
         // Action icon.
         Text {
             text: root.icon
-            color: root.destructive ? "#ff6666"
+            color: !root.enabled ? "#666666"
+                : root.destructive ? "#ff6666"
                 : root.highlighted ? "#88aaff" : "#aaaaaa"
             font.pixelSize: 14
             width: 16
@@ -42,7 +44,7 @@ Item {
         // Action label.
         Text {
             text: root.label
-            color: root.destructive ? "#ff6666" : "#dddddd"
+            color: !root.enabled ? "#666666" : root.destructive ? "#ff6666" : "#dddddd"
             font.pixelSize: 12
         }
     }
@@ -52,7 +54,8 @@ Item {
 
         anchors.fill: parent
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
+        enabled: root.enabled
+        cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: root.clicked()
     }
 }

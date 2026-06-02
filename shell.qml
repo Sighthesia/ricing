@@ -39,6 +39,10 @@ ShellRoot {
     Bar.WidgetPickerWindow {
     }
 
+    // Per-widget settings panel rendered in its own floating window.
+    Bar.WidgetSettingsWindow {
+    }
+
     // Settings panel popup triggered from bar right-click.
     Settings.SettingsWindow {
     }

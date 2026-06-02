@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 
 // Persist user-facing shell settings (bar, appearance, notifications) to settings.json.
 QtObject {
@@ -10,6 +11,7 @@ QtObject {
     readonly property alias bar: adapter.bar
     readonly property alias appearance: adapter.appearance
     readonly property alias notifications: adapter.notifications
+    readonly property alias widgetSettings: adapter.widgetSettings
     readonly property real panelSurfaceOpacity: appearance.enableBlur
         ? Math.min(appearance.panelOpacity, 0.62)
         : appearance.panelOpacity
@@ -34,6 +36,31 @@ QtObject {
         debounce.restart()
     }
 
+    function ensureWidgetSettingDefaults(widgetId) {
+        var registryDefaults = WidgetSettingsRegistry.defaults(widgetId)
+        var settingsKey = WidgetSettingsRegistry.settingsKey(widgetId)
+
+        if (!settingsKey)
+            return null
+
+        var target = adapter.widgetSettings[settingsKey]
+        if (!target)
+            return null
+
+        var changed = false
+        for (var key in registryDefaults) {
+            if (target[key] === undefined) {
+                target[key] = registryDefaults[key]
+                changed = true
+            }
+        }
+
+        if (changed)
+            save()
+
+        return target
+    }
+
     property Timer debounce: Timer {
         interval: 500
         onTriggered: settingsFile.writeAdapter()
@@ -45,6 +72,7 @@ QtObject {
         blockLoading: true
         onFileChanged: reload()
         onAdapterUpdated: root.save()
+        onLoaded: root.ensureWidgetSettingDefaults("clock")
         onLoadFailed: error => {
             if (error === FileViewError.FileNotFound) {
                 settingsFile.writeAdapter()
@@ -89,6 +117,14 @@ QtObject {
                 property int timeout: 5000
                 property string position: "top-right"
                 property bool dnd: false
+            }
+
+            property JsonObject widgetSettings: JsonObject {
+                property JsonObject clock: JsonObject {
+                    property bool showDate: true
+                    property string timeFormat: "12h"
+                    property bool showDateWhenSimplified: false
+                }
             }
         }
     }

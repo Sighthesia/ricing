@@ -12,6 +12,7 @@ Item {
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     readonly property string widgetId: widgetEntry && widgetEntry.id ? widgetEntry.id : ""
     readonly property bool localPointerIntent: pointerHover.hovered
+    readonly property real centerXInRoot: width > 0 ? mapToItem(null, width / 2, height / 2).x : 0
     objectName: widgetInstanceKey
 
     implicitHeight: loader.item ? loader.item.implicitHeight : 0
@@ -115,7 +116,7 @@ Item {
                 barContent = barContent.parent
             }
             if (barContent && barContent.openWidgetContextMenu) {
-                barContent.openWidgetContextMenu(root.widgetInstanceKey, root.widgetId, barPos.x)
+                barContent.openWidgetContextMenu(root.widgetInstanceKey, root.widgetId, barPos.x, root.screenName, root.centerXInRoot)
             }
         }
     }
