@@ -1,3 +1,4 @@
+import "." as Widgets
 import QtQuick
 import "../../../services" as Services
 
@@ -5,9 +6,10 @@ import "../../../services" as Services
 Item {
     id: root
 
-    implicitWidth: brightnessRow.implicitWidth + 20
+    implicitWidth: brightnessBadge.implicitWidth
     implicitHeight: 30
 
+    // Keep scroll-to-adjust active across the full hover-expand footprint.
     WheelHandler {
         onWheel: event => {
             let delta = event.angleDelta.y > 0 ? 0.05 : -0.05
@@ -15,24 +17,21 @@ Item {
         }
     }
 
-    Row {
-        id: brightnessRow
+    // Render the circular brightness badge and reveal percentage on hover.
+    Widgets.CircularHoverWidget {
+        id: brightnessBadge
+
         anchors.centerIn: parent
-        spacing: 4
+        centerText: "BRI"
+        centerTextPixelSize: 8
+        centerTextColor: Services.Color.mPrimary
+        progressValue: Services.BrightnessService.brightness
+        progressColor: Services.Color.mPrimary
 
-        // Sun icon
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "☀"
-            font.pixelSize: 16
-            color: Services.Color.mOnSurface
-        }
-
-        // Percentage
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: Math.round(Services.BrightnessService.brightness * 100) + "%"
-            color: Services.Color.mOnSurfaceVariant
+            color: Services.Color.mOnSurface
             font.pixelSize: Services.TextSize.barContent
         }
     }

@@ -1,3 +1,4 @@
+import "." as Widgets
 import QtQuick
 import "../../../services" as Services
 
@@ -5,9 +6,15 @@ import "../../../services" as Services
 Item {
     id: root
 
-    implicitWidth: volumeRow.implicitWidth + 20
+    readonly property real displayVolume: Services.VolumeService.sinkMuted ? 0 : Services.VolumeService.sinkVolume
+    readonly property color accentColor: Services.VolumeService.sinkMuted
+        ? Services.Color.mError
+        : Services.Color.mPrimary
+
+    implicitWidth: volumeBadge.implicitWidth
     implicitHeight: 30
 
+    // Keep scroll-to-adjust active across the full hover-expand footprint.
     WheelHandler {
         onWheel: event => {
             let delta = event.angleDelta.y > 0 ? 0.05 : -0.05
@@ -15,31 +22,25 @@ Item {
         }
     }
 
-    MouseArea {
-        anchors.fill: parent
-        onClicked: Services.VolumeService.toggleSinkMute()
-    }
+    // Render the circular volume badge and expand the percentage on hover.
+    Widgets.CircularHoverWidget {
+        id: volumeBadge
 
-    Row {
-        id: volumeRow
         anchors.centerIn: parent
-        spacing: 4
+        clickable: true
+        centerText: Services.VolumeService.sinkMuted ? "M" : "VOL"
+        centerTextPixelSize: Services.VolumeService.sinkMuted ? 10 : 8
+        centerTextColor: root.accentColor
+        progressValue: root.displayVolume
+        progressColor: root.accentColor
+        onActivated: Services.VolumeService.toggleSinkMute()
 
-        // Volume icon (changes with mute state)
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: Services.VolumeService.sinkMuted ? "🔇" : "🔊"
-            font.pixelSize: 16
-            color: Services.Color.mOnSurface
-        }
-
-        // Percentage
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Math.round(Services.VolumeService.sinkVolume * 100) + "%"
+            text: Services.VolumeService.sinkMuted ? "Muted" : (Math.round(Services.VolumeService.sinkVolume * 100) + "%")
             color: Services.VolumeService.sinkMuted
-                ? Services.Color.mOutline
-                : Services.Color.mOnSurfaceVariant
+                ? Services.Color.mError
+                : Services.Color.mOnSurface
             font.pixelSize: Services.TextSize.barContent
         }
     }
