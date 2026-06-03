@@ -14,14 +14,6 @@ Item {
     implicitWidth: volumeBadge.implicitWidth
     implicitHeight: 30
 
-    // Keep scroll-to-adjust active across the full hover-expand footprint.
-    WheelHandler {
-        onWheel: event => {
-            let delta = event.angleDelta.y > 0 ? 0.05 : -0.05
-            Services.VolumeService.setSinkVolume(Services.VolumeService.sinkVolume + delta)
-        }
-    }
-
     // Render the circular volume badge and expand the percentage on hover.
     Widgets.CircularHoverWidget {
         id: volumeBadge
@@ -35,6 +27,10 @@ Item {
         progressValue: root.displayVolume
         progressColor: root.accentColor
         onActivated: Services.VolumeService.toggleSinkMute()
+        onWheel: event => {
+            let delta = event.angleDelta.y > 0 ? 0.05 : -0.05
+            Services.VolumeService.setSinkVolume(Services.VolumeService.sinkVolume + delta)
+        }
 
         Text {
             anchors.verticalCenter: parent.verticalCenter

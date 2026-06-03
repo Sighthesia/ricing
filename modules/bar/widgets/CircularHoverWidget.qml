@@ -31,7 +31,7 @@ Item {
     property real progressValue: -1
     property real badgeSize: 24
     property real contentSpacing: 8
-    property real sidePadding: 10
+    property real sidePadding: 6
     property bool clickable: false
     property bool showPointerCursor: true
     property int activationButtons: Qt.LeftButton
@@ -40,6 +40,7 @@ Item {
     default property alias expandedContent: detailRow.data
 
     signal activated()
+    signal wheel(var event)
 
     implicitWidth: (root.sidePadding * 2) + badgeSlot.width + detailSlot.width + (detailSlot.width > 0 ? root.contentSpacing : 0)
     implicitHeight: 30
@@ -168,5 +169,6 @@ Item {
         acceptedButtons: root.clickable ? root.activationButtons : Qt.NoButton
         cursorShape: root.showPointerCursor ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: root.activated()
+        onWheel: root.wheel(wheel)
     }
 }

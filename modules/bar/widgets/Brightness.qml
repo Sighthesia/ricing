@@ -9,14 +9,6 @@ Item {
     implicitWidth: brightnessBadge.implicitWidth
     implicitHeight: 30
 
-    // Keep scroll-to-adjust active across the full hover-expand footprint.
-    WheelHandler {
-        onWheel: event => {
-            let delta = event.angleDelta.y > 0 ? 0.05 : -0.05
-            Services.BrightnessService.setBrightness(Services.BrightnessService.brightness + delta)
-        }
-    }
-
     // Render the circular brightness badge and reveal percentage on hover.
     Widgets.CircularHoverWidget {
         id: brightnessBadge
@@ -28,6 +20,10 @@ Item {
         centerTextColor: Services.Color.mPrimary
         progressValue: Services.BrightnessService.brightness
         progressColor: Services.Color.mPrimary
+        onWheel: event => {
+            let delta = event.angleDelta.y > 0 ? 0.05 : -0.05
+            Services.BrightnessService.setBrightness(Services.BrightnessService.brightness + delta)
+        }
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
