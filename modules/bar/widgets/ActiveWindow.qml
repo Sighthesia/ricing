@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Widgets
 import "../../../services" as Services
+import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 
 // Display the focused window icon and title.
 Item {
@@ -11,6 +12,19 @@ Item {
     property string pendingTitle: currentTitle
     property string pendingAppId: currentAppId
     property bool transitioning: false
+    readonly property var activeWindowSettings: WidgetSettingsRegistry.settingsObject(
+        "active-window",
+        Services.SettingsService.widgetSettings
+    )
+    readonly property string desktopLabel: activeWindowSettings
+        ? activeWindowSettings.desktopLabel
+        : "Desktop"
+    readonly property bool showIcon: activeWindowSettings
+        ? activeWindowSettings.showIcon
+        : true
+    readonly property int maxTitleWidth: activeWindowSettings
+        ? activeWindowSettings.maxTitleWidth
+        : 200
 
     implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 20, 240)
     implicitHeight: 30
@@ -20,7 +34,7 @@ Item {
     }
 
     function syncFocusedWindow() {
-        var nextTitle = Services.NiriService.activeTitle || "Desktop"
+        var nextTitle = Services.NiriService.activeTitle || root.desktopLabel
         var nextAppId = Services.NiriService.activeAppId || ""
 
         if (nextTitle === root.currentTitle && nextAppId === root.currentAppId && !root.transitioning)
@@ -107,9 +121,9 @@ Item {
                 id: currentIconSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: root.currentAppId !== "" ? 18 : 0
+                width: root.showIcon && root.currentAppId !== "" ? 18 : 0
                 height: 18
-                opacity: root.currentAppId !== "" ? 1 : 0
+                opacity: root.showIcon && root.currentAppId !== "" ? 1 : 0
 
                 Behavior on width {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
@@ -121,7 +135,7 @@ Item {
 
                 IconImage {
                     anchors.fill: parent
-                    source: "image://icon/" + (root.currentAppId || "application-x-executable")
+                    source: root.currentAppId !== "" ? ("image://icon/" + root.currentAppId) : ""
                     implicitSize: 18
                     visible: currentIconSlot.width > 0
                 }
@@ -132,7 +146,7 @@ Item {
                 id: currentTitleSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(currentTitleText.implicitWidth, 200)
+                width: Math.min(currentTitleText.implicitWidth, root.maxTitleWidth)
                 height: currentTitleText.implicitHeight
 
                 Behavior on width {
@@ -177,9 +191,9 @@ Item {
                 id: nextIconSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: root.pendingAppId !== "" ? 18 : 0
+                width: root.showIcon && root.pendingAppId !== "" ? 18 : 0
                 height: 18
-                opacity: root.pendingAppId !== "" ? 1 : 0
+                opacity: root.showIcon && root.pendingAppId !== "" ? 1 : 0
 
                 Behavior on width {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
@@ -191,7 +205,7 @@ Item {
 
                 IconImage {
                     anchors.fill: parent
-                    source: "image://icon/" + (root.pendingAppId || "application-x-executable")
+                    source: root.pendingAppId !== "" ? ("image://icon/" + root.pendingAppId) : ""
                     implicitSize: 18
                     visible: nextIconSlot.width > 0
                 }
@@ -202,7 +216,7 @@ Item {
                 id: nextTitleSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(nextTitleText.implicitWidth, 200)
+                width: Math.min(nextTitleText.implicitWidth, root.maxTitleWidth)
                 height: nextTitleText.implicitHeight
 
                 Behavior on width {
