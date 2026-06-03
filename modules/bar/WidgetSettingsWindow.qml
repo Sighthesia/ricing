@@ -3,18 +3,13 @@ import Quickshell
 import Quickshell.Wayland
 import "../../services" as Services
 import "../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
-import "widgetsettings"
+import "widgetsettings" as WidgetPanels
 
 // Floating per-widget settings panel anchored below the bar.
 Variants {
     id: root
 
     model: Quickshell.screens
-
-    // Register the known widget settings panels with the shared registry.
-    ClockSettingsPanel {
-        visible: false
-    }
 
     // Keep one overlay window per screen and only show the active target screen.
     PanelWindow {
@@ -24,7 +19,7 @@ Variants {
 
         readonly property string activeWidgetId: Services.BarLayoutService.activeWidgetSettingsId
         readonly property string panelTitle: WidgetSettingsRegistry.title(activeWidgetId)
-        readonly property Component settingsPanel: WidgetSettingsRegistry.panelComponent(activeWidgetId)
+        readonly property string panelType: WidgetSettingsRegistry.panelKey(activeWidgetId)
 
         screen: modelData
         visible: Services.BarLayoutService.widgetSettingsVisible
@@ -144,8 +139,8 @@ Variants {
                 // Load the registered settings panel for the active widget.
                 Loader {
                     width: parent.width
-                    active: !!settingsWindow.settingsPanel
-                    sourceComponent: settingsWindow.settingsPanel
+                    active: settingsWindow.panelType !== ""
+                    sourceComponent: settingsWindow.panelComponentForType(settingsWindow.panelType)
                 }
             }
 
@@ -156,6 +151,63 @@ Variants {
                 color: "transparent"
                 border.color: Services.Color.mOutline
                 border.width: 1
+            }
+        }
+
+        Component {
+            id: clockPanelComponent
+
+            WidgetPanels.ClockSettingsPanel {
+                width: parent ? parent.width : 0
+            }
+        }
+
+        Component {
+            id: activeWindowPanelComponent
+
+            WidgetPanels.ActiveWindowSettingsPanel {
+                width: parent ? parent.width : 0
+            }
+        }
+
+        Component {
+            id: batteryPanelComponent
+
+            WidgetPanels.BatterySettingsPanel {
+                width: parent ? parent.width : 0
+            }
+        }
+
+        Component {
+            id: systemMonitorPanelComponent
+
+            WidgetPanels.SystemMonitorSettingsPanel {
+                width: parent ? parent.width : 0
+            }
+        }
+
+        Component {
+            id: mediaPanelComponent
+
+            WidgetPanels.MediaSettingsPanel {
+                width: parent ? parent.width : 0
+            }
+        }
+
+        function panelComponentForType(panelType) {
+            switch (panelType) {
+            case "clock":
+                return clockPanelComponent
+            case "active-window":
+                return activeWindowPanelComponent
+            case "battery":
+                return batteryPanelComponent
+            case "media":
+                return mediaPanelComponent
+            case "system-monitor":
+                return systemMonitorPanelComponent
+            default:
+                return null
             }
         }
 

@@ -14,54 +14,43 @@ Column {
         Services.SettingsService.widgetSettings
     )
 
-    Component.onCompleted: WidgetSettingsRegistry.registerPanel("clock", panelComponent)
+    SettingToggle {
+        width: parent.width
+        settingLabel: "Show Date"
+        description: "Show the month and day alongside the time."
+        checked: root.clockSettings ? root.clockSettings.showDate : true
+        onToggled: value => {
+            if (!root.clockSettings)
+                return
 
-    // Expose the panel as a reusable registry component.
-    Component {
-        id: panelComponent
+            root.clockSettings.showDate = value
+        }
+    }
 
-        Column {
-            spacing: 10
+    SettingDropdown {
+        width: parent.width
+        settingLabel: "Time Format"
+        description: "Choose 12-hour or 24-hour clock output."
+        model: ["12h", "24h"]
+        currentValue: root.clockSettings ? root.clockSettings.timeFormat : "12h"
+        onSelected: value => {
+            if (!root.clockSettings)
+                return
 
-            SettingToggle {
-                width: parent.width
-                settingLabel: "Show Date"
-                description: "Show the month and day alongside the time."
-                checked: root.clockSettings ? root.clockSettings.showDate : true
-                onToggled: value => {
-                    if (!root.clockSettings)
-                        return
+            root.clockSettings.timeFormat = value
+        }
+    }
 
-                    root.clockSettings.showDate = value
-                }
-            }
+    SettingToggle {
+        width: parent.width
+        settingLabel: "Date In Compact Mode"
+        description: "Keep the date visible even while transient messages simplify the clock."
+        checked: root.clockSettings ? root.clockSettings.showDateWhenSimplified : false
+        onToggled: value => {
+            if (!root.clockSettings)
+                return
 
-            SettingDropdown {
-                width: parent.width
-                settingLabel: "Time Format"
-                description: "Choose 12-hour or 24-hour clock output."
-                model: ["12h", "24h"]
-                currentValue: root.clockSettings ? root.clockSettings.timeFormat : "12h"
-                onSelected: value => {
-                    if (!root.clockSettings)
-                        return
-
-                    root.clockSettings.timeFormat = value
-                }
-            }
-
-            SettingToggle {
-                width: parent.width
-                settingLabel: "Date In Compact Mode"
-                description: "Keep the date visible even while transient messages simplify the clock."
-                checked: root.clockSettings ? root.clockSettings.showDateWhenSimplified : false
-                onToggled: value => {
-                    if (!root.clockSettings)
-                        return
-
-                    root.clockSettings.showDateWhenSimplified = value
-                }
-            }
+            root.clockSettings.showDateWhenSimplified = value
         }
     }
 }

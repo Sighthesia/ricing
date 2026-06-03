@@ -1,36 +1,67 @@
 .pragma library
 
 var _definitions = {
+    "active-window": {
+        title: "Active Window Settings",
+        settingsKey: "activeWindow",
+        panelKey: "active-window",
+        defaults: {
+            showIcon: true,
+            maxTitleWidth: 200,
+            desktopLabel: "Desktop",
+        },
+    },
     "clock": {
         title: "Clock Settings",
         settingsKey: "clock",
+        panelKey: "clock",
         defaults: {
             showDate: true,
             timeFormat: "12h",
             showDateWhenSimplified: false,
         },
     },
+    "battery": {
+        title: "Battery Settings",
+        panelKey: "battery",
+        instanceScoped: true,
+        defaults: {
+            showPercentage: true,
+            showStateLabel: true,
+        },
+    },
+    "system-monitor": {
+        title: "System Monitor Settings",
+        panelKey: "system-monitor",
+        instanceScoped: true,
+        defaults: {
+            showCpu: true,
+            showMemory: true,
+            showNetwork: false,
+            showLoad: false,
+        },
+    },
+    "media": {
+        title: "Media Settings",
+        panelKey: "media",
+        instanceScoped: true,
+        defaults: {
+            showAudioSpectrum: false,
+        },
+    },
 }
-
-var _panelComponents = {}
 
 function definition(widgetId) {
     return widgetId && _definitions[widgetId] ? _definitions[widgetId] : null
 }
 
-function registerPanel(widgetId, component) {
-    if (!widgetId || !component)
-        return
-
-    _panelComponents[widgetId] = component
-}
-
-function panelComponent(widgetId) {
-    return widgetId && _panelComponents[widgetId] ? _panelComponents[widgetId] : null
-}
-
 function hasSettings(widgetId) {
-    return !!definition(widgetId) && !!panelComponent(widgetId)
+    return !!definition(widgetId)
+}
+
+function isInstanceScoped(widgetId) {
+    var info = definition(widgetId)
+    return !!info && info.instanceScoped === true
 }
 
 function title(widgetId) {
@@ -41,6 +72,11 @@ function title(widgetId) {
 function settingsKey(widgetId) {
     var info = definition(widgetId)
     return info && info.settingsKey ? info.settingsKey : ""
+}
+
+function panelKey(widgetId) {
+    var info = definition(widgetId)
+    return info && info.panelKey ? info.panelKey : ""
 }
 
 function defaults(widgetId) {
@@ -54,4 +90,11 @@ function settingsObject(widgetId, settingsRoot) {
         return null
 
     return settingsRoot[key] || null
+}
+
+function instanceSettingsObject(widgetId, instanceKey, settingsRoot) {
+    if (!isInstanceScoped(widgetId) || !instanceKey || !settingsRoot)
+        return null
+
+    return settingsRoot[instanceKey] || null
 }

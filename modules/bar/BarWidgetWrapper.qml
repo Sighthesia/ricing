@@ -95,6 +95,17 @@ Item {
         anchors.centerIn: parent
         source: Qt.resolvedUrl(root.widgetSource)
         visible: !root._isDragging
+
+        onLoaded: {
+            if (!item)
+                return
+
+            if (item.widgetInstanceKey !== undefined)
+                item.widgetInstanceKey = root.widgetInstanceKey
+
+            if (item.widgetId !== undefined)
+                item.widgetId = root.widgetId
+        }
     }
 
     // Passive right-click + hover detection via pointer handlers so they do not

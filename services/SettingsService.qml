@@ -12,6 +12,7 @@ QtObject {
     readonly property alias appearance: adapter.appearance
     readonly property alias notifications: adapter.notifications
     readonly property alias widgetSettings: adapter.widgetSettings
+    readonly property alias widgetInstanceSettings: adapter.widgetInstanceSettings
     readonly property real panelSurfaceOpacity: appearance.enableBlur
         ? Math.min(appearance.panelOpacity, 0.62)
         : appearance.panelOpacity
@@ -61,6 +62,72 @@ QtObject {
         return target
     }
 
+    function ensureWidgetInstanceSettingDefaults(widgetId, instanceKey) {
+        if (!WidgetSettingsRegistry.isInstanceScoped(widgetId) || !instanceKey)
+            return null
+
+        var registryDefaults = WidgetSettingsRegistry.defaults(widgetId)
+        var rootMap = Object.assign({}, adapter.widgetInstanceSettings || ({}))
+        var target = Object.assign({}, rootMap[instanceKey] || ({}))
+        var changed = false
+
+        for (var key in registryDefaults) {
+            if (target[key] === undefined) {
+                target[key] = registryDefaults[key]
+                changed = true
+            }
+        }
+
+        if (!rootMap[instanceKey] || changed) {
+            rootMap[instanceKey] = target
+            adapter.widgetInstanceSettings = rootMap
+            save()
+        }
+
+        return target
+    }
+
+    function ensureWidgetSettings(widgetId, instanceKey) {
+        if (WidgetSettingsRegistry.isInstanceScoped(widgetId))
+            return ensureWidgetInstanceSettingDefaults(widgetId, instanceKey)
+
+        return ensureWidgetSettingDefaults(widgetId)
+    }
+
+    function widgetSettingsObject(widgetId, instanceKey) {
+        if (WidgetSettingsRegistry.isInstanceScoped(widgetId))
+            return WidgetSettingsRegistry.instanceSettingsObject(widgetId, instanceKey, adapter.widgetInstanceSettings)
+
+        return WidgetSettingsRegistry.settingsObject(widgetId, adapter.widgetSettings)
+    }
+
+    function setWidgetInstanceSettingValue(widgetId, instanceKey, key, value) {
+        if (!WidgetSettingsRegistry.isInstanceScoped(widgetId) || !instanceKey || !key)
+            return
+
+        ensureWidgetInstanceSettingDefaults(widgetId, instanceKey)
+
+        var rootMap = Object.assign({}, adapter.widgetInstanceSettings || ({}))
+        var target = Object.assign({}, rootMap[instanceKey] || ({}))
+        if (target[key] === value)
+            return
+
+        target[key] = value
+        rootMap[instanceKey] = target
+        adapter.widgetInstanceSettings = rootMap
+        save()
+    }
+
+    function removeWidgetInstanceSettings(instanceKey) {
+        if (!instanceKey || !adapter.widgetInstanceSettings || adapter.widgetInstanceSettings[instanceKey] === undefined)
+            return
+
+        var rootMap = Object.assign({}, adapter.widgetInstanceSettings)
+        delete rootMap[instanceKey]
+        adapter.widgetInstanceSettings = rootMap
+        save()
+    }
+
     property Timer debounce: Timer {
         interval: 500
         onTriggered: settingsFile.writeAdapter()
@@ -72,7 +139,10 @@ QtObject {
         blockLoading: true
         onFileChanged: reload()
         onAdapterUpdated: root.save()
-        onLoaded: root.ensureWidgetSettingDefaults("clock")
+        onLoaded: {
+            root.ensureWidgetSettingDefaults("clock")
+            root.ensureWidgetSettingDefaults("active-window")
+        }
         onLoadFailed: error => {
             if (error === FileViewError.FileNotFound) {
                 settingsFile.writeAdapter()
@@ -120,12 +190,20 @@ QtObject {
             }
 
             property JsonObject widgetSettings: JsonObject {
+                property JsonObject activeWindow: JsonObject {
+                    property bool showIcon: true
+                    property int maxTitleWidth: 200
+                    property string desktopLabel: "Desktop"
+                }
+
                 property JsonObject clock: JsonObject {
                     property bool showDate: true
                     property string timeFormat: "12h"
                     property bool showDateWhenSimplified: false
                 }
             }
+
+            property var widgetInstanceSettings: ({})
         }
     }
 }

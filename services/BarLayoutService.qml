@@ -118,6 +118,7 @@ QtObject {
     }
 
     function removeWidget(instanceKey) {
+        SettingsService.removeWidgetInstanceSettings(instanceKey)
         saveLayoutModel(BarLayoutModel.removeWidgetByKey(layoutModel, instanceKey))
     }
 
@@ -171,7 +172,7 @@ QtObject {
         if (!widgetSupportsSettings(widgetId))
             return
 
-        SettingsService.ensureWidgetSettingDefaults(widgetId)
+        SettingsService.ensureWidgetSettings(widgetId, instanceKey)
         activeWidgetSettingsKey = instanceKey || ""
         activeWidgetSettingsId = widgetId || ""
         widgetSettingsX = centerX || 0
