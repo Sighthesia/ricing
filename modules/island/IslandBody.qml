@@ -132,6 +132,36 @@ Item {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
             }
 
+            // Keep the center spectrum pinned to the island's lower edge instead of following the centered content row.
+            Item {
+                id: collapsedSpectrumBand
+
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: root.earRadius + 10
+                anchors.rightMargin: root.earRadius + 10
+                anchors.bottomMargin: 1
+                height: Math.min(parent.height, Math.max(16, root.collapsedH - 12))
+                visible: root.showCenterSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
+                z: 0
+                clip: true
+                opacity: Services.SpectrumService.isIdle ? 0 : 1
+
+                Behavior on opacity {
+                    NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
+                }
+
+                Bar.DockzoneSpectrum {
+                    anchors.fill: parent
+                    anchors.leftMargin: 0
+                    anchors.rightMargin: 0
+                    anchors.topMargin: 8
+                    anchors.bottomMargin: 0
+                    values: Services.SpectrumService.values
+                }
+            }
+
             // Switch collapsed content between the real center widgets and the
             // fallback clock, with the transient message card adjacent so an
             // active message grows the island (layout push, no overlap). The
@@ -157,25 +187,6 @@ Item {
                     anchors.top: parent.top
                     width: collapsedContentLoader.width
                     height: collapsedContentLoader.height
-
-                    // Keep the spectrum behind the managed center widgets inside the collapsed island band.
-                    Item {
-                        anchors.fill: parent
-                        visible: root.showCenterSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
-                        z: -1
-                        clip: true
-                        opacity: Services.SpectrumService.isIdle ? 0 : 1
-
-                        Behavior on opacity {
-                            NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-                        }
-
-                        Bar.DockzoneSpectrum {
-                            anchors.fill: parent
-                            anchors.margins: 6
-                            values: Services.SpectrumService.values
-                        }
-                    }
 
                     Loader {
                         id: collapsedContentLoader

@@ -1,4 +1,5 @@
 singleton BarLayoutService 1.0 BarLayoutService.qml
+singleton BatteryService 1.0 BatteryService.qml
 singleton IslandService 1.0 IslandService.qml
 singleton BrightnessService 1.0 BrightnessService.qml
 singleton Motion 1.0 Motion.qml
@@ -21,3 +22,5 @@ singleton WindowHintService 1.0 WindowHintService.qml
 singleton LaunchCountService 1.0 LaunchCountService.qml
 singleton TrayMenuService 1.0 TrayMenuService.qml
 singleton TransientMessageService 1.0 TransientMessageService.qml
+singleton SpectrumService 1.0 SpectrumService.qml
+singleton SystemMonitorService 1.0 SystemMonitorService.qml

@@ -11,7 +11,9 @@ var DEFAULT_WIDGET_SOURCE_BY_ID = {
     "clock": "../../modules/bar/widgets/Clock.qml",
     "tray": "../../modules/bar/widgets/Tray.qml",
     "active-window": "../../modules/bar/widgets/ActiveWindow.qml",
+    "battery": "../../modules/bar/widgets/Battery.qml",
     "brightness": "../../modules/bar/widgets/Brightness.qml",
+    "system-monitor": "../../modules/bar/widgets/SystemMonitor.qml",
     "volume": "../../modules/bar/widgets/Volume.qml",
     "media": "../../modules/bar/widgets/Media.qml",
 }
@@ -89,6 +91,20 @@ var AVAILABLE_WIDGETS = [
         description: "Screen brightness with scroll control.",
         section: "right",
         source: "../../modules/bar/widgets/Brightness.qml",
+    },
+    {
+        id: "battery",
+        label: "Battery",
+        description: "Primary battery state with percentage.",
+        section: "right",
+        source: "../../modules/bar/widgets/Battery.qml",
+    },
+    {
+        id: "system-monitor",
+        label: "System Monitor",
+        description: "Compact CPU and memory usage readout.",
+        section: "right",
+        source: "../../modules/bar/widgets/SystemMonitor.qml",
     },
     {
         id: "volume",

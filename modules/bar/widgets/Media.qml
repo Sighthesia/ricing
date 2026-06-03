@@ -1,5 +1,6 @@
 import QtQuick
 import Qt5Compat.GraphicalEffects
+import ".." as Bar
 import "../../../services" as Services
 
 // Render a compact now-playing pill for the bar. While a transient message is
@@ -8,8 +9,19 @@ import "../../../services" as Services
 Item {
     id: root
 
+    property string widgetInstanceKey: ""
+
     // Simplify to icon-only during transient messages (hardcoded on for now).
     readonly property bool simplified: Services.TransientMessageService.active
+    readonly property var mediaSettings: Services.SettingsService.widgetSettingsObject(
+        "media",
+        root.widgetInstanceKey
+    )
+    readonly property bool showAudioSpectrum: root.mediaSettings
+        ? root.mediaSettings.showAudioSpectrum
+        : false
+    readonly property bool needsAudioSpectrum: root.showAudioSpectrum && !root.simplified
+    readonly property string spectrumComponentId: "media:" + root.widgetInstanceKey
 
     property string currentText: root._displayText
     property string pendingText: root._displayText
@@ -94,14 +106,26 @@ Item {
             root._stableArtUrl = ""
     }
 
+    function syncSpectrumRegistration() {
+        if (root.needsAudioSpectrum)
+            Services.SpectrumService.registerComponent(root.spectrumComponentId)
+        else
+            Services.SpectrumService.unregisterComponent(root.spectrumComponentId)
+    }
+
     Component.onCompleted: {
+        Services.SettingsService.ensureWidgetSettings("media", root.widgetInstanceKey)
         syncDisplayText()
         syncArtwork()
         root._progressValue = Services.MediaControlService.progress
+        syncSpectrumRegistration()
     }
+
+    Component.onDestruction: Services.SpectrumService.unregisterComponent(root.spectrumComponentId)
 
     on_DisplayTextChanged: syncDisplayText()
     on_DisplayTextKeyChanged: syncDisplayText()
+    onNeedsAudioSpectrumChanged: syncSpectrumRegistration()
 
     Connections {
         target: Services.MediaControlService
@@ -180,6 +204,28 @@ Item {
         visible: opacity > 0
         implicitWidth: currentContent.implicitWidth
         implicitHeight: currentContent.implicitHeight
+
+        // Keep the spectrum tucked behind the compact media contents.
+        Item {
+            anchors.fill: currentContent
+            visible: root.needsAudioSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
+            z: -1
+            clip: true
+            opacity: Services.SpectrumService.isIdle ? 0 : 1
+
+            Behavior on opacity {
+                NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
+            }
+
+            Bar.DockzoneSpectrum {
+                anchors.fill: parent
+                anchors.leftMargin: 4
+                anchors.rightMargin: 4
+                anchors.topMargin: 3
+                anchors.bottomMargin: 3
+                values: Services.SpectrumService.values
+            }
+        }
 
         // Render the current compact media content.
         Row {
@@ -344,6 +390,28 @@ Item {
         z: 1
         implicitWidth: nextContent.implicitWidth
         implicitHeight: nextContent.implicitHeight
+
+        // Mirror the spectrum during text transitions so the background stays continuous.
+        Item {
+            anchors.fill: nextContent
+            visible: root.needsAudioSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
+            z: -1
+            clip: true
+            opacity: Services.SpectrumService.isIdle ? 0 : 1
+
+            Behavior on opacity {
+                NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
+            }
+
+            Bar.DockzoneSpectrum {
+                anchors.fill: parent
+                anchors.leftMargin: 4
+                anchors.rightMargin: 4
+                anchors.topMargin: 3
+                anchors.bottomMargin: 3
+                values: Services.SpectrumService.values
+            }
+        }
 
         // Render the incoming compact media content.
         Row {
