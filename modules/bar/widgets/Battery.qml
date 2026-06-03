@@ -22,9 +22,9 @@ Item {
     readonly property bool showStateLabel: root.batterySettings
         ? root.batterySettings.showStateLabel
         : true
-    readonly property string collapsedText: root.showStateLabel
-        ? Services.BatteryService.iconText
-        : String(Services.BatteryService.percentage)
+    readonly property string collapsedText: Services.BatteryService.charging
+        ? "\uf0e7"
+        : (Services.BatteryService.pluggedIn ? "\uf1e6" : "\uf242")
     readonly property string detailStateText: root.showStateLabel ? Services.BatteryService.iconText : ""
 
     Component.onCompleted: Services.SettingsService.ensureWidgetSettings("battery", root.widgetInstanceKey)
@@ -48,8 +48,9 @@ Item {
         id: batteryBadge
 
         anchors.centerIn: parent
+        centerTextFontFamily: "Symbols Nerd Font"
         centerText: root.collapsedText
-        centerTextPixelSize: root.collapsedText.length >= 3 ? 8 : 9
+        centerTextPixelSize: 10
         centerTextColor: root.stateColor
         progressValue: Services.BatteryService.percentage / 100
         progressColor: root.stateColor
@@ -57,6 +58,7 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: root.detailStateText
+            font.family: root.detailStateText !== "" ? "Symbols Nerd Font" : font.family
             color: root.stateColor
             font.pixelSize: Services.TextSize.barContent
             visible: text !== ""

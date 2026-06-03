@@ -22,8 +22,9 @@ Item {
         id: brightnessBadge
 
         anchors.centerIn: parent
-        centerText: "BRI"
-        centerTextPixelSize: 8
+        centerText: "\uf185"
+        centerTextFontFamily: "Symbols Nerd Font"
+        centerTextPixelSize: 10
         centerTextColor: Services.Color.mPrimary
         progressValue: Services.BrightnessService.brightness
         progressColor: Services.Color.mPrimary

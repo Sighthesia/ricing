@@ -45,8 +45,9 @@ Item {
         id: metricsBadge
 
         anchors.centerIn: parent
-        centerText: String(Math.round(Services.SystemMonitorService.cpuUsage))
-        centerTextPixelSize: String(Math.round(Services.SystemMonitorService.cpuUsage)).length >= 3 ? 8 : 9
+        centerText: "\uf201"
+        centerTextFontFamily: "Symbols Nerd Font"
+        centerTextPixelSize: 10
         centerTextColor: root.cpuAccentColor
         progressValue: Services.SystemMonitorService.cpuUsage / 100
         progressColor: root.cpuAccentColor

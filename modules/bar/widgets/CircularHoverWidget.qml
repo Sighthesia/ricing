@@ -6,6 +6,7 @@ Item {
     id: root
 
     property string centerText: ""
+    property string centerTextFontFamily: ""
     property int centerTextPixelSize: 9
     property color centerTextColor: Services.Color.mOnSurface
     property color badgeFillColor: Qt.rgba(
@@ -34,9 +35,9 @@ Item {
     property bool clickable: false
     property bool showPointerCursor: true
     property int activationButtons: Qt.LeftButton
-    property list<Item> expandedContent
     readonly property bool expanded: hoverArea.containsMouse
     readonly property real clampedProgress: progressValue < 0 ? -1 : Math.max(0, Math.min(1, progressValue))
+    default property alias expandedContent: detailRow.data
 
     signal activated()
 
@@ -121,9 +122,10 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: root.centerText
+                    font.family: root.centerTextFontFamily !== "" ? root.centerTextFontFamily : font.family
                     color: root.centerTextColor
                     font.pixelSize: root.centerTextPixelSize
-                    font.bold: true
+                    font.bold: root.centerTextFontFamily === ""
                 }
             }
         }
@@ -153,7 +155,6 @@ Item {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
-                data: root.expandedContent
             }
         }
     }

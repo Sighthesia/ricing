@@ -28,8 +28,9 @@ Item {
 
         anchors.centerIn: parent
         clickable: true
-        centerText: Services.VolumeService.sinkMuted ? "M" : "VOL"
-        centerTextPixelSize: Services.VolumeService.sinkMuted ? 10 : 8
+        centerText: Services.VolumeService.sinkMuted ? "\uf6a9" : "\uf028"
+        centerTextFontFamily: "Symbols Nerd Font"
+        centerTextPixelSize: 10
         centerTextColor: root.accentColor
         progressValue: root.displayVolume
         progressColor: root.accentColor
