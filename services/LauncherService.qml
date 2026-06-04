@@ -2,13 +2,15 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "./" as Services
 
 // Manages launcher visibility, query input, and mode derivation.
 // Now delegates to IslandService for the primary toggle path.
 Singleton {
     id: root
 
-    property bool visible: false
+    readonly property bool visible: Services.IslandService.expanded
+        && Services.IslandService.panelPage === "launcher"
     property string query: ""
 
     // Derived mode based on query prefix.
@@ -20,12 +22,26 @@ Singleton {
 
     Component.onCompleted: NiriService.syncManagedHotkeys()
 
-    function open() { visible = true }
-    function close() { visible = false; query = "" }
-    function toggle() { IslandService.toggle() }
+    function open() { Services.IslandService.showLauncher() }
+    function close() {
+        Services.IslandService.close()
+        query = ""
+    }
+    function toggle() {
+        if (visible)
+            Services.IslandService.close()
+        else
+            Services.IslandService.showLauncher()
+    }
 
-    function openClipboard() { IslandService.query = ">clip "; IslandService.open() }
-    function openShortcuts() { query = ">key "; open() }
+    function openClipboard() {
+        Services.IslandService.query = ">clip "
+        Services.IslandService.showLauncher()
+    }
+    function openShortcuts() {
+        Services.IslandService.query = ">key "
+        Services.IslandService.showLauncher()
+    }
 
     // IPC surface for niri keybind integration.
     IpcHandler {

@@ -152,7 +152,7 @@ Variants {
                     label: "Settings"
                     icon: "\u2699"
                     onClicked: {
-                        Services.SettingsService.togglePanel()
+                        Services.IslandService.showSettingsCenter()
                         Services.BarLayoutService.closeContextMenu()
                     }
                 }

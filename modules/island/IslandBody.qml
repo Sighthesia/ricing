@@ -1,5 +1,6 @@
 import QtQuick
 import "../bar" as Bar
+import "../settings" as Settings
 import "../workspace-hint" as WorkspaceHint
 import "../../services" as Services
 
@@ -16,19 +17,29 @@ Item {
     // Geometry constants.
     readonly property int collapsedW: 220
     readonly property int collapsedH: Services.BarLayoutService.barHeight
-    readonly property int expandedW: 480
-    readonly property int expandedH: 420
     readonly property int earRadius: 24
     readonly property int collapsedHorizontalPadding: 16
     readonly property int hoverWLift: 12
     readonly property int hoverHLift: 4
     readonly property int hoverRadiusLift: 2
+    readonly property int expandedW: Math.min(760, Screen.width - 48)
+    readonly property int expandedH: Math.min(620, Screen.height - 96)
+    readonly property int expandedTopMargin: 14
+    readonly property int expandedWidgetClearance: Math.max(root.collapsedH, root.messageContentHeight) + 12
+    readonly property int expandedInnerGap: 12
+    readonly property int expandedNavHeight: 42
     readonly property color surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
     readonly property var centerWidgets: Services.BarLayoutService.sectionWidgets("center")
-    readonly property bool showManagedCenterWidgets: !Services.IslandService.expanded
-        && root.centerWidgets.length > 0
+    readonly property bool showManagedCenterWidgets: root.centerWidgets.length > 0
     readonly property bool showCenterSpectrum: root.showManagedCenterWidgets
         && !Services.IslandService.windowHintActive
+        && !Services.IslandService.expanded
+    readonly property bool launcherPageVisible: Services.IslandService.expanded
+        && Services.IslandService.panelPage === "launcher"
+    readonly property bool controlCenterVisible: Services.IslandService.expanded
+        && Services.IslandService.panelPage === "control-center"
+    readonly property bool settingsCenterVisible: Services.IslandService.expanded
+        && Services.IslandService.panelPage === "settings-center"
     readonly property real collapsedContentWidth: collapsedRow.implicitWidth > 0
         ? collapsedRow.implicitWidth + collapsedHorizontalPadding
         : collapsedW
@@ -47,24 +58,22 @@ Item {
     readonly property int windowHintW: hintStage.stageWidth + 32
     readonly property int windowHintH: hintStage.stageHeight + 24
 
-    // Target dimensions driven by island state and passive hover intent;
-    // fed into the surface which owns the spring deformation. Launcher expansion
-    // takes priority; the window hint only extends the resting island.
+    // Target dimensions reuse the expanded island body instead of a second panel.
     property int targetW: Services.IslandService.expanded
         ? expandedW
         : (Services.IslandService.windowHintActive
-            ? windowHintW
-            : collapsedContentWidth + (hoverHandler.hovered ? hoverWLift : 0))
+        ? windowHintW
+        : collapsedContentWidth + (hoverHandler.hovered ? hoverWLift : 0))
     property int targetH: Services.IslandService.expanded
         ? expandedH
         : (Services.IslandService.windowHintActive
-            ? windowHintH
-            : messageContentHeight + (hoverHandler.hovered ? hoverHLift : 0))
+        ? windowHintH
+        : messageContentHeight + (hoverHandler.hovered ? hoverHLift : 0))
     property int targetR: Services.IslandService.expanded
         ? 24
         : (Services.IslandService.windowHintActive
-            ? 24
-            : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0))
+        ? 24
+        : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0))
 
     // Size mirrors the surface's animated geometry so external consumers
     // (IslandWindow hit region) keep tracking the live island bounds.
@@ -122,10 +131,8 @@ Item {
         Item {
             id: collapsedContent
             anchors.fill: parent
-            // Fade the clock/center widgets out whenever the body morphs into
-            // either the launcher or the window-hint stage, so the collapsed
-            // content never overlaps the extended panel.
-            opacity: (Services.IslandService.expanded || Services.IslandService.windowHintActive) ? 0 : 1
+            // Keep the dockzone content visible while the bottom overlay is open.
+            opacity: Services.IslandService.windowHintActive ? 0 : 1
             visible: opacity > 0.01
 
             Behavior on opacity {
@@ -234,12 +241,15 @@ Item {
             }
         }
 
-        // --- Expanded content: search + results ---
+        // --- Expanded content: mode switcher + current page inside the same
+        // island body, so the expanded panel remains the single visual host. ---
         Item {
             id: expandedContent
             anchors.fill: parent
-            anchors.margins: 16
-            anchors.topMargin: 12
+            anchors.leftMargin: 16
+            anchors.rightMargin: 16
+            anchors.topMargin: root.expandedWidgetClearance
+            anchors.bottomMargin: 16
             opacity: Services.IslandService.expanded ? 1 : 0
             visible: opacity > 0.01
 
@@ -247,9 +257,67 @@ Item {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
             }
 
-            IslandLauncher {
-                anchors.fill: parent
-                visible: parent.visible
+            // Keep the mode switcher inside the expanded panel header.
+            Rectangle {
+                id: expandedModeStrip
+
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Math.min(parent.width, 420)
+                height: root.expandedNavHeight
+                radius: Math.round(height / 2)
+                color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
+                border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.7)
+                border.width: 1
+
+                // Lay out the three pages as a segmented control.
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    spacing: 4
+
+                    IslandPanelNavButton {
+                        width: (parent.width - 8) / 3
+                        height: parent.height
+                        label: "启动器"
+                        selected: root.launcherPageVisible
+                        firstSegment: true
+                        onClicked: Services.IslandService.showLauncher()
+                    }
+
+                    IslandPanelNavButton {
+                        width: (parent.width - 8) / 3
+                        height: parent.height
+                        label: "控制中心"
+                        selected: root.controlCenterVisible
+                        onClicked: Services.IslandService.showControlCenter()
+                    }
+
+                    IslandPanelNavButton {
+                        width: (parent.width - 8) / 3
+                        height: parent.height
+                        label: "设置中心"
+                        selected: root.settingsCenterVisible
+                        lastSegment: true
+                        onClicked: Services.IslandService.showSettingsCenter()
+                    }
+                }
+            }
+
+            // Keep the current page below the switcher inside the same panel shell.
+            Item {
+                anchors.top: expandedModeStrip.bottom
+                anchors.topMargin: root.expandedInnerGap
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+
+                Loader {
+                    anchors.fill: parent
+                    sourceComponent: root.launcherPageVisible
+                        ? launcherPanelPage
+                        : (root.controlCenterVisible ? controlCenterPage : settingsCenterPage)
+                }
             }
         }
 
@@ -307,6 +375,33 @@ Item {
                 var scenePos = root.mapToItem(null, mouse.x, mouse.y)
                 Services.BarLayoutService.openContextMenu(scenePos.x, "", "", root.screenName)
             }
+        }
+    }
+
+    // Render the launcher page inside the shared bottom panel.
+    Component {
+        id: launcherPanelPage
+
+        IslandLauncher {
+            anchors.fill: parent
+        }
+    }
+
+    // Render the control center page inside the shared bottom panel.
+    Component {
+        id: controlCenterPage
+
+        IslandControlCenter {
+            anchors.fill: parent
+        }
+    }
+
+    // Render the settings page inside the shared bottom panel.
+    Component {
+        id: settingsCenterPage
+
+        Settings.SettingsContent {
+            anchors.fill: parent
         }
     }
 }

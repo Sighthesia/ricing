@@ -10,6 +10,7 @@ Singleton {
 
     property bool expanded: false
     property string query: ""
+    property string panelPage: "launcher"
 
     // Window-hint extension is active only in attached-island mode while the
     // hint is held; floating-capsule mode leaves the island untouched.
@@ -40,6 +41,35 @@ Singleton {
         expanded = true
     }
 
+    function openPage(page) {
+        if (page)
+            panelPage = page
+
+        open()
+    }
+
+    function showLauncher() {
+        openPage("launcher")
+    }
+
+    function showControlCenter() {
+        openPage("control-center")
+    }
+
+    function showSettingsCenter() {
+        openPage("settings-center")
+    }
+
+    function openClipboard() {
+        query = ">clip "
+        showLauncher()
+    }
+
+    function openShortcuts() {
+        query = ">key "
+        showLauncher()
+    }
+
     function close() {
         expanded = false
         _closeTimer.restart()
@@ -52,9 +82,21 @@ Singleton {
 
     // IPC surface for niri keybind integration.
     IpcHandler {
+        target: "launcher"
+        function toggle() { root.toggle() }
+        function open() { root.open() }
+        function close() { root.close() }
+        function openClipboard() { root.openClipboard() }
+        function openShortcuts() { root.openShortcuts() }
+    }
+
+    // New IPC target used by the refactored island launcher flow.
+    IpcHandler {
         target: "island"
         function toggle() { root.toggle() }
         function open() { root.open() }
         function close() { root.close() }
+        function openClipboard() { root.openClipboard() }
+        function openShortcuts() { root.openShortcuts() }
     }
 }

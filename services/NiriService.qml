@@ -50,19 +50,19 @@ Singleton {
             {
                 sequence: "Super+Shift+Space",
                 title: "Launcher: afloat",
-                target: "launcher",
+                target: "island",
                 action: "toggle"
             },
             {
                 sequence: "Super+Shift+V",
                 title: "Clipboard: afloat",
-                target: "launcher",
+                target: "island",
                 action: "openClipboard"
             },
             {
                 sequence: "Super+Shift+Slash",
                 title: "Shortcuts: afloat",
-                target: "launcher",
+                target: "island",
                 action: "openShortcuts"
             },
             {

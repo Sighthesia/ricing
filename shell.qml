@@ -5,12 +5,13 @@ import "services" as Services
 import "modules/background" as Background
 import "modules/bar" as Bar
 import "modules/island" as Island
-import "modules/settings" as Settings
-import "modules/launcher" as Launcher
 import "modules/workspace-hint" as WorkspaceHint
 
 // Keep the shell root minimal while layering reusable screen surfaces.
 ShellRoot {
+    // Sync managed compositor hotkeys once at shell startup.
+    Component.onCompleted: Services.NiriService.syncManagedHotkeys()
+
     // Render wallpaper on each screen behind all other surfaces.
     Background.BackgroundWindow {
     }
@@ -41,14 +42,6 @@ ShellRoot {
 
     // Per-widget settings panel rendered in its own floating window.
     Bar.WidgetSettingsWindow {
-    }
-
-    // Settings panel popup triggered from bar right-click.
-    Settings.SettingsWindow {
-    }
-
-    // Full-screen launcher overlay triggered from context menu.
-    Launcher.LauncherWindow {
     }
 
     // Workspace/window hint OSD shown while mod key is held. Only the

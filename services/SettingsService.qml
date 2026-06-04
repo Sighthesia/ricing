@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "./" as Services
 import "WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 
 // Persist user-facing shell settings (bar, appearance, notifications) to settings.json.
@@ -23,8 +24,18 @@ QtObject {
 
     // Panel visibility state (driven by bar widget, consumed by SettingsWindow)
     property bool panelVisible: false
-    function togglePanel() { panelVisible = !panelVisible }
-    function closePanel() { panelVisible = false }
+    function togglePanel() {
+        if (Services.IslandService.expanded && Services.IslandService.panelPage === "settings-center")
+            Services.IslandService.close()
+        else
+            Services.IslandService.showSettingsCenter()
+    }
+    function closePanel() {
+        panelVisible = false
+
+        if (Services.IslandService.panelPage === "settings-center")
+            Services.IslandService.close()
+    }
 
     // Expose settings visibility over Quickshell IPC for compositor-managed hotkeys.
     property IpcHandler ipc: IpcHandler {
