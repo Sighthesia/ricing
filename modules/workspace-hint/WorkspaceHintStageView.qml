@@ -25,6 +25,8 @@ Item {
     property bool titleRowOnly: false
     // Screen width used to clamp capsule width; caller supplies the live value.
     property int screenWidth: 1
+    // Side inset reserved so edge ears remain fully visible.
+    property int capsuleEdgeInset: 24
 
     // --- Exposed geometry ---
     readonly property int stageWidth: _workspaceStageWidth
@@ -54,7 +56,7 @@ Item {
     readonly property int _activeWorkspacePosition: _hintData ? _hintData.activeWorkspacePosition : -1
  readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     readonly property real _overflowSlotPosition: 1.18
-  readonly property int _workspaceCapsuleMaxWidth: Math.max(1, Math.floor(stageView.screenWidth))
+  readonly property int _workspaceCapsuleMaxWidth: Math.max(1, Math.floor(stageView.screenWidth - stageView.capsuleEdgeInset * 2))
   readonly property int _workspaceSideWidth: 96
     // Deterministic primary width from the hint data (character-metric
     // estimate). Same data always yields the same width, so the stage size is

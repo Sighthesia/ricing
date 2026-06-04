@@ -89,6 +89,20 @@ Item {
     readonly property real _activeWorkspaceLabelWidth: activeWorkspaceLabel.text !== ""
         ? Math.ceil(activeWorkspaceLabel.implicitWidth) + CapsuleMetrics.compactInnerHorizontal
         : 0
+    readonly property real _workspaceAreaMinWidth: {
+        const labelWidth = root._activeWorkspaceLabelWidth > 0
+            ? root._activeWorkspaceLabelWidth + root._primaryOuterSpacing
+            : 0
+        const titleAreaWidth = labelWidth + root._primaryTrailingPadding
+        const workspaceMaxSideWidth = host && host._workspaceMaxSideWidth !== undefined
+            ? host._workspaceMaxSideWidth
+            : 1
+        const workspaceAreaWidth = workspaceMaxSideWidth
+            + root._primaryOuterSpacing
+            + root._primaryTrailingPadding
+
+        return Math.max(titleAreaWidth, workspaceAreaWidth)
+    }
     readonly property real preferredPrimaryWidth: Math.min(root._maxCapsuleWidth, root._naturalPrimaryWidth)
 
     readonly property int _cardCount: root._isPrimaryCapsule ? root._activeWindows.length : 0
@@ -159,7 +173,10 @@ Item {
         + ((host._workspaceStageTargetY + root._metrics.y) * root._revealProgress)
     width: Math.min(
         root._maxCapsuleWidth,
-        root._metrics.height + ((root._metrics.width - root._metrics.height) * root._revealProgress)
+        Math.max(
+            root._workspaceAreaMinWidth,
+            root._metrics.height + ((root._metrics.width - root._metrics.height) * root._revealProgress)
+        )
     )
     height: root._metrics.height
     opacity: root.capsule && root.capsule.visible ? root._capsuleOpacity : 0

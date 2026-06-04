@@ -52,10 +52,6 @@ Singleton {
         openPage("launcher")
     }
 
-    function showControlCenter() {
-        openPage("control-center")
-    }
-
     function showSettingsCenter() {
         openPage("settings-center")
     }
@@ -73,6 +69,11 @@ Singleton {
     function close() {
         expanded = false
         _closeTimer.restart()
+    }
+
+    onExpandedChanged: {
+        if (expanded)
+            panelPage = panelPage === "settings-center" ? "settings-center" : "launcher"
     }
 
     function toggle() {

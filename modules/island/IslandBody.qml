@@ -22,9 +22,8 @@ Item {
     readonly property int hoverWLift: 12
     readonly property int hoverHLift: 4
     readonly property int hoverRadiusLift: 2
-    readonly property int expandedW: Math.min(760, Screen.width - 48)
+    readonly property int expandedW: Math.min(620, Screen.width - 48)
     readonly property int expandedH: Math.min(620, Screen.height - 96)
-    readonly property int expandedTopMargin: 14
     readonly property int expandedWidgetClearance: Math.max(root.collapsedH, root.messageContentHeight) + 12
     readonly property int expandedInnerGap: 12
     readonly property int expandedNavHeight: 42
@@ -36,8 +35,6 @@ Item {
         && !Services.IslandService.expanded
     readonly property bool launcherPageVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "launcher"
-    readonly property bool controlCenterVisible: Services.IslandService.expanded
-        && Services.IslandService.panelPage === "control-center"
     readonly property bool settingsCenterVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "settings-center"
     readonly property real collapsedContentWidth: collapsedRow.implicitWidth > 0
@@ -55,8 +52,8 @@ Item {
     // expanded size and only the title row overlays the launcher's lower half.
     readonly property bool hintLauncherConflict: Services.IslandService.expanded
         && Services.IslandService.windowHintActive
-    readonly property int windowHintW: hintStage.stageWidth + 32
-    readonly property int windowHintH: hintStage.stageHeight + 24
+    readonly property int windowHintW: Math.min(hintStage.stageWidth + 32, Screen.width - root.earRadius * 2)
+    readonly property int windowHintH: root.collapsedH + hintStage.stageHeight + 24
 
     // Target dimensions reuse the expanded island body instead of a second panel.
     property int targetW: Services.IslandService.expanded
@@ -131,9 +128,10 @@ Item {
         Item {
             id: collapsedContent
             anchors.fill: parent
-            // Keep the dockzone content visible while the bottom overlay is open.
-            opacity: Services.IslandService.windowHintActive ? 0 : 1
+            // Keep the dockzone content visible while the window hint expands.
+            opacity: 1
             visible: opacity > 0.01
+            z: 1
 
             Behavior on opacity {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -243,19 +241,33 @@ Item {
 
         // --- Expanded content: mode switcher + current page inside the same
         // island body, so the expanded panel remains the single visual host. ---
-        Item {
-            id: expandedContent
-            anchors.fill: parent
-            anchors.leftMargin: 16
-            anchors.rightMargin: 16
-            anchors.topMargin: root.expandedWidgetClearance
-            anchors.bottomMargin: 16
-            opacity: Services.IslandService.expanded ? 1 : 0
-            visible: opacity > 0.01
+            Item {
+                id: expandedContent
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                anchors.topMargin: root.expandedWidgetClearance
+                anchors.bottomMargin: 16
+                opacity: Services.IslandService.expanded ? 1 : 0
+                visible: opacity > 0.01
+                focus: Services.IslandService.expanded
 
-            Behavior on opacity {
-                NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-            }
+                Component.onCompleted: if (Services.IslandService.expanded) forceActiveFocus()
+
+                Connections {
+                    target: Services.IslandService
+
+                    function onExpandedChanged() {
+                        if (Services.IslandService.expanded)
+                            expandedContent.forceActiveFocus()
+                    }
+                }
+
+                Keys.onEscapePressed: Services.IslandService.close()
+
+                Behavior on opacity {
+                    NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                }
 
             // Keep the mode switcher inside the expanded panel header.
             Rectangle {
@@ -277,7 +289,7 @@ Item {
                     spacing: 4
 
                     IslandPanelNavButton {
-                        width: (parent.width - 8) / 3
+                        width: (parent.width - 4) / 2
                         height: parent.height
                         label: "启动器"
                         selected: root.launcherPageVisible
@@ -286,15 +298,7 @@ Item {
                     }
 
                     IslandPanelNavButton {
-                        width: (parent.width - 8) / 3
-                        height: parent.height
-                        label: "控制中心"
-                        selected: root.controlCenterVisible
-                        onClicked: Services.IslandService.showControlCenter()
-                    }
-
-                    IslandPanelNavButton {
-                        width: (parent.width - 8) / 3
+                        width: (parent.width - 4) / 2
                         height: parent.height
                         label: "设置中心"
                         selected: root.settingsCenterVisible
@@ -316,7 +320,7 @@ Item {
                     anchors.fill: parent
                     sourceComponent: root.launcherPageVisible
                         ? launcherPanelPage
-                        : (root.controlCenterVisible ? controlCenterPage : settingsCenterPage)
+                        : settingsCenterPage
                 }
             }
         }
@@ -328,8 +332,10 @@ Item {
         Item {
             id: windowHintContent
             anchors.fill: parent
+            anchors.topMargin: root.collapsedH + 12
             opacity: Services.IslandService.windowHintActive ? 1 : 0
             visible: opacity > 0.01
+            z: 0
 
             Behavior on opacity {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -338,12 +344,8 @@ Item {
             WorkspaceHint.WorkspaceHintStageView {
                 id: hintStage
 
-                // Center the stage; align it to the bottom of the body during
-                // the launcher conflict so the title row sits below the launcher.
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: root.hintLauncherConflict
-                    ? parent.height - height - 12
-                    : (parent.height - height) / 2
+                anchors.top: parent.top
                 width: stageWidth
                 height: stageHeight
 
@@ -352,6 +354,7 @@ Item {
                 titleRowOnly: root.hintLauncherConflict
                 stageTargetY: 12
                 screenWidth: Screen.width
+                capsuleEdgeInset: root.earRadius
             }
         }
 
@@ -383,15 +386,6 @@ Item {
         id: launcherPanelPage
 
         IslandLauncher {
-            anchors.fill: parent
-        }
-    }
-
-    // Render the control center page inside the shared bottom panel.
-    Component {
-        id: controlCenterPage
-
-        IslandControlCenter {
             anchors.fill: parent
         }
     }

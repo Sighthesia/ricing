@@ -85,6 +85,7 @@ Variants {
                 active: hintWindow._hintActive
                 stageTargetY: Services.BarLayoutService.barHeight + 16
                 screenWidth: hintWindow.screen ? hintWindow.screen.width : hintWindow.width
+                capsuleEdgeInset: 24
             }
         }
 
