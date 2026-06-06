@@ -56,6 +56,12 @@ Singleton {
         openPage("settings-center")
     }
 
+    function showNotifications() {
+        Services.NotificationService.markAllRead()
+        Services.NotificationService.clearStickyNotifications()
+        openPage("notifications")
+    }
+
     function openClipboard() {
         query = ">clip "
         showLauncher()
@@ -72,8 +78,11 @@ Singleton {
     }
 
     onExpandedChanged: {
-        if (expanded)
-            panelPage = panelPage === "settings-center" ? "settings-center" : "launcher"
+        if (expanded
+            && panelPage !== "launcher"
+            && panelPage !== "settings-center"
+            && panelPage !== "notifications")
+            panelPage = "launcher"
     }
 
     function toggle() {

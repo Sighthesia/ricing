@@ -37,10 +37,12 @@ Item {
         && Services.IslandService.panelPage === "launcher"
     readonly property bool settingsCenterVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "settings-center"
+    readonly property bool notificationsPageVisible: Services.IslandService.expanded
+        && Services.IslandService.panelPage === "notifications"
     readonly property real collapsedContentWidth: collapsedRow.implicitWidth > 0
         ? collapsedRow.implicitWidth + collapsedHorizontalPadding
         : collapsedW
-    readonly property real collapsedContentHeight: Math.max(collapsedContentLoader.implicitHeight, 18)
+    readonly property real collapsedContentHeight: Math.max(collapsedRow.implicitHeight, collapsedContentLoader.implicitHeight, 18)
     // When a transient message is active the collapsed body grows downward to
     // fit the message card (clock stays in the top row); height tracks the card.
     readonly property real messageContentHeight: Services.TransientMessageService.active
@@ -226,6 +228,12 @@ Item {
                     id: transientMessageBand
                     anchors.top: parent.top
                 }
+
+                // Notification summary entry: unread badge and opencode shortcut.
+                NotificationSummaryDockzone {
+                    id: notificationSummary
+                    anchors.top: parent.top
+                }
             }
 
             // Render the actual managed center widgets in collapsed mode.
@@ -310,7 +318,7 @@ Item {
                     spacing: 4
 
                     IslandPanelNavButton {
-                        width: (parent.width - 4) / 2
+                        width: (parent.width - 8) / 3
                         height: parent.height
                         label: "启动器"
                         selected: root.launcherPageVisible
@@ -319,12 +327,20 @@ Item {
                     }
 
                     IslandPanelNavButton {
-                        width: (parent.width - 4) / 2
+                        width: (parent.width - 8) / 3
                         height: parent.height
                         label: "设置中心"
                         selected: root.settingsCenterVisible
-                        lastSegment: true
                         onClicked: Services.IslandService.showSettingsCenter()
+                    }
+
+                    IslandPanelNavButton {
+                        width: (parent.width - 8) / 3
+                        height: parent.height
+                        label: "通知中心"
+                        selected: root.notificationsPageVisible
+                        lastSegment: true
+                        onClicked: Services.IslandService.showNotifications()
                     }
                 }
             }
@@ -341,7 +357,9 @@ Item {
                     anchors.fill: parent
                     sourceComponent: root.launcherPageVisible
                         ? launcherPanelPage
-                        : settingsCenterPage
+                        : (root.settingsCenterVisible
+                            ? settingsCenterPage
+                            : notificationsCenterPage)
 
                     onLoaded: {
                         if (item && root.launcherPageVisible && item.focusSearch) {
@@ -422,6 +440,15 @@ Item {
         id: settingsCenterPage
 
         Settings.SettingsContent {
+            anchors.fill: parent
+        }
+    }
+
+    // Render the notification center inside the shared bottom panel.
+    Component {
+        id: notificationsCenterPage
+
+        NotificationCenterView {
             anchors.fill: parent
         }
     }
