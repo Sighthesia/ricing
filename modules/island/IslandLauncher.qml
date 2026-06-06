@@ -7,7 +7,10 @@ import "../../services" as Services
 Item {
     id: root
 
-    Keys.onEscapePressed: Services.IslandService.close()
+    function focusSearch() {
+        searchInput.forceActiveFocus()
+        searchInput.selectAll()
+    }
 
     Column {
         anchors.fill: parent
@@ -32,6 +35,8 @@ Item {
                 font.pixelSize: 14
                 text: Services.IslandService.query
                 onTextChanged: Services.IslandService.query = text
+                focus: true
+                Keys.onEscapePressed: Services.IslandService.close()
 
                 // Navigate list with Up/Down keys.
                 Keys.onUpPressed: {
@@ -108,21 +113,6 @@ Item {
         }
     }
 
-    // Focus the search input when island expands.
-    Connections {
-        target: Services.IslandService
-        function onExpandedChanged() {
-            if (Services.IslandService.expanded) {
-                searchInput.forceActiveFocus()
-            }
-        }
-    }
-
-    Component.onCompleted: {
-        if (Services.IslandService.expanded)
-            searchInput.forceActiveFocus()
-    }
-
     // --- App list component ---
     Component {
         id: islandAppList
@@ -165,6 +155,7 @@ Item {
             model: filteredApps
 
             delegate: Rectangle {
+                id: appDelegate
                 required property var modelData
                 required property int index
                 width: ListView.view ? ListView.view.width : 200
@@ -217,9 +208,11 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        ListView.view.currentIndex = index
-                        Services.LaunchCountService.recordLaunch(modelData.id || "")
-                        modelData.execute()
+                        var app = appDelegate.modelData
+                        var idx = appDelegate.index
+                        if (ListView.view) ListView.view.currentIndex = idx
+                        Services.LaunchCountService.recordLaunch(app.id || "")
+                        app.execute()
                         Services.IslandService.close()
                     }
                 }

@@ -262,29 +262,29 @@ Item {
 
         // --- Expanded content: mode switcher + current page inside the same
         // island body, so the expanded panel remains the single visual host. ---
-            Item {
-                id: expandedContent
-                anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
-                anchors.topMargin: root.expandedWidgetClearance
-                anchors.bottomMargin: 16
-                opacity: root.expandedRevealProgress
-                visible: opacity > 0.01
-                focus: Services.IslandService.expanded
+                FocusScope {
+                    id: expandedContent
+                    anchors.fill: parent
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 16
+                    anchors.topMargin: root.expandedWidgetClearance
+                    anchors.bottomMargin: 16
+                    opacity: root.expandedRevealProgress
+                    visible: opacity > 0.01
+                    focus: Services.IslandService.expanded
 
-                Component.onCompleted: if (Services.IslandService.expanded) forceActiveFocus()
+                    Component.onCompleted: if (Services.IslandService.expanded) forceActiveFocus()
 
-                Connections {
-                    target: Services.IslandService
+                    Connections {
+                        target: Services.IslandService
 
-                    function onExpandedChanged() {
-                        if (Services.IslandService.expanded)
-                            expandedContent.forceActiveFocus()
+                        function onExpandedChanged() {
+                            if (Services.IslandService.expanded)
+                                expandedContent.forceActiveFocus()
+                        }
                     }
-                }
 
-                Keys.onEscapePressed: Services.IslandService.close()
+                    Keys.onEscapePressed: Services.IslandService.close()
 
                 Behavior on opacity {
                     NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -342,6 +342,12 @@ Item {
                     sourceComponent: root.launcherPageVisible
                         ? launcherPanelPage
                         : settingsCenterPage
+
+                    onLoaded: {
+                        if (item && root.launcherPageVisible && item.focusSearch) {
+                            item.focusSearch()
+                        }
+                    }
                 }
             }
         }
