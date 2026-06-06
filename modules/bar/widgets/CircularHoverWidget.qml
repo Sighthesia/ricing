@@ -37,17 +37,14 @@ Item {
     property int activationButtons: Qt.LeftButton
     readonly property bool expanded: hoverArea.containsMouse
     readonly property real clampedProgress: progressValue < 0 ? -1 : Math.max(0, Math.min(1, progressValue))
+    readonly property real detailTargetWidth: root.expanded ? detailRow.implicitWidth : 0
     default property alias expandedContent: detailRow.data
 
     signal activated()
     signal wheel(var event)
 
-    implicitWidth: (root.sidePadding * 2) + badgeSlot.width + detailSlot.width + (detailSlot.width > 0 ? root.contentSpacing : 0)
+    implicitWidth: (root.sidePadding * 2) + badgeSlot.width + root.detailTargetWidth + (root.detailTargetWidth > 0 ? root.contentSpacing : 0)
     implicitHeight: 30
-
-    Behavior on implicitWidth {
-        NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-    }
 
     onProgressValueChanged: ringCanvas.requestPaint()
     onProgressColorChanged: ringCanvas.requestPaint()
@@ -58,7 +55,7 @@ Item {
         id: contentRow
 
         anchors.centerIn: parent
-        spacing: detailSlot.width > 0 ? root.contentSpacing : 0
+        spacing: root.detailTargetWidth > 0 ? root.contentSpacing : 0
 
         // Keep the circular badge persistent across collapsed and expanded states.
         Item {
@@ -135,13 +132,15 @@ Item {
         Item {
             id: detailSlot
 
-            width: root.expanded ? detailRow.implicitWidth : 0
+            property real revealWidth: root.detailTargetWidth
+
+            width: revealWidth
             height: detailRow.implicitHeight
             opacity: root.expanded ? 1 : 0
             clip: true
             visible: width > 0 || opacity > 0
 
-            Behavior on width {
+            Behavior on revealWidth {
                 NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
             }
 

@@ -36,10 +36,6 @@ Item {
 
     Component.onCompleted: Services.SettingsService.ensureWidgetSettings("system-monitor", root.widgetInstanceKey)
 
-    Behavior on implicitWidth {
-        NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-    }
-
     // Render the circular CPU badge and reveal configured metrics on hover.
     Widgets.CircularHoverWidget {
         id: metricsBadge

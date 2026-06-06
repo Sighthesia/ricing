@@ -10,6 +10,7 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
+    property real availableWidth: -1
 
     // Simplify to icon-only during transient messages (hardcoded on for now).
     readonly property bool simplified: Services.TransientMessageService.active
@@ -22,6 +23,20 @@ Item {
         : false
     readonly property bool needsAudioSpectrum: root.showAudioSpectrum && !root.simplified
     readonly property string spectrumComponentId: "media:" + root.widgetInstanceKey
+    readonly property real compactTextWidth: {
+        if (root.simplified)
+            return 0
+
+        if (root.availableWidth <= 0)
+            return 200
+
+        var artWidth = 24
+        var spacing = 6
+        var chrome = 16
+        return Math.max(48, Math.min(200, root.availableWidth - artWidth - spacing - chrome))
+    }
+    readonly property real currentTextTargetWidth: root.simplified ? 0 : Math.min(currentTextLabel.implicitWidth, root.compactTextWidth)
+    readonly property real nextTextTargetWidth: root.simplified ? 0 : Math.min(nextTextLabel.implicitWidth, root.compactTextWidth)
 
     property string currentText: root._displayText
     property string pendingText: root._displayText
@@ -71,10 +86,6 @@ Item {
 
     implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 16, 240)
     implicitHeight: 30
-
-    Behavior on implicitWidth {
-        NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-    }
 
     Behavior on _progressValue {
         NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
@@ -202,7 +213,7 @@ Item {
         anchors.centerIn: parent
         opacity: 1
         visible: opacity > 0
-        implicitWidth: currentContent.implicitWidth
+        implicitWidth: currentArtworkSlot.width + root.currentTextTargetWidth + (root.currentTextTargetWidth > 0 ? currentContent.spacing : 0)
         implicitHeight: currentContent.implicitHeight
 
         // Keep the spectrum tucked behind the compact media contents.
@@ -355,10 +366,12 @@ Item {
 
                 anchors.verticalCenter: parent.verticalCenter
                 visible: !root.simplified
-                width: root.simplified ? 0 : Math.min(currentTextLabel.implicitWidth, 200)
+                property real revealWidth: root.currentTextTargetWidth
+
+                width: revealWidth
                 height: currentTextLabel.implicitHeight
 
-                Behavior on width {
+                Behavior on revealWidth {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
@@ -388,7 +401,7 @@ Item {
         opacity: 0
         visible: opacity > 0
         z: 1
-        implicitWidth: nextContent.implicitWidth
+        implicitWidth: nextArtworkSlot.width + root.nextTextTargetWidth + (root.nextTextTargetWidth > 0 ? nextContent.spacing : 0)
         implicitHeight: nextContent.implicitHeight
 
         // Mirror the spectrum during text transitions so the background stays continuous.
@@ -541,10 +554,12 @@ Item {
 
                 anchors.verticalCenter: parent.verticalCenter
                 visible: !root.simplified
-                width: root.simplified ? 0 : Math.min(nextTextLabel.implicitWidth, 200)
+                property real revealWidth: root.nextTextTargetWidth
+
+                width: revealWidth
                 height: nextTextLabel.implicitHeight
 
-                Behavior on width {
+                Behavior on revealWidth {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 

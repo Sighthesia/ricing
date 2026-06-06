@@ -40,11 +40,28 @@ Item {
     readonly property real collapsedContentWidth: collapsedRow.implicitWidth > 0
         ? collapsedRow.implicitWidth + collapsedHorizontalPadding
         : collapsedW
+    readonly property real collapsedContentHeight: Math.max(collapsedContentLoader.implicitHeight, 18)
     // When a transient message is active the collapsed body grows downward to
     // fit the message card (clock stays in the top row); height tracks the card.
     readonly property real messageContentHeight: Services.TransientMessageService.active
         ? Math.max(collapsedH, collapsedRow.implicitHeight + 12)
         : collapsedH
+    readonly property real collapsedCapsuleWidth: collapsedContentWidth + (hoverHandler.hovered ? hoverWLift : 0)
+    readonly property real liveBodyWidth: Math.max(0, root.width - root.earRadius * 2)
+    readonly property real collapsedWidthProgress: root.collapsedCapsuleWidth > 0
+        ? Math.max(0, Math.min(1, root.liveBodyWidth / root.collapsedCapsuleWidth))
+        : 1
+    readonly property real collapsedRevealProgress: root.showManagedCenterWidgets
+        && !Services.IslandService.expanded
+        && !Services.IslandService.windowHintActive
+        ? Math.max(0, Math.min(1, (root.collapsedWidthProgress - 0.98) / 0.02))
+        : 1
+    readonly property real expandedWidthProgress: root.expandedW > 0
+        ? Math.max(0, Math.min(1, root.liveBodyWidth / root.expandedW))
+        : 1
+    readonly property real expandedRevealProgress: Services.IslandService.expanded
+        ? Math.max(0, Math.min(1, (root.expandedWidthProgress - 0.6) / 0.3))
+        : 0
 
     // Window-hint extension geometry, sized to the live stage. When the hint is
     // held without the launcher, the island grows to wrap the full vertical
@@ -60,7 +77,7 @@ Item {
         ? expandedW
         : (Services.IslandService.windowHintActive
         ? windowHintW
-        : collapsedContentWidth + (hoverHandler.hovered ? hoverWLift : 0))
+        : collapsedCapsuleWidth)
     property int targetH: Services.IslandService.expanded
         ? expandedH
         : (Services.IslandService.windowHintActive
@@ -180,18 +197,21 @@ Item {
                 // Center the row's top item in the bar-height band so the clock
                 // stays vertically centered while the body grows downward for
                 // long message bodies.
-                anchors.topMargin: Math.max(0, (root.collapsedH - childHeightHint) / 2)
-                readonly property real childHeightHint: Math.max(
-                    collapsedContentLoader.height, 18)
+                anchors.topMargin: Math.max(0, (root.collapsedH - root.collapsedContentHeight) / 2)
                 spacing: 8
+                opacity: root.collapsedRevealProgress
+
+                Behavior on opacity {
+                    NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                }
 
                 // Wrap the collapsed center content so the spectrum can size to the managed widget block.
                 Item {
                     id: collapsedContentFrame
 
                     anchors.top: parent.top
-                    width: collapsedContentLoader.width
-                    height: collapsedContentLoader.height
+                    width: collapsedContentLoader.implicitWidth
+                    height: collapsedContentLoader.implicitHeight
 
                     Loader {
                         id: collapsedContentLoader
@@ -203,6 +223,7 @@ Item {
 
                 // Transient message card beside the clock; zero size when idle.
                 TransientMessageBand {
+                    id: transientMessageBand
                     anchors.top: parent.top
                 }
             }
@@ -248,7 +269,7 @@ Item {
                 anchors.rightMargin: 16
                 anchors.topMargin: root.expandedWidgetClearance
                 anchors.bottomMargin: 16
-                opacity: Services.IslandService.expanded ? 1 : 0
+                opacity: root.expandedRevealProgress
                 visible: opacity > 0.01
                 focus: Services.IslandService.expanded
 

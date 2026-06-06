@@ -39,13 +39,6 @@ Item {
     clip: true
     visible: Services.TransientMessageService.active || implicitWidth > 1
 
-    Behavior on implicitWidth {
-        NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-    }
-    Behavior on implicitHeight {
-        NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-    }
-
     Column {
         id: card
         anchors.left: parent.left

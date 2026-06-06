@@ -12,6 +12,7 @@ Item {
     property string pendingTitle: currentTitle
     property string pendingAppId: currentAppId
     property bool transitioning: false
+    property real availableWidth: -1
     readonly property var activeWindowSettings: WidgetSettingsRegistry.settingsObject(
         "active-window",
         Services.SettingsService.widgetSettings
@@ -25,13 +26,22 @@ Item {
     readonly property int maxTitleWidth: activeWindowSettings
         ? activeWindowSettings.maxTitleWidth
         : 200
+    readonly property real compactTitleWidth: {
+        if (root.availableWidth <= 0)
+            return root.maxTitleWidth
+
+        var iconWidth = root.showIcon ? 18 : 0
+        var spacing = root.showIcon ? 6 : 0
+        var chrome = 20
+        return Math.max(40, Math.min(root.maxTitleWidth, root.availableWidth - iconWidth - spacing - chrome))
+    }
+    readonly property real currentIconTargetWidth: root.showIcon && root.currentAppId !== "" ? 18 : 0
+    readonly property real nextIconTargetWidth: root.showIcon && root.pendingAppId !== "" ? 18 : 0
+    readonly property real currentTitleTargetWidth: Math.min(currentTitleText.implicitWidth, root.compactTitleWidth)
+    readonly property real nextTitleTargetWidth: Math.min(nextTitleText.implicitWidth, root.compactTitleWidth)
 
     implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 20, 240)
     implicitHeight: 30
-
-    Behavior on implicitWidth {
-        NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-    }
 
     function syncFocusedWindow() {
         var nextTitle = Services.NiriService.activeTitle || root.desktopLabel
@@ -106,7 +116,7 @@ Item {
         opacity: 1
         visible: opacity > 0
 
-        implicitWidth: currentContent.implicitWidth
+        implicitWidth: root.currentIconTargetWidth + root.currentTitleTargetWidth + (root.currentTitleTargetWidth > 0 && root.currentIconTargetWidth > 0 ? currentContent.spacing : 0)
         implicitHeight: currentContent.implicitHeight
 
         // Render the currently focused icon and title.
@@ -121,11 +131,13 @@ Item {
                 id: currentIconSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: root.showIcon && root.currentAppId !== "" ? 18 : 0
-                height: 18
-                opacity: root.showIcon && root.currentAppId !== "" ? 1 : 0
+                property real revealWidth: root.currentIconTargetWidth
 
-                Behavior on width {
+                width: revealWidth
+                height: 18
+                opacity: root.currentIconTargetWidth > 0 ? 1 : 0
+
+                Behavior on revealWidth {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
@@ -146,10 +158,12 @@ Item {
                 id: currentTitleSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(currentTitleText.implicitWidth, root.maxTitleWidth)
+                property real revealWidth: root.currentTitleTargetWidth
+
+                width: revealWidth
                 height: currentTitleText.implicitHeight
 
-                Behavior on width {
+                Behavior on revealWidth {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
@@ -176,7 +190,7 @@ Item {
         visible: opacity > 0
         z: 1
 
-        implicitWidth: nextContent.implicitWidth
+        implicitWidth: root.nextIconTargetWidth + root.nextTitleTargetWidth + (root.nextTitleTargetWidth > 0 && root.nextIconTargetWidth > 0 ? nextContent.spacing : 0)
         implicitHeight: nextContent.implicitHeight
 
         // Render the next focused icon and title.
@@ -191,11 +205,13 @@ Item {
                 id: nextIconSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: root.showIcon && root.pendingAppId !== "" ? 18 : 0
-                height: 18
-                opacity: root.showIcon && root.pendingAppId !== "" ? 1 : 0
+                property real revealWidth: root.nextIconTargetWidth
 
-                Behavior on width {
+                width: revealWidth
+                height: 18
+                opacity: root.nextIconTargetWidth > 0 ? 1 : 0
+
+                Behavior on revealWidth {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
@@ -216,10 +232,12 @@ Item {
                 id: nextTitleSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(nextTitleText.implicitWidth, root.maxTitleWidth)
+                property real revealWidth: root.nextTitleTargetWidth
+
+                width: revealWidth
                 height: nextTitleText.implicitHeight
 
-                Behavior on width {
+                Behavior on revealWidth {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 

@@ -8,6 +8,7 @@ Item {
     required property var widgetEntry
     required property string widgetSource
     required property string screenName
+    property real availableWidth: -1
 
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     readonly property string widgetId: widgetEntry && widgetEntry.id ? widgetEntry.id : ""
@@ -105,6 +106,9 @@ Item {
 
             if (item.widgetId !== undefined)
                 item.widgetId = root.widgetId
+
+            if (item.availableWidth !== undefined)
+                item.availableWidth = Qt.binding(function() { return root.availableWidth })
         }
     }
 

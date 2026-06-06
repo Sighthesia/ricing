@@ -29,10 +29,6 @@ Item {
 
     Component.onCompleted: Services.SettingsService.ensureWidgetSettings("battery", root.widgetInstanceKey)
 
-    Behavior on implicitWidth {
-        NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-    }
-
     readonly property color stateColor: {
         if (Services.BatteryService.critical)
             return Services.Color.mError
