@@ -11,6 +11,7 @@ Singleton {
     property bool expanded: false
     property string query: ""
     property string panelPage: "launcher"
+    property var centerSurfaceWidths: ({})
 
     // Window-hint extension is active only in attached-island mode while the
     // hint is held; floating-capsule mode leaves the island untouched.
@@ -27,6 +28,24 @@ Singleton {
     readonly property string mode: {
         if (query.startsWith(">clip ")) return "clipboard"
         return "apps"
+    }
+
+    function setCenterSurfaceWidth(screenName, width) {
+        var nextWidths = Object.assign({}, centerSurfaceWidths)
+
+        if (screenName && width > 0)
+            nextWidths[screenName] = width
+        else if (screenName)
+            delete nextWidths[screenName]
+
+        centerSurfaceWidths = nextWidths
+    }
+
+    function centerSurfaceWidthFor(screenName) {
+        if (!screenName)
+            return 0
+
+        return centerSurfaceWidths[screenName] || 0
     }
 
     // Delay query reset so mode stays stable during the collapse animation.

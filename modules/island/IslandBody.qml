@@ -119,12 +119,18 @@ Item {
         root._spectrumRegistered = root.showCenterSpectrum
     }
 
-    Component.onCompleted: syncSpectrumRegistration()
+    Component.onCompleted: {
+        syncSpectrumRegistration()
+        Services.IslandService.setCenterSurfaceWidth(root.screenName, width)
+    }
     Component.onDestruction: {
         if (root._spectrumRegistered)
             Services.SpectrumService.unregisterComponent("island-center:" + root.screenName)
+
+        Services.IslandService.setCenterSurfaceWidth(root.screenName, 0)
     }
     onShowCenterSpectrumChanged: syncSpectrumRegistration()
+    onWidthChanged: Services.IslandService.setCenterSurfaceWidth(root.screenName, width)
 
     // Passive hover tracking for the collapsed island geometry.
     HoverHandler {

@@ -61,7 +61,6 @@ Item {
 
         Item {
             id: surfaceRoot
-
             readonly property var blurParts: dockzone.blurParts
 
             implicitWidth: dockzone.implicitWidth

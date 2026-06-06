@@ -42,6 +42,10 @@ Variants {
         property bool _hintActive: testHintHeld !== null ? testHintHeld : Services.WindowHintService.hintVisible
         property var _hintData: testHintData !== null ? testHintData : Services.WindowHintService.activeHint
 
+        Component.onCompleted: Services.WindowHintService.setCenterSurfaceWidth(modelData.name, stageView.width)
+        Component.onDestruction: Services.WindowHintService.setCenterSurfaceWidth(modelData.name, 0)
+        on_WindowVisibleChanged: Services.WindowHintService.setCenterSurfaceWidth(modelData.name, _windowVisible ? stageView.width : 0)
+
         // Keep the window alive through the exit grace so the reverse
         // animation can play before hiding; the stage's own reveal logic is
         // gated declaratively by `active` below.
@@ -86,6 +90,7 @@ Variants {
                 stageTargetY: Services.BarLayoutService.barHeight + 16
                 screenWidth: hintWindow.screen ? hintWindow.screen.width : hintWindow.width
                 capsuleEdgeInset: 24
+                onWidthChanged: Services.WindowHintService.setCenterSurfaceWidth(modelData.name, hintWindow._windowVisible ? width : 0)
             }
         }
 

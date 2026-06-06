@@ -10,6 +10,7 @@ Singleton {
 
     property bool hintHeld: false
     property var activeHint: _emptyHint()
+    property var centerSurfaceWidths: ({})
     // hintVisible driven directly by hintHeld so activeHint data is never cleared during exit.
     readonly property bool hintVisible: root.hintHeld
 
@@ -22,6 +23,24 @@ Singleton {
         }
     }
     onHintHeldChanged: root.pullProgress = root.hintHeld ? 1.0 : 0.0
+
+    function setCenterSurfaceWidth(screenName, width) {
+        var nextWidths = Object.assign({}, centerSurfaceWidths)
+
+        if (screenName && width > 0)
+            nextWidths[screenName] = width
+        else if (screenName)
+            delete nextWidths[screenName]
+
+        centerSurfaceWidths = nextWidths
+    }
+
+    function centerSurfaceWidthFor(screenName) {
+        if (!screenName)
+            return 0
+
+        return centerSurfaceWidths[screenName] || 0
+    }
 
     property int _revision: 0
     property int _lastActiveWorkspacePosition: -1

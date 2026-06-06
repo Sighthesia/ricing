@@ -10,6 +10,17 @@ Item {
     required property string screenName
     readonly property var leftSectionBlurParts: leftSection.blurParts
     readonly property var rightSectionBlurParts: rightSection.blurParts
+    readonly property real centerSurfaceWidth: Math.max(
+        Services.IslandService.centerSurfaceWidthFor(root.screenName),
+        Services.WindowHintService.centerSurfaceWidthFor(root.screenName)
+    )
+    readonly property real centerSurfaceLeft: root.width > 0 ? (root.width - root.centerSurfaceWidth) / 2 : 0
+    readonly property real leftSectionPush: root.centerSurfaceWidth > 0
+        ? Math.max(0, leftSection.width - root.centerSurfaceLeft)
+        : 0
+    readonly property real rightSectionPush: root.centerSurfaceWidth > 0
+        ? Math.max(0, (root.centerSurfaceLeft + root.centerSurfaceWidth) - (root.width - rightSection.width))
+        : 0
 
     // Keep the transparent container tall enough for unified side bottom ears.
     implicitHeight: Math.max(
@@ -22,9 +33,9 @@ Item {
     // Report section pixel bounds to the service for drag hit-testing.
     function _updateSectionBounds() {
         Services.BarLayoutService.sectionBounds = [
-            { name: "left", left: leftSection.x, right: leftSection.x + leftSection.width },
-            { name: "center", left: centerSection.x, right: centerSection.x + centerSection.width },
-            { name: "right", left: rightSection.x, right: rightSection.x + rightSection.width }
+            { name: "left", left: leftSection.mapToItem(null, 0, 0).x, right: leftSection.mapToItem(null, leftSection.width, 0).x },
+            { name: "center", left: centerSection.mapToItem(null, 0, 0).x, right: centerSection.mapToItem(null, centerSection.width, 0).x },
+            { name: "right", left: rightSection.mapToItem(null, 0, 0).x, right: rightSection.mapToItem(null, rightSection.width, 0).x }
         ]
     }
 
@@ -41,7 +52,7 @@ Item {
         var model = Services.BarLayoutService.sectionWidgets(sectionName)
         var spacing = BarLayoutSections.widgetSpacing
         // Approximate centers from section x + cumulative widths
-        var offset = section.x
+        var offset = section.mapToItem(null, 0, 0).x
         for (var i = 0; i < model.length; i++) {
             var w = model[i].implicitWidth || 40
             centers[sectionName].push({
@@ -62,6 +73,7 @@ Item {
         screenName: root.screenName
         anchors.left: parent.left
         anchors.top: parent.top
+        anchors.leftMargin: -root.leftSectionPush
         onWidthChanged: root._updateSectionBounds()
         onXChanged: root._updateSectionBounds()
     }
@@ -88,6 +100,7 @@ Item {
         screenName: root.screenName
         anchors.right: parent.right
         anchors.top: parent.top
+        anchors.rightMargin: -root.rightSectionPush
         onWidthChanged: root._updateSectionBounds()
         onXChanged: root._updateSectionBounds()
     }
@@ -129,6 +142,16 @@ Item {
     }
 
     onWidthChanged: {
+        _updateSectionBounds()
+        _updateWidgetCenters()
+    }
+
+    onLeftSectionPushChanged: {
+        _updateSectionBounds()
+        _updateWidgetCenters()
+    }
+
+    onRightSectionPushChanged: {
         _updateSectionBounds()
         _updateWidgetCenters()
     }
