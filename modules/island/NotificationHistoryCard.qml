@@ -173,11 +173,10 @@ Item {
                 wrapMode: Text.WordWrap
             }
 
-            Text {
+            // Hint how primary click changes persistent state.
+            NotificationStickyPrompt {
                 width: parent.width
-                text: root.sticky ? "左键可取消常驻" : "左键可设为常驻"
-                color: Services.Color.mOnSurfaceVariant
-                font.pixelSize: 10
+                sticky: root.sticky
             }
         }
     }
