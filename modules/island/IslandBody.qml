@@ -384,7 +384,7 @@ Item {
             id: windowHintContent
             anchors.fill: parent
             anchors.topMargin: root.collapsedH + 12
-            opacity: Services.IslandService.windowHintActive ? 1 : 0
+            opacity: Services.IslandService.windowHintActive || !hintStage.exitComplete ? 1 : 0
             visible: opacity > 0.01
             z: 0
 

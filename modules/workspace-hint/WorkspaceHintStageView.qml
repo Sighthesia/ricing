@@ -34,6 +34,10 @@ Item {
     readonly property Item hitRegionItem: stageHitRegion
     // Expose the live capsule items so a host window can build its blur region.
     readonly property var capsuleItems: stageRepeater.count > 0 ? workspaceStage.children : []
+    readonly property bool exitComplete: !active
+        && _stageTopProgress <= 0.001
+        && _stageMiddleProgress <= 0.001
+        && _stageBottomProgress <= 0.001
 
     implicitWidth: workspaceStage.width
     implicitHeight: workspaceStage.height
@@ -45,6 +49,7 @@ Item {
     property int _workspaceAnchorDuration: _workspaceAnchorBaseDuration
     property bool _workspaceAnchorAnimationEnabled: true
     property bool _workspaceSettlePending: false
+    property bool _stageExiting: false
     property real _stageTopProgress: 0
     property real _stageMiddleProgress: 0
     property real _stageBottomProgress: 0
@@ -72,6 +77,8 @@ Item {
     readonly property int _workspaceStageHeight: _workspaceSideHeight * 2 + _workspacePrimaryHeight + _workspaceColumnGap * 2
     // Capsule reveal drop distance, supplied by the host surface.
     readonly property real _workspaceStageTargetY: stageView.stageTargetY
+    // Host-supplied distance from the screen top to the stage target origin.
+    readonly property real _workspaceStageScreenY: stageView.stageTargetY
     readonly property int _workspaceAnchorBaseDuration: Math.max(150, Services.Motion.number.surfaceDuration)
     property int _workspaceCapsuleOpacityDuration: Math.max(90, Services.Motion.number.surfaceDuration)
     readonly property int _anchorDurationStep: 24
@@ -252,6 +259,7 @@ for (let index = 0; index < text.length; index++) {
     // Staggered reveal in, staggered reverse out — mirrors the legacy timing.
     onActiveChanged: {
    if (active) {
+       _stageExiting = false
        _exitTopTimer.stop()
       _exitMiddleTimer.stop()
             _exitBottomTimer.stop()
@@ -263,6 +271,7 @@ for (let index = 0; index < text.length; index++) {
      return
         }
 
+_stageExiting = true
 _enterTopTimer.stop()
         _enterMiddleTimer.stop()
         _enterBottomTimer.stop()

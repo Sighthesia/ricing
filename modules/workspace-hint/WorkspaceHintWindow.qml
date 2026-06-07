@@ -51,24 +51,13 @@ Variants {
         // gated declaratively by `active` below.
         on_HintActiveChanged: {
             if (_hintActive) {
-                _hideTimer.stop()
                 _windowVisible = true
-                return
             }
-
-            _hideTimer.restart()
         }
 
         on_HintDataChanged: {
             if (_hintActive && !_windowVisible)
                 _windowVisible = true
-        }
-
-        // Hide the window only after the release grace period finishes.
-        Timer {
-            id: _hideTimer
-            interval: 380
-            onTriggered: hintWindow._windowVisible = false
         }
 
         // Own the centered stage inside the transparent overlay; drop the
@@ -90,6 +79,10 @@ Variants {
                 stageTargetY: Services.BarLayoutService.barHeight + 16
                 screenWidth: hintWindow.screen ? hintWindow.screen.width : hintWindow.width
                 capsuleEdgeInset: 24
+                onExitCompleteChanged: {
+                    if (exitComplete)
+                        hintWindow._windowVisible = false
+                }
                 onWidthChanged: Services.WindowHintService.setCenterSurfaceWidth(modelData.name, hintWindow._windowVisible ? width : 0)
             }
         }

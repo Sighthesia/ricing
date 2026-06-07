@@ -117,8 +117,18 @@ Item {
         }
         return -1
     }
-    readonly property real visibleY: root.y < (-host._workspaceStageTargetY)
-        ? (-host._workspaceStageTargetY)
+    readonly property real _collapsedDiameter: root._metrics.height
+    readonly property real _screenStartY: -host._workspaceStageScreenY - (root._collapsedDiameter / 2)
+    readonly property real _targetY: root._metrics.y
+    readonly property real _targetWidth: Math.min(
+        root._maxCapsuleWidth,
+        Math.max(root._workspaceAreaMinWidth, root._metrics.width)
+    )
+    readonly property real _enterOpacityFactor: Math.max(0, Math.min(1, root._revealProgress / 0.08))
+    readonly property real _exitOpacityFactor: Math.max(0, Math.min(1, root._revealProgress / 0.6))
+    readonly property real _revealOpacityFactor: host._stageExiting ? root._exitOpacityFactor : root._enterOpacityFactor
+    readonly property real visibleY: root.y < root._screenStartY
+        ? root._screenStartY
         : root.y
     readonly property real _surfaceOffsetY: root.visibleY - root.y
 
@@ -169,22 +179,15 @@ Item {
     }
 
     x: (host._workspaceStageWidth - width) / 2
-    y: (-host._workspaceStageTargetY)
-        + ((host._workspaceStageTargetY + root._metrics.y) * root._revealProgress)
-    width: Math.min(
-        root._maxCapsuleWidth,
-        Math.max(
-            root._workspaceAreaMinWidth,
-            root._metrics.height + ((root._metrics.width - root._metrics.height) * root._revealProgress)
-        )
-    )
+    y: root._screenStartY + ((root._targetY - root._screenStartY) * root._revealProgress)
+    width: root._collapsedDiameter + ((root._targetWidth - root._collapsedDiameter) * root._revealProgress)
     height: root._metrics.height
-    opacity: root.capsule && root.capsule.visible ? root._capsuleOpacity : 0
+    opacity: root.capsule && root.capsule.visible ? root._capsuleOpacity * root._revealOpacityFactor : 0
     visible: root.capsule !== null && opacity > 0
     clip: false
 
     Behavior on opacity {
-        enabled: !host._workspaceSettlePending
+        enabled: false
 
         NumberAnimation {
             duration: host._workspaceCapsuleOpacityDuration
