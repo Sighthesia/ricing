@@ -177,6 +177,8 @@ Item {
     readonly property real pushedBodyWidth: Math.max(root.earRadius, root.bodyWidth - root.bodyShrinkX)
     readonly property real visualOffsetX: root.isRightSection ? root.bodyShrinkX : 0
     readonly property real visualBodyX: root.pushedBodyX + root.visualOffsetX
+    readonly property real pushedBodyRadius: Math.min(root.bodyRadius, root.pushedBodyWidth / 2, root.bodyHeight / 2)
+    readonly property bool earBlurEnabled: root.bodyShrinkX < 0.5
 
     function _earCutX(localY) {
         var radius = Math.max(1, root.earRadius)
@@ -216,17 +218,17 @@ Item {
     readonly property var blurParts: [
         {
             item: centerBodyBlurSource,
-            radius: root.bodyRadius,
+            radius: root.pushedBodyRadius,
             topLeftRadius: 0,
             topRightRadius: 0,
-            bottomLeftRadius: root.isRightSection || (!root.isLeftSection && !root.isRightSection) ? root.bodyRadius : 0,
-            bottomRightRadius: root.isLeftSection || (!root.isLeftSection && !root.isRightSection) ? root.bodyRadius : 0
+            bottomLeftRadius: root.isRightSection || (!root.isLeftSection && !root.isRightSection) ? root.pushedBodyRadius : 0,
+            bottomRightRadius: root.isLeftSection || (!root.isLeftSection && !root.isRightSection) ? root.pushedBodyRadius : 0
         }
     ].concat(
-        root._stripParts(leftEarBlurStrips, leftEar.visible),
-        root._stripParts(rightEarBlurStrips, rightEar.visible),
-        root._stripParts(leftBottomEarBlurStrips, leftBottomEar.visible),
-        root._stripParts(rightBottomEarBlurStrips, rightBottomEar.visible)
+        root._stripParts(leftEarBlurStrips, root.earBlurEnabled && leftEar.visible),
+        root._stripParts(rightEarBlurStrips, root.earBlurEnabled && rightEar.visible),
+        root._stripParts(leftBottomEarBlurStrips, root.earBlurEnabled && leftBottomEar.visible),
+        root._stripParts(rightBottomEarBlurStrips, root.earBlurEnabled && rightBottomEar.visible)
     )
 
     // Root-level global motion envelope — body and ears inherit these so
@@ -360,7 +362,7 @@ Item {
     Repeater {
         id: leftEarBlurStrips
 
-        model: root.earBlurStripCount
+        model: root.earBlurEnabled ? root.earBlurStripCount : 0
 
         Item {
             required property int index
@@ -378,7 +380,7 @@ Item {
     Repeater {
         id: rightEarBlurStrips
 
-        model: root.earBlurStripCount
+        model: root.earBlurEnabled ? root.earBlurStripCount : 0
 
         Item {
             required property int index
@@ -397,7 +399,7 @@ Item {
     Repeater {
         id: leftBottomEarBlurStrips
 
-        model: root.earBlurStripCount
+        model: root.earBlurEnabled ? root.earBlurStripCount : 0
 
         Item {
             required property int index
@@ -416,7 +418,7 @@ Item {
     Repeater {
         id: rightBottomEarBlurStrips
 
-        model: root.earBlurStripCount
+        model: root.earBlurEnabled ? root.earBlurStripCount : 0
 
         Item {
             required property int index

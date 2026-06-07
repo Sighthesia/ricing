@@ -145,7 +145,6 @@ Item {
 
         sectionName: "left"
         screenName: root.screenName
-        blurSourceOffsetX: -root.leftSectionPushVisual * 0.35
         sectionPushOffsetX: root.leftSectionPushVisual
         anchors.left: parent.left
         anchors.top: parent.top
@@ -174,7 +173,6 @@ Item {
 
         sectionName: "right"
         screenName: root.screenName
-        blurSourceOffsetX: root.rightSectionPushVisual * 0.35
         sectionPushOffsetX: root.rightSectionPushVisual
         anchors.right: parent.right
         anchors.top: parent.top
