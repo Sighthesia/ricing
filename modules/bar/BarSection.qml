@@ -10,6 +10,7 @@ Item {
 
     required property string sectionName
     required property string screenName
+    property real blurSourceOffsetX: 0
     property bool floatingValidationIntent: false
     readonly property var sectionModel: Services.BarLayoutService.sectionWidgets(sectionName)
     readonly property bool hasSectionContent: root.sectionModel.length > 0
@@ -99,6 +100,7 @@ Item {
 
                 section: root.sectionName
                 screenName: root.screenName
+                blurSourceOffsetX: root.blurSourceOffsetX
                 surfaceHeight: Services.BarLayoutService.barHeight
                 contentWidth: sectionRow.implicitWidth
                 contentHeight: sectionRow.implicitHeight

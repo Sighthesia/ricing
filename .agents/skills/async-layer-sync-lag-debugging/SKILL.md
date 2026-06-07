@@ -53,6 +53,8 @@ Failed attempts (the trap is that none of these address the clock mismatch):
   - **zero again once settled** (layers sit flush)
   - apply only on the **moving edges**; pinned edges get no lead
 
+- If the async layer is not actually shrinking/growing but is being **translated by an overlap-driven push**, do **not** reuse a velocity lead that remembers the last delta. That can stick the blur in the middle or leave it permanently offset. Use a **self-zeroing direct offset** from the current push amount, or temporarily disable the async layer during motion if the region commit path still cannot keep up.
+
 ```qml
 // Per-frame shrink speed as a lead proxy; only acts while shrinking.
 property real leadW: 0
@@ -67,6 +69,7 @@ onWidthChanged: { leadW = Math.max(0, _lastW - width) * leadFactor; _lastW = wid
 - **Never step an async-committed value during a continuous animation.** Step values (jump-to-target) on a trailing layer produce pop/disappear. Keep it continuous.
 - **Correct in the failing direction only.** Lag artifacts are asymmetric (overflow on shrink, gap on grow). A one-sided, velocity-proportional correction beats a symmetric fixed margin.
 - **Make the correction self-zeroing at the endpoints.** Any lead/inset/offset that is non-zero at rest leaves a permanent visual defect; tie it to velocity so it vanishes when motion stops.
+- **Prefer current-state offsets over remembered delta when the main layer is being pushed, not resized.** A stale lead on a translated blur region can freeze in the middle or fail to recover; a direct binding to the current push amount is safer when the source geometry remains stable.
 - **Don't fix a cross-clock problem with motion-timing knobs.** Spring/easing/duration changes cannot synchronize two independent clocks.
 
 **Warning signs this class of bug exists elsewhere**
@@ -81,3 +84,4 @@ onWidthChanged: { leadW = Math.max(0, _lastW - width) * leadFactor; _lastW = wid
 - **Check both endpoints and the midpoint.** Confirm: flush at rest, no pop at onset, no overflow/gap mid-motion, flush again after settling.
 - **Vary the lead/correction factor and observe the trade.** Too small → residual overflow mid-motion; too large → visible inset/gap. The correct value is the smallest that removes the artifact across the speed range.
 - **Confirm pinned edges are untouched.** Edges that don't move during the animation must remain flush (no spurious correction).
+- **Verify reset behavior explicitly.** For any offset/lead that is driven by motion, test motion stop, reversal, and unrelated state changes. If the secondary layer only recovers when an unrelated event happens (e.g. another overlay toggles), the compensation is not self-zeroing enough.

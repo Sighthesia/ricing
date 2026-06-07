@@ -253,14 +253,32 @@ Item {
         property real blurLeadH: 0
         property real _lastW: width
         property real _lastH: height
-        onWidthChanged: {
+
+        Timer {
+            id: blurLeadResetTimer
+
+            interval: 40
+            repeat: false
+            onTriggered: {
+                bodyRect.blurLeadW = 0
+                bodyRect.blurLeadH = 0
+            }
+        }
+
+        function _updateBlurLead() {
             blurLeadW = Math.max(0, _lastW - width) * blurLeadFactor
-            _lastW = width
-        }
-        onHeightChanged: {
             blurLeadH = Math.max(0, _lastH - height) * blurLeadFactor
+            _lastW = width
             _lastH = height
+
+            if (blurLeadW > 0 || blurLeadH > 0)
+                blurLeadResetTimer.restart()
+            else
+                blurLeadResetTimer.stop()
         }
+
+        onWidthChanged: _updateBlurLead()
+        onHeightChanged: _updateBlurLead()
 
         // Blur source for the body. Follows the live body size continuously so
         // the blur shrinks smoothly with the silhouette, inset by the velocity

@@ -21,6 +21,58 @@ Item {
     readonly property real rightSectionPush: root.centerSurfaceWidth > 0
         ? Math.max(0, (root.centerSurfaceLeft + root.centerSurfaceWidth) - (root.width - rightSection.width))
         : 0
+    property real leftSectionPushVisual: 0
+    property real rightSectionPushVisual: 0
+    property bool leftSectionReturnSpringEnabled: false
+    property bool rightSectionReturnSpringEnabled: false
+
+    // Keep the pushed sections visually ahead of their release for a short
+    // beat, then let a spring bring them home.
+    Timer {
+        id: leftSectionReturnDelay
+
+        interval: Services.Motion.number.shortDuration
+        repeat: false
+        onTriggered: {
+            root.leftSectionReturnSpringEnabled = true
+            root.leftSectionPushVisual = root.leftSectionPush
+        }
+    }
+
+    // Mirror the same delayed-release spring on the right section.
+    Timer {
+        id: rightSectionReturnDelay
+
+        interval: Services.Motion.number.shortDuration
+        repeat: false
+        onTriggered: {
+            root.rightSectionReturnSpringEnabled = true
+            root.rightSectionPushVisual = root.rightSectionPush
+        }
+    }
+
+    // Keep the displayed push snapped to the target while expanding, and only
+    // animate the return path after the release delay expires.
+    Behavior on leftSectionPushVisual {
+        enabled: root.leftSectionReturnSpringEnabled
+        SpringAnimation {
+            spring: Services.Motion.islandExpand.spring
+            mass: Services.Motion.islandExpand.mass
+            damping: Services.Motion.islandExpand.dampingCollapse
+            epsilon: Services.Motion.islandExpand.epsilon
+        }
+    }
+
+    // Same delayed-return spring for the right side.
+    Behavior on rightSectionPushVisual {
+        enabled: root.rightSectionReturnSpringEnabled
+        SpringAnimation {
+            spring: Services.Motion.islandExpand.spring
+            mass: Services.Motion.islandExpand.mass
+            damping: Services.Motion.islandExpand.dampingCollapse
+            epsilon: Services.Motion.islandExpand.epsilon
+        }
+    }
 
     // Keep the transparent container tall enough for unified side bottom ears.
     implicitHeight: Math.max(
@@ -65,15 +117,38 @@ Item {
         }
     }
 
+    function _syncLeftSectionPush() {
+        if (root.leftSectionPush >= root.leftSectionPushVisual) {
+            leftSectionReturnDelay.stop()
+            root.leftSectionReturnSpringEnabled = false
+            root.leftSectionPushVisual = root.leftSectionPush
+            return
+        }
+
+        leftSectionReturnDelay.restart()
+    }
+
+    function _syncRightSectionPush() {
+        if (root.rightSectionPush >= root.rightSectionPushVisual) {
+            rightSectionReturnDelay.stop()
+            root.rightSectionReturnSpringEnabled = false
+            root.rightSectionPushVisual = root.rightSectionPush
+            return
+        }
+
+        rightSectionReturnDelay.restart()
+    }
+
     // Keep the left zone anchored to the screen edge.
     BarSection {
         id: leftSection
 
         sectionName: "left"
         screenName: root.screenName
+        blurSourceOffsetX: -root.leftSectionPushVisual * 0.35
         anchors.left: parent.left
         anchors.top: parent.top
-        anchors.leftMargin: -root.leftSectionPush
+        anchors.leftMargin: -root.leftSectionPushVisual
         onWidthChanged: root._updateSectionBounds()
         onXChanged: root._updateSectionBounds()
     }
@@ -98,9 +173,10 @@ Item {
 
         sectionName: "right"
         screenName: root.screenName
+        blurSourceOffsetX: root.rightSectionPushVisual * 0.35
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.rightMargin: -root.rightSectionPush
+        anchors.rightMargin: -root.rightSectionPushVisual
         onWidthChanged: root._updateSectionBounds()
         onXChanged: root._updateSectionBounds()
     }
@@ -136,22 +212,28 @@ Item {
         }
     }
 
-    Component.onCompleted: {
-        _updateSectionBounds()
-        _updateWidgetCenters()
-    }
-
     onWidthChanged: {
         _updateSectionBounds()
         _updateWidgetCenters()
     }
 
     onLeftSectionPushChanged: {
+        _syncLeftSectionPush()
         _updateSectionBounds()
         _updateWidgetCenters()
     }
 
     onRightSectionPushChanged: {
+        _syncRightSectionPush()
+        _updateSectionBounds()
+        _updateWidgetCenters()
+    }
+
+    Component.onCompleted: {
+        leftSectionPushVisual = leftSectionPush
+        rightSectionPushVisual = rightSectionPush
+        _syncLeftSectionPush()
+        _syncRightSectionPush()
         _updateSectionBounds()
         _updateWidgetCenters()
     }

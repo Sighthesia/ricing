@@ -69,12 +69,9 @@ Variants {
             onPressed: Services.TrayMenuService.close()
         }
 
-        // Disable left/right blur while the dockzones are being pushed, then
-        // restore the original blur regions once the bar settles.
+        // Track blur to visible dockzone geometry parts instead of the full transparent bar window.
         property Variants barBlurRegions: Variants {
-            model: (barContent.leftSectionPush > 0 || barContent.rightSectionPush > 0)
-                ? []
-                : barContent.leftSectionBlurParts.concat(barContent.rightSectionBlurParts)
+            model: barContent.leftSectionBlurParts.concat(barContent.rightSectionBlurParts)
 
             Region {
                 required property var modelData

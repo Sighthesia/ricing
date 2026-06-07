@@ -17,6 +17,7 @@ Item {
     required property real surfaceHeight
     required property real contentWidth
     required property real contentHeight
+    property real blurSourceOffsetX: 0
 
     // Optional vertical expansion (island-style): the body grows downward by
     // expandHeight and widens to expandWidth to host an attached popup (the tray
@@ -337,10 +338,10 @@ Item {
     // Keep the bar blur source in normal item geometry, not inside Canvas paint nodes.
     // Full-size: the blur region matches the painted body edge so the acrylic
     // covers the fill completely with no un-blurred semi-transparent rim.
-    Item {
-        id: centerBodyBlurSource
+        Item {
+            id: centerBodyBlurSource
 
-        x: centerBody.x
+        x: centerBody.x + root.blurSourceOffsetX
         y: centerBody.y
         width: centerBody.width
         height: centerBody.height
@@ -357,7 +358,7 @@ Item {
             readonly property real localY: Services.SettingsService.blurRegionInset + index
             readonly property real cutX: root._earCutX(localY)
 
-            x: leftEar.x + cutX
+            x: leftEar.x + cutX + root.blurSourceOffsetX
             y: leftEar.y + localY
             width: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset - cutX)
             height: 1
@@ -376,7 +377,7 @@ Item {
             readonly property real cutX: root._earCutX(localY)
             readonly property real fillRight: root.earRadius - cutX
 
-            x: rightEar.x + Services.SettingsService.blurRegionInset
+            x: rightEar.x + Services.SettingsService.blurRegionInset + root.blurSourceOffsetX
             y: rightEar.y + localY
             width: Math.max(0, fillRight - Services.SettingsService.blurRegionInset)
             height: 1
@@ -395,7 +396,7 @@ Item {
             readonly property real cutX: root._earCutX(localY)
             readonly property real fillRight: root.earRadius - cutX
 
-            x: leftBottomEar.x + Services.SettingsService.blurRegionInset
+            x: leftBottomEar.x + Services.SettingsService.blurRegionInset + root.blurSourceOffsetX
             y: leftBottomEar.y + localY
             width: Math.max(0, fillRight - Services.SettingsService.blurRegionInset)
             height: 1
@@ -413,7 +414,7 @@ Item {
             readonly property real localY: Services.SettingsService.blurRegionInset + index
             readonly property real cutX: root._earCutX(localY)
 
-            x: rightBottomEar.x + cutX
+            x: rightBottomEar.x + cutX + root.blurSourceOffsetX
             y: rightBottomEar.y + localY
             width: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset - cutX)
             height: 1
