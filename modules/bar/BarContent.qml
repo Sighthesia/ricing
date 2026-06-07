@@ -26,33 +26,8 @@ Item {
     property bool leftSectionReturnSpringEnabled: false
     property bool rightSectionReturnSpringEnabled: false
 
-    // Keep the pushed sections visually ahead of their release for a short
-    // beat, then let a spring bring them home.
-    Timer {
-        id: leftSectionReturnDelay
-
-        interval: Services.Motion.number.shortDuration
-        repeat: false
-        onTriggered: {
-            root.leftSectionReturnSpringEnabled = true
-            root.leftSectionPushVisual = root.leftSectionPush
-        }
-    }
-
-    // Mirror the same delayed-release spring on the right section.
-    Timer {
-        id: rightSectionReturnDelay
-
-        interval: Services.Motion.number.shortDuration
-        repeat: false
-        onTriggered: {
-            root.rightSectionReturnSpringEnabled = true
-            root.rightSectionPushVisual = root.rightSectionPush
-        }
-    }
-
     // Keep the displayed push snapped to the target while expanding, and only
-    // animate the return path after the release delay expires.
+    // animate the return path once the center stops overlapping.
     Behavior on leftSectionPushVisual {
         enabled: root.leftSectionReturnSpringEnabled
         SpringAnimation {
@@ -119,24 +94,24 @@ Item {
 
     function _syncLeftSectionPush() {
         if (root.leftSectionPush >= root.leftSectionPushVisual) {
-            leftSectionReturnDelay.stop()
             root.leftSectionReturnSpringEnabled = false
             root.leftSectionPushVisual = root.leftSectionPush
             return
         }
 
-        leftSectionReturnDelay.restart()
+        root.leftSectionReturnSpringEnabled = true
+        root.leftSectionPushVisual = root.leftSectionPush
     }
 
     function _syncRightSectionPush() {
         if (root.rightSectionPush >= root.rightSectionPushVisual) {
-            rightSectionReturnDelay.stop()
             root.rightSectionReturnSpringEnabled = false
             root.rightSectionPushVisual = root.rightSectionPush
             return
         }
 
-        rightSectionReturnDelay.restart()
+        root.rightSectionReturnSpringEnabled = true
+        root.rightSectionPushVisual = root.rightSectionPush
     }
 
     // Keep the left zone anchored to the screen edge.

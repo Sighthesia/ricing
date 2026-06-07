@@ -179,6 +179,9 @@ Item {
     readonly property real visualBodyX: root.pushedBodyX + root.visualOffsetX
     readonly property real pushedBodyRadius: Math.min(root.bodyRadius, root.pushedBodyWidth / 2, root.bodyHeight / 2)
     readonly property bool earBlurEnabled: root.bodyShrinkX < 0.5
+    readonly property bool blurVisible: root.model.state.visibilityProgress > 0
+        && (!root.isLeftSection || root.residualPushOffsetX < root.pushedBodyWidth)
+        && (!root.isRightSection || root.residualPushOffsetX < root.pushedBodyWidth)
 
     function _earCutX(localY) {
         var radius = Math.max(1, root.earRadius)
@@ -215,7 +218,7 @@ Item {
     // Blur source parts for body and ears.
     // Ear parts are one-pixel strips so wl_region can approximate the concave arcs
     // without unsupported subtract/ellipse composition.
-    readonly property var blurParts: [
+    readonly property var blurParts: root.blurVisible ? [
         {
             item: centerBodyBlurSource,
             radius: root.pushedBodyRadius,
@@ -229,7 +232,7 @@ Item {
         root._stripParts(rightEarBlurStrips, root.earBlurEnabled && rightEar.visible),
         root._stripParts(leftBottomEarBlurStrips, root.earBlurEnabled && leftBottomEar.visible),
         root._stripParts(rightBottomEarBlurStrips, root.earBlurEnabled && rightBottomEar.visible)
-    )
+    ) : []
 
     // Root-level global motion envelope — body and ears inherit these so
     // the entire surface moves as one continuous object.
