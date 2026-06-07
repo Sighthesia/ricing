@@ -41,6 +41,7 @@ Failed attempts (the trap is that none of these address the clock mismatch):
 | Critical damping + larger `epsilon` to shorten the tail | The layer still ramps per frame → still samples on the coalesced clock → still stutters. |
 | Freeze blur to a fixed **target-sized** rect while animating | Target is a *step* value → blur jumped to final size instantly → "sudden disappear/appear". |
 | Clamp blur to `min(live, target)` | `target` still a step → instant snap to final size on collapse onset → "blur vanishes". |
+| Keep approximating every curved sub-part during a fast compression | Dozens of committed strip/region items changed every frame, causing both overflow at extreme sizes and visible stutter. |
 
 ## The Anti-Pattern vs. Best Practice
 
@@ -54,6 +55,7 @@ Failed attempts (the trap is that none of these address the clock mismatch):
   - apply only on the **moving edges**; pinned edges get no lead
 
 - If the async layer is not actually shrinking/growing but is being **translated by an overlap-driven push**, do **not** reuse a velocity lead that remembers the last delta. That can stick the blur in the middle or leave it permanently offset. Use a **self-zeroing direct offset** from the current push amount, or temporarily disable the async layer during motion if the region commit path still cannot keep up.
+- If the main layer is doing a **complex continuous shape deformation** (shrinking, translating, and preserving curved decorations at once), do **not** require the async layer to precisely approximate every sub-part during the moving interval. Use a cheaper stable approximation while moving (for example, body-only blur with current radius) and restore the detailed region only at rest.
 
 ```qml
 // Per-frame shrink speed as a lead proxy; only acts while shrinking.
@@ -70,6 +72,7 @@ onWidthChanged: { leadW = Math.max(0, _lastW - width) * leadFactor; _lastW = wid
 - **Correct in the failing direction only.** Lag artifacts are asymmetric (overflow on shrink, gap on grow). A one-sided, velocity-proportional correction beats a symmetric fixed margin.
 - **Make the correction self-zeroing at the endpoints.** Any lead/inset/offset that is non-zero at rest leaves a permanent visual defect; tie it to velocity so it vanishes when motion stops.
 - **Prefer current-state offsets over remembered delta when the main layer is being pushed, not resized.** A stale lead on a translated blur region can freeze in the middle or fail to recover; a direct binding to the current push amount is safer when the source geometry remains stable.
+- **Simplify the async region during complex deformation.** When exact sub-shape tracking creates overflow or stutter, temporarily drop non-essential detailed parts from the async layer and keep only a bounded core region. Restore detailed parts once motion settles.
 - **Don't fix a cross-clock problem with motion-timing knobs.** Spring/easing/duration changes cannot synchronize two independent clocks.
 
 **Warning signs this class of bug exists elsewhere**
@@ -77,6 +80,7 @@ onWidthChanged: { leadW = Math.max(0, _lastW - width) * leadFactor; _lastW = wid
 - A property is mirrored into a compositor region, mask, cached effect, snapshot, or across IPC, *and* that property is also animated per frame.
 - An artifact appears only during fast transitions and disappears at rest.
 - Speeding up the main layer (e.g. Canvas→Shape, CPU→GPU) suddenly *reveals* a lag that was previously hidden by both layers being slow.
+- A detailed async approximation (many strips, masks, or small regions) follows a shape that becomes very small, compressed, or self-overlapping during motion.
 
 ## Universal Verification Strategy
 
@@ -85,3 +89,4 @@ onWidthChanged: { leadW = Math.max(0, _lastW - width) * leadFactor; _lastW = wid
 - **Vary the lead/correction factor and observe the trade.** Too small → residual overflow mid-motion; too large → visible inset/gap. The correct value is the smallest that removes the artifact across the speed range.
 - **Confirm pinned edges are untouched.** Edges that don't move during the animation must remain flush (no spurious correction).
 - **Verify reset behavior explicitly.** For any offset/lead that is driven by motion, test motion stop, reversal, and unrelated state changes. If the secondary layer only recovers when an unrelated event happens (e.g. another overlay toggles), the compensation is not self-zeroing enough.
+- **Stress the smallest shape.** Drive the animation to the most compressed/extreme geometry and verify the simplified async region stays bounded and does not reintroduce per-frame stutter.
