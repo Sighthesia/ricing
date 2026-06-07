@@ -11,11 +11,13 @@ Item {
     required property string sectionName
     required property string screenName
     property real blurSourceOffsetX: 0
+    property real sectionPushOffsetX: 0
     property bool floatingValidationIntent: false
     readonly property var sectionModel: Services.BarLayoutService.sectionWidgets(sectionName)
     readonly property bool hasSectionContent: root.sectionModel.length > 0
     readonly property bool canOpenWidgetPicker: Services.BarLayoutService.layoutReady
     readonly property var blurParts: surfaceLoader.item ? surfaceLoader.item.blurParts : []
+    readonly property real residualPushOffsetX: surfaceLoader.item ? surfaceLoader.item.residualPushOffsetX : 0
     readonly property string surfaceState: root.sectionName === "center"
         ? (root.hasSectionContent ? (root.floatingValidationIntent ? "floating" : "attached") : "hidden")
         : (root.hasSectionContent ? "attached" : "hidden")
@@ -63,6 +65,7 @@ Item {
         Item {
             id: surfaceRoot
             readonly property var blurParts: dockzone.blurParts
+            readonly property real residualPushOffsetX: dockzone.residualPushOffsetX
 
             implicitWidth: dockzone.implicitWidth
             implicitHeight: dockzone.implicitHeight
@@ -101,6 +104,7 @@ Item {
                 section: root.sectionName
                 screenName: root.screenName
                 blurSourceOffsetX: root.blurSourceOffsetX
+                sectionPushOffsetX: root.sectionPushOffsetX
                 surfaceHeight: Services.BarLayoutService.barHeight
                 contentWidth: sectionRow.implicitWidth
                 contentHeight: sectionRow.implicitHeight
@@ -137,7 +141,7 @@ Item {
                     rootHandle: Services.TrayMenuService.menuHandle
                 }
 
-                expandHeight: hostsTrayMenu ? (menuH + 8) : 0
+                expandHeight: hostsTrayMenu ? (menuH + 8 + dockzone.menuClipInset) : 0
                 expandWidth: hostsTrayMenu ? menuW : 0
 
                 Behavior on expandHeight {
@@ -165,9 +169,9 @@ Item {
 
                     active: dockzone.hostsTrayMenu || dockzone.bodyHeight > dockzone.topBandHeight + 1
                     z: 2
-                    x: parent.bodyX + (parent.bodyWidth - width) / 2
+                    x: parent.bodyX + (parent.bodyWidth - width) / 2 + (root.sectionName === "right" ? parent.bodyShrinkX : (root.sectionName === "left" ? -parent.bodyShrinkX : 0))
                     y: parent.bodyY + parent.topBandHeight
-                    width: Math.min(dockzone.menuW, dockzone.bodyWidth)
+                    width: Math.min(dockzone.menuW, dockzone.pushedBodyWidth)
                     height: Math.max(0, dockzone.bodyHeight - parent.topBandHeight - dockzone.menuClipInset)
 
                     sourceComponent: Tray.TrayMenuView {
@@ -185,33 +189,42 @@ Item {
 
 
                 // Lay out widgets for this section in order.
-                Row {
-                    id: sectionRow
+                Item {
+                    id: sectionClip
 
                     z: 1
-                    // Center horizontally in the body; vertically in the resting
-                    // top band so it stays put when the body expands downward.
-                    x: parent.bodyX + (parent.bodyWidth - width) / 2
-                    y: parent.bodyY + (parent.topBandHeight - height) / 2
-                    spacing: BarLayoutSections.widgetSpacing
+                    x: parent.visualBodyX
+                    y: parent.bodyY
+                    width: parent.pushedBodyWidth
+                    height: parent.topBandHeight
+                    clip: true
 
-                    // Instantiate each managed widget in sequence.
-                    Repeater {
-                        model: root.sectionModel.length
+                    // Lay out widgets in the moving body while clipping to its visible width.
+                    Row {
+                        id: sectionRow
 
-                        // Keep each widget wrapper as the delegate so its implicit size drives the row.
-                        BarWidgetWrapper {
-                            required property int index
+                        x: parent.parent.bodyX + (parent.parent.bodyWidth - width) / 2 + (root.sectionName === "right" ? parent.parent.bodyShrinkX : (root.sectionName === "left" ? -parent.parent.bodyShrinkX : 0)) - sectionClip.x
+                        y: (sectionClip.height - height) / 2
+                        spacing: BarLayoutSections.widgetSpacing
 
-                            screenName: root.screenName
-                            widgetEntry: root.sectionModel[index]
-                            widgetSource: Qt.resolvedUrl(widgetEntry.source)
+                        // Instantiate each managed widget in sequence.
+                        Repeater {
+                            model: root.sectionModel.length
 
-                            onLocalPointerIntentChanged: surfaceRoot.syncCenterFloatingValidationIntent()
+                            // Keep each widget wrapper as the delegate so its implicit size drives the row.
+                            BarWidgetWrapper {
+                                required property int index
+
+                                screenName: root.screenName
+                                widgetEntry: root.sectionModel[index]
+                                widgetSource: Qt.resolvedUrl(widgetEntry.source)
+
+                                onLocalPointerIntentChanged: surfaceRoot.syncCenterFloatingValidationIntent()
+                            }
+
                         }
 
                     }
-
                 }
 
             }

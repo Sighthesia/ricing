@@ -18,6 +18,7 @@ Item {
     required property real contentWidth
     required property real contentHeight
     property real blurSourceOffsetX: 0
+    property real sectionPushOffsetX: 0
 
     // Optional vertical expansion (island-style): the body grows downward by
     // expandHeight and widens to expandWidth to host an attached popup (the tray
@@ -169,6 +170,13 @@ Item {
     readonly property bool isLeftSection: root.section === "left"
     readonly property bool isRightSection: root.section === "right"
     readonly property int earBlurStripCount: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset * 2)
+    readonly property real pushShrinkLimit: Math.max(0, root.bodyWidth - root.earRadius)
+    readonly property real bodyShrinkX: (root.isLeftSection || root.isRightSection) ? Math.min(root.sectionPushOffsetX, root.pushShrinkLimit) : 0
+    readonly property real residualPushOffsetX: (root.isLeftSection || root.isRightSection) ? Math.max(0, root.sectionPushOffsetX - root.pushShrinkLimit) : 0
+    readonly property real pushedBodyX: root.bodyX
+    readonly property real pushedBodyWidth: Math.max(root.earRadius, root.bodyWidth - root.bodyShrinkX)
+    readonly property real visualOffsetX: root.isRightSection ? root.bodyShrinkX : 0
+    readonly property real visualBodyX: root.pushedBodyX + root.visualOffsetX
 
     function _earCutX(localY) {
         var radius = Math.max(1, root.earRadius)
@@ -255,8 +263,9 @@ Item {
         // are quarter-circle arcs (sweep flag 0, matching AttachedIslandSurface).
         readonly property string outline: {
             var er = root.earRadius
-            var bx = root.bodyX
-            var bw = root.bodyWidth
+            var ox = root.visualOffsetX
+            var bx = root.visualBodyX
+            var bw = root.pushedBodyWidth
             var bh = root.bodyHeight
 
             if (bw <= 0 || bh <= 0)
@@ -267,24 +276,24 @@ Item {
 
             if (root.isLeftSection) {
                 // Body (bodyX=0) + top-right ear + bottom-left ear.
-                return "M 0 0"
+                return "M " + ox + " 0"
                     + " L " + (bodyRightX + er) + " 0"
                     + " A " + er + " " + er + " 0 0 0 " + bodyRightX + " " + er
                     + " L " + bodyRightX + " " + (bh - radius)
                     + " Q " + bodyRightX + " " + bh + " " + (bodyRightX - radius) + " " + bh
-                    + " L " + er + " " + bh
-                    + " A " + er + " " + er + " 0 0 0 0 " + (bh + er)
-                    + " L 0 0 Z"
+                    + " L " + (ox + er) + " " + bh
+                    + " A " + er + " " + er + " 0 0 0 " + ox + " " + (bh + er)
+                    + " L " + ox + " 0 Z"
             } else if (root.isRightSection) {
                 // Body (bodyX=er) + top-left ear + bottom-right ear.
-                return "M 0 0"
+                return "M " + ox + " 0"
                     + " L " + bodyRightX + " 0"
                     + " L " + bodyRightX + " " + (bh + er)
                     + " A " + er + " " + er + " 0 0 0 " + (bodyRightX - er) + " " + bh
                     + " L " + (bx + radius) + " " + bh
                     + " Q " + bx + " " + bh + " " + bx + " " + (bh - radius)
                     + " L " + bx + " " + er
-                    + " A " + er + " " + er + " 0 0 0 0 0 Z"
+                    + " A " + er + " " + er + " 0 0 0 " + ox + " 0 Z"
             }
 
             // Center: both top ears + both rounded bottom corners.
@@ -316,7 +325,7 @@ Item {
         id: leftEar
 
         z: 0
-        x: root.metrics.hasLeftTopEar ? root.bodyX - root.earRadius : 0
+        x: root.metrics.hasLeftTopEar ? root.visualBodyX - root.earRadius : root.visualOffsetX
         y: 0
         width: root.earRadius
         height: root.earRadius
@@ -328,9 +337,9 @@ Item {
         id: centerBody
 
         z: 0
-        x: root.bodyX
+        x: root.visualBodyX
         y: root.bodyY
-        width: root.bodyWidth
+        width: root.pushedBodyWidth
         height: root.bodyHeight
         visible: root.model.state.visibilityProgress > 0
     }
@@ -421,13 +430,12 @@ Item {
         }
     }
 
-    // --- Left bottom ear geometry (left section) ---
-    // Geometry-only marker for the blur strips and silhouette path.
+    // Left bottom ear stays in the continuous section shape.
     Item {
         id: leftBottomEar
 
         z: 0
-        x: root.metrics.bottomLeftEarX
+        x: root.visualOffsetX + root.metrics.bottomLeftEarX
         y: root.bodyHeight - 1
         width: root.earRadius
         height: root.earRadius
@@ -440,23 +448,23 @@ Item {
         id: rightEar
 
         z: 0
-        x: root.bodyX + root.bodyWidth
+        x: root.visualBodyX + root.pushedBodyWidth
         y: 0
         width: root.earRadius
         height: root.earRadius
         visible: root.model.state.visibilityProgress > 0 && root.metrics.hasTopRightEar
     }
 
-    // --- Right bottom ear geometry (right section) ---
-    // Geometry-only marker for the blur strips and silhouette path.
+    // Right bottom ear stays in the continuous section shape.
     Item {
         id: rightBottomEar
 
         z: 0
-        x: root.bodyX + root.bodyWidth - root.earRadius
+        x: root.visualBodyX + root.pushedBodyWidth - root.earRadius
         y: root.bodyHeight - 1
         width: root.earRadius
         height: root.earRadius
         visible: root.model.state.visibilityProgress > 0 && root.metrics.hasBottomRightEar
     }
+
 }

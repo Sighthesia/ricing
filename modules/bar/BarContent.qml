@@ -146,9 +146,10 @@ Item {
         sectionName: "left"
         screenName: root.screenName
         blurSourceOffsetX: -root.leftSectionPushVisual * 0.35
+        sectionPushOffsetX: root.leftSectionPushVisual
         anchors.left: parent.left
         anchors.top: parent.top
-        anchors.leftMargin: -root.leftSectionPushVisual
+        anchors.leftMargin: -leftSection.residualPushOffsetX
         onWidthChanged: root._updateSectionBounds()
         onXChanged: root._updateSectionBounds()
     }
@@ -174,9 +175,10 @@ Item {
         sectionName: "right"
         screenName: root.screenName
         blurSourceOffsetX: root.rightSectionPushVisual * 0.35
+        sectionPushOffsetX: root.rightSectionPushVisual
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.rightMargin: -root.rightSectionPushVisual
+        anchors.rightMargin: -rightSection.residualPushOffsetX
         onWidthChanged: root._updateSectionBounds()
         onXChanged: root._updateSectionBounds()
     }
