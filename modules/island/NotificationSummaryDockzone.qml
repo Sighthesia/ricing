@@ -10,7 +10,7 @@ Item {
         && !Services.NotificationService.summaryDismissed
         && !Services.TransientMessageService.active
 
-    implicitWidth: showSummary ? Math.max(280, summaryCapsule.implicitWidth) : 0
+    implicitWidth: showSummary ? summaryCapsule.implicitWidth : 0
     implicitHeight: showSummary ? 28 : 0
     visible: showSummary
 
@@ -27,8 +27,8 @@ Item {
         surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
         outlineColor: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.72)
 
-        implicitWidth: contentRow.implicitWidth + 20
-        implicitHeight: 24
+        implicitWidth: contentRow.implicitWidth + 24
+        implicitHeight: 28
 
         // Open the shared notification center.
         MouseArea {
@@ -46,7 +46,7 @@ Item {
             id: contentRow
 
             anchors.left: parent.left
-            anchors.leftMargin: 10
+            anchors.leftMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             spacing: 8
 
