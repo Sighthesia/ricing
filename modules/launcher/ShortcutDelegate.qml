@@ -19,6 +19,32 @@ Rectangle {
     color: mouseArea.containsMouse
         ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.2)
         : Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.1)
+    readonly property color shellBadgeColor: Qt.rgba(
+        Services.Color.mPrimary.r,
+        Services.Color.mPrimary.g,
+        Services.Color.mPrimary.b,
+        0.26
+    )
+    readonly property color neutralBadgeColor: Qt.rgba(
+        Services.Color.mOnSurface.r,
+        Services.Color.mOnSurface.g,
+        Services.Color.mOnSurface.b,
+        0.2
+    )
+    readonly property color shellBadgeLabelColor: Services.Color.mPrimary
+    readonly property color neutralBadgeLabelColor: Services.Color.mOnSurfaceVariant
+    readonly property color editFieldColor: Qt.rgba(
+        Services.Color.mOnSurface.r,
+        Services.Color.mOnSurface.g,
+        Services.Color.mOnSurface.b,
+        0.14
+    )
+    readonly property color editFieldActiveColor: Qt.rgba(
+        Services.Color.mOnSurface.r,
+        Services.Color.mOnSurface.g,
+        Services.Color.mOnSurface.b,
+        0.24
+    )
 
     property bool editing: false
 
@@ -39,13 +65,13 @@ Rectangle {
             height: 20
             radius: MenuVisuals.badgeRadius
             anchors.verticalCenter: parent.verticalCenter
-            color: delegate.managedByShell ? "#44448aff" : "#33ffffff"
+            color: delegate.managedByShell ? delegate.shellBadgeColor : delegate.neutralBadgeColor
 
             Text {
                 id: catText
                 anchors.centerIn: parent
                 text: delegate.category
-                color: delegate.managedByShell ? "#88aaff" : "#aaaaaa"
+                color: delegate.managedByShell ? delegate.shellBadgeLabelColor : delegate.neutralBadgeLabelColor
                 font.pixelSize: 10
             }
         }
@@ -55,7 +81,7 @@ Rectangle {
             width: parent.width * 0.4
             anchors.verticalCenter: parent.verticalCenter
             text: delegate.label
-            color: "white"
+            color: Services.Color.mOnSurface
             font.pixelSize: 13
             elide: Text.ElideRight
         }
@@ -66,8 +92,8 @@ Rectangle {
             height: MenuVisuals.compactControlHeight
             radius: MenuVisuals.badgeRadius
             anchors.verticalCenter: parent.verticalCenter
-            color: delegate.editing ? "#44ffffff" : "#22ffffff"
-            border.color: delegate.editing ? "#88aaff" : "transparent"
+            color: delegate.editing ? delegate.editFieldActiveColor : delegate.editFieldColor
+            border.color: delegate.editing ? Services.Color.mPrimary : "transparent"
             border.width: 1
 
             // Display mode
@@ -75,7 +101,7 @@ Rectangle {
                 id: seqText
                 anchors.centerIn: parent
                 text: delegate.sequence
-                color: "#dddddd"
+                color: Services.Color.mOnSurface
                 font.pixelSize: 12
                 font.family: "monospace"
                 visible: !delegate.editing
@@ -85,7 +111,7 @@ Rectangle {
             TextInput {
                 id: seqInput
                 anchors { fill: parent; margins: MenuVisuals.smallGap }
-                color: "white"
+                color: Services.Color.mOnSurface
                 font.pixelSize: 12
                 font.family: "monospace"
                 visible: delegate.editing

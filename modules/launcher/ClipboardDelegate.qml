@@ -25,7 +25,7 @@ Rectangle {
     Text {
         anchors { left: parent.left; right: actions.left; top: parent.top; bottom: parent.bottom; leftMargin: MenuVisuals.listContentInset }
         text: modelData.isImage ? "[Image]" : (modelData.preview.length > 0 ? modelData.preview.substring(0, 80) : "[empty]")
-        color: "white"
+        color: Services.Color.mOnSurface
         font.pixelSize: 13
         elide: Text.ElideRight
         verticalAlignment: Text.AlignVCenter
@@ -39,7 +39,7 @@ Rectangle {
 
         Text {
             text: "⎘"
-            color: "white"
+            color: Services.Color.mOnSurface
             font.pixelSize: MenuVisuals.actionIconSize
             verticalAlignment: Text.AlignVCenter
             height: MenuVisuals.rowHeight
@@ -51,7 +51,7 @@ Rectangle {
 
         Text {
             text: "✕"
-            color: "white"
+            color: Services.Color.mOnSurface
             font.pixelSize: 14
             verticalAlignment: Text.AlignVCenter
             height: MenuVisuals.rowHeight
