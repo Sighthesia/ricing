@@ -13,26 +13,8 @@ function workspaceSummaryHasContent(summary) {
 }
 
 function workspaceEdgePlaceholderIndex(summaries, anchor, step) {
-    var safeSummaries = summaries || []
-    var resolvedAnchor = anchor !== undefined ? Math.round(anchor) : -1
-
-    if (resolvedAnchor < 0 || resolvedAnchor >= safeSummaries.length)
-        return -1
-    if (!workspaceSummaryHasContent(safeSummaries[resolvedAnchor]))
-        return -1
-
-    var candidate = resolvedAnchor + step
-    if (candidate < 0 || candidate >= safeSummaries.length)
-        return -1
-    if (workspaceSummaryHasContent(safeSummaries[candidate]))
-        return -1
-
-    for (var index = candidate + step; index >= 0 && index < safeSummaries.length; index += step) {
-        if (workspaceSummaryHasContent(safeSummaries[index]))
-            return -1
-    }
-
-    return candidate
+    // Empty edge placeholders are disabled; only the active empty workspace renders.
+    return -1
 }
 
 function workspaceIsEdgePlaceholder(summaries, absoluteIndex, anchor) {
@@ -90,7 +72,7 @@ function workspaceDisplayLayoutForAnchor(summaries, anchor) {
     var beforeIndex = -1
     var afterIndex = -1
 
-    if (resolvedAnchor < 0 || resolvedAnchor >= safeSummaries.length) {
+    if (resolvedAnchor < 0) {
         return {
             first: -1,
             last: -1,

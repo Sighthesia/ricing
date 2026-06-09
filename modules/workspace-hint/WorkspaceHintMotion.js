@@ -279,7 +279,6 @@ function workspaceMetrics(host, slotPosition) {
     var topY = 0
     var centerY = host._workspaceSideHeight + host._workspaceColumnGap
     var bottomY = centerY + host._workspacePrimaryHeight + host._workspaceColumnGap
-
     if (slotPosition < -1) {
         var beforeOverflow = Math.min(1, -1 - slotPosition)
         return {

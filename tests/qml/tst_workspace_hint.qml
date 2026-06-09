@@ -36,6 +36,19 @@ Item {
             compare(layout.hasAfter, true)
         }
 
+        function test_workspaceDisplayLayout_omits_empty_edge_placeholders() {
+            const layout = Stage.workspaceDisplayLayoutForAnchor([
+                _summary("ws-1", 1, 1),
+                _summary("ws-2", 2, 0)
+            ], 0)
+
+            compare(layout.first, 0)
+            compare(layout.last, 0)
+            compare(layout.count, 1)
+            compare(layout.hasBefore, false)
+            compare(layout.hasAfter, false)
+        }
+
         function test_workspaceCapsuleForAbsolute_uses_active_windows_for_current_workspace() {
             const capsule = Stage.workspaceCapsuleForAbsolute(1, {
                 visible: true,
@@ -86,6 +99,56 @@ Item {
             compare(items[3].absoluteIndex, 3)
         }
 
+        function test_workspaceStageCapsulesForHint_keeps_empty_target_current() {
+            const host = {
+                _animatedWorkspaceAnchor: 0,
+                _workspaceStageSlots: [
+                    { absoluteIndex: 0, capsule: { visible: true } }
+                ]
+            }
+
+            const items = Stage.workspaceStageCapsulesForHint(host, {
+                visible: true,
+                activeWorkspacePosition: 1,
+                workspaceIndex: 2,
+                windows: [],
+                workspaces: [
+                    _summary("ws-1", 1, 1),
+                    _summary("ws-2", 2, 0)
+                ]
+            }, true)
+
+            compare(items.length, 2)
+            compare(items[1].absoluteIndex, 1)
+            compare(items[1].capsule.isCurrent, true)
+            compare(items[1].capsule.visible, true)
+            compare(items[1].capsule.icons.length, 0)
+        }
+
+        function test_workspaceStageCapsulesForHint_keeps_new_empty_target_without_summary() {
+            const host = {
+                _animatedWorkspaceAnchor: 0,
+                _workspaceStageSlots: [
+                    { absoluteIndex: 0, capsule: { visible: true } }
+                ]
+            }
+
+            const items = Stage.workspaceStageCapsulesForHint(host, {
+                visible: true,
+                activeWorkspacePosition: 1,
+                workspaceIndex: 2,
+                windows: [],
+                workspaces: [
+                    _summary("ws-1", 1, 1)
+                ]
+            }, true)
+
+            compare(items.length, 2)
+            compare(items[1].absoluteIndex, 1)
+            compare(items[1].capsule.isCurrent, true)
+            compare(items[1].capsule.visible, true)
+        }
+
         function test_workspaceStageSlotPosition_tracks_anchor_delta() {
             const host = {
                 _animatedWorkspaceAnchor: 2,
@@ -125,6 +188,20 @@ Item {
             compare(metrics.width, 132)
             compare(metrics.height, 44)
             compare(metrics.opacity, 1)
+        }
+
+        function test_workspaceMetrics_second_workspace_keeps_center_slot() {
+            const metrics = Motion.workspaceMetrics({
+                _workspaceStageWidth: 132,
+                _workspaceSideWidth: 90,
+                _workspacePrimaryWidth: 132,
+                _workspaceSideHeight: 28,
+                _workspacePrimaryHeight: 44,
+                _workspaceColumnGap: 8,
+                _animatedWorkspaceAnchor: 1
+            }, 0)
+
+            compare(metrics.y, 36)
         }
 
         function test_workspaceMetrics_neighbor_slot_uses_side_metrics() {

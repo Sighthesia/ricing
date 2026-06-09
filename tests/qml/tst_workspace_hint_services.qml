@@ -48,5 +48,41 @@ Item {
                 Services.WindowHintService._lastActiveWorkspacePosition = originalLastPosition
             }
         }
+
+        function test_refresh_hint_commits_empty_active_workspace() {
+            const originalBuildHint = Services.WindowHintService._buildHint
+            const originalActiveHint = Services.WindowHintService.activeHint
+            const originalHintHeld = Services.WindowHintService.hintHeld
+
+            Services.WindowHintService.hintHeld = true
+            Services.WindowHintService.activeHint = {
+                visible: true,
+                workspaceId: "ws-1",
+                workspaceIndex: 1,
+                activeWorkspacePosition: 0,
+                windows: [{ windowId: "win-1" }],
+                workspaces: []
+            }
+            Services.WindowHintService._buildHint = function() {
+                return {
+                    visible: true,
+                    workspaceId: "ws-2",
+                    workspaceIndex: 2,
+                    activeWorkspacePosition: 1,
+                    windows: [],
+                    workspaces: []
+                }
+            }
+
+            try {
+                Services.WindowHintService._refreshHint()
+                compare(Services.WindowHintService.activeHint.workspaceId, "ws-2")
+                compare(Services.WindowHintService.activeHint.windows.length, 0)
+            } finally {
+                Services.WindowHintService._buildHint = originalBuildHint
+                Services.WindowHintService.activeHint = originalActiveHint
+                Services.WindowHintService.hintHeld = originalHintHeld
+            }
+        }
     }
 }

@@ -30,7 +30,7 @@ Item {
 
     // --- Exposed geometry ---
     readonly property int stageWidth: _workspaceStageWidth
-    readonly property int stageHeight: _workspaceStageHeight
+    readonly property int stageHeight: _workspaceVisibleStageHeight
     readonly property Item hitRegionItem: stageHitRegion
     // Expose the live capsule items so a host window can build its blur region.
     readonly property var capsuleItems: stageRepeater.count > 0 ? workspaceStage.children : []
@@ -40,7 +40,8 @@ Item {
         && _stageBottomProgress <= 0.001
 
     implicitWidth: workspaceStage.width
-    implicitHeight: workspaceStage.height
+    implicitHeight: _workspaceVisibleStageHeight
+    clip: true
 
     // --- Stage state (migrated from WorkspaceHintWindow) ---
     property var _workspaceStageSlots: Motion.emptyStageSlots(_persistentStageSlotIndices, "workspace-slot")
@@ -59,6 +60,12 @@ Item {
 
     readonly property var _hintData: stageView.hintData
     readonly property int _activeWorkspacePosition: _hintData ? _hintData.activeWorkspacePosition : -1
+    readonly property var _workspaceHintLayout: Stage.workspaceDisplayLayoutForHint(_renderHint || _hintData)
+    readonly property int _workspaceVisibleCount: _workspaceHintLayout && _workspaceHintLayout.count !== undefined
+        ? _workspaceHintLayout.count
+        : 0
+    readonly property bool _workspaceHasBefore: !!(_workspaceHintLayout && _workspaceHintLayout.hasBefore)
+    readonly property bool _workspaceHasAfter: !!(_workspaceHintLayout && _workspaceHintLayout.hasAfter)
  readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     readonly property real _overflowSlotPosition: 1.18
   readonly property int _workspaceCapsuleMaxWidth: Math.max(1, Math.floor(stageView.screenWidth - stageView.capsuleEdgeInset * 2))
@@ -74,7 +81,24 @@ Item {
     readonly property int _workspacePrimaryHeight: 44
     readonly property int _workspaceColumnGap: 8
     readonly property int _workspaceStageWidth: Math.max(_workspacePrimaryWidth, _workspaceMaxSideWidth)
-    readonly property int _workspaceStageHeight: _workspaceSideHeight * 2 + _workspacePrimaryHeight + _workspaceColumnGap * 2
+    readonly property int _workspaceFullStageHeight: _workspaceSideHeight * 2 + _workspacePrimaryHeight + _workspaceColumnGap * 2
+    readonly property real _workspaceSingleSideTrim: _workspaceSideHeight + _workspaceColumnGap
+    readonly property real _workspaceSingleSideOffset:
+        _workspaceVisibleCount <= 1 || (_workspaceHasBefore && _workspaceHasAfter)
+            ? 0
+            : ((Math.max(0, Math.min(1, _animatedWorkspaceAnchor - (_workspaceVisibleCount - 2)))
+                - Math.max(0, Math.min(1, 1 - _animatedWorkspaceAnchor)))
+                * _workspaceSingleSideTrim / 2)
+    readonly property real _workspaceLeadingTrimTarget:
+        _workspaceHasBefore && _workspaceHasAfter
+            ? 0
+            : (_workspaceHasBefore || _workspaceHasAfter
+                ? _workspaceSingleSideTrim / 2
+                : _workspaceSingleSideTrim)
+    readonly property real _workspaceTrailingTrimTarget: _workspaceLeadingTrimTarget
+    property real _workspaceLeadingTrim: _workspaceLeadingTrimTarget
+    property real _workspaceTrailingTrim: _workspaceTrailingTrimTarget
+    readonly property real _workspaceVisibleStageHeight: _workspaceFullStageHeight - _workspaceLeadingTrim - _workspaceTrailingTrim
     // Capsule reveal drop distance, supplied by the host surface.
     readonly property real _workspaceStageTargetY: stageView.stageTargetY
     // Host-supplied distance from the screen top to the stage target origin.
@@ -381,6 +405,22 @@ if (!stageView._workspaceSettlePending)
         }
     }
 
+    // Animate visible stage trimming as edge neighbors appear and disappear.
+    Behavior on _workspaceLeadingTrim {
+        NumberAnimation {
+            duration: stageView._workspaceCapsuleOpacityDuration
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    // Animate the trailing trim with the same timing as the leading trim.
+    Behavior on _workspaceTrailingTrim {
+        NumberAnimation {
+            duration: stageView._workspaceCapsuleOpacityDuration
+            easing.type: Easing.OutCubic
+        }
+    }
+
     // Track the visible-capsule bounds so a host window can build its mask.
     Item {
         id: stageHitRegion
@@ -429,9 +469,9 @@ if (!stageView._workspaceSettlePending)
         id: workspaceStage
 
         x: (stageView.width - width) / 2
-        y: 0
+        y: -stageView._workspaceLeadingTrim + stageView._workspaceSingleSideOffset
    width: stageView._workspaceStageWidth
-        height: stageView._workspaceStageHeight
+        height: stageView._workspaceFullStageHeight
         clip: false
 
         // Render the persistent workspace stage slots.
