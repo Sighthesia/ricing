@@ -62,7 +62,10 @@ Item {
                 label: "Add Widget to " + Services.BarLayoutService.contextMenuSection
                 icon: "+"
                 onClicked: {
-                    Services.BarLayoutService.openWidgetPicker(Services.BarLayoutService.contextMenuSection)
+                    Services.BarLayoutService.openWidgetPicker(
+                        Services.BarLayoutService.contextMenuSection,
+                        Services.BarLayoutService.contextMenuScreenName
+                    )
                     Services.BarLayoutService.closeContextMenu()
                 }
             }

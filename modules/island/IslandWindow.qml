@@ -55,7 +55,7 @@ Variants {
         // Mask: when collapsed only the island body receives input;
         // when expanded the full window receives input (for click-away dismiss).
         mask: Region {
-            item: Services.IslandService.expanded ? fullHitRegion : collapsedHitRegion
+            item: (Services.IslandService.expanded || Services.BarLayoutService.widgetPickerVisible) ? fullHitRegion : collapsedHitRegion
         }
 
         // Full-window hit region for expanded state.
@@ -73,12 +73,16 @@ Variants {
             height: islandBody.height
         }
 
-        // Click-away dismiss (only active when expanded).
+        // Click-away dismiss while the island owns a full-window overlay state.
         MouseArea {
             anchors.fill: parent
-            enabled: Services.IslandService.expanded
+            enabled: Services.IslandService.expanded || (Services.BarLayoutService.widgetPickerVisible && Services.BarLayoutService.widgetPickerScreenName === modelData.name)
             z: 0
-            onClicked: Services.IslandService.close()
+            onClicked: {
+                if (Services.IslandService.expanded)
+                    Services.IslandService.close()
+                Services.BarLayoutService.closeWidgetPicker()
+            }
         }
 
         // The island body itself.

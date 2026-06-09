@@ -41,8 +41,14 @@ Item {
     readonly property bool notificationsPageVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "notifications"
     readonly property bool hostsCenterContextMenu: Services.BarLayoutService.contextMenuVisible
+        && !Services.BarLayoutService.widgetPickerVisible
         && Services.BarLayoutService.contextMenuSection === "center"
         && Services.BarLayoutService.contextMenuScreenName === root.screenName
+        && !Services.IslandService.expanded
+        && !Services.IslandService.windowHintActive
+    readonly property bool hostsCenterWidgetPicker: Services.BarLayoutService.widgetPickerVisible
+        && Services.BarLayoutService.widgetPickerSection === "center"
+        && Services.BarLayoutService.widgetPickerScreenName === root.screenName
         && !Services.IslandService.expanded
         && !Services.IslandService.windowHintActive
     readonly property real collapsedContentWidth: collapsedRow.implicitWidth > 0
@@ -73,6 +79,9 @@ Item {
     readonly property real centerContextMenuW: centerContextMenuMeasure.implicitWidth
     readonly property real centerContextMenuH: centerContextMenuMeasure.implicitHeight
     readonly property real centerContextMenuClipInset: Math.max(10, surface.bodyRadius * 0.75)
+    readonly property real centerWidgetPickerW: centerWidgetPickerMeasure.implicitWidth
+    readonly property real centerWidgetPickerH: centerWidgetPickerMeasure.implicitHeight
+    readonly property real centerWidgetPickerClipInset: Math.max(6, surface.bodyRadius * 0.45)
 
     // Window-hint extension geometry, sized to the live stage. When the hint is
     // held without the launcher, the island grows to wrap the full vertical
@@ -86,25 +95,31 @@ Item {
     // Target dimensions reuse the expanded island body instead of a second panel.
     property int targetW: Services.IslandService.expanded
         ? expandedW
+        : (root.hostsCenterWidgetPicker
+        ? centerWidgetPickerW
         : (root.hostsCenterContextMenu
         ? Math.max(collapsedCapsuleWidth, centerContextMenuW)
         : (Services.IslandService.windowHintActive
         ? windowHintW
-        : collapsedCapsuleWidth))
+        : collapsedCapsuleWidth)))
     property int targetH: Services.IslandService.expanded
         ? expandedH
+        : (root.hostsCenterWidgetPicker
+        ? collapsedH + centerWidgetPickerH + 8 + centerWidgetPickerClipInset
         : (root.hostsCenterContextMenu
         ? Math.max(messageContentHeight, collapsedH) + centerContextMenuH + 8 + centerContextMenuClipInset
         : (Services.IslandService.windowHintActive
         ? windowHintH
-        : messageContentHeight + (hoverHandler.hovered ? hoverHLift : 0)))
+        : messageContentHeight + (hoverHandler.hovered ? hoverHLift : 0))))
     property int targetR: Services.IslandService.expanded
         ? 24
+        : (root.hostsCenterWidgetPicker
+        ? 14
         : (root.hostsCenterContextMenu
         ? 14
         : (Services.IslandService.windowHintActive
         ? 24
-        : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0)))
+        : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0))))
 
     // Size mirrors the surface's animated geometry so external consumers
     // (IslandWindow hit region) keep tracking the live island bounds.
@@ -169,6 +184,14 @@ Item {
         // expand its shared body before rendering the live menu view.
         Bar.BarContextMenuView {
             id: centerContextMenuMeasure
+            visible: false
+            enabled: false
+        }
+
+        // Measure the center widget picker without clipping so the island can
+        // expand its shared body before rendering the live picker view.
+        Bar.WidgetPickerView {
+            id: centerWidgetPickerMeasure
             visible: false
             enabled: false
         }
@@ -321,6 +344,32 @@ Item {
             sourceComponent: Bar.BarContextMenuView {
                 viewportWidth: centerContextMenuLoader.width
                 viewportHeight: centerContextMenuLoader.height
+            }
+        }
+
+        // Render the center widget picker inside the island's own expanded body
+        // so picker browsing shares the same surface owner as the center zone.
+        Loader {
+            id: centerWidgetPickerLoader
+
+            active: root.hostsCenterWidgetPicker || opacity > 0.01
+            z: 2
+            x: (parent.width - width) / 2
+            y: root.collapsedH
+            width: parent.width
+            height: Math.max(0, parent.height - root.collapsedH - root.centerWidgetPickerClipInset)
+            opacity: root.hostsCenterWidgetPicker ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Services.Motion.popup.opacityDuration
+                    easing.type: Services.Motion.popup.opacityEasing
+                }
+            }
+
+            sourceComponent: Bar.WidgetPickerView {
+                viewportWidth: centerWidgetPickerLoader.width
+                viewportHeight: centerWidgetPickerLoader.height
             }
         }
 

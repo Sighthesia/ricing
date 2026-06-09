@@ -19,6 +19,7 @@ QtObject {
     readonly property bool layoutReady: layoutFile.loaded
     property bool widgetPickerVisible: false
     property string widgetPickerSection: "center"
+    property string widgetPickerScreenName: ""
     property bool widgetSettingsVisible: false
     property real widgetSettingsX: 0
     property string activeWidgetSettingsKey: ""
@@ -140,6 +141,7 @@ QtObject {
     property string contextMenuScreenName: ""
 
     function openContextMenu(x, instanceKey, widgetId, screenName) {
+        closeWidgetPicker()
         contextMenuX = x
         contextMenuWidgetKey = instanceKey || ""
         contextMenuWidgetId = widgetId || ""
@@ -192,8 +194,10 @@ QtObject {
     }
 
     // --- Widget picker ---
-    function openWidgetPicker(sectionName) {
+    function openWidgetPicker(sectionName, screenName) {
+        closeContextMenu()
         widgetPickerSection = typeof sectionName === "string" && sectionName ? sectionName : "center"
+        widgetPickerScreenName = screenName || ""
         widgetPickerVisible = true
         if (!settingsMode)
             settingsMode = true
@@ -201,15 +205,16 @@ QtObject {
 
     function closeWidgetPicker() {
         widgetPickerVisible = false
+        widgetPickerScreenName = ""
     }
 
-    function toggleWidgetPicker(sectionName) {
+    function toggleWidgetPicker(sectionName, screenName) {
         if (widgetPickerVisible) {
             closeWidgetPicker()
             return
         }
 
-        openWidgetPicker(sectionName)
+        openWidgetPicker(sectionName, screenName)
     }
 
     // --- Query helpers ---

@@ -32,10 +32,6 @@ ShellRoot {
     Island.IslandWindow {
     }
 
-    // Widget picker rendered in its own window so empty sections can recover widgets.
-    Bar.WidgetPickerWindow {
-    }
-
     // Per-widget settings panel rendered in its own floating window.
     Bar.WidgetSettingsWindow {
     }
