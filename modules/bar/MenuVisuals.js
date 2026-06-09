@@ -9,6 +9,7 @@ var contentSpacing = 8;
 var outerPadding = 8;
 var rowEdgeInset = 4;
 var separatorInset = 12;
+var listContentInset = 12;
 var checkIndicatorWidth = 14;
 var submenuHeaderHeight = 30;
 var separatorRowHeight = 7;

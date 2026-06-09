@@ -161,15 +161,15 @@ Item {
                 required property int index
                 width: ListView.view ? ListView.view.width : 200
                 height: 48
-                radius: 6
+                radius: MenuVisuals.rowRadius
                 color: delegateMouse.containsMouse || ListView.view.currentIndex === index
                     ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
 
                 Row {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
+                    anchors.leftMargin: MenuVisuals.listContentInset
+                    anchors.rightMargin: MenuVisuals.listContentInset
                     spacing: 12
 
                     IconImage {
@@ -258,15 +258,15 @@ Item {
                 required property int index
                 width: ListView.view ? ListView.view.width : 200
                 height: 48
-                radius: 6
+                radius: MenuVisuals.rowRadius
                 color: clipMouse.containsMouse || clipListView.currentIndex === index
                     ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
 
                 Text {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
+                    anchors.leftMargin: MenuVisuals.listContentInset
+                    anchors.rightMargin: MenuVisuals.listContentInset
                     verticalAlignment: Text.AlignVCenter
                     text: modelData.isImage ? "[Image]" : (modelData.preview || "")
                     color: Services.Color.mOnSurface
