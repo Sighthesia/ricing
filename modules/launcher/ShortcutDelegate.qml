@@ -17,19 +17,19 @@ Rectangle {
     height: 52
     radius: MenuVisuals.rowRadius
     color: mouseArea.containsMouse
-        ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.2)
-        : Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.1)
+        ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.listHoverOpacity)
+        : Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.listRestOpacity)
     readonly property color shellBadgeColor: Qt.rgba(
         Services.Color.mPrimary.r,
         Services.Color.mPrimary.g,
         Services.Color.mPrimary.b,
-        0.26
+        MenuVisuals.primaryBadgeOpacity
     )
     readonly property color neutralBadgeColor: Qt.rgba(
         Services.Color.mOnSurface.r,
         Services.Color.mOnSurface.g,
         Services.Color.mOnSurface.b,
-        0.2
+        MenuVisuals.listHoverOpacity
     )
     readonly property color shellBadgeLabelColor: Services.Color.mPrimary
     readonly property color neutralBadgeLabelColor: Services.Color.mOnSurfaceVariant
@@ -37,13 +37,13 @@ Rectangle {
         Services.Color.mOnSurface.r,
         Services.Color.mOnSurface.g,
         Services.Color.mOnSurface.b,
-        0.14
+        MenuVisuals.fieldRestOpacity
     )
     readonly property color editFieldActiveColor: Qt.rgba(
         Services.Color.mOnSurface.r,
         Services.Color.mOnSurface.g,
         Services.Color.mOnSurface.b,
-        0.24
+        MenuVisuals.fieldActiveOpacity
     )
 
     property bool editing: false
