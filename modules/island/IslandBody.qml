@@ -1,4 +1,5 @@
 import QtQuick
+import "../bar/MenuVisuals.js" as MenuVisuals
 import "../bar" as Bar
 import "../settings" as Settings
 import "../workspace-hint" as WorkspaceHint
@@ -362,7 +363,7 @@ Item {
                 width: Math.min(parent.width, 420)
                 height: root.expandedNavHeight
                 radius: Math.round(height / 2)
-                color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
+                color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                 border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.7)
                 border.width: 1
 

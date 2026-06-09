@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import "../bar/MenuVisuals.js" as MenuVisuals
 import "../../services" as Services
 import "../common" as Common
 
@@ -36,7 +37,7 @@ Item {
             width: parent.width
             height: 48
             radius: 14
-            color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
+            color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
             border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.55)
             border.width: 1
 

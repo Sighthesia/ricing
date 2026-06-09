@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
+import "../bar/MenuVisuals.js" as MenuVisuals
 import "../../services" as Services
 
 // Expanded island content: search input + app list or clipboard list.
@@ -23,7 +24,7 @@ Item {
             anchors.right: parent.right
             height: 40
             radius: 12
-            color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
+            color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
 
             TextInput {
                 id: searchInput
@@ -162,7 +163,7 @@ Item {
                 height: 48
                 radius: 6
                 color: delegateMouse.containsMouse || ListView.view.currentIndex === index
-                    ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
+                    ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
 
                 Row {
@@ -259,7 +260,7 @@ Item {
                 height: 48
                 radius: 6
                 color: clipMouse.containsMouse || clipListView.currentIndex === index
-                    ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.08)
+                    ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
 
                 Text {
