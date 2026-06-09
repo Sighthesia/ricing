@@ -18,9 +18,14 @@ Item {
     readonly property bool canOpenWidgetPicker: Services.BarLayoutService.layoutReady
     readonly property var blurParts: surfaceLoader.item ? surfaceLoader.item.blurParts : []
     readonly property real residualPushOffsetX: surfaceLoader.item ? surfaceLoader.item.residualPushOffsetX : 0
+    readonly property bool hostsContextMenu: Services.BarLayoutService.contextMenuVisible
+        && Services.BarLayoutService.contextMenuScreenName === root.screenName
+        && Services.BarLayoutService.contextMenuSection === root.sectionName
     readonly property string surfaceState: root.sectionName === "center"
-        ? (root.hasSectionContent ? (root.floatingValidationIntent ? "floating" : "attached") : "hidden")
-        : (root.hasSectionContent ? "attached" : "hidden")
+        ? ((root.hasSectionContent || root.hostsContextMenu)
+            ? (root.floatingValidationIntent ? "floating" : "attached")
+            : "hidden")
+        : ((root.hasSectionContent || root.hostsContextMenu) ? "attached" : "hidden")
 
     implicitHeight: surfaceLoader.item ? surfaceLoader.item.implicitHeight : Services.BarLayoutService.barHeight
     implicitWidth: root.hasSectionContent
@@ -45,7 +50,9 @@ Item {
             }
 
             if (barContent && barContent.openWidgetContextMenu) {
-                barContent.openWidgetContextMenu("", "", barPos.x, root.screenName, barPos.x)
+                var scenePos = root.mapToItem(null, mouse.x, mouse.y)
+                Services.TrayMenuService.close()
+                barContent.openWidgetContextMenu("", "", scenePos.x, root.screenName, scenePos.x)
             }
         }
     }
@@ -124,16 +131,24 @@ Item {
                     && Services.TrayMenuService.visible
                     && Services.TrayMenuService.anchorX >= rowScreenLeft - 24
                     && Services.TrayMenuService.anchorX <= rowScreenRight + 24
+                readonly property bool hostsContextMenu: root.hostsContextMenu && !hostsTrayMenu
                 // Natural menu size measured by a hidden, unclipped instance so
                 // it is independent of the clipped render tree below (whose size
                 // is driven by the Loader, not the content).
                 readonly property real menuW: trayMenuMeasure.implicitWidth
                 readonly property real menuH: trayMenuMeasure.implicitHeight
+                readonly property real contextMenuW: contextMenuMeasure.implicitWidth
+                readonly property real contextMenuH: contextMenuMeasure.implicitHeight
                 // Keep the menu a little inside the lower glass contour during
                 // the expand so foreground text/icons cannot peek through the
                 // transparent rounded corners before the body reaches full size.
                 readonly property real menuClipInset: Math.max(10, dockzone.bodyRadius * 0.75)
+                readonly property real activeMenuW: hostsTrayMenu ? menuW : contextMenuW
+                readonly property real activeMenuH: hostsTrayMenu ? menuH : contextMenuH
+                readonly property real menuAnchorX: Services.BarLayoutService.contextMenuX
+                    - surfaceRoot.mapToItem(null, 0, 0).x
 
+                // Measure the tray menu without clipping so the host can expand first.
                 Tray.TrayMenuView {
                     id: trayMenuMeasure
                     visible: false
@@ -141,8 +156,15 @@ Item {
                     rootHandle: Services.TrayMenuService.menuHandle
                 }
 
-                expandHeight: hostsTrayMenu ? (menuH + 8 + dockzone.menuClipInset) : 0
-                expandWidth: hostsTrayMenu ? menuW : 0
+                // Measure the context menu without clipping so the host can expand first.
+                BarContextMenuView {
+                    id: contextMenuMeasure
+                    visible: false
+                    enabled: false
+                }
+
+                expandHeight: (hostsTrayMenu || hostsContextMenu) ? (activeMenuH + 8 + dockzone.menuClipInset) : 0
+                expandWidth: (hostsTrayMenu || hostsContextMenu) ? activeMenuW : 0
 
                 Behavior on expandHeight {
                     SpringAnimation {
@@ -167,12 +189,20 @@ Item {
                 Loader {
                     id: trayMenuLoader
 
-                    active: dockzone.hostsTrayMenu || dockzone.bodyHeight > dockzone.topBandHeight + 1
+                    active: dockzone.hostsTrayMenu || opacity > 0.01
                     z: 2
                     x: parent.bodyX + (parent.bodyWidth - width) / 2 + (root.sectionName === "right" ? parent.bodyShrinkX : (root.sectionName === "left" ? -parent.bodyShrinkX : 0))
                     y: parent.bodyY + parent.topBandHeight
                     width: Math.min(dockzone.menuW, dockzone.pushedBodyWidth)
                     height: Math.max(0, dockzone.bodyHeight - parent.topBandHeight - dockzone.menuClipInset)
+                    opacity: dockzone.hostsTrayMenu ? 1 : 0
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: Services.Motion.popup.opacityDuration
+                            easing.type: Services.Motion.popup.opacityEasing
+                        }
+                    }
 
                     sourceComponent: Tray.TrayMenuView {
                         rootHandle: Services.TrayMenuService.menuHandle
@@ -184,6 +214,32 @@ Item {
                     HoverHandler {
                         id: trayMenuHover
                         onHoveredChanged: Services.TrayMenuService.pointerInMenu = hovered
+                    }
+                }
+
+                // Bar context menu rendered inside the expanded body beneath the
+                // dockzone row so it shares the tray-style host surface.
+                Loader {
+                    id: contextMenuLoader
+
+                    active: dockzone.hostsContextMenu || (item && opacity > 0.01)
+                    z: 2
+                    y: parent.bodyY + parent.topBandHeight
+                    width: dockzone.pushedBodyWidth
+                    height: Math.max(0, dockzone.bodyHeight - parent.topBandHeight - dockzone.menuClipInset)
+                    opacity: dockzone.hostsContextMenu ? 1 : 0
+                    x: parent.bodyX + (parent.bodyWidth - width) / 2 + (root.sectionName === "right" ? parent.bodyShrinkX : (root.sectionName === "left" ? -parent.bodyShrinkX : 0))
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: Services.Motion.popup.opacityDuration
+                            easing.type: Services.Motion.popup.opacityEasing
+                        }
+                    }
+
+                    sourceComponent: BarContextMenuView {
+                        viewportWidth: contextMenuLoader.width
+                        viewportHeight: contextMenuLoader.height
                     }
                 }
 

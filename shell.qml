@@ -32,10 +32,6 @@ ShellRoot {
     Island.IslandWindow {
     }
 
-    // Context menu rendered in its own window to avoid bar-height clipping.
-    Bar.BarContextMenu {
-    }
-
     // Widget picker rendered in its own window so empty sections can recover widgets.
     Bar.WidgetPickerWindow {
     }

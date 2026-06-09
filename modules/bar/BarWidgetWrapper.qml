@@ -125,13 +125,13 @@ Item {
         gesturePolicy: TapHandler.ReleaseWithinBounds
         onTapped: (eventPoint) => {
             // Forward right-click to BarContent's context menu with widget context.
-            var barPos = root.mapToItem(null, eventPoint.position.x, eventPoint.position.y)
+            var scenePos = root.mapToItem(null, eventPoint.position.x, eventPoint.position.y)
             var barContent = root.parent
             while (barContent && !barContent.openWidgetContextMenu) {
                 barContent = barContent.parent
             }
             if (barContent && barContent.openWidgetContextMenu) {
-                barContent.openWidgetContextMenu(root.widgetInstanceKey, root.widgetId, barPos.x, root.screenName, root.centerXInRoot)
+                barContent.openWidgetContextMenu(root.widgetInstanceKey, root.widgetId, scenePos.x, root.screenName, root.centerXInRoot)
             }
         }
     }

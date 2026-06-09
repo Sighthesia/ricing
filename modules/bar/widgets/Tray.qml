@@ -10,8 +10,29 @@ import "../../../services" as Services
 Item {
     id: root
 
+    property string widgetInstanceKey: ""
+    property string widgetId: ""
     implicitWidth: trayRow.implicitWidth + 16
     implicitHeight: 30
+    property int hoveredIconCount: 0
+
+    function syncHoverSuppression() {
+        if (Services.BarLayoutService.contextMenuVisible)
+            return
+
+        if (root.hoveredIconCount === 0)
+            Services.TrayMenuService.releaseHoverSuppression()
+    }
+
+    function openBarContextMenu(sceneX) {
+        var barContent = root.parent
+
+        while (barContent && !barContent.openWidgetContextMenu)
+            barContent = barContent.parent
+
+        if (barContent && barContent.openWidgetContextMenu)
+            barContent.openWidgetContextMenu(root.widgetInstanceKey, root.widgetId, sceneX, "", sceneX)
+    }
 
     // Close the menu shortly after the pointer leaves both the icons and the
     // menu card, giving time to cross the small gap between bar and menu.
@@ -34,6 +55,22 @@ Item {
                 closeTimer.stop()
             else if (Services.TrayMenuService.visible)
                 closeTimer.restart()
+        }
+    }
+
+    // Let the bar context menu temporarily take exclusive ownership of this
+    // dockzone even if the pointer remains hovered on a tray icon.
+    Connections {
+        target: Services.BarLayoutService
+
+        function onContextMenuVisibleChanged() {
+            if (Services.BarLayoutService.contextMenuVisible) {
+                Services.TrayMenuService.closeAndSuppress()
+                closeTimer.stop()
+                return
+            }
+
+            root.syncHoverSuppression()
         }
     }
 
@@ -77,19 +114,24 @@ Item {
 
                     // Hover drives the menu: open on enter, schedule close on leave.
                     onHoveredChanged: {
+                        root.hoveredIconCount = Math.max(0, root.hoveredIconCount + (hovered ? 1 : -1))
+
                         if (hovered) {
                             closeTimer.stop()
-                            if (iconItem.modelData.hasMenu)
+                            if (iconItem.modelData.hasMenu && !Services.TrayMenuService.suppressHoverOpen)
                                 iconItem.openMenu()
                             else if (Services.TrayMenuService.visible)
                                 closeTimer.restart()
                         } else {
                             closeTimer.restart()
+                            root.syncHoverSuppression()
                         }
                     }
                 }
 
-                // Clicks only; hover is owned by the HoverHandler above.
+                // Left-click activation stays local; right-click opens the
+                // shared bar context menu directly from the icon layer so it
+                // does not get lost to tray-item-specific pointer handling.
                 MouseArea {
                     id: iconArea
 
@@ -99,8 +141,11 @@ Item {
                     onClicked: event => {
                         if (event.button === Qt.LeftButton)
                             iconItem.modelData.activate()
-                        else if (event.button === Qt.RightButton)
-                            iconItem.modelData.secondaryActivate()
+                        else if (event.button === Qt.RightButton) {
+                            var scenePos = iconItem.mapToItem(null, event.x, event.y)
+                            Services.TrayMenuService.closeAndSuppress()
+                            root.openBarContextMenu(scenePos.x)
+                        }
                     }
                 }
             }

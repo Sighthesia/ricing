@@ -36,11 +36,11 @@ Variants {
 
         // The window is a fixed tall transparent surface. Restrict input to the
         // bar-height band at the top while idle (so the empty area below never
-        // blocks other windows); when the tray menu is open take the whole
-        // window so a click anywhere outside the menu dismisses it (island-
-        // style). exclusiveZone stays pinned to the bar height regardless.
+        // blocks other windows); when a dockzone-hosted menu is open take the
+        // whole window so a click anywhere outside the menu dismisses it
+        // (island-style). exclusiveZone stays pinned to the bar height regardless.
         mask: Region {
-            item: Services.TrayMenuService.visible ? fullHit : barBandHit
+            item: (Services.TrayMenuService.visible || Services.BarLayoutService.contextMenuVisible) ? fullHit : barBandHit
         }
 
         Item {
@@ -58,15 +58,17 @@ Variants {
             height: barContent.implicitHeight
         }
 
-        // Click-away dismiss: active only while the tray menu is open, so a
-        // click anywhere outside the menu closes it (island-style). Disabled
-        // otherwise so normal bar clicks are unaffected.
+        // Click-away dismiss: active only while a dockzone-hosted menu is open,
+        // so a click anywhere outside the menu closes it (island-style).
         MouseArea {
             anchors.fill: parent
             z: -1
-            enabled: Services.TrayMenuService.visible
+            enabled: Services.TrayMenuService.visible || Services.BarLayoutService.contextMenuVisible
             acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onPressed: Services.TrayMenuService.close()
+            onPressed: {
+                Services.TrayMenuService.close()
+                Services.BarLayoutService.closeContextMenu()
+            }
         }
 
         // Track blur to visible dockzone geometry parts instead of the full transparent bar window.

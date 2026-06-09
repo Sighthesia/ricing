@@ -129,7 +129,7 @@ Item {
     }
 
     // Keep the center zone aligned to the screen midpoint.
-    // Hidden: island module now owns center content (and the transient message band).
+    // Hidden: island module owns center content and center context-menu hosting.
     BarSection {
         id: centerSection
 
@@ -161,9 +161,10 @@ Item {
     }
 
     // Open context menu on widget right-click (called from BarWidgetWrapper).
-    function openWidgetContextMenu(instanceKey, widgetId, clickX, screenName, widgetCenterX) {
-        Services.BarLayoutService.openContextMenu(clickX, instanceKey, widgetId, screenName || root.screenName)
-        Services.BarLayoutService.widgetSettingsX = widgetCenterX || clickX
+    function openWidgetContextMenu(instanceKey, widgetId, clickSceneX, screenName, widgetCenterX) {
+        Services.TrayMenuService.close()
+        Services.BarLayoutService.openContextMenu(clickSceneX, instanceKey, widgetId, screenName || root.screenName)
+        Services.BarLayoutService.widgetSettingsX = widgetCenterX || clickSceneX
     }
 
     // Right-click on empty bar area opens the context menu.
@@ -172,7 +173,11 @@ Item {
         z: -1
         acceptedButtons: Qt.RightButton
         propagateComposedEvents: true
-        onClicked: (mouse) => Services.BarLayoutService.openContextMenu(mouse.x, "", "", root.screenName)
+        onClicked: (mouse) => {
+            var scenePos = root.mapToItem(null, mouse.x, mouse.y)
+            Services.TrayMenuService.close()
+            Services.BarLayoutService.openContextMenu(scenePos.x, "", "", root.screenName)
+        }
     }
 
     // Escape key exits settings mode and closes context menu.

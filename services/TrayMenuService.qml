@@ -8,6 +8,9 @@ QtObject {
 
     // Whether the tray menu surface should currently be shown.
     property bool visible: false
+    // Suppress hover-driven re-open while another higher-priority tray-adjacent
+    // interaction (for example the bar context menu) owns the same dockzone.
+    property bool suppressHoverOpen: false
     // Bar-window-local X (== screen X, both windows span full width) of the hovered icon center.
     property real anchorX: 0
     // The hovered tray item's DBusMenu handle (QsMenuHandle), bound into QsMenuOpener.
@@ -19,6 +22,8 @@ QtObject {
     // re-hovering the same already-open item only re-anchors, so jitter at the
     // icon edge does not re-trigger the open animation.
     function open(x, handle) {
+        if (suppressHoverOpen)
+            return
         if (visible && menuHandle === handle) {
             anchorX = x
             return
@@ -30,6 +35,17 @@ QtObject {
 
     function close() {
         visible = false
+        anchorX = 0
+        menuHandle = null
         pointerInMenu = false
+    }
+
+    function closeAndSuppress() {
+        close()
+        suppressHoverOpen = true
+    }
+
+    function releaseHoverSuppression() {
+        suppressHoverOpen = false
     }
 }

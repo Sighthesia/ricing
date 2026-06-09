@@ -39,6 +39,11 @@ Item {
         && Services.IslandService.panelPage === "settings-center"
     readonly property bool notificationsPageVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "notifications"
+    readonly property bool hostsCenterContextMenu: Services.BarLayoutService.contextMenuVisible
+        && Services.BarLayoutService.contextMenuSection === "center"
+        && Services.BarLayoutService.contextMenuScreenName === root.screenName
+        && !Services.IslandService.expanded
+        && !Services.IslandService.windowHintActive
     readonly property real collapsedContentWidth: collapsedRow.implicitWidth > 0
         ? collapsedRow.implicitWidth + collapsedHorizontalPadding
         : collapsedW
@@ -64,6 +69,9 @@ Item {
     readonly property real expandedRevealProgress: Services.IslandService.expanded
         ? Math.max(0, Math.min(1, (root.expandedWidthProgress - 0.6) / 0.3))
         : 0
+    readonly property real centerContextMenuW: centerContextMenuMeasure.implicitWidth
+    readonly property real centerContextMenuH: centerContextMenuMeasure.implicitHeight
+    readonly property real centerContextMenuClipInset: Math.max(10, surface.bodyRadius * 0.75)
 
     // Window-hint extension geometry, sized to the live stage. When the hint is
     // held without the launcher, the island grows to wrap the full vertical
@@ -77,19 +85,25 @@ Item {
     // Target dimensions reuse the expanded island body instead of a second panel.
     property int targetW: Services.IslandService.expanded
         ? expandedW
+        : (root.hostsCenterContextMenu
+        ? Math.max(collapsedCapsuleWidth, centerContextMenuW)
         : (Services.IslandService.windowHintActive
         ? windowHintW
-        : collapsedCapsuleWidth)
+        : collapsedCapsuleWidth))
     property int targetH: Services.IslandService.expanded
         ? expandedH
+        : (root.hostsCenterContextMenu
+        ? Math.max(messageContentHeight, collapsedH) + centerContextMenuH + 8 + centerContextMenuClipInset
         : (Services.IslandService.windowHintActive
         ? windowHintH
-        : messageContentHeight + (hoverHandler.hovered ? hoverHLift : 0))
+        : messageContentHeight + (hoverHandler.hovered ? hoverHLift : 0)))
     property int targetR: Services.IslandService.expanded
         ? 24
+        : (root.hostsCenterContextMenu
+        ? 14
         : (Services.IslandService.windowHintActive
         ? 24
-        : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0))
+        : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0)))
 
     // Size mirrors the surface's animated geometry so external consumers
     // (IslandWindow hit region) keep tracking the live island bounds.
@@ -103,6 +117,7 @@ Item {
 
     // Forward widget-aware context menu requests from center widget wrappers.
     function openWidgetContextMenu(instanceKey, widgetId, clickX, screenName, widgetCenterX) {
+        Services.TrayMenuService.close()
         Services.BarLayoutService.openContextMenu(clickX, instanceKey, widgetId, screenName || root.screenName)
         Services.BarLayoutService.widgetSettingsX = widgetCenterX || clickX
     }
@@ -148,6 +163,14 @@ Item {
         targetRadius: root.targetR
         earRadius: root.earRadius
         surfaceColor: root.surfaceColor
+
+        // Measure the center context menu without clipping so the island can
+        // expand its shared body before rendering the live menu view.
+        Bar.BarContextMenuView {
+            id: centerContextMenuMeasure
+            visible: false
+            enabled: false
+        }
 
         // --- Collapsed content: center widgets or fallback clock ---
         Item {
@@ -271,6 +294,32 @@ Item {
 
                 IslandClock {
                 }
+            }
+        }
+
+        // Render the center context menu inside the island's own expanded body
+        // so the menu, blur, and background all come from one surface owner.
+        Loader {
+            id: centerContextMenuLoader
+
+            active: root.hostsCenterContextMenu || opacity > 0.01
+            z: 2
+            x: (parent.width - width) / 2
+            y: root.collapsedH
+            width: parent.width
+            height: Math.max(0, parent.height - root.collapsedH - root.centerContextMenuClipInset)
+            opacity: root.hostsCenterContextMenu ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Services.Motion.popup.opacityDuration
+                    easing.type: Services.Motion.popup.opacityEasing
+                }
+            }
+
+            sourceComponent: Bar.BarContextMenuView {
+                viewportWidth: centerContextMenuLoader.width
+                viewportHeight: centerContextMenuLoader.height
             }
         }
 
@@ -409,24 +458,24 @@ Item {
             }
         }
 
-        // Keep left-click expansion on the whole collapsed island surface.
+        // Keep one collapsed-island click layer so left-click expansion and
+        // background right-click menu opening do not starve each other.
         MouseArea {
             anchors.fill: parent
             enabled: !Services.IslandService.expanded
-                && !Services.BarLayoutService.settingsMode
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            acceptedButtons: Qt.LeftButton
-            onClicked: Services.IslandService.toggle()
-        }
-
-        // Right-click opens the center layout menu across the collapsed island.
-        MouseArea {
-            anchors.fill: parent
-            enabled: !Services.IslandService.expanded && !root.showManagedCenterWidgets
-            acceptedButtons: Qt.RightButton
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            propagateComposedEvents: true
             onClicked: (mouse) => {
+                if (mouse.button === Qt.LeftButton) {
+                    if (!Services.BarLayoutService.settingsMode)
+                        Services.IslandService.toggle()
+                    return
+                }
+
                 var scenePos = root.mapToItem(null, mouse.x, mouse.y)
+                Services.TrayMenuService.close()
                 Services.BarLayoutService.openContextMenu(scenePos.x, "", "", root.screenName)
             }
         }
