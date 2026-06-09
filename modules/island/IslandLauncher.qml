@@ -44,13 +44,13 @@ Item {
                 Keys.onUpPressed: {
                     var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
                     if (loader.item && loader.item.count > 0) {
-                        loader.item.currentIndex = Math.max(0, loader.item.currentIndex - 1)
+                        loader.item.currentIndex = loader.item.nextVisibleIndex(loader.item.currentIndex, "up")
                     }
                 }
                 Keys.onDownPressed: {
                     var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
                     if (loader.item && loader.item.count > 0) {
-                        loader.item.currentIndex = Math.min(loader.item.count - 1, loader.item.currentIndex + 1)
+                        loader.item.currentIndex = loader.item.nextVisibleIndex(loader.item.currentIndex, "down")
                     }
                 }
                 Keys.onReturnPressed: {
@@ -131,6 +131,17 @@ Item {
                 if (q.startsWith(">")) return ""
                 return q
             }
+            onQueryChanged: {
+                var apps = sortedApps
+                for (var i = 0; i < apps.length; i++) {
+                    if (appMatches(apps[i], query)) {
+                        appListView.currentIndex = i
+                        appListView.positionViewAtBeginning()
+                        return
+                    }
+                }
+                appListView.currentIndex = 0
+            }
 
             property var sortedApps: {
                 const all = DesktopEntries.applications.values
@@ -152,6 +163,17 @@ Item {
                 return name.includes(q) || comment.includes(q)
                     || genericName.includes(q) || appId.includes(q)
                     || keywords.includes(q)
+            }
+
+            function nextVisibleIndex(from, direction) {
+                var step = direction === "down" ? 1 : -1
+                var i = from + step
+                while (i >= 0 && i < sortedApps.length) {
+                    if (appMatches(sortedApps[i], query))
+                        return i
+                    i += step
+                }
+                return from
             }
 
             model: sortedApps
@@ -284,11 +306,32 @@ Item {
                 if (!all || all.length === 0) return []
                 return all
             }
+            onQueryChanged: {
+                var items = allItems
+                for (var i = 0; i < items.length; i++) {
+                    if (clipMatches(items[i], query)) {
+                        clipListView.currentIndex = i
+                        clipListView.positionViewAtBeginning()
+                        return
+                    }
+                }
+                clipListView.currentIndex = 0
+            }
             function clipMatches(item, q) {
                 if (!q) return true
                 const preview = (item.preview || "").toLowerCase()
                 const kind = item.isImage ? "image" : "text"
                 return preview.includes(q) || kind.includes(q)
+            }
+            function nextVisibleIndex(from, direction) {
+                var step = direction === "down" ? 1 : -1
+                var i = from + step
+                while (i >= 0 && i < allItems.length) {
+                    if (clipMatches(allItems[i], query))
+                        return i
+                    i += step
+                }
+                return from
             }
 
             model: allItems
