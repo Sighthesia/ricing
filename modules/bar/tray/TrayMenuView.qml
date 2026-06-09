@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 
+import "../MenuVisuals.js" as MenuVisuals
 import QtQuick
 import QtQuick.Controls
 import Quickshell
@@ -13,7 +14,7 @@ Item {
     id: root
 
     // Fixed menu width; rows elide their labels to fit.
-    readonly property real menuWidth: 220
+    readonly property real menuWidth: MenuVisuals.trayMenuWidth
     // The top-level DBus menu handle (QsMenuHandle) for the hovered tray item.
     property var rootHandle: null
     // The currently visible height provided by the host while the dockzone
@@ -88,11 +89,11 @@ Item {
             property bool shown: false
 
             width: root.menuWidth
-            leftPadding: 6
-            rightPadding: 6
-            topPadding: 6
-            bottomPadding: 6
-            spacing: 2
+            leftPadding: MenuVisuals.rowRadius
+            rightPadding: MenuVisuals.rowRadius
+            topPadding: MenuVisuals.rowRadius
+            bottomPadding: MenuVisuals.rowRadius
+            spacing: MenuVisuals.compactSpacing
 
             // Animate page entry/exit with opacity only so foreground text/icons
             // never overshoot the host clip during the dockzone expand.
@@ -119,14 +120,14 @@ Item {
                 readonly property bool fullyRevealed: y + height <= root.revealHeight
 
                 width: root.menuWidth - 12
-                height: 30
+                height: MenuVisuals.submenuHeaderHeight
                 visible: page.isSubMenu
                 opacity: fullyRevealed ? 1 : 0
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 6
-                    color: backArea.containsMouse ? Qt.alpha(Services.Color.mOnSurface, 0.08) : "transparent"
+                    radius: MenuVisuals.rowRadius
+                    color: backArea.containsMouse ? Qt.alpha(Services.Color.mOnSurface, MenuVisuals.hoverOpacity) : "transparent"
 
                     Behavior on color { ColorAnimation { duration: Services.Motion.number.shortDuration; easing.type: Services.Motion.number.shortEasing } }
                 }
@@ -134,22 +135,22 @@ Item {
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.left: parent.left
-                    anchors.leftMargin: 8
-                    spacing: 8
+                    anchors.leftMargin: MenuVisuals.contentInset
+                    spacing: MenuVisuals.contentSpacing
 
                     Text {
                         text: "\u2039"
                         color: Services.Color.mPrimary
-                        font.pixelSize: 14
+                        font.pixelSize: MenuVisuals.iconFontSize
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 16
+                        width: MenuVisuals.iconWidth
                         horizontalAlignment: Text.AlignHCenter
                     }
 
                     Text {
                         text: "Back"
                         color: Services.Color.mPrimary
-                        font.pixelSize: 12
+                        font.pixelSize: MenuVisuals.bodyFontSize
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
@@ -169,10 +170,10 @@ Item {
             Rectangle {
                 readonly property bool fullyRevealed: y + height <= root.revealHeight
 
-                width: root.menuWidth - 16
+                width: root.menuWidth - MenuVisuals.separatorInset * 2
                 anchors.horizontalCenter: parent.horizontalCenter
                 height: 1
-                color: Qt.alpha(Services.Color.mOutline, 0.4)
+                color: Qt.alpha(Services.Color.mOutline, MenuVisuals.dividerOpacity)
                 visible: page.isSubMenu
                 opacity: fullyRevealed ? 1 : 0
             }
@@ -187,16 +188,16 @@ Item {
                     required property var modelData
                     readonly property bool fullyRevealed: y + implicitHeight <= root.revealHeight
 
-                    width: root.menuWidth - 12
-                    implicitHeight: modelData.isSeparator ? 7 : 32
+                    width: root.menuWidth - MenuVisuals.separatorInset
+                    implicitHeight: modelData.isSeparator ? MenuVisuals.separatorRowHeight : MenuVisuals.rowHeight
                     opacity: fullyRevealed ? 1 : 0
 
                     // Separator: centered hairline, no interaction.
                     Rectangle {
                         anchors.centerIn: parent
-                        width: parent.width - 4
+                        width: parent.width - MenuVisuals.rowEdgeInset
                         height: 1
-                        color: Qt.alpha(Services.Color.mOutline, 0.4)
+                        color: Qt.alpha(Services.Color.mOutline, MenuVisuals.dividerOpacity)
                         visible: entry.modelData.isSeparator
                     }
 
@@ -209,8 +210,8 @@ Item {
                             // Hover highlight background.
                             Rectangle {
                                 anchors.fill: parent
-                                radius: 6
-                                color: rowArea.containsMouse && entry.modelData.enabled ? Qt.alpha(Services.Color.mOnSurface, 0.08) : "transparent"
+                                radius: MenuVisuals.rowRadius
+                                color: rowArea.containsMouse && entry.modelData.enabled ? Qt.alpha(Services.Color.mOnSurface, MenuVisuals.hoverOpacity) : "transparent"
 
                                 Behavior on color { ColorAnimation { duration: Services.Motion.number.shortDuration; easing.type: Services.Motion.number.shortEasing } }
                             }
@@ -220,13 +221,13 @@ Item {
                                 id: check
 
                                 anchors.left: parent.left
-                                anchors.leftMargin: 8
+                                anchors.leftMargin: MenuVisuals.contentInset
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: 14
+                                width: MenuVisuals.checkIndicatorWidth
                                 horizontalAlignment: Text.AlignHCenter
                                 text: "\u2713"
                                 color: Services.Color.mPrimary
-                                font.pixelSize: 12
+                                font.pixelSize: MenuVisuals.bodyFontSize
                                 visible: entry.modelData.checkState === Qt.Checked
                             }
 
@@ -235,13 +236,13 @@ Item {
                                 id: rowIcon
 
                                 anchors.left: check.visible ? check.right : parent.left
-                                anchors.leftMargin: check.visible ? 4 : 8
+                                anchors.leftMargin: check.visible ? MenuVisuals.rowEdgeInset : MenuVisuals.contentInset
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: 16
-                                height: 16
+                                width: MenuVisuals.iconWidth
+                                height: MenuVisuals.iconImageSize
                                 visible: entry.modelData.icon !== ""
                                 source: entry.modelData.icon
-                                sourceSize: Qt.size(16, 16)
+                                sourceSize: Qt.size(MenuVisuals.iconImageSize, MenuVisuals.iconImageSize)
                                 smooth: true
                             }
 
@@ -252,12 +253,12 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.left: rowIcon.visible ? rowIcon.right
                                     : check.visible ? check.right : parent.left
-                                anchors.leftMargin: (rowIcon.visible || check.visible) ? 6 : 8
+                                anchors.leftMargin: (rowIcon.visible || check.visible) ? MenuVisuals.rowRadius : MenuVisuals.contentInset
                                 anchors.right: chevron.visible ? chevron.left : parent.right
-                                anchors.rightMargin: 8
+                                anchors.rightMargin: MenuVisuals.contentInset
                                 text: entry.modelData.text
                                 color: entry.modelData.enabled ? Services.Color.mOnSurface : Services.Color.mOutline
-                                font.pixelSize: 12
+                                font.pixelSize: MenuVisuals.bodyFontSize
                                 elide: Text.ElideRight
                             }
 
@@ -266,11 +267,11 @@ Item {
                                 id: chevron
 
                                 anchors.right: parent.right
-                                anchors.rightMargin: 8
+                                anchors.rightMargin: MenuVisuals.contentInset
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "\u203a"
                                 color: entry.modelData.enabled ? Services.Color.mOnSurfaceVariant : Services.Color.mOutline
-                                font.pixelSize: 14
+                                font.pixelSize: MenuVisuals.chevronFontSize
                                 visible: entry.modelData.hasChildren
                             }
 

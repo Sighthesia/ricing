@@ -1,0 +1,22 @@
+// Shared visual tokens for dockzone-hosted menu surfaces.
+
+var rowRadius = 6;
+var rowHeight = 32;
+var compactSpacing = 2;
+var contentInset = 8;
+var iconWidth = 16;
+var contentSpacing = 8;
+var outerPadding = 8;
+var rowEdgeInset = 4;
+var separatorInset = 12;
+var checkIndicatorWidth = 14;
+var submenuHeaderHeight = 30;
+var separatorRowHeight = 7;
+var idealContextContentWidth = 180;
+var trayMenuWidth = 220;
+var bodyFontSize = 12;
+var chevronFontSize = 14;
+var iconFontSize = 14;
+var iconImageSize = 16;
+var dividerOpacity = 0.4;
+var hoverOpacity = 0.08;

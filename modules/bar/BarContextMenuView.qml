@@ -1,4 +1,5 @@
 import "."
+import "MenuVisuals.js" as MenuVisuals
 import "../../services" as Services
 import QtQuick
 
@@ -6,10 +7,10 @@ import QtQuick
 Item {
     id: root
 
-    readonly property real idealContentWidth: 180
-    readonly property real outerPadding: 8
-    readonly property real rowEdgeInset: 4
-    readonly property real separatorInset: 12
+    readonly property real idealContentWidth: MenuVisuals.idealContextContentWidth
+    readonly property real outerPadding: MenuVisuals.outerPadding
+    readonly property real rowEdgeInset: MenuVisuals.rowEdgeInset
+    readonly property real separatorInset: MenuVisuals.separatorInset
     property real viewportWidth: menuContentWidth
     property real viewportHeight: contentHeight
     readonly property real menuContentWidth: idealContentWidth
@@ -37,7 +38,7 @@ Item {
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.topMargin: root.outerPadding
-            spacing: 2
+            spacing: MenuVisuals.compactSpacing
 
             // Layout mode toggle.
             ContextMenuRow {
@@ -73,7 +74,7 @@ Item {
                 width: parent.width - root.separatorInset * 2
                 anchors.horizontalCenter: parent.horizontalCenter
                 height: 1
-                color: Qt.alpha(Services.Color.mOutline, 0.4)
+                color: Qt.alpha(Services.Color.mOutline, MenuVisuals.dividerOpacity)
                 visible: Services.BarLayoutService.contextMenuWidgetKey !== ""
                 opacity: fullyRevealed ? 1 : 0
             }
@@ -121,7 +122,7 @@ Item {
                 width: parent.width - root.separatorInset * 2
                 anchors.horizontalCenter: parent.horizontalCenter
                 height: 1
-                color: Qt.alpha(Services.Color.mOutline, 0.4)
+                color: Qt.alpha(Services.Color.mOutline, MenuVisuals.dividerOpacity)
                 opacity: fullyRevealed ? 1 : 0
             }
 
@@ -145,7 +146,7 @@ Item {
                 width: parent.width - root.separatorInset * 2
                 anchors.horizontalCenter: parent.horizontalCenter
                 height: 1
-                color: Qt.alpha(Services.Color.mOutline, 0.4)
+                color: Qt.alpha(Services.Color.mOutline, MenuVisuals.dividerOpacity)
                 opacity: fullyRevealed ? 1 : 0
             }
 
