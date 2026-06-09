@@ -1,4 +1,5 @@
 import QtQuick
+import "../bar/MenuVisuals.js" as MenuVisuals
 import "../../services" as Services
 
 // Single shortcut row: key sequence (editable) + action label + category badge.
@@ -14,8 +15,10 @@ Rectangle {
 
     width: ListView.view.width
     height: 52
-    radius: 6
-    color: mouseArea.containsMouse ? "#33ffffff" : "#1affffff"
+    radius: MenuVisuals.rowRadius
+    color: mouseArea.containsMouse
+        ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.2)
+        : Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.1)
 
     property bool editing: false
 
@@ -27,14 +30,14 @@ Rectangle {
     }
 
     Row {
-        anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-        spacing: 8
+        anchors { fill: parent; leftMargin: MenuVisuals.listContentInset; rightMargin: MenuVisuals.listContentInset }
+        spacing: MenuVisuals.contentSpacing
 
         // Category badge
         Rectangle {
             width: catText.implicitWidth + 12
             height: 20
-            radius: 4
+            radius: MenuVisuals.badgeRadius
             anchors.verticalCenter: parent.verticalCenter
             color: delegate.managedByShell ? "#44448aff" : "#33ffffff"
 
@@ -60,8 +63,8 @@ Rectangle {
         // Key sequence display / edit
         Rectangle {
             width: seqInput.visible ? 140 : seqText.implicitWidth + 16
-            height: 28
-            radius: 4
+            height: MenuVisuals.compactControlHeight
+            radius: MenuVisuals.badgeRadius
             anchors.verticalCenter: parent.verticalCenter
             color: delegate.editing ? "#44ffffff" : "#22ffffff"
             border.color: delegate.editing ? "#88aaff" : "transparent"
@@ -81,7 +84,7 @@ Rectangle {
             // Edit mode
             TextInput {
                 id: seqInput
-                anchors { fill: parent; margins: 4 }
+                anchors { fill: parent; margins: MenuVisuals.smallGap }
                 color: "white"
                 font.pixelSize: 12
                 font.family: "monospace"
