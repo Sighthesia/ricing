@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Widgets
 import "../bar/MenuVisuals.js" as MenuVisuals
@@ -123,7 +124,7 @@ Item {
             anchors.fill: parent
             anchors.margins: 4
             clip: true
-            spacing: 4
+            spacing: 0
 
             property string query: {
                 var q = Services.IslandService.query.toLowerCase()
@@ -131,43 +132,83 @@ Item {
                 return q
             }
 
-            property var filteredApps: {
-                const q = query
+            property var sortedApps: {
                 const all = DesktopEntries.applications.values
                 if (!all || all.length === 0) return []
-                const filtered = all.filter(a => {
-                    if (!q) return true
-                    const name = (a.name || "").toLowerCase()
-                    const comment = (a.comment || "").toLowerCase()
-                    const genericName = (a.genericName || "").toLowerCase()
-                    const id = (a.id || "").toLowerCase()
-                    const keywords = (a.keywords || []).join(" ").toLowerCase()
-                    return name.includes(q) || comment.includes(q)
-                        || genericName.includes(q) || id.includes(q)
-                        || keywords.includes(q)
-                })
-                return filtered.sort((a, b) => {
+                return all.slice().sort((a, b) => {
                     const ca = Services.LaunchCountService.getLaunchCount(a.id || "")
                     const cb = Services.LaunchCountService.getLaunchCount(b.id || "")
                     return cb - ca
                 })
             }
 
-            model: filteredApps
+            function appMatches(app, q) {
+                if (!q) return true
+                const name = (app.name || "").toLowerCase()
+                const comment = (app.comment || "").toLowerCase()
+                const genericName = (app.genericName || "").toLowerCase()
+                const appId = (app.id || "").toLowerCase()
+                const keywords = (app.keywords || []).join(" ").toLowerCase()
+                return name.includes(q) || comment.includes(q)
+                    || genericName.includes(q) || appId.includes(q)
+                    || keywords.includes(q)
+            }
+
+            model: sortedApps
+
+            add: Transition {
+                ParallelAnimation {
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "x"; from: 26; to: 0; duration: 220; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "_filterSoftness"; from: 1; to: 0; duration: 220; easing.type: Easing.OutCubic }
+                }
+            }
+
+            remove: Transition {
+                ParallelAnimation {
+                    NumberAnimation { property: "opacity"; to: 0; duration: 150; easing.type: Easing.InCubic }
+                    NumberAnimation { property: "x"; to: 30; duration: 180; easing.type: Easing.InCubic }
+                    NumberAnimation { property: "_filterSoftness"; to: 1; duration: 180; easing.type: Easing.InCubic }
+                }
+            }
+
+            displaced: Transition {
+                NumberAnimation { properties: "x,y"; duration: 220; easing.type: Easing.OutCubic }
+            }
 
             delegate: Rectangle {
                 id: appDelegate
                 required property var modelData
                 required property int index
+                readonly property bool matchesFilter: appListView.appMatches(modelData, appListView.query)
+                property real _filterSoftness: matchesFilter ? 0 : 1
+
                 width: ListView.view ? ListView.view.width : 200
-                height: 48
+                height: matchesFilter ? 52 : 0
+                opacity: matchesFilter ? 1 : 0
+                x: matchesFilter ? 0 : 30
+                visible: height > 1 || opacity > 0.01
                 radius: MenuVisuals.rowRadius
+                layer.enabled: _filterSoftness > 0.01
+                layer.effect: MultiEffect {
+                    blurEnabled: true
+                    blurMax: 14
+                    blur: appDelegate._filterSoftness * 0.42
+                }
                 color: delegateMouse.containsMouse || ListView.view.currentIndex === index
                     ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
 
+                Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
+                Behavior on x { NumberAnimation { duration: 190; easing.type: appDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+                Behavior on opacity { NumberAnimation { duration: 190; easing.type: appDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+                Behavior on _filterSoftness { NumberAnimation { duration: 190; easing.type: appDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+
                 Row {
-                    anchors.fill: parent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: 48
                     anchors.leftMargin: MenuVisuals.listContentInset
                     anchors.rightMargin: MenuVisuals.listContentInset
                     spacing: 12
@@ -230,7 +271,7 @@ Item {
             anchors.fill: parent
             anchors.margins: 4
             clip: true
-            spacing: 4
+            spacing: 0
 
             property string query: {
                 var q = Services.IslandService.query.toLowerCase()
@@ -238,33 +279,76 @@ Item {
                 return q.startsWith(">") ? "" : q
             }
 
-            property var filteredItems: {
-                const q = query
+            property var allItems: {
                 const all = Services.ClipboardService.items
                 if (!all || all.length === 0) return []
-                if (!q) return all
-                return all.filter(item => {
-                    const preview = (item.preview || "").toLowerCase()
-                    return preview.includes(q)
-                })
+                return all
+            }
+            function clipMatches(item, q) {
+                if (!q) return true
+                const preview = (item.preview || "").toLowerCase()
+                const kind = item.isImage ? "image" : "text"
+                return preview.includes(q) || kind.includes(q)
             }
 
-            model: filteredItems
+            model: allItems
 
             Component.onCompleted: Services.ClipboardService.list()
 
+            add: Transition {
+                ParallelAnimation {
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "x"; from: 26; to: 0; duration: 220; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "_filterSoftness"; from: 1; to: 0; duration: 220; easing.type: Easing.OutCubic }
+                }
+            }
+
+            remove: Transition {
+                ParallelAnimation {
+                    NumberAnimation { property: "opacity"; to: 0; duration: 150; easing.type: Easing.InCubic }
+                    NumberAnimation { property: "x"; to: 30; duration: 180; easing.type: Easing.InCubic }
+                    NumberAnimation { property: "_filterSoftness"; to: 1; duration: 180; easing.type: Easing.InCubic }
+                }
+            }
+
+            displaced: Transition {
+                NumberAnimation { properties: "x,y"; duration: 220; easing.type: Easing.OutCubic }
+            }
+
             delegate: Rectangle {
+                id: clipDelegate
+
                 required property var modelData
                 required property int index
+                readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
+                property real _filterSoftness: matchesFilter ? 0 : 1
+
                 width: ListView.view ? ListView.view.width : 200
-                height: 48
+                height: matchesFilter ? 52 : 0
+                opacity: matchesFilter ? 1 : 0
+                x: matchesFilter ? 0 : 30
+                visible: height > 1 || opacity > 0.01
                 radius: MenuVisuals.rowRadius
+                layer.enabled: _filterSoftness > 0.01
+                layer.effect: MultiEffect {
+                    blurEnabled: true
+                    blurMax: 14
+                    blur: clipDelegate._filterSoftness * 0.42
+                }
                 color: clipMouse.containsMouse || clipListView.currentIndex === index
                     ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
 
+                Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
+                Behavior on x { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+                Behavior on opacity { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+                Behavior on _filterSoftness { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+
                 Text {
-                    anchors.fill: parent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: 48
                     anchors.leftMargin: MenuVisuals.listContentInset
                     anchors.rightMargin: MenuVisuals.listContentInset
                     verticalAlignment: Text.AlignVCenter

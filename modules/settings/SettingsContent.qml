@@ -7,6 +7,10 @@ import "controls"
 Item {
     id: root
 
+    function settingMatches(label) {
+        return label.toLowerCase().includes(searchField.text.toLowerCase())
+    }
+
     // Search field at the top
     TextField {
         id: searchField
@@ -48,8 +52,12 @@ Item {
                 font.bold: true
                 font.pixelSize: 14
                 topPadding: 8
-                visible: barHeight.visible || barPosition.visible || barFloating.visible ||
-                         barFloatingMargin.visible || barBgOpacity.visible || barCornerRadius.visible
+                height: (barHeight.filterVisible || barPosition.filterVisible || barFloating.filterVisible ||
+                         barFloatingMargin.filterVisible || barBgOpacity.filterVisible || barCornerRadius.filterVisible) ? implicitHeight : 0
+                opacity: height > 0 ? 1 : 0
+                visible: height > 1 || opacity > 0.01
+                Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
             }
 
             SettingSlider {
@@ -59,7 +67,7 @@ Item {
                 value: Services.SettingsService.bar.height
                 suffix: "px"
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.bar.height = v }
             }
 
@@ -69,7 +77,7 @@ Item {
                 model: ["top", "bottom"]
                 currentValue: Services.SettingsService.bar.position
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onSelected: v => { Services.SettingsService.bar.position = v }
             }
 
@@ -78,7 +86,7 @@ Item {
                 settingLabel: "Floating"
                 checked: Services.SettingsService.bar.floating
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onToggled: v => { Services.SettingsService.bar.floating = v }
             }
 
@@ -90,8 +98,7 @@ Item {
                 suffix: "px"
                 width: parent.width
                 // Only visible when floating is enabled and matches search
-                visible: Services.SettingsService.bar.floating &&
-                         settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: Services.SettingsService.bar.floating && root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.bar.floatingMargin = v }
             }
 
@@ -101,7 +108,7 @@ Item {
                 from: 0; to: 1; stepSize: 0.05
                 value: Services.SettingsService.bar.backgroundOpacity
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.bar.backgroundOpacity = v }
             }
 
@@ -112,7 +119,7 @@ Item {
                 value: Services.SettingsService.bar.cornerRadius
                 suffix: "px"
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.bar.cornerRadius = v }
             }
 
@@ -126,10 +133,14 @@ Item {
                 font.bold: true
                 font.pixelSize: 14
                 topPadding: 8
-                visible: appWallpaper.visible || appColorScheme.visible || appPanelOpacity.visible ||
-                         appCornerRadius.visible || appBlur.visible ||
-                         appOverviewBg.visible || appOverviewSolid.visible ||
-                         appOverviewBlur.visible || appOverviewTint.visible
+                height: (appWallpaper.filterVisible || appColorScheme.filterVisible || appPanelOpacity.filterVisible ||
+                         appCornerRadius.filterVisible || appBlur.filterVisible ||
+                         appOverviewBg.filterVisible || appOverviewSolid.filterVisible ||
+                         appOverviewBlur.filterVisible || appOverviewTint.filterVisible) ? implicitHeight : 0
+                opacity: height > 0 ? 1 : 0
+                visible: height > 1 || opacity > 0.01
+                Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
             }
 
             SettingText {
@@ -138,7 +149,7 @@ Item {
                 text: Services.SettingsService.appearance.wallpaperPath
                 placeholderText: "/path/to/wallpaper.png"
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onEdited: v => { Services.WallpaperService.changeWallpaper(v) }
             }
 
@@ -148,7 +159,7 @@ Item {
                 model: ["auto", "dark", "light"]
                 currentValue: Services.SettingsService.appearance.colorScheme
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onSelected: v => { Services.SettingsService.appearance.colorScheme = v }
             }
 
@@ -158,7 +169,7 @@ Item {
                 from: 0; to: 1; stepSize: 0.05
                 value: Services.SettingsService.appearance.panelOpacity
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.appearance.panelOpacity = v }
             }
 
@@ -169,7 +180,7 @@ Item {
                 value: Services.SettingsService.appearance.cornerRadius
                 suffix: "px"
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.appearance.cornerRadius = v }
             }
 
@@ -178,7 +189,7 @@ Item {
                 settingLabel: "Enable Blur"
                 checked: Services.SettingsService.appearance.enableBlur
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onToggled: v => { Services.SettingsService.appearance.enableBlur = v }
             }
 
@@ -187,7 +198,7 @@ Item {
                 settingLabel: "Overview Background"
                 checked: Services.SettingsService.appearance.overviewBackground
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onToggled: v => { Services.SettingsService.appearance.overviewBackground = v }
             }
 
@@ -196,8 +207,7 @@ Item {
                 settingLabel: "Overview Solid Color"
                 checked: Services.SettingsService.appearance.overviewBackgroundSolid
                 width: parent.width
-                visible: Services.SettingsService.appearance.overviewBackground &&
-                         settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: Services.SettingsService.appearance.overviewBackground && root.settingMatches(settingLabel)
                 onToggled: v => { Services.SettingsService.appearance.overviewBackgroundSolid = v }
             }
 
@@ -207,9 +217,9 @@ Item {
                 from: 0; to: 1; stepSize: 0.05
                 value: Services.SettingsService.appearance.overviewBackgroundBlur
                 width: parent.width
-                visible: Services.SettingsService.appearance.overviewBackground &&
-                         !Services.SettingsService.appearance.overviewBackgroundSolid &&
-                         settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: Services.SettingsService.appearance.overviewBackground &&
+                               !Services.SettingsService.appearance.overviewBackgroundSolid &&
+                               root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.appearance.overviewBackgroundBlur = v }
             }
 
@@ -219,8 +229,7 @@ Item {
                 from: 0; to: 1; stepSize: 0.05
                 value: Services.SettingsService.appearance.overviewBackgroundTint
                 width: parent.width
-                visible: Services.SettingsService.appearance.overviewBackground &&
-                         settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: Services.SettingsService.appearance.overviewBackground && root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.appearance.overviewBackgroundTint = v }
             }
 
@@ -234,7 +243,11 @@ Item {
                 font.bold: true
                 font.pixelSize: 14
                 topPadding: 8
-                visible: notifMaxVisible.visible || notifTimeout.visible || notifPosition.visible || notifDnd.visible
+                height: (notifMaxVisible.filterVisible || notifTimeout.filterVisible || notifPosition.filterVisible || notifDnd.filterVisible) ? implicitHeight : 0
+                opacity: height > 0 ? 1 : 0
+                visible: height > 1 || opacity > 0.01
+                Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
             }
 
             SettingSlider {
@@ -243,7 +256,7 @@ Item {
                 from: 1; to: 10; stepSize: 1
                 value: Services.SettingsService.notifications.maxVisible
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.notifications.maxVisible = v }
             }
 
@@ -255,7 +268,7 @@ Item {
                 // Display as seconds
                 suffix: "s"
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.notifications.timeout = v }
             }
 
@@ -265,7 +278,7 @@ Item {
                 model: ["top-right", "top-left", "bottom-right", "bottom-left"]
                 currentValue: Services.SettingsService.notifications.position
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onSelected: v => { Services.SettingsService.notifications.position = v }
             }
 
@@ -274,7 +287,7 @@ Item {
                 settingLabel: "Do Not Disturb"
                 checked: Services.SettingsService.notifications.dnd
                 width: parent.width
-                visible: settingLabel.toLowerCase().includes(searchField.text.toLowerCase())
+                filterVisible: root.settingMatches(settingLabel)
                 onToggled: v => { Services.SettingsService.notifications.dnd = v }
             }
 

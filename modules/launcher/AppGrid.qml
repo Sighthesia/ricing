@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import "../../services" as Services
 
+// Searchable application grid with soft add/remove filtering motion.
 Item {
     id: root
     anchors.fill: parent
@@ -46,5 +47,27 @@ Item {
         delegate: AppGridDelegate {}
         focus: true
         Keys.onReturnPressed: if (currentItem) launchApp(currentItem.modelData)
+
+        add: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "scale"; from: 0.94; to: 1; duration: 220; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "_filterOffset"; from: 28; to: 0; duration: 220; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "_filterSoftness"; from: 1; to: 0; duration: 220; easing.type: Easing.OutCubic }
+            }
+        }
+
+        remove: Transition {
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; to: 0; duration: 160; easing.type: Easing.InCubic }
+                NumberAnimation { property: "scale"; to: 0.92; duration: 180; easing.type: Easing.InCubic }
+                NumberAnimation { property: "_filterOffset"; to: 32; duration: 180; easing.type: Easing.InCubic }
+                NumberAnimation { property: "_filterSoftness"; to: 1; duration: 180; easing.type: Easing.InCubic }
+            }
+        }
+
+        displaced: Transition {
+            NumberAnimation { properties: "x,y"; duration: 220; easing.type: Easing.OutCubic }
+        }
     }
 }
