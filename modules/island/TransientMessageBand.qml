@@ -11,7 +11,9 @@ import "../../services" as Services
 Item {
     id: root
 
-    readonly property var msg: Services.TransientMessageService.current
+    property var displayMsg: Services.TransientMessageService.current
+    readonly property var msg: displayMsg
+    readonly property real revealProgress: Services.TransientMessageService.revealProgress
     readonly property string kind: msg ? (msg.kind || "") : ""
     readonly property string glyph: msg ? (msg.glyph || "") : ""
     readonly property string rawIcon: msg ? (msg.icon || "") : ""
@@ -34,16 +36,33 @@ Item {
     readonly property bool hasLeading: showArt || showAppIcon || showGlyph || showFallbackBell
 
     // Zero size when idle so the island returns to its bare clock size.
-    implicitWidth: Services.TransientMessageService.active ? card.implicitWidth + 12 : 0
-    implicitHeight: Services.TransientMessageService.active ? card.implicitHeight : 26
+    implicitWidth: (card.implicitWidth + 12) * root.revealProgress
+    implicitHeight: 26 + Math.max(0, card.implicitHeight - 26) * root.revealProgress
     clip: true
-    visible: Services.TransientMessageService.active || implicitWidth > 1
+    visible: Services.TransientMessageService.active || root.revealProgress > 0.01
 
+    onRevealProgressChanged: {
+        if (root.revealProgress <= 0.01 && !Services.TransientMessageService.active)
+            root.displayMsg = null
+    }
+
+    Connections {
+        target: Services.TransientMessageService
+
+        function onCurrentChanged() {
+            if (Services.TransientMessageService.current)
+                root.displayMsg = Services.TransientMessageService.current
+        }
+    }
+
+    // Slide and fade the retained message content with the shared reveal progress.
     Column {
         id: card
         anchors.left: parent.left
         anchors.top: parent.top
         spacing: 4
+        opacity: root.revealProgress
+        x: Math.round((1 - root.revealProgress) * -10)
 
         // Top row: leading separator, icon/art/glyph, app name + title.
         Row {

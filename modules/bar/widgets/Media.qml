@@ -12,8 +12,9 @@ Item {
     property string widgetInstanceKey: ""
     property real availableWidth: -1
 
-    // Simplify to icon-only during transient messages (hardcoded on for now).
-    readonly property bool simplified: Services.TransientMessageService.active
+    // Simplify to icon-only using the shared transient reveal progress.
+    readonly property real transientRevealProgress: Services.TransientMessageService.revealProgress
+    readonly property bool simplified: transientRevealProgress >= 0.99
     readonly property var mediaSettings: Services.SettingsService.widgetSettingsObject(
         "media",
         root.widgetInstanceKey
@@ -24,9 +25,6 @@ Item {
     readonly property bool needsAudioSpectrum: root.showAudioSpectrum && !root.simplified
     readonly property string spectrumComponentId: "media:" + root.widgetInstanceKey
     readonly property real compactTextWidth: {
-        if (root.simplified)
-            return 0
-
         if (root.availableWidth <= 0)
             return 200
 
@@ -35,8 +33,9 @@ Item {
         var chrome = 16
         return Math.max(48, Math.min(200, root.availableWidth - artWidth - spacing - chrome))
     }
-    readonly property real currentTextTargetWidth: root.simplified ? 0 : Math.min(currentTextLabel.implicitWidth, root.compactTextWidth)
-    readonly property real nextTextTargetWidth: root.simplified ? 0 : Math.min(nextTextLabel.implicitWidth, root.compactTextWidth)
+    readonly property real transientTextRevealProgress: Math.max(0, Math.min(1, 1 - root.transientRevealProgress))
+    readonly property real currentTextTargetWidth: Math.min(currentTextLabel.implicitWidth, root.compactTextWidth) * root.transientTextRevealProgress
+    readonly property real nextTextTargetWidth: Math.min(nextTextLabel.implicitWidth, root.compactTextWidth) * root.transientTextRevealProgress
 
     property string currentText: root._displayText
     property string pendingText: root._displayText
@@ -365,7 +364,7 @@ Item {
                 id: currentTextSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                visible: !root.simplified
+                visible: root.transientTextRevealProgress > 0.01
                 property real revealWidth: root.currentTextTargetWidth
 
                 width: revealWidth
@@ -380,6 +379,8 @@ Item {
 
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
+                    opacity: root.transientTextRevealProgress
+                    x: Math.round((1 - root.transientTextRevealProgress) * -6)
                     text: root.currentText
                     color: Services.MediaControlService.showCompactLyric
                         ? Services.Color.mPrimary
@@ -553,7 +554,7 @@ Item {
                 id: nextTextSlot
 
                 anchors.verticalCenter: parent.verticalCenter
-                visible: !root.simplified
+                visible: root.transientTextRevealProgress > 0.01
                 property real revealWidth: root.nextTextTargetWidth
 
                 width: revealWidth
@@ -568,6 +569,8 @@ Item {
 
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
+                    opacity: root.transientTextRevealProgress
+                    x: Math.round((1 - root.transientTextRevealProgress) * -6)
                     text: root.pendingText
                     color: Services.MediaControlService.showCompactLyric
                         ? Services.Color.mPrimary

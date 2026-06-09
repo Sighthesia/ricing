@@ -18,7 +18,10 @@ Item {
     readonly property bool showDate: clockSettings ? clockSettings.showDate : true
     readonly property bool showDateWhenSimplified: clockSettings ? clockSettings.showDateWhenSimplified : false
     readonly property bool use24Hour: clockSettings ? clockSettings.timeFormat === "24h" : false
-    readonly property bool dateVisible: root.showDate && (!root.simplified || root.showDateWhenSimplified)
+    readonly property real transientRevealProgress: Services.TransientMessageService.revealProgress
+    readonly property real dateRevealProgress: root.showDate
+        ? (root.showDateWhenSimplified ? 1 : 1 - root.transientRevealProgress)
+        : 0
 
     implicitWidth: clockRow.implicitWidth + 20
     implicitHeight: 30
@@ -34,22 +37,40 @@ Item {
         anchors.centerIn: parent
         spacing: 6
 
-        // Date: MMM d
-        Text {
+        // Date slot smoothly yields space to transient messages.
+        Item {
+            id: dateSlot
+
             anchors.verticalCenter: parent.verticalCenter
-            visible: root.dateVisible
-            text: Qt.formatDateTime(systemClock.date, "MMM d")
-            color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: Services.TextSize.barContent
+            width: dateText.implicitWidth * root.dateRevealProgress
+            height: dateText.implicitHeight
+            clip: true
+            visible: width > 0.5
+
+            Text {
+                id: dateText
+
+                anchors.verticalCenter: parent.verticalCenter
+                text: Qt.formatDateTime(systemClock.date, "MMM d")
+                color: Services.Color.mOnSurfaceVariant
+                font.pixelSize: Services.TextSize.barContent
+                opacity: root.dateRevealProgress
+                x: Math.round((1 - root.dateRevealProgress) * -6)
+            }
         }
 
-        // Separator
-        Rectangle {
-            width: 1
-            height: 14
+        // Separator yields with the date so the clock remains one object.
+        Item {
             anchors.verticalCenter: parent.verticalCenter
-            visible: root.dateVisible
-            color: Services.Color.mOutline
+            width: root.dateRevealProgress > 0.01 ? 1 : 0
+            height: 14
+            clip: true
+
+            Rectangle {
+                anchors.fill: parent
+                color: Services.Color.mOutline
+                opacity: root.dateRevealProgress
+            }
         }
 
         // Time: HH:mm

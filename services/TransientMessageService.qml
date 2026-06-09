@@ -12,6 +12,14 @@ Singleton {
     // Current message: { kind, glyph, icon, title, body, progress } or null.
     property var current: null
     readonly property bool active: current !== null
+    property real revealProgress: active ? 1 : 0
+
+    Behavior on revealProgress {
+        NumberAnimation {
+            duration: Services.Motion.number.contentDuration
+            easing.type: Services.Motion.number.contentEasing
+        }
+    }
 
     // Suppress the initial property emissions (brightness poll, volume init)
     // that fire during startup so the band only appears on genuine changes.
@@ -27,6 +35,7 @@ Singleton {
     // Coalescing key of the showing message so rapid repeats (volume drag)
     // refresh in place instead of stacking.
     property string _currentKey: ""
+    property bool _betweenMessages: false
 
     // Push a message; keyed kinds coalesce, notifications always enqueue.
     function _push(msg) {
@@ -49,12 +58,13 @@ Singleton {
         }
         q.push(msg)
         root._queue = q
-        if (!root.active)
+        if (!root.active && !root._betweenMessages)
             _advance()
     }
 
     // Promote the next queued message and arm the hide timer.
     function _advance() {
+        root._betweenMessages = false
         if (root._queue.length === 0) {
             root.current = null
             root._currentKey = ""
@@ -72,6 +82,21 @@ Singleton {
     // Per-message dwell: notifications linger, OSD feedback is brief.
     property Timer hideTimer: Timer {
         interval: root.current && root.current.kind === "notification" ? 5000 : 1800
+        onTriggered: {
+            if (root._queue.length === 0) {
+                root._advance()
+                return
+            }
+
+            root._betweenMessages = true
+            root.current = null
+            root._currentKey = ""
+            nextMessageTimer.restart()
+        }
+    }
+
+    property Timer nextMessageTimer: Timer {
+        interval: Services.Motion.number.contentDuration + 40
         onTriggered: root._advance()
     }
 
