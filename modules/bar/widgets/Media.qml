@@ -349,11 +349,11 @@ Item {
                         maskSource: currentArtworkMaskContainer
                     }
 
-                    Text {
+                    Services.FluidText {
                         anchors.centerIn: parent
                         text: "♪"
                         color: Services.Color.mOnSurfaceVariant
-                        font.pixelSize: 10
+                        basePixelSize: 10
                         visible: root._displayArtUrl === ""
                     }
                 }
@@ -374,7 +374,7 @@ Item {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
-                Text {
+                Services.FluidText {
                     id: currentTextLabel
 
                     anchors.verticalCenter: parent.verticalCenter
@@ -385,7 +385,6 @@ Item {
                     color: Services.MediaControlService.showCompactLyric
                         ? Services.Color.mPrimary
                         : Services.Color.mOnSurface
-                    font.pixelSize: Services.TextSize.barContent
                     font.bold: Services.MediaControlService.showCompactLyric
                     elide: Text.ElideRight
                     maximumLineCount: 1
@@ -539,11 +538,11 @@ Item {
                         maskSource: nextArtworkMaskContainer
                     }
 
-                    Text {
+                    Services.FluidText {
                         anchors.centerIn: parent
                         text: "♪"
                         color: Services.Color.mOnSurfaceVariant
-                        font.pixelSize: 10
+                        basePixelSize: 10
                         visible: root._displayArtUrl === ""
                     }
                 }
@@ -564,7 +563,7 @@ Item {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
-                Text {
+                Services.FluidText {
                     id: nextTextLabel
 
                     anchors.verticalCenter: parent.verticalCenter
@@ -575,7 +574,6 @@ Item {
                     color: Services.MediaControlService.showCompactLyric
                         ? Services.Color.mPrimary
                         : Services.Color.mOnSurface
-                    font.pixelSize: Services.TextSize.barContent
                     font.bold: Services.MediaControlService.showCompactLyric
                     elide: Text.ElideRight
                     maximumLineCount: 1

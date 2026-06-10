@@ -11,6 +11,8 @@ singleton VolumeService 1.0 VolumeService.qml
 singleton WallpaperService 1.0 WallpaperService.qml
 singleton SettingsService 1.0 SettingsService.qml
 singleton ClipboardService 1.0 ClipboardService.qml
+singleton FontService 1.0 FontService.qml
+FluidText 1.0 FluidText.qml
 singleton LauncherService 1.0 LauncherService.qml
 singleton MediaService 1.0 MediaService.qml
 singleton MediaControlService 1.0 MediaControlService.qml

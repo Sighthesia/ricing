@@ -182,6 +182,11 @@ QtObject {
    property real panelOpacity: 0.9
              property int cornerRadius: 12
         property bool enableBlur: true
+                // Font family — empty string means system default (Qt.application.font.family)
+                property string fontDefault: ""
+                property string fontFixed: "monospace"
+                property real fontDefaultScale: 1.0
+                property real fontFixedScale: 1.0
                 // Window hint layout: "attached-island" extends from the island,
           // "floating-capsule" keeps the legacy independent floating popup.
                 property string windowHintMode: "attached-island"

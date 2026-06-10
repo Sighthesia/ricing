@@ -32,13 +32,12 @@ Item {
             Services.VolumeService.setSinkVolume(Services.VolumeService.sinkVolume + delta)
         }
 
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: Services.VolumeService.sinkMuted ? "Muted" : (Math.round(Services.VolumeService.sinkVolume * 100) + "%")
             color: Services.VolumeService.sinkMuted
                 ? Services.Color.mError
                 : Services.Color.mOnSurface
-            font.pixelSize: Services.TextSize.barContent
         }
     }
 }

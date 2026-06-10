@@ -9,8 +9,11 @@ import "modules/workspace-hint" as WorkspaceHint
 
 // Keep the shell root minimal while layering reusable screen surfaces.
 ShellRoot {
-    // Sync managed compositor hotkeys once at shell startup.
-    Component.onCompleted: Services.NiriService.syncManagedHotkeys()
+    // Sync managed compositor hotkeys and enumerate system fonts at startup.
+    Component.onCompleted: {
+        Services.NiriService.syncManagedHotkeys()
+        Services.FontService.init()
+    }
 
     // Render wallpaper on each screen behind all other surfaces.
     Background.BackgroundWindow {

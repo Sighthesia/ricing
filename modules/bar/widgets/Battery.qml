@@ -51,21 +51,19 @@ Item {
         progressValue: Services.BatteryService.percentage / 100
         progressColor: root.stateColor
 
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: root.detailStateText
-            font.family: root.detailStateText !== "" ? "Symbols Nerd Font" : font.family
+            explicitFontFamily: root.detailStateText !== "" ? "Symbols Nerd Font" : ""
             color: root.stateColor
-            font.pixelSize: Services.TextSize.barContent
             visible: text !== ""
         }
 
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: Services.BatteryService.percentage + "%"
             color: root.stateColor
             visible: root.showPercentage
-            font.pixelSize: Services.TextSize.barContent
         }
     }
 }

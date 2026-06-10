@@ -239,13 +239,12 @@ Item {
                         0.35
                     )
 
-                    Text {
+                    Services.FluidText {
                         id: activeWorkspaceLabel
                         anchors.centerIn: parent
 
                         text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
                         color: Services.Color.mPrimary
-                        font.pixelSize: Services.TextSize.barContent
                         font.bold: true
                         visible: text !== ""
                     }
@@ -538,11 +537,10 @@ Item {
                                     }
 
                                     // Show one window title using the old elide rules.
-                                    Text {
+                                    Services.FluidText {
                                         id: titleText
 
                                         text: modelData.title || ""
-                                        font.pixelSize: Services.TextSize.barContent
                                         font.bold: false
                                         color: modelData.isFocused
                                             ? Services.Color.mOnSurface
@@ -572,10 +570,9 @@ Item {
                         }
 
                         // Preserve the empty focused-workspace fallback.
-                        Text {
+                        Services.FluidText {
                             visible: root._isPrimaryCapsule && root._isEmptyWorkspace
                             text: "空工作区"
-                            font.pixelSize: Services.TextSize.barContent
                             color: Services.Color.mOnSurfaceVariant
                             opacity: 0.5
                         }
@@ -589,11 +586,10 @@ Item {
                     visible: false
                     spacing: CapsuleMetrics.groupGap
 
-                    Text {
+                    Services.FluidText {
                         id: primaryMeasureWorkspaceLabel
 
                         text: root._activeWorkspaceIndex > 0 ? String(root._activeWorkspaceIndex) : ""
-                        font.pixelSize: Services.TextSize.barContent
                         font.bold: true
                         visible: text !== ""
                     }
@@ -631,20 +627,18 @@ Item {
                                         height: 16
                                     }
 
-                                    Text {
+                                    Services.FluidText {
                                         id: measureTitleText
 
                                         text: modelData.title || ""
-                                        font.pixelSize: Services.TextSize.barContent
                                     }
                                 }
                             }
                         }
 
-                        Text {
+                        Services.FluidText {
                             visible: root._isEmptyWorkspace
                             text: "空工作区"
-                            font.pixelSize: Services.TextSize.barContent
                         }
                     }
                 }
@@ -664,13 +658,12 @@ Item {
                         width: neighborWorkspaceLabel.visible ? neighborWorkspaceLabel.implicitWidth : 0
                         height: root._iconSize + 10
 
-                        Text {
+                        Services.FluidText {
                             id: neighborWorkspaceLabel
                             anchors.verticalCenter: parent.verticalCenter
 
                             text: root.capsule ? String(root.capsule.workspaceIndex) : ""
                             color: root._textColor
-                            font.pixelSize: Services.TextSize.barContent
                             font.bold: root._emphasis >= 0.5
                             visible: text !== ""
                         }
@@ -742,10 +735,9 @@ Item {
                 }
 
                 // Keep empty workspaces readable even without window icons.
-                Text {
+                Services.FluidText {
                     text: root._isEmptyWorkspace ? "空工作区" : ""
                     color: Services.Color.mOnSurfaceVariant
-                    font.pixelSize: Services.TextSize.barContent
                     opacity: 0.75
                     visible: text !== "" && root._emphasis >= 0.35
                 }

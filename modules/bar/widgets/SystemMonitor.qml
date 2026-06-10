@@ -48,35 +48,31 @@ Item {
         progressValue: Services.SystemMonitorService.cpuUsage / 100
         progressColor: root.cpuAccentColor
 
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: root.cpuLabel
             color: Services.Color.mOnSurface
-            font.pixelSize: Services.TextSize.barContent
             visible: root.showCpu
         }
 
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: root.memLabel
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: Services.TextSize.barContent
             visible: root.showMemory
         }
 
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: root.netLabel
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: Services.TextSize.barContent
             visible: root.showNetwork
         }
 
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: root.loadLabel
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: Services.TextSize.barContent
             visible: root.showLoad
         }
     }

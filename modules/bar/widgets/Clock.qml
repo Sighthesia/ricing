@@ -47,13 +47,12 @@ Item {
             clip: true
             visible: width > 0.5
 
-            Text {
+            Services.FluidText {
                 id: dateText
 
                 anchors.verticalCenter: parent.verticalCenter
                 text: Qt.formatDateTime(systemClock.date, "MMM d")
                 color: Services.Color.mOnSurfaceVariant
-                font.pixelSize: Services.TextSize.barContent
                 opacity: root.dateRevealProgress
                 x: Math.round((1 - root.dateRevealProgress) * -6)
             }
@@ -74,11 +73,10 @@ Item {
         }
 
         // Time: HH:mm
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(systemClock.date, root.use24Hour ? "HH:mm" : "hh:mm")
             color: Services.Color.mOnSurface
-            font.pixelSize: Services.TextSize.barContent
             font.bold: true
         }
     }

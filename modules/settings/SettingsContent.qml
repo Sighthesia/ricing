@@ -136,7 +136,9 @@ Item {
                 height: (appWallpaper.filterVisible || appColorScheme.filterVisible || appPanelOpacity.filterVisible ||
                          appCornerRadius.filterVisible || appBlur.filterVisible ||
                          appOverviewBg.filterVisible || appOverviewSolid.filterVisible ||
-                         appOverviewBlur.filterVisible || appOverviewTint.filterVisible) ? implicitHeight : 0
+                         appOverviewBlur.filterVisible || appOverviewTint.filterVisible ||
+                         fontDefault.filterVisible || fontFixed.filterVisible ||
+                         fontDefaultScale.filterVisible || fontFixedScale.filterVisible) ? implicitHeight : 0
                 opacity: height > 0 ? 1 : 0
                 visible: height > 1 || opacity > 0.01
                 Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutCubic } }
@@ -233,6 +235,67 @@ Item {
                 onMoved: v => { Services.SettingsService.appearance.overviewBackgroundTint = v }
             }
 
+            // ── Fonts ────────────────────────────────────────────────────────
+
+            Text {
+                id: fontsHeader
+                text: "Fonts"
+                color: Services.Color.mPrimary
+                font.bold: true
+                font.pixelSize: 14
+                topPadding: 8
+                height: (fontDefault.filterVisible || fontFixed.filterVisible ||
+                         fontDefaultScale.filterVisible || fontFixedScale.filterVisible) ? implicitHeight : 0
+                opacity: height > 0 ? 1 : 0
+                visible: height > 1 || opacity > 0.01
+                Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+            }
+
+            SettingFontCombo {
+                id: fontDefault
+                settingLabel: "Default Font"
+                description: "UI text font family (empty = system default)"
+                fontModel: Services.FontService.fontsLoaded ? Services.FontService.availableFonts : null
+                currentKey: Services.SettingsService.appearance.fontDefault
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onSelected: k => { Services.SettingsService.appearance.fontDefault = k }
+            }
+
+            SettingFontCombo {
+                id: fontFixed
+                settingLabel: "Monospace Font"
+                description: "Monospace font for numerals and code"
+                fontModel: Services.FontService.fontsLoaded ? Services.FontService.monospaceFonts : null
+                currentKey: Services.SettingsService.appearance.fontFixed
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onSelected: k => { Services.SettingsService.appearance.fontFixed = k }
+            }
+
+            SettingSlider {
+                id: fontDefaultScale
+                settingLabel: "Default Font Scale"
+                from: 0.75; to: 1.25; stepSize: 0.01
+                value: Services.SettingsService.appearance.fontDefaultScale
+                suffix: "×"
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.fontDefaultScale = v }
+            }
+
+            SettingSlider {
+                id: fontFixedScale
+                settingLabel: "Monospace Font Scale"
+                from: 0.75; to: 1.25; stepSize: 0.01
+                value: Services.SettingsService.appearance.fontFixedScale
+                suffix: "×"
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.fontFixedScale = v }
+            }
+
             // ── Notifications ─────────────────────────────────────────────────
 
             // Notifications category header
@@ -300,7 +363,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 topPadding: 16
                 // Visible only when all rows are hidden by the search filter
-                visible: !barHeader.visible && !appearanceHeader.visible && !notifHeader.visible
+                visible: !barHeader.visible && !appearanceHeader.visible && !fontsHeader.visible && !notifHeader.visible
             }
         }
     }

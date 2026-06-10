@@ -167,13 +167,12 @@ Item {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
-                Text {
+                Services.FluidText {
                     id: currentTitleText
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
                     text: root.currentTitle
                     color: Services.Color.mOnSurface
-                    font.pixelSize: Services.TextSize.barContent
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -241,13 +240,12 @@ Item {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
-                Text {
+                    Services.FluidText {
                     id: nextTitleText
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
                     text: root.pendingTitle
                     color: Services.Color.mOnSurface
-                    font.pixelSize: Services.TextSize.barContent
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }

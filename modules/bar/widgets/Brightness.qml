@@ -25,11 +25,10 @@ Item {
             Services.BrightnessService.setBrightness(Services.BrightnessService.brightness + delta)
         }
 
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: Math.round(Services.BrightnessService.brightness * 100) + "%"
             color: Services.Color.mOnSurface
-            font.pixelSize: Services.TextSize.barContent
         }
     }
 }
