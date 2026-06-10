@@ -39,16 +39,16 @@ Row {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
 
-        Text {
+        Services.FluidText {
             text: root.settingLabel
             color: Services.Color.mOnSurface
-            font.pixelSize: 13
+            basePixelSize: 13
         }
 
-        Text {
+        Services.FluidText {
             text: root.description
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: 11
+            basePixelSize: 11
             visible: root.description !== ""
         }
     }
@@ -86,10 +86,10 @@ Row {
             border.width: 1
         }
 
-        contentItem: Text {
+        contentItem: Services.FluidText {
             text: trigger.text
             color: Services.Color.mOnSurface
-            font.pixelSize: 12
+            basePixelSize: 12
             elide: Text.ElideRight
             verticalAlignment: Text.AlignVCenter
             leftPadding: 8
@@ -117,10 +117,10 @@ Row {
                 height: 28
                 highlighted: ListView.isCurrentItem
 
-                contentItem: Text {
+                contentItem: Services.FluidText {
                     text: model.name
                     color: highlighted ? Services.Color.mPrimary : Services.Color.mOnSurface
-                    font.pixelSize: 12
+                    basePixelSize: 12
                     elide: Text.ElideRight
                     verticalAlignment: Text.AlignVCenter
                     leftPadding: 8

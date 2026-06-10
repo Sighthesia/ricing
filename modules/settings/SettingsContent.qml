@@ -19,6 +19,8 @@ Item {
         anchors.right: parent.right
         placeholderText: "Search settings..."
         color: Services.Color.mOnSurface
+        font.family: Services.SettingsService.appearance.fontDefault || Qt.application.font.family
+        font.pixelSize: Math.round(13 * (Services.SettingsService.appearance.fontDefaultScale || 1.0))
         background: Rectangle {
             radius: 8
             color: Services.Color.mSurfaceVariant

@@ -59,6 +59,31 @@ Row {
         model: root.model
         width: 140
         currentIndex: root.model.indexOf(root.currentValue)
+        font.family: Services.SettingsService.appearance.fontDefault || Qt.application.font.family
+        font.pixelSize: Math.round(13 * (Services.SettingsService.appearance.fontDefaultScale || 1.0))
         onActivated: root.selected(root.model[currentIndex])
+
+        contentItem: Text {
+            text: combo.displayText
+            font: combo.font
+            color: Services.Color.mOnSurface
+            verticalAlignment: Text.AlignVCenter
+            leftPadding: 8
+        }
+
+        delegate: ItemDelegate {
+            width: combo.width
+            contentItem: Services.FluidText {
+                text: modelData
+                color: highlighted ? Services.Color.mPrimary : Services.Color.mOnSurface
+                basePixelSize: 13
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 8
+            }
+            background: Rectangle {
+                color: highlighted ? Services.Color.mSurfaceVariant : "transparent"
+                radius: 4
+            }
+        }
     }
 }

@@ -138,19 +138,19 @@ Item {
                     anchors.leftMargin: MenuVisuals.contentInset
                     spacing: MenuVisuals.contentSpacing
 
-                    Text {
+                    Services.FluidText {
                         text: "\u2039"
                         color: Services.Color.mPrimary
-                        font.pixelSize: MenuVisuals.iconFontSize
+                        basePixelSize: MenuVisuals.iconFontSize
                         anchors.verticalCenter: parent.verticalCenter
                         width: MenuVisuals.iconWidth
                         horizontalAlignment: Text.AlignHCenter
                     }
 
-                    Text {
+                    Services.FluidText {
                         text: "Back"
                         color: Services.Color.mPrimary
-                        font.pixelSize: MenuVisuals.bodyFontSize
+                        basePixelSize: MenuVisuals.bodyFontSize
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
@@ -217,7 +217,7 @@ Item {
                             }
 
                             // Leading check/radio marker when the entry is toggled on.
-                            Text {
+                            Services.FluidText {
                                 id: check
 
                                 anchors.left: parent.left
@@ -227,7 +227,7 @@ Item {
                                 horizontalAlignment: Text.AlignHCenter
                                 text: "\u2713"
                                 color: Services.Color.mPrimary
-                                font.pixelSize: MenuVisuals.bodyFontSize
+                                basePixelSize: MenuVisuals.bodyFontSize
                                 visible: entry.modelData.checkState === Qt.Checked
                             }
 
@@ -247,7 +247,7 @@ Item {
                             }
 
                             // Entry label, elided to fit before the chevron.
-                            Text {
+                            Services.FluidText {
                                 id: rowLabel
 
                                 anchors.verticalCenter: parent.verticalCenter
@@ -258,12 +258,12 @@ Item {
                                 anchors.rightMargin: MenuVisuals.contentInset
                                 text: entry.modelData.text
                                 color: entry.modelData.enabled ? Services.Color.mOnSurface : Services.Color.mOutline
-                                font.pixelSize: MenuVisuals.bodyFontSize
+                                basePixelSize: MenuVisuals.bodyFontSize
                                 elide: Text.ElideRight
                             }
 
                             // Submenu affordance.
-                            Text {
+                            Services.FluidText {
                                 id: chevron
 
                                 anchors.right: parent.right
@@ -271,7 +271,7 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "\u203a"
                                 color: entry.modelData.enabled ? Services.Color.mOnSurfaceVariant : Services.Color.mOutline
-                                font.pixelSize: MenuVisuals.chevronFontSize
+                                basePixelSize: MenuVisuals.chevronFontSize
                                 visible: entry.modelData.hasChildren
                             }
 
