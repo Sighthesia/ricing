@@ -45,12 +45,12 @@ Item {
             // ── Bar ──────────────────────────────────────────────────────────
 
             // Bar category header
-            Text {
+            Services.FluidText {
                 id: barHeader
                 text: "Bar"
                 color: Services.Color.mPrimary
                 font.bold: true
-                font.pixelSize: 14
+                basePixelSize: 14
                 topPadding: 8
                 height: (barHeight.filterVisible || barPosition.filterVisible || barFloating.filterVisible ||
                          barFloatingMargin.filterVisible || barBgOpacity.filterVisible || barCornerRadius.filterVisible) ? implicitHeight : 0
@@ -126,12 +126,12 @@ Item {
             // ── Appearance ───────────────────────────────────────────────────
 
             // Appearance category header
-            Text {
+            Services.FluidText {
                 id: appearanceHeader
                 text: "Appearance"
                 color: Services.Color.mPrimary
                 font.bold: true
-                font.pixelSize: 14
+                basePixelSize: 14
                 topPadding: 8
                 height: (appWallpaper.filterVisible || appColorScheme.filterVisible || appPanelOpacity.filterVisible ||
                          appCornerRadius.filterVisible || appBlur.filterVisible ||
@@ -237,12 +237,12 @@ Item {
 
             // ── Fonts ────────────────────────────────────────────────────────
 
-            Text {
+            Services.FluidText {
                 id: fontsHeader
                 text: "Fonts"
                 color: Services.Color.mPrimary
                 font.bold: true
-                font.pixelSize: 14
+                basePixelSize: 14
                 topPadding: 8
                 height: (fontDefault.filterVisible || fontFixed.filterVisible ||
                          fontDefaultScale.filterVisible || fontFixedScale.filterVisible) ? implicitHeight : 0
@@ -299,12 +299,12 @@ Item {
             // ── Notifications ─────────────────────────────────────────────────
 
             // Notifications category header
-            Text {
+            Services.FluidText {
                 id: notifHeader
                 text: "Notifications"
                 color: Services.Color.mPrimary
                 font.bold: true
-                font.pixelSize: 14
+                basePixelSize: 14
                 topPadding: 8
                 height: (notifMaxVisible.filterVisible || notifTimeout.filterVisible || notifPosition.filterVisible || notifDnd.filterVisible) ? implicitHeight : 0
                 opacity: height > 0 ? 1 : 0
@@ -355,11 +355,11 @@ Item {
             }
 
             // Empty-search fallback message
-            Text {
+            Services.FluidText {
                 width: parent.width
                 text: "No matching settings"
                 color: Services.Color.mOnSurfaceVariant
-                font.pixelSize: 13
+                basePixelSize: 13
                 horizontalAlignment: Text.AlignHCenter
                 topPadding: 16
                 // Visible only when all rows are hidden by the search filter

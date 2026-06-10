@@ -120,12 +120,12 @@ Item {
                     visible: root.showAppIcon
                 }
 
-                Text {
+                Services.FluidText {
                     anchors.centerIn: parent
                     visible: root.showGlyph || root.showFallbackBell
                     text: root.showGlyph ? root.glyph : "\uf0f3"
                     font.family: root.showGlyph ? font.family : "Symbols Nerd Font"
-                    font.pixelSize: 13
+                    basePixelSize: 13
                     color: Services.Color.mOnSurface
                 }
             }
@@ -135,19 +135,19 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 0
 
-                Text {
+                Services.FluidText {
                     visible: root.appName !== ""
                     text: root.appName
                     color: Services.Color.mOnSurfaceVariant
-                    font.pixelSize: 9
+                    basePixelSize: 9
                     elide: Text.ElideRight
                     width: Math.min(implicitWidth, 220)
                 }
 
-                Text {
+                Services.FluidText {
                     text: root.title
                     color: Services.Color.mOnSurface
-                    font.pixelSize: 12
+                    basePixelSize: 12
                     font.bold: true
                     elide: Text.ElideRight
                     width: Math.min(implicitWidth, 220)
@@ -156,13 +156,13 @@ Item {
         }
 
         // Body text: full notification body, wrapped, indented under the head.
-        Text {
+        Services.FluidText {
             visible: root.body !== ""
             leftPadding: 25
             width: Math.min(implicitWidth + leftPadding, 260)
             text: root.body
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: 11
+            basePixelSize: 11
             wrapMode: Text.WordWrap
             maximumLineCount: 4
             elide: Text.ElideRight

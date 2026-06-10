@@ -94,12 +94,12 @@ Item {
                     sourceSize.height: 24
                 }
 
-                Text {
+                Services.FluidText {
                     anchors.centerIn: parent
                     visible: root.iconSource === ""
                     text: root.appName !== "" ? root.appName.charAt(0).toUpperCase() : "N"
                     color: Services.Color.mOnSurface
-                    font.pixelSize: 11
+                    basePixelSize: 11
                     font.bold: true
                 }
             }
@@ -109,31 +109,31 @@ Item {
                 width: parent.width - 92
                 spacing: 2
 
-                Text {
+                Services.FluidText {
                     width: parent.width
                     text: root.appName !== "" ? root.appName : "通知"
                     color: Services.Color.mOnSurface
-                    font.pixelSize: 12
+                    basePixelSize: 12
                     font.bold: true
                     elide: Text.ElideRight
                 }
 
-                Text {
+                Services.FluidText {
                     width: parent.width
                     text: root.summary !== "" ? root.summary : root.body
                     color: Services.Color.mOnSurfaceVariant
-                    font.pixelSize: 11
+                    basePixelSize: 11
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
             }
 
             // Sticky marker for persistent entries.
-            Text {
+            Services.FluidText {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.sticky ? "★" : ""
                 color: Services.Color.mPrimary
-                font.pixelSize: 13
+                basePixelSize: 13
                 font.bold: true
             }
         }
@@ -156,20 +156,20 @@ Item {
                 NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
             }
 
-            Text {
+            Services.FluidText {
                 width: parent.width
                 text: root.summary
                 color: Services.Color.mOnSurface
-                font.pixelSize: 12
+                basePixelSize: 12
                 font.bold: true
                 wrapMode: Text.WordWrap
             }
 
-            Text {
+            Services.FluidText {
                 width: parent.width
                 text: root.body !== "" ? root.body : "(无正文)"
                 color: Services.Color.mOnSurfaceVariant
-                font.pixelSize: 11
+                basePixelSize: 11
                 wrapMode: Text.WordWrap
             }
 

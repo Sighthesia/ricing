@@ -47,21 +47,21 @@ Item {
                 anchors.rightMargin: 14
                 spacing: 12
 
-                Text {
+                Services.FluidText {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "通知中心"
                     color: Services.Color.mOnSurface
-                    font.pixelSize: 14
+                    basePixelSize: 14
                     font.bold: true
                 }
 
-                Text {
+                Services.FluidText {
                     anchors.verticalCenter: parent.verticalCenter
                     text: Services.NotificationService.unreadCount > 0
                         ? (Services.NotificationService.unreadCount + " 条未读")
                         : "已读"
                     color: Services.Color.mOnSurfaceVariant
-                    font.pixelSize: 11
+                    basePixelSize: 11
                 }
             }
         }

@@ -61,11 +61,11 @@ Item {
                 border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.7)
                 border.width: 1
 
-                Text {
+                Services.FluidText {
                     anchors.centerIn: parent
                     text: Services.NotificationService.unreadCount > 99 ? "99+" : String(Services.NotificationService.unreadCount)
                     color: Services.Color.mPrimary
-                    font.pixelSize: 8
+                    basePixelSize: 8
                     font.bold: true
                 }
             }

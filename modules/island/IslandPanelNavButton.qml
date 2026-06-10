@@ -30,11 +30,11 @@ Rectangle {
     }
 
     // Keep the label centered and easy to scan at a glance.
-    Text {
+    Services.FluidText {
         anchors.centerIn: parent
         text: root.label
         color: root.selected ? Services.Color.mPrimary : Services.Color.mOnSurface
-        font.pixelSize: 13
+        basePixelSize: 13
         font.bold: root.selected
     }
 

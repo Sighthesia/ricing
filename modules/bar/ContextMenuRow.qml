@@ -65,21 +65,21 @@ Item {
             spacing: root.contentSpacing
 
             // Action icon.
-            Text {
+            Services.FluidText {
                 text: root.icon
                 color: !root.enabled ? root.disabledColor
                     : root.destructive ? root.destructiveColor
                     : root.iconColor
-                font.pixelSize: 14
+                basePixelSize: 14
                 width: root.iconWidth
                 horizontalAlignment: Text.AlignHCenter
             }
 
             // Action label.
-            Text {
+            Services.FluidText {
                 text: root.label
                 color: !root.enabled ? root.disabledColor : root.labelColor
-                font.pixelSize: 12
+                basePixelSize: 12
                 width: Math.max(0, parent.parent.width - root.iconWidth - root.contentSpacing)
                 horizontalAlignment: Text.AlignLeft
                 elide: Text.ElideRight

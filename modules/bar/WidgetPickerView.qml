@@ -52,11 +52,11 @@ Item {
             spacing: 10
 
             // Show which dockzone section will receive the new widget.
-            Text {
+            Services.FluidText {
                 opacity: root.headerRevealProgress
                 text: "Add widget to - " + Services.BarLayoutService.widgetPickerSection
                 color: Services.Color.mOnSurfaceVariant
-                font.pixelSize: 12
+                basePixelSize: 12
             }
 
             // Provide a simple inline search field for the available widgets.
@@ -75,18 +75,19 @@ Item {
                     anchors.fill: parent
                     anchors.margins: CapsuleMetrics.compactVerticalPadding
                     color: Services.Color.mOnSurface
-                    font.pixelSize: 12
+                    font.family: Services.SettingsService.appearance.fontDefault || Qt.application.font.family
+                    font.pixelSize: Math.round(12 * (Services.SettingsService.appearance.fontDefaultScale || 1.0))
                     clip: true
                     selectedTextColor: Services.Color.mOnSurface
                     selectionColor: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.45)
 
                     // Keep a lightweight placeholder inside the search field.
-                    Text {
+                    Services.FluidText {
                         anchors.fill: parent
                         text: "Search widgets..."
                         color: Services.Color.mOnSurfaceVariant
                         opacity: 0.7
-                        font.pixelSize: 12
+                        basePixelSize: 12
                         visible: !searchInput.text && !searchInput.activeFocus
                     }
                 }
@@ -134,18 +135,18 @@ Item {
                             spacing: 2
 
                             // Show the widget label prominently.
-                            Text {
+                            Services.FluidText {
                                 text: modelData.label
                                 color: Services.Color.mOnSurface
-                                font.pixelSize: 12
+                                basePixelSize: 12
                                 font.bold: true
                             }
 
                             // Show the short widget description when available.
-                            Text {
+                            Services.FluidText {
                                 text: modelData.description || ""
                                 color: Services.Color.mOnSurfaceVariant
-                                font.pixelSize: 10
+                                basePixelSize: 10
                                 elide: Text.ElideRight
                                 width: parent.width
                                 visible: text !== ""

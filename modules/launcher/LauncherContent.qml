@@ -28,12 +28,13 @@ Item {
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
                 color: "white"
-                font.pixelSize: 16
+                font.family: Services.SettingsService.appearance.fontDefault || Qt.application.font.family
+                font.pixelSize: Math.round(16 * (Services.SettingsService.appearance.fontDefaultScale || 1.0))
                 text: Services.LauncherService.query
                 onTextChanged: Services.LauncherService.query = text
 
                 // Placeholder text
-                Text {
+                Services.FluidText {
                     text: "Search apps..."
                     color: "white"
                     opacity: 0.5

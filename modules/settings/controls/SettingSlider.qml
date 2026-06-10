@@ -41,16 +41,16 @@ Row {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
 
-        Text {
+        Services.FluidText {
             text: root.settingLabel
             color: Services.Color.mOnSurface
-            font.pixelSize: 13
+            basePixelSize: 13
         }
 
-        Text {
+        Services.FluidText {
             text: root.description
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: 11
+            basePixelSize: 11
             visible: root.description !== ""
         }
     }
@@ -73,12 +73,12 @@ Row {
         }
 
         // Formatted value label
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             // Show integers without decimals, reals to 2dp
             text: (root.stepSize < 1 ? slider.value.toFixed(2) : Math.round(slider.value).toString()) + root.suffix
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: 11
+            basePixelSize: 11
             width: 48
         }
     }

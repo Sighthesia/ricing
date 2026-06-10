@@ -38,16 +38,16 @@ Row {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
 
-        Text {
+        Services.FluidText {
             text: root.settingLabel
             color: Services.Color.mOnSurface
-            font.pixelSize: 13
+            basePixelSize: 13
         }
 
-        Text {
+        Services.FluidText {
             text: root.description
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: 11
+            basePixelSize: 11
             visible: root.description !== ""
         }
     }

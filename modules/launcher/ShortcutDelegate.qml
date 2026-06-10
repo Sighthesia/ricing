@@ -77,22 +77,22 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             color: delegate.managedByShell ? delegate.shellBadgeColor : delegate.neutralBadgeColor
 
-            Text {
+            Services.FluidText {
                 id: catText
                 anchors.centerIn: parent
                 text: delegate.category
                 color: delegate.managedByShell ? delegate.shellBadgeLabelColor : delegate.neutralBadgeLabelColor
-                font.pixelSize: 10
+                basePixelSize: 10
             }
         }
 
         // Action label
-        Text {
+        Services.FluidText {
             width: parent.width * 0.4
             anchors.verticalCenter: parent.verticalCenter
             text: delegate.label
             color: Services.Color.mOnSurface
-            font.pixelSize: 13
+            basePixelSize: 13
             elide: Text.ElideRight
         }
 
@@ -107,13 +107,13 @@ Rectangle {
             border.width: 1
 
             // Display mode
-            Text {
+            Services.FluidText {
                 id: seqText
                 anchors.centerIn: parent
                 text: delegate.sequence
                 color: Services.Color.mOnSurface
-                font.pixelSize: 12
-                font.family: "monospace"
+                font.family: Services.SettingsService.appearance.fontFixed || "monospace"
+                font.pixelSize: Math.round(12 * (Services.SettingsService.appearance.fontFixedScale || 1.0))
                 visible: !delegate.editing
             }
 
@@ -122,7 +122,7 @@ Rectangle {
                 id: seqInput
                 anchors { fill: parent; margins: MenuVisuals.smallGap }
                 color: Services.Color.mOnSurface
-                font.pixelSize: 12
+                basePixelSize: 12
                 font.family: "monospace"
                 visible: delegate.editing
                 text: delegate.sequence

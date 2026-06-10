@@ -20,11 +20,11 @@ Item {
         spacing: 6
 
         // Date: MMM d
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(systemClock.date, "MMM d")
             color: Services.Color.mOnSurfaceVariant
-            font.pixelSize: 11
+            basePixelSize: 11
         }
 
         // Separator
@@ -36,11 +36,11 @@ Item {
         }
 
         // Time: HH:mm
-        Text {
+        Services.FluidText {
             anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDateTime(systemClock.date, "hh:mm")
             color: Services.Color.mOnSurface
-            font.pixelSize: 12
+            basePixelSize: 12
             font.bold: true
         }
     }

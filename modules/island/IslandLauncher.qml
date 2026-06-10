@@ -34,7 +34,8 @@ Item {
                 anchors.rightMargin: 14
                 verticalAlignment: TextInput.AlignVCenter
                 color: Services.Color.mOnSurface
-                font.pixelSize: 14
+                font.family: Services.SettingsService.appearance.fontDefault || Qt.application.font.family
+                font.pixelSize: Math.round(14 * (Services.SettingsService.appearance.fontDefaultScale || 1.0))
                 text: Services.IslandService.query
                 onTextChanged: Services.IslandService.query = text
                 focus: true
@@ -68,7 +69,7 @@ Item {
                 Keys.onEnterPressed: Keys.onReturnPressed(null)
 
                 // Placeholder text.
-                Text {
+                Services.FluidText {
                     text: "Search apps or >clip for clipboard..."
                     color: Services.Color.mOnSurfaceVariant
                     opacity: 0.6
@@ -246,18 +247,18 @@ Item {
                         width: parent.width - 32
                         spacing: 2
 
-                        Text {
+                        Services.FluidText {
                             text: modelData.name || ""
                             color: Services.Color.mOnSurface
-                            font.pixelSize: 13
+                            basePixelSize: 13
                             elide: Text.ElideRight
                             width: parent.width
                         }
 
-                        Text {
+                        Services.FluidText {
                             text: modelData.comment || modelData.genericName || ""
                             color: Services.Color.mOnSurfaceVariant
-                            font.pixelSize: 11
+                            basePixelSize: 11
                             opacity: 0.7
                             elide: Text.ElideRight
                             width: parent.width
@@ -387,7 +388,7 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
                 Behavior on _filterSoftness { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
 
-                Text {
+                Services.FluidText {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
@@ -397,7 +398,7 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                     text: modelData.isImage ? "[Image]" : (modelData.preview || "")
                     color: Services.Color.mOnSurface
-                    font.pixelSize: 13
+                    basePixelSize: 13
                     elide: Text.ElideRight
                 }
 

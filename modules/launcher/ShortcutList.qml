@@ -61,10 +61,10 @@ Item {
     }
 
     // Status/error footer
-    Text {
+    Services.FluidText {
         anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 8 }
         text: Services.NiriShortcutService.errorText || Services.NiriShortcutService.statusText
         color: Services.NiriShortcutService.errorText ? "#ff6666" : "#aaaaaa"
-        font.pixelSize: 11
+        basePixelSize: 11
     }
 }

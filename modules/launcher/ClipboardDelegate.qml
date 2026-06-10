@@ -35,11 +35,11 @@ Rectangle {
     }
 
     // Preview text: show [Image] for images, [empty] for blank, else truncated text
-    Text {
+    Services.FluidText {
         anchors { left: parent.left; right: actions.left; top: parent.top; bottom: parent.bottom; leftMargin: MenuVisuals.listContentInset }
         text: modelData.isImage ? "[Image]" : (modelData.preview.length > 0 ? modelData.preview.substring(0, 80) : "[empty]")
         color: Services.Color.mOnSurface
-        font.pixelSize: 13
+        basePixelSize: 13
         elide: Text.ElideRight
         verticalAlignment: Text.AlignVCenter
     }
@@ -50,7 +50,7 @@ Rectangle {
         anchors { right: parent.right; rightMargin: MenuVisuals.contentInset; verticalCenter: parent.verticalCenter }
         spacing: MenuVisuals.smallGap
 
-        Text {
+        Services.FluidText {
             text: "⎘"
             color: Services.Color.mOnSurface
             font.pixelSize: MenuVisuals.actionIconSize
@@ -62,10 +62,10 @@ Rectangle {
             }
         }
 
-        Text {
+        Services.FluidText {
             text: "✕"
             color: Services.Color.mOnSurface
-            font.pixelSize: 14
+            basePixelSize: 14
             verticalAlignment: Text.AlignVCenter
             height: MenuVisuals.rowHeight
             MouseArea {

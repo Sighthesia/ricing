@@ -71,11 +71,11 @@ Item {
             NumberAnimation { duration: Services.Motion.number.settleDuration; easing.type: Services.Motion.number.settleEasing }
         }
 
-        Text {
+        Services.FluidText {
             anchors.centerIn: parent
             text: "\u00d7"
             color: "white"
-            font.pixelSize: 10
+            basePixelSize: 10
             font.bold: true
         }
 

@@ -136,17 +136,17 @@ Variants {
                         spacing: 12
 
                         // Icon
-                        Text {
+                        Services.FluidText {
                             text: osdWindow.icon
-                            font.pixelSize: 28
+                            basePixelSize: 28
                             color: Services.Color.mOnSurface
                             anchors.verticalCenter: parent.verticalCenter
                         }
 
                         // Value
-                        Text {
+                        Services.FluidText {
                             text: osdWindow.valueText
-                            font.pixelSize: 18
+                            basePixelSize: 18
                             font.bold: true
                             color: Services.Color.mOnSurface
                             anchors.verticalCenter: parent.verticalCenter

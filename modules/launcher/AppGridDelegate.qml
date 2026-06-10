@@ -39,10 +39,10 @@ Item {
             implicitSize: 48
         }
 
-        Text {
+        Services.FluidText {
             text: modelData.name
             color: "white"
-            font.pixelSize: 12
+            basePixelSize: 12
             elide: Text.ElideRight
             horizontalAlignment: Text.AlignHCenter
             width: (GridView.view ? GridView.view.cellWidth : 120) - 16

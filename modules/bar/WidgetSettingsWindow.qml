@@ -88,10 +88,10 @@ Variants {
                     width: parent.width
                     spacing: 8
 
-                    Text {
+                    Services.FluidText {
                         text: settingsWindow.panelTitle
                         color: Services.Color.mOnSurface
-                        font.pixelSize: 14
+                        basePixelSize: 14
                         font.bold: true
                     }
 
@@ -110,11 +110,11 @@ Variants {
                         border.color: Services.Color.mOutline
                         border.width: 1
 
-                        Text {
+                        Services.FluidText {
                             anchors.centerIn: parent
                             text: "\u00d7"
                             color: Services.Color.mOnSurface
-                            font.pixelSize: 11
+                            basePixelSize: 11
                             font.bold: true
                         }
 

@@ -184,22 +184,22 @@ Variants {
                             spacing: 2
 
                             // Summary.
-                            Text {
+                            Services.FluidText {
                                 width: parent.width
                                 text: model.summary || ""
                                 color: Services.Color.mOnSurface
-                                font.pixelSize: 13
+                                basePixelSize: 13
                                 font.bold: true
                                 elide: Text.ElideRight
                                 maximumLineCount: 1
                             }
 
                             // Body.
-                            Text {
+                            Services.FluidText {
                                 width: parent.width
                                 text: model.body || ""
                                 color: Services.Color.mOnSurfaceVariant
-                                font.pixelSize: 12
+                                basePixelSize: 12
                                 elide: Text.ElideRight
                                 maximumLineCount: 1
                             }
