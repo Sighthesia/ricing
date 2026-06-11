@@ -56,14 +56,23 @@ Item {
                 }
                 Keys.onReturnPressed: {
                     var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
-                    if (loader.item && loader.item.currentItem) {
+                    var listView = loader.item
+                    if (listView) {
+                        var idx = listView.currentIndex
                         if (Services.IslandService.mode === "clipboard") {
-                            Services.ClipboardService.copyItem(loader.item.currentItem.modelData.id)
+                            var items = listView.allItems
+                            if (idx >= 0 && idx < items.length) {
+                                Services.ClipboardService.copyItem(items[idx].id)
+                                Services.IslandService.close()
+                            }
                         } else {
-                            Services.LaunchCountService.recordLaunch(loader.item.currentItem.modelData.id || "")
-                            loader.item.currentItem.modelData.execute()
+                            var apps = listView.sortedApps
+                            if (idx >= 0 && idx < apps.length) {
+                                Services.LaunchCountService.recordLaunch(apps[idx].id || "")
+                                apps[idx].execute()
+                                Services.IslandService.close()
+                            }
                         }
-                        Services.IslandService.close()
                     }
                 }
                 Keys.onEnterPressed: Keys.onReturnPressed(null)
