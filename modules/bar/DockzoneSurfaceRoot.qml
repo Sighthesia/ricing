@@ -406,7 +406,7 @@ Item {
             y: rippleLayer.originY - height / 2
             radius: width / 2
             color: "transparent"
-            border.width: Math.max(36, Math.min(92, width * 0.068))
+            border.width: rippleRing.border.width * 10
             border.color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.46)
             opacity: 0
         }
@@ -420,7 +420,7 @@ Item {
             y: rippleLayer.originY - height / 2
             radius: width / 2
             color: "transparent"
-            border.width: Math.max(54, Math.min(132, width * 0.095))
+            border.width: rippleRing.border.width * 14
             border.color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.24)
             opacity: 0
         }
