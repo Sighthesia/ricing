@@ -222,6 +222,9 @@ Item {
     }
 
     function playRipplePulse() {
+        rippleHighlightDelay.interval = highlightDelayMs()
+        rippleHighlightDelay.restart()
+
         if (Services.SettingsService.appearance.ripplePulseFullscreen)
             return
 
@@ -229,12 +232,14 @@ Item {
         rippleRing.opacity = 0
         rippleGlow.opacity = 0
         ripplePulse.restart()
-        rippleHighlightDelay.interval = highlightDelayMs()
-        rippleHighlightDelay.restart()
     }
 
     function highlightDelayMs() {
-        return Math.max(0, Math.min(520, (root.windowX + centerBody.x + centerBody.width / 2) / Math.max(1, root.screenWidth) * 520))
+        var surfaceCenterX = root.windowX + centerBody.x + centerBody.width / 2
+        var distance = Math.abs(surfaceCenterX - root.screenWidth / 2)
+        var maxRadius = Math.max(1, Math.sqrt(root.screenWidth * root.screenWidth + root.screenHeight * root.screenHeight))
+
+        return Math.max(0, Math.min(900, distance / maxRadius * 1800))
     }
 
     function playRippleHighlight() {
@@ -365,9 +370,30 @@ Item {
         }
 
         ShapePath {
-            fillColor: Qt.tint(root.fillColor, Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, root.rippleHighlightProgress * 0.18))
+            fillColor: root.fillColor
             strokeColor: root.borderColor
             strokeWidth: 1
+
+            PathSvg {
+                path: silhouetteFill.outline
+            }
+        }
+    }
+
+    // Brighten the whole dockzone background after the ripple sweep crosses it.
+    Shape {
+        id: rippleHighlightOverlay
+
+        z: 0.5
+        anchors.fill: parent
+        preferredRendererType: Shape.CurveRenderer
+        antialiasing: true
+        visible: opacity > 0.01
+        opacity: root.rippleHighlightProgress
+
+        ShapePath {
+            fillColor: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.34)
+            strokeWidth: 0
 
             PathSvg {
                 path: silhouetteFill.outline

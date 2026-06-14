@@ -85,6 +85,9 @@ Item {
     }
 
     function playRipplePulse() {
+        rippleHighlightDelay.interval = highlightDelayMs()
+        rippleHighlightDelay.restart()
+
         if (Services.SettingsService.appearance.ripplePulseFullscreen)
             return
 
@@ -92,12 +95,14 @@ Item {
         rippleRing.opacity = 0
         rippleGlow.opacity = 0
         ripplePulse.restart()
-        rippleHighlightDelay.interval = highlightDelayMs()
-        rippleHighlightDelay.restart()
     }
 
     function highlightDelayMs() {
-        return Math.max(0, Math.min(520, (root.x + root.width / 2) / Math.max(1, root.rippleScreenWidth) * 520))
+        var surfaceCenterX = islandBody.x + root.x + root.width / 2
+        var distance = Math.abs(surfaceCenterX - root.rippleScreenWidth / 2)
+        var maxRadius = Math.max(1, Math.sqrt(root.rippleScreenWidth * root.rippleScreenWidth + root.rippleScreenHeight * root.rippleScreenHeight))
+
+        return Math.max(0, Math.min(900, distance / maxRadius * 1800))
     }
 
     function playRippleHighlight() {
@@ -242,7 +247,28 @@ Item {
         }
 
         ShapePath {
-            fillColor: Qt.tint(root.surfaceColor, Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, root.rippleHighlightProgress * 0.18))
+            fillColor: root.surfaceColor
+            strokeWidth: 0
+
+            PathSvg {
+                path: silhouetteFill.outline
+            }
+        }
+    }
+
+    // Brighten the full island background after the ripple sweep crosses it.
+    Shape {
+        id: rippleHighlightOverlay
+
+        anchors.fill: parent
+        preferredRendererType: Shape.CurveRenderer
+        antialiasing: true
+        opacity: root.rippleHighlightProgress
+        visible: opacity > 0.01
+        z: 0.5
+
+        ShapePath {
+            fillColor: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.34)
             strokeWidth: 0
 
             PathSvg {
@@ -285,6 +311,7 @@ Item {
     // Caller content lands here via the default bodyContent slot.
     Item {
         id: bodyRect
+        z: 1
         x: root.earRadius
         y: 0
         width: root.width - root.earRadius * 2
