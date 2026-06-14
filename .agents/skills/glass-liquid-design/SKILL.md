@@ -92,6 +92,18 @@ Use this reusable shape for compact surfaces that must feel anchored to an edge.
 - Keep the hover region passive and stable so moving within the surface does not retrigger the expansion.
 - Use this pattern for attached backgrounds, edge anchors, and other hoverable shells that should stay layout-stable while still feeling alive.
 
+### Global Sweep With Surface-Local Trail Pattern
+
+Use this for one ripple, scanline, shimmer, spotlight, or wave that must read as a single event across multiple QML surfaces/windows while still appearing clipped to each shell surface.
+
+- Drive the sweep from one singleton timeline (`progress`, `active`, `token`, duration), not from independent animations inside every surface.
+- Let each surface compute the same global origin in its own local coordinates, then render the sweep/trail inside its existing clipped body or silhouette owner.
+- Keep the main sweep and trailing highlight derived from the same global progress so left/right dockzones, islands, and fullscreen overlays stay phase-aligned.
+- In fullscreen overlay mode, draw the main ring in the fixed full-screen window, but keep the shell-only trail visible inside each dockzone/island surface.
+- Make the trail much wider and paler than the main ring; for a clear brushed highlight, start around 10-20x the main ring stroke width and tune opacity visually.
+- Prefer clipped surface-local trail bands over delayed whole-surface flashes when the desired effect is “the sweep passed through this shell background”.
+- Avoid per-surface timers or delayed one-shot highlights for a traveling sweep; they read as sequential flashes rather than one continuous object.
+
 Use it for:
 
 - Dock zones
