@@ -25,6 +25,7 @@ Item {
     property real rippleScreenY: 0
     property real rippleScreenWidth: Screen.width
     property real rippleScreenHeight: Screen.height
+    property real rippleHighlightProgress: 0
 
     // Animated size: body width grows by the two ear radii, matching the
     // legacy IslandBody size semantics (targetW + earRadius*2 / targetH).
@@ -90,9 +91,37 @@ Item {
         rippleRing.width = 16
         rippleRing.opacity = 0
         rippleGlow.opacity = 0
-        rippleAfterglowNear.opacity = 0
-        rippleAfterglowFar.opacity = 0
         ripplePulse.restart()
+        rippleHighlightDelay.interval = highlightDelayMs()
+        rippleHighlightDelay.restart()
+    }
+
+    function highlightDelayMs() {
+        return Math.max(0, Math.min(520, (root.x + root.width / 2) / Math.max(1, root.rippleScreenWidth) * 520))
+    }
+
+    function playRippleHighlight() {
+        rippleHighlight.stop()
+        rippleHighlightProgress = 1
+        rippleHighlight.start()
+    }
+
+    Timer {
+        id: rippleHighlightDelay
+
+        interval: 0
+        repeat: false
+        onTriggered: root.playRippleHighlight()
+    }
+
+    NumberAnimation {
+        id: rippleHighlight
+
+        target: root
+        property: "rippleHighlightProgress"
+        to: 0
+        duration: 620
+        easing.type: Easing.OutCubic
     }
 
     onRipplePulseTokenChanged: {
@@ -213,7 +242,7 @@ Item {
         }
 
         ShapePath {
-            fillColor: root.surfaceColor
+            fillColor: Qt.tint(root.surfaceColor, Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, root.rippleHighlightProgress * 0.18))
             strokeWidth: 0
 
             PathSvg {
@@ -354,44 +383,12 @@ Item {
                 scale: 1
             }
 
-            Rectangle {
-                id: rippleAfterglowNear
-
-                width: 16
-                height: width
-                x: rippleLayer.originX - width / 2
-                y: rippleLayer.originY - height / 2
-                radius: width / 2
-                color: "transparent"
-                border.width: rippleRing.border.width * 10
-                border.color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.46)
-                opacity: 0
-            }
-
-            Rectangle {
-                id: rippleAfterglowFar
-
-                width: 16
-                height: width
-                x: rippleLayer.originX - width / 2
-                y: rippleLayer.originY - height / 2
-                radius: width / 2
-                color: "transparent"
-                border.width: rippleRing.border.width * 14
-                border.color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.24)
-                opacity: 0
-            }
-
             ParallelAnimation {
                 id: ripplePulse
 
                 NumberAnimation { target: rippleRing; property: "width"; from: 16; to: rippleLayer.maxDiameter; duration: 1800; easing.type: Easing.OutCubic }
                 NumberAnimation { target: rippleRing; property: "opacity"; from: 0.95; to: 0; duration: 1800; easing.type: Easing.OutCubic }
                 NumberAnimation { target: rippleGlow; property: "opacity"; from: 0.34; to: 0; duration: 1450; easing.type: Easing.OutCubic }
-                NumberAnimation { target: rippleAfterglowNear; property: "width"; from: 16; to: rippleLayer.maxDiameter; duration: 1850; easing.type: Easing.OutCubic }
-                NumberAnimation { target: rippleAfterglowNear; property: "opacity"; from: 0.42; to: 0; duration: 1850; easing.type: Easing.OutCubic }
-                NumberAnimation { target: rippleAfterglowFar; property: "width"; from: 16; to: rippleLayer.maxDiameter; duration: 1920; easing.type: Easing.OutCubic }
-                NumberAnimation { target: rippleAfterglowFar; property: "opacity"; from: 0.24; to: 0; duration: 1920; easing.type: Easing.OutCubic }
             }
         }
     }
