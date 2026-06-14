@@ -20,12 +20,10 @@ Item {
     property int targetRadius: 14
     property int earRadius: 24
     property color surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
-    property int ripplePulseToken: 0
     property real rippleScreenX: 0
     property real rippleScreenY: 0
     property real rippleScreenWidth: Screen.width
     property real rippleScreenHeight: Screen.height
-    property real rippleHighlightProgress: 0
 
     // Animated size: body width grows by the two ear radii, matching the
     // legacy IslandBody size semantics (targetW + earRadius*2 / targetH).
@@ -82,56 +80,6 @@ Item {
         }
 
         return parts
-    }
-
-    function playRipplePulse() {
-        rippleHighlightDelay.interval = highlightDelayMs()
-        rippleHighlightDelay.restart()
-
-        if (Services.SettingsService.appearance.ripplePulseFullscreen)
-            return
-
-        rippleRing.width = 16
-        rippleRing.opacity = 0
-        rippleGlow.opacity = 0
-        ripplePulse.restart()
-    }
-
-    function highlightDelayMs() {
-        var surfaceCenterX = islandBody.x + root.x + root.width / 2
-        var distance = Math.abs(surfaceCenterX - root.rippleScreenWidth / 2)
-        var maxRadius = Math.max(1, Math.sqrt(root.rippleScreenWidth * root.rippleScreenWidth + root.rippleScreenHeight * root.rippleScreenHeight))
-
-        return Math.max(0, Math.min(900, distance / maxRadius * 1800))
-    }
-
-    function playRippleHighlight() {
-        rippleHighlight.stop()
-        rippleHighlightProgress = 1
-        rippleHighlight.start()
-    }
-
-    Timer {
-        id: rippleHighlightDelay
-
-        interval: 0
-        repeat: false
-        onTriggered: root.playRippleHighlight()
-    }
-
-    NumberAnimation {
-        id: rippleHighlight
-
-        target: root
-        property: "rippleHighlightProgress"
-        to: 0
-        duration: 620
-        easing.type: Easing.OutCubic
-    }
-
-    onRipplePulseTokenChanged: {
-        if (ripplePulseToken > 0)
-            playRipplePulse()
     }
 
     // Blur source parts for the center island body and top ears. The body
@@ -256,27 +204,6 @@ Item {
         }
     }
 
-    // Brighten the full island background after the ripple sweep crosses it.
-    Shape {
-        id: rippleHighlightOverlay
-
-        anchors.fill: parent
-        preferredRendererType: Shape.CurveRenderer
-        antialiasing: true
-        opacity: root.rippleHighlightProgress
-        visible: opacity > 0.01
-        z: 0.5
-
-        ShapePath {
-            fillColor: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.34)
-            strokeWidth: 0
-
-            PathSvg {
-                path: silhouetteFill.outline
-            }
-        }
-    }
-
     // --- Left ear geometry (connects body to screen top-left) ---
     // Geometry-only marker: positions the blur strips and the silhouette path.
     Item {
@@ -375,7 +302,7 @@ Item {
             id: rippleLayer
 
             anchors.fill: parent
-            visible: rippleRing.opacity > 0.01
+            visible: Services.RipplePulseService.active
             z: 999
 
             readonly property real originX: root.rippleScreenWidth / 2 - islandBody.x - bodyRect.x
@@ -383,22 +310,36 @@ Item {
             readonly property real maxDiameter: Math.ceil(Math.sqrt(root.rippleScreenWidth * root.rippleScreenWidth + root.rippleScreenHeight * root.rippleScreenHeight) * 2)
 
             Rectangle {
+                id: rippleTrailBand
+
+                width: Services.RipplePulseService.trailDiameter(rippleLayer.maxDiameter)
+                height: width
+                x: rippleLayer.originX - width / 2
+                y: rippleLayer.originY - height / 2
+                radius: width / 2
+                color: "transparent"
+                border.width: Math.max(96, Math.min(360, rippleRing.border.width * 16))
+                border.color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.78)
+                opacity: Services.RipplePulseService.trailOpacity()
+            }
+
+            Rectangle {
                 id: rippleGlow
 
-                width: rippleRing.width
+                width: Services.RipplePulseService.diameter(rippleLayer.maxDiameter)
                 height: width
                 x: rippleLayer.originX - width / 2
                 y: rippleLayer.originY - height / 2
                 radius: width / 2
                 color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.08)
-                opacity: 0
+                opacity: Services.SettingsService.appearance.ripplePulseFullscreen ? 0 : Services.RipplePulseService.glowOpacity()
                 scale: 1
             }
 
             Rectangle {
                 id: rippleRing
 
-                width: 16
+                width: Services.RipplePulseService.diameter(rippleLayer.maxDiameter)
                 height: width
                 x: rippleLayer.originX - width / 2
                 y: rippleLayer.originY - height / 2
@@ -406,16 +347,8 @@ Item {
                 color: "transparent"
                 border.width: Math.max(8, Math.min(18, width * 0.018))
                 border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.9)
-                opacity: 0
+                opacity: Services.SettingsService.appearance.ripplePulseFullscreen ? 0 : Services.RipplePulseService.ringOpacity()
                 scale: 1
-            }
-
-            ParallelAnimation {
-                id: ripplePulse
-
-                NumberAnimation { target: rippleRing; property: "width"; from: 16; to: rippleLayer.maxDiameter; duration: 1800; easing.type: Easing.OutCubic }
-                NumberAnimation { target: rippleRing; property: "opacity"; from: 0.95; to: 0; duration: 1800; easing.type: Easing.OutCubic }
-                NumberAnimation { target: rippleGlow; property: "opacity"; from: 0.34; to: 0; duration: 1450; easing.type: Easing.OutCubic }
             }
         }
     }

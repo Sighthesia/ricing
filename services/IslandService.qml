@@ -12,7 +12,7 @@ Singleton {
     property string query: ""
     property string panelPage: "launcher"
     property var centerSurfaceWidths: ({})
-    property int ripplePulseToken: 0
+    readonly property int ripplePulseToken: Services.RipplePulseService.token
 
     // Window-hint extension is active only in attached-island mode while the
     // hint is held; floating-capsule mode leaves the island untouched.
@@ -53,7 +53,7 @@ Singleton {
         if (!Services.SettingsService.appearance.ripplePulseEnabled)
             return
 
-        ++ripplePulseToken
+        Services.RipplePulseService.trigger()
     }
 
     // Delay query reset so mode stays stable during the collapse animation.

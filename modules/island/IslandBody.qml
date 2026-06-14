@@ -201,7 +201,6 @@ Item {
         targetRadius: root.targetR
         earRadius: root.earRadius
         surfaceColor: root.surfaceColor
-        ripplePulseToken: Services.IslandService.ripplePulseToken
         rippleScreenX: root.screenX
         rippleScreenY: root.screenY
         rippleScreenWidth: root.screenWidth

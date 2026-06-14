@@ -19,7 +19,6 @@ Item {
     property real windowX: 0
     property string surfaceState: "attached"
     property bool hoverIntent: false
-    property real rippleHighlightProgress: 0
     required property real surfaceHeight
     required property real contentWidth
     required property real contentHeight
@@ -221,56 +220,6 @@ Item {
         return parts
     }
 
-    function playRipplePulse() {
-        rippleHighlightDelay.interval = highlightDelayMs()
-        rippleHighlightDelay.restart()
-
-        if (Services.SettingsService.appearance.ripplePulseFullscreen)
-            return
-
-        rippleRing.width = 16
-        rippleRing.opacity = 0
-        rippleGlow.opacity = 0
-        ripplePulse.restart()
-    }
-
-    function highlightDelayMs() {
-        var surfaceCenterX = root.windowX + centerBody.x + centerBody.width / 2
-        var distance = Math.abs(surfaceCenterX - root.screenWidth / 2)
-        var maxRadius = Math.max(1, Math.sqrt(root.screenWidth * root.screenWidth + root.screenHeight * root.screenHeight))
-
-        return Math.max(0, Math.min(900, distance / maxRadius * 1800))
-    }
-
-    function playRippleHighlight() {
-        rippleHighlight.stop()
-        rippleHighlightProgress = 1
-        rippleHighlight.start()
-    }
-
-    Timer {
-        id: rippleHighlightDelay
-
-        interval: 0
-        repeat: false
-        onTriggered: root.playRippleHighlight()
-    }
-
-    NumberAnimation {
-        id: rippleHighlight
-
-        target: root
-        property: "rippleHighlightProgress"
-        to: 0
-        duration: 620
-        easing.type: Easing.OutCubic
-    }
-
-    onVisibleChanged: {
-        if (!visible)
-            ripplePulse.stop()
-    }
-
     // Blur source parts for body and ears.
     // Ear parts are one-pixel strips so wl_region can approximate the concave arcs
     // without unsupported subtract/ellipse composition.
@@ -380,36 +329,6 @@ Item {
         }
     }
 
-    // Brighten the whole dockzone background after the ripple sweep crosses it.
-    Shape {
-        id: rippleHighlightOverlay
-
-        z: 0.5
-        anchors.fill: parent
-        preferredRendererType: Shape.CurveRenderer
-        antialiasing: true
-        visible: opacity > 0.01
-        opacity: root.rippleHighlightProgress
-
-        ShapePath {
-            fillColor: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.34)
-            strokeWidth: 0
-
-            PathSvg {
-                path: silhouetteFill.outline
-            }
-        }
-    }
-
-    Connections {
-        target: Services.IslandService
-
-        function onRipplePulseTokenChanged() {
-            if (Services.IslandService.ripplePulseToken > 0)
-                root.playRipplePulse()
-        }
-    }
-
     // Mask the shared screen-origin ripple to this dockzone surface only.
     Item {
         id: rippleLayer
@@ -419,7 +338,7 @@ Item {
         width: centerBody.width
         height: centerBody.height
         clip: true
-        visible: rippleRing.opacity > 0.01
+        visible: Services.RipplePulseService.active
         z: 999
 
         readonly property real originX: root.screenWidth / 2 - root.windowX - centerBody.x
@@ -427,21 +346,35 @@ Item {
         readonly property real maxDiameter: Math.ceil(Math.sqrt(root.screenWidth * root.screenWidth + root.screenHeight * root.screenHeight) * 2)
 
         Rectangle {
+            id: rippleTrailBand
+
+            width: Services.RipplePulseService.trailDiameter(rippleLayer.maxDiameter)
+            height: width
+            x: rippleLayer.originX - width / 2
+            y: rippleLayer.originY - height / 2
+            radius: width / 2
+            color: "transparent"
+            border.width: Math.max(96, Math.min(360, rippleRing.border.width * 16))
+            border.color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.78)
+            opacity: Services.RipplePulseService.trailOpacity()
+        }
+
+        Rectangle {
             id: rippleGlow
 
-            width: rippleRing.width
+            width: Services.RipplePulseService.diameter(rippleLayer.maxDiameter)
             height: width
             x: rippleLayer.originX - width / 2
             y: rippleLayer.originY - height / 2
             radius: width / 2
             color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.08)
-            opacity: 0
+            opacity: Services.SettingsService.appearance.ripplePulseFullscreen ? 0 : Services.RipplePulseService.glowOpacity()
         }
 
         Rectangle {
             id: rippleRing
 
-            width: 16
+            width: Services.RipplePulseService.diameter(rippleLayer.maxDiameter)
             height: width
             x: rippleLayer.originX - width / 2
             y: rippleLayer.originY - height / 2
@@ -449,15 +382,7 @@ Item {
             color: "transparent"
             border.width: Math.max(8, Math.min(18, width * 0.018))
             border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.9)
-            opacity: 0
-        }
-
-        ParallelAnimation {
-            id: ripplePulse
-
-            NumberAnimation { target: rippleRing; property: "width"; from: 16; to: rippleLayer.maxDiameter; duration: 1800; easing.type: Easing.OutCubic }
-            NumberAnimation { target: rippleRing; property: "opacity"; from: 0.95; to: 0; duration: 1800; easing.type: Easing.OutCubic }
-            NumberAnimation { target: rippleGlow; property: "opacity"; from: 0.34; to: 0; duration: 1450; easing.type: Easing.OutCubic }
+            opacity: Services.SettingsService.appearance.ripplePulseFullscreen ? 0 : Services.RipplePulseService.ringOpacity()
         }
     }
 

@@ -90,43 +90,27 @@ Variants {
             id: fullscreenRippleLayer
 
             anchors.fill: parent
-            visible: Services.SettingsService.appearance.ripplePulseFullscreen && fullscreenRippleRing.opacity > 0.01
+            visible: Services.SettingsService.appearance.ripplePulseFullscreen && Services.RipplePulseService.active
             z: 0.5
 
             readonly property real maxDiameter: Math.ceil(Math.sqrt(width * width + height * height) * 2)
 
-            function play() {
-                fullscreenRippleRing.width = 16
-                fullscreenRippleRing.opacity = 0
-                fullscreenRippleGlow.opacity = 0
-                fullscreenRipplePulse.restart()
-            }
-
-            Connections {
-                target: Services.IslandService
-
-                function onRipplePulseTokenChanged() {
-                    if (Services.IslandService.ripplePulseToken > 0 && Services.SettingsService.appearance.ripplePulseFullscreen)
-                        fullscreenRippleLayer.play()
-                }
-            }
-
             Rectangle {
                 id: fullscreenRippleGlow
 
-                width: fullscreenRippleRing.width
+                width: Services.RipplePulseService.diameter(fullscreenRippleLayer.maxDiameter)
                 height: width
                 x: parent.width / 2 - width / 2
                 y: -height / 2
                 radius: width / 2
                 color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.08)
-                opacity: 0
+                opacity: Services.RipplePulseService.glowOpacity()
             }
 
             Rectangle {
                 id: fullscreenRippleRing
 
-                width: 16
+                width: Services.RipplePulseService.diameter(fullscreenRippleLayer.maxDiameter)
                 height: width
                 x: parent.width / 2 - width / 2
                 y: -height / 2
@@ -134,15 +118,7 @@ Variants {
                 color: "transparent"
                 border.width: Math.max(8, Math.min(20, width * 0.018))
                 border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.9)
-                opacity: 0
-            }
-
-            ParallelAnimation {
-                id: fullscreenRipplePulse
-
-                NumberAnimation { target: fullscreenRippleRing; property: "width"; from: 16; to: fullscreenRippleLayer.maxDiameter; duration: 1800; easing.type: Easing.OutCubic }
-                NumberAnimation { target: fullscreenRippleRing; property: "opacity"; from: 0.95; to: 0; duration: 1800; easing.type: Easing.OutCubic }
-                NumberAnimation { target: fullscreenRippleGlow; property: "opacity"; from: 0.34; to: 0; duration: 1450; easing.type: Easing.OutCubic }
+                opacity: Services.RipplePulseService.ringOpacity()
             }
         }
 

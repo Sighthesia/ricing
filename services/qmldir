@@ -26,3 +26,4 @@ singleton TrayMenuService 1.0 TrayMenuService.qml
 singleton TransientMessageService 1.0 TransientMessageService.qml
 singleton SpectrumService 1.0 SpectrumService.qml
 singleton SystemMonitorService 1.0 SystemMonitorService.qml
+singleton RipplePulseService 1.0 RipplePulseService.qml
