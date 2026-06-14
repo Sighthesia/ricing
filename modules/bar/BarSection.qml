@@ -10,6 +10,10 @@ Item {
 
     required property string sectionName
     required property string screenName
+    required property real screenX
+    required property real screenY
+    required property real screenWidth
+    required property real screenHeight
     property real blurSourceOffsetX: 0
     property real sectionPushOffsetX: 0
     property bool floatingValidationIntent: false
@@ -114,6 +118,11 @@ Item {
 
                 section: root.sectionName
                 screenName: root.screenName
+                screenX: root.screenX
+                screenY: root.screenY
+                screenWidth: root.screenWidth
+                screenHeight: root.screenHeight
+                windowX: surfaceRoot.x + root.x
                 blurSourceOffsetX: root.blurSourceOffsetX
                 sectionPushOffsetX: root.sectionPushOffsetX
                 surfaceHeight: Services.BarLayoutService.barHeight

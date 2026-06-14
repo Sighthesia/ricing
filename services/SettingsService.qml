@@ -181,7 +181,9 @@ QtObject {
        property string colorScheme: "auto"
    property real panelOpacity: 0.9
              property int cornerRadius: 12
-        property bool enableBlur: true
+                property bool enableBlur: true
+                property bool ripplePulseEnabled: true
+                property bool ripplePulseFullscreen: false
                 // Font family — empty string means system default (Qt.application.font.family)
                 property string fontDefault: ""
                 property string fontFixed: "monospace"

@@ -13,6 +13,10 @@ Item {
     id: root
 
     required property string screenName
+    required property real screenX
+    required property real screenY
+    required property real screenWidth
+    required property real screenHeight
     property bool _spectrumRegistered: false
 
     // Geometry constants.
@@ -163,6 +167,24 @@ Item {
     onShowCenterSpectrumChanged: syncSpectrumRegistration()
     onWidthChanged: Services.IslandService.setCenterSurfaceWidth(root.screenName, width)
 
+    Connections {
+        target: Services.IslandService
+
+        function onExpandedChanged() {
+            if (Services.IslandService.expanded)
+                Services.IslandService.triggerRipplePulse()
+        }
+    }
+
+    Connections {
+        target: Services.TransientMessageService
+
+        function onActiveChanged() {
+            if (Services.TransientMessageService.active)
+                Services.IslandService.triggerRipplePulse()
+        }
+    }
+
     // Passive hover tracking for the collapsed island geometry.
     HoverHandler {
         id: hoverHandler
@@ -179,6 +201,11 @@ Item {
         targetRadius: root.targetR
         earRadius: root.earRadius
         surfaceColor: root.surfaceColor
+        ripplePulseToken: Services.IslandService.ripplePulseToken
+        rippleScreenX: root.screenX
+        rippleScreenY: root.screenY
+        rippleScreenWidth: root.screenWidth
+        rippleScreenHeight: root.screenHeight
 
         // Measure the center context menu without clipping so the island can
         // expand its shared body before rendering the live menu view.

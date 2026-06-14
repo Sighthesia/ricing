@@ -20,6 +20,11 @@ Item {
     property int targetRadius: 14
     property int earRadius: 24
     property color surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
+    property int ripplePulseToken: 0
+    property real rippleScreenX: 0
+    property real rippleScreenY: 0
+    property real rippleScreenWidth: Screen.width
+    property real rippleScreenHeight: Screen.height
 
     // Animated size: body width grows by the two ear radii, matching the
     // legacy IslandBody size semantics (targetW + earRadius*2 / targetH).
@@ -76,6 +81,21 @@ Item {
         }
 
         return parts
+    }
+
+    function playRipplePulse() {
+        if (Services.SettingsService.appearance.ripplePulseFullscreen)
+            return
+
+        rippleRing.width = 16
+        rippleRing.opacity = 0
+        rippleGlow.opacity = 0
+        ripplePulse.restart()
+    }
+
+    onRipplePulseTokenChanged: {
+        if (ripplePulseToken > 0)
+            playRipplePulse()
     }
 
     // Blur source parts for the center island body and top ears. The body
@@ -290,6 +310,55 @@ Item {
             y: 0
             width: Math.max(0, bodyRect.width - bodyRect.blurLeadW)
             height: Math.max(0, bodyRect.height - bodyRect.blurLeadH)
+        }
+
+        // Mask the screen-origin ripple to the shell surface only.
+        Item {
+            id: rippleLayer
+
+            anchors.fill: parent
+            visible: rippleRing.opacity > 0.01
+            z: 999
+
+            readonly property real originX: root.rippleScreenWidth / 2 - islandBody.x - bodyRect.x
+            readonly property real originY: -bodyRect.y
+            readonly property real maxDiameter: Math.ceil(Math.sqrt(root.rippleScreenWidth * root.rippleScreenWidth + root.rippleScreenHeight * root.rippleScreenHeight) * 2)
+
+            Rectangle {
+                id: rippleGlow
+
+                width: rippleRing.width
+                height: width
+                x: rippleLayer.originX - width / 2
+                y: rippleLayer.originY - height / 2
+                radius: width / 2
+                color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.08)
+                opacity: 0
+                scale: 1
+            }
+
+            Rectangle {
+                id: rippleRing
+
+                width: 16
+                height: width
+                x: rippleLayer.originX - width / 2
+                y: rippleLayer.originY - height / 2
+                radius: width / 2
+                color: "transparent"
+                border.width: Math.max(8, Math.min(18, width * 0.018))
+                border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.9)
+                opacity: 0
+                scale: 1
+            }
+
+            ParallelAnimation {
+                id: ripplePulse
+
+                NumberAnimation { target: rippleRing; property: "width"; from: 16; to: rippleLayer.maxDiameter; duration: 1800; easing.type: Easing.OutCubic }
+                NumberAnimation { target: rippleRing; property: "opacity"; from: 0.95; to: 0; duration: 1800; easing.type: Easing.OutCubic }
+                NumberAnimation { target: rippleGlow; property: "opacity"; from: 0.34; to: 0; duration: 1450; easing.type: Easing.OutCubic }
+            }
         }
     }
 

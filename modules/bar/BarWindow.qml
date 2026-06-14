@@ -98,6 +98,10 @@ Variants {
             id: barContent
 
             screenName: modelData.name
+            screenX: modelData.x
+            screenY: modelData.y
+            screenWidth: modelData.width
+            screenHeight: modelData.height
             anchors.fill: parent
         }
 

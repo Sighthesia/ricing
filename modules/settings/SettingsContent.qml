@@ -136,7 +136,8 @@ Item {
                 basePixelSize: 14
                 topPadding: 8
                 height: (appWallpaper.filterVisible || appColorScheme.filterVisible || appPanelOpacity.filterVisible ||
-                         appCornerRadius.filterVisible || appBlur.filterVisible ||
+                         appCornerRadius.filterVisible || appBlur.filterVisible || appRipplePulse.filterVisible ||
+                         appRippleFullscreen.filterVisible ||
                          appOverviewBg.filterVisible || appOverviewSolid.filterVisible ||
                          appOverviewBlur.filterVisible || appOverviewTint.filterVisible ||
                          fontDefault.filterVisible || fontFixed.filterVisible ||
@@ -195,6 +196,26 @@ Item {
                 width: parent.width
                 filterVisible: root.settingMatches(settingLabel)
                 onToggled: v => { Services.SettingsService.appearance.enableBlur = v }
+            }
+
+            SettingToggle {
+                id: appRipplePulse
+                settingLabel: "Ripple Pulse"
+                description: "Flash a screen-centered ring when island panels or transient messages appear"
+                checked: Services.SettingsService.appearance.ripplePulseEnabled
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onToggled: v => { Services.SettingsService.appearance.ripplePulseEnabled = v }
+            }
+
+            SettingToggle {
+                id: appRippleFullscreen
+                settingLabel: "Ripple Fullscreen Overlay"
+                description: "Let the pulse cover the full screen instead of only shell surfaces"
+                checked: Services.SettingsService.appearance.ripplePulseFullscreen
+                width: parent.width
+                filterVisible: Services.SettingsService.appearance.ripplePulseEnabled && root.settingMatches(settingLabel)
+                onToggled: v => { Services.SettingsService.appearance.ripplePulseFullscreen = v }
             }
 
             SettingToggle {

@@ -12,6 +12,11 @@ Item {
     // High-level semantic inputs from the section owner.
     required property string section
     required property string screenName
+    required property real screenX
+    required property real screenY
+    required property real screenWidth
+    required property real screenHeight
+    property real windowX: 0
     property string surfaceState: "attached"
     property bool hoverIntent: false
     required property real surfaceHeight
@@ -215,6 +220,21 @@ Item {
         return parts
     }
 
+    function playRipplePulse() {
+        if (Services.SettingsService.appearance.ripplePulseFullscreen)
+            return
+
+        rippleRing.width = 16
+        rippleRing.opacity = 0
+        rippleGlow.opacity = 0
+        ripplePulse.restart()
+    }
+
+    onVisibleChanged: {
+        if (!visible)
+            ripplePulse.stop()
+    }
+
     // Blur source parts for body and ears.
     // Ear parts are one-pixel strips so wl_region can approximate the concave arcs
     // without unsupported subtract/ellipse composition.
@@ -321,6 +341,66 @@ Item {
             PathSvg {
                 path: silhouetteFill.outline
             }
+        }
+    }
+
+    Connections {
+        target: Services.IslandService
+
+        function onRipplePulseTokenChanged() {
+            if (Services.IslandService.ripplePulseToken > 0)
+                root.playRipplePulse()
+        }
+    }
+
+    // Mask the shared screen-origin ripple to this dockzone surface only.
+    Item {
+        id: rippleLayer
+
+        x: centerBody.x
+        y: centerBody.y
+        width: centerBody.width
+        height: centerBody.height
+        clip: true
+        visible: rippleRing.opacity > 0.01
+        z: 999
+
+        readonly property real originX: root.screenWidth / 2 - root.windowX - centerBody.x
+        readonly property real originY: -centerBody.y
+        readonly property real maxDiameter: Math.ceil(Math.sqrt(root.screenWidth * root.screenWidth + root.screenHeight * root.screenHeight) * 2)
+
+        Rectangle {
+            id: rippleGlow
+
+            width: rippleRing.width
+            height: width
+            x: rippleLayer.originX - width / 2
+            y: rippleLayer.originY - height / 2
+            radius: width / 2
+            color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.08)
+            opacity: 0
+        }
+
+        Rectangle {
+            id: rippleRing
+
+            width: 16
+            height: width
+            x: rippleLayer.originX - width / 2
+            y: rippleLayer.originY - height / 2
+            radius: width / 2
+            color: "transparent"
+            border.width: Math.max(8, Math.min(18, width * 0.018))
+            border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.9)
+            opacity: 0
+        }
+
+        ParallelAnimation {
+            id: ripplePulse
+
+            NumberAnimation { target: rippleRing; property: "width"; from: 16; to: rippleLayer.maxDiameter; duration: 1800; easing.type: Easing.OutCubic }
+            NumberAnimation { target: rippleRing; property: "opacity"; from: 0.95; to: 0; duration: 1800; easing.type: Easing.OutCubic }
+            NumberAnimation { target: rippleGlow; property: "opacity"; from: 0.34; to: 0; duration: 1450; easing.type: Easing.OutCubic }
         }
     }
 

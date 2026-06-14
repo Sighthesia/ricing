@@ -8,6 +8,10 @@ Item {
     id: root
 
     required property string screenName
+    required property real screenX
+    required property real screenY
+    required property real screenWidth
+    required property real screenHeight
     readonly property var leftSectionBlurParts: leftSection.blurParts
     readonly property var rightSectionBlurParts: rightSection.blurParts
     readonly property real centerSurfaceWidth: Math.max(
@@ -120,6 +124,10 @@ Item {
 
         sectionName: "left"
         screenName: root.screenName
+        screenX: root.screenX
+        screenY: root.screenY
+        screenWidth: root.screenWidth
+        screenHeight: root.screenHeight
         sectionPushOffsetX: root.leftSectionPushVisual
         anchors.left: parent.left
         anchors.top: parent.top
@@ -135,6 +143,10 @@ Item {
 
         sectionName: "center"
         screenName: root.screenName
+        screenX: root.screenX
+        screenY: root.screenY
+        screenWidth: root.screenWidth
+        screenHeight: root.screenHeight
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         visible: false
@@ -148,6 +160,10 @@ Item {
 
         sectionName: "right"
         screenName: root.screenName
+        screenX: root.screenX
+        screenY: root.screenY
+        screenWidth: root.screenWidth
+        screenHeight: root.screenHeight
         sectionPushOffsetX: root.rightSectionPushVisual
         anchors.right: parent.right
         anchors.top: parent.top
