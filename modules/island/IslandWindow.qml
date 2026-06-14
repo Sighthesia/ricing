@@ -99,6 +99,8 @@ Variants {
                 fullscreenRippleRing.width = 16
                 fullscreenRippleRing.opacity = 0
                 fullscreenRippleGlow.opacity = 0
+                fullscreenRippleAfterglowNear.opacity = 0
+                fullscreenRippleAfterglowFar.opacity = 0
                 fullscreenRipplePulse.restart()
             }
 
@@ -137,12 +139,44 @@ Variants {
                 opacity: 0
             }
 
+            Rectangle {
+                id: fullscreenRippleAfterglowNear
+
+                width: 16
+                height: width
+                x: parent.width / 2 - width / 2
+                y: -height / 2
+                radius: width / 2
+                color: "transparent"
+                border.width: Math.max(18, Math.min(42, width * 0.034))
+                border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.38)
+                opacity: 0
+            }
+
+            Rectangle {
+                id: fullscreenRippleAfterglowFar
+
+                width: 16
+                height: width
+                x: parent.width / 2 - width / 2
+                y: -height / 2
+                radius: width / 2
+                color: "transparent"
+                border.width: Math.max(28, Math.min(64, width * 0.052))
+                border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.22)
+                opacity: 0
+            }
+
             ParallelAnimation {
                 id: fullscreenRipplePulse
 
                 NumberAnimation { target: fullscreenRippleRing; property: "width"; from: 16; to: fullscreenRippleLayer.maxDiameter; duration: 1800; easing.type: Easing.OutCubic }
                 NumberAnimation { target: fullscreenRippleRing; property: "opacity"; from: 0.95; to: 0; duration: 1800; easing.type: Easing.OutCubic }
                 NumberAnimation { target: fullscreenRippleGlow; property: "opacity"; from: 0.34; to: 0; duration: 1450; easing.type: Easing.OutCubic }
+                NumberAnimation { target: fullscreenRippleAfterglowNear; property: "width"; from: 16; to: fullscreenRippleLayer.maxDiameter * 0.98; duration: 2050; easing.type: Easing.OutCubic }
+                NumberAnimation { target: fullscreenRippleAfterglowNear; property: "opacity"; from: 0.28; to: 0; duration: 2050; easing.type: Easing.OutCubic }
+                NumberAnimation { target: fullscreenRippleAfterglowFar; property: "width"; from: 16; to: fullscreenRippleLayer.maxDiameter * 0.94; duration: 2300; easing.type: Easing.OutCubic }
+                NumberAnimation { target: fullscreenRippleAfterglowFar; property: "opacity"; from: 0.16; to: 0; duration: 2300; easing.type: Easing.OutCubic }
             }
         }
 

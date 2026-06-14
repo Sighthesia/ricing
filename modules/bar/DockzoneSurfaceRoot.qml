@@ -227,6 +227,8 @@ Item {
         rippleRing.width = 16
         rippleRing.opacity = 0
         rippleGlow.opacity = 0
+        rippleAfterglowNear.opacity = 0
+        rippleAfterglowFar.opacity = 0
         ripplePulse.restart()
     }
 
@@ -395,12 +397,44 @@ Item {
             opacity: 0
         }
 
+        Rectangle {
+            id: rippleAfterglowNear
+
+            width: 16
+            height: width
+            x: rippleLayer.originX - width / 2
+            y: rippleLayer.originY - height / 2
+            radius: width / 2
+            color: "transparent"
+            border.width: Math.max(18, Math.min(42, width * 0.034))
+            border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.38)
+            opacity: 0
+        }
+
+        Rectangle {
+            id: rippleAfterglowFar
+
+            width: 16
+            height: width
+            x: rippleLayer.originX - width / 2
+            y: rippleLayer.originY - height / 2
+            radius: width / 2
+            color: "transparent"
+            border.width: Math.max(28, Math.min(64, width * 0.052))
+            border.color: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.22)
+            opacity: 0
+        }
+
         ParallelAnimation {
             id: ripplePulse
 
             NumberAnimation { target: rippleRing; property: "width"; from: 16; to: rippleLayer.maxDiameter; duration: 1800; easing.type: Easing.OutCubic }
             NumberAnimation { target: rippleRing; property: "opacity"; from: 0.95; to: 0; duration: 1800; easing.type: Easing.OutCubic }
             NumberAnimation { target: rippleGlow; property: "opacity"; from: 0.34; to: 0; duration: 1450; easing.type: Easing.OutCubic }
+            NumberAnimation { target: rippleAfterglowNear; property: "width"; from: 16; to: rippleLayer.maxDiameter * 0.98; duration: 2050; easing.type: Easing.OutCubic }
+            NumberAnimation { target: rippleAfterglowNear; property: "opacity"; from: 0.28; to: 0; duration: 2050; easing.type: Easing.OutCubic }
+            NumberAnimation { target: rippleAfterglowFar; property: "width"; from: 16; to: rippleLayer.maxDiameter * 0.94; duration: 2300; easing.type: Easing.OutCubic }
+            NumberAnimation { target: rippleAfterglowFar; property: "opacity"; from: 0.16; to: 0; duration: 2300; easing.type: Easing.OutCubic }
         }
     }
 
