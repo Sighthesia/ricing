@@ -242,8 +242,6 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                anchors.leftMargin: root.earRadius + 10
-                anchors.rightMargin: root.earRadius + 10
                 anchors.bottomMargin: 1
                 height: Math.min(parent.height, Math.max(16, root.collapsedH - 12))
                 visible: root.showCenterSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
