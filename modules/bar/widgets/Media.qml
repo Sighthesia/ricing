@@ -42,7 +42,6 @@ Item {
     property string currentTextKey: root._displayTextKey
     property string pendingTextKey: root._displayTextKey
     property bool transitioning: false
-    property string _stableArtUrl: ""
     property real _progressValue: Services.MediaControlService.progress
 
     readonly property string _fallbackTitle: Services.MediaControlService.title !== ""
@@ -68,8 +67,9 @@ Item {
         Services.Color.mSurfaceVariant.b,
         0.9
     )
-    readonly property string _displayArtUrl:
-        root._stableArtUrl !== "" ? root._stableArtUrl : Services.MediaControlService.artUrl
+    readonly property string _displayArtUrl: Services.MediaControlService.artUrl
+    readonly property bool _currentArtworkReady: currentArtworkSource.status === Image.Ready
+    readonly property bool _nextArtworkReady: nextArtworkSource.status === Image.Ready
     readonly property color _ringTrackColor: Qt.rgba(
         Services.Color.mOutline.r,
         Services.Color.mOutline.g,
@@ -90,11 +90,29 @@ Item {
         NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
     }
 
+    function isLyricTextKey(textKey) {
+        return textKey.indexOf("original:") === 0
+            || textKey.indexOf("translated:") === 0
+            || textKey.indexOf("lyric:") === 0
+    }
+
     function syncDisplayText() {
         const nextText = root._displayText
         const nextKey = root._displayTextKey
         if (nextKey === root.currentTextKey && !root.transitioning)
             return
+
+        if (root.isLyricTextKey(root.currentTextKey) && root.isLyricTextKey(nextKey)) {
+            fadeTransition.stop()
+            currentLayer.opacity = 1
+            nextLayer.opacity = 0
+            root.currentText = nextText
+            root.pendingText = nextText
+            root.currentTextKey = nextKey
+            root.pendingTextKey = nextKey
+            root.transitioning = false
+            return
+        }
 
         root.pendingText = nextText
         root.pendingTextKey = nextKey
@@ -104,16 +122,6 @@ Item {
 
         root.transitioning = true
         fadeTransition.restart()
-    }
-
-    function syncArtwork() {
-        if (Services.MediaControlService.artUrl !== "") {
-            root._stableArtUrl = Services.MediaControlService.artUrl
-            return
-        }
-
-        if (Services.MediaControlService.title === "" && Services.MediaControlService.artist === "")
-            root._stableArtUrl = ""
     }
 
     function syncSpectrumRegistration() {
@@ -126,7 +134,6 @@ Item {
     Component.onCompleted: {
         Services.SettingsService.ensureWidgetSettings("media", root.widgetInstanceKey)
         syncDisplayText()
-        syncArtwork()
         root._progressValue = Services.MediaControlService.progress
         syncSpectrumRegistration()
     }
@@ -150,15 +157,6 @@ Item {
 
         function onTitleChanged() {
             root.syncDisplayText()
-            root.syncArtwork()
-        }
-
-        function onArtistChanged() {
-            root.syncArtwork()
-        }
-
-        function onArtUrlChanged() {
-            root.syncArtwork()
         }
 
         function onProgressChanged() {
@@ -329,6 +327,11 @@ Item {
                     asynchronous: true
                     cache: true
                     smooth: true
+
+                    onStatusChanged: {
+                        if (status === Image.Error && source !== "")
+                            Services.MediaService.reportArtLoadFailure(source)
+                    }
                 }
 
                 // Frame the circular artwork badge.
@@ -344,7 +347,7 @@ Item {
                     // Render the masked circular artwork.
                     OpacityMask {
                         anchors.fill: parent
-                        visible: root._displayArtUrl !== ""
+                        visible: root._currentArtworkReady
                         source: currentArtworkSource
                         maskSource: currentArtworkMaskContainer
                     }
@@ -354,7 +357,7 @@ Item {
                         text: "♪"
                         color: Services.Color.mOnSurfaceVariant
                         basePixelSize: 10
-                        visible: root._displayArtUrl === ""
+                        visible: !root._currentArtworkReady
                     }
                 }
             }
@@ -518,6 +521,11 @@ Item {
                     asynchronous: true
                     cache: true
                     smooth: true
+
+                    onStatusChanged: {
+                        if (status === Image.Error && source !== "")
+                            Services.MediaService.reportArtLoadFailure(source)
+                    }
                 }
 
                 // Reuse the same circular badge inside the progress ring.
@@ -533,7 +541,7 @@ Item {
                     // Render the masked circular artwork.
                     OpacityMask {
                         anchors.fill: parent
-                        visible: root._displayArtUrl !== ""
+                        visible: root._nextArtworkReady
                         source: nextArtworkSource
                         maskSource: nextArtworkMaskContainer
                     }
@@ -543,7 +551,7 @@ Item {
                         text: "♪"
                         color: Services.Color.mOnSurfaceVariant
                         basePixelSize: 10
-                        visible: root._displayArtUrl === ""
+                        visible: !root._nextArtworkReady
                     }
                 }
             }

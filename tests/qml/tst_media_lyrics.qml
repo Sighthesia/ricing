@@ -88,6 +88,114 @@ TestCase {
         compare(Services.NeteaseWebLyricsService.currentLyric, "Line two")
     }
 
+    function test_lyric_window_matches_media_position_with_artist_format_differences() {
+        resetState()
+
+        Services.MediaService._activePlayerRef = {
+            identity: "Firefox",
+            desktopEntry: "firefox",
+            trackTitle: "Song Name",
+            trackArtist: "Artist A / Artist B",
+            trackAlbum: "Album",
+            trackArtUrl: "",
+            positionSupported: true,
+            position: 1.2,
+            lengthSupported: true,
+            length: 5,
+            canControl: true,
+            canGoPrevious: true,
+            canTogglePlaying: true,
+            canGoNext: true,
+            canSeek: true,
+            playbackState: MprisPlaybackState.Playing,
+            isPlaying: true,
+            play: function() {},
+            pause: function() {},
+            previous: function() {},
+            next: function() {}
+        }
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.MediaService._positionTick += 1
+
+        Services.NeteaseWebLyricsService._applyPayload({
+            songId: "2",
+            title: " song name ",
+            artist: "artist a, artist b",
+            playbackState: "paused",
+            positionMs: 0,
+            durationMs: 5000,
+            rawLyric: "[00:00.00]Line one\n[00:01.00]Line two"
+        })
+
+        compare(Services.NeteaseWebLyricsService.currentLyric, "Line two")
+    }
+
+    function test_compact_lyric_survives_metadata_case_and_separator_churn() {
+        resetState()
+
+        Services.MediaService._activePlayerRef = makePlayer(0)
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.NeteaseWebLyricsService.songId = ""
+        Services.NeteaseWebLyricsService.title = "Song Name"
+        Services.NeteaseWebLyricsService.artist = "Artist A, Artist B"
+        Services.NeteaseWebLyricsService.currentLyric = "Line one"
+        Services.NeteaseWebLyricsService.hasLyrics = true
+        Services.MediaControlService._refreshLyricsSession()
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactPrimaryLyric === "Line one"
+        }, 1000)
+
+        Services.MediaService._activePlayerRef.trackTitle = " song name "
+        Services.MediaService._activePlayerRef.trackArtist = "Artist A / Artist B"
+        Services.NeteaseWebLyricsService.title = "SONG NAME"
+        Services.NeteaseWebLyricsService.artist = "artist a / artist b"
+        Services.MediaControlService._refreshLyricsSession()
+
+        compare(Services.MediaControlService.compactPrimaryLyric, "Line one")
+        compare(Services.MediaControlService._lyricsSourceLatched, true)
+    }
+
+    function test_compact_lyric_survives_temporary_empty_media_artist() {
+        resetState()
+
+        Services.MediaService._activePlayerRef = makePlayer(0)
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.NeteaseWebLyricsService.title = "Song"
+        Services.NeteaseWebLyricsService.artist = "Artist"
+        Services.NeteaseWebLyricsService.currentLyric = "Line one"
+        Services.NeteaseWebLyricsService.hasLyrics = true
+        Services.MediaControlService._refreshLyricsSession()
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactPrimaryLyric === "Line one"
+        }, 1000)
+
+        Services.MediaService._activePlayerRef.trackArtist = ""
+        Services.MediaControlService._refreshLyricsSession()
+        compare(Services.MediaControlService.compactPrimaryLyric, "Line one")
+        compare(Services.MediaControlService._lyricsSourceLatched, true)
+
+        Services.MediaService._activePlayerRef.trackArtist = "Artist"
+        Services.MediaControlService._refreshLyricsSession()
+        compare(Services.MediaControlService.compactPrimaryLyric, "Line one")
+        compare(Services.MediaControlService._lyricsSourceLatched, true)
+    }
+
+    function test_web_art_url_is_preferred_when_mpris_cover_missing() {
+        resetState()
+
+        Services.MediaService._activePlayerRef = makePlayer(0)
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.MediaService.artUrl = ""
+        Services.NeteaseWebLyricsService.artUrl = "file:///tmp/web-cover.jpg"
+
+        compare(Services.MediaControlService.artUrl, "file:///tmp/web-cover.jpg")
+
+        Services.MediaService.artUrl = "file:///tmp/mpris-cover.jpg"
+        compare(Services.MediaControlService.artUrl, "file:///tmp/mpris-cover.jpg")
+    }
+
     function test_instrumental_lyric_should_not_display_compact_lyric() {
         resetState()
 

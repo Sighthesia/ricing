@@ -10,18 +10,17 @@ Singleton {
 
     readonly property bool preferLyrics: true
     readonly property bool preferTranslatedLyrics: false
-    readonly property string _lyricsMetadataKey:
-        Services.NeteaseWebLyricsService.title !== "" && Services.NeteaseWebLyricsService.artist !== ""
-            ? [Services.NeteaseWebLyricsService.title, Services.NeteaseWebLyricsService.artist].join("|")
-            : ""
+    readonly property string _lyricsMetadataKey: root._normalizedTrackKey(
+        Services.NeteaseWebLyricsService.title,
+        Services.NeteaseWebLyricsService.artist
+    )
     readonly property string _lyricsSessionKey:
         Services.NeteaseWebLyricsService.songId !== ""
             ? "id:" + Services.NeteaseWebLyricsService.songId
             : (root._lyricsMetadataKey !== "" ? "meta:" + root._lyricsMetadataKey : "")
-    readonly property string _playerTrackKey:
-        Services.MediaService.hasPlayer
-            ? [Services.MediaService.title || "", Services.MediaService.artist || ""].join("|")
-            : ""
+    readonly property string _playerTrackKey: Services.MediaService.hasPlayer
+        ? root._normalizedTrackKey(Services.MediaService.title, Services.MediaService.artist)
+        : ""
     readonly property bool _lyricsSignalActive:
         root.preferLyrics
             && (Services.NeteaseWebLyricsService.active
@@ -57,7 +56,10 @@ Singleton {
             ? Services.NeteaseWebLyricsService.artist
             : (Services.MediaService.hasPlayer ? Services.MediaService.artist : ""))
         : (Services.MediaService.hasPlayer ? Services.MediaService.artist : Services.NeteaseWebLyricsService.artist)
-    readonly property string artUrl: Services.MediaService.hasPlayer ? Services.MediaService.artUrl : ""
+    readonly property string artUrl:
+        Services.MediaService.hasPlayer && Services.MediaService.artUrl !== ""
+            ? Services.MediaService.artUrl
+            : (Services.NeteaseWebLyricsService.artUrl !== "" ? Services.NeteaseWebLyricsService.artUrl : "")
     readonly property string playerName: Services.MediaService.hasPlayer ? Services.MediaService.playerName : ""
     readonly property string playbackState: root._preferLyricsMediaSource
         ? ((Services.MediaService.hasPlayer && Services.MediaService.playbackState !== "playing")
@@ -135,6 +137,57 @@ Singleton {
 
     function _isInstrumentalLyric(text) {
         return text === "纯音乐，请欣赏" || text === "纯音乐，请欣赏。"
+    }
+
+    function _normalizedTrackTitle(value) {
+        return value != null ? String(value).trim().toLowerCase().replace(/\s+/g, " ") : ""
+    }
+
+    function _normalizedArtistKey(value) {
+        const normalized = value != null ? String(value).trim().toLowerCase().replace(/\s+/g, " ") : ""
+        if (normalized === "")
+            return ""
+
+        const tokens = normalized
+            .split(/\s*(?:,|，|\/|&|、|;|；| feat\.? | featuring )\s*/)
+            .map(token => token.trim())
+            .filter(token => token !== "")
+
+        const unique = []
+        for (let index = 0; index < tokens.length; index += 1) {
+            const token = tokens[index]
+            if (unique.indexOf(token) === -1)
+                unique.push(token)
+        }
+
+        unique.sort()
+        return unique.join(",")
+    }
+
+    function _normalizedTrackKey(title, artist) {
+        const normalizedTitle = root._normalizedTrackTitle(title)
+        if (normalizedTitle === "")
+            return ""
+
+        return [normalizedTitle, root._normalizedArtistKey(artist)].join("|")
+    }
+
+    function _trackKeysMatch(firstKey, secondKey) {
+        if (firstKey === "" || secondKey === "")
+            return false
+        if (firstKey === secondKey)
+            return true
+
+        const firstParts = firstKey.split("|")
+        const secondParts = secondKey.split("|")
+        const firstTitle = firstParts.length > 0 ? firstParts[0] : ""
+        const secondTitle = secondParts.length > 0 ? secondParts[0] : ""
+        if (firstTitle === "" || secondTitle === "" || firstTitle !== secondTitle)
+            return false
+
+        const firstArtist = firstParts.length > 1 ? firstParts[1] : ""
+        const secondArtist = secondParts.length > 1 ? secondParts[1] : ""
+        return firstArtist === "" || secondArtist === ""
     }
 
     function _lyricKey(prefix, phase, index, text) {
@@ -227,13 +280,12 @@ Singleton {
     function _refreshLyricsSession() {
         const sessionKey = root._lyricsSessionKey
         const playerTrackKey = root._playerTrackKey
-        const currentTrackMatchesLatched = playerTrackKey !== "" && root._latchedPlayerTrackKey !== ""
-            && playerTrackKey === root._latchedPlayerTrackKey
+        const currentTrackMatchesLatched = root._trackKeysMatch(playerTrackKey, root._latchedPlayerTrackKey)
         const hasStableLyrics = root.hasLyrics || root._hasStableLyricsCache()
         const lyricsSessionChanged = sessionKey !== "" && root._latchedLyricsSessionKey !== ""
             && sessionKey !== root._latchedLyricsSessionKey
         const playerTrackChanged = playerTrackKey !== "" && root._latchedPlayerTrackKey !== ""
-            && playerTrackKey !== root._latchedPlayerTrackKey
+            && !root._trackKeysMatch(playerTrackKey, root._latchedPlayerTrackKey)
         const shouldIgnoreSessionKeyChurn = lyricsSessionChanged && currentTrackMatchesLatched
             && hasStableLyrics && root._lyricsSignalActive
 
@@ -299,7 +351,7 @@ Singleton {
         onTriggered: {
             if (root._lyricsSignalActive || (root._playerTrackKey !== ""
                     && root._latchedPlayerTrackKey !== ""
-                    && root._playerTrackKey === root._latchedPlayerTrackKey
+                    && root._trackKeysMatch(root._playerTrackKey, root._latchedPlayerTrackKey)
                     && root._hasStableLyricsCache())) {
                 lyricsSourceTimer.restart()
                 return

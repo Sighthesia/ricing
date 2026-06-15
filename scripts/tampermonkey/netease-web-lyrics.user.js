@@ -69,6 +69,7 @@
       progress,
       rawLyric: normalizeText(payload.rawLyric),
       translatedLyric: normalizeText(payload.translatedLyric),
+      artUrl: normalizeText(payload.artUrl || payload.coverUrl || payload.trackArtUrl),
     };
   }
 
@@ -82,6 +83,7 @@
       payload.durationMs,
       payload.rawLyric,
       payload.translatedLyric,
+      payload.artUrl,
     ].join('|');
   }
 
@@ -362,6 +364,7 @@
         songId: '',
         title: '',
         artist: '',
+        artUrl: '',
         playbackState: 'stopped',
         durationMs: 0,
         positionMs: 0,
@@ -388,6 +391,7 @@
           songId: normalizeText(state.songId),
           title: normalizeText(state.title),
           artist: normalizeText(state.artist),
+          artUrl: normalizeText(state.artUrl),
           playbackState: normalizeText(state.playbackState) || 'stopped',
           durationMs: clampInt(state.durationMs),
           positionMs: clampInt(state.positionMs),
@@ -399,6 +403,7 @@
           payload.songId,
           payload.title,
           payload.artist,
+          payload.artUrl,
           payload.playbackState,
           payload.positionMs,
           payload.durationMs,
@@ -427,6 +432,30 @@
           return '';
 
         return `${normalizedTitle}|${normalizedArtist}`;
+      }
+
+      function artworkFromTrack(track) {
+        if (!track || typeof track !== 'object')
+          return '';
+
+        const candidates = [
+          track.artUrl,
+          track.coverUrl,
+          track.picUrl,
+          track.img1v1Url,
+          track.al && track.al.picUrl,
+          track.album && track.album.picUrl,
+          track.album && track.album.blurPicUrl,
+          track.al && track.al.blurPicUrl,
+        ];
+
+        for (const candidate of candidates) {
+          const normalized = normalizeText(candidate);
+          if (normalized)
+            return normalized;
+        }
+
+        return '';
       }
 
       function lyricRequestSongId(requestUrl) {
@@ -490,6 +519,12 @@
         }
         if (nextArtist && nextArtist !== state.artist) {
           state.artist = nextArtist;
+          changed = true;
+        }
+
+        const nextArtUrl = artworkFromTrack(track);
+        if (nextArtUrl && nextArtUrl !== state.artUrl) {
+          state.artUrl = nextArtUrl;
           changed = true;
         }
 
@@ -561,6 +596,21 @@
         if (nextPlaybackState && nextPlaybackState !== 'none' && nextPlaybackState !== state.playbackState) {
           state.playbackState = nextPlaybackState;
           changed = true;
+        }
+
+        const sessionArtwork = session.metadata && Array.isArray(session.metadata.artwork)
+          ? session.metadata.artwork
+          : [];
+        for (const artwork of sessionArtwork) {
+          const nextArtUrl = normalizeText(artwork && (artwork.src || artwork.url || artwork));
+          if (!nextArtUrl)
+            continue;
+
+          if (nextArtUrl !== state.artUrl) {
+            state.artUrl = nextArtUrl;
+            changed = true;
+          }
+          break;
         }
 
         return changed;

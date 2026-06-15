@@ -9,6 +9,9 @@ import QtQuick
 Singleton {
     id: root
 
+    readonly property bool _artDebugEnabled:
+        (Quickshell.env("AFLOAT_MEDIA_ART_DEBUG") || "").trim() === "1"
+
     property int _positionTick: 0
     property string _preferredPlayerKey: ""
     property var _activePlayerRef: null
@@ -18,8 +21,9 @@ Singleton {
     property string _lastArtTitle: ""
     property string _lastArtArtist: ""
     property bool _artRecoveryPending: false
-    property int _artRecoveryStartedAt: 0
+    property real _artRecoveryStartedAt: 0
     property var _artUrlCache: ({})
+    property var _failedArtUrlCache: ({})
     property string _lastSeenArtKey: ""
     property int _cacheVersion: 0
 
@@ -74,6 +78,29 @@ Singleton {
         return Object.assign({}, cache)
     }
 
+    function _debugArtLog(event, player, artUrl, extra) {
+        if (!root._artDebugEnabled)
+            return
+
+        const safePlayer = player || root.activePlayer
+        const payload = {
+            event: event,
+            player: safePlayer ? (safePlayer.identity || safePlayer.desktopEntry || "") : "",
+            title: safePlayer ? (safePlayer.trackTitle || "") : "",
+            artist: safePlayer ? (safePlayer.trackArtist || "") : "",
+            trackArtUrl: safePlayer ? root._normalizeArtUrl(safePlayer.trackArtUrl || "") : "",
+            artUrl: root._normalizeArtUrl(artUrl != null ? artUrl : root.artUrl),
+            failed: root._isFailedArtUrl(artUrl != null ? artUrl : root.artUrl),
+            recoveryPending: root._artRecoveryPending,
+            recoveryStartedAt: root._artRecoveryStartedAt
+        }
+
+        if (extra && typeof extra === "object")
+            Object.assign(payload, extra)
+
+        console.log("[afloat:MediaArt]", JSON.stringify(payload))
+    }
+
     function _rememberArtContext(playerKey, artKey, trackTitle, trackArtist) {
         root._lastArtPlayerKey = playerKey
         root._lastArtKey = artKey
@@ -124,7 +151,8 @@ Singleton {
     }
 
     function _cacheArtUrl(artKey, artUrl) {
-        if (!artKey || !artUrl)
+        const normalizedArtUrl = root._normalizeArtUrl(artUrl)
+        if (!artKey || !normalizedArtUrl)
             return
 
         const cache = root._cloneArtCache(root._artUrlCache)
@@ -133,17 +161,56 @@ Singleton {
             const oldestKey = keys[0]
             delete cache[oldestKey]
         }
-        cache[artKey] = artUrl
+        cache[artKey] = normalizedArtUrl
         root._artUrlCache = cache
         root._cacheVersion += 1
         artCacheAdapter.artUrlCache = cache
         artCacheSaveTimer.restart()
     }
 
+    function _normalizeArtUrl(artUrl) {
+        return artUrl != null ? String(artUrl).trim() : ""
+    }
+
     function _lookupCachedArtUrl(artKey) {
         if (!artKey)
             return ""
-        return root._artUrlCache[artKey] || ""
+
+        const cachedArtUrl = root._artUrlCache[artKey] || ""
+        return root._isFailedArtUrl(cachedArtUrl) ? "" : cachedArtUrl
+    }
+
+    function _isFailedArtUrl(artUrl) {
+        const normalizedArtUrl = root._normalizeArtUrl(artUrl)
+        return !!(normalizedArtUrl && root._failedArtUrlCache[normalizedArtUrl])
+    }
+
+    function _rememberFailedArtUrl(artUrl) {
+        const normalizedArtUrl = root._normalizeArtUrl(artUrl)
+        if (!normalizedArtUrl || root._isFailedArtUrl(normalizedArtUrl))
+            return
+
+        const failedCache = root._cloneArtCache(root._failedArtUrlCache)
+        failedCache[normalizedArtUrl] = true
+        root._failedArtUrlCache = failedCache
+    }
+
+    function reportArtLoadFailure(artUrl) {
+        const failedArtUrl = root._normalizeArtUrl(artUrl)
+        if (!failedArtUrl)
+            return
+
+        root._rememberFailedArtUrl(failedArtUrl)
+        root._debugArtLog("load-failure", root.activePlayer, failedArtUrl)
+
+        if (root._normalizeArtUrl(root.artUrl) === failedArtUrl) {
+            root.artUrl = ""
+            root._artRecoveryPending = root.hasPlayer && root._artKey(root.activePlayer) !== ""
+            root._artRecoveryStartedAt = root._artRecoveryPending ? Date.now() : 0
+        }
+
+        if (root.hasPlayer)
+            root._syncArtUrl()
     }
 
     function _selectActivePlayer() {
@@ -206,7 +273,7 @@ Singleton {
         const artKey = root._artKey(player)
         const trackTitle = player.trackTitle || ""
         const trackArtist = player.trackArtist || ""
-        const nextArtUrl = player.trackArtUrl || ""
+        const nextArtUrl = root._normalizeArtUrl(player.trackArtUrl || "")
         const trackChanged = artKey !== root._lastSeenArtKey
 
         // Track changed: reset recovery timer so new track gets full window.
@@ -215,8 +282,17 @@ Singleton {
             root._artRecoveryStartedAt = 0
         }
 
+        const cachedArt = root._lookupCachedArtUrl(artKey)
+        root._debugArtLog("sync", player, nextArtUrl, {
+            trackChanged: trackChanged,
+            artKey: artKey,
+            cachedArt: cachedArt,
+            failedTrackArtUrl: root._isFailedArtUrl(nextArtUrl),
+            failedCurrentArtUrl: root._isFailedArtUrl(root.artUrl)
+        })
+
         // Player provides art URL directly: use and cache it.
-        if (nextArtUrl !== "") {
+        if (nextArtUrl !== "" && !root._isFailedArtUrl(nextArtUrl)) {
             root._rememberArtContext(playerKey, artKey, trackTitle, trackArtist)
             root.artUrl = nextArtUrl
             root._artRecoveryPending = false
@@ -225,8 +301,15 @@ Singleton {
             return
         }
 
+        if (nextArtUrl !== "" && root._isFailedArtUrl(nextArtUrl)) {
+            root._rememberArtContext(playerKey, artKey, trackTitle, trackArtist)
+            root.artUrl = ""
+            root._artRecoveryPending = false
+            root._artRecoveryStartedAt = 0
+            return
+        }
+
         // Art URL empty: check track-level cache for previously seen art.
-        const cachedArt = root._lookupCachedArtUrl(artKey)
         if (cachedArt !== "") {
             root._rememberArtContext(playerKey, artKey, trackTitle, trackArtist)
             root.artUrl = cachedArt

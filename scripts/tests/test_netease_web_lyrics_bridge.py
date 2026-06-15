@@ -51,6 +51,17 @@ class BridgeModuleTests(unittest.TestCase):
         self.assertEqual(state["progress"], 0.5)
         self.assertEqual(state["playbackState"], "playing")
 
+    def test_normalize_state_preserves_art_url(self):
+        self.assertIsNotNone(BRIDGE_MODULE)
+
+        state = BRIDGE_MODULE._normalize_state({
+            "title": "Song",
+            "artist": "Artist",
+            "artUrl": " file:///tmp/cover.jpg ",
+        })
+
+        self.assertEqual(state["artUrl"], "file:///tmp/cover.jpg")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -47,6 +47,7 @@ Singleton {
     property string songId: ""
     property string title: ""
     property string artist: ""
+    property string artUrl: ""
     property string playbackState: "stopped"
     property real progress: 0
     property int durationMs: 0
@@ -64,30 +65,85 @@ Singleton {
     property bool hasLyrics: false
     property var _lyricLines: []
     property var _translatedLyricLines: []
-    property int _lastUpdateMs: 0
-    property int _positionAnchorMs: 0
+    property real _lastUpdateMs: 0
+    property real _positionAnchorMs: 0
     property string _lastPayloadSignature: ""
     property bool _restartPending: false
 
     function _normalizedTrackKey(trackTitle, trackArtist) {
-        const normalizedTitle = root._normalizeText(trackTitle)
-        const normalizedArtist = root._normalizeText(trackArtist)
-        if (normalizedTitle === "" || normalizedArtist === "")
+        const normalizedTitle = root._normalizedTrackTitle(trackTitle)
+        if (normalizedTitle === "")
             return ""
 
-        return [normalizedTitle, normalizedArtist].join("|")
+        return [normalizedTitle, root._normalizedArtistKey(trackArtist)].join("|")
+    }
+
+    function _normalizedTrackTitle(value) {
+        return root._normalizeText(value).toLowerCase().replace(/\s+/g, " ")
+    }
+
+    function _normalizedArtistTokens(value) {
+        const normalized = root._normalizeText(value).toLowerCase().replace(/\s+/g, " ")
+        if (normalized === "")
+            return []
+
+        return normalized
+            .split(/\s*(?:,|，|\/|&|、|;|；| feat\.? | featuring )\s*/)
+            .map(token => token.trim())
+            .filter(token => token !== "")
+    }
+
+    function _normalizedArtistKey(value) {
+        const tokens = root._normalizedArtistTokens(value)
+        if (!tokens || tokens.length === 0)
+            return ""
+
+        const unique = []
+        for (let index = 0; index < tokens.length; index += 1) {
+            const token = tokens[index]
+            if (unique.indexOf(token) === -1)
+                unique.push(token)
+        }
+
+        unique.sort()
+        return unique.join(",")
+    }
+
+    function _trackMetadataMatches(firstTitle, firstArtist, secondTitle, secondArtist) {
+        const normalizedFirstTitle = root._normalizedTrackTitle(firstTitle)
+        const normalizedSecondTitle = root._normalizedTrackTitle(secondTitle)
+        if (normalizedFirstTitle === "" || normalizedSecondTitle === "")
+            return false
+        if (normalizedFirstTitle !== normalizedSecondTitle)
+            return false
+
+        const firstArtists = root._normalizedArtistTokens(firstArtist)
+        const secondArtists = root._normalizedArtistTokens(secondArtist)
+        if (firstArtists.length === 0 || secondArtists.length === 0)
+            return true
+
+        for (let firstIndex = 0; firstIndex < firstArtists.length; firstIndex += 1) {
+            const firstToken = firstArtists[firstIndex]
+            for (let secondIndex = 0; secondIndex < secondArtists.length; secondIndex += 1) {
+                const secondToken = secondArtists[secondIndex]
+                if (firstToken === secondToken || firstToken.indexOf(secondToken) !== -1 || secondToken.indexOf(firstToken) !== -1)
+                    return true
+            }
+        }
+
+        return false
     }
 
     function _shouldUseMediaTimeline() {
         if (!Services.MediaService.hasPlayer)
             return false
 
-        const lyricTrackKey = root._normalizedTrackKey(root.title, root.artist)
-        const mediaTrackKey = root._normalizedTrackKey(Services.MediaService.title, Services.MediaService.artist)
-        if (lyricTrackKey === "" || mediaTrackKey === "")
-            return false
-
-        return lyricTrackKey === mediaTrackKey
+        return root._trackMetadataMatches(
+            root.title,
+            root.artist,
+            Services.MediaService.title,
+            Services.MediaService.artist
+        )
     }
 
     function _normalizeText(value) {
@@ -338,6 +394,7 @@ Singleton {
         root.songId = ""
         root.title = ""
         root.artist = ""
+        root.artUrl = ""
         root.playbackState = "stopped"
         root.progress = 0
         root.durationMs = 0
@@ -364,6 +421,7 @@ Singleton {
         const nextSongId = root._normalizeText(payload.songId || payload.id)
         const nextTitle = root._normalizeText(payload.title)
         const nextArtist = root._normalizeText(payload.artist)
+        const nextArtUrl = root._normalizeText(payload.artUrl || payload.coverUrl || payload.trackArtUrl)
         const nextPlaybackState = root._normalizePlaybackState(payload.playbackState)
         const nextProgress = root._normalizeProgress(payload.progress)
         const nextDurationMs = Math.max(0, Math.round(root._normalizeNumber(payload.durationMs != null ? payload.durationMs : payload.duration, 0)))
@@ -381,16 +439,16 @@ Singleton {
             && nextTranslatedLyric === ""
             && nextPlaybackState === "paused"
         const weakPayload = root._isWeakerSessionPayload(nextSongId, nextTitle, nextArtist, nextRawLyric, nextTranslatedLyric)
-        const metadataLooksSame = nextSongId === "" && nextTitle !== "" && nextTitle === root.title
-            && ((nextArtist !== "" && nextArtist === root.artist) || (nextArtist === "" && root.artist === ""))
-        const metadataLooksDifferent = nextSongId === "" && ((nextTitle !== "" && nextTitle !== root.title)
-            || (nextArtist !== "" && nextArtist !== root.artist))
+        const metadataLooksSame = nextSongId === "" && root._trackMetadataMatches(nextTitle, nextArtist, root.title, root.artist)
+        const metadataLooksDifferent = nextSongId === "" && (nextTitle !== "" || nextArtist !== "")
+            && !root._trackMetadataMatches(nextTitle, nextArtist, root.title, root.artist)
         const sessionSeemsSame = (nextSongId !== "" && nextSongId === root.songId)
             || (metadataLooksSame && hasSessionContent)
             || pauseSessionGap
         const resolvedSongId = nextSongId !== "" ? nextSongId : (sessionSeemsSame ? root.songId : "")
         const resolvedTitle = nextTitle !== "" ? nextTitle : (sessionSeemsSame ? root.title : "")
         const resolvedArtist = nextArtist !== "" ? nextArtist : (sessionSeemsSame ? root.artist : "")
+        const resolvedArtUrl = nextArtUrl !== "" ? nextArtUrl : (sessionSeemsSame ? root.artUrl : "")
         const preserveLyricsPayload = sessionSeemsSame && !metadataLooksDifferent
             && nextRawLyric === "" && nextTranslatedLyric === ""
         const resolvedRawLyric = nextRawLyric !== "" ? nextRawLyric : (preserveLyricsPayload ? root.rawLyric : "")
@@ -413,6 +471,7 @@ Singleton {
             resolvedSongId,
             resolvedTitle,
             resolvedArtist,
+            resolvedArtUrl,
             resolvedPlaybackState,
             String(resolvedPositionMs),
             String(resolvedDurationMs),
@@ -423,6 +482,7 @@ Singleton {
         root.songId = preserveCurrentSession ? root.songId : resolvedSongId
         root.title = preserveCurrentSession ? root.title : resolvedTitle
         root.artist = preserveCurrentSession ? root.artist : resolvedArtist
+        root.artUrl = preserveCurrentSession ? root.artUrl : resolvedArtUrl
         root.playbackState = resolvedPlaybackState
         root.progress = resolvedProgress
         root.durationMs = resolvedDurationMs
