@@ -18,6 +18,8 @@ Item {
     required property real screenWidth
     required property real screenHeight
     property bool _spectrumRegistered: false
+    property var _centerWidgetExpandHeights: ({})
+    property real centerWidgetExpandHeight: 0
 
     // Geometry constants.
     readonly property int collapsedW: 220
@@ -59,11 +61,12 @@ Item {
         ? collapsedRow.implicitWidth + collapsedHorizontalPadding
         : collapsedW
     readonly property real collapsedContentHeight: Math.max(collapsedRow.implicitHeight, collapsedContentLoader.implicitHeight, 18)
+    readonly property real managedContentHeight: Math.max(collapsedH, collapsedRow.implicitHeight + root.centerWidgetExpandHeight)
     // When a transient message is active the collapsed body grows downward to
     // fit the message card (clock stays in the top row); height tracks the card.
     readonly property real messageContentHeight: Services.TransientMessageService.active
-        ? Math.max(collapsedH, collapsedRow.implicitHeight + 12)
-        : collapsedH
+        ? Math.max(root.managedContentHeight, collapsedRow.implicitHeight + 12)
+        : root.managedContentHeight
     readonly property real collapsedCapsuleWidth: collapsedContentWidth + (hoverHandler.hovered ? hoverWLift : 0)
     readonly property real liveBodyWidth: Math.max(0, root.width - root.earRadius * 2)
     readonly property real collapsedWidthProgress: root.collapsedCapsuleWidth > 0
@@ -152,6 +155,27 @@ Item {
             Services.SpectrumService.unregisterComponent("island-center:" + root.screenName)
 
         root._spectrumRegistered = root.showCenterSpectrum
+    }
+
+    function reportCenterWidgetExpandHeight(instanceKey, expandHeight) {
+        if (!instanceKey)
+            return
+
+        var nextMap = Object.assign({}, root._centerWidgetExpandHeights)
+        var resolvedHeight = Math.max(0, expandHeight || 0)
+        if (resolvedHeight > 0)
+            nextMap[instanceKey] = resolvedHeight
+        else
+            delete nextMap[instanceKey]
+
+        root._centerWidgetExpandHeights = nextMap
+
+        var nextHeight = 0
+        var keys = Object.keys(nextMap)
+        for (var index = 0; index < keys.length; index += 1)
+            nextHeight = Math.max(nextHeight, nextMap[keys[index]])
+
+        root.centerWidgetExpandHeight = nextHeight
     }
 
     Component.onCompleted: {
@@ -331,6 +355,9 @@ Item {
                             screenName: root.screenName
                             widgetEntry: root.centerWidgets[index]
                             widgetSource: Qt.resolvedUrl(widgetEntry.source)
+                            onDockzoneExpandHeightChanged: root.reportCenterWidgetExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
+                            Component.onCompleted: root.reportCenterWidgetExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
+                            Component.onDestruction: root.reportCenterWidgetExpandHeight(widgetInstanceKey, 0)
                         }
                     }
                 }

@@ -40,6 +40,8 @@ Singleton {
     property string _stableNextTranslatedLyric: ""
     property string _compactDisplayedLyric: ""
     property string _compactDisplayedLyricKey: ""
+    property string _compactDisplayedTranslatedLyric: ""
+    property string _compactDisplayedTranslatedLyricKey: ""
     property string _compactDisplayedTrack: ""
     property string _compactDisplayedLyricsSessionKey: ""
     property string _compactDisplayedLyricsPlayerTrackKey: ""
@@ -128,10 +130,15 @@ Singleton {
         : (root.currentLyric !== ""
             ? root.currentLyric
             : (root.currentTranslatedLyric !== "" ? root.currentTranslatedLyric : ""))
-    readonly property string compactPrimaryLyric: root._isInstrumentalLyric(root._compactDisplayedLyric) ? "" : root._compactDisplayedLyric
-    readonly property string compactPrimaryLyricKey: root._isInstrumentalLyric(root._compactDisplayedLyric) ? "" : root._compactDisplayedLyricKey
+    readonly property bool _compactOriginalIsInstrumental: root._isInstrumentalLyric(root._compactDisplayedLyric)
+    readonly property string compactOriginalLyric: root._compactOriginalIsInstrumental ? "" : root._compactDisplayedLyric
+    readonly property string compactOriginalLyricKey: root._compactOriginalIsInstrumental ? "" : root._compactDisplayedLyricKey
+    readonly property string compactTranslatedLyric: root._compactOriginalIsInstrumental || root._isInstrumentalLyric(root._compactDisplayedTranslatedLyric) ? "" : root._compactDisplayedTranslatedLyric
+    readonly property string compactTranslatedLyricKey: root._compactOriginalIsInstrumental || root._isInstrumentalLyric(root._compactDisplayedTranslatedLyric) ? "" : root._compactDisplayedTranslatedLyricKey
+    readonly property string compactPrimaryLyric: root.compactOriginalLyric
+    readonly property string compactPrimaryLyricKey: root.compactOriginalLyricKey
     readonly property bool showCompactLyric:
-        root.preferLyrics && root.compactPrimaryLyric !== ""
+        root.preferLyrics && (root.compactOriginalLyric !== "" || root.compactTranslatedLyric !== "")
     readonly property real progress:
         root.lengthMs > 0 ? Math.max(0, Math.min(1, root.positionMs / root.lengthMs)) : 0
 
@@ -211,7 +218,13 @@ Singleton {
         return root.preferTranslatedLyrics ? "translated" : "original"
     }
 
-    function _setCompactDisplayedLyric(state, trackPrefix) {
+    function _setCompactDisplayedTrack(trackPrefix, state) {
+        if (trackPrefix === "translated") {
+            root._compactDisplayedTranslatedLyric = state.text
+            root._compactDisplayedTranslatedLyricKey = state.key
+            return
+        }
+
         root._compactDisplayedTrack = state.text !== "" ? trackPrefix : ""
         root._compactDisplayedLyric = state.text
         root._compactDisplayedLyricKey = state.key
@@ -223,6 +236,8 @@ Singleton {
         root._compactDisplayedTrack = ""
         root._compactDisplayedLyric = ""
         root._compactDisplayedLyricKey = ""
+        root._compactDisplayedTranslatedLyric = ""
+        root._compactDisplayedTranslatedLyricKey = ""
         root._compactDisplayedLyricsSessionKey = ""
         root._compactDisplayedLyricsPlayerTrackKey = ""
     }
@@ -250,31 +265,47 @@ Singleton {
         root._clearStableLyrics()
     }
 
-    function _updateCompactDisplayedLyric() {
-        const trackPrefix = root._selectedCompactTrackPrefix()
-        const currentState = root.preferTranslatedLyrics
+    function _compactDisplayedState(trackPrefix) {
+        if (trackPrefix === "translated") {
+            return {
+                text: root._compactDisplayedTranslatedLyric,
+                key: root._compactDisplayedTranslatedLyricKey
+            }
+        }
+
+        return {
+            text: root._compactDisplayedLyric,
+            key: root._compactDisplayedLyricKey
+        }
+    }
+
+    function _updateCompactDisplayedTrack(trackPrefix) {
+        const isTranslatedTrack = trackPrefix === "translated"
+        const currentState = isTranslatedTrack
             ? root._compactTrackDisplayState(trackPrefix, "current", Services.NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
             : root._compactTrackDisplayState(trackPrefix, "current", Services.NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
-        const nextState = root.preferTranslatedLyrics
+        const nextState = isTranslatedTrack
             ? root._compactTrackDisplayState(trackPrefix, "next", Services.NeteaseWebLyricsService.nextTranslatedLyricIndex, root.nextTranslatedLyric)
             : root._compactTrackDisplayState(trackPrefix, "next", Services.NeteaseWebLyricsService.nextLyricIndex, root.nextLyric)
+        const displayedState = root._compactDisplayedState(trackPrefix)
 
         let desiredState = { text: "", key: "" }
         if (currentState.text !== "")
             desiredState = currentState
-        else if (root._compactDisplayedTrack === trackPrefix && root._compactDisplayedLyric !== "")
-            desiredState = { text: root._compactDisplayedLyric, key: root._compactDisplayedLyricKey }
-        else if ((root._compactDisplayedLyric !== "" || root._hasStableLyricsCache()) && nextState.text !== "")
+        else if (displayedState.text !== "")
+            desiredState = displayedState
+        else if (root._hasStableLyricsCache() && nextState.text !== "")
             desiredState = nextState
 
-        if (desiredState.text === root._compactDisplayedLyric && desiredState.key === root._compactDisplayedLyricKey)
+        if (desiredState.text === displayedState.text && desiredState.key === displayedState.key)
             return
-        if (desiredState.text === "") {
-            root._clearCompactDisplayedLyric()
-            return
-        }
 
-        root._setCompactDisplayedLyric(desiredState, trackPrefix)
+        root._setCompactDisplayedTrack(trackPrefix, desiredState)
+    }
+
+    function _updateCompactDisplayedLyric() {
+        root._updateCompactDisplayedTrack("original")
+        root._updateCompactDisplayedTrack("translated")
     }
 
     function _refreshLyricsSession() {

@@ -47,6 +47,7 @@ var _definitions = {
         instanceScoped: true,
         defaults: {
             showAudioSpectrum: false,
+            lyricsDisplayMode: "Original",
         },
     },
 }

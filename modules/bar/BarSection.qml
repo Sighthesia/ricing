@@ -34,6 +34,8 @@ Item {
             ? (root.floatingValidationIntent ? "floating" : "attached")
             : "hidden")
         : ((root.hasSectionContent || root.hostsContextMenu || root.hostsWidgetPicker) ? "attached" : "hidden")
+    property var _dockzoneExpandHeights: ({})
+    property real dockzoneContentExpandHeight: 0
 
     implicitHeight: surfaceLoader.item ? surfaceLoader.item.implicitHeight : Services.BarLayoutService.barHeight
     implicitWidth: root.hasSectionContent
@@ -41,6 +43,27 @@ Item {
         : (root.canOpenWidgetPicker ? 72 : 0)
     width: implicitWidth
     height: implicitHeight
+
+    function reportWidgetDockzoneExpandHeight(instanceKey, expandHeight) {
+        if (!instanceKey)
+            return
+
+        var nextMap = Object.assign({}, root._dockzoneExpandHeights)
+        var resolvedHeight = Math.max(0, expandHeight || 0)
+        if (resolvedHeight > 0)
+            nextMap[instanceKey] = resolvedHeight
+        else
+            delete nextMap[instanceKey]
+
+        root._dockzoneExpandHeights = nextMap
+
+        var nextHeight = 0
+        var keys = Object.keys(nextMap)
+        for (var index = 0; index < keys.length; index += 1)
+            nextHeight = Math.max(nextHeight, nextMap[keys[index]])
+
+        root.dockzoneContentExpandHeight = nextHeight
+    }
 
     // Preserve a small hit target so an empty dockzone can still reopen the widget picker.
     MouseArea {
@@ -163,6 +186,7 @@ Item {
                 readonly property real pickerClipInset: Math.max(6, dockzone.bodyRadius * 0.45)
                 readonly property real activeMenuW: hostsTrayMenu ? menuW : (hostsContextMenu ? contextMenuW : widgetPickerW)
                 readonly property real activeMenuH: hostsTrayMenu ? menuH : (hostsContextMenu ? contextMenuH : widgetPickerH)
+                readonly property real contentExpandH: root.dockzoneContentExpandHeight
                 readonly property real menuAnchorX: Services.BarLayoutService.contextMenuX
                     - surfaceRoot.mapToItem(null, 0, 0).x
 
@@ -190,7 +214,7 @@ Item {
 
                 expandHeight: (hostsTrayMenu || hostsContextMenu || root.hostsWidgetPicker)
                     ? (activeMenuH + 8 + (root.hostsWidgetPicker ? dockzone.pickerClipInset : dockzone.menuClipInset))
-                    : 0
+                    : contentExpandH
                 expandWidth: (hostsTrayMenu || hostsContextMenu || root.hostsWidgetPicker) ? activeMenuW : 0
 
                 Behavior on expandHeight {
@@ -305,7 +329,7 @@ Item {
                     x: parent.visualBodyX
                     y: parent.bodyY
                     width: parent.pushedBodyWidth
-                    height: parent.topBandHeight
+                    height: parent.topBandHeight + dockzone.contentExpandH
                     clip: true
 
                     // Lay out widgets in the moving body while clipping to its visible width.
@@ -313,7 +337,7 @@ Item {
                         id: sectionRow
 
                         x: parent.parent.bodyX + (parent.parent.bodyWidth - width) / 2 + (root.sectionName === "right" ? parent.parent.bodyShrinkX : (root.sectionName === "left" ? -parent.parent.bodyShrinkX : 0)) - sectionClip.x
-                        y: (sectionClip.height - height) / 2
+                        y: (parent.parent.topBandHeight - height) / 2
                         spacing: BarLayoutSections.widgetSpacing
 
                         // Instantiate each managed widget in sequence.
@@ -329,6 +353,9 @@ Item {
                                 widgetSource: Qt.resolvedUrl(widgetEntry.source)
 
                                 onLocalPointerIntentChanged: surfaceRoot.syncCenterFloatingValidationIntent()
+                                onDockzoneExpandHeightChanged: root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
+                                Component.onCompleted: root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
+                                Component.onDestruction: root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, 0)
                             }
 
                         }

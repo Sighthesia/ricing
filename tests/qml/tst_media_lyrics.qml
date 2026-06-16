@@ -68,6 +68,43 @@ TestCase {
         }, 1000)
     }
 
+    function test_compact_translated_lyric_updates_with_current_line() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.currentLyric = "Line one"
+        Services.NeteaseWebLyricsService.currentTranslatedLyric = "第一行"
+        Services.NeteaseWebLyricsService.nextLyric = "Line two"
+        Services.NeteaseWebLyricsService.nextTranslatedLyric = "第二行"
+        Services.NeteaseWebLyricsService.hasLyrics = true
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactOriginalLyric === "Line one"
+                && Services.MediaControlService.compactTranslatedLyric === "第一行"
+        }, 1000)
+
+        Services.NeteaseWebLyricsService.currentLyric = "Line two"
+        Services.NeteaseWebLyricsService.currentTranslatedLyric = "第二行"
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactOriginalLyric === "Line two"
+                && Services.MediaControlService.compactTranslatedLyric === "第二行"
+        }, 1000)
+    }
+
+    function test_translated_only_lyric_can_drive_compact_display() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.currentTranslatedLyric = "Translated only"
+        Services.NeteaseWebLyricsService.hasLyrics = true
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactOriginalLyric === ""
+                && Services.MediaControlService.compactTranslatedLyric === "Translated only"
+        }, 1000)
+
+        compare(Services.MediaControlService.showCompactLyric, true)
+    }
+
     function test_lyric_window_falls_back_to_media_position_when_web_timeline_stalls() {
         resetState()
 

@@ -11,6 +11,22 @@ Column {
     readonly property string instanceKey: Services.BarLayoutService.activeWidgetSettingsKey
     readonly property var mediaSettings: Services.SettingsService.widgetSettingsObject("media", root.instanceKey)
 
+    SettingDropdown {
+        width: parent.width
+        settingLabel: "Lyrics Display"
+        description: "Choose whether compact lyrics use original text, translation, or both."
+        model: ["Original", "Translated", "Original + Translation"]
+        currentValue: root.mediaSettings && root.mediaSettings.lyricsDisplayMode
+            ? root.mediaSettings.lyricsDisplayMode
+            : "Original"
+        onSelected: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "lyricsDisplayMode",
+            value
+        )
+    }
+
     SettingToggle {
         width: parent.width
         settingLabel: "Show Audio Spectrum"

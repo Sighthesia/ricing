@@ -12,8 +12,10 @@ Item {
 
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     readonly property string widgetId: widgetEntry && widgetEntry.id ? widgetEntry.id : ""
+    readonly property real dockzoneExpandHeight: root._dockzoneExpandHeight
     readonly property bool localPointerIntent: pointerHover.hovered
     readonly property real centerXInRoot: width > 0 ? mapToItem(null, width / 2, height / 2).x : 0
+    property real _dockzoneExpandHeight: 0
     objectName: widgetInstanceKey
 
     implicitHeight: loader.item ? loader.item.implicitHeight : 0
@@ -109,6 +111,21 @@ Item {
 
             if (item.availableWidth !== undefined)
                 item.availableWidth = Qt.binding(function() { return root.availableWidth })
+
+            root._dockzoneExpandHeight = item.dockzoneExpandHeight !== undefined
+                ? item.dockzoneExpandHeight
+                : 0
+        }
+    }
+
+    Connections {
+        target: loader.item
+        ignoreUnknownSignals: true
+
+        function onDockzoneExpandHeightChanged() {
+            root._dockzoneExpandHeight = loader.item && loader.item.dockzoneExpandHeight !== undefined
+                ? loader.item.dockzoneExpandHeight
+                : 0
         }
     }
 

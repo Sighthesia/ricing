@@ -14,6 +14,7 @@ QtObject {
     readonly property alias notifications: adapter.notifications
     readonly property alias widgetSettings: adapter.widgetSettings
     readonly property alias widgetInstanceSettings: adapter.widgetInstanceSettings
+    property int widgetSettingsRevision: 0
     readonly property real panelSurfaceOpacity: appearance.enableBlur
         ? Math.min(appearance.panelOpacity, 0.62)
         : appearance.panelOpacity
@@ -48,6 +49,10 @@ QtObject {
         debounce.restart()
     }
 
+    function _bumpWidgetSettingsRevision() {
+        widgetSettingsRevision += 1
+    }
+
     function ensureWidgetSettingDefaults(widgetId) {
         var registryDefaults = WidgetSettingsRegistry.defaults(widgetId)
         var settingsKey = WidgetSettingsRegistry.settingsKey(widgetId)
@@ -67,8 +72,10 @@ QtObject {
             }
         }
 
-        if (changed)
+        if (changed) {
+            _bumpWidgetSettingsRevision()
             save()
+        }
 
         return target
     }
@@ -92,6 +99,7 @@ QtObject {
         if (!rootMap[instanceKey] || changed) {
             rootMap[instanceKey] = target
             adapter.widgetInstanceSettings = rootMap
+            _bumpWidgetSettingsRevision()
             save()
         }
 
@@ -106,6 +114,8 @@ QtObject {
     }
 
     function widgetSettingsObject(widgetId, instanceKey) {
+        root.widgetSettingsRevision
+
         if (WidgetSettingsRegistry.isInstanceScoped(widgetId))
             return WidgetSettingsRegistry.instanceSettingsObject(widgetId, instanceKey, adapter.widgetInstanceSettings)
 
@@ -126,6 +136,7 @@ QtObject {
         target[key] = value
         rootMap[instanceKey] = target
         adapter.widgetInstanceSettings = rootMap
+        _bumpWidgetSettingsRevision()
         save()
     }
 
@@ -136,6 +147,7 @@ QtObject {
         var rootMap = Object.assign({}, adapter.widgetInstanceSettings)
         delete rootMap[instanceKey]
         adapter.widgetInstanceSettings = rootMap
+        _bumpWidgetSettingsRevision()
         save()
     }
 
@@ -153,6 +165,7 @@ QtObject {
         onLoaded: {
             root.ensureWidgetSettingDefaults("clock")
             root.ensureWidgetSettingDefaults("active-window")
+            root._bumpWidgetSettingsRevision()
         }
         onLoadFailed: error => {
             if (error === FileViewError.FileNotFound) {

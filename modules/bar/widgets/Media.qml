@@ -19,6 +19,13 @@ Item {
         "media",
         root.widgetInstanceKey
     )
+    readonly property string lyricsDisplayMode: root.normalizedLyricsDisplayMode(
+        root.mediaSettings && root.mediaSettings.lyricsDisplayMode
+            ? root.mediaSettings.lyricsDisplayMode
+            : "Original"
+    )
+    readonly property bool compactLyricVisible: Services.MediaControlService.showCompactLyric
+        && root._displayLyricPrimaryText !== ""
     readonly property bool showAudioSpectrum: root.mediaSettings
         ? root.mediaSettings.showAudioSpectrum
         : false
@@ -34,11 +41,24 @@ Item {
         return Math.max(48, Math.min(200, root.availableWidth - artWidth - spacing - chrome))
     }
     readonly property real transientTextRevealProgress: Math.max(0, Math.min(1, 1 - root.transientRevealProgress))
-    readonly property real currentTextTargetWidth: Math.min(currentTextLabel.implicitWidth, root.compactTextWidth) * root.transientTextRevealProgress
-    readonly property real nextTextTargetWidth: Math.min(nextTextLabel.implicitWidth, root.compactTextWidth) * root.transientTextRevealProgress
+    readonly property real currentTextTargetWidth: Math.min(Math.max(currentTextLabel.implicitWidth, currentSecondaryTextLabel.implicitWidth), root.compactTextWidth) * root.transientTextRevealProgress
+    readonly property real nextTextTargetWidth: Math.min(Math.max(nextTextLabel.implicitWidth, nextSecondaryTextLabel.implicitWidth), root.compactTextWidth) * root.transientTextRevealProgress
+    readonly property real compactBaseHeight: 30
+    readonly property real lyricExtraHeight: Math.max(
+        currentSecondaryText !== "" ? Math.max(0, currentTextColumn.implicitHeight - currentTextLabel.implicitHeight) : 0,
+        pendingSecondaryText !== "" ? Math.max(0, nextTextColumn.implicitHeight - nextTextLabel.implicitHeight) : 0
+    )
+    readonly property real lyricBottomPadding: 8
+    readonly property bool lyricHeightExpanded: root.compactLyricVisible && root.transientTextRevealProgress > 0.01
+    readonly property real dockzoneExpandHeight: root.lyricHeightExpanded
+        ? (root.lyricExtraHeight > 0 ? root.lyricExtraHeight + root.lyricBottomPadding : 0)
+        : 0
+    readonly property real compactCenterY: root.compactBaseHeight / 2
 
     property string currentText: root._displayText
+    property string currentSecondaryText: root._displaySecondaryText
     property string pendingText: root._displayText
+    property string pendingSecondaryText: root._displaySecondaryText
     property string currentTextKey: root._displayTextKey
     property string pendingTextKey: root._displayTextKey
     property bool transitioning: false
@@ -53,13 +73,29 @@ Item {
     readonly property string _fallbackDisplayText: root._fallbackArtist !== ""
         ? root._fallbackTitle + " · " + root._fallbackArtist
         : root._fallbackTitle
-    readonly property string _displayText: Services.MediaControlService.showCompactLyric
-        ? Services.MediaControlService.compactPrimaryLyric
+    readonly property string _displayLyricPrimaryText: {
+        var original = Services.MediaControlService.compactOriginalLyric
+        var translated = Services.MediaControlService.compactTranslatedLyric
+        if (root.lyricsDisplayMode === "translated")
+            return translated !== "" ? translated : original
+
+        return original !== "" ? original : translated
+    }
+    readonly property string _displayLyricSecondaryText: root.lyricsDisplayMode === "both"
+        && Services.MediaControlService.compactOriginalLyric !== ""
+        && Services.MediaControlService.compactTranslatedLyric !== ""
+            ? Services.MediaControlService.compactTranslatedLyric
+            : ""
+    readonly property string _displayText: root.compactLyricVisible
+        ? root._displayLyricPrimaryText
         : root._fallbackDisplayText
-    readonly property string _displayTextKey: Services.MediaControlService.showCompactLyric
-        ? (Services.MediaControlService.compactPrimaryLyricKey !== ""
-            ? Services.MediaControlService.compactPrimaryLyricKey
-            : ("lyric:" + Services.MediaControlService.compactPrimaryLyric))
+    readonly property string _displaySecondaryText: root.compactLyricVisible ? root._displayLyricSecondaryText : ""
+    readonly property string _displayTextKey: root.compactLyricVisible
+        ? ("lyric:" + root.lyricsDisplayMode + ":"
+            + (root.lyricsDisplayMode === "translated" && Services.MediaControlService.compactTranslatedLyric !== ""
+                ? Services.MediaControlService.compactTranslatedLyricKey
+                : Services.MediaControlService.compactOriginalLyricKey)
+            + ":" + Services.MediaControlService.compactTranslatedLyricKey)
         : ("title:" + root._fallbackDisplayText)
     readonly property color _artFallbackColor: Qt.rgba(
         Services.Color.mSurfaceVariant.r,
@@ -84,7 +120,7 @@ Item {
     )
 
     implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 16, 240)
-    implicitHeight: 30
+    implicitHeight: root.compactBaseHeight
 
     Behavior on _progressValue {
         NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
@@ -96,8 +132,17 @@ Item {
             || textKey.indexOf("lyric:") === 0
     }
 
+    function normalizedLyricsDisplayMode(value) {
+        if (value === "Translated" || value === "translated")
+            return "translated"
+        if (value === "Original + Translation" || value === "both")
+            return "both"
+        return "original"
+    }
+
     function syncDisplayText() {
         const nextText = root._displayText
+        const nextSecondaryText = root._displaySecondaryText
         const nextKey = root._displayTextKey
         if (nextKey === root.currentTextKey && !root.transitioning)
             return
@@ -107,7 +152,9 @@ Item {
             currentLayer.opacity = 1
             nextLayer.opacity = 0
             root.currentText = nextText
+            root.currentSecondaryText = nextSecondaryText
             root.pendingText = nextText
+            root.pendingSecondaryText = nextSecondaryText
             root.currentTextKey = nextKey
             root.pendingTextKey = nextKey
             root.transitioning = false
@@ -115,6 +162,7 @@ Item {
         }
 
         root.pendingText = nextText
+        root.pendingSecondaryText = nextSecondaryText
         root.pendingTextKey = nextKey
 
         if (root.transitioning)
@@ -142,6 +190,8 @@ Item {
 
     on_DisplayTextChanged: syncDisplayText()
     on_DisplayTextKeyChanged: syncDisplayText()
+    on_DisplaySecondaryTextChanged: syncDisplayText()
+    onLyricsDisplayModeChanged: syncDisplayText()
     onNeedsAudioSpectrumChanged: syncSpectrumRegistration()
 
     Connections {
@@ -152,6 +202,14 @@ Item {
         }
 
         function onCompactPrimaryLyricKeyChanged() {
+            root.syncDisplayText()
+        }
+
+        function onCompactTranslatedLyricChanged() {
+            root.syncDisplayText()
+        }
+
+        function onCompactTranslatedLyricKeyChanged() {
             root.syncDisplayText()
         }
 
@@ -190,6 +248,7 @@ Item {
         ScriptAction {
             script: {
                 root.currentText = root.pendingText
+                root.currentSecondaryText = root.pendingSecondaryText
                 root.currentTextKey = root.pendingTextKey
             }
         }
@@ -207,7 +266,8 @@ Item {
     Item {
         id: currentLayer
 
-        anchors.centerIn: parent
+        x: Math.round((parent.width - width) / 2)
+        y: Math.round(root.compactCenterY - height / 2)
         opacity: 1
         visible: opacity > 0
         implicitWidth: currentArtworkSlot.width + root.currentTextTargetWidth + (root.currentTextTargetWidth > 0 ? currentContent.spacing : 0)
@@ -377,20 +437,39 @@ Item {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
-                Services.FluidText {
-                    id: currentTextLabel
-
-                    anchors.verticalCenter: parent.verticalCenter
+                // Stack original and translated lyric lines when both are requested.
+                Column {
+                    id: currentTextColumn
                     width: parent.width
+                    y: 0
                     opacity: root.transientTextRevealProgress
                     x: Math.round((1 - root.transientTextRevealProgress) * -6)
-                    text: root.currentText
-                    color: Services.MediaControlService.showCompactLyric
-                        ? Services.Color.mPrimary
-                        : Services.Color.mOnSurface
-                    font.bold: Services.MediaControlService.showCompactLyric
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
+                    spacing: root.currentSecondaryText !== "" ? -1 : 0
+
+                    Services.FluidText {
+                        id: currentTextLabel
+
+                        width: parent.width
+                        text: root.currentText
+                        color: root.compactLyricVisible
+                            ? Services.Color.mPrimary
+                            : Services.Color.mOnSurface
+                        font.bold: root.compactLyricVisible
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    Services.FluidText {
+                        id: currentSecondaryTextLabel
+
+                        visible: root.currentSecondaryText !== ""
+                        width: parent.width
+                        text: root.currentSecondaryText
+                        color: Services.Color.mOnSurfaceVariant
+                        basePixelSize: 10
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
                 }
             }
         }
@@ -400,7 +479,8 @@ Item {
     Item {
         id: nextLayer
 
-        anchors.centerIn: parent
+        x: Math.round((parent.width - width) / 2)
+        y: Math.round(root.compactCenterY - height / 2)
         opacity: 0
         visible: opacity > 0
         z: 1
@@ -571,20 +651,39 @@ Item {
                     NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
                 }
 
-                Services.FluidText {
-                    id: nextTextLabel
-
-                    anchors.verticalCenter: parent.verticalCenter
+                // Mirror the stacked lyric layout for incoming text transitions.
+                Column {
+                    id: nextTextColumn
                     width: parent.width
+                    y: 0
                     opacity: root.transientTextRevealProgress
                     x: Math.round((1 - root.transientTextRevealProgress) * -6)
-                    text: root.pendingText
-                    color: Services.MediaControlService.showCompactLyric
-                        ? Services.Color.mPrimary
-                        : Services.Color.mOnSurface
-                    font.bold: Services.MediaControlService.showCompactLyric
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
+                    spacing: root.pendingSecondaryText !== "" ? -1 : 0
+
+                    Services.FluidText {
+                        id: nextTextLabel
+
+                        width: parent.width
+                        text: root.pendingText
+                        color: root.compactLyricVisible
+                            ? Services.Color.mPrimary
+                            : Services.Color.mOnSurface
+                        font.bold: root.compactLyricVisible
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    Services.FluidText {
+                        id: nextSecondaryTextLabel
+
+                        visible: root.pendingSecondaryText !== ""
+                        width: parent.width
+                        text: root.pendingSecondaryText
+                        color: Services.Color.mOnSurfaceVariant
+                        basePixelSize: 10
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
                 }
             }
         }
