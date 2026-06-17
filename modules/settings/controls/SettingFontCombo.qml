@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
 import "../../../services" as Services
+import "../../bar/MenuVisuals.js" as MenuVisuals
 
 // Font-picker row.  Custom Popup + ListView (not QtQuick.Controls.ComboBox)
 // to avoid ComboBox+ListModel freeze in Wayland/layershell contexts.
@@ -13,13 +14,14 @@ Row {
     property var fontModel: null
     property string currentKey: ""
     property bool filterVisible: true
+    property real contentInset: MenuVisuals.contentInset
 
     signal selected(string key)
 
-    width: parent.width
+    width: Math.max(0, parent.width - root.contentInset * 2)
+    x: root.contentInset + (filterVisible ? 0 : 24)
     height: filterVisible ? implicitHeight : 0
-    x: filterVisible ? 0 : 24
-    spacing: 8
+    spacing: MenuVisuals.contentSpacing
     opacity: filterVisible ? 1 : 0
     visible: height > 1 || opacity > 0.01
     layer.enabled: !filterVisible || opacity < 0.99
@@ -35,21 +37,24 @@ Row {
 
     // Label and description on the left
     Column {
-        width: parent.width - trigger.width - parent.spacing
+        width: parent.width - trigger.width - parent.spacing - root.contentInset
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
+        spacing: MenuVisuals.compactSpacing
 
         Services.FluidText {
+            width: parent.width
             text: root.settingLabel
             color: Services.Color.mOnSurface
-            basePixelSize: 13
+            basePixelSize: MenuVisuals.bodyFontSize
         }
 
         Services.FluidText {
+            width: parent.width
             text: root.description
             color: Services.Color.mOnSurfaceVariant
-            basePixelSize: 11
+            basePixelSize: 10
             visible: root.description !== ""
+            wrapMode: Text.WordWrap
         }
     }
 
@@ -66,11 +71,11 @@ Row {
     }
 
     // Font picker trigger button on the right
-    Button {
-        id: trigger
-        anchors.verticalCenter: parent.verticalCenter
-        width: 160
-        height: 30
+        Button {
+            id: trigger
+            anchors.verticalCenter: parent.verticalCenter
+        width: Math.max(112, Math.min(144, root.width * 0.44))
+        height: 28
 
         text: root._displayName(root.currentKey)
 
@@ -89,11 +94,11 @@ Row {
         contentItem: Services.FluidText {
             text: trigger.text
             color: Services.Color.mOnSurface
-            basePixelSize: 12
+            basePixelSize: 11
             elide: Text.ElideRight
             verticalAlignment: Text.AlignVCenter
-            leftPadding: 8
-            rightPadding: 8
+            leftPadding: MenuVisuals.contentInset
+            rightPadding: MenuVisuals.contentInset
         }
     }
 
@@ -101,7 +106,7 @@ Row {
     Popup {
         id: popup
         y: trigger.height + 4
-        padding: 4
+        padding: MenuVisuals.smallGap
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
         contentItem: ListView {
@@ -114,16 +119,16 @@ Row {
 
             delegate: ItemDelegate {
                 width: listView.width
-                height: 28
+                height: 26
                 highlighted: ListView.isCurrentItem
 
                 contentItem: Services.FluidText {
                     text: model.name
                     color: highlighted ? Services.Color.mPrimary : Services.Color.mOnSurface
-                    basePixelSize: 12
+                    basePixelSize: 11
                     elide: Text.ElideRight
                     verticalAlignment: Text.AlignVCenter
-                    leftPadding: 8
+                    leftPadding: MenuVisuals.contentInset
                 }
 
                 background: Rectangle {

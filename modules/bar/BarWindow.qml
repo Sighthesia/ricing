@@ -40,7 +40,7 @@ Variants {
         // whole window so a click anywhere outside the menu dismisses it
         // (island-style). exclusiveZone stays pinned to the bar height regardless.
         mask: Region {
-            item: (Services.TrayMenuService.visible || Services.BarLayoutService.contextMenuVisible || Services.BarLayoutService.widgetPickerVisible) ? fullHit : barBandHit
+            item: (Services.TrayMenuService.visible || Services.BarLayoutService.contextMenuVisible || Services.BarLayoutService.widgetPickerVisible || Services.BarLayoutService.widgetSettingsVisible) ? fullHit : barBandHit
         }
 
         Item {
@@ -63,12 +63,13 @@ Variants {
         MouseArea {
             anchors.fill: parent
             z: -1
-            enabled: Services.TrayMenuService.visible || Services.BarLayoutService.contextMenuVisible || Services.BarLayoutService.widgetPickerVisible
+            enabled: Services.TrayMenuService.visible || Services.BarLayoutService.contextMenuVisible || Services.BarLayoutService.widgetPickerVisible || Services.BarLayoutService.widgetSettingsVisible
             acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onPressed: {
+            onClicked: {
                 Services.TrayMenuService.close()
                 Services.BarLayoutService.closeContextMenu()
                 Services.BarLayoutService.closeWidgetPicker()
+                Services.BarLayoutService.closeWidgetSettings()
             }
         }
 

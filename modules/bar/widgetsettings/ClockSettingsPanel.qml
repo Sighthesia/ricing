@@ -1,5 +1,6 @@
 import QtQuick
 import "../../settings/controls"
+import "../../bar/MenuVisuals.js" as MenuVisuals
 import "../../../services" as Services
 import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 
@@ -7,7 +8,7 @@ import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 Column {
     id: root
 
-    spacing: 10
+    spacing: MenuVisuals.smallGap
 
     readonly property var clockSettings: WidgetSettingsRegistry.settingsObject(
         "clock",

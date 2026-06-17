@@ -112,7 +112,8 @@ Item {
                         Services.BarLayoutService.contextMenuWidgetKey,
                         Services.BarLayoutService.contextMenuWidgetId,
                         Services.BarLayoutService.contextMenuX,
-                        Services.BarLayoutService.contextMenuScreenName
+                        Services.BarLayoutService.contextMenuScreenName,
+                        Services.BarLayoutService.contextMenuSection
                     )
                     Services.BarLayoutService.closeContextMenu()
                 }

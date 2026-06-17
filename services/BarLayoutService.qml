@@ -24,6 +24,7 @@ QtObject {
     property real widgetSettingsX: 0
     property string activeWidgetSettingsKey: ""
     property string activeWidgetSettingsId: ""
+    property string widgetSettingsSection: "center"
     property string widgetSettingsScreenName: ""
 
     // --- Layout editing mode ---
@@ -170,14 +171,17 @@ QtObject {
         return WidgetSettingsRegistry.hasSettings(widgetId)
     }
 
-    function openWidgetSettings(instanceKey, widgetId, centerX, screenName) {
+    function openWidgetSettings(instanceKey, widgetId, centerX, screenName, sectionName) {
         if (!widgetSupportsSettings(widgetId))
             return
 
+        closeWidgetPicker()
+        closeContextMenu()
         SettingsService.ensureWidgetSettings(widgetId, instanceKey)
         activeWidgetSettingsKey = instanceKey || ""
         activeWidgetSettingsId = widgetId || ""
         widgetSettingsX = centerX || 0
+        widgetSettingsSection = sectionName || _sectionForX(widgetSettingsX)
         widgetSettingsScreenName = screenName || ""
         widgetSettingsVisible = true
 
@@ -190,6 +194,7 @@ QtObject {
         activeWidgetSettingsKey = ""
         activeWidgetSettingsId = ""
         widgetSettingsX = 0
+        widgetSettingsSection = "center"
         widgetSettingsScreenName = ""
     }
 

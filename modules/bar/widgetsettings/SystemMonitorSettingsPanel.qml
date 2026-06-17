@@ -1,12 +1,13 @@
 import QtQuick
 import "../../settings/controls"
+import "../../bar/MenuVisuals.js" as MenuVisuals
 import "../../../services" as Services
 
 // Render instance-scoped settings controls for the system monitor widget.
 Column {
     id: root
 
-    spacing: 10
+    spacing: MenuVisuals.smallGap
 
     readonly property string instanceKey: Services.BarLayoutService.activeWidgetSettingsKey
     readonly property var monitorSettings: Services.SettingsService.widgetSettingsObject("system-monitor", root.instanceKey)

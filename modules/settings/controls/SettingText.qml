@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
 import "../../../services" as Services
+import "../../bar/MenuVisuals.js" as MenuVisuals
 
 // A labeled text-input row for free-form string settings.
 Row {
@@ -12,13 +13,14 @@ Row {
     property string text: ""
     property string placeholderText: ""
     property bool filterVisible: true
+    property real contentInset: MenuVisuals.contentInset
 
     signal edited(string value)
 
-    width: parent.width
+    width: Math.max(0, parent.width - root.contentInset * 2)
+    x: root.contentInset + (filterVisible ? 0 : 24)
     height: filterVisible ? implicitHeight : 0
-    x: filterVisible ? 0 : 24
-    spacing: 8
+    spacing: MenuVisuals.contentSpacing
     opacity: filterVisible ? 1 : 0
     visible: height > 1 || opacity > 0.01
     layer.enabled: !filterVisible || opacity < 0.99
@@ -34,21 +36,24 @@ Row {
 
     // Label and description on the left
     Column {
-        width: parent.width - field.width - parent.spacing
+        width: parent.width - field.width - parent.spacing - root.contentInset
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
+        spacing: MenuVisuals.compactSpacing
 
         Services.FluidText {
+            width: parent.width
             text: root.settingLabel
             color: Services.Color.mOnSurface
-            basePixelSize: 13
+            basePixelSize: MenuVisuals.bodyFontSize
         }
 
         Services.FluidText {
+            width: parent.width
             text: root.description
             color: Services.Color.mOnSurfaceVariant
-            basePixelSize: 11
+            basePixelSize: 10
             visible: root.description !== ""
+            wrapMode: Text.WordWrap
         }
     }
 
@@ -56,9 +61,10 @@ Row {
     TextField {
         id: field
         anchors.verticalCenter: parent.verticalCenter
-        width: 160
+        width: 152
         text: root.text
         placeholderText: root.placeholderText
+        font.pixelSize: 12
         onEditingFinished: root.edited(text)
     }
 }

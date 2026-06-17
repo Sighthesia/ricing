@@ -29,11 +29,14 @@ Item {
     readonly property bool hostsWidgetPicker: Services.BarLayoutService.widgetPickerVisible
         && Services.BarLayoutService.widgetPickerScreenName === root.screenName
         && Services.BarLayoutService.widgetPickerSection === root.sectionName
+    readonly property bool hostsWidgetSettings: Services.BarLayoutService.widgetSettingsVisible
+        && Services.BarLayoutService.widgetSettingsScreenName === root.screenName
+        && Services.BarLayoutService.widgetSettingsSection === root.sectionName
     readonly property string surfaceState: root.sectionName === "center"
-        ? ((root.hasSectionContent || root.hostsContextMenu || root.hostsWidgetPicker)
+        ? ((root.hasSectionContent || root.hostsContextMenu || root.hostsWidgetPicker || root.hostsWidgetSettings)
             ? (root.floatingValidationIntent ? "floating" : "attached")
             : "hidden")
-        : ((root.hasSectionContent || root.hostsContextMenu || root.hostsWidgetPicker) ? "attached" : "hidden")
+        : ((root.hasSectionContent || root.hostsContextMenu || root.hostsWidgetPicker || root.hostsWidgetSettings) ? "attached" : "hidden")
     property var _dockzoneExpandHeights: ({})
     property real dockzoneContentExpandHeight: 0
 
@@ -184,8 +187,10 @@ Item {
                 // The widget picker is a much taller body than the context menu,
                 // so keep its lower clip guard shallower to reduce dead space.
                 readonly property real pickerClipInset: Math.max(6, dockzone.bodyRadius * 0.45)
-                readonly property real activeMenuW: hostsTrayMenu ? menuW : (hostsContextMenu ? contextMenuW : widgetPickerW)
-                readonly property real activeMenuH: hostsTrayMenu ? menuH : (hostsContextMenu ? contextMenuH : widgetPickerH)
+                readonly property real widgetSettingsW: widgetSettingsMeasure.implicitWidth
+                readonly property real widgetSettingsH: widgetSettingsMeasure.implicitHeight
+                readonly property real activeMenuW: hostsTrayMenu ? menuW : (hostsContextMenu ? contextMenuW : (hostsWidgetPicker ? widgetPickerW : widgetSettingsW))
+                readonly property real activeMenuH: hostsTrayMenu ? menuH : (hostsContextMenu ? contextMenuH : (hostsWidgetPicker ? widgetPickerH : widgetSettingsH))
                 readonly property real contentExpandH: root.dockzoneContentExpandHeight
                 readonly property real menuAnchorX: Services.BarLayoutService.contextMenuX
                     - surfaceRoot.mapToItem(null, 0, 0).x
@@ -212,10 +217,17 @@ Item {
                     enabled: false
                 }
 
-                expandHeight: (hostsTrayMenu || hostsContextMenu || root.hostsWidgetPicker)
+                // Measure the widget settings without clipping so the host can expand first.
+                WidgetSettingsView {
+                    id: widgetSettingsMeasure
+                    visible: false
+                    enabled: false
+                }
+
+                expandHeight: (hostsTrayMenu || hostsContextMenu || root.hostsWidgetPicker || root.hostsWidgetSettings)
                     ? (activeMenuH + 8 + (root.hostsWidgetPicker ? dockzone.pickerClipInset : dockzone.menuClipInset))
                     : contentExpandH
-                expandWidth: (hostsTrayMenu || hostsContextMenu || root.hostsWidgetPicker) ? activeMenuW : 0
+                expandWidth: (hostsTrayMenu || hostsContextMenu || root.hostsWidgetPicker || root.hostsWidgetSettings) ? activeMenuW : 0
 
                 Behavior on expandHeight {
                     SpringAnimation {
@@ -273,7 +285,7 @@ Item {
                 Loader {
                     id: contextMenuLoader
 
-                    active: dockzone.hostsContextMenu || (item && opacity > 0.01)
+                    active: dockzone.hostsContextMenu || opacity > 0.01
                     z: 2
                     y: parent.bodyY + parent.topBandHeight
                     width: dockzone.pushedBodyWidth
@@ -299,7 +311,7 @@ Item {
                 Loader {
                     id: widgetPickerLoader
 
-                    active: root.hostsWidgetPicker || (item && opacity > 0.01)
+                    active: root.hostsWidgetPicker || opacity > 0.01
                     z: 2
                     y: parent.bodyY + parent.topBandHeight
                     width: dockzone.pushedBodyWidth
@@ -317,6 +329,32 @@ Item {
                     sourceComponent: WidgetPickerView {
                         viewportWidth: widgetPickerLoader.width
                         viewportHeight: widgetPickerLoader.height
+                    }
+                }
+
+                // Widget settings rendered inside the expanded body beneath the
+                // dockzone row so its controls feel attached to the bar.
+                Loader {
+                    id: widgetSettingsLoader
+
+                    active: dockzone.hostsWidgetSettings || opacity > 0.01
+                    z: 2
+                    y: parent.bodyY + parent.topBandHeight
+                    width: dockzone.pushedBodyWidth
+                    height: Math.max(0, dockzone.bodyHeight - parent.topBandHeight - dockzone.menuClipInset)
+                    opacity: dockzone.hostsWidgetSettings ? 1 : 0
+                    x: parent.bodyX + (parent.bodyWidth - width) / 2 + (root.sectionName === "right" ? parent.bodyShrinkX : (root.sectionName === "left" ? -parent.bodyShrinkX : 0))
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: Services.Motion.popup.opacityDuration
+                            easing.type: Services.Motion.popup.opacityEasing
+                        }
+                    }
+
+                    sourceComponent: WidgetSettingsView {
+                        viewportWidth: widgetSettingsLoader.width
+                        viewportHeight: widgetSettingsLoader.height
                     }
                 }
 

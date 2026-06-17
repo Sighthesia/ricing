@@ -35,10 +35,6 @@ ShellRoot {
     Island.IslandWindow {
     }
 
-    // Per-widget settings panel rendered in its own floating window.
-    Bar.WidgetSettingsWindow {
-    }
-
     // Workspace/window hint OSD shown while mod key is held. Only the
     // floating-capsule layout uses this independent overlay; attached-island
     // mode extends the island itself (see IslandBody).

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
 import "../../../services" as Services
+import "../../bar/MenuVisuals.js" as MenuVisuals
 
 // A labeled toggle row binding a boolean setting to a Switch.
 Row {
@@ -11,13 +12,14 @@ Row {
     property string description: ""
     property bool checked: false
     property bool filterVisible: true
+    property real contentInset: MenuVisuals.contentInset
 
     signal toggled(bool value)
 
-    width: parent.width
+    width: Math.max(0, parent.width - root.contentInset * 2)
+    x: root.contentInset + (filterVisible ? 0 : 24)
     height: filterVisible ? implicitHeight : 0
-    x: filterVisible ? 0 : 24
-    spacing: 8
+    spacing: MenuVisuals.contentSpacing
     opacity: filterVisible ? 1 : 0
     visible: height > 1 || opacity > 0.01
     layer.enabled: !filterVisible || opacity < 0.99
@@ -33,21 +35,24 @@ Row {
 
     // Label and description on the left
     Column {
-        width: parent.width - toggle.width - parent.spacing
+        width: parent.width - toggle.width - parent.spacing - root.contentInset
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
+        spacing: MenuVisuals.compactSpacing
 
         Services.FluidText {
+            width: parent.width
             text: root.settingLabel
             color: Services.Color.mOnSurface
-            basePixelSize: 13
+            basePixelSize: MenuVisuals.bodyFontSize
         }
 
         Services.FluidText {
+            width: parent.width
             text: root.description
             color: Services.Color.mOnSurfaceVariant
-            basePixelSize: 11
+            basePixelSize: 10
             visible: root.description !== ""
+            wrapMode: Text.WordWrap
         }
     }
 

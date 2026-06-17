@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
 import "../../../services" as Services
+import "../../bar/MenuVisuals.js" as MenuVisuals
 
 // A labeled slider row for numeric settings with optional unit suffix.
 Row {
@@ -15,13 +16,14 @@ Row {
     property real value: 0
     property string suffix: ""
     property bool filterVisible: true
+    property real contentInset: MenuVisuals.contentInset
 
     signal moved(real value)
 
-    width: parent.width
+    width: Math.max(0, parent.width - root.contentInset * 2)
+    x: root.contentInset + (filterVisible ? 0 : 24)
     height: filterVisible ? implicitHeight : 0
-    x: filterVisible ? 0 : 24
-    spacing: 8
+    spacing: MenuVisuals.contentSpacing
     opacity: filterVisible ? 1 : 0
     visible: height > 1 || opacity > 0.01
     layer.enabled: !filterVisible || opacity < 0.99
@@ -37,21 +39,24 @@ Row {
 
     // Label and description on the left
     Column {
-        width: parent.width - controlRow.width - parent.spacing
+        width: parent.width - controlRow.width - parent.spacing - root.contentInset
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
+        spacing: MenuVisuals.compactSpacing
 
         Services.FluidText {
+            width: parent.width
             text: root.settingLabel
             color: Services.Color.mOnSurface
-            basePixelSize: 13
+            basePixelSize: MenuVisuals.bodyFontSize
         }
 
         Services.FluidText {
+            width: parent.width
             text: root.description
             color: Services.Color.mOnSurfaceVariant
-            basePixelSize: 11
+            basePixelSize: 10
             visible: root.description !== ""
+            wrapMode: Text.WordWrap
         }
     }
 
@@ -59,7 +64,7 @@ Row {
     Row {
         id: controlRow
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 4
+        spacing: MenuVisuals.smallGap
 
         Slider {
             id: slider
@@ -67,7 +72,7 @@ Row {
             to: root.to
             stepSize: root.stepSize
             value: root.value
-            width: 120
+            width: 108
             anchors.verticalCenter: parent.verticalCenter
             onMoved: root.moved(value)
         }
@@ -78,8 +83,8 @@ Row {
             // Show integers without decimals, reals to 2dp
             text: (root.stepSize < 1 ? slider.value.toFixed(2) : Math.round(slider.value).toString()) + root.suffix
             color: Services.Color.mOnSurfaceVariant
-            basePixelSize: 11
-            width: 48
+            basePixelSize: 10
+            width: 44
         }
     }
 }
