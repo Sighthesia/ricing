@@ -116,6 +116,18 @@ Do not use it for:
 - Freely floating capsules or cards
 - Unanchored surfaces that should read as independent objects
 
+### Dockzone-Hosted Expand Surface Pattern
+
+Use this for bar-attached content that should feel like it grows out of the dockzone rather than appearing as a separate popup.
+
+- Host the content inside the owning dockzone or island body instead of creating an independent floating `PanelWindow` or popup window.
+- Let the dockzone body expand to contain the surface while the content is clipped to the host-provided viewport during reveal.
+- Keep outer padding, row height, compact spacing, content inset, separator inset, and row radius aligned with the shared menu tokens such as `MenuVisuals`.
+- Make headers and content rows share the same left and right text baselines; do not add a second inner padding layer unless the row itself visually requires it.
+- Keep foreground reveal synchronized with the host expansion: rows should fade or reveal only when they fit inside the expanded glass body.
+- Use this pattern for tray menus, bar context menus, widget settings, widget pickers, and similar bar-attached utility surfaces.
+- Avoid using this pattern for detached dialogs, fullscreen overlays, or content that should read as independent from the top bar.
+
 ## Top Status Bar Composition
 
 Use this model for top status bar designs unless a task explicitly asks for a different shell structure.
