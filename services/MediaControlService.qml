@@ -281,21 +281,23 @@ Singleton {
 
     function _updateCompactDisplayedTrack(trackPrefix) {
         const isTranslatedTrack = trackPrefix === "translated"
-        const currentState = isTranslatedTrack
-            ? root._compactTrackDisplayState(trackPrefix, "current", Services.NeteaseWebLyricsService.currentTranslatedLyricIndex, root.currentTranslatedLyric)
-            : root._compactTrackDisplayState(trackPrefix, "current", Services.NeteaseWebLyricsService.currentLyricIndex, root.currentLyric)
-        const nextState = isTranslatedTrack
-            ? root._compactTrackDisplayState(trackPrefix, "next", Services.NeteaseWebLyricsService.nextTranslatedLyricIndex, root.nextTranslatedLyric)
-            : root._compactTrackDisplayState(trackPrefix, "next", Services.NeteaseWebLyricsService.nextLyricIndex, root.nextLyric)
+        const currentServiceValue = isTranslatedTrack ? Services.NeteaseWebLyricsService.currentTranslatedLyric : Services.NeteaseWebLyricsService.currentLyric
         const displayedState = root._compactDisplayedState(trackPrefix)
 
-        let desiredState = { text: "", key: "" }
-        if (currentState.text !== "")
-            desiredState = currentState
-        else if (displayedState.text !== "")
-            desiredState = displayedState
-        else if (root._hasStableLyricsCache() && nextState.text !== "")
-            desiredState = nextState
+        let desiredState = root._compactTrackDisplayState(
+            trackPrefix,
+            "current",
+            isTranslatedTrack ? Services.NeteaseWebLyricsService.currentTranslatedLyricIndex : Services.NeteaseWebLyricsService.currentLyricIndex,
+            currentServiceValue === "" && !isTranslatedTrack && root._stableCurrentLyric !== "" ? root._stableCurrentLyric : currentServiceValue
+        )
+
+        if (desiredState.text === "") {
+            if (isTranslatedTrack) {
+                desiredState = { text: "", key: "" }
+            } else if (displayedState.text !== "") {
+                desiredState = displayedState
+            }
+        }
 
         if (desiredState.text === displayedState.text && desiredState.key === displayedState.key)
             return
@@ -328,14 +330,36 @@ Singleton {
         if (playerTrackKey !== "")
             root._latchedPlayerTrackKey = playerTrackKey
 
+        // Update stable lyric properties from service values when available
+        var fallbackText = Services.NeteaseWebLyricsService.title
+        if (Services.NeteaseWebLyricsService.title !== "" && Services.NeteaseWebLyricsService.artist !== "") {
+            fallbackText = Services.NeteaseWebLyricsService.title + " · " + Services.NeteaseWebLyricsService.artist
+        }
+        
+        // For primary/original lyrics: show fallback (title/artist) when no actual lyric
         if (Services.NeteaseWebLyricsService.currentLyric !== "")
             root._stableCurrentLyric = Services.NeteaseWebLyricsService.currentLyric
+        else
+            // Fallback to title/artist when no current lyric (e.g., before first timestamp)
+            root._stableCurrentLyric = fallbackText
+            
         if (Services.NeteaseWebLyricsService.nextLyric !== "")
             root._stableNextLyric = Services.NeteaseWebLyricsService.nextLyric
+        else
+            // Fallback to title/artist when no next lyric
+            root._stableNextLyric = fallbackText
+            
+        // For translated/secondary lyrics: keep empty when no actual translated lyric
+        // (don't use fallback, so secondary line stays blank)
         if (Services.NeteaseWebLyricsService.currentTranslatedLyric !== "")
             root._stableCurrentTranslatedLyric = Services.NeteaseWebLyricsService.currentTranslatedLyric
+        else
+            root._stableCurrentTranslatedLyric = ""
+            
         if (Services.NeteaseWebLyricsService.nextTranslatedLyric !== "")
             root._stableNextTranslatedLyric = Services.NeteaseWebLyricsService.nextTranslatedLyric
+        else
+            root._stableNextTranslatedLyric = ""
 
         if (!root._lyricsSignalActive && !(currentTrackMatchesLatched && hasStableLyrics)) {
             root._updateCompactDisplayedLyric()

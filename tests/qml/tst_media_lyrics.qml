@@ -233,6 +233,22 @@ TestCase {
         compare(Services.MediaControlService.artUrl, "file:///tmp/mpris-cover.jpg")
     }
 
+    function test_compact_display_uses_title_artist_before_first_lyric_without_secondary() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.title = "Song"
+        Services.NeteaseWebLyricsService.artist = "Artist"
+        Services.NeteaseWebLyricsService.nextLyric = "Line one"
+        Services.NeteaseWebLyricsService.nextTranslatedLyric = "第一行"
+        Services.NeteaseWebLyricsService.hasLyrics = true
+
+        Services.MediaControlService._refreshLyricsSession()
+
+        compare(Services.MediaControlService.compactOriginalLyric, "Song · Artist")
+        compare(Services.MediaControlService.compactTranslatedLyric, "")
+        compare(Services.MediaControlService.showCompactLyric, true)
+    }
+
     function test_instrumental_lyric_should_not_display_compact_lyric() {
         resetState()
 
