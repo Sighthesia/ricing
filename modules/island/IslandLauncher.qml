@@ -9,9 +9,72 @@ import "../../services" as Services
 Item {
     id: root
 
+    property bool compact: false
+    readonly property bool focusAllowed: root.visible
+        && root.width > 0
+        && root.height > 0
+        && Services.IslandService.expanded
+        && ((root.compact && Services.IslandService.panelPage === "overview")
+            || (!root.compact && Services.IslandService.panelPage === "launcher"))
+
     function focusSearch() {
+        if (!searchInput.visible || !searchInput.enabled)
+            return
+
         searchInput.forceActiveFocus()
-        searchInput.selectAll()
+        searchInput.deselect()
+        searchInput.cursorPosition = searchInput.text.length
+    }
+
+    function clearSearchFocus() {
+        if (searchInput.activeFocus || searchInput.focus)
+            searchInput.focus = false
+    }
+
+    function focusSearchWhenReady() {
+        Qt.callLater(() => {
+            if (root.focusAllowed) {
+                Qt.callLater(() => {
+                    if (root.focusAllowed)
+                        focusSearch()
+                })
+            }
+        })
+    }
+
+    Component.onCompleted: focusSearchWhenReady()
+
+    Connections {
+        target: Services.IslandService
+
+        function onExpandedChanged() {
+            if (root.focusAllowed) {
+                root.focusSearchWhenReady()
+            } else {
+                root.clearSearchFocus()
+            }
+        }
+
+        function onPanelPageChanged() {
+            if (root.focusAllowed) {
+                root.focusSearchWhenReady()
+            } else {
+                root.clearSearchFocus()
+            }
+        }
+
+        function onQueryChanged() {
+            if (root.focusAllowed && Services.IslandService.query.startsWith(">clip ")) {
+                root.focusSearchWhenReady()
+            }
+        }
+    }
+
+    onFocusAllowedChanged: {
+        if (focusAllowed)
+            focusSearchWhenReady()
+        else
+            clearSearchFocus()
     }
 
     Column {
@@ -37,8 +100,12 @@ Item {
                 font.family: Services.SettingsService.appearance.fontDefault || Qt.application.font.family
                 font.pixelSize: Math.round(14 * (Services.SettingsService.appearance.fontDefaultScale || 1.0))
                 text: Services.IslandService.query
-                onTextChanged: Services.IslandService.query = text
-                focus: true
+                onTextChanged: {
+                    Services.IslandService.query = text
+                    if (text.trim().length > 0)
+                        Services.IslandService.openPage("launcher")
+                }
+                focus: root.focusAllowed
                 Keys.onEscapePressed: Services.IslandService.close()
 
                 // Navigate list with Up/Down keys.
@@ -94,6 +161,7 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             height: root.height - searchBar.height - 8
+            clip: true
 
             // App list mode.
             Loader {
@@ -103,7 +171,7 @@ Item {
                 sourceComponent: islandAppList
 
                 onLoaded: {
-                    if (item) {
+                    if (item && Services.IslandService.query.trim().length === 0) {
                         item.currentIndex = 0
                     }
                 }
@@ -117,7 +185,7 @@ Item {
                 sourceComponent: islandClipboard
 
                 onLoaded: {
-                    if (item) {
+                    if (item && Services.IslandService.query.trim().length === 0) {
                         item.currentIndex = 0
                     }
                 }

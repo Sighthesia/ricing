@@ -10,7 +10,7 @@ Singleton {
 
     property bool expanded: false
     property string query: ""
-    property string panelPage: "launcher"
+    property string panelPage: "overview"
     property var centerSurfaceWidths: ({})
     readonly property int ripplePulseToken: Services.RipplePulseService.token
 
@@ -22,7 +22,7 @@ Singleton {
     // Source driving the island's open geometry. Launcher takes priority over
     // the window hint when both want to expand.
     readonly property string expansionSource: expanded
-        ? "launcher"
+        ? "island"
         : (windowHintActive ? "windowHint" : "none")
 
     // Derived mode based on query prefix (mirrors LauncherService convention).
@@ -30,6 +30,8 @@ Singleton {
         if (query.startsWith(">clip ")) return "clipboard"
         return "apps"
     }
+    readonly property bool launcherDetailActive: query.trim().length > 0
+        || panelPage === "launcher"
 
     function setCenterSurfaceWidth(screenName, width) {
         var nextWidths = Object.assign({}, centerSurfaceWidths)
@@ -65,6 +67,11 @@ Singleton {
 
     function open() {
         _closeTimer.stop()
+        if (query.trim().length > 0)
+            panelPage = "launcher"
+        else if (panelPage !== "settings-center" && panelPage !== "notifications" && panelPage !== "media" && panelPage !== "calendar" && panelPage !== "weather")
+            panelPage = "overview"
+
         expanded = true
     }
 
@@ -75,8 +82,12 @@ Singleton {
         open()
     }
 
+    function showOverview() {
+        openPage("overview")
+    }
+
     function showLauncher() {
-        openPage("launcher")
+        openPage(query.trim().length > 0 ? "launcher" : "overview")
     }
 
     function showSettingsCenter() {
@@ -91,25 +102,42 @@ Singleton {
 
     function openClipboard() {
         query = ">clip "
-        showLauncher()
+        openPage("launcher")
     }
 
     function openShortcuts() {
         query = ">key "
-        showLauncher()
+        openPage("launcher")
     }
 
     function close() {
         expanded = false
+        panelPage = "overview"
         _closeTimer.restart()
     }
 
     onExpandedChanged: {
         if (expanded
+            && panelPage !== "overview"
             && panelPage !== "launcher"
             && panelPage !== "settings-center"
-            && panelPage !== "notifications")
-            panelPage = "launcher"
+            && panelPage !== "notifications"
+            && panelPage !== "media"
+            && panelPage !== "calendar"
+            && panelPage !== "weather")
+            panelPage = "overview"
+    }
+
+    onQueryChanged: {
+        if (!expanded)
+            return
+
+        if (query.trim().length > 0) {
+            if (panelPage === "overview")
+                panelPage = "launcher"
+        } else if (panelPage === "launcher") {
+            panelPage = "overview"
+        }
     }
 
     function toggle() {

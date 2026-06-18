@@ -42,10 +42,18 @@ Item {
         && !Services.IslandService.expanded
     readonly property bool launcherPageVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "launcher"
+    readonly property bool overviewPageVisible: Services.IslandService.expanded
+        && Services.IslandService.panelPage === "overview"
     readonly property bool settingsCenterVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "settings-center"
     readonly property bool notificationsPageVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "notifications"
+    readonly property bool mediaPageVisible: Services.IslandService.expanded
+        && Services.IslandService.panelPage === "media"
+    readonly property bool calendarPageVisible: Services.IslandService.expanded
+        && Services.IslandService.panelPage === "calendar"
+    readonly property bool weatherPageVisible: Services.IslandService.expanded
+        && Services.IslandService.panelPage === "weather"
     readonly property bool hostsCenterContextMenu: Services.BarLayoutService.contextMenuVisible
         && !Services.BarLayoutService.widgetPickerVisible
         && Services.BarLayoutService.contextMenuSection === "center"
@@ -190,6 +198,23 @@ Item {
             nextHeight = Math.max(nextHeight, nextMap[keys[index]])
 
         root.centerWidgetExpandHeight = nextHeight
+    }
+
+    function focusExpandedPage() {
+        if (!Services.IslandService.expanded)
+            return
+
+        Qt.callLater(() => {
+            if (!Services.IslandService.expanded)
+                return
+
+            if (root.launcherPageVisible && detailPageLoader.item && detailPageLoader.item.focusSearchWhenReady) {
+                detailPageLoader.item.focusSearchWhenReady()
+                return
+            }
+
+            expandedContent.forceActiveFocus()
+        })
     }
 
     Component.onCompleted: {
@@ -479,20 +504,24 @@ Item {
                     anchors.fill: parent
                     anchors.leftMargin: 16
                     anchors.rightMargin: 16
-                    anchors.topMargin: root.expandedWidgetClearance
+                anchors.topMargin: root.overviewPageVisible ? 16 : root.expandedWidgetClearance
                     anchors.bottomMargin: 16
                     opacity: root.expandedRevealProgress
                     visible: opacity > 0.01
                     focus: Services.IslandService.expanded
 
-                    Component.onCompleted: if (Services.IslandService.expanded) forceActiveFocus()
+                    Component.onCompleted: root.focusExpandedPage()
 
                     Connections {
                         target: Services.IslandService
 
                         function onExpandedChanged() {
                             if (Services.IslandService.expanded)
-                                expandedContent.forceActiveFocus()
+                                root.focusExpandedPage()
+                        }
+
+                        function onPanelPageChanged() {
+                            root.focusExpandedPage()
                         }
                     }
 
@@ -502,73 +531,170 @@ Item {
                     NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
                 }
 
-            // Keep the mode switcher inside the expanded panel header.
+            // Keep the overview layout as the default expanded island page.
+            Item {
+                id: overviewPage
+
+                anchors.fill: parent
+                opacity: root.overviewPageVisible ? 1 : 0
+                visible: opacity > 0.01
+                enabled: root.overviewPageVisible
+
+                Behavior on opacity {
+                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                }
+
+                // Keep overview modules at intrinsic height and dedicate the rest to launcher content.
+                Item {
+                    anchors.fill: parent
+
+                    // Primary overview strip for glanceable modules.
+                    Flow {
+                        id: overviewGrid
+
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        spacing: 8
+
+                        OverviewModuleButton {
+                            width: (overviewGrid.width - 16) / 3
+                            height: 72
+                            title: Qt.formatTime(new Date(), "hh:mm")
+                            subtitle: Qt.formatDate(new Date(), "ddd · MMM d")
+                            detail: "时间"
+                            onClicked: Services.IslandService.openPage("calendar")
+                        }
+
+                        OverviewModuleButton {
+                            width: (overviewGrid.width - 16) / 3
+                            height: 72
+                            title: "日历"
+                            subtitle: Qt.formatDate(new Date(), "yyyy")
+                            detail: "今日概览"
+                            onClicked: Services.IslandService.openPage("calendar")
+                        }
+
+                        OverviewModuleButton {
+                            width: (overviewGrid.width - 16) / 3
+                            height: 72
+                            title: "天气"
+                            subtitle: "待接入"
+                            detail: "预报"
+                            onClicked: Services.IslandService.openPage("weather")
+                        }
+
+                        OverviewModuleButton {
+                            width: (overviewGrid.width - 16) / 3
+                            height: 72
+                            title: Services.MediaControlService.hasMedia ? Services.MediaControlService.title : "媒体"
+                            subtitle: Services.MediaControlService.hasMedia ? Services.MediaControlService.artist : "暂无播放"
+                            detail: Services.MediaControlService.playbackState
+                            onClicked: Services.IslandService.openPage("media")
+                        }
+
+                        OverviewModuleButton {
+                            width: (overviewGrid.width - 16) / 3
+                            height: 72
+                            title: "通知"
+                            subtitle: Services.NotificationService.unreadCount > 0
+                                ? (Services.NotificationService.unreadCount + " 条未读")
+                                : "已读"
+                            detail: "通知中心"
+                            onClicked: Services.IslandService.showNotifications()
+                        }
+
+                        OverviewModuleButton {
+                            width: (overviewGrid.width - 16) / 3
+                            height: 72
+                            title: "设置"
+                            subtitle: "中心"
+                            detail: "快速入口"
+                            onClicked: Services.IslandService.showSettingsCenter()
+                        }
+                    }
+
+                    // Short launcher stays anchored below overview modules until search expands it.
+                    IslandLauncher {
+                        anchors.top: overviewGrid.bottom
+                        anchors.topMargin: 12
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: Math.max(240, parent.height - overviewGrid.height - 12)
+                        compact: true
+                    }
+                }
+            }
+
+            // Return from any detail page to the overview layout.
             Rectangle {
-                id: expandedModeStrip
+                id: detailBackButton
 
                 anchors.top: parent.top
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: Math.min(parent.width, 420)
-                height: root.expandedNavHeight
-                radius: Math.round(height / 2)
-                color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
-                border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.7)
+                anchors.left: parent.left
+                width: 38
+                height: 34
+                z: 4
+                opacity: root.overviewPageVisible ? 0 : 1
+                visible: opacity > 0.01
+                enabled: !root.overviewPageVisible
+                radius: 14
+                color: backMouse.containsMouse
+                    ? Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.22)
+                    : Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
+                border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.55)
                 border.width: 1
 
-                // Lay out the three pages as a segmented control.
-                Row {
+                Behavior on opacity {
+                    NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                }
+
+                Behavior on color {
+                    ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing }
+                }
+
+                Services.FluidText {
+                    anchors.centerIn: parent
+                    text: "‹"
+                    color: Services.Color.mOnSurface
+                    basePixelSize: 20
+                }
+
+                MouseArea {
+                    id: backMouse
+
                     anchors.fill: parent
-                    anchors.margins: 4
-                    spacing: 4
-
-                    IslandPanelNavButton {
-                        width: (parent.width - 8) / 3
-                        height: parent.height
-                        label: "启动器"
-                        selected: root.launcherPageVisible
-                        firstSegment: true
-                        onClicked: Services.IslandService.showLauncher()
-                    }
-
-                    IslandPanelNavButton {
-                        width: (parent.width - 8) / 3
-                        height: parent.height
-                        label: "设置中心"
-                        selected: root.settingsCenterVisible
-                        onClicked: Services.IslandService.showSettingsCenter()
-                    }
-
-                    IslandPanelNavButton {
-                        width: (parent.width - 8) / 3
-                        height: parent.height
-                        label: "通知中心"
-                        selected: root.notificationsPageVisible
-                        lastSegment: true
-                        onClicked: Services.IslandService.showNotifications()
-                    }
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Services.IslandService.showOverview()
                 }
             }
 
             // Keep the current page below the switcher inside the same panel shell.
             Item {
-                anchors.top: expandedModeStrip.bottom
-                anchors.topMargin: root.expandedInnerGap
+                anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
 
                 Loader {
+                    id: detailPageLoader
+
                     anchors.fill: parent
+                    active: !root.overviewPageVisible
                     sourceComponent: root.launcherPageVisible
                         ? launcherPanelPage
                         : (root.settingsCenterVisible
                             ? settingsCenterPage
-                            : notificationsCenterPage)
+                            : (root.notificationsPageVisible
+                                ? notificationsCenterPage
+                                : (root.mediaPageVisible
+                                    ? mediaDetailPage
+                                    : (root.calendarPageVisible ? calendarDetailPage : weatherDetailPage))))
 
                     onLoaded: {
-                        if (item && root.launcherPageVisible && item.focusSearch) {
-                            item.focusSearch()
-                        }
+                        root.focusExpandedPage()
                     }
                 }
             }
@@ -654,6 +780,37 @@ Item {
 
         NotificationCenterView {
             anchors.fill: parent
+        }
+    }
+
+    // Render the media detail page inside the shared bottom panel.
+    Component {
+        id: mediaDetailPage
+
+        MediaDetailView {
+            anchors.fill: parent
+        }
+    }
+
+    // Render the calendar placeholder page inside the shared bottom panel.
+    Component {
+        id: calendarDetailPage
+
+        PlaceholderDetailView {
+            anchors.fill: parent
+            title: "日历"
+            body: "这里会显示今日日程、未来几天概览和待办。"
+        }
+    }
+
+    // Render the weather placeholder page inside the shared bottom panel.
+    Component {
+        id: weatherDetailPage
+
+        PlaceholderDetailView {
+            anchors.fill: parent
+            title: "天气"
+            body: "这里会显示温度、降雨、风速和小时预报。"
         }
     }
 }
