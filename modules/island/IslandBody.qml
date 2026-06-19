@@ -96,11 +96,6 @@ Item {
     readonly property real collapsedWidthProgress: root.collapsedCapsuleWidth > 0
         ? Math.max(0, Math.min(1, root.liveBodyWidth / root.collapsedCapsuleWidth))
         : 1
-    readonly property real collapsedRevealProgress: root.showManagedCenterWidgets
-        && !Services.IslandService.expanded
-        && !Services.IslandService.windowHintActive
-        ? Math.max(0, Math.min(1, (root.collapsedWidthProgress - 0.98) / 0.02))
-        : 1
     readonly property real expandedWidthProgress: root.expandedW > 0
         ? Math.max(0, Math.min(1, root.liveBodyWidth / root.expandedW))
         : 1
@@ -362,11 +357,7 @@ Item {
                 // long message bodies.
                 anchors.topMargin: Math.max(0, (root.collapsedH - root.collapsedContentHeight) / 2)
                 spacing: 8
-                opacity: root.collapsedRevealProgress
-
-                Behavior on opacity {
-                    NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                }
+                opacity: 1
 
                 // Wrap the collapsed center content so the spectrum can size to the managed widget block.
                 Item {
