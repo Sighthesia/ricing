@@ -31,9 +31,20 @@ Item {
     readonly property int hoverRadiusLift: 2
     readonly property int expandedW: Math.min(620, Screen.width - 48)
     readonly property int expandedH: Math.min(620, Screen.height - 96)
+    // Sum of the overview collage rows (launcher + gaps + cards), so
+    // targetH adapts to the actual content instead of reserving 620px
+    // and leaving whitespace below the bottom row.
+    readonly property real overviewNatHeight: {
+        if (!root.overviewPageVisible) return 0
+        return launcherCard.height + 10 + topRow.height + 10 + middleRow.height + 10 + calendarCardBottom.height
+    }
     readonly property int expandedWidgetClearance: Math.max(root.collapsedH, root.messageContentHeight) + 12
     readonly property int expandedInnerGap: 12
     readonly property int expandedNavHeight: 42
+    // Max height of the compact launcher card at the top of the overview,
+    // so search results expand downward but do not push the control-center
+    // cards entirely out of view.
+    readonly property int launcherCardMaxHeight: 250
     readonly property color surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
     readonly property var centerWidgets: Services.BarLayoutService.sectionWidgets("center")
     readonly property bool showManagedCenterWidgets: root.centerWidgets.length > 0
@@ -128,7 +139,9 @@ Item {
         ? windowHintW
         : collapsedCapsuleWidth))))
     property int targetH: Services.IslandService.expanded
-        ? expandedH
+        ? (root.overviewPageVisible
+            ? Math.min(expandedH, Math.round(root.overviewNatHeight + root.expandedWidgetClearance + 16))
+            : expandedH)
         : (root.hostsCenterWidgetPicker
         ? collapsedH + centerWidgetPickerH + 8 + centerWidgetPickerClipInset
         : (root.hostsCenterWidgetSettings
@@ -504,7 +517,7 @@ Item {
                     anchors.fill: parent
                     anchors.leftMargin: 16
                     anchors.rightMargin: 16
-                anchors.topMargin: root.overviewPageVisible ? 16 : root.expandedWidgetClearance
+                    anchors.topMargin: root.expandedWidgetClearance
                     anchors.bottomMargin: 16
                     opacity: root.expandedRevealProgress
                     visible: opacity > 0.01
@@ -531,99 +544,193 @@ Item {
                     NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
                 }
 
-            // Keep the overview layout as the default expanded island page.
+            // Control-center collage overview: mixed-size glanceable cards
+            // arranged in an asymmetric hierarchy — bold clock + toggle grid
+            // on top, large media + dense notification in the middle, and a
+            // full-width calendar preview at the bottom.
             Item {
                 id: overviewPage
 
                 anchors.fill: parent
-                opacity: root.overviewPageVisible ? 1 : 0
-                visible: opacity > 0.01
+                visible: root.overviewPageVisible || overviewPage._overviewProgress > 0.01
                 enabled: root.overviewPageVisible
+                opacity: 1
 
-                Behavior on opacity {
-                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                // Entrance progress (0→1) drives staggered card cascade so the
+                // search bar appears first and the control-center cards trickle
+                // in from top to bottom, making the transition feel intentional.
+                property real _overviewProgress: 0
+
+                Behavior on _overviewProgress {
+                    NumberAnimation { duration: 350; easing.type: Easing.OutCubic }
                 }
 
-                // Keep overview modules at intrinsic height and dedicate the rest to launcher content.
-                Item {
-                    anchors.fill: parent
+                // Toggle the progress animation when the overview page is shown
+                // or hidden.  Uses `enabled` (which tracks root.overviewPageVisible
+                // directly) instead of `visible` so the trigger fires even when
+                // the fade-out keeps visible=true via _overviewProgress > 0.01.
+                onEnabledChanged: {
+                    if (root.overviewPageVisible)
+                        overviewPage._overviewProgress = 1
+                    else
+                        overviewPage._overviewProgress = 0
+                }
 
-                    // Primary overview strip for glanceable modules.
-                    Flow {
-                        id: overviewGrid
+                // Compact search-and-apps launcher at the top of the overview:
+                // search bar always visible, results expand downward when the
+                // user types — like a start menu integrated into the control
+                // center.  The card wrapper (radius 16, gradient, highlight
+                // strip, border, hover color) matches the glass visual language
+                // of the surrounding overview cards.
+                Rectangle {
+                    id: launcherCard
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    // Collapse to just the search bar height (40px + 12px margins)
+                    // when no query is entered, so the card does not reserve a
+                    // large empty area.  Once the user types, the card expands
+                    // up to 250 px to show search results inline.
+                    height: compactLauncher._localQuery.trim().length === 0
+                        ? 52
+                        : Math.min(root.launcherCardMaxHeight, Math.max(52, parent.height - y))
+                    clip: true
+                    radius: 16
+                    // Cascade tier 1: the search bar appears first, settling
+                    // before the control-center cards start their entrance.
+                    opacity: Math.min(1, Math.max(0, (overviewPage._overviewProgress - 0.0) / 0.5))
 
+                    Behavior on height {
+                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                    }
+                    color: launcherCardHover.hovered
+                        ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.listHoverOpacity)
+                        : Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
+                    border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.4)
+                    border.width: 1
+
+                    Behavior on color {
+                        ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing }
+                    }
+
+                    Behavior on border.color {
+                        ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing }
+                    }
+
+                    // Subtle gradient overlay for glass depth.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.03) }
+                            GradientStop { position: 1.0; color: "transparent" }
+                        }
+                    }
+
+                    // Top-edge glass highlight strip.
+                    Rectangle {
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        spacing: 8
+                        height: 1
+                        color: Qt.rgba(1, 1, 1, 0.08)
+                    }
 
-                        OverviewModuleButton {
-                            width: (overviewGrid.width - 16) / 3
-                            height: 72
-                            title: Qt.formatTime(new Date(), "hh:mm")
-                            subtitle: Qt.formatDate(new Date(), "ddd · MMM d")
-                            detail: "时间"
-                            onClicked: Services.IslandService.openPage("calendar")
-                        }
+                    // Inset container so the launcher's search bar (radius 12)
+                    // aligns concentrically inside the card frame (radius 16).
+                    Item {
+                        anchors.fill: parent
+                        anchors.margins: 6
 
-                        OverviewModuleButton {
-                            width: (overviewGrid.width - 16) / 3
-                            height: 72
-                            title: "日历"
-                            subtitle: Qt.formatDate(new Date(), "yyyy")
-                            detail: "今日概览"
-                            onClicked: Services.IslandService.openPage("calendar")
-                        }
-
-                        OverviewModuleButton {
-                            width: (overviewGrid.width - 16) / 3
-                            height: 72
-                            title: "天气"
-                            subtitle: "待接入"
-                            detail: "预报"
-                            onClicked: Services.IslandService.openPage("weather")
-                        }
-
-                        OverviewModuleButton {
-                            width: (overviewGrid.width - 16) / 3
-                            height: 72
-                            title: Services.MediaControlService.hasMedia ? Services.MediaControlService.title : "媒体"
-                            subtitle: Services.MediaControlService.hasMedia ? Services.MediaControlService.artist : "暂无播放"
-                            detail: Services.MediaControlService.playbackState
-                            onClicked: Services.IslandService.openPage("media")
-                        }
-
-                        OverviewModuleButton {
-                            width: (overviewGrid.width - 16) / 3
-                            height: 72
-                            title: "通知"
-                            subtitle: Services.NotificationService.unreadCount > 0
-                                ? (Services.NotificationService.unreadCount + " 条未读")
-                                : "已读"
-                            detail: "通知中心"
-                            onClicked: Services.IslandService.showNotifications()
-                        }
-
-                        OverviewModuleButton {
-                            width: (overviewGrid.width - 16) / 3
-                            height: 72
-                            title: "设置"
-                            subtitle: "中心"
-                            detail: "快速入口"
-                            onClicked: Services.IslandService.showSettingsCenter()
+                        IslandLauncher {
+                            id: compactLauncher
+                            anchors.fill: parent
+                            compact: true
                         }
                     }
 
-                    // Short launcher stays anchored below overview modules until search expands it.
-                    IslandLauncher {
-                        anchors.top: overviewGrid.bottom
-                        anchors.topMargin: 12
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: Math.max(240, parent.height - overviewGrid.height - 12)
-                        compact: true
+                    HoverHandler {
+                        id: launcherCardHover
                     }
+                }
+
+                // Thin glass separator between the search launcher and the
+                // control-center card grid.  Anchored mid-gap with a staggered
+                // fade-in that trails the launcher card slightly, making the
+                // boundary feel designed rather than a plain spacing break.
+                Rectangle {
+                    anchors.top: launcherCard.bottom
+                    anchors.topMargin: 4
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    height: 1
+                    color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.12)
+                    opacity: Math.min(1, Math.max(0, (overviewPage._overviewProgress - 0.0) / 0.55))
+                }
+
+                // Top zone: bold clock card (38 %) beside a 2×2 settings
+                // quick-toggle grid (62 %).  Cascade tier 2 — reveals after
+                // the search bar and separator have settled.
+                Row {
+                    id: topRow
+                    anchors.top: launcherCard.bottom
+                    anchors.topMargin: 10
+                    width: parent.width
+                    height: 110
+                    spacing: 10
+                    opacity: Math.min(1, Math.max(0, (overviewPage._overviewProgress - 0.0) / 0.65))
+
+                    OverviewClockCard {
+                        width: Math.round((parent.width - 10) * 0.38)
+                        height: parent.height
+                        onClicked: Services.IslandService.openPage("calendar")
+                    }
+
+                    OverviewSettingsCard {
+                        width: parent.width - Math.round((parent.width - 10) * 0.38) - 10
+                        height: parent.height
+                        onClicked: Services.IslandService.showSettingsCenter()
+                    }
+                }
+
+                // Middle zone: large media card (62 %) beside notification
+                // preview (38 %).  Cascade tier 3 — starts revealing after the
+                // top row is already mid-entrance.
+                Row {
+                    id: middleRow
+                    anchors.top: topRow.bottom
+                    anchors.topMargin: 10
+                    width: parent.width
+                    height: 190
+                    spacing: 10
+                    opacity: Math.min(1, Math.max(0, (overviewPage._overviewProgress - 0.10) / 0.65))
+
+                    OverviewMediaCard {
+                        width: Math.round((parent.width - 10) * 0.62)
+                        height: parent.height
+                        onClicked: Services.IslandService.openPage("media")
+                    }
+
+                    OverviewNotificationCard {
+                        width: parent.width - Math.round((parent.width - 10) * 0.62) - 10
+                        height: parent.height
+                        onClicked: Services.IslandService.showNotifications()
+                    }
+                }
+
+                // Bottom zone: full-width calendar card with prominent date
+                // and placeholder event rows.  Cascade tier 4 — trails the
+                // middle section so the full collage assembles top-to-bottom.
+                OverviewCalendarCard {
+                    id: calendarCardBottom
+                    anchors.top: middleRow.bottom
+                    anchors.topMargin: 10
+                    width: parent.width
+                    height: 130
+                    opacity: Math.min(1, Math.max(0, (overviewPage._overviewProgress - 0.20) / 0.75))
+                    onClicked: Services.IslandService.openPage("calendar")
                 }
             }
 

@@ -12,6 +12,10 @@ Singleton {
     property string query: ""
     property string panelPage: "overview"
     property var centerSurfaceWidths: ({})
+    // Pre-filter text for the settings center when opened from a search
+    // result. Set before showSettingsCenter() and consumed once by
+    // SettingsContent on load, then reset.
+    property string settingsInitialFilter: ""
     readonly property int ripplePulseToken: Services.RipplePulseService.token
 
     // Window-hint extension is active only in attached-island mode while the

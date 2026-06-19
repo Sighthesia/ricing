@@ -11,6 +11,15 @@ Item {
         return label.toLowerCase().includes(searchField.text.toLowerCase())
     }
 
+    // Consume any pre-filter passed from a search result navigation.
+    Component.onCompleted: {
+        var filter = Services.IslandService.settingsInitialFilter
+        if (filter && filter.trim().length > 0) {
+            searchField.text = filter
+            Services.IslandService.settingsInitialFilter = ""
+        }
+    }
+
     // Search field at the top
     TextField {
         id: searchField
