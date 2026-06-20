@@ -43,19 +43,29 @@ Item {
     signal activated()
     signal wheel(var event)
 
-    implicitWidth: (root.sidePadding * 2) + badgeSlot.width + root.detailTargetWidth + (root.detailTargetWidth > 0 ? root.contentSpacing : 0)
+    implicitWidth: (root.sidePadding * 2) + badgeSlot.width + detailSlot.revealWidth + (detailSlot.revealWidth > 0.5 ? root.contentSpacing : 0)
     implicitHeight: 30
 
     onProgressValueChanged: ringCanvas.requestPaint()
     onProgressColorChanged: ringCanvas.requestPaint()
     onTrackColorChanged: ringCanvas.requestPaint()
 
-    // Keep the badge and expanded details centered as one continuous object.
+    // Keep the badge anchored to a fixed left position; the detail slot
+    // expands continuously to the right on hover instead of growing from center.
     Row {
         id: contentRow
 
-        anchors.centerIn: parent
-        spacing: root.detailTargetWidth > 0 ? root.contentSpacing : 0
+        anchors.left: parent.left
+        anchors.leftMargin: root.sidePadding
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: detailSlot.revealWidth > 0.5 ? root.contentSpacing : 0
+
+        Behavior on spacing {
+            NumberAnimation {
+                duration: Services.Motion.number.snugDuration
+                easing.type: Services.Motion.number.snugEasing
+            }
+        }
 
         // Keep the circular badge persistent across collapsed and expanded states.
         Item {

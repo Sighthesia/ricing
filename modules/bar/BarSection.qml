@@ -22,6 +22,7 @@ Item {
     readonly property bool canOpenWidgetPicker: Services.BarLayoutService.layoutReady
     readonly property var blurParts: surfaceLoader.item ? surfaceLoader.item.blurParts : []
     readonly property real residualPushOffsetX: surfaceLoader.item ? surfaceLoader.item.residualPushOffsetX : 0
+    readonly property real bodyShrinkX: (surfaceLoader.item && surfaceLoader.item.dockzone) ? surfaceLoader.item.dockzone.bodyShrinkX : 0
     readonly property bool hostsContextMenu: Services.BarLayoutService.contextMenuVisible
         && !Services.BarLayoutService.widgetPickerVisible
         && Services.BarLayoutService.contextMenuScreenName === root.screenName
@@ -371,10 +372,17 @@ Item {
                     clip: true
 
                     // Lay out widgets in the moving body while clipping to its visible width.
+                    // Centered within bodyWidth then shifted by bodyShrinkX so
+                    // content and background share the same immediate shrink
+                    // response. The bias direction (left = -shrunk, right = +shrunk)
+                    // preserves the existing lean-away-from-center feel during push.
                     Row {
                         id: sectionRow
 
-                        x: parent.parent.bodyX + (parent.parent.bodyWidth - width) / 2 + (root.sectionName === "right" ? parent.parent.bodyShrinkX : (root.sectionName === "left" ? -parent.parent.bodyShrinkX : 0)) - sectionClip.x
+                        x: parent.parent.bodyX
+                            + (parent.parent.bodyWidth - width) / 2
+                            + (root.sectionName === "right" ? parent.parent.bodyShrinkX : (root.sectionName === "left" ? -parent.parent.bodyShrinkX : 0))
+                            - sectionClip.x
                         y: (parent.parent.topBandHeight - height) / 2
                         spacing: BarLayoutSections.widgetSpacing
 

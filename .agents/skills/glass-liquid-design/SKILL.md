@@ -154,6 +154,22 @@ When changing QML:
 - Move capsule components between dock zones by animating position and opacity rather than destroying one instance and creating another.
 - For dockzone ears, centralize shared geometry state before adding large-scale motion so ear/body transforms do not drift apart across states.
 
+### Bar Widget Width Coupling Rules
+
+When a bar widget's content width changes (title, label, icon, or detail reveal on hover), the dockzone background, widget position, and adjacent section displacement must share a unified geometry rhythm:
+
+- **Fixed expansion anchor**: Widget content that grows/shrinks must do so from a fixed edge — keep the content left-anchored (or right-anchored) so the expansion extends in one direction only, never from the visual center. Avoid `anchors.centerIn` for content rows whose width changes dynamically; use `anchors.left` (or `anchors.right`) with a `leftMargin`/`rightMargin` equal to the widget's visual padding.
+
+- **Animated layout width**: The widget's `implicitWidth` must derive from the *animated* width of its expanding content, not the instantaneous target width. If the expanding inner slot uses a `Behavior` on its width (e.g., `revealWidth`), use that animated property directly in the `implicitWidth` expression so the dockzone background and the section row reflow continuously rather than jumping.
+
+- **Coordinated content–background reveal**: The dockzone background width, the section row position, and any adjacent section push should respond to changes on the same animation timeline. Use `targetImplicitWidth`/`animImplicitWidth` with a `Behavior` for widgets whose content width changes via crossfade (e.g., `ActiveWindow` title swap), so the layout width transitions smoothly alongside the foreground transition.
+
+- **One-directional expand priority for push**: When a section is pushed by the center surface (or an adjacent expanding widget), the push displacement should snap on increase (to avoid overlap) but spring-animate on decrease (to feel like a smooth return home). This mirrors the `DockzoneSurfaceRoot._animBodyShrinkX` pattern: `enabled` for the return spring, disabled for the expand snap.
+
+- **Avoid double centering**: If a section row already centers its widgets within the dockzone body (via `bodyWidth - width / 2`), individual widgets must not center their internal content again. Widgets should be left-anchored (in left/center sections) or right-anchored (in right sections) so only the section-level centering handles the overall alignment.
+
+- **Unify geometry through the section model pipeline**: Use the same `contentWidth → bodyWidth → pushedBodyWidth → visualOffset` cascade for both the glass background outline and the widget row position. Do not add independent offset/width compensations in the widget layer that bypass this chain.
+
 ## Anti-Patterns
 
 Avoid:

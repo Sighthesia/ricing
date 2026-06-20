@@ -40,8 +40,19 @@ Item {
     readonly property real currentTitleTargetWidth: Math.min(currentTitleText.implicitWidth, root.compactTitleWidth)
     readonly property real nextTitleTargetWidth: Math.min(nextTitleText.implicitWidth, root.compactTitleWidth)
 
-    implicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 20, 240)
+    readonly property real targetImplicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 20, 240)
+    property real animImplicitWidth: targetImplicitWidth
+    onTargetImplicitWidthChanged: root.animImplicitWidth = root.targetImplicitWidth
+
+    implicitWidth: animImplicitWidth
     implicitHeight: 30
+
+    Behavior on animImplicitWidth {
+        NumberAnimation {
+            duration: Services.Motion.number.contentDuration
+            easing.type: Services.Motion.number.contentEasing
+        }
+    }
 
     function syncFocusedWindow() {
         var nextTitle = Services.NiriService.activeTitle || root.desktopLabel
@@ -109,10 +120,14 @@ Item {
     }
 
     // Keep the current content visible while the next one fades in.
+    // Left-anchored so the left edge stays fixed when title width changes;
+    // the right edge extends/shrinks outward instead of drifting from center.
     Item {
         id: currentLayer
 
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.leftMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
         opacity: 1
         visible: opacity > 0
 
@@ -123,7 +138,8 @@ Item {
         Row {
             id: currentContent
 
-            anchors.centerIn: parent
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
             spacing: 6
 
             // Current app icon.
@@ -181,10 +197,14 @@ Item {
     }
 
     // Fade in the next content on top of the outgoing content.
+    // Same left-anchored layout as currentLayer so both layers share the same
+    // fixed left edge during the crossfade, and only the right edge changes.
     Item {
         id: nextLayer
 
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.leftMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
         opacity: 0
         visible: opacity > 0
         z: 1
@@ -196,7 +216,8 @@ Item {
         Row {
             id: nextContent
 
-            anchors.centerIn: parent
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
             spacing: 6
 
             // Next app icon.
