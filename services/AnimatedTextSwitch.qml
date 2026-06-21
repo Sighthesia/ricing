@@ -276,7 +276,7 @@ Item {
         }
     }
 
-    // Render the incoming text from a soft down-right offset back into place.
+    // Render the incoming text from a soft down-left offset back into place.
     Item {
         id: incomingLayer
 
@@ -296,7 +296,7 @@ Item {
                 readonly property real progress: root.glyphIncomingProgress(index)
                 readonly property real positionProgress: root.incomingPositionProgress(progress)
 
-                x: modelData.x + root.offsetX * root.incomingOffsetScale * (1 - positionProgress)
+                x: modelData.x - root.offsetX * root.incomingOffsetScale * (1 - positionProgress)
                 y: root.offsetY * root.incomingOffsetScale * (1 - positionProgress)
                 opacity: root.incomingOpacity(progress)
                 text: modelData.display
