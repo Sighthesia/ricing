@@ -13,6 +13,7 @@ singleton SettingsService 1.0 SettingsService.qml
 singleton ClipboardService 1.0 ClipboardService.qml
 singleton FontService 1.0 FontService.qml
 FluidText 1.0 FluidText.qml
+AnimatedTextSwitch 1.0 AnimatedTextSwitch.qml
 singleton LauncherService 1.0 LauncherService.qml
 singleton MediaService 1.0 MediaService.qml
 singleton MediaControlService 1.0 MediaControlService.qml

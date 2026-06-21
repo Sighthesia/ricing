@@ -21,21 +21,19 @@ Item {
                 anchors.margins: 14
                 spacing: 4
 
-                Services.FluidText {
+                Services.AnimatedTextSwitch {
                     text: Services.MediaControlService.title !== "" ? Services.MediaControlService.title : "暂无媒体"
                     color: Services.Color.mOnSurface
                     basePixelSize: 16
                     font.bold: true
                     width: parent.width
-                    elide: Text.ElideRight
                 }
 
-                Services.FluidText {
+                Services.AnimatedTextSwitch {
                     text: Services.MediaControlService.artist !== "" ? Services.MediaControlService.artist : "等待播放器连接"
                     color: Services.Color.mOnSurfaceVariant
                     basePixelSize: 12
                     width: parent.width
-                    elide: Text.ElideRight
                 }
 
                 Services.FluidText {

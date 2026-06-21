@@ -7,12 +7,6 @@ import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 Item {
     id: root
 
-    property string currentTitle: Services.NiriService.activeTitle || "Desktop"
-    property string currentAppId: Services.NiriService.activeAppId || ""
-    property string pendingTitle: currentTitle
-    property string pendingAppId: currentAppId
-    property bool transitioning: false
-    property real availableWidth: -1
     readonly property var activeWindowSettings: WidgetSettingsRegistry.settingsObject(
         "active-window",
         Services.SettingsService.widgetSettings
@@ -26,6 +20,11 @@ Item {
     readonly property int maxTitleWidth: activeWindowSettings
         ? activeWindowSettings.maxTitleWidth
         : 200
+
+    property real availableWidth: -1
+    property string currentTitle: Services.NiriService.activeTitle || root.desktopLabel
+    property string currentAppId: Services.NiriService.activeAppId || ""
+
     readonly property real compactTitleWidth: {
         if (root.availableWidth <= 0)
             return root.maxTitleWidth
@@ -35,13 +34,13 @@ Item {
         var chrome = 20
         return Math.max(40, Math.min(root.maxTitleWidth, root.availableWidth - iconWidth - spacing - chrome))
     }
-    readonly property real currentIconTargetWidth: root.showIcon && root.currentAppId !== "" ? 18 : 0
-    readonly property real nextIconTargetWidth: root.showIcon && root.pendingAppId !== "" ? 18 : 0
-    readonly property real currentTitleTargetWidth: Math.min(currentTitleText.implicitWidth, root.compactTitleWidth)
-    readonly property real nextTitleTargetWidth: Math.min(nextTitleText.implicitWidth, root.compactTitleWidth)
+    readonly property real iconTargetWidth: root.showIcon && root.currentAppId !== "" ? 18 : 0
+    readonly property real titleTargetWidth: Math.min(titleText.contentWidth, root.compactTitleWidth)
+    readonly property real rowSpacing: titleTargetWidth > 0 && iconTargetWidth > 0 ? contentRow.spacing : 0
+    readonly property real targetImplicitWidth: Math.min(root.iconTargetWidth + root.titleTargetWidth + rowSpacing + 20, 240)
 
-    readonly property real targetImplicitWidth: Math.min(Math.max(currentLayer.implicitWidth, nextLayer.implicitWidth) + 20, 240)
     property real animImplicitWidth: targetImplicitWidth
+
     onTargetImplicitWidthChanged: root.animImplicitWidth = root.targetImplicitWidth
 
     implicitWidth: animImplicitWidth
@@ -55,221 +54,95 @@ Item {
     }
 
     function syncFocusedWindow() {
-        var nextTitle = Services.NiriService.activeTitle || root.desktopLabel
-        var nextAppId = Services.NiriService.activeAppId || ""
-
-        if (nextTitle === root.currentTitle && nextAppId === root.currentAppId && !root.transitioning)
-            return
-
-        root.pendingTitle = nextTitle
-        root.pendingAppId = nextAppId
-
-        if (root.transitioning)
-            return
-
-        root.transitioning = true
-        fadeTransition.restart()
+        root.currentTitle = Services.NiriService.activeTitle || root.desktopLabel
+        root.currentAppId = Services.NiriService.activeAppId || ""
     }
 
     Component.onCompleted: syncFocusedWindow()
 
     Connections {
         target: Services.NiriService
+
         function onWindowsUpdated() {
             root.syncFocusedWindow()
         }
     }
 
-    SequentialAnimation {
-        id: fadeTransition
-
-        ParallelAnimation {
-            NumberAnimation {
-                target: currentLayer
-                property: "opacity"
-                from: 1
-                to: 0
-                duration: Services.Motion.number.shortDuration
-                easing.type: Services.Motion.number.shortEasing
-            }
-
-            NumberAnimation {
-                target: nextLayer
-                property: "opacity"
-                from: 0
-                to: 1
-                duration: Services.Motion.number.enterDuration
-                easing.type: Services.Motion.number.enterEasing
-            }
-        }
-
-        ScriptAction {
-            script: {
-                root.currentTitle = root.pendingTitle
-                root.currentAppId = root.pendingAppId
-            }
-        }
-
-        ScriptAction {
-            script: {
-                currentLayer.opacity = 1
-                nextLayer.opacity = 0
-                root.transitioning = false
-            }
-        }
-    }
-
-    // Keep the current content visible while the next one fades in.
-    // Left-anchored so the left edge stays fixed when title width changes;
-    // the right edge extends/shrinks outward instead of drifting from center.
-    Item {
-        id: currentLayer
+    // Keep the content left-anchored so width changes only extend to the right.
+    Row {
+        id: contentRow
 
         anchors.left: parent.left
         anchors.leftMargin: 10
         anchors.verticalCenter: parent.verticalCenter
-        opacity: 1
-        visible: opacity > 0
+        spacing: 6
+    
+        // Reveal the focused app icon without shifting the row anchor.
+        Item {
+            id: iconSlot
 
-        implicitWidth: root.currentIconTargetWidth + root.currentTitleTargetWidth + (root.currentTitleTargetWidth > 0 && root.currentIconTargetWidth > 0 ? currentContent.spacing : 0)
-        implicitHeight: currentContent.implicitHeight
-
-        // Render the currently focused icon and title.
-        Row {
-            id: currentContent
-
-            anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 6
+            property real revealWidth: root.iconTargetWidth
 
-            // Current app icon.
-            Item {
-                id: currentIconSlot
+            width: revealWidth
+            height: 18
+            opacity: root.iconTargetWidth > 0 ? 1 : 0
 
-                anchors.verticalCenter: parent.verticalCenter
-                property real revealWidth: root.currentIconTargetWidth
-
-                width: revealWidth
-                height: 18
-                opacity: root.currentIconTargetWidth > 0 ? 1 : 0
-
-                Behavior on revealWidth {
-                    NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-                }
-
-                Behavior on opacity {
-                    NumberAnimation { duration: Services.Motion.number.snugDuration; easing.type: Services.Motion.number.snugEasing }
-                }
-
-                IconImage {
-                    anchors.fill: parent
-                    source: root.currentAppId !== "" ? ("image://icon/" + root.currentAppId) : ""
-                    implicitSize: 18
-                    visible: currentIconSlot.width > 0
+            Behavior on revealWidth {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
                 }
             }
 
-            // Current window title.
-            Item {
-                id: currentTitleSlot
-
-                anchors.verticalCenter: parent.verticalCenter
-                property real revealWidth: root.currentTitleTargetWidth
-
-                width: revealWidth
-                height: currentTitleText.implicitHeight
-
-                Behavior on revealWidth {
-                    NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Services.Motion.number.snugDuration
+                    easing.type: Services.Motion.number.snugEasing
                 }
+            }
 
-                Services.FluidText {
-                    id: currentTitleText
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width
-                    text: root.currentTitle
-                    color: Services.Color.mOnSurface
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                }
+            IconImage {
+                anchors.fill: parent
+                source: root.currentAppId !== "" ? ("image://icon/" + root.currentAppId) : ""
+                implicitSize: 18
+                visible: iconSlot.width > 0
             }
         }
-    }
 
-    // Fade in the next content on top of the outgoing content.
-    // Same left-anchored layout as currentLayer so both layers share the same
-    // fixed left edge during the crossfade, and only the right edge changes.
-    Item {
-        id: nextLayer
+        // Clip the title slot while the text inside performs the staggered switch.
+        Item {
+            id: titleSlot
 
-        anchors.left: parent.left
-        anchors.leftMargin: 10
-        anchors.verticalCenter: parent.verticalCenter
-        opacity: 0
-        visible: opacity > 0
-        z: 1
-
-        implicitWidth: root.nextIconTargetWidth + root.nextTitleTargetWidth + (root.nextTitleTargetWidth > 0 && root.nextIconTargetWidth > 0 ? nextContent.spacing : 0)
-        implicitHeight: nextContent.implicitHeight
-
-        // Render the next focused icon and title.
-        Row {
-            id: nextContent
-
-            anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 6
+            property real revealWidth: root.titleTargetWidth
 
-            // Next app icon.
-            Item {
-                id: nextIconSlot
+            width: revealWidth
+            height: titleText.implicitHeight
+            clip: true
 
-                anchors.verticalCenter: parent.verticalCenter
-                property real revealWidth: root.nextIconTargetWidth
-
-                width: revealWidth
-                height: 18
-                opacity: root.nextIconTargetWidth > 0 ? 1 : 0
-
-                Behavior on revealWidth {
-                    NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-                }
-
-                Behavior on opacity {
-                    NumberAnimation { duration: Services.Motion.number.snugDuration; easing.type: Services.Motion.number.snugEasing }
-                }
-
-                IconImage {
-                    anchors.fill: parent
-                    source: root.pendingAppId !== "" ? ("image://icon/" + root.pendingAppId) : ""
-                    implicitSize: 18
-                    visible: nextIconSlot.width > 0
+            Behavior on revealWidth {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
                 }
             }
 
-            // Next window title.
-            Item {
-                id: nextTitleSlot
+            Services.AnimatedTextSwitch {
+                id: titleText
 
+                anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                property real revealWidth: root.nextTitleTargetWidth
-
-                width: revealWidth
-                height: nextTitleText.implicitHeight
-
-                Behavior on revealWidth {
-                    NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-                }
-
-                    Services.FluidText {
-                    id: nextTitleText
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width
-                    text: root.pendingTitle
-                    color: Services.Color.mOnSurface
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                }
+                width: parent.width
+                clipWidth: parent.width
+                text: root.currentTitle
+                color: Services.Color.mOnSurface
+                maximumLineCount: 1
+                wrapMode: Text.NoWrap
+                horizontalAlignment: Text.AlignLeft
+                verticalAlignment: Text.AlignVCenter
+                offsetX: 7
+                offsetY: 5
             }
         }
     }
