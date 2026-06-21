@@ -110,7 +110,7 @@ Item {
             }
         }
 
-        // Clip the title slot while the text inside performs the staggered switch.
+        // Keep the title slot open so the text switch can drift beyond the slot bounds.
         Item {
             id: titleSlot
 
@@ -119,7 +119,7 @@ Item {
 
             width: revealWidth
             height: titleText.implicitHeight
-            clip: true
+            clip: false
 
             Behavior on revealWidth {
                 NumberAnimation {

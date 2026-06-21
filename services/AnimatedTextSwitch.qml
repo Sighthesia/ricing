@@ -15,7 +15,7 @@ Item {
     property real offsetY: 9
     property real interruptDurationScale: 0.72
     property real incomingFadeFloor: 0.03
-    property real incomingFadeDelay: 0.22
+    property real incomingFadeDelay: 0.04
     property real incomingLiftBoost: 1.18
     property real incomingOffsetScale: 1.45
     property real snapshotCaptureOpacityThreshold: 0.16
@@ -46,7 +46,7 @@ Item {
 
     implicitWidth: Math.max(root._incomingWidth, root._snapshotWidth)
     implicitHeight: textTemplate.implicitHeight
-    clip: true
+    clip: false
 
     function buildGlyphs(value) {
         var source = value || ""
@@ -183,7 +183,7 @@ Item {
             var positionProgress = root.incomingPositionProgress(incomingProgress)
             captured.push({
                 display: incomingGlyph.display,
-                x: incomingGlyph.x + root.offsetX * root.incomingOffsetScale * (1 - positionProgress),
+                x: incomingGlyph.x - root.offsetX * root.incomingOffsetScale * (1 - positionProgress),
                 y: root.offsetY * root.incomingOffsetScale * (1 - positionProgress),
                 width: incomingGlyph.width,
                 opacity: visibleOpacity
@@ -239,7 +239,7 @@ Item {
         text: root.text || ""
     }
 
-    // Fade out a frozen snapshot of the glyphs currently visible on screen.
+    // Fade out a frozen snapshot of the glyphs while drifting them down-right.
     Item {
         id: snapshotLayer
 
@@ -259,8 +259,8 @@ Item {
 
                 readonly property real progress: root.snapshotProgress(index)
 
-                x: modelData.x
-                y: modelData.y
+                x: modelData.x + root.offsetX * progress
+                y: modelData.y + root.offsetY * progress
                 opacity: modelData.opacity * (1 - progress)
                 text: modelData.display
                 color: root.color
