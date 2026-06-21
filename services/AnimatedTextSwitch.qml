@@ -8,9 +8,9 @@ Item {
 
     property string text: ""
     property color color: Services.Color.mOnSurface
-    property int switchDuration: 210
-    property int interPhaseGap: 70
-    property int staggerStep: 34
+    property int switchDuration: Services.Motion.number.surfaceDuration
+    property int interPhaseGap: 96
+    property int staggerStep: 42
     property real offsetX: 12
     property real offsetY: 9
     property real interruptDurationScale: 0.72
@@ -124,7 +124,7 @@ Item {
 
         var interruptedDuration = Math.round(root.switchDuration * Math.pow(root.interruptDurationScale, root._interruptChainDepth + 1))
         root._activeSwitchDuration = root._transitioning
-            ? Math.max(110, interruptedDuration)
+            ? Math.max(Math.round(Services.Motion.number.contentDuration * 0.9), interruptedDuration)
             : root.switchDuration
 
         root._displayedText = root._pendingText

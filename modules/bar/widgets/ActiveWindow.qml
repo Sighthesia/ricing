@@ -102,10 +102,10 @@ Item {
                 }
             }
 
-            IconImage {
+            // Switch the focused app icon with the same directional motion as the title.
+            Services.AnimatedIconSwitch {
                 anchors.fill: parent
                 source: root.currentAppId !== "" ? ("image://icon/" + root.currentAppId) : ""
-                implicitSize: 18
                 visible: iconSlot.width > 0
             }
         }

@@ -446,9 +446,11 @@ Item {
                     x: Math.round((1 - root.transientTextRevealProgress) * -6)
                     spacing: root.currentSecondaryText !== "" ? -1 : 0
 
+                    // Keep a hidden measurement label for width and height calculations.
                     Services.FluidText {
                         id: currentTextLabel
 
+                        visible: false
                         width: parent.width
                         text: root.currentText
                         color: root.compactLyricVisible
@@ -459,10 +461,65 @@ Item {
                         maximumLineCount: 1
                     }
 
+                    // Animate the live lyric line while keeping title rendering unchanged.
+                    Services.AnimatedTextSwitch {
+                        visible: root.compactLyricVisible
+                        width: parent.width
+                        clipWidth: parent.width
+                        text: root.currentText
+                        color: Services.Color.mPrimary
+                        font.bold: true
+                        maximumLineCount: 1
+                        wrapMode: Text.NoWrap
+                        horizontalAlignment: Text.AlignLeft
+                        verticalAlignment: Text.AlignVCenter
+                        offsetX: 7
+                        offsetY: 5
+                    }
+
+                    // Keep plain title rendering for non-lyric compact media text.
+                    Services.FluidText {
+                        visible: !root.compactLyricVisible
+                        width: parent.width
+                        text: root.currentText
+                        color: Services.Color.mOnSurface
+                        font.bold: false
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    // Keep a hidden measurement label for the secondary line geometry.
                     Services.FluidText {
                         id: currentSecondaryTextLabel
 
-                        visible: root.currentSecondaryText !== ""
+                        visible: false
+                        width: parent.width
+                        text: root.currentSecondaryText
+                        color: Services.Color.mOnSurfaceVariant
+                        basePixelSize: 10
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    // Animate translated lyric updates with the same switch treatment.
+                    Services.AnimatedTextSwitch {
+                        visible: root.compactLyricVisible && root.currentSecondaryText !== ""
+                        width: parent.width
+                        clipWidth: parent.width
+                        text: root.currentSecondaryText
+                        color: Services.Color.mOnSurfaceVariant
+                        basePixelSize: 10
+                        maximumLineCount: 1
+                        wrapMode: Text.NoWrap
+                        horizontalAlignment: Text.AlignLeft
+                        verticalAlignment: Text.AlignVCenter
+                        offsetX: 6
+                        offsetY: 4
+                    }
+
+                    // Keep the static secondary line for non-lyric states.
+                    Services.FluidText {
+                        visible: !root.compactLyricVisible && root.currentSecondaryText !== ""
                         width: parent.width
                         text: root.currentSecondaryText
                         color: Services.Color.mOnSurfaceVariant
@@ -663,6 +720,7 @@ Item {
                     Services.FluidText {
                         id: nextTextLabel
 
+                        visible: false
                         width: parent.width
                         text: root.pendingText
                         color: root.compactLyricVisible
@@ -676,7 +734,29 @@ Item {
                     Services.FluidText {
                         id: nextSecondaryTextLabel
 
-                        visible: root.pendingSecondaryText !== ""
+                        visible: false
+                        width: parent.width
+                        text: root.pendingSecondaryText
+                        color: Services.Color.mOnSurfaceVariant
+                        basePixelSize: 10
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    // Keep the incoming title layer readable during non-lyric fades.
+                    Services.FluidText {
+                        visible: !root.compactLyricVisible
+                        width: parent.width
+                        text: root.pendingText
+                        color: Services.Color.mOnSurface
+                        font.bold: false
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    // Keep the incoming secondary title line readable during non-lyric fades.
+                    Services.FluidText {
+                        visible: !root.compactLyricVisible && root.pendingSecondaryText !== ""
                         width: parent.width
                         text: root.pendingSecondaryText
                         color: Services.Color.mOnSurfaceVariant
