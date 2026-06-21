@@ -139,6 +139,7 @@ Item {
                 color: Services.Color.mOnSurface
                 maximumLineCount: 1
                 wrapMode: Text.NoWrap
+                elide: Text.ElideRight
                 horizontalAlignment: Text.AlignLeft
                 verticalAlignment: Text.AlignVCenter
                 offsetX: 7

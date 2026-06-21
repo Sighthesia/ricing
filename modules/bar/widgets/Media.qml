@@ -471,6 +471,7 @@ Item {
                         font.bold: true
                         maximumLineCount: 1
                         wrapMode: Text.NoWrap
+                        elide: Text.ElideRight
                         horizontalAlignment: Text.AlignLeft
                         verticalAlignment: Text.AlignVCenter
                         offsetX: 7
@@ -511,6 +512,7 @@ Item {
                         basePixelSize: 10
                         maximumLineCount: 1
                         wrapMode: Text.NoWrap
+                        elide: Text.ElideRight
                         horizontalAlignment: Text.AlignLeft
                         verticalAlignment: Text.AlignVCenter
                         offsetX: 6

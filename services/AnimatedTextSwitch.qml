@@ -22,6 +22,7 @@ Item {
     property real clipWidth: -1
     property int maximumLineCount: 1
     property int wrapMode: Text.NoWrap
+    property int elide: Text.ElideNone
     property int horizontalAlignment: Text.AlignLeft
     property int verticalAlignment: Text.AlignVCenter
     property alias basePixelSize: textTemplate.basePixelSize
@@ -29,7 +30,6 @@ Item {
     property alias explicitFontFamily: textTemplate.explicitFontFamily
     property alias font: textTemplate.font
     property alias contentWidth: textMetrics.width
-
     property string _displayedText: ""
     property string _pendingText: ""
     property bool _transitioning: false
@@ -38,10 +38,14 @@ Item {
     property int _activeSwitchDuration: root.switchDuration
     property var _snapshotGlyphs: []
     property real _snapshotWidth: 0
-    readonly property var _incomingGlyphs: buildGlyphs(root._displayedText)
+    readonly property real _effectiveClipWidth: clipWidth > 0
+        ? clipWidth
+        : (width > 0 ? width : textMetrics.width)
+    readonly property string _displayedRenderText: root.elide === Text.ElideNone ? root._displayedText : displayedTextMetrics.elidedText
+    readonly property var _incomingGlyphs: buildGlyphs(root._displayedRenderText)
     readonly property real _incomingWidth: glyphWidth(root._incomingGlyphs)
     readonly property int _maxGlyphCount: Math.max(root._incomingGlyphs.length, root._snapshotGlyphs.length)
-    readonly property real _layoutWidth: clipWidth > 0 ? clipWidth : 0
+    readonly property real _layoutWidth: root._effectiveClipWidth > 0 ? root._effectiveClipWidth : 0
     readonly property int _totalDuration: root._activeSwitchDuration * 2 + root.interPhaseGap + Math.max(0, root._maxGlyphCount - 1) * root.staggerStep
 
     implicitWidth: Math.max(root._incomingWidth, root._snapshotWidth)
@@ -239,6 +243,16 @@ Item {
         text: root.text || ""
     }
 
+    // Resolve the rendered single-line text after applying the requested elide mode.
+    TextMetrics {
+        id: displayedTextMetrics
+
+        font: textTemplate.font
+        text: root._displayedText || ""
+        elide: root.elide
+        elideWidth: Math.max(0, root._effectiveClipWidth)
+    }
+
     // Fade out a frozen snapshot of the glyphs while drifting them down-right.
     Item {
         id: snapshotLayer
@@ -269,6 +283,7 @@ Item {
                 explicitFontFamily: root.explicitFontFamily
                 font: root.font
                 wrapMode: root.wrapMode
+                elide: root.elide
                 maximumLineCount: root.maximumLineCount
                 horizontalAlignment: root.horizontalAlignment
                 verticalAlignment: root.verticalAlignment
@@ -306,6 +321,7 @@ Item {
                 explicitFontFamily: root.explicitFontFamily
                 font: root.font
                 wrapMode: root.wrapMode
+                elide: root.elide
                 maximumLineCount: root.maximumLineCount
                 horizontalAlignment: root.horizontalAlignment
                 verticalAlignment: root.verticalAlignment

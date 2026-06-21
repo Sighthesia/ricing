@@ -27,6 +27,8 @@ Item {
                     basePixelSize: 16
                     font.bold: true
                     width: parent.width
+                    clipWidth: parent.width
+                    elide: Text.ElideRight
                 }
 
                 Services.AnimatedTextSwitch {
@@ -34,6 +36,8 @@ Item {
                     color: Services.Color.mOnSurfaceVariant
                     basePixelSize: 12
                     width: parent.width
+                    clipWidth: parent.width
+                    elide: Text.ElideRight
                 }
 
                 Services.FluidText {
