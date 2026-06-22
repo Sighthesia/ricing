@@ -8,6 +8,7 @@ var _definitions = {
         defaults: {
             showIcon: true,
             maxTitleWidth: 200,
+            maxWidth: 240,
             desktopLabel: "Desktop",
         },
     },
@@ -48,6 +49,12 @@ var _definitions = {
         defaults: {
             showAudioSpectrum: false,
             lyricsDisplayMode: "Original",
+            maxWidth: 240,
+            spectrumPosition: "Bar",
+            spectrumStyle: "Bars",
+            spectrumMirror: true,
+            spectrumColor: "Primary",
+            spectrumOpacity: 34,
         },
     },
 }

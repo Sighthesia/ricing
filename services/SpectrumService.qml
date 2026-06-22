@@ -12,6 +12,10 @@ Singleton {
     property int _crashCount: 0
     property var values: []
     property bool isIdle: true
+    // Dockzone spectrum override — set by the active media widget.
+    property string dockzoneStyle: ""
+    property bool dockzoneMirror: true
+    property color dockzoneBarColor: Qt.rgba(0.78, 0.75, 1.0, 0.34)
     readonly property int barsCount: 24
     readonly property int _registeredCount: Object.keys(root._registeredComponents).length
     readonly property bool _shouldRun: root._registeredCount > 0

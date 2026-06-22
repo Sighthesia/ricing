@@ -20,6 +20,9 @@ Item {
     readonly property int maxTitleWidth: activeWindowSettings
         ? activeWindowSettings.maxTitleWidth
         : 200
+    readonly property int maxWidth: activeWindowSettings
+        ? activeWindowSettings.maxWidth
+        : 240
 
     property real availableWidth: -1
     property string currentTitle: Services.NiriService.activeTitle || root.desktopLabel
@@ -37,7 +40,7 @@ Item {
     readonly property real iconTargetWidth: root.showIcon && root.currentAppId !== "" ? 18 : 0
     readonly property real titleTargetWidth: Math.min(titleText.contentWidth, root.compactTitleWidth)
     readonly property real rowSpacing: titleTargetWidth > 0 && iconTargetWidth > 0 ? contentRow.spacing : 0
-    readonly property real targetImplicitWidth: Math.min(root.iconTargetWidth + root.titleTargetWidth + rowSpacing + 20, 240)
+    readonly property real targetImplicitWidth: Math.min(root.iconTargetWidth + root.titleTargetWidth + rowSpacing + 20, root.maxWidth)
 
     property real animImplicitWidth: targetImplicitWidth
 

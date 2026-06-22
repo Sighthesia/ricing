@@ -28,6 +28,23 @@ Column {
         )
     }
 
+    SettingSlider {
+        width: parent.width
+        settingLabel: "Max Widget Width"
+        description: "Limit how wide the media widget can grow in the bar."
+        from: 140
+        to: 420
+        stepSize: 10
+        suffix: "px"
+        value: root.mediaSettings ? root.mediaSettings.maxWidth : 240
+        onMoved: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "maxWidth",
+            value
+        )
+    }
+
     SettingToggle {
         width: parent.width
         settingLabel: "Show Audio Spectrum"
@@ -37,6 +54,78 @@ Column {
             "media",
             root.instanceKey,
             "showAudioSpectrum",
+            value
+        )
+    }
+
+    SettingDropdown {
+        width: parent.width
+        settingLabel: "Spectrum Position"
+        description: "Where to display the spectrum: bar widget, island dockzone, or both."
+        model: ["Bar", "Dockzone", "Both"]
+        currentValue: root.mediaSettings ? root.mediaSettings.spectrumPosition : "Bar"
+        onSelected: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "spectrumPosition",
+            value
+        )
+    }
+
+    SettingDropdown {
+        width: parent.width
+        settingLabel: "Spectrum Style"
+        description: "Choose the audio spectrum visual style."
+        model: ["Bars", "Wave", "Dots"]
+        currentValue: root.mediaSettings ? root.mediaSettings.spectrumStyle : "Bars"
+        onSelected: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "spectrumStyle",
+            value
+        )
+    }
+
+    SettingDropdown {
+        width: parent.width
+        settingLabel: "Spectrum Color"
+        description: "Choose the accent color for the spectrum visualization."
+        model: ["Primary", "Secondary", "Tertiary"]
+        currentValue: root.mediaSettings ? root.mediaSettings.spectrumColor : "Primary"
+        onSelected: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "spectrumColor",
+            value
+        )
+    }
+
+    SettingSlider {
+        width: parent.width
+        settingLabel: "Spectrum Opacity"
+        description: "Adjust the opacity of the spectrum visualization."
+        from: 10
+        to: 100
+        stepSize: 10
+        suffix: "%"
+        value: root.mediaSettings ? root.mediaSettings.spectrumOpacity : 34
+        onMoved: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "spectrumOpacity",
+            value
+        )
+    }
+
+    SettingToggle {
+        width: parent.width
+        settingLabel: "Spectrum Mirror"
+        description: "Mirror the spectrum from the center for a balanced look."
+        checked: root.mediaSettings ? root.mediaSettings.spectrumMirror : true
+        onToggled: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "spectrumMirror",
             value
         )
     }

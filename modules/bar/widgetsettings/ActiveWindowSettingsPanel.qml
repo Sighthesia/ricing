@@ -30,6 +30,23 @@ Column {
 
     SettingSlider {
         width: parent.width
+        settingLabel: "Max Widget Width"
+        description: "Limit how wide the active window widget can grow in the bar."
+        from: 140
+        to: 420
+        stepSize: 10
+        suffix: "px"
+        value: root.activeWindowSettings ? root.activeWindowSettings.maxWidth : 240
+        onMoved: value => {
+            if (!root.activeWindowSettings)
+                return
+
+            root.activeWindowSettings.maxWidth = value
+        }
+    }
+
+    SettingSlider {
+        width: parent.width
         settingLabel: "Max Title Width"
         description: "Limit how wide the active title can grow in the bar."
         from: 120

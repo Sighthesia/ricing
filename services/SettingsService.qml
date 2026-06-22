@@ -224,6 +224,7 @@ QtObject {
                 property JsonObject activeWindow: JsonObject {
                     property bool showIcon: true
                     property int maxTitleWidth: 200
+                    property int maxWidth: 240
                     property string desktopLabel: "Desktop"
                 }
 
