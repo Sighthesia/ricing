@@ -339,15 +339,6 @@ Item {
                     anchors.topMargin: 8
                     anchors.bottomMargin: 0
                     values: Services.SpectrumService.values
-                    style: Services.SpectrumService.dockzoneStyle !== ""
-                        ? Services.SpectrumService.dockzoneStyle
-                        : "bars"
-                    mirror: Services.SpectrumService.dockzoneStyle !== ""
-                        ? Services.SpectrumService.dockzoneMirror
-                        : true
-                    barColor: Services.SpectrumService.dockzoneStyle !== ""
-                        ? Services.SpectrumService.dockzoneBarColor
-                        : Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.34)
                 }
             }
 

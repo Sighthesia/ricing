@@ -259,11 +259,6 @@ Item {
     on_DisplaySecondaryTextChanged: syncDisplayText()
     onLyricsDisplayModeChanged: syncDisplayText()
     onNeedsAudioSpectrumChanged: syncSpectrumRegistration()
-    onSimplifiedChanged: syncSpectrumRegistration()
-    onSpectrumPositionChanged: syncSpectrumRegistration()
-    onSpectrumStyleChanged: syncDockzoneSpectrumOverride()
-    onSpectrumMirrorChanged: syncDockzoneSpectrumOverride()
-    on_SpectrumBarColorChanged: syncDockzoneSpectrumOverride()
 
     Connections {
         target: Services.MediaControlService

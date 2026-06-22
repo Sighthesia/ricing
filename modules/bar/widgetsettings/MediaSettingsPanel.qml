@@ -60,20 +60,6 @@ Column {
 
     SettingDropdown {
         width: parent.width
-        settingLabel: "Spectrum Position"
-        description: "Where to display the spectrum: bar widget, island dockzone, or both."
-        model: ["Bar", "Dockzone", "Both"]
-        currentValue: root.mediaSettings ? root.mediaSettings.spectrumPosition : "Bar"
-        onSelected: value => Services.SettingsService.setWidgetInstanceSettingValue(
-            "media",
-            root.instanceKey,
-            "spectrumPosition",
-            value
-        )
-    }
-
-    SettingDropdown {
-        width: parent.width
         settingLabel: "Spectrum Style"
         description: "Choose the audio spectrum visual style."
         model: ["Bars", "Wave", "Dots"]
