@@ -53,3 +53,22 @@ Avoid:
 - blur appearing or disappearing abruptly
 - spacing or scale changes that cause hard visual pops
 - animating one related property while hard-cutting the rest
+
+## Filtered List Animation Ownership
+
+Use this when a search/filter list regression still feels abrupt even though
+`add`, `remove`, or `displaced` transitions exist on a `ListView`/`GridView`.
+
+- First identify the old animation owner: model transitions animate item
+  insertion/removal/reflow, while delegate `Behavior`s animate a persistent
+  row changing `height`, `opacity`, `x`, `scale`, or blur.
+- If the desired feel is rows softly collapsing out of the list, keep the
+  candidate model stable and let each delegate derive `matchesFilter` from the
+  current query. Animate all perceptible properties on that delegate.
+- Use model-driven filtered subsets only when destroying/recreating items is the
+  intended effect. They can bypass the old collapse animation because the
+  delegate disappears instead of transforming.
+- For keyboard navigation and empty states, derive behavior from visible matches,
+  not raw model count, so hidden zero-height delegates are skipped.
+- When compact and full variants share a search surface, verify both variants use
+  the same animation ownership model before assuming a transition rule applies.

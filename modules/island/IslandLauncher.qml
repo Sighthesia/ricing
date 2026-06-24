@@ -133,7 +133,7 @@ Item {
                 // in full launcher mode the app/clipboard list handles it.
                 Keys.onUpPressed: {
                     if (root.compact && compactResultsLoader.active && compactResultsLoader.item) {
-                        compactResultsLoader.item.currentIndex = Math.max(0, compactResultsLoader.item.currentIndex - 1)
+                        compactResultsLoader.item.currentIndex = compactResultsLoader.item.nextVisibleIndex(compactResultsLoader.item.currentIndex, "up")
                     } else {
                         var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
                         if (loader.item && loader.item.count > 0) {
@@ -143,10 +143,7 @@ Item {
                 }
                 Keys.onDownPressed: {
                     if (root.compact && compactResultsLoader.active && compactResultsLoader.item) {
-                        compactResultsLoader.item.currentIndex = Math.min(
-                            compactResultsLoader.item.combinedEntries.length - 1,
-                            compactResultsLoader.item.currentIndex + 1
-                        )
+                        compactResultsLoader.item.currentIndex = compactResultsLoader.item.nextVisibleIndex(compactResultsLoader.item.currentIndex, "down")
                     } else {
                         var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
                         if (loader.item && loader.item.count > 0) {
@@ -275,6 +272,16 @@ Item {
                 if (q.startsWith(">")) return ""
                 return q
             }
+            property var sortedApps: {
+                const all = DesktopEntries.applications.values
+                if (!all || all.length === 0) return []
+                return all.slice().sort((a, b) => {
+                    const ca = Services.LaunchCountService.getLaunchCount(a.id || "")
+                    const cb = Services.LaunchCountService.getLaunchCount(b.id || "")
+                    return cb - ca
+                })
+            }
+
             onQueryChanged: {
                 var apps = sortedApps
                 for (var i = 0; i < apps.length; i++) {
@@ -285,16 +292,6 @@ Item {
                     }
                 }
                 appListView.currentIndex = 0
-            }
-
-            property var sortedApps: {
-                const all = DesktopEntries.applications.values
-                if (!all || all.length === 0) return []
-                return all.slice().sort((a, b) => {
-                    const ca = Services.LaunchCountService.getLaunchCount(a.id || "")
-                    const cb = Services.LaunchCountService.getLaunchCount(b.id || "")
-                    return cb - ca
-                })
             }
 
             function appMatches(app, q) {
@@ -478,27 +475,25 @@ Item {
                     || keywords.includes(q)
             }
 
-            // Build combined result entries from matching apps + settings.
+            // Build the complete app + settings candidate pool. Filtering is
+            // handled by delegates so rows can smoothly collapse instead of
+            // being destroyed on every query change.
             property var combinedEntries: {
-                var q = root._localQuery.trim().toLowerCase()
-                if (!q) return []
                 var results = []
 
-                // Matching apps.
+                // App candidates.
                 var apps = sortedApps
                 for (var i = 0; i < apps.length; i++) {
-                    if (appMatches(apps[i], q)) {
-                        results.push({
-                            type: "app",
-                            appData: apps[i],
-                            label: apps[i].name || "",
-                            description: apps[i].comment || apps[i].genericName || ""
-                        })
-                    }
+                    results.push({
+                        type: "app",
+                        appData: apps[i],
+                        label: apps[i].name || "",
+                        description: apps[i].comment || apps[i].genericName || ""
+                    })
                 }
 
-                // Matching settings entries.
-                var settingsEntries = SettingsSearch.search(q)
+                // Settings candidates.
+                var settingsEntries = SettingsSearch.allEntries()
                 for (var j = 0; j < settingsEntries.length; j++) {
                     var entry = settingsEntries[j]
                     results.push({
@@ -512,20 +507,105 @@ Item {
                 return results
             }
 
+            function entryMatches(entry, q) {
+                if (!q) return false
+                if (entry.type === "app")
+                    return appMatches(entry.appData, q)
+                if (entry.type === "setting")
+                    return SettingsSearch.matches(entry.settingData, q)
+                return false
+            }
+
+            function firstVisibleIndex() {
+                var q = root._localQuery.trim().toLowerCase()
+                var entries = combinedEntries
+                for (var i = 0; i < entries.length; i++) {
+                    if (entryMatches(entries[i], q))
+                        return i
+                }
+                return 0
+            }
+
+            function hasVisibleEntries() {
+                var q = root._localQuery.trim().toLowerCase()
+                var entries = combinedEntries
+                for (var i = 0; i < entries.length; i++) {
+                    if (entryMatches(entries[i], q))
+                        return true
+                }
+                return false
+            }
+
+            function nextVisibleIndex(from, direction) {
+                var q = root._localQuery.trim().toLowerCase()
+                var step = direction === "down" ? 1 : -1
+                var entries = combinedEntries
+                var i = from + step
+                while (i >= 0 && i < entries.length) {
+                    if (entryMatches(entries[i], q))
+                        return i
+                    i += step
+                }
+                return from
+            }
+
+            onCombinedEntriesChanged: currentIndex = firstVisibleIndex()
+            Connections {
+                target: root
+                function on_LocalQueryChanged() {
+                    compactListView.currentIndex = compactListView.firstVisibleIndex()
+                    compactListView.positionViewAtBeginning()
+                }
+            }
+
             currentIndex: 0
             model: combinedEntries
+
+            add: Transition {
+                ParallelAnimation {
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "x"; from: 26; to: 0; duration: 220; easing.type: Easing.OutCubic }
+                }
+            }
+
+            remove: Transition {
+                ParallelAnimation {
+                    NumberAnimation { property: "opacity"; to: 0; duration: 150; easing.type: Easing.InCubic }
+                    NumberAnimation { property: "x"; to: 30; duration: 180; easing.type: Easing.InCubic }
+                }
+            }
+
+            displaced: Transition {
+                NumberAnimation { properties: "x,y"; duration: 220; easing.type: Easing.OutCubic }
+            }
 
             delegate: Rectangle {
                 id: compactDelegate
                 required property var modelData
                 required property int index
+                readonly property bool matchesFilter: compactListView.entryMatches(modelData, root._localQuery.trim().toLowerCase())
+                property real _filterSoftness: matchesFilter ? 0 : 1
 
                 width: ListView.view ? ListView.view.width : 200
-                height: 52
+                height: matchesFilter ? 52 : 0
+                opacity: matchesFilter ? 1 : 0
+                x: matchesFilter ? 0 : 30
+                visible: height > 1 || opacity > 0.01
                 radius: 6
+                layer.enabled: _filterSoftness > 0.01
+                layer.effect: MultiEffect {
+                    blurEnabled: true
+                    blurMax: 14
+                    blur: compactDelegate._filterSoftness * 0.42
+                }
                 color: compactMouse.containsMouse || compactListView.currentIndex === index
                     ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
+
+                Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
+                Behavior on x { NumberAnimation { duration: 190; easing.type: compactDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+                Behavior on opacity { NumberAnimation { duration: 190; easing.type: compactDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+                Behavior on _filterSoftness { NumberAnimation { duration: 190; easing.type: compactDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
 
                 Row {
                     anchors.left: parent.left
@@ -611,7 +691,7 @@ Item {
             // surface — user sees a clear "no results" cue instead.
             Item {
                 anchors.centerIn: parent
-                visible: compactListView.combinedEntries.length === 0
+                visible: !compactListView.hasVisibleEntries()
                 width: parent.width
                 height: noMatchLabel.height
 
@@ -650,6 +730,7 @@ Item {
                 if (!all || all.length === 0) return []
                 return all
             }
+
             onQueryChanged: {
                 var items = allItems
                 for (var i = 0; i < items.length; i++) {

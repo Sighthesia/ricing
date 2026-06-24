@@ -46,8 +46,20 @@ function search(query) {
     var results = []
     for (var i = 0; i < settingsEntries.length; i++) {
         var entry = settingsEntries[i]
-        if (entry.label.toLowerCase().includes(q) || entry.category.toLowerCase().includes(q))
+        if (matches(entry, q))
             results.push(entry)
     }
     return results
+}
+
+function allEntries() {
+    return settingsEntries
+}
+
+function matches(entry, query) {
+    if (!entry || !query || query.trim().length === 0)
+        return false
+
+    var q = query.toLowerCase().trim()
+    return entry.label.toLowerCase().includes(q) || entry.category.toLowerCase().includes(q)
 }
