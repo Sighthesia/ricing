@@ -15,6 +15,7 @@ Item {
     // Keeps the query separate from IslandService.query so typing in the
     // overview card does not trigger page navigation to the full launcher.
     property string _localQuery: ""
+    property int _openRevealToken: 0
     readonly property bool focusAllowed: root.visible
         && root.width > 0
         && root.height > 0
@@ -36,6 +37,13 @@ Item {
             searchInput.focus = false
     }
 
+    function triggerOpenReveal() {
+        if (root.compact || !root.focusAllowed)
+            return
+
+        root._openRevealToken += 1
+    }
+
     function focusSearchWhenReady() {
         Qt.callLater(() => {
             if (root.focusAllowed) {
@@ -55,6 +63,7 @@ Item {
         function onExpandedChanged() {
             if (root.focusAllowed) {
                 root.focusSearchWhenReady()
+                root.triggerOpenReveal()
             } else {
                 // Reset the local search text when the island collapses
                 // so the compact launcher starts clean on next open.
@@ -66,9 +75,15 @@ Item {
         function onPanelPageChanged() {
             if (root.focusAllowed) {
                 root.focusSearchWhenReady()
+                root.triggerOpenReveal()
             } else {
                 root.clearSearchFocus()
             }
+        }
+
+        function onModeChanged() {
+            if (root.focusAllowed)
+                root.triggerOpenReveal()
         }
 
         function onQueryChanged() {
@@ -79,9 +94,10 @@ Item {
     }
 
     onFocusAllowedChanged: {
-        if (focusAllowed)
+        if (focusAllowed) {
             focusSearchWhenReady()
-        else
+            triggerOpenReveal()
+        } else
             clearSearchFocus()
     }
 
@@ -273,6 +289,24 @@ Item {
             anchors.margins: 4
             clip: true
             spacing: 0
+            property int openStaggerStep: 28
+            property int openStaggerCount: 8
+            property int openRevealToken: 0
+            property bool openRevealArmed: false
+
+            function triggerOpenReveal() {
+                openRevealToken = root._openRevealToken
+                openRevealArmed = true
+                openRevealResetTimer.restart()
+            }
+
+            Connections {
+                target: root
+
+                function on_OpenRevealTokenChanged() {
+                    appListView.triggerOpenReveal()
+                }
+            }
 
             property string query: {
                 var raw = root.compact ? root._localQuery : Services.IslandService.query
@@ -353,6 +387,8 @@ Item {
                 required property int index
                 readonly property bool matchesFilter: appListView.appMatches(modelData, appListView.query)
                 property real _filterSoftness: matchesFilter ? 0 : 1
+                property bool _contentRevealVisible: true
+                property int _seenOpenRevealToken: 0
 
                 width: ListView.view ? ListView.view.width : 200
                 height: matchesFilter ? 52 : 0
@@ -374,6 +410,47 @@ Item {
                 Behavior on x { NumberAnimation { duration: 190; easing.type: appDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
                 Behavior on opacity { NumberAnimation { duration: 190; easing.type: appDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
                 Behavior on _filterSoftness { NumberAnimation { duration: 190; easing.type: appDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+
+                Component.onCompleted: maybeQueueOpenReveal()
+
+                function maybeQueueOpenReveal() {
+                    if (!ListView.view || !ListView.view.openRevealArmed || !matchesFilter)
+                        return
+                    if (_seenOpenRevealToken === ListView.view.openRevealToken)
+                        return
+
+                    _seenOpenRevealToken = ListView.view.openRevealToken
+                    _contentRevealVisible = false
+                    openRevealTimer.restart()
+                }
+
+                Connections {
+                    target: ListView.view
+
+                    function onOpenRevealTokenChanged() {
+                        appDelegate.maybeQueueOpenReveal()
+                    }
+                }
+
+                // Delay each row slightly so the launcher opens with a
+                // top-to-bottom stagger instead of a single hard cut.
+                Timer {
+                    id: openRevealTimer
+                    interval: Math.min(appDelegate.index, appListView.openStaggerCount) * appListView.openStaggerStep
+                    repeat: false
+                    onTriggered: appDelegate._contentRevealVisible = true
+                }
+
+                // Keep the delegate geometry stable while only the foreground
+                // content performs the one-shot open reveal.
+                Item {
+                    id: appContent
+                    anchors.fill: parent
+                    opacity: appDelegate._contentRevealVisible ? 1 : 0
+                    x: appDelegate._contentRevealVisible ? 0 : 18
+
+                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
                 Row {
                     anchors.left: parent.left
@@ -414,6 +491,7 @@ Item {
                         }
                     }
                 }
+                }
 
                 MouseArea {
                     id: delegateMouse
@@ -429,6 +507,15 @@ Item {
                         Services.IslandService.close()
                     }
                 }
+            }
+
+            // Drop the one-shot open-reveal arm after the stagger window so
+            // later filter changes keep using the normal per-row behaviors.
+            Timer {
+                id: openRevealResetTimer
+                interval: appListView.openStaggerCount * appListView.openStaggerStep + 260
+                repeat: false
+                onTriggered: appListView.openRevealArmed = false
             }
         }
     }
@@ -736,6 +823,24 @@ Item {
             anchors.margins: 4
             clip: true
             spacing: 0
+            property int openStaggerStep: 28
+            property int openStaggerCount: 8
+            property int openRevealToken: 0
+            property bool openRevealArmed: false
+
+            function triggerOpenReveal() {
+                openRevealToken = root._openRevealToken
+                openRevealArmed = true
+                openRevealResetTimer.restart()
+            }
+
+            Connections {
+                target: root
+
+                function on_OpenRevealTokenChanged() {
+                    clipListView.triggerOpenReveal()
+                }
+            }
 
             property string query: {
                 var q = Services.IslandService.query.toLowerCase()
@@ -808,6 +913,8 @@ Item {
                 required property int index
                 readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
                 property real _filterSoftness: matchesFilter ? 0 : 1
+                property bool _contentRevealVisible: true
+                property int _seenOpenRevealToken: 0
 
                 width: ListView.view ? ListView.view.width : 200
                 height: matchesFilter ? 52 : 0
@@ -830,18 +937,60 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
                 Behavior on _filterSoftness { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
 
-                Services.FluidText {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    height: 48
-                    anchors.leftMargin: MenuVisuals.listContentInset
-                    anchors.rightMargin: MenuVisuals.listContentInset
-                    verticalAlignment: Text.AlignVCenter
-                    text: modelData.isImage ? "[Image]" : (modelData.preview || "")
-                    color: Services.Color.mOnSurface
-                    basePixelSize: 13
-                    elide: Text.ElideRight
+                Component.onCompleted: maybeQueueOpenReveal()
+
+                function maybeQueueOpenReveal() {
+                    if (!ListView.view || !ListView.view.openRevealArmed || !matchesFilter)
+                        return
+                    if (_seenOpenRevealToken === ListView.view.openRevealToken)
+                        return
+
+                    _seenOpenRevealToken = ListView.view.openRevealToken
+                    _contentRevealVisible = false
+                    openRevealTimer.restart()
+                }
+
+                Connections {
+                    target: ListView.view
+
+                    function onOpenRevealTokenChanged() {
+                        clipDelegate.maybeQueueOpenReveal()
+                    }
+                }
+
+                // Delay each clipboard row slightly so direct-open stays
+                // readable instead of popping all visible entries at once.
+                Timer {
+                    id: openRevealTimer
+                    interval: Math.min(clipDelegate.index, clipListView.openStaggerCount) * clipListView.openStaggerStep
+                    repeat: false
+                    onTriggered: clipDelegate._contentRevealVisible = true
+                }
+
+                // Keep the delegate geometry stable while only the clipboard
+                // preview content performs the one-shot open reveal.
+                Item {
+                    id: clipContent
+                    anchors.fill: parent
+                    opacity: clipDelegate._contentRevealVisible ? 1 : 0
+                    x: clipDelegate._contentRevealVisible ? 0 : 18
+
+                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+                    Services.FluidText {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: 48
+                        anchors.leftMargin: MenuVisuals.listContentInset
+                        anchors.rightMargin: MenuVisuals.listContentInset
+                        verticalAlignment: Text.AlignVCenter
+                        text: modelData.isImage ? "[Image]" : (modelData.preview || "")
+                        color: Services.Color.mOnSurface
+                        basePixelSize: 13
+                        elide: Text.ElideRight
+                    }
                 }
 
                 MouseArea {
@@ -855,6 +1004,15 @@ Item {
                         Services.IslandService.close()
                     }
                 }
+            }
+
+            // Limit the reveal arm to the initial open so later search updates
+            // keep the existing soft filter behaviors.
+            Timer {
+                id: openRevealResetTimer
+                interval: clipListView.openStaggerCount * clipListView.openStaggerStep + 260
+                repeat: false
+                onTriggered: clipListView.openRevealArmed = false
             }
         }
     }
