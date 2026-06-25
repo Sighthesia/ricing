@@ -225,6 +225,14 @@ Item {
     TestCase {
         name: "WorkspaceHintCapsule"
 
+        function test_computeExpandedPrimaryWidth_uses_full_visible_content_requirement() {
+            compare(Capsule.computeExpandedPrimaryWidth(320, 180, 240), 240)
+        }
+
+        function test_computeExpandedPrimaryWidth_never_exceeds_capsule_limit() {
+            compare(Capsule.computeExpandedPrimaryWidth(200, 180, 240), 200)
+        }
+
         function test_computeCardTitleWidthCap_returns_infinity_when_content_fits() {
             compare(Capsule.computeCardTitleWidthCap([40, 32], [43, 24], 160, 6), Infinity)
         }

@@ -133,21 +133,29 @@ Item {
                 // in full launcher mode the app/clipboard list handles it.
                 Keys.onUpPressed: {
                     if (root.compact && compactResultsLoader.active && compactResultsLoader.item) {
-                        compactResultsLoader.item.currentIndex = compactResultsLoader.item.nextVisibleIndex(compactResultsLoader.item.currentIndex, "up")
+                        var compactUpIndex = compactResultsLoader.item.nextVisibleIndex(compactResultsLoader.item.currentIndex, "up")
+                        compactResultsLoader.item.currentIndex = compactUpIndex
+                        compactResultsLoader.item.positionViewAtIndex(compactUpIndex, ListView.Contain)
                     } else {
                         var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
                         if (loader.item && loader.item.count > 0) {
-                            loader.item.currentIndex = loader.item.nextVisibleIndex(loader.item.currentIndex, "up")
+                            var upIndex = loader.item.nextVisibleIndex(loader.item.currentIndex, "up")
+                            loader.item.currentIndex = upIndex
+                            loader.item.positionViewAtIndex(upIndex, ListView.Contain)
                         }
                     }
                 }
                 Keys.onDownPressed: {
                     if (root.compact && compactResultsLoader.active && compactResultsLoader.item) {
-                        compactResultsLoader.item.currentIndex = compactResultsLoader.item.nextVisibleIndex(compactResultsLoader.item.currentIndex, "down")
+                        var compactDownIndex = compactResultsLoader.item.nextVisibleIndex(compactResultsLoader.item.currentIndex, "down")
+                        compactResultsLoader.item.currentIndex = compactDownIndex
+                        compactResultsLoader.item.positionViewAtIndex(compactDownIndex, ListView.Contain)
                     } else {
                         var loader = Services.IslandService.mode === "clipboard" ? clipLoader : appLoader
                         if (loader.item && loader.item.count > 0) {
-                            loader.item.currentIndex = loader.item.nextVisibleIndex(loader.item.currentIndex, "down")
+                            var downIndex = loader.item.nextVisibleIndex(loader.item.currentIndex, "down")
+                            loader.item.currentIndex = downIndex
+                            loader.item.positionViewAtIndex(downIndex, ListView.Contain)
                         }
                     }
                 }
@@ -443,6 +451,16 @@ Item {
             anchors.fill: parent
             color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
             radius: 6
+            property alias currentIndex: compactListView.currentIndex
+            property alias combinedEntries: compactListView.combinedEntries
+
+            function nextVisibleIndex(from, direction) {
+                return compactListView.nextVisibleIndex(from, direction)
+            }
+
+            function positionViewAtIndex(index, mode) {
+                compactListView.positionViewAtIndex(index, mode)
+            }
 
             ListView {
             id: compactListView

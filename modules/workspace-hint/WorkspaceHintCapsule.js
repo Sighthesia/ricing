@@ -1,5 +1,13 @@
 .pragma library
 
+function computeExpandedPrimaryWidth(maxCapsuleWidth, naturalPrimaryWidth, workspaceAreaMinWidth) {
+    var safeMaxWidth = Math.max(1, maxCapsuleWidth || 0)
+    var safeNaturalWidth = Math.max(0, naturalPrimaryWidth || 0)
+    var safeWorkspaceAreaWidth = Math.max(0, workspaceAreaMinWidth || 0)
+
+    return Math.min(safeMaxWidth, Math.max(safeNaturalWidth, safeWorkspaceAreaWidth))
+}
+
 // Compute a maximum title width for NON-FOCUSED cards so the whole row fits
 // within availableRowWidth, while the focused card keeps its full natural
 // title. focusedIndex selects the card that is exempt from capping (-1 = none).

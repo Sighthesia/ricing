@@ -104,6 +104,13 @@ Item {
         return Math.max(titleAreaWidth, workspaceAreaWidth)
     }
     readonly property real preferredPrimaryWidth: Math.min(root._maxCapsuleWidth, root._naturalPrimaryWidth)
+    // Expand from the full visible content requirement so changing focus does
+    // not shrink the row around the active card alone.
+    readonly property real _expandedPrimaryWidth: Capsule.computeExpandedPrimaryWidth(
+        root._maxCapsuleWidth,
+        root._naturalPrimaryWidth,
+        root._workspaceAreaMinWidth
+    )
 
     readonly property int _cardCount: root._isPrimaryCapsule ? root._activeWindows.length : 0
     readonly property real _iconSize: 16 + (2 * root._emphasis)
@@ -122,7 +129,7 @@ Item {
     readonly property real _targetY: root._metrics.y
     readonly property real _targetWidth: Math.min(
         root._maxCapsuleWidth,
-        Math.max(root._workspaceAreaMinWidth, root._metrics.width)
+        Math.max(root._expandedPrimaryWidth, root._metrics.width)
     )
     readonly property real _enterOpacityFactor: Math.max(0, Math.min(1, root._revealProgress / 0.08))
     readonly property real _exitOpacityFactor: Math.max(0, Math.min(1, root._revealProgress / 0.6))
