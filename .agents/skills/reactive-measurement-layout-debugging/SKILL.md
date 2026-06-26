@@ -26,6 +26,8 @@ description: Use when diagnosing or fixing UI layout bugs where measured, prefer
 
 **Trigger Symptom**: Text or content is clipped even though logs or obvious constants say the maximum width is large enough.
 
+**Second trap**: A workspace capsule looked clipped on its left and right edges even after widening the outer body. Narrow capsules first suggested a paint/border issue, but wider capsules made the clipping worse. The real owner was a host `clip: true` on the stage container, not the capsule's own drawing or content viewport.
+
 ## C. The Anti-Pattern vs. Best Practice
 
 | Anti-Pattern | Why It Fails |
@@ -34,6 +36,7 @@ description: Use when diagnosing or fixing UI layout bugs where measured, prefer
 | Assuming `itemAt()` or child traversal automatically rebinds | Many reactive engines do not track future delegate creation through imperative lookup calls. |
 | Trusting max width as proof of available space | Max width is only a bound; target and actual width may still be smaller. |
 | Testing only helper math | Helper math can pass while the component geometry still clips. |
+| Adding paint guards or content-viewport guards before proving the clip owner | Can make the opposite width range worse and create regressions. |
 
 | Best Practice | Effect |
 | --- | --- |
@@ -41,6 +44,7 @@ description: Use when diagnosing or fixing UI layout bugs where measured, prefer
 | Add explicit generation/revision invalidation around dynamic children | Parent measurements recompute after delegate creation/removal. |
 | Test the composed component, not just pure functions | Regression covers measurement, target sizing, and clipping together. |
 | Build a small harness that prints all relevant size domains | Quickly reveals which domain is still constraining the UI. |
+| Use one-line A/B clip toggles on suspected owners | Immediately distinguishes inner-content clipping from outer-container clipping. |
 
 ## D. Generalizable Rules
 
@@ -51,6 +55,9 @@ description: Use when diagnosing or fixing UI layout bugs where measured, prefer
 - If a component has animation, distinguish transient current size from final target size.
 - If content is clipped, inspect both the content width and the clip viewport width.
 - Fix the owner of the final rendered geometry, not only the helper that computes desired geometry.
+- If left/right clipping gets worse as width grows, suspect a host clip boundary before suspecting the content itself.
+- When several nested layers can clip, temporarily disable exactly one `clip: true` at a time; do not stack speculative padding fixes across multiple layers.
+- If disabling a host clip removes the artifact, prefer moving that clip outward or adding stable outer padding around the clipped region instead of over-expanding the child itself.
 
 **Warning Signs**:
 
@@ -59,6 +66,7 @@ description: Use when diagnosing or fixing UI layout bugs where measured, prefer
 - Separate modules computing stage/host size and child/content size.
 - Text cap, elide, or overflow logic based on animated current width.
 - The issue disappears after reload, delay, or interaction, indicating stale measurement invalidation.
+- The issue changes direction across width ranges (for example, narrow looks worse, then wide looks worse after a paint-guard fix), indicating the wrong clip owner is being compensated.
 
 ## E. Universal Verification Strategy
 
@@ -71,5 +79,6 @@ description: Use when diagnosing or fixing UI layout bugs where measured, prefer
 | Assert actual width equals preferred width | The final visual owner follows measurement. |
 | Assert cap/elide is disabled or infinite when content fits | Text logic no longer constrains unnecessarily. |
 | Print measured, preferred, target, actual, and clip widths in a temporary harness | Confirms the constraining domain before and after the fix. |
+| Toggle a single suspected `clip: true` to `false` and compare visually | Proves whether that exact layer is the clip owner before deeper refactors. |
 
 **Cleanup Rule**: Remove temporary harnesses and debug logs after verification; keep only regression tests at the real composed-component seam.
