@@ -29,7 +29,7 @@ Item {
     property int capsuleEdgeInset: 24
 
     // --- Exposed geometry ---
-    readonly property int stageWidth: _workspaceStageWidth
+    readonly property int stageWidth: _workspaceStageWidth + (_workspaceStagePadding * 2)
     readonly property int stageHeight: _workspaceVisibleStageHeight
     readonly property Item hitRegionItem: stageHitRegion
     // Expose the live capsule items so a host window can build its blur region.
@@ -39,9 +39,9 @@ Item {
         && _stageMiddleProgress <= 0.001
         && _stageBottomProgress <= 0.001
 
-    implicitWidth: workspaceStage.width
+    implicitWidth: stageView.stageWidth
     implicitHeight: _workspaceVisibleStageHeight
-    clip: true
+    clip: false
 
     // --- Stage state (migrated from WorkspaceHintWindow) ---
     property var _workspaceStageSlots: Motion.emptyStageSlots(_persistentStageSlotIndices, "workspace-slot")
@@ -68,6 +68,7 @@ Item {
     readonly property bool _workspaceHasAfter: !!(_workspaceHintLayout && _workspaceHintLayout.hasAfter)
  readonly property var _persistentStageSlotIndices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     readonly property real _overflowSlotPosition: 1.18
+    readonly property int _workspaceStagePadding: 16
   readonly property int _workspaceCapsuleMaxWidth: Math.max(1, Math.floor(stageView.screenWidth - stageView.capsuleEdgeInset * 2))
   readonly property int _workspaceSideWidth: 96
     // Deterministic primary width from the hint data (character-metric
@@ -555,7 +556,7 @@ if (!stageView._workspaceSettlePending)
     Item {
         id: workspaceStage
 
-        x: (stageView.width - width) / 2
+        x: stageView._workspaceStagePadding
         y: -stageView._workspaceLeadingTrim + stageView._workspaceSingleSideOffset
    width: stageView._workspaceStageWidth
         height: stageView._workspaceFullStageHeight
