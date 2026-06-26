@@ -661,28 +661,38 @@ Item {
                     opacity: Math.min(1, Math.max(0, (overviewPage._overviewProgress - 0.0) / 0.55))
                 }
 
-                // Top zone: bold clock card (38 %) beside a 2×2 settings
-                // quick-toggle grid (62 %).  Cascade tier 2 — reveals after
-                // the search bar and separator have settled.
+                // Top zone: time+todo card (58 %) beside quick-toggle
+                // panel with settings button (42 %).  Cascade tier 2 —
+                // reveals after the search bar and separator have settled.
                 Row {
                     id: topRow
                     anchors.top: launcherCard.bottom
                     anchors.topMargin: 10
                     width: parent.width
-                    height: 110
+                    height: 130
                     spacing: 10
                     opacity: Math.min(1, Math.max(0, (overviewPage._overviewProgress - 0.0) / 0.65))
 
                     OverviewClockCard {
-                        width: Math.round((parent.width - 10) * 0.38)
+                        width: Math.round((parent.width - 10) * 0.58)
                         height: parent.height
                         onClicked: Services.IslandService.openPage("calendar")
                     }
 
                     OverviewSettingsCard {
-                        width: parent.width - Math.round((parent.width - 10) * 0.38) - 10
+                        width: parent.width - Math.round((parent.width - 10) * 0.58) - 10
                         height: parent.height
-                        onClicked: Services.IslandService.showSettingsCenter()
+                        brightnessValue: Services.BrightnessService.brightness
+                        onBrightnessClicked: {
+                            // Open settings center scrolled to brightness —
+                            // pass "亮度" as the initial filter so the correct
+                            // row is visible on arrival.
+                            Services.IslandService.settingsInitialFilter = "亮度"
+                            Services.IslandService.showSettingsCenter()
+                        }
+                        onOpenSettings: {
+                            Services.IslandService.showSettingsCenter()
+                        }
                     }
                 }
 
