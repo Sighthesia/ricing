@@ -80,7 +80,14 @@ Item {
     readonly property int _workspaceSideHeight: 28
     readonly property int _workspacePrimaryHeight: 44
     readonly property int _workspaceColumnGap: 8
-    readonly property int _workspaceStageWidth: Math.max(_workspacePrimaryWidth, _workspaceMaxSideWidth)
+    readonly property int _workspaceExpandedPrimaryWidth: _workspaceExpandedPrimaryWidthForHint(_renderHint || _hintData)
+    readonly property int _workspaceVisibleContentWidthFloor: _workspaceVisibleContentWidthFloorForHint(_renderHint || _hintData)
+    readonly property int _workspaceStageWidth: Math.max(
+        _workspacePrimaryWidth,
+        _workspaceMaxSideWidth,
+        _workspaceExpandedPrimaryWidth,
+        _workspaceVisibleContentWidthFloor
+    )
     readonly property int _workspaceFullStageHeight: _workspaceSideHeight * 2 + _workspacePrimaryHeight + _workspaceColumnGap * 2
     readonly property real _workspaceSingleSideTrim: _workspaceSideHeight + _workspaceColumnGap
     readonly property real _workspaceSingleSideOffset:
@@ -262,9 +269,89 @@ for (let index = 0; index < text.length; index++) {
         return Math.min(_workspaceCapsuleMaxWidth, Math.max(144, width))
     }
 
+    // Expanded primary width computed from the full visible content requirement,
+    // mirroring WorkspaceHintCapsule._expandedPrimaryWidth logic but using
+    // character-metric estimation. Ensures the stage container is wide enough
+    // for the expanded capsule content (full-width window cards + side-wide
+    // minimum from non-focused capsules), not just the character estimate alone.
+    function _workspaceExpandedPrimaryWidthForHint(hint) {
+        const safeHint = hint || {}
+        const windows = safeHint.windows || []
+        const maxCapsuleWidth = Math.max(_workspacePrimaryHeight, _workspaceCapsuleMaxWidth)
+
+        // Natural primary width using character metrics (same structure as
+        // _workspacePrimaryWidthForHint but returns the raw estimate without
+        // the final cap — the expanded formula applies its own capping after
+        // also considering the workspace-area minimum width from side capsules).
+        let naturalWidth = CapsuleMetrics.compactInnerHorizontal
+
+        if (safeHint.workspaceIndex !== undefined && safeHint.workspaceIndex > 0)
+            naturalWidth += _titleDisplayWidth(String(safeHint.workspaceIndex))
+                + CapsuleMetrics.compactInnerHorizontal
+                + CapsuleMetrics.groupGap
+
+        if (windows.length > 0) {
+            for (let index = 0; index < windows.length; index++) {
+                const windowData = windows[index] || {}
+                const title = windowData.title || ""
+                const titleWidth = _titleDisplayWidth(title)
+                const iconWidth = windowData.icon ? 21 : 0
+                const cardWidth = Math.max(60, titleWidth + iconWidth + CapsuleMetrics.compactInnerHorizontal)
+                naturalWidth += cardWidth
+                if (index < windows.length - 1)
+                    naturalWidth += CapsuleMetrics.inlineGap
+            }
+        } else {
+            // No windows: keep at least the workspace label width if present.
+            naturalWidth = Math.max(naturalWidth, 144)
+        }
+
+        naturalWidth += CapsuleMetrics.compactSidePadding
+        naturalWidth = Math.max(144, naturalWidth)
+
+        // Compute the same workspace-area minimum width as the capsule's
+        // _workspaceAreaMinWidth so the expanded floor comes from the maximum
+        // side capsule width across all workspaces, not just the primary estimate.
+        const hasLabel = safeHint.workspaceIndex !== undefined && safeHint.workspaceIndex > 0
+        const titleAreaWidth = hasLabel
+            ? _titleDisplayWidth(String(safeHint.workspaceIndex)) + CapsuleMetrics.compactInnerHorizontal + CapsuleMetrics.compactSidePadding
+            : 0
+        const workspaceAreaWidth = _workspaceMaxSideWidth + CapsuleMetrics.groupGap + CapsuleMetrics.compactSidePadding
+        const areaMinWidth = Math.max(titleAreaWidth, workspaceAreaWidth)
+
+        return Math.min(maxCapsuleWidth, Math.max(naturalWidth, areaMinWidth))
+    }
+
+    // Keep the center dockzone wide enough for the widest visible workspace
+    // summary, even when the focused capsule itself narrows.
+    function _workspaceVisibleContentWidthFloorForHint(hint) {
+        const safeHint = hint || {}
+        const workspaces = safeHint.workspaces || []
+        let width = _workspaceMaxSideWidth
+
+        for (let index = 0; index < workspaces.length; index++) {
+            const summary = workspaces[index] || {}
+            const workspaceIndex = summary.workspaceIndex !== undefined ? summary.workspaceIndex : -1
+            const labelWidth = workspaceIndex > 0 ? _titleDisplayWidth(String(workspaceIndex)) : 0
+            const iconCount = summary.icons ? summary.icons.length : 0
+            const iconWidth = iconCount > 0
+                ? (iconCount * 18) + Math.max(0, iconCount - 1) * CapsuleMetrics.iconGap
+                : 0
+            const gap = labelWidth > 0 && iconWidth > 0 ? CapsuleMetrics.inlineGap : 0
+            const summaryWidth = Math.min(
+                _workspaceCapsuleMaxWidth,
+                Math.max(_workspaceSideWidth, labelWidth + iconWidth + gap + CapsuleMetrics.compactInnerHorizontal)
+            )
+
+            width = Math.max(width, summaryWidth)
+        }
+
+        return width
+    }
+
     function _settleWorkspaceStage(hint) {
         Motion.settleWorkspaceStageSlots(stageView, hint, Stage)
- }
+  }
 
     function _stageRevealForSlot(slotPosition) {
         if (slotPosition <= -0.5)

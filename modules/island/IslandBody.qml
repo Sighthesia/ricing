@@ -118,7 +118,10 @@ Item {
     // expanded size and only the title row overlays the launcher's lower half.
     readonly property bool hintLauncherConflict: Services.IslandService.expanded
         && Services.IslandService.windowHintActive
-    readonly property int windowHintW: Math.min(hintStage.stageWidth + 32, Screen.width - root.earRadius * 2)
+    readonly property int windowHintW: Math.max(
+        root.collapsedContentWidth,
+        Math.min(hintStage.stageWidth + 32, Screen.width - root.earRadius * 2)
+    )
     readonly property int windowHintH: root.collapsedH + hintStage.stageHeight + 24
 
     // Target dimensions reuse the expanded island body instead of a second panel.
