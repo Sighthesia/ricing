@@ -36,7 +36,7 @@ Item {
     // and leaving whitespace below the bottom row.
     readonly property real overviewNatHeight: {
         if (!root.overviewPageVisible) return 0
-        return launcherCard.height + 10 + topRow.height + 10 + middleRow.height + 10 + calendarCardBottom.height
+        return launcherCard.height + 10 + topRow.height + 10 + middleRow.height
     }
     readonly property int expandedWidgetClearance: Math.max(root.collapsedH, root.messageContentHeight) + 12
     readonly property int expandedInnerGap: 12
@@ -724,18 +724,6 @@ Item {
                     }
                 }
 
-                // Bottom zone: full-width calendar card with prominent date
-                // and placeholder event rows.  Cascade tier 4 — trails the
-                // middle section so the full collage assembles top-to-bottom.
-                OverviewCalendarCard {
-                    id: calendarCardBottom
-                    anchors.top: middleRow.bottom
-                    anchors.topMargin: 10
-                    width: parent.width
-                    height: 130
-                    opacity: Math.min(1, Math.max(0, (overviewPage._overviewProgress - 0.20) / 0.75))
-                    onClicked: Services.IslandService.openPage("calendar")
-                }
             }
 
             // Return from any detail page to the overview layout.
