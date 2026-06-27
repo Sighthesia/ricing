@@ -1,6 +1,5 @@
 import QtQuick
 import Qt5Compat.GraphicalEffects
-import ".." as Bar
 import "../../../services" as Services
 
 // Render a compact now-playing pill for the bar. While a transient message is
@@ -24,47 +23,24 @@ Item {
             ? root.mediaSettings.lyricsDisplayMode
             : "Original"
     )
+    readonly property real spectrumHeightScale: Math.max(0.1, (
+        root.mediaSettings && root.mediaSettings.spectrumHeight !== undefined
+            ? root.mediaSettings.spectrumHeight
+            : 100
+    ) / 100)
+    readonly property real spectrumBarWidthRatio: Math.max(0.05, Math.min(1, (
+        root.mediaSettings && root.mediaSettings.spectrumBarWidth !== undefined
+            ? root.mediaSettings.spectrumBarWidth
+            : 42
+    ) / 100))
+    readonly property real spectrumSpacing: Math.max(0, root.mediaSettings && root.mediaSettings.spectrumSpacing !== undefined
+        ? root.mediaSettings.spectrumSpacing
+        : 0)
     readonly property bool compactLyricVisible: Services.MediaControlService.showCompactLyric
         && root._displayLyricPrimaryText !== ""
-    readonly property bool showAudioSpectrum: root.mediaSettings
-        ? root.mediaSettings.showAudioSpectrum
-        : false
-    readonly property bool needsAudioSpectrum: root.showAudioSpectrum && !root.simplified
-    readonly property bool needsDockzoneOverride: root.showAudioSpectrum && !root.simplified
-        && (root.spectrumPosition === "dockzone" || root.spectrumPosition === "both")
-    readonly property bool showWidgetSpectrum: root.showAudioSpectrum && !root.simplified
-        && root.spectrumPosition !== "dockzone"
-    readonly property string spectrumComponentId: "media:" + root.widgetInstanceKey
     readonly property int maxWidth: root.mediaSettings
         ? root.mediaSettings.maxWidth
         : 240
-    readonly property string spectrumPosition: root.mediaSettings
-        ? root.normalizedSpectrumPosition(root.mediaSettings.spectrumPosition)
-        : "bar"
-    readonly property string spectrumStyle: root.mediaSettings
-        ? root.normalizedSpectrumStyle(root.mediaSettings.spectrumStyle)
-        : "bars"
-    readonly property bool spectrumMirror: root.mediaSettings
-        ? root.mediaSettings.spectrumMirror
-        : true
-    readonly property string spectrumColor: root.mediaSettings
-        ? root.mediaSettings.spectrumColor
-        : "Primary"
-    readonly property int spectrumOpacity: root.mediaSettings
-        ? root.mediaSettings.spectrumOpacity
-        : 34
-    readonly property color _spectrumBarColor: {
-        var base
-        var preset = root.spectrumColor
-        if (preset === "Secondary")
-            base = Services.Color.mSecondary
-        else if (preset === "Tertiary")
-            base = Services.Color.mTertiary
-        else
-            base = Services.Color.mPrimary
-
-        return Qt.rgba(base.r, base.g, base.b, root.spectrumOpacity / 100)
-    }
     readonly property real compactTextWidth: {
         var effectiveMax = root.maxWidth - 46
 
@@ -176,22 +152,6 @@ Item {
         return "original"
     }
 
-    function normalizedSpectrumStyle(value) {
-        if (value === "Wave" || value === "wave")
-            return "wave"
-        if (value === "Dots" || value === "dots")
-            return "dots"
-        return "bars"
-    }
-
-    function normalizedSpectrumPosition(value) {
-        if (value === "Dockzone" || value === "dockzone")
-            return "dockzone"
-        if (value === "Both" || value === "both")
-            return "both"
-        return "bar"
-    }
-
     function syncDisplayText() {
         const nextText = root._displayText
         const nextSecondaryText = root._displaySecondaryText
@@ -224,41 +184,24 @@ Item {
         fadeTransition.restart()
     }
 
-    function syncSpectrumRegistration() {
-        if (root.needsAudioSpectrum)
-            Services.SpectrumService.registerComponent(root.spectrumComponentId)
-        else
-            Services.SpectrumService.unregisterComponent(root.spectrumComponentId)
-
-        root.syncDockzoneSpectrumOverride()
-    }
-
-    function syncDockzoneSpectrumOverride() {
-        if (root.needsDockzoneOverride) {
-            Services.SpectrumService.dockzoneStyle = root.spectrumStyle
-            Services.SpectrumService.dockzoneMirror = root.spectrumMirror
-            Services.SpectrumService.dockzoneBarColor = root._spectrumBarColor
-        } else if (Services.SpectrumService.dockzoneStyle !== "") {
-            Services.SpectrumService.dockzoneStyle = ""
-            Services.SpectrumService.dockzoneMirror = true
-            Services.SpectrumService.dockzoneBarColor = Qt.rgba(0.78, 0.75, 1.0, 0.34)
-        }
+    function syncSpectrumSettings() {
+        Services.SpectrumService.dockzoneHeightScale = root.spectrumHeightScale
+        Services.SpectrumService.dockzoneBarWidthRatio = root.spectrumBarWidthRatio
+        Services.SpectrumService.dockzoneSpacing = root.spectrumSpacing
     }
 
     Component.onCompleted: {
         Services.SettingsService.ensureWidgetSettings("media", root.widgetInstanceKey)
         syncDisplayText()
+        syncSpectrumSettings()
         root._progressValue = Services.MediaControlService.progress
-        syncSpectrumRegistration()
     }
-
-    Component.onDestruction: Services.SpectrumService.unregisterComponent(root.spectrumComponentId)
 
     on_DisplayTextChanged: syncDisplayText()
     on_DisplayTextKeyChanged: syncDisplayText()
     on_DisplaySecondaryTextChanged: syncDisplayText()
     onLyricsDisplayModeChanged: syncDisplayText()
-    onNeedsAudioSpectrumChanged: syncSpectrumRegistration()
+    onMediaSettingsChanged: syncSpectrumSettings()
 
     Connections {
         target: Services.MediaControlService
@@ -338,31 +281,6 @@ Item {
         visible: opacity > 0
         implicitWidth: currentArtworkSlot.width + root.currentTextTargetWidth + (root.currentTextTargetWidth > 0 ? currentContent.spacing : 0)
         implicitHeight: currentContent.implicitHeight
-
-        // Keep the spectrum tucked behind the compact media contents.
-        Item {
-            anchors.fill: currentContent
-            visible: root.showWidgetSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
-            z: -1
-            clip: true
-            opacity: Services.SpectrumService.isIdle ? 0 : 1
-
-            Behavior on opacity {
-                NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-            }
-
-            Bar.DockzoneSpectrum {
-                anchors.fill: parent
-                anchors.leftMargin: 4
-                anchors.rightMargin: 4
-                anchors.topMargin: 3
-                anchors.bottomMargin: 3
-                values: Services.SpectrumService.values
-                style: root.spectrumStyle
-                mirror: root.spectrumMirror
-                barColor: root._spectrumBarColor
-            }
-        }
 
         // Render the current compact media content.
         Row {
@@ -614,31 +532,6 @@ Item {
         z: 1
         implicitWidth: nextArtworkSlot.width + root.nextTextTargetWidth + (root.nextTextTargetWidth > 0 ? nextContent.spacing : 0)
         implicitHeight: nextContent.implicitHeight
-
-        // Mirror the spectrum during text transitions so the background stays continuous.
-        Item {
-            anchors.fill: nextContent
-            visible: root.showWidgetSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
-            z: -1
-            clip: true
-            opacity: Services.SpectrumService.isIdle ? 0 : 1
-
-            Behavior on opacity {
-                NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-            }
-
-            Bar.DockzoneSpectrum {
-                anchors.fill: parent
-                anchors.leftMargin: 4
-                anchors.rightMargin: 4
-                anchors.topMargin: 3
-                anchors.bottomMargin: 3
-                values: Services.SpectrumService.values
-                style: root.spectrumStyle
-                mirror: root.spectrumMirror
-                barColor: root._spectrumBarColor
-            }
-        }
 
         // Render the incoming compact media content.
         Row {

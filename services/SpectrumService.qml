@@ -13,6 +13,9 @@ Singleton {
     property var values: []
     property bool isIdle: true
     // Dockzone spectrum override — set by the active media widget.
+    property real dockzoneHeightScale: 1.0
+    property real dockzoneBarWidthRatio: 0.42
+    property real dockzoneSpacing: 0
     property string dockzoneStyle: ""
     property bool dockzoneMirror: true
     property color dockzoneBarColor: Qt.rgba(0.78, 0.75, 1.0, 0.34)

@@ -45,74 +45,55 @@ Column {
         )
     }
 
-    SettingToggle {
+    SettingSlider {
         width: parent.width
-        settingLabel: "Show Audio Spectrum"
-        description: "Show the animated audio spectrum behind the compact media widget."
-        checked: root.mediaSettings ? root.mediaSettings.showAudioSpectrum : false
-        onToggled: value => Services.SettingsService.setWidgetInstanceSettingValue(
+        settingLabel: "Spectrum Height"
+        description: "Adjust how tall the dockzone spectrum can grow."
+        from: 50
+        to: 200
+        stepSize: 5
+        suffix: "%"
+        value: root.mediaSettings ? root.mediaSettings.spectrumHeight : 100
+        onMoved: value => Services.SettingsService.setWidgetInstanceSettingValue(
             "media",
             root.instanceKey,
-            "showAudioSpectrum",
-            value
-        )
-    }
-
-    SettingDropdown {
-        width: parent.width
-        settingLabel: "Spectrum Style"
-        description: "Choose the audio spectrum visual style."
-        model: ["Bars", "Wave", "Dots"]
-        currentValue: root.mediaSettings ? root.mediaSettings.spectrumStyle : "Bars"
-        onSelected: value => Services.SettingsService.setWidgetInstanceSettingValue(
-            "media",
-            root.instanceKey,
-            "spectrumStyle",
-            value
-        )
-    }
-
-    SettingDropdown {
-        width: parent.width
-        settingLabel: "Spectrum Color"
-        description: "Choose the accent color for the spectrum visualization."
-        model: ["Primary", "Secondary", "Tertiary"]
-        currentValue: root.mediaSettings ? root.mediaSettings.spectrumColor : "Primary"
-        onSelected: value => Services.SettingsService.setWidgetInstanceSettingValue(
-            "media",
-            root.instanceKey,
-            "spectrumColor",
+            "spectrumHeight",
             value
         )
     }
 
     SettingSlider {
         width: parent.width
-        settingLabel: "Spectrum Opacity"
-        description: "Adjust the opacity of the spectrum visualization."
-        from: 10
+        settingLabel: "Spectrum Bar Width"
+        description: "Adjust how wide each spectrum bar can be."
+        from: 20
         to: 100
-        stepSize: 10
+        stepSize: 1
         suffix: "%"
-        value: root.mediaSettings ? root.mediaSettings.spectrumOpacity : 34
+        value: root.mediaSettings ? root.mediaSettings.spectrumBarWidth : 42
         onMoved: value => Services.SettingsService.setWidgetInstanceSettingValue(
             "media",
             root.instanceKey,
-            "spectrumOpacity",
+            "spectrumBarWidth",
             value
         )
     }
 
-    SettingToggle {
+    SettingSlider {
         width: parent.width
-        settingLabel: "Spectrum Mirror"
-        description: "Mirror the spectrum from the center for a balanced look."
-        checked: root.mediaSettings ? root.mediaSettings.spectrumMirror : true
-        onToggled: value => Services.SettingsService.setWidgetInstanceSettingValue(
+        settingLabel: "Spectrum Spacing"
+        description: "Adjust the gap between spectrum bars."
+        from: 0
+        to: 12
+        stepSize: 1
+        suffix: "px"
+        value: root.mediaSettings ? root.mediaSettings.spectrumSpacing : 0
+        onMoved: value => Services.SettingsService.setWidgetInstanceSettingValue(
             "media",
             root.instanceKey,
-            "spectrumMirror",
+            "spectrumSpacing",
             value
         )
     }
+
 }
