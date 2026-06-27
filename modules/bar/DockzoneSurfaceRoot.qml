@@ -152,7 +152,8 @@ Item {
     // expansion is applied here as a lightweight additive override on top of the
     // resting model geometry, so the per-frame spring never re-runs the JS
     // model (which would thrash the GC and stutter the animation).
-    readonly property real bodyX: metrics.bodyX
+    readonly property real expandDelta: Math.max(0, root.expandWidth - metrics.bodyWidth)
+    readonly property real bodyX: metrics.bodyX - root.expandDelta / 2
     readonly property real bodyY: metrics.bodyY
     readonly property real bodyWidth: Math.max(metrics.bodyWidth, root.expandWidth)
     readonly property real bodyHeight: metrics.bodyHeight + root.expandHeight

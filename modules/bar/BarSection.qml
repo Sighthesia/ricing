@@ -404,19 +404,19 @@ Item {
                     clip: true
 
                     // Lay out widgets in the moving body while clipping to its visible width.
-                    // Pinned to the natural resting body width so hover-driven
-                    // expandWidth does not recenter the row and displace edge
-                    // widgets away from the cursor (which would close the loop).
-                    // Right section anchors content to the right edge so the body
-                    // can grow leftward toward center without moving widgets.
+                    // Pinned to the resting body center so the glass can grow symmetrically
+                    // around the badge without dragging edge widgets sideways (which would
+                    // close the hover loop). Right section anchors to the right edge.
                     Row {
                         id: sectionRow
 
                         property bool isRightSection: root.sectionName === "right"
+                        // Use the resting bodyX (metrics.bodyX) + half expandDelta so the
+                        // row stays at the resting center while the glass grows both ways.
                         x: isRightSection
-                            ? parent.parent.bodyX + parent.parent.naturalBodyWidth - width
+                            ? parent.parent.metrics.bodyX + parent.parent.naturalBodyWidth - width
                             + parent.parent.bodyShrinkX - sectionClip.x
-                            : parent.parent.bodyX
+                            : parent.parent.metrics.bodyX
                             + (parent.parent.naturalBodyWidth - width) / 2
                             - (root.sectionName === "left" ? parent.parent.bodyShrinkX : 0)
                             - sectionClip.x
