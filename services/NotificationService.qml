@@ -14,6 +14,10 @@ Singleton {
     property int unreadCount: 0
     property int stickyCarouselIndex: 0
     property bool summaryDismissed: false
+    property string latestAppName: ""
+    property string latestSummary: ""
+    property string latestBody: ""
+    property string latestIcon: ""
     property string latestOpencodeId: ""
     property string latestOpencodeAppName: ""
     property string latestOpencodeSummary: ""
@@ -83,6 +87,12 @@ Singleton {
     }
 
     function _refreshDerivedState() {
+        const latest = root.latestNotification()
+        latestAppName = latest ? (latest.appName || "") : ""
+        latestSummary = latest ? (latest.summary || "") : ""
+        latestBody = latest ? (latest.body || "") : ""
+        latestIcon = latest ? (latest.icon || "") : ""
+
         const currentSticky = root.currentStickyNotification()
         const currentStickyId = currentSticky ? currentSticky.notifId : ""
 

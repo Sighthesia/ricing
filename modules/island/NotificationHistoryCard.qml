@@ -49,7 +49,9 @@ Item {
             : Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, root.read ? 0.55 : 0.75)
         borderWidth: root.sticky ? 1.4 : 1
 
-        implicitHeight: root.hovered ? expandedColumn.implicitHeight + 18 : compactRow.implicitHeight + 18
+        implicitHeight: root.hovered
+            ? expandedColumn.y + expandedColumn.implicitHeight + 9
+            : compactRow.implicitHeight + 18
 
         Behavior on implicitHeight {
             NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
@@ -176,7 +178,12 @@ Item {
             // Hint how primary click changes persistent state.
             NotificationStickyPrompt {
                 width: parent.width
+                height: implicitHeight
                 sticky: root.sticky
+                appName: root.appName
+                summary: root.summary
+                body: root.body
+                rawIcon: notificationEntry ? (notificationEntry.icon || "") : ""
             }
         }
     }
