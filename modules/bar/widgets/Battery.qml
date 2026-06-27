@@ -7,6 +7,8 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
+    readonly property real dockzoneExpandHeight: batteryBadge.dockzoneExpandHeight
+    readonly property real dockzoneExpandWidth: batteryBadge.dockzoneExpandWidth
 
     visible: Services.BatteryService.available
     implicitWidth: visible ? batteryBadge.implicitWidth : 0
@@ -39,7 +41,7 @@ Item {
         return Services.Color.mOnSurfaceVariant
     }
 
-    // Render the circular battery badge and reveal configured details on hover.
+    // Render the circular battery badge and reveal configured details below the dockzone.
     Widgets.CircularHoverWidget {
         id: batteryBadge
 
@@ -51,19 +53,13 @@ Item {
         progressValue: Services.BatteryService.percentage / 100
         progressColor: root.stateColor
 
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.detailStateText
-            explicitFontFamily: root.detailStateText !== "" ? "Symbols Nerd Font" : ""
-            color: root.stateColor
-            visible: text !== ""
-        }
-
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Services.BatteryService.percentage + "%"
-            color: root.stateColor
-            visible: root.showPercentage
+        Widgets.CompactHoverDetail {
+            iconText: root.collapsedText
+            labelText: "Battery"
+            valueText: Services.BatteryService.percentage + "%"
+            secondaryText: root.detailStateText
+            progressValue: Services.BatteryService.percentage / 100
+            accentColor: root.stateColor
         }
     }
 }

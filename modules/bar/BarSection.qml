@@ -39,7 +39,9 @@ Item {
             : "hidden")
         : ((root.hasSectionContent || root.hostsContextMenu || root.hostsWidgetPicker || root.hostsWidgetSettings) ? "attached" : "hidden")
     property var _dockzoneExpandHeights: ({})
+    property var _dockzoneExpandWidths: ({})
     property real dockzoneContentExpandHeight: 0
+    property real dockzoneContentExpandWidth: 0
 
     implicitHeight: surfaceLoader.item ? surfaceLoader.item.implicitHeight : Services.BarLayoutService.barHeight
     implicitWidth: root.hasSectionContent
@@ -67,6 +69,35 @@ Item {
             nextHeight = Math.max(nextHeight, nextMap[keys[index]])
 
         root.dockzoneContentExpandHeight = nextHeight
+    }
+
+    function reportWidgetDockzoneExpandWidth(instanceKey, expandWidth, centerX, rowWidth) {
+        if (!instanceKey)
+            return
+
+        var nextMap = Object.assign({}, root._dockzoneExpandWidths)
+        var resolvedWidth = Math.max(0, expandWidth || 0)
+        if (resolvedWidth > 0)
+            nextMap[instanceKey] = {
+                width: resolvedWidth,
+                centerX: Math.max(0, centerX || 0),
+                rowWidth: Math.max(0, rowWidth || 0),
+            }
+        else
+            delete nextMap[instanceKey]
+
+        root._dockzoneExpandWidths = nextMap
+
+        var nextWidth = 0
+        var keys = Object.keys(nextMap)
+        for (var index = 0; index < keys.length; index += 1) {
+            var entry = nextMap[keys[index]]
+            var rowCenterX = entry.rowWidth / 2
+            var centerOffset = Math.abs((entry.centerX || rowCenterX) - rowCenterX)
+            nextWidth = Math.max(nextWidth, entry.width + centerOffset * 2)
+        }
+
+        root.dockzoneContentExpandWidth = nextWidth
     }
 
     // Preserve a small hit target so an empty dockzone can still reopen the widget picker.
@@ -193,6 +224,7 @@ Item {
                 readonly property real activeMenuW: hostsTrayMenu ? menuW : (hostsContextMenu ? contextMenuW : (hostsWidgetPicker ? widgetPickerW : widgetSettingsW))
                 readonly property real activeMenuH: hostsTrayMenu ? menuH : (hostsContextMenu ? contextMenuH : (hostsWidgetPicker ? widgetPickerH : widgetSettingsH))
                 readonly property real contentExpandH: root.dockzoneContentExpandHeight
+                readonly property real contentExpandW: root.dockzoneContentExpandWidth
                 readonly property real menuAnchorX: Services.BarLayoutService.contextMenuX
                     - surfaceRoot.mapToItem(null, 0, 0).x
 
@@ -228,7 +260,7 @@ Item {
                 expandHeight: (hostsTrayMenu || hostsContextMenu || root.hostsWidgetPicker || root.hostsWidgetSettings)
                     ? (activeMenuH + 8 + (root.hostsWidgetPicker ? dockzone.pickerClipInset : dockzone.menuClipInset))
                     : contentExpandH
-                expandWidth: (hostsTrayMenu || hostsContextMenu || root.hostsWidgetPicker || root.hostsWidgetSettings) ? activeMenuW : 0
+                expandWidth: (hostsTrayMenu || hostsContextMenu || root.hostsWidgetPicker || root.hostsWidgetSettings) ? activeMenuW : contentExpandW
 
                 Behavior on expandHeight {
                     SpringAnimation {
@@ -372,16 +404,21 @@ Item {
                     clip: true
 
                     // Lay out widgets in the moving body while clipping to its visible width.
-                    // Centered within bodyWidth then shifted by bodyShrinkX so
-                    // content and background share the same immediate shrink
-                    // response. The bias direction (left = -shrunk, right = +shrunk)
-                    // preserves the existing lean-away-from-center feel during push.
+                    // Pinned to the natural resting body width so hover-driven
+                    // expandWidth does not recenter the row and displace edge
+                    // widgets away from the cursor (which would close the loop).
+                    // Right section anchors content to the right edge so the body
+                    // can grow leftward toward center without moving widgets.
                     Row {
                         id: sectionRow
 
-                        x: parent.parent.bodyX
-                            + (parent.parent.bodyWidth - width) / 2
-                            + (root.sectionName === "right" ? parent.parent.bodyShrinkX : (root.sectionName === "left" ? -parent.parent.bodyShrinkX : 0))
+                        property bool isRightSection: root.sectionName === "right"
+                        x: isRightSection
+                            ? parent.parent.bodyX + parent.parent.naturalBodyWidth - width
+                            + parent.parent.bodyShrinkX - sectionClip.x
+                            : parent.parent.bodyX
+                            + (parent.parent.naturalBodyWidth - width) / 2
+                            - (root.sectionName === "left" ? parent.parent.bodyShrinkX : 0)
                             - sectionClip.x
                         y: (parent.parent.topBandHeight - height) / 2
                         spacing: BarLayoutSections.widgetSpacing
@@ -397,11 +434,22 @@ Item {
                                 screenName: root.screenName
                                 widgetEntry: root.sectionModel[index]
                                 widgetSource: Qt.resolvedUrl(widgetEntry.source)
+                                readonly property real widgetCenterXInSection: x + width / 2
+                                readonly property real widgetRowWidth: sectionRow.implicitWidth
 
                                 onLocalPointerIntentChanged: surfaceRoot.syncCenterFloatingValidationIntent()
                                 onDockzoneExpandHeightChanged: root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
-                                Component.onCompleted: root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
-                                Component.onDestruction: root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, 0)
+                                onDockzoneExpandWidthChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                onWidgetCenterXInSectionChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                onWidgetRowWidthChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                Component.onCompleted: {
+                                    root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
+                                    root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                }
+                                Component.onDestruction: {
+                                    root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, 0)
+                                    root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, 0)
+                                }
                             }
 
                         }

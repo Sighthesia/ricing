@@ -6,10 +6,13 @@ import "../../../services" as Services
 Item {
     id: root
 
+    readonly property real dockzoneExpandHeight: brightnessBadge.dockzoneExpandHeight
+    readonly property real dockzoneExpandWidth: brightnessBadge.dockzoneExpandWidth
+
     implicitWidth: brightnessBadge.implicitWidth
     implicitHeight: 30
 
-    // Render the circular brightness badge and reveal percentage on hover.
+    // Render the circular brightness badge and reveal percentage below the dockzone.
     Widgets.CircularHoverWidget {
         id: brightnessBadge
 
@@ -25,10 +28,14 @@ Item {
             Services.BrightnessService.setBrightness(Services.BrightnessService.brightness + delta)
         }
 
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Math.round(Services.BrightnessService.brightness * 100) + "%"
-            color: Services.Color.mOnSurface
+        Widgets.CompactHoverDetail {
+            iconText: "\uf185"
+            labelText: "Brightness"
+            valueText: Math.round(Services.BrightnessService.brightness * 100) + "%"
+            progressValue: Services.BrightnessService.brightness
+            accentColor: Services.Color.mPrimary
+            interactive: true
+            onMoved: value => Services.BrightnessService.setBrightness(value)
         }
     }
 }

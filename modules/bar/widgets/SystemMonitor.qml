@@ -30,13 +30,15 @@ Item {
         : (Services.SystemMonitorService.cpuUsage >= 65
             ? Services.Color.mTertiary
             : Services.Color.mPrimary)
+    readonly property real dockzoneExpandHeight: metricsBadge.dockzoneExpandHeight
+    readonly property real dockzoneExpandWidth: metricsBadge.dockzoneExpandWidth
 
     implicitWidth: metricsBadge.implicitWidth
     implicitHeight: 30
 
     Component.onCompleted: Services.SettingsService.ensureWidgetSettings("system-monitor", root.widgetInstanceKey)
 
-    // Render the circular CPU badge and reveal configured metrics on hover.
+    // Render the circular CPU badge and reveal configured metrics below the dockzone.
     Widgets.CircularHoverWidget {
         id: metricsBadge
 
@@ -48,32 +50,24 @@ Item {
         progressValue: Services.SystemMonitorService.cpuUsage / 100
         progressColor: root.cpuAccentColor
 
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.cpuLabel
-            color: Services.Color.mOnSurface
-            visible: root.showCpu
-        }
-
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.memLabel
-            color: Services.Color.mOnSurfaceVariant
-            visible: root.showMemory
-        }
-
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.netLabel
-            color: Services.Color.mOnSurfaceVariant
-            visible: root.showNetwork
-        }
-
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.loadLabel
-            color: Services.Color.mOnSurfaceVariant
-            visible: root.showLoad
+        Widgets.CompactHoverDetail {
+            iconText: "\uf201"
+            labelText: root.showCpu ? "CPU" : (root.showMemory ? "Memory" : "System")
+            valueText: root.showCpu ? Services.SystemMonitorService.cpuText : (root.showMemory ? Services.SystemMonitorService.memText : "Live")
+            secondaryText: {
+                var details = []
+                if (root.showMemory)
+                    details.push(root.memLabel)
+                if (root.showNetwork)
+                    details.push(root.netLabel)
+                if (root.showLoad)
+                    details.push(root.loadLabel)
+                return details.join("  ")
+            }
+            progressValue: root.showCpu
+                ? Services.SystemMonitorService.cpuUsage / 100
+                : (root.showMemory ? Services.SystemMonitorService.memPercent / 100 : 0)
+            accentColor: root.cpuAccentColor
         }
     }
 }

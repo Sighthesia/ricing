@@ -10,11 +10,13 @@ Item {
     readonly property color accentColor: Services.VolumeService.sinkMuted
         ? Services.Color.mError
         : Services.Color.mPrimary
+    readonly property real dockzoneExpandHeight: volumeBadge.dockzoneExpandHeight
+    readonly property real dockzoneExpandWidth: volumeBadge.dockzoneExpandWidth
 
     implicitWidth: volumeBadge.implicitWidth
     implicitHeight: 30
 
-    // Render the circular volume badge and expand the percentage on hover.
+    // Render the circular volume badge and reveal the percentage below the dockzone.
     Widgets.CircularHoverWidget {
         id: volumeBadge
 
@@ -32,12 +34,14 @@ Item {
             Services.VolumeService.setSinkVolume(Services.VolumeService.sinkVolume + delta)
         }
 
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Services.VolumeService.sinkMuted ? "Muted" : (Math.round(Services.VolumeService.sinkVolume * 100) + "%")
-            color: Services.VolumeService.sinkMuted
-                ? Services.Color.mError
-                : Services.Color.mOnSurface
+        Widgets.CompactHoverDetail {
+            iconText: Services.VolumeService.sinkMuted ? "\uf6a9" : "\uf028"
+            labelText: "Volume"
+            valueText: Services.VolumeService.sinkMuted ? "Muted" : (Math.round(Services.VolumeService.sinkVolume * 100) + "%")
+            progressValue: root.displayVolume
+            accentColor: root.accentColor
+            interactive: true
+            onMoved: value => Services.VolumeService.setSinkVolume(value)
         }
     }
 }

@@ -162,7 +162,14 @@ Item {
     readonly property real topBandHeight: metrics.topBandHeight
     readonly property real contentShiftX: metrics.contentShiftX
 
-    implicitWidth: metrics.containerWidth + Math.max(0, root.expandWidth - metrics.bodyWidth)
+    // The outer container keeps its resting width so hover-driven expandWidth
+    // does not widen the owning section (which would reposition edge-anchored
+    // sections and displace their widgets away from the cursor — the flicker
+    // loop). The glass body expands visually beyond this container; the host
+    // clip still follows pushedBodyWidth so content stays masked correctly.
+    readonly property real restingContainerWidth: metrics.containerWidth
+
+    implicitWidth: metrics.containerWidth
     implicitHeight: metrics.containerHeight + root.expandHeight
     width: implicitWidth
     height: implicitHeight

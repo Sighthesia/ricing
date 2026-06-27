@@ -13,9 +13,11 @@ Item {
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     readonly property string widgetId: widgetEntry && widgetEntry.id ? widgetEntry.id : ""
     readonly property real dockzoneExpandHeight: root._dockzoneExpandHeight
+    readonly property real dockzoneExpandWidth: root._dockzoneExpandWidth
     readonly property bool localPointerIntent: pointerHover.hovered
     readonly property real centerXInRoot: width > 0 ? mapToItem(null, width / 2, height / 2).x : 0
     property real _dockzoneExpandHeight: 0
+    property real _dockzoneExpandWidth: 0
     objectName: widgetInstanceKey
 
     implicitHeight: loader.item ? loader.item.implicitHeight : 0
@@ -115,6 +117,9 @@ Item {
             root._dockzoneExpandHeight = item.dockzoneExpandHeight !== undefined
                 ? item.dockzoneExpandHeight
                 : 0
+            root._dockzoneExpandWidth = item.dockzoneExpandWidth !== undefined
+                ? item.dockzoneExpandWidth
+                : 0
         }
     }
 
@@ -125,6 +130,12 @@ Item {
         function onDockzoneExpandHeightChanged() {
             root._dockzoneExpandHeight = loader.item && loader.item.dockzoneExpandHeight !== undefined
                 ? loader.item.dockzoneExpandHeight
+                : 0
+        }
+
+        function onDockzoneExpandWidthChanged() {
+            root._dockzoneExpandWidth = loader.item && loader.item.dockzoneExpandWidth !== undefined
+                ? loader.item.dockzoneExpandWidth
                 : 0
         }
     }
