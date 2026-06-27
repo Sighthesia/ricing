@@ -15,6 +15,15 @@ Singleton {
     property int _positionTick: 0
     property string _preferredPlayerKey: ""
     property var _activePlayerRef: null
+    // Sticky lock: when set, the active player stays selected even if another
+    // player starts playing, until the locked player stops or disappears.
+    property bool _userLockedPlayer: false
+    property string _userLockedPlayerKey: ""
+    // Debounce timestamp (ms) to suppress auto-switching when multiple players
+    // are simultaneously playing; the selection only switches if a different
+    // player has been preferred for longer than this window.
+    property real _lastSelectionChangeAt: 0
+    readonly property real _selectionDebounceMs: 800
     property string artUrl: ""
     property string _lastArtKey: ""
     property string _lastArtPlayerKey: ""
@@ -29,6 +38,21 @@ Singleton {
 
     readonly property var activePlayer: root._activePlayerRef
     readonly property bool hasPlayer: activePlayer !== null
+    // Live list of all MPRIS players for control-center listing.
+    readonly property var playerList: Mpris.players.values
+    readonly property int playerCount: root.playerList.length
+    readonly property int activePlayerIndex: {
+        const players = root.playerList
+        const current = root.activePlayer
+        if (!current)
+            return -1
+
+        for (let i = 0; i < players.length; i += 1) {
+            if (players[i] === current)
+                return i
+        }
+        return -1
+    }
     readonly property bool playing: root.playbackState === "playing"
     readonly property string playerName:
         hasPlayer ? (activePlayer.identity || activePlayer.desktopEntry || "") : ""
@@ -232,20 +256,106 @@ Singleton {
                 firstPlayingPlayer = player
         }
 
-        if (preferredPlayer !== null && preferredPlayer.isPlaying)
-            return preferredPlayer
-        if (firstPlayingPlayer !== null)
+        // User-locked player takes priority until it stops or disappears.
+        if (root._userLockedPlayer && root._userLockedPlayerKey !== "") {
+            let lockedPlayer = null
+            for (let index = 0; index < players.length; index += 1) {
+                const player = players[index]
+                if (player && root._artPlayerKey(player) === root._userLockedPlayerKey) {
+                    lockedPlayer = player
+                    break
+                }
+            }
+
+            if (lockedPlayer) {
+                const stillPlaying = lockedPlayer.isPlaying
+                    || lockedPlayer.playbackState === MprisPlaybackState.Paused
+                if (stillPlaying)
+                    return lockedPlayer
+            }
+            // Locked player gone or stopped — release the lock.
+            root._userLockedPlayer = false
+            root._userLockedPlayerKey = ""
+        }
+
+        const current = root._activePlayerRef
+        const currentKey = root._artPlayerKey(current)
+
+        // Sticky: keep the current player while it is still playing so a
+        // newly started second player does not preempt it.
+        if (current && current.isPlaying)
+            return current
+
+        // If current is paused and another player starts playing, debounce
+        // the switch so brief play-state flickers do not cause churn.
+        if (firstPlayingPlayer !== null) {
+            const candidateKey = root._artPlayerKey(firstPlayingPlayer)
+            if (currentKey === candidateKey)
+                return firstPlayingPlayer
+
+            const now = Date.now()
+            if (root._lastSelectionChangeAt === 0
+                    || (now - root._lastSelectionChangeAt) >= root._selectionDebounceMs) {
+                root._lastSelectionChangeAt = now
+                return firstPlayingPlayer
+            }
+            // Within the debounce window: keep current if it still exists.
+            if (current)
+                return current
             return firstPlayingPlayer
+        }
+
         if (preferredPlayer !== null)
             return preferredPlayer
+
+        // Fall back to the current player if it still exists, even when paused,
+        // so the bar does not flash empty on transient play/pause toggles.
+        if (current)
+            return current
 
         return players.length > 0 ? players[0] : null
     }
 
     function _syncActivePlayer() {
         const nextPlayer = root._selectActivePlayer()
+        const previousKey = root._artPlayerKey(root._activePlayerRef)
+        const nextKey = root._artPlayerKey(nextPlayer)
+        if (previousKey !== nextKey)
+            root._lastSelectionChangeAt = Date.now()
+
         root._activePlayerRef = nextPlayer
-        root._preferredPlayerKey = root._artPlayerKey(nextPlayer)
+        root._preferredPlayerKey = nextKey
+    }
+
+    // User-selected active player from the control center; locks selection
+    // until the user picks another, or the player stops/leaves.
+    function setActivePlayer(playerKey) {
+        const normalizedKey = playerKey != null ? String(playerKey) : ""
+        if (normalizedKey === "")
+            return
+
+        const players = Mpris.players.values
+        for (let index = 0; index < players.length; index += 1) {
+            const player = players[index]
+            if (player && root._artPlayerKey(player) === normalizedKey) {
+                root._userLockedPlayer = true
+                root._userLockedPlayerKey = normalizedKey
+                root._activePlayerRef = player
+                root._preferredPlayerKey = normalizedKey
+                root._lastSelectionChangeAt = Date.now()
+                root._syncArtUrl()
+                root.mediaChanged()
+                return
+            }
+        }
+    }
+
+    function clearActivePlayerLock() {
+        root._userLockedPlayer = false
+        root._userLockedPlayerKey = ""
+        root._syncActivePlayer()
+        root._syncArtUrl()
+        root.mediaChanged()
     }
 
     function _syncArtUrl() {

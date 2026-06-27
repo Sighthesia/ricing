@@ -1,74 +1,80 @@
 import QtQuick
-import "../bar/MenuVisuals.js" as MenuVisuals
 import "../../services" as Services
 
 // Media detail page for the shared island surface.
+// Lists every live MPRIS player as a MediaPlayerCard; selecting a card
+// locks it as the active media source for the bar and compact rendering.
+// When no players are active, shows a placeholder prompt.
 Item {
     id: root
 
+    readonly property var players: Services.MediaService.playerList
+    readonly property int playerCount: Services.MediaService.playerCount
+    readonly property string activePlayerKey: Services.MediaService.hasPlayer
+        ? (Services.MediaService.activePlayer.identity || Services.MediaService.activePlayer.desktopEntry || "")
+        : ""
+
+    // Empty-state placeholder when no player is connected.
     Column {
-        anchors.fill: parent
-        spacing: 10
+        id: emptyState
 
-        Rectangle {
-            width: parent.width
-            height: 110
-            radius: 18
-            color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
+        anchors.centerIn: parent
+        visible: root.playerCount === 0
+        spacing: 8
 
-            Column {
-                anchors.fill: parent
-                anchors.margins: 14
-                spacing: 4
-
-                Services.AnimatedTextSwitch {
-                    text: Services.MediaControlService.title !== "" ? Services.MediaControlService.title : "暂无媒体"
-                    color: Services.Color.mOnSurface
-                    basePixelSize: 16
-                    font.bold: true
-                    width: parent.width
-                    clipWidth: parent.width
-                    elide: Text.ElideRight
-                }
-
-                Services.AnimatedTextSwitch {
-                    text: Services.MediaControlService.artist !== "" ? Services.MediaControlService.artist : "等待播放器连接"
-                    color: Services.Color.mOnSurfaceVariant
-                    basePixelSize: 12
-                    width: parent.width
-                    clipWidth: parent.width
-                    elide: Text.ElideRight
-                }
-
-                Services.FluidText {
-                    text: Services.MediaControlService.playbackState
-                    color: Services.Color.mPrimary
-                    basePixelSize: 11
-                    width: parent.width
-                }
-            }
+        Services.FluidText {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "\u266A"
+            color: Services.Color.mPrimary
+            basePixelSize: 32
+            opacity: 0.6
         }
 
-        Row {
+        Services.FluidText {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "\u6682\u65E0\u5A92\u4F53"
+            color: Services.Color.mOnSurface
+            basePixelSize: 16
+            font.bold: true
+        }
+
+        Services.FluidText {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "\u7B49\u5F85\u64AD\u653E\u5668\u8FDE\u63A5"
+            color: Services.Color.mOnSurfaceVariant
+            basePixelSize: 12
+        }
+    }
+
+    // Scrollable list of all live media players.
+    Flickable {
+        id: playerList
+
+        anchors.fill: parent
+        visible: root.playerCount > 0
+        contentWidth: width
+        contentHeight: playerColumn.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+
+        Column {
+            id: playerColumn
+
             width: parent.width
-            spacing: 8
+            spacing: 10
 
-            IslandActionButton {
-                text: "上一首"
-                enabled: Services.MediaControlService.canGoPrevious
-                onClicked: Services.MediaControlService.previous()
-            }
+            Repeater {
+                model: root.players
 
-            IslandActionButton {
-                text: Services.MediaControlService.playbackState === "playing" ? "暂停" : "播放"
-                enabled: Services.MediaControlService.canTogglePlayback
-                onClicked: Services.MediaControlService.playPause()
-            }
+                // Single media player card with cover, metadata, and controls.
+                MediaPlayerCard {
+                    required property var modelData
 
-            IslandActionButton {
-                text: "下一首"
-                enabled: Services.MediaControlService.canGoNext
-                onClicked: Services.MediaControlService.next()
+                    width: parent.width
+                    player: modelData
+                    isActive: (modelData.identity || modelData.desktopEntry || "") === root.activePlayerKey
+                }
             }
         }
     }
