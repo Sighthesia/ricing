@@ -9,12 +9,16 @@ Item {
     property var values: []
     property string style: "bars"
     property bool mirror: true
+    property real heightScale: Services.SpectrumService.dockzoneHeightScale
+    property real barWidthRatio: Services.SpectrumService.dockzoneBarWidthRatio
+    property real barSpacing: Services.SpectrumService.dockzoneSpacing
     property color barColor: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.34)
 
     readonly property int valuesCount: (root.values && root.values.length !== undefined) ? root.values.length : 0
     readonly property int mirroredCount: root.mirror ? root.valuesCount * 2 : root.valuesCount
     readonly property int totalElements: mirroredCount
-    readonly property real slotWidth: root.totalElements > 0 ? root.width / root.totalElements : 0
+    readonly property real totalSpacing: Math.max(0, root.totalElements - 1) * Math.max(0, root.barSpacing)
+    readonly property real slotWidth: root.totalElements > 0 ? Math.max(0, (root.width - root.totalSpacing) / root.totalElements) : 0
     readonly property real floorInset: 4
     readonly property real usableHeight: Math.max(0, root.height - root.floorInset)
 
@@ -32,6 +36,7 @@ Item {
         delegate: Rectangle {
             readonly property int vi: root.valueIndex(index)
             readonly property real amplitude: (root.values && root.values[vi] !== undefined) ? root.values[vi] : 0
+            readonly property real scaledAmplitude: Math.max(0, Math.min(1, amplitude * Math.max(0.1, root.heightScale)))
             readonly property real emphasis: {
                 if (root.totalElements <= 1)
                     return 1
@@ -42,15 +47,15 @@ Item {
             }
 
             width: root.style === "dots"
-                ? Math.max(2, root.slotWidth * 0.5)
-                : Math.max(1, root.slotWidth * 0.42)
+                ? Math.max(2, root.slotWidth * Math.max(0.05, Math.min(1, root.barWidthRatio)))
+                : Math.max(1, root.slotWidth * Math.max(0.05, Math.min(1, root.barWidthRatio)))
             height: root.style === "dots"
                 ? width
-                : root.usableHeight * amplitude
+                : root.usableHeight * scaledAmplitude
             radius: root.style === "dots" ? width / 2 : width / 2
-            x: index * root.slotWidth + ((root.slotWidth - width) / 2)
+            x: index * (root.slotWidth + Math.max(0, root.barSpacing)) + ((root.slotWidth - width) / 2)
             y: root.style === "dots"
-                ? root.height - (root.usableHeight * amplitude) - height - root.floorInset / 2
+                ? root.height - (root.usableHeight * scaledAmplitude) - height - root.floorInset / 2
                 : root.height - height - root.floorInset
             color: Qt.rgba(root.barColor.r, root.barColor.g, root.barColor.b, root.barColor.a * emphasis)
             visible: height > 0.5 && root.visible
@@ -75,7 +80,9 @@ Item {
 
             const mirror = root.mirror
             const total = mirror ? n * 2 : n
-            const slotW = w / total
+            const spacing = Math.max(0, root.barSpacing)
+            const totalSpacing = Math.max(0, total - 1) * spacing
+            const slotW = Math.max(0, (w - totalSpacing) / total)
             const usable = root.usableHeight
 
             ctx.beginPath()
@@ -92,8 +99,9 @@ Item {
                 }
 
                 const amp = (root.values && root.values[vi] !== undefined) ? root.values[vi] : 0
-                const cx = i === 0 ? 0 : (i === total ? w : i * slotW + slotW / 2)
-                const cy = h - root.floorInset - usable * amp
+                const scaledAmp = Math.max(0, Math.min(1, amp * Math.max(0.1, root.heightScale)))
+                const cx = i === 0 ? 0 : (i === total ? w : i * (slotW + spacing) + slotW / 2)
+                const cy = h - root.floorInset - usable * scaledAmp
                 ctx.lineTo(cx, cy)
             }
 

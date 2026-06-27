@@ -61,7 +61,7 @@ Item {
     Timer {
         id: hoverExitHoldTimer
 
-        interval: 220
+        interval: 300
         repeat: false
     }
 

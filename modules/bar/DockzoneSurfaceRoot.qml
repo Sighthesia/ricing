@@ -152,8 +152,7 @@ Item {
     // expansion is applied here as a lightweight additive override on top of the
     // resting model geometry, so the per-frame spring never re-runs the JS
     // model (which would thrash the GC and stutter the animation).
-    readonly property real expandDelta: Math.max(0, root.expandWidth - metrics.bodyWidth)
-    readonly property real bodyX: metrics.bodyX - root.expandDelta / 2
+    readonly property real bodyX: metrics.bodyX
     readonly property real bodyY: metrics.bodyY
     readonly property real bodyWidth: Math.max(metrics.bodyWidth, root.expandWidth)
     readonly property real bodyHeight: metrics.bodyHeight + root.expandHeight
@@ -164,12 +163,11 @@ Item {
     readonly property real contentShiftX: metrics.contentShiftX
 
     // The outer container keeps its resting width so hover-driven expandWidth
-    // does not widen the owning section (which would reposition edge-anchored
-    // sections and displace their widgets away from the cursor — the flicker
-    // loop). The glass body expands visually beyond this container; the host
-    // clip still follows pushedBodyWidth so content stays masked correctly.
-    readonly property real restingContainerWidth: metrics.containerWidth
-
+    // does not widen the owning section. Edge-anchored sections (right) would
+    // otherwise shift sideways as they widen toward center, moving their
+    // widgets away from the cursor and oscillating the hover loop. The glass
+    // body paints beyond this container; content clipping follows
+    // pushedBodyWidth so the reveal stays masked correctly.
     implicitWidth: metrics.containerWidth
     implicitHeight: metrics.containerHeight + root.expandHeight
     width: implicitWidth
@@ -183,7 +181,10 @@ Item {
     readonly property bool isLeftSection: root.section === "left"
     readonly property bool isRightSection: root.section === "right"
     readonly property int earBlurStripCount: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset * 2)
-    readonly property real pushShrinkLimit: Math.max(0, root.bodyWidth - root.earRadius)
+    // Use the natural (un-extended) body width for push/shrink math so
+    // hover-driven expandWidth cannot feed back into section displacement
+    // (which would move edge widgets away from the cursor and oscillate).
+    readonly property real pushShrinkLimit: Math.max(0, root.naturalBodyWidth - root.earRadius)
     readonly property real bodyShrinkX: (root.isLeftSection || root.isRightSection) ? Math.min(root.sectionPushOffsetX, root.pushShrinkLimit) : 0
     readonly property real residualPushOffsetX: (root.isLeftSection || root.isRightSection) ? Math.max(0, root.sectionPushOffsetX - root.pushShrinkLimit) : 0
     readonly property real pushedBodyX: root.bodyX
