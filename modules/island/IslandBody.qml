@@ -29,6 +29,36 @@ Item {
     readonly property int hoverWLift: 12
     readonly property int hoverHLift: 4
     readonly property int hoverRadiusLift: 2
+    // Hover-driven content scale lift, mirroring the dockzone motion contract:
+    // the collapsed body breathes by 3% so hover reads as the same object
+    // growing, matching the edge dockzone's motionBlend * 0.03 scale lift.
+    readonly property real hoverScaleLift: 0.03
+    // Spring-animated hover progress (0..1) so the scale lift eases in/out
+    // instead of snapping with the boolean hover state. Mirrors the dockzone
+    // _hoverProgress + Motion.hover spring pair.
+    property real _hoverProgress: 0
+    // Suppress the hover lift once the island leaves the collapsed capsule
+    // state (expanded panel, hosted menus, window-hint stage) so the lift
+    // only applies to the same collapsed silhouette the edge dockzones lift.
+    readonly property bool _collapsedHoverActive: hoverHandler.hovered
+        && !Services.IslandService.expanded
+        && !root.hostsCenterContextMenu
+        && !root.hostsCenterWidgetPicker
+        && !root.hostsCenterWidgetSettings
+        && !Services.IslandService.windowHintActive
+
+    // Initialize hover progress from the live collapsed-hover state on creation
+    // (the existing Component.onCompleted block below folds this in).
+    on_CollapsedHoverActiveChanged: root._hoverProgress = root._collapsedHoverActive ? 1 : 0
+
+    Behavior on _hoverProgress {
+        SpringAnimation {
+            spring: Services.Motion.hover.spring
+            damping: Services.Motion.hover.damping
+            mass: Services.Motion.hover.mass
+            epsilon: Services.Motion.hover.epsilon
+        }
+    }
     readonly property int expandedW: Math.min(620, Screen.width - 48)
     readonly property int expandedH: Math.min(620, Screen.height - 96)
     // Sum of the overview collage rows (launcher + gaps + cards), so
@@ -167,6 +197,12 @@ Item {
     height: surface.height
     implicitWidth: width
     implicitHeight: height
+    // Hover-driven content scale lift mirrors the edge dockzone motion
+    // contract: the collapsed silhouette grows by 3% on hover so the whole
+    // body (glass + content) reads as one continuous object breathing, not
+    // just the geometry widening. Suppressed outside the collapsed state.
+    scale: 1 + root._hoverProgress * root.hoverScaleLift
+    transformOrigin: Item.Center
 
     // Forward the surface blur parts for IslandWindow's blur region tracking.
     readonly property var blurParts: surface.blurParts
@@ -231,6 +267,7 @@ Item {
     Component.onCompleted: {
         syncSpectrumRegistration()
         Services.IslandService.setCenterSurfaceWidth(root.screenName, width)
+        root._hoverProgress = root._collapsedHoverActive ? 1 : 0
     }
     Component.onDestruction: {
         if (root._spectrumRegistered)
