@@ -114,6 +114,20 @@ var AVAILABLE_WIDGETS = [
         source: "../../modules/bar/widgets/Volume.qml",
     },
     {
+        id: "bluetooth",
+        label: "Bluetooth",
+        description: "Bluetooth adapter power, scan, and device list.",
+        section: "right",
+        source: "../../modules/bar/widgets/Bluetooth.qml",
+    },
+    {
+        id: "network",
+        label: "Wi-Fi",
+        description: "Wi-Fi power, scan, and network list.",
+        section: "right",
+        source: "../../modules/bar/widgets/Network.qml",
+    },
+    {
         id: "media",
         label: "Media",
         description: "Compact now playing with lyric priority.",

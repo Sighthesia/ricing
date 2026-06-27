@@ -8,6 +8,8 @@ singleton ColorService 1.0 ColorService.qml
 singleton NiriService 1.0 NiriService.qml
 singleton NotificationService 1.0 NotificationService.qml
 singleton VolumeService 1.0 VolumeService.qml
+singleton BluetoothService 1.0 BluetoothService.qml
+singleton NetworkService 1.0 NetworkService.qml
 singleton WallpaperService 1.0 WallpaperService.qml
 singleton SettingsService 1.0 SettingsService.qml
 singleton ClipboardService 1.0 ClipboardService.qml

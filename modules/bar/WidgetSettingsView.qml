@@ -151,6 +151,30 @@ Item {
         }
     }
 
+    Component {
+        id: bluetoothPanelComponent
+
+        WidgetPanels.BluetoothSettingsPanel {
+            width: parent ? parent.width : 0
+        }
+    }
+
+    Component {
+        id: networkPanelComponent
+
+        WidgetPanels.NetworkSettingsPanel {
+            width: parent ? parent.width : 0
+        }
+    }
+
+    Component {
+        id: volumePanelComponent
+
+        WidgetPanels.VolumeSettingsPanel {
+            width: parent ? parent.width : 0
+        }
+    }
+
     function panelComponentForType(panelType) {
         switch (panelType) {
         case "clock":
@@ -163,6 +187,12 @@ Item {
             return mediaPanelComponent
         case "system-monitor":
             return systemMonitorPanelComponent
+        case "bluetooth":
+            return bluetoothPanelComponent
+        case "network":
+            return networkPanelComponent
+        case "volume":
+            return volumePanelComponent
         default:
             return null
         }

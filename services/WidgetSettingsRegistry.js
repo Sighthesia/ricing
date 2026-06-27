@@ -47,15 +47,30 @@ var _definitions = {
         panelKey: "media",
         instanceScoped: true,
         defaults: {
-            showAudioSpectrum: false,
             lyricsDisplayMode: "Original",
             maxWidth: 240,
-            spectrumPosition: "Bar",
-            spectrumStyle: "Bars",
-            spectrumMirror: true,
-            spectrumColor: "Primary",
-            spectrumOpacity: 34,
+            spectrumHeight: 100,
+            spectrumBarWidth: 42,
+            spectrumSpacing: 0,
         },
+    },
+    "bluetooth": {
+        title: "Bluetooth Settings",
+        panelKey: "bluetooth",
+        instanceScoped: true,
+        defaults: {},
+    },
+    "network": {
+        title: "Wi-Fi Settings",
+        panelKey: "network",
+        instanceScoped: true,
+        defaults: {},
+    },
+    "volume": {
+        title: "Volume Settings",
+        panelKey: "volume",
+        instanceScoped: true,
+        defaults: {},
     },
 }
 

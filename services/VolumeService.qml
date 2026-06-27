@@ -44,6 +44,50 @@ Singleton {
             Pipewire.defaultAudioSource.audio.muted = !Pipewire.defaultAudioSource.audio.muted
     }
 
+    // --- Device enumeration (hardware sinks/sources, excluding streams) ---
+    readonly property var sinks: Pipewire.ready ? _filterDevices(true) : []
+    readonly property var sources: Pipewire.ready ? _filterDevices(false) : []
+
+    function _filterDevices(wantSinks) {
+        if (!Pipewire.nodes || !Pipewire.nodes.values) return []
+        return Pipewire.nodes.values.filter(function (node) {
+            if (!node || node.isStream) return false
+            var name = node.name || ""
+            var mediaName = (node.properties && node.properties["media.name"]) || ""
+            if (name === "quickshell" || mediaName === "quickshell") return false
+            if (wantSinks) return node.isSink === true
+            // Source: not a sink, has audio
+            return node.audio != null && !node.isSink
+        })
+    }
+
+    // Track all device nodes so their audio properties stay bound.
+    property PwObjectTracker _deviceTracker: PwObjectTracker {
+        objects: root.sinks.concat(root.sources)
+    }
+
+    // Switch the default output device.
+    function setAudioSink(node) {
+        if (!Pipewire.ready || !node) return
+        Pipewire.preferredDefaultAudioSink = node
+        console.info("[Volume] setAudioSink", node.name || node.description)
+    }
+
+    // Switch the default input device.
+    function setAudioSource(node) {
+        if (!Pipewire.ready || !node) return
+        Pipewire.preferredDefaultAudioSource = node
+        console.info("[Volume] setAudioSource", node.name || node.description)
+    }
+
+    // Human-readable label for a device node.
+    function deviceLabel(node) {
+        if (!node) return ""
+        var desc = node.description
+        if (desc && String(desc).trim() !== "") return desc
+        return node.name || "Device"
+    }
+
     // IPC surface for niri keybind integration.
     property IpcHandler ipc: IpcHandler {
         target: "VolumeService"

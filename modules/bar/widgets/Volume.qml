@@ -1,5 +1,6 @@
 import "." as Widgets
 import QtQuick
+import Quickshell.Services.Pipewire
 import "../../../services" as Services
 
 // Volume indicator with scroll-to-adjust and click-to-mute.
@@ -38,6 +39,7 @@ Item {
             iconText: Services.VolumeService.sinkMuted ? "\uf6a9" : "\uf028"
             labelText: "Volume"
             valueText: Services.VolumeService.sinkMuted ? "Muted" : (Math.round(Services.VolumeService.sinkVolume * 100) + "%")
+            secondaryText: Pipewire.defaultAudioSink ? Services.VolumeService.deviceLabel(Pipewire.defaultAudioSink) : ""
             progressValue: root.displayVolume
             accentColor: root.accentColor
             interactive: true
