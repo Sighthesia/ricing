@@ -51,7 +51,7 @@ Singleton {
         if (!device || device.percentage === undefined)
             return 0
 
-        return Math.round(device.percentage)
+        return Math.round(device.percentage * 100)
     }
 
     function isCharging(device) {
