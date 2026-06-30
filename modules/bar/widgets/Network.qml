@@ -7,6 +7,9 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
+    property real dockzoneRevealCenterX: -1
+    property real dockzoneRevealTargetCenterX: -1
+    property real dockzoneRevealViewportWidth: -1
     readonly property real dockzoneExpandHeight: wifiBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: wifiBadge.dockzoneExpandWidth
 
@@ -41,6 +44,9 @@ Item {
         centerTextFontFamily: "Symbols Nerd Font"
         centerTextPixelSize: 10
         centerTextColor: root.stateColor
+        dockzoneRevealCenterX: root.dockzoneRevealCenterX
+        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
+        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         progressValue: Services.NetworkService.wifiConnected ? root.connectedSignalFraction : -1
         progressColor: root.stateColor
         onActivated: Services.NetworkService.setWifiEnabled(!Services.NetworkService.wifiEnabled)

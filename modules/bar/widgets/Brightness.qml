@@ -6,6 +6,9 @@ import "../../../services" as Services
 Item {
     id: root
 
+    property real dockzoneRevealCenterX: -1
+    property real dockzoneRevealTargetCenterX: -1
+    property real dockzoneRevealViewportWidth: -1
     readonly property real dockzoneExpandHeight: brightnessBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: brightnessBadge.dockzoneExpandWidth
 
@@ -21,6 +24,9 @@ Item {
         centerTextFontFamily: "Symbols Nerd Font"
         centerTextPixelSize: 10
         centerTextColor: Services.Color.mPrimary
+        dockzoneRevealCenterX: root.dockzoneRevealCenterX
+        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
+        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         progressValue: Services.BrightnessService.brightness
         progressColor: Services.Color.mPrimary
         onWheel: event => {

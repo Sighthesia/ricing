@@ -9,6 +9,9 @@ Item {
     required property string widgetSource
     required property string screenName
     property real availableWidth: -1
+    property real dockzoneRevealCenterX: -1
+    property real dockzoneRevealTargetCenterX: -1
+    property real dockzoneRevealViewportWidth: -1
 
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     readonly property string widgetId: widgetEntry && widgetEntry.id ? widgetEntry.id : ""
@@ -113,6 +116,15 @@ Item {
 
             if (item.availableWidth !== undefined)
                 item.availableWidth = Qt.binding(function() { return root.availableWidth })
+
+            if (item.dockzoneRevealCenterX !== undefined)
+                item.dockzoneRevealCenterX = Qt.binding(function() { return root.dockzoneRevealCenterX })
+
+            if (item.dockzoneRevealTargetCenterX !== undefined)
+                item.dockzoneRevealTargetCenterX = Qt.binding(function() { return root.dockzoneRevealTargetCenterX })
+
+            if (item.dockzoneRevealViewportWidth !== undefined)
+                item.dockzoneRevealViewportWidth = Qt.binding(function() { return root.dockzoneRevealViewportWidth })
 
             root._dockzoneExpandHeight = item.dockzoneExpandHeight !== undefined
                 ? item.dockzoneExpandHeight

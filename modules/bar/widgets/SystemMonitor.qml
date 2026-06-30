@@ -7,6 +7,9 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
+    property real dockzoneRevealCenterX: -1
+    property real dockzoneRevealTargetCenterX: -1
+    property real dockzoneRevealViewportWidth: -1
 
     readonly property var monitorSettings: Services.SettingsService.widgetSettingsObject(
         "system-monitor",
@@ -47,6 +50,9 @@ Item {
         centerTextFontFamily: "Symbols Nerd Font"
         centerTextPixelSize: 10
         centerTextColor: root.cpuAccentColor
+        dockzoneRevealCenterX: root.dockzoneRevealCenterX
+        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
+        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         progressValue: Services.SystemMonitorService.cpuUsage / 100
         progressColor: root.cpuAccentColor
 

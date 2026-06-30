@@ -11,6 +11,9 @@ Item {
     readonly property color accentColor: Services.VolumeService.sinkMuted
         ? Services.Color.mError
         : Services.Color.mPrimary
+    property real dockzoneRevealCenterX: -1
+    property real dockzoneRevealTargetCenterX: -1
+    property real dockzoneRevealViewportWidth: -1
     readonly property real dockzoneExpandHeight: volumeBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: volumeBadge.dockzoneExpandWidth
 
@@ -27,6 +30,9 @@ Item {
         centerTextFontFamily: "Symbols Nerd Font"
         centerTextPixelSize: 10
         centerTextColor: root.accentColor
+        dockzoneRevealCenterX: root.dockzoneRevealCenterX
+        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
+        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         progressValue: root.displayVolume
         progressColor: root.accentColor
         onActivated: Services.VolumeService.toggleSinkMute()

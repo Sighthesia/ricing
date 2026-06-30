@@ -7,6 +7,9 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
+    property real dockzoneRevealCenterX: -1
+    property real dockzoneRevealTargetCenterX: -1
+    property real dockzoneRevealViewportWidth: -1
     readonly property real dockzoneExpandHeight: btBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: btBadge.dockzoneExpandWidth
 
@@ -38,6 +41,9 @@ Item {
         centerTextFontFamily: "Symbols Nerd Font"
         centerTextPixelSize: 10
         centerTextColor: root.stateColor
+        dockzoneRevealCenterX: root.dockzoneRevealCenterX
+        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
+        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         progressValue: -1
         progressColor: root.stateColor
         onActivated: Services.BluetoothService.setBluetoothEnabled(!Services.BluetoothService.enabled)

@@ -7,6 +7,9 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
+    property real dockzoneRevealCenterX: -1
+    property real dockzoneRevealTargetCenterX: -1
+    property real dockzoneRevealViewportWidth: -1
     readonly property real dockzoneExpandHeight: batteryBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: batteryBadge.dockzoneExpandWidth
 
@@ -50,6 +53,9 @@ Item {
         centerText: root.collapsedText
         centerTextPixelSize: 10
         centerTextColor: root.stateColor
+        dockzoneRevealCenterX: root.dockzoneRevealCenterX
+        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
+        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         progressValue: Services.BatteryService.percentage / 100
         progressColor: root.stateColor
 

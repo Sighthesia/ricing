@@ -428,6 +428,12 @@ Item {
                                 screenName: root.screenName
                                 widgetEntry: root.sectionModel[index]
                                 widgetSource: Qt.resolvedUrl(widgetEntry.source)
+                                dockzoneRevealCenterX: sectionRow.x + x + width / 2
+                                dockzoneRevealTargetCenterX: sectionClip.width / 2
+                                    + (root.sectionName === "right"
+                                        ? dockzone.bodyShrinkX / 2
+                                        : (root.sectionName === "left" ? -dockzone.bodyShrinkX / 2 : 0))
+                                dockzoneRevealViewportWidth: sectionClip.width
                                 readonly property real widgetCenterXInSection: x + width / 2
                                 readonly property real widgetRowWidth: sectionRow.implicitWidth
 

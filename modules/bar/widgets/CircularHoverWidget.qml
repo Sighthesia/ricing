@@ -35,8 +35,26 @@ Item {
     property bool clickable: false
     property bool showPointerCursor: true
     property int activationButtons: Qt.LeftButton
+    property real dockzoneRevealCenterX: -1
+    property real dockzoneRevealTargetCenterX: -1
+    property real dockzoneRevealViewportWidth: -1
     readonly property bool expanded: badgeArea.containsMouse || detailHover.hovered || hoverExitHoldTimer.running
     readonly property real clampedProgress: progressValue < 0 ? -1 : Math.max(0, Math.min(1, progressValue))
+    readonly property real detailCenterXInViewport: {
+        if (dockzoneRevealTargetCenterX >= 0)
+            return dockzoneRevealTargetCenterX
+
+        if (dockzoneRevealCenterX < 0 || dockzoneRevealViewportWidth <= 0)
+            return root.width / 2
+
+        return dockzoneRevealViewportWidth / 2
+    }
+    readonly property real detailCenterXInWidget: {
+        if (dockzoneRevealCenterX < 0 || dockzoneRevealViewportWidth <= 0)
+            return root.width / 2
+
+        return root.width / 2 + (root.detailCenterXInViewport - dockzoneRevealCenterX)
+    }
     readonly property real dockzoneExpandHeight: detailRow.implicitWidth > 0
         ? (root.expanded ? detailSlot.expandedHeight : 0)
         : 0
@@ -155,7 +173,7 @@ Item {
         property real revealHeight: root.expanded ? expandedHeight : 0
 
         z: 2
-        anchors.horizontalCenter: parent.horizontalCenter
+        x: root.detailCenterXInWidget - width / 2
         y: root.implicitHeight + root.contentSpacing - (root.expanded ? 0 : 5)
         width: detailRow.implicitWidth
         height: revealHeight
