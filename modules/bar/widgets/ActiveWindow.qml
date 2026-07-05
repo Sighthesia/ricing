@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Widgets
 import "../../../services" as Services
 import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
@@ -108,7 +109,7 @@ Item {
             // Switch the focused app icon with the same directional motion as the title.
             Services.AnimatedIconSwitch {
                 anchors.fill: parent
-                source: root.currentAppId !== "" ? ("image://icon/" + root.currentAppId) : ""
+                source: Quickshell.iconPath(root.currentAppId, "application-x-executable")
                 visible: iconSlot.width > 0
             }
         }
