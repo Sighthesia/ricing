@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "." as Services
 
 // Screen brightness state via brightnessctl, polled periodically.
 Singleton {
@@ -19,6 +20,8 @@ Singleton {
     property IpcHandler ipc: IpcHandler {
         target: "BrightnessService"
         function setBrightness(delta: real) { root.setBrightness(root.brightness + delta) }
+        function stepBrightnessUp() { root.setBrightness(root.brightness + Services.SettingsService.controls.brightnessStep) }
+        function stepBrightnessDown() { root.setBrightness(root.brightness - Services.SettingsService.controls.brightnessStep) }
     }
 
     // Poll brightnessctl -m for current value

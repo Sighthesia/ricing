@@ -37,7 +37,8 @@ Item {
         progressColor: root.accentColor
         onActivated: Services.VolumeService.toggleSinkMute()
         onWheel: event => {
-            let delta = event.angleDelta.y > 0 ? 0.05 : -0.05
+            let step = Services.SettingsService.controls.volumeStep
+            let delta = event.angleDelta.y > 0 ? step : -step
             Services.VolumeService.setSinkVolume(Services.VolumeService.sinkVolume + delta)
         }
 

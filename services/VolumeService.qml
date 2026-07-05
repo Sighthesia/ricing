@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
+import "." as Services
 
 // Pipewire audio state: default sink/source volume and mute control.
 Singleton {
@@ -92,6 +93,8 @@ Singleton {
     property IpcHandler ipc: IpcHandler {
         target: "VolumeService"
         function setSinkVolume(volume: real) { root.setSinkVolume(root.sinkVolume + volume) }
+        function stepVolumeUp() { root.setSinkVolume(root.sinkVolume + Services.SettingsService.controls.volumeStep) }
+        function stepVolumeDown() { root.setSinkVolume(root.sinkVolume - Services.SettingsService.controls.volumeStep) }
         function toggleSinkMute() { root.toggleSinkMute() }
         function toggleSourceMute() { root.toggleSourceMute() }
     }

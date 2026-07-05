@@ -30,7 +30,8 @@ Item {
         progressValue: Services.BrightnessService.brightness
         progressColor: Services.Color.mPrimary
         onWheel: event => {
-            let delta = event.angleDelta.y > 0 ? 0.05 : -0.05
+            let step = Services.SettingsService.controls.brightnessStep
+            let delta = event.angleDelta.y > 0 ? step : -step
             Services.BrightnessService.setBrightness(Services.BrightnessService.brightness + delta)
         }
 

@@ -12,6 +12,7 @@ QtObject {
     readonly property alias bar: adapter.bar
     readonly property alias appearance: adapter.appearance
     readonly property alias notifications: adapter.notifications
+    readonly property alias controls: adapter.controls
     readonly property alias widgetSettings: adapter.widgetSettings
     readonly property alias widgetInstanceSettings: adapter.widgetInstanceSettings
     property int widgetSettingsRevision: 0
@@ -218,6 +219,11 @@ QtObject {
                 property int timeout: 5000
                 property string position: "top-right"
                 property bool dnd: false
+            }
+
+            property JsonObject controls: JsonObject {
+                property real volumeStep: 0.05
+                property real brightnessStep: 0.05
             }
 
             property JsonObject widgetSettings: JsonObject {

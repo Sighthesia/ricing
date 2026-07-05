@@ -386,6 +386,47 @@ Item {
                 onToggled: v => { Services.SettingsService.notifications.dnd = v }
             }
 
+            // ── Controls ────────────────────────────────────────────────────────
+
+            // Controls category header
+            Services.FluidText {
+                id: controlsHeader
+                text: "Controls"
+                color: Services.Color.mPrimary
+                font.bold: true
+                basePixelSize: 14
+                topPadding: 8
+                height: (volStep.filterVisible || briStep.filterVisible) ? implicitHeight : 0
+                opacity: height > 0 ? 1 : 0
+                visible: height > 1 || opacity > 0.01
+                Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+            }
+
+            SettingSlider {
+                id: volStep
+                settingLabel: "Volume Step"
+                description: "Increment per scroll tick or shortcut press"
+                from: 0.01; to: 0.20; stepSize: 0.01
+                value: Services.SettingsService.controls.volumeStep
+                suffix: ""
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.controls.volumeStep = v }
+            }
+
+            SettingSlider {
+                id: briStep
+                settingLabel: "Brightness Step"
+                description: "Increment per scroll tick or shortcut press"
+                from: 0.01; to: 0.20; stepSize: 0.01
+                value: Services.SettingsService.controls.brightnessStep
+                suffix: ""
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.controls.brightnessStep = v }
+            }
+
             // Empty-search fallback message
             Services.FluidText {
                 width: parent.width
@@ -395,7 +436,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 topPadding: 16
                 // Visible only when all rows are hidden by the search filter
-                visible: !barHeader.visible && !appearanceHeader.visible && !fontsHeader.visible && !notifHeader.visible
+                visible: !barHeader.visible && !appearanceHeader.visible && !fontsHeader.visible && !notifHeader.visible && !controlsHeader.visible
             }
         }
     }
