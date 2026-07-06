@@ -288,6 +288,8 @@ Item {
             anchors.margins: 4
             clip: true
             spacing: 0
+            property int prewarmCount: 12
+            property bool prewarmArmed: false
 
             property string query: {
                 var raw = root.compact ? root._localQuery : Services.IslandService.query
@@ -303,6 +305,11 @@ Item {
                     const cb = Services.LaunchCountService.getLaunchCount(b.id || "")
                     return cb - ca
                 })
+            }
+            property var prewarmApps: {
+                const apps = sortedApps
+                if (!apps || apps.length === 0) return []
+                return apps.slice(0, Math.min(prewarmCount, apps.length))
             }
 
             property int openStaggerStep: 28
@@ -500,6 +507,70 @@ Item {
                 interval: appListView.openStaggerCount * appListView.openStaggerStep + 260
                 repeat: false
                 onTriggered: appListView.openRevealArmed = false
+            }
+
+            Component.onCompleted: appPrewarmTimer.start()
+
+            Timer {
+                id: appPrewarmTimer
+                interval: 0
+                repeat: false
+                onTriggered: appListView.prewarmArmed = true
+            }
+
+            Item {
+                visible: false
+                opacity: 0
+                x: -10000
+                y: -10000
+
+                Repeater {
+                    model: appListView.prewarmArmed ? appListView.prewarmApps : []
+
+                    delegate: Item {
+                        required property var modelData
+
+                        width: 200
+                        height: 52
+
+                        Row {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            height: 48
+                            spacing: 12
+
+                            IconImage {
+                                anchors.verticalCenter: parent.verticalCenter
+                                source: "image://icon/" + (modelData.icon || "application-x-executable")
+                                implicitSize: 32
+                            }
+
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 160
+                                spacing: 2
+
+                                Services.FluidText {
+                                    text: modelData.name || ""
+                                    color: Services.Color.mOnSurface
+                                    basePixelSize: 13
+                                    elide: Text.ElideRight
+                                    width: parent.width
+                                }
+
+                                Services.FluidText {
+                                    text: modelData.comment || modelData.genericName || ""
+                                    color: Services.Color.mOnSurfaceVariant
+                                    basePixelSize: 11
+                                    opacity: 0.7
+                                    elide: Text.ElideRight
+                                    width: parent.width
+                                    visible: text.length > 0
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -799,6 +870,8 @@ Item {
             anchors.margins: 4
             clip: true
             spacing: 0
+            property int prewarmCount: 16
+            property bool prewarmArmed: false
             property int openStaggerStep: 28
             property int openStaggerCount: 8
             property int openRevealToken: 0
@@ -828,6 +901,11 @@ Item {
                 const all = Services.ClipboardService.items
                 if (!all || all.length === 0) return []
                 return all
+            }
+            property var prewarmItems: {
+                const items = allItems
+                if (!items || items.length === 0) return []
+                return items.slice(0, Math.min(prewarmCount, items.length))
             }
 
             onQueryChanged: {
@@ -973,6 +1051,48 @@ Item {
                 interval: clipListView.openStaggerCount * clipListView.openStaggerStep + 260
                 repeat: false
                 onTriggered: clipListView.openRevealArmed = false
+            }
+
+            onAllItemsChanged: {
+                if (!prewarmArmed && allItems.length > 0)
+                    clipPrewarmTimer.start()
+            }
+
+            Timer {
+                id: clipPrewarmTimer
+                interval: 0
+                repeat: false
+                onTriggered: clipListView.prewarmArmed = true
+            }
+
+            Item {
+                visible: false
+                opacity: 0
+                x: -10000
+                y: -10000
+
+                Repeater {
+                    model: clipListView.prewarmArmed ? clipListView.prewarmItems : []
+
+                    delegate: Item {
+                        required property var modelData
+
+                        width: 200
+                        height: 52
+
+                        Services.FluidText {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            width: 180
+                            height: 48
+                            verticalAlignment: Text.AlignVCenter
+                            text: modelData.isImage ? "[Image]" : (modelData.preview || "")
+                            color: Services.Color.mOnSurface
+                            basePixelSize: 13
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
             }
         }
     }
