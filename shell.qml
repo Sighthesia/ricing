@@ -9,10 +9,13 @@ import "modules/workspace-hint" as WorkspaceHint
 
 // Keep the shell root minimal while layering reusable screen surfaces.
 ShellRoot {
-    // Sync managed compositor hotkeys and enumerate system fonts at startup.
+    // Sync managed compositor hotkeys, enumerate system fonts, and prewarm
+    // the desktop entries cache (DesktopEntries.applications.values) so the
+    // launcher's first search does not stall on cold-start desktop file I/O.
     Component.onCompleted: {
         Services.NiriService.syncManagedHotkeys()
         Services.FontService.init()
+        DesktopEntries.applications.values; // prewarm cold cache
     }
 
     // Render wallpaper on each screen behind all other surfaces.
