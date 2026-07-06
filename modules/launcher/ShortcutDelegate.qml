@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import "../bar/MenuVisuals.js" as MenuVisuals
 import "../../services" as Services
 
@@ -8,24 +7,20 @@ Rectangle {
     id: delegate
 
     required property int index
-    required property string entryId
-    required property string label
-    required property string sequence
-    required property string category
-    required property bool managedByShell
+    required property var modelData
     property real _filterOffset: 0
-    property real _filterSoftness: 0
+
+    readonly property string entryId: modelData.entryId
+    readonly property string label: modelData.label
+    readonly property string sequence: modelData.sequence
+    readonly property string category: modelData.category
+    readonly property bool managedByShell: modelData.managedByShell
 
     width: ListView.view.width
     height: 52
     radius: MenuVisuals.rowRadius
-    layer.enabled: _filterSoftness > 0.01
-    layer.effect: MultiEffect {
-        blurEnabled: true
-        blurMax: 12
-        blur: delegate._filterSoftness * 0.35
-    }
     transform: Translate { x: delegate._filterOffset }
+
     color: mouseArea.containsMouse
         ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.listHoverOpacity)
         : Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.listRestOpacity)

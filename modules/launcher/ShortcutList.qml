@@ -31,7 +31,6 @@ Item {
             height: matchesFilter ? 52 : 0
             opacity: matchesFilter ? 1 : 0
             x: matchesFilter ? 0 : 28
-            _filterSoftness: matchesFilter ? 0 : 1
             visible: height > 1 || opacity > 0.01
 
             Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutCubic } }
@@ -43,7 +42,6 @@ Item {
             ParallelAnimation {
                 NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 160; easing.type: Easing.OutCubic }
                 NumberAnimation { property: "_filterOffset"; from: 24; to: 0; duration: 200; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "_filterSoftness"; from: 1; to: 0; duration: 200; easing.type: Easing.OutCubic }
             }
         }
 
@@ -51,7 +49,6 @@ Item {
             ParallelAnimation {
                 NumberAnimation { property: "opacity"; to: 0; duration: 140; easing.type: Easing.InCubic }
                 NumberAnimation { property: "_filterOffset"; to: 28; duration: 180; easing.type: Easing.InCubic }
-                NumberAnimation { property: "_filterSoftness"; to: 1; duration: 180; easing.type: Easing.InCubic }
             }
         }
 

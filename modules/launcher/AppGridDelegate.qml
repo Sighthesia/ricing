@@ -1,24 +1,17 @@
 import QtQuick
-import QtQuick.Effects
 import Quickshell.Widgets
 import "../../services" as Services
 
-// Application result tile with filter-enter and filter-exit softness.
+// Application result tile with filter-enter/exit offset animation.
+// Blur-free for smooth performance during large filter changes.
 Item {
     id: delegate
 
     required property var modelData
     property real _filterOffset: 0
-    property real _filterSoftness: 0
 
     width: GridView.view ? GridView.view.cellWidth : 120
     height: GridView.view ? GridView.view.cellHeight : 110
-    layer.enabled: _filterSoftness > 0.01
-    layer.effect: MultiEffect {
-        blurEnabled: true
-        blurMax: 12
-        blur: delegate._filterSoftness * 0.35
-    }
 
     transform: Translate { x: delegate._filterOffset }
 

@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import Quickshell
 import Quickshell.Widgets
 import "../bar/MenuVisuals.js" as MenuVisuals
@@ -289,6 +288,23 @@ Item {
             anchors.margins: 4
             clip: true
             spacing: 0
+
+            property string query: {
+                var raw = root.compact ? root._localQuery : Services.IslandService.query
+                var q = raw.toLowerCase()
+                if (q.startsWith(">")) return ""
+                return q
+            }
+            property var sortedApps: {
+                const all = DesktopEntries.applications.values
+                if (!all || all.length === 0) return []
+                return all.slice().sort((a, b) => {
+                    const ca = Services.LaunchCountService.getLaunchCount(a.id || "")
+                    const cb = Services.LaunchCountService.getLaunchCount(b.id || "")
+                    return cb - ca
+                })
+            }
+
             property int openStaggerStep: 28
             property int openStaggerCount: 8
             property int openRevealToken: 0
@@ -306,22 +322,6 @@ Item {
                 function on_OpenRevealTokenChanged() {
                     appListView.triggerOpenReveal()
                 }
-            }
-
-            property string query: {
-                var raw = root.compact ? root._localQuery : Services.IslandService.query
-                var q = raw.toLowerCase()
-                if (q.startsWith(">")) return ""
-                return q
-            }
-            property var sortedApps: {
-                const all = DesktopEntries.applications.values
-                if (!all || all.length === 0) return []
-                return all.slice().sort((a, b) => {
-                    const ca = Services.LaunchCountService.getLaunchCount(a.id || "")
-                    const cb = Services.LaunchCountService.getLaunchCount(b.id || "")
-                    return cb - ca
-                })
             }
 
             onQueryChanged: {
@@ -365,7 +365,6 @@ Item {
                 ParallelAnimation {
                     NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
                     NumberAnimation { property: "x"; from: 26; to: 0; duration: 220; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "_filterSoftness"; from: 1; to: 0; duration: 220; easing.type: Easing.OutCubic }
                 }
             }
 
@@ -373,7 +372,6 @@ Item {
                 ParallelAnimation {
                     NumberAnimation { property: "opacity"; to: 0; duration: 150; easing.type: Easing.InCubic }
                     NumberAnimation { property: "x"; to: 30; duration: 180; easing.type: Easing.InCubic }
-                    NumberAnimation { property: "_filterSoftness"; to: 1; duration: 180; easing.type: Easing.InCubic }
                 }
             }
 
@@ -386,7 +384,6 @@ Item {
                 required property var modelData
                 required property int index
                 readonly property bool matchesFilter: appListView.appMatches(modelData, appListView.query)
-                property real _filterSoftness: matchesFilter ? 0 : 1
                 property bool _contentRevealVisible: true
                 property int _seenOpenRevealToken: 0
 
@@ -396,12 +393,6 @@ Item {
                 x: matchesFilter ? 0 : 30
                 visible: height > 1 || opacity > 0.01
                 radius: MenuVisuals.rowRadius
-                layer.enabled: _filterSoftness > 0.01
-                layer.effect: MultiEffect {
-                    blurEnabled: true
-                    blurMax: 14
-                    blur: appDelegate._filterSoftness * 0.42
-                }
                 color: delegateMouse.containsMouse || ListView.view.currentIndex === index
                     ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
@@ -409,7 +400,6 @@ Item {
                 Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
                 Behavior on x { NumberAnimation { duration: 190; easing.type: appDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
                 Behavior on opacity { NumberAnimation { duration: 190; easing.type: appDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
-                Behavior on _filterSoftness { NumberAnimation { duration: 190; easing.type: appDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
 
                 Component.onCompleted: maybeQueueOpenReveal()
 
@@ -432,8 +422,6 @@ Item {
                     }
                 }
 
-                // Delay each row slightly so the launcher opens with a
-                // top-to-bottom stagger instead of a single hard cut.
                 Timer {
                     id: openRevealTimer
                     interval: Math.min(appDelegate.index, appListView.openStaggerCount) * appListView.openStaggerStep
@@ -441,8 +429,6 @@ Item {
                     onTriggered: appDelegate._contentRevealVisible = true
                 }
 
-                // Keep the delegate geometry stable while only the foreground
-                // content performs the one-shot open reveal.
                 Item {
                     id: appContent
                     anchors.fill: parent
@@ -452,45 +438,45 @@ Item {
                     Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
-                Row {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    height: 48
-                    anchors.leftMargin: MenuVisuals.listContentInset
-                    anchors.rightMargin: MenuVisuals.listContentInset
-                    spacing: 12
+                    Row {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: 48
+                        anchors.leftMargin: MenuVisuals.listContentInset
+                        anchors.rightMargin: MenuVisuals.listContentInset
+                        spacing: 12
 
-                    IconImage {
-                        anchors.verticalCenter: parent.verticalCenter
-                        source: "image://icon/" + (modelData.icon || "application-x-executable")
-                        implicitSize: 32
-                    }
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 32
-                        spacing: 2
-
-                        Services.FluidText {
-                            text: modelData.name || ""
-                            color: Services.Color.mOnSurface
-                            basePixelSize: 13
-                            elide: Text.ElideRight
-                            width: parent.width
+                        IconImage {
+                            anchors.verticalCenter: parent.verticalCenter
+                            source: "image://icon/" + (modelData.icon || "application-x-executable")
+                            implicitSize: 32
                         }
 
-                        Services.FluidText {
-                            text: modelData.comment || modelData.genericName || ""
-                            color: Services.Color.mOnSurfaceVariant
-                            basePixelSize: 11
-                            opacity: 0.7
-                            elide: Text.ElideRight
-                            width: parent.width
-                            visible: text.length > 0
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - 32
+                            spacing: 2
+
+                            Services.FluidText {
+                                text: modelData.name || ""
+                                color: Services.Color.mOnSurface
+                                basePixelSize: 13
+                                elide: Text.ElideRight
+                                width: parent.width
+                            }
+
+                            Services.FluidText {
+                                text: modelData.comment || modelData.genericName || ""
+                                color: Services.Color.mOnSurfaceVariant
+                                basePixelSize: 11
+                                opacity: 0.7
+                                elide: Text.ElideRight
+                                width: parent.width
+                                visible: text.length > 0
+                            }
                         }
                     }
-                }
                 }
 
                 MouseArea {
@@ -509,8 +495,6 @@ Item {
                 }
             }
 
-            // Drop the one-shot open-reveal arm after the stagger window so
-            // later filter changes keep using the normal per-row behaviors.
             Timer {
                 id: openRevealResetTimer
                 interval: appListView.openStaggerCount * appListView.openStaggerStep + 260
@@ -654,7 +638,6 @@ Item {
                 return from
             }
 
-            onCombinedEntriesChanged: currentIndex = firstVisibleIndex()
             Connections {
                 target: root
                 function on_LocalQueryChanged() {
@@ -663,6 +646,7 @@ Item {
                 }
             }
 
+            onCombinedEntriesChanged: currentIndex = firstVisibleIndex()
             currentIndex: 0
             model: combinedEntries
 
@@ -688,21 +672,14 @@ Item {
                 id: compactDelegate
                 required property var modelData
                 required property int index
-                readonly property bool matchesFilter: compactListView.entryMatches(modelData, root._localQuery.trim().toLowerCase())
-                property real _filterSoftness: matchesFilter ? 0 : 1
 
                 width: ListView.view ? ListView.view.width : 200
+                readonly property bool matchesFilter: compactListView.entryMatches(modelData, root._localQuery.trim().toLowerCase())
                 height: matchesFilter ? 52 : 0
                 opacity: matchesFilter ? 1 : 0
                 x: matchesFilter ? 0 : 30
                 visible: height > 1 || opacity > 0.01
                 radius: 6
-                layer.enabled: _filterSoftness > 0.01
-                layer.effect: MultiEffect {
-                    blurEnabled: true
-                    blurMax: 14
-                    blur: compactDelegate._filterSoftness * 0.42
-                }
                 color: compactMouse.containsMouse || compactListView.currentIndex === index
                     ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
@@ -710,7 +687,6 @@ Item {
                 Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
                 Behavior on x { NumberAnimation { duration: 190; easing.type: compactDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
                 Behavior on opacity { NumberAnimation { duration: 190; easing.type: compactDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
-                Behavior on _filterSoftness { NumberAnimation { duration: 190; easing.type: compactDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
 
                 Row {
                     anchors.left: parent.left
@@ -890,7 +866,6 @@ Item {
                 ParallelAnimation {
                     NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
                     NumberAnimation { property: "x"; from: 26; to: 0; duration: 220; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "_filterSoftness"; from: 1; to: 0; duration: 220; easing.type: Easing.OutCubic }
                 }
             }
 
@@ -898,7 +873,6 @@ Item {
                 ParallelAnimation {
                     NumberAnimation { property: "opacity"; to: 0; duration: 150; easing.type: Easing.InCubic }
                     NumberAnimation { property: "x"; to: 30; duration: 180; easing.type: Easing.InCubic }
-                    NumberAnimation { property: "_filterSoftness"; to: 1; duration: 180; easing.type: Easing.InCubic }
                 }
             }
 
@@ -911,23 +885,16 @@ Item {
 
                 required property var modelData
                 required property int index
-                readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
-                property real _filterSoftness: matchesFilter ? 0 : 1
-                property bool _contentRevealVisible: true
-                property int _seenOpenRevealToken: 0
 
                 width: ListView.view ? ListView.view.width : 200
+                readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
+                property bool _contentRevealVisible: true
+                property int _seenOpenRevealToken: 0
                 height: matchesFilter ? 52 : 0
                 opacity: matchesFilter ? 1 : 0
                 x: matchesFilter ? 0 : 30
                 visible: height > 1 || opacity > 0.01
                 radius: MenuVisuals.rowRadius
-                layer.enabled: _filterSoftness > 0.01
-                layer.effect: MultiEffect {
-                    blurEnabled: true
-                    blurMax: 14
-                    blur: clipDelegate._filterSoftness * 0.42
-                }
                 color: clipMouse.containsMouse || clipListView.currentIndex === index
                     ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                     : "transparent"
@@ -935,7 +902,6 @@ Item {
                 Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
                 Behavior on x { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
                 Behavior on opacity { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
-                Behavior on _filterSoftness { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
 
                 Component.onCompleted: maybeQueueOpenReveal()
 
@@ -958,8 +924,6 @@ Item {
                     }
                 }
 
-                // Delay each clipboard row slightly so direct-open stays
-                // readable instead of popping all visible entries at once.
                 Timer {
                     id: openRevealTimer
                     interval: Math.min(clipDelegate.index, clipListView.openStaggerCount) * clipListView.openStaggerStep
@@ -967,8 +931,6 @@ Item {
                     onTriggered: clipDelegate._contentRevealVisible = true
                 }
 
-                // Keep the delegate geometry stable while only the clipboard
-                // preview content performs the one-shot open reveal.
                 Item {
                     id: clipContent
                     anchors.fill: parent
@@ -1006,8 +968,6 @@ Item {
                 }
             }
 
-            // Limit the reveal arm to the initial open so later search updates
-            // keep the existing soft filter behaviors.
             Timer {
                 id: openRevealResetTimer
                 interval: clipListView.openStaggerCount * clipListView.openStaggerStep + 260

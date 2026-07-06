@@ -1,45 +1,67 @@
 import QtQuick
 import "../../services" as Services
 
-// Filterable clipboard list with soft search transitions.
+// Filterable clipboard list with stable full-list model and per-delegate
+// filtering to avoid expensive model replacement on every keystroke.
 Item {
     id: root
 
     anchors.fill: parent
-    property string query: Services.LauncherService.query.toLowerCase().trim()
-    property var filteredItems: {
-        const q = root.query
-        const all = Services.ClipboardService.items || []
-        if (!q) return all
-        return all.filter(item => {
-            const preview = (item.preview || "").toLowerCase()
-            const kind = item.isImage ? "image" : "text"
-            return preview.includes(q) || kind.includes(q)
-        })
+
+    // Hidden prewarm batch: instantiate a small representative set of
+    // clipboard rows ahead of the first large search so row text/layout and
+    // action subtrees are already warm when many matches are first revealed.
+    property int _prewarmCount: 16
+    property bool _prewarmArmed: false
+    property var _prewarmItems: {
+        const all = root.allItems || []
+        if (!all || all.length === 0) return []
+        return all.slice(0, Math.min(_prewarmCount, all.length))
     }
+
+    // Debounce: avoid rapid filter cycles during fast typing.
+    property string _debouncedQuery: Services.LauncherService.query.toLowerCase().trim()
+
+    Timer {
+        id: debounceTimer
+        interval: 80
+        repeat: false
+        onTriggered: {
+            _debouncedQuery = Services.LauncherService.query.toLowerCase().trim()
+        }
+    }
+
+    Connections {
+        target: Services.LauncherService
+        function onQueryChanged() {
+            debounceTimer.restart()
+        }
+    }
+
+    Component.onCompleted: {
+        Services.ClipboardService.list()
+        prewarmTimer.start()
+    }
+
+    Timer {
+        id: prewarmTimer
+        interval: 0
+        repeat: false
+        onTriggered: root._prewarmArmed = true
+    }
+
+    // Stable model: full clipboard items list.
+    // Does not change on query so ListView avoids add/remove cycles.
+    property var allItems: Services.ClipboardService.items || []
 
     ListView {
         anchors.fill: parent
         anchors.margins: 8
         clip: true
         spacing: 4
-        model: root.filteredItems
-        delegate: ClipboardDelegate {}
-
-        add: Transition {
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 160; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "_filterOffset"; from: 24; to: 0; duration: 200; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "_filterSoftness"; from: 1; to: 0; duration: 200; easing.type: Easing.OutCubic }
-            }
-        }
-
-        remove: Transition {
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 0; duration: 140; easing.type: Easing.InCubic }
-                NumberAnimation { property: "_filterOffset"; to: 28; duration: 180; easing.type: Easing.InCubic }
-                NumberAnimation { property: "_filterSoftness"; to: 1; duration: 180; easing.type: Easing.InCubic }
-            }
+        model: root.allItems
+        delegate: ClipboardDelegate {
+            query: root._debouncedQuery
         }
 
         displaced: Transition {
@@ -47,5 +69,17 @@ Item {
         }
     }
 
-    Component.onCompleted: Services.ClipboardService.list()
+    Item {
+        visible: false
+        opacity: 0
+        x: -10000
+        y: -10000
+
+        Repeater {
+            model: root._prewarmArmed ? root._prewarmItems : []
+            delegate: ClipboardDelegate {
+                query: ""
+            }
+        }
+    }
 }

@@ -1,26 +1,36 @@
 import QtQuick
-import QtQuick.Effects
 import "../bar/MenuVisuals.js" as MenuVisuals
 import "../../services" as Services
 
-// Clipboard result row with soft filter exit state.
+// Clipboard result row with per-delegate filtering via height/opacity/x
+// transitions.  Uses stable full-list model (no add/remove model churn).
 Rectangle {
     id: delegate
 
     required property var modelData
+    required property string query
     property real _filterOffset: 0
-    property real _filterSoftness: 0
+
+    readonly property bool matchesFilter: {
+        if (!query) return true
+        const q = query.toLowerCase().trim()
+        const preview = (modelData.preview || "").toLowerCase()
+        const kind = modelData.isImage ? "image" : "text"
+        return preview.includes(q) || kind.includes(q)
+    }
 
     width: ListView.view.width
-    height: 48
+    height: matchesFilter ? 48 : 0
+    opacity: matchesFilter ? 1 : 0
+    x: matchesFilter ? 0 : 28
+    visible: height > 1 || opacity > 0.01
     radius: MenuVisuals.rowRadius
-    layer.enabled: _filterSoftness > 0.01
-    layer.effect: MultiEffect {
-        blurEnabled: true
-        blurMax: 12
-        blur: delegate._filterSoftness * 0.35
-    }
     transform: Translate { x: delegate._filterOffset }
+
+    Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
+    Behavior on x { NumberAnimation { duration: 190; easing.type: matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+    Behavior on opacity { NumberAnimation { duration: 190; easing.type: matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+
     // Highlight on hover
     color: mouseArea.containsMouse
         ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.listHoverOpacity)
