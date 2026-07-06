@@ -610,6 +610,8 @@ Item {
             anchors.margins: 4
             clip: true
             spacing: 0
+            property int prewarmCount: 16
+            property bool prewarmArmed: false
 
             // Derive sorted apps (same logic as islandAppList).
             property var sortedApps: {
@@ -666,6 +668,11 @@ Item {
 
                 return results
             }
+            property var prewarmEntries: {
+                const entries = combinedEntries
+                if (!entries || entries.length === 0) return []
+                return entries.slice(0, Math.min(prewarmCount, entries.length))
+            }
 
             function entryMatches(entry, q) {
                 if (!q) return false
@@ -721,6 +728,8 @@ Item {
             currentIndex: 0
             model: combinedEntries
 
+            Component.onCompleted: compactPrewarmTimer.start()
+
             add: Transition {
                 ParallelAnimation {
                     NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
@@ -737,6 +746,13 @@ Item {
 
             displaced: Transition {
                 NumberAnimation { properties: "x,y"; duration: 220; easing.type: Easing.OutCubic }
+            }
+
+            Timer {
+                id: compactPrewarmTimer
+                interval: 0
+                repeat: false
+                onTriggered: compactListView.prewarmArmed = true
             }
 
             delegate: Rectangle {
@@ -854,6 +870,72 @@ Item {
                     color: Services.Color.mOnSurfaceVariant
                     basePixelSize: 13
                     opacity: 0.5
+                }
+            }
+
+            Item {
+                visible: false
+                opacity: 0
+                x: -10000
+                y: -10000
+
+                Repeater {
+                    model: compactListView.prewarmArmed ? compactListView.prewarmEntries : []
+
+                    delegate: Item {
+                        required property var modelData
+
+                        width: 200
+                        height: 52
+
+                        Row {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            height: 48
+                            spacing: 12
+
+                            IconImage {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: modelData.type === "app"
+                                source: modelData.type === "app"
+                                    ? "image://icon/" + (modelData.appData.icon || "application-x-executable")
+                                    : ""
+                                implicitSize: 32
+                            }
+
+                            Services.FluidText {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: modelData.type === "setting"
+                                text: "⚙"
+                                color: Services.Color.mPrimary
+                                basePixelSize: 22
+                            }
+
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 160
+                                spacing: 2
+
+                                Services.FluidText {
+                                    text: modelData.label || ""
+                                    color: Services.Color.mOnSurface
+                                    basePixelSize: 13
+                                    elide: Text.ElideRight
+                                    width: parent.width
+                                }
+
+                                Services.FluidText {
+                                    text: modelData.description || ""
+                                    color: Services.Color.mOnSurfaceVariant
+                                    basePixelSize: 11
+                                    opacity: 0.7
+                                    elide: Text.ElideRight
+                                    width: parent.width
+                                    visible: text.length > 0
+                                }
+                            }
+                        }
+                    }
                 }
             }
             }
