@@ -43,9 +43,26 @@ Singleton {
                     let tab = line.indexOf("\t")
                     let id = tab >= 0 ? line.slice(0, tab) : line.split(" ")[0]
                     let preview = tab >= 0 ? line.slice(tab + 1) : line.slice(id.length + 1)
-                    // cliphist marks binary/image entries with a bracketed mime hint
-                    let isImage = preview.startsWith("[") && /image/.test(preview)
-                    let mime = isImage ? preview.replace(/^\[|\]$/g, "") : "text/plain"
+                    let lowerPreview = preview.toLowerCase()
+                    // cliphist image previews vary by version: bracketed mime,
+                    // binary-data text, or an HTML img snippet.
+                    let isImage = (preview.startsWith("[") && /image/.test(preview))
+                        || lowerPreview.startsWith("[image]")
+                        || lowerPreview.includes(" binary data ")
+                        || lowerPreview.includes("<img")
+                    let mime = "text/plain"
+                    if (isImage) {
+                        if (lowerPreview.includes("png"))
+                            mime = "image/png"
+                        else if (lowerPreview.includes("jpg") || lowerPreview.includes("jpeg"))
+                            mime = "image/jpeg"
+                        else if (lowerPreview.includes("webp"))
+                            mime = "image/webp"
+                        else if (lowerPreview.includes("gif"))
+                            mime = "image/gif"
+                        else
+                            mime = "image/*"
+                    }
                     result.push({ id, preview, isImage, mime })
                 }
                 root.items = result
@@ -108,6 +125,74 @@ Singleton {
         Quickshell.execDetached(["cliphist", "wipe"])
         root.items = []
         root.revision++
+    }
+
+    // ---- Preview support: decode an item for inline preview. ----
+    // Tracks the most recent request id so stale completions are ignored.
+    property string _previewRequestId: ""
+    // Tracks which id the currently running process belongs to.
+    property string _runningDecodeId: ""
+    property string _runningDecodePath: ""
+    property int _previewRevision: 0
+    signal previewDecoded(string id, string contentOrPath)
+
+    property Process _previewDecodeProc: Process {
+        id: previewDecodeProc
+        command: []
+        running: false
+        stdout: StdioCollector {}
+        onExited: (code) => {
+            var runningId = root._runningDecodeId
+            var runningPath = root._runningDecodePath
+            root._runningDecodeId = ""
+            root._runningDecodePath = ""
+            if (!runningId || code !== 0) return
+            // Ignore if a newer request has superseded this one.
+            if (runningId !== root._previewRequestId) return
+            if (root._previewDecodeIsImage) {
+                // Image was piped to a temp file by the shell command.
+                root._previewRevision++
+                root.previewDecoded(runningId, "file://" + runningPath + "?rev=" + root._previewRevision)
+            } else {
+                root.previewDecoded(runningId, stdout.text)
+            }
+        }
+    }
+    property bool _previewDecodeIsImage: false
+
+    // Initiate async decoding of an item for preview.
+    // For images the result is a file:// URL; for text the raw content string.
+    function requestPreview(id, isImage) {
+        if (!root.available || !id) return
+        root._previewRequestId = id
+        root._previewDecodeIsImage = isImage
+        if (isImage) {
+            var safeName = encodeURIComponent(id).replace(/%/g, "_")
+            var path = "/tmp/afloat-clip-preview-" + safeName + ".img"
+            previewDecodeProc.command = [
+                "sh", "-c",
+                "cliphist decode \"$1\" > \"$2\"",
+                "afloat-clip-preview",
+                id,
+                path
+            ]
+            root._runningDecodePath = path
+        } else {
+            previewDecodeProc.command = ["cliphist", "decode", id]
+            root._runningDecodePath = ""
+        }
+        root._runningDecodeId = id
+        previewDecodeProc.running = true
+    }
+
+    // Clean up temp preview files for the given id (called when preview changes).
+    function discardPreview(id) {
+        if (!id) return
+        if (root._previewRequestId === id) {
+            root._previewRequestId = ""
+        }
+        var safeName = encodeURIComponent(id).replace(/%/g, "_")
+        Quickshell.execDetached(["rm", "-f", "/tmp/afloat-clip-preview-" + safeName + ".img"])
     }
 
     Component.onCompleted: _checkProc.running = true

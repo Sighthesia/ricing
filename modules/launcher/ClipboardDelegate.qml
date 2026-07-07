@@ -8,8 +8,15 @@ Rectangle {
     id: delegate
 
     required property var modelData
+    required property int index
     required property string query
+    property var hoverHandler: null
     property real _filterOffset: 0
+
+    // Expose hover state for parent preview tracking.
+    readonly property bool hovered: mouseArea.containsMouse
+    readonly property bool isPreviewable: modelData.isImage
+        || (modelData.preview && modelData.preview.length > 80)
 
     readonly property bool matchesFilter: {
         if (!query) return true
@@ -42,12 +49,19 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
+        // Notify parent list about hover state changes for preview.
+        onContainsMouseChanged: {
+            if (typeof delegate.hoverHandler === "function") {
+                delegate.hoverHandler(delegate.modelData, delegate.index, delegate.hovered)
+            }
+        }
     }
 
     // Preview text: show [Image] for images, [empty] for blank, else truncated text
     Services.FluidText {
         anchors { left: parent.left; right: actions.left; top: parent.top; bottom: parent.bottom; leftMargin: MenuVisuals.listContentInset }
         text: modelData.isImage ? "[Image]" : (modelData.preview.length > 0 ? modelData.preview.substring(0, 80) : "[empty]")
+        textFormat: Text.PlainText
         color: Services.Color.mOnSurface
         basePixelSize: 13
         elide: Text.ElideRight

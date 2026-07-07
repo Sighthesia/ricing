@@ -11,6 +11,7 @@ Singleton {
     property bool expanded: false
     property string query: ""
     property string panelPage: "overview"
+    property real clipboardPreviewWidth: 0
     property var centerSurfaceWidths: ({})
     // Pre-filter text for the settings center when opened from a search
     // result. Set before showSettingsCenter() and consumed once by
@@ -117,6 +118,7 @@ Singleton {
     function close() {
         expanded = false
         panelPage = "overview"
+        clipboardPreviewWidth = 0
         _closeTimer.restart()
     }
 

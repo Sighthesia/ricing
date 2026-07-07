@@ -946,232 +946,473 @@ Item {
     Component {
         id: islandClipboard
 
-        ListView {
-            id: clipListView
-            anchors.fill: parent
-            anchors.margins: 4
-            clip: true
-            spacing: 0
-            property int prewarmCount: 16
-            property bool prewarmArmed: false
-            property int openStaggerStep: 28
-            property int openStaggerCount: 8
-            property int openRevealToken: 0
-            property bool openRevealArmed: false
+        // Wrapper Item: provides left-side preview alongside the clipboard list.
+        // Forwards count/currentIndex/allItems/navigation to the inner ListView
+        // so keyboard navigation from IslandLauncher still works through clipLoader.item.
+        Item {
+            id: clipRoot
 
-            function triggerOpenReveal() {
-                openRevealToken = root._openRevealToken
-                openRevealArmed = true
-                openRevealResetTimer.restart()
-            }
+            // ---- Preview state ----
+            property int _hoverActiveIndex: -1
+            property int _previewActiveIndex: -1
+            property string _previewActiveSource: ""
+            property var _pendingPreviewItem: null
+            property int _pendingPreviewIndex: -1
+            property real _restingListWidth: 0
+            property real _previewSlotWidth: 0
+            readonly property real _outerInset: 4
+            readonly property real _forcedPreviewWidth: 420
 
-            Connections {
-                target: root
-
-                function on_OpenRevealTokenChanged() {
-                    clipListView.triggerOpenReveal()
-                }
-            }
-
-            property string query: {
-                var q = Services.IslandService.query.toLowerCase()
-                if (q.startsWith(">clip")) return q.slice(5).trim()
-                return q.startsWith(">") ? "" : q
-            }
+            // Forwarded for keyboard navigation from IslandLauncher.qml.
+            readonly property alias count: clipListView.count
+            property alias currentIndex: clipListView.currentIndex
 
             property var allItems: {
                 const all = Services.ClipboardService.items
                 if (!all || all.length === 0) return []
                 return all
             }
-            property var prewarmItems: {
-                const items = allItems
-                if (!items || items.length === 0) return []
-                return items.slice(0, Math.min(prewarmCount, items.length))
+
+            onWidthChanged: {
+                _syncRestingListWidth()
             }
 
-            onQueryChanged: {
-                var items = allItems
-                for (var i = 0; i < items.length; i++) {
-                    if (clipMatches(items[i], query)) {
-                        clipListView.currentIndex = i
-                        clipListView.positionViewAtBeginning()
-                        return
+            Component.onCompleted: {
+                _syncRestingListWidth()
+                _previewSlotWidth = _forcedPreviewWidth
+            }
+
+            function _syncRestingListWidth() {
+                _restingListWidth = Math.max(0, width - _outerInset * 2 - _previewSlotWidth)
+            }
+
+            function _isPreviewable(item) {
+                return !!item
+            }
+
+            function _updatePreviewToItem(index, item) {
+                if (!item || !_isPreviewable(item)) {
+                    _clearPreview()
+                    return
+                }
+                previewClearTimer.stop()
+                clipRoot._previewActiveIndex = index
+                clipRoot._pendingPreviewIndex = index
+                clipRoot._pendingPreviewItem = item
+                var targetWidth = _forcedPreviewWidth
+                clipRoot._previewSlotWidth = targetWidth
+                Services.IslandService.clipboardPreviewWidth = targetWidth
+                var preview = clipPreviewLoader.item
+                if (!preview) return
+                preview.isImage = item.isImage
+                preview.clipboardId = item.id
+                preview.previewText = item.preview || ""
+                preview.active = true
+                preview.targetPreviewWidth = targetWidth
+                Services.IslandService.clipboardPreviewWidth = targetWidth
+            }
+
+            function _clearPreview() {
+                previewClearTimer.stop()
+                clipRoot._previewActiveIndex = -1
+                clipRoot._previewActiveSource = ""
+                clipRoot._pendingPreviewIndex = -1
+                clipRoot._pendingPreviewItem = null
+                var preview = clipPreviewLoader.item
+                if (!preview) return
+                preview.active = false
+                preview.isImage = false
+                preview.previewText = ""
+                preview.targetPreviewWidth = _forcedPreviewWidth
+                Qt.callLater(function() {
+                    if (preview && !preview.active)
+                        preview.clipboardId = ""
+                })
+            }
+
+            on_PreviewSlotWidthChanged: {
+                Services.IslandService.clipboardPreviewWidth = _previewSlotWidth
+                _syncRestingListWidth()
+            }
+
+            Behavior on _previewSlotWidth {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
+                }
+            }
+
+            function _onDelegateHoverChanged(itemData, index, hovered) {
+                if (hovered) {
+                    previewClearTimer.stop()
+                    clipRoot._hoverActiveIndex = index
+                    if (clipRoot._isPreviewable(itemData)) {
+                        clipRoot._previewActiveSource = "hover"
+                        clipRoot._updatePreviewToItem(index, itemData)
+                    } else {
+                        clipRoot._clearPreview()
                     }
                 }
-                clipListView.currentIndex = 0
-            }
-            function clipMatches(item, q) {
-                if (!q) return true
-                const preview = (item.preview || "").toLowerCase()
-                const kind = item.isImage ? "image" : "text"
-                return preview.includes(q) || kind.includes(q)
-            }
-            function nextVisibleIndex(from, direction) {
-                var step = direction === "down" ? 1 : -1
-                var i = from + step
-                while (i >= 0 && i < allItems.length) {
-                    if (clipMatches(allItems[i], query))
-                        return i
-                    i += step
-                }
-                return from
             }
 
-            model: allItems
-
-            Component.onCompleted: Services.ClipboardService.list()
-
-            add: Transition {
-                ParallelAnimation {
-                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "x"; from: 26; to: 0; duration: 220; easing.type: Easing.OutCubic }
-                }
-            }
-
-            remove: Transition {
-                ParallelAnimation {
-                    NumberAnimation { property: "opacity"; to: 0; duration: 150; easing.type: Easing.InCubic }
-                    NumberAnimation { property: "x"; to: 30; duration: 180; easing.type: Easing.InCubic }
-                }
-            }
-
-            displaced: Transition {
-                NumberAnimation { properties: "x,y"; duration: 220; easing.type: Easing.OutCubic }
-            }
-
-            delegate: Rectangle {
-                id: clipDelegate
-
-                required property var modelData
-                required property int index
-
-                width: ListView.view ? ListView.view.width : 200
-                readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
-                property bool _contentRevealVisible: true
-                property int _seenOpenRevealToken: 0
-                height: matchesFilter ? 52 : 0
-                opacity: matchesFilter ? 1 : 0
-                x: matchesFilter ? 0 : 30
-                visible: height > 1 || opacity > 0.01
-                radius: MenuVisuals.rowRadius
-                color: clipMouse.containsMouse || clipListView.currentIndex === index
-                    ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
-                    : "transparent"
-
-                Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
-                Behavior on x { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
-                Behavior on opacity { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
-
-                Component.onCompleted: maybeQueueOpenReveal()
-
-                function maybeQueueOpenReveal() {
-                    if (!ListView.view || !ListView.view.openRevealArmed || !matchesFilter)
-                        return
-                    if (_seenOpenRevealToken === ListView.view.openRevealToken)
-                        return
-
-                    _seenOpenRevealToken = ListView.view.openRevealToken
-                    _contentRevealVisible = false
-                    openRevealTimer.restart()
+            function _updatePreviewFromListPosition(mouseX, mouseY) {
+                previewClearTimer.stop()
+                var idx = clipListView.indexAt(mouseX, mouseY + clipListView.contentY)
+                if (idx < 0 || idx >= clipRoot.allItems.length) {
+                    clipRoot._hoverActiveIndex = -1
+                    previewClearTimer.restart()
+                    return
                 }
 
-                Connections {
-                    target: ListView.view
-
-                    function onOpenRevealTokenChanged() {
-                        clipDelegate.maybeQueueOpenReveal()
-                    }
-                }
-
-                Timer {
-                    id: openRevealTimer
-                    interval: Math.min(clipDelegate.index, clipListView.openStaggerCount) * clipListView.openStaggerStep
-                    repeat: false
-                    onTriggered: clipDelegate._contentRevealVisible = true
-                }
-
-                Item {
-                    id: clipContent
-                    anchors.fill: parent
-                    opacity: clipDelegate._contentRevealVisible ? 1 : 0
-                    x: clipDelegate._contentRevealVisible ? 0 : 18
-
-                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-
-                    Services.FluidText {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        height: 48
-                        anchors.leftMargin: MenuVisuals.listContentInset
-                        anchors.rightMargin: MenuVisuals.listContentInset
-                        verticalAlignment: Text.AlignVCenter
-                        text: modelData.isImage ? "[Image]" : (modelData.preview || "")
-                        color: Services.Color.mOnSurface
-                        basePixelSize: 13
-                        elide: Text.ElideRight
-                    }
-                }
-
-                MouseArea {
-                    id: clipMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        clipListView.currentIndex = index
-                        Services.ClipboardService.copyItem(modelData.id)
-                        Services.IslandService.close()
-                    }
+                var item = clipRoot.allItems[idx]
+                clipRoot._hoverActiveIndex = idx
+                if (clipRoot._isPreviewable(item)) {
+                    clipRoot._previewActiveSource = "pointer"
+                    clipRoot._updatePreviewToItem(idx, item)
+                } else {
+                    clipRoot._clearPreview()
                 }
             }
 
             Timer {
-                id: openRevealResetTimer
-                interval: clipListView.openStaggerCount * clipListView.openStaggerStep + 260
+                id: previewClearTimer
+                interval: 350
                 repeat: false
-                onTriggered: clipListView.openRevealArmed = false
+                onTriggered: {
+                    if (clipRoot._hoverActiveIndex >= 0)
+                        return
+                    // Don't clear if the pointer is still over the preview panel.
+                    var preview = clipPreviewLoader.item
+                    if (preview && preview.hovered)
+                        return
+                    clipRoot._clearPreview()
+                }
             }
 
+            // Clear preview when the underlying clipboard items change.
             onAllItemsChanged: {
-                if (!prewarmArmed && allItems.length > 0)
-                    clipPrewarmTimer.start()
+                clipRoot._hoverActiveIndex = -1
+                clipRoot._clearPreview()
+                // Trigger prewarm when items first arrive.
+                Qt.callLater(function() {
+                    clipListView.prewarmArmed = true
+                })
             }
 
-            Timer {
-                id: clipPrewarmTimer
-                interval: 0
-                repeat: false
-                onTriggered: clipListView.prewarmArmed = true
+            function nextVisibleIndex(from, direction) {
+                return clipListView.nextVisibleIndex(from, direction)
+            }
+
+            function positionViewAtIndex(index, mode) {
+                clipListView.positionViewAtIndex(index, mode)
             }
 
             Item {
-                visible: false
-                opacity: 0
-                x: -10000
-                y: -10000
+                x: clipRoot._outerInset + clipRoot._previewSlotWidth
+                y: clipRoot._outerInset
+                width: clipRoot._restingListWidth
+                height: parent.height - clipRoot._outerInset * 2
+                clip: false
 
-                Repeater {
-                    model: clipListView.prewarmArmed ? clipListView.prewarmItems : []
+                // Surface-level hover tracking over the whole Row (preview + list).
+                // When the pointer is over the preview panel the preview's hovered
+                // property is set so the clear timer skips it.  When the pointer
+                // leaves the entire area the timer starts the linger-then-hide.
+                MouseArea {
+                    id: clipRowHover
+                    x: -clipRoot._previewSlotWidth
+                    y: 0
+                    width: clipRoot._previewSlotWidth + clipRoot._restingListWidth
+                    height: parent.height
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                    onPositionChanged: (mouse) => {
+                        var isOverPreview = mouse.x < clipPreviewLoader.width
+                        var preview = clipPreviewLoader.item
+                        if (preview) preview.hovered = isOverPreview
+                    }
+                    onExited: {
+                        clipRoot._hoverActiveIndex = -1
+                        previewClearTimer.restart()
+                        var preview = clipPreviewLoader.item
+                        if (preview) preview.hovered = false
+                    }
+                }
 
-                    delegate: Item {
+                // Left-side preview panel for image or long-text items.
+                Loader {
+                    id: clipPreviewLoader
+                    x: -width
+                    height: parent.height
+                    source: "../launcher/ClipboardPreview.qml"
+                    width: clipRoot._previewSlotWidth
+                    clip: true
+                    visible: width > 1
+                    z: 1
+                    onLoaded: {
+                        item.x = 0
+                        item.y = 0
+                        item.height = Qt.binding(function() { return clipPreviewLoader.height })
+                        item.targetPreviewWidth = Qt.binding(function() { return clipPreviewLoader.width })
+                        if (clipRoot._pendingPreviewItem)
+                            clipRoot._updatePreviewToItem(clipRoot._pendingPreviewIndex, clipRoot._pendingPreviewItem)
+                    }
+                }
+
+                // Clipboard entry list fills remaining space.
+                ListView {
+                    id: clipListView
+                    x: 0
+                    width: clipRoot._restingListWidth
+                    height: parent.height
+                    clip: true
+                    spacing: 0
+                    property int prewarmCount: 16
+                    property bool prewarmArmed: false
+                    property int openStaggerStep: 28
+                    property int openStaggerCount: 8
+                    property int openRevealToken: 0
+                    property bool openRevealArmed: false
+
+                    function triggerOpenReveal() {
+                        openRevealToken = root._openRevealToken
+                        openRevealArmed = true
+                        openRevealResetTimer.restart()
+                    }
+
+                    Connections {
+                        target: root
+
+                        function on_OpenRevealTokenChanged() {
+                            clipListView.triggerOpenReveal()
+                        }
+                    }
+
+                    property string query: {
+                        var q = Services.IslandService.query.toLowerCase()
+                        if (q.startsWith(">clip")) return q.slice(5).trim()
+                        return q.startsWith(">") ? "" : q
+                    }
+
+                    property var prewarmItems: {
+                        const items = clipRoot.allItems
+                        if (!items || items.length === 0) return []
+                        return items.slice(0, Math.min(prewarmCount, items.length))
+                    }
+
+                    onQueryChanged: {
+                        var items = clipRoot.allItems
+                        for (var i = 0; i < items.length; i++) {
+                            if (clipMatches(items[i], query)) {
+                                clipListView.currentIndex = i
+                                clipListView.positionViewAtBeginning()
+                                return
+                            }
+                        }
+                        clipListView.currentIndex = 0
+                    }
+
+                    // Keyboard selection updates the preview when no delegate is hovered.
+                    onCurrentIndexChanged: {
+                        if (clipRoot._hoverActiveIndex >= 0)
+                            return
+
+                        var items = clipRoot.allItems
+                        if (currentIndex >= 0 && currentIndex < items.length
+                            && clipRoot._isPreviewable(items[currentIndex])) {
+                            clipRoot._previewActiveSource = "keyboard"
+                            clipRoot._updatePreviewToItem(currentIndex, items[currentIndex])
+                        } else {
+                            clipRoot._clearPreview()
+                        }
+                    }
+
+                    function clipMatches(item, q) {
+                        if (!q) return true
+                        const preview = (item.preview || "").toLowerCase()
+                        const kind = item.isImage ? "image" : "text"
+                        return preview.includes(q) || kind.includes(q)
+                    }
+                    function nextVisibleIndex(from, direction) {
+                        var step = direction === "down" ? 1 : -1
+                        var i = from + step
+                        while (i >= 0 && i < clipRoot.allItems.length) {
+                            if (clipMatches(clipRoot.allItems[i], query))
+                                return i
+                            i += step
+                        }
+                        return from
+                    }
+
+                    model: clipRoot.allItems
+
+                    Component.onCompleted: Services.ClipboardService.list()
+
+                    // Per-pixel position tracking over the list area.
+                    // Exit/surface-level hover is handled by the Row's MouseArea
+                    // so the pointer can move into the preview panel without
+                    // triggering the clear timer.
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
+                        z: 100
+                        onPositionChanged: (mouse) => clipRoot._updatePreviewFromListPosition(mouse.x, mouse.y)
+                        onEntered: (mouse) => clipRoot._updatePreviewFromListPosition(mouse.x, mouse.y)
+                    }
+
+                    add: Transition {
+                        ParallelAnimation {
+                            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
+                            NumberAnimation { property: "x"; from: 26; to: 0; duration: 220; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    remove: Transition {
+                        ParallelAnimation {
+                            NumberAnimation { property: "opacity"; to: 0; duration: 150; easing.type: Easing.InCubic }
+                            NumberAnimation { property: "x"; to: 30; duration: 180; easing.type: Easing.InCubic }
+                        }
+                    }
+
+                    displaced: Transition {
+                        NumberAnimation { properties: "x,y"; duration: 220; easing.type: Easing.OutCubic }
+                    }
+
+                    delegate: Rectangle {
+                        id: clipDelegate
+
                         required property var modelData
+                        required property int index
 
-                        width: 200
-                        height: 52
+                        // Expose hover state for parent preview tracking.
+                        property var hoverHandler: clipRoot._onDelegateHoverChanged
+                        readonly property bool hovered: clipMouse.containsMouse
 
-                        Services.FluidText {
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            width: 180
-                            height: 48
-                            verticalAlignment: Text.AlignVCenter
-                            text: modelData.isImage ? "[Image]" : (modelData.preview || "")
-                            color: Services.Color.mOnSurface
-                            basePixelSize: 13
-                            elide: Text.ElideRight
+                        width: ListView.view ? ListView.view.width : 200
+                        readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
+                        property bool _contentRevealVisible: true
+                        property int _seenOpenRevealToken: 0
+                        height: matchesFilter ? 52 : 0
+                        opacity: matchesFilter ? 1 : 0
+                        x: matchesFilter ? 0 : 30
+                        visible: height > 1 || opacity > 0.01
+                        radius: MenuVisuals.rowRadius
+                        color: clipMouse.containsMouse || (clipRoot._hoverActiveIndex < 0 && clipListView.currentIndex === index)
+                            ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
+                            : "transparent"
+
+                        Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
+                        Behavior on x { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+                        Behavior on opacity { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
+
+                        Component.onCompleted: maybeQueueOpenReveal()
+
+                        function maybeQueueOpenReveal() {
+                            if (!ListView.view || !ListView.view.openRevealArmed || !matchesFilter)
+                                return
+                            if (_seenOpenRevealToken === ListView.view.openRevealToken)
+                                return
+
+                            _seenOpenRevealToken = ListView.view.openRevealToken
+                            _contentRevealVisible = false
+                            openRevealTimer.restart()
+                        }
+
+                        Connections {
+                            target: ListView.view
+
+                            function onOpenRevealTokenChanged() {
+                                clipDelegate.maybeQueueOpenReveal()
+                            }
+                        }
+
+                        Timer {
+                            id: openRevealTimer
+                            interval: Math.min(clipDelegate.index, clipListView.openStaggerCount) * clipListView.openStaggerStep
+                            repeat: false
+                            onTriggered: clipDelegate._contentRevealVisible = true
+                        }
+
+                        Item {
+                            id: clipContent
+                            anchors.fill: parent
+                            opacity: clipDelegate._contentRevealVisible ? 1 : 0
+                            x: clipDelegate._contentRevealVisible ? 0 : 18
+
+                            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                            Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+                            Services.FluidText {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                height: 48
+                                anchors.leftMargin: MenuVisuals.listContentInset
+                                anchors.rightMargin: MenuVisuals.listContentInset
+                                verticalAlignment: Text.AlignVCenter
+                                text: modelData.isImage ? "[Image]" : (modelData.preview || "")
+                                textFormat: Text.PlainText
+                                color: Services.Color.mOnSurface
+                                basePixelSize: 13
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        MouseArea {
+                            id: clipMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                clipListView.currentIndex = index
+                                Services.ClipboardService.copyItem(modelData.id)
+                                Services.IslandService.close()
+                            }
+                            // Notify parent about hover state changes for preview.
+                            onContainsMouseChanged: {
+                                if (typeof clipDelegate.hoverHandler === "function") {
+                                    clipDelegate.hoverHandler(clipDelegate.modelData, clipDelegate.index, clipDelegate.hovered)
+                                }
+                            }
+                        }
+                    }
+
+                    Timer {
+                        id: openRevealResetTimer
+                        interval: clipListView.openStaggerCount * clipListView.openStaggerStep + 260
+                        repeat: false
+                        onTriggered: clipListView.openRevealArmed = false
+                    }
+
+                    Item {
+                        visible: false
+                        opacity: 0
+                        x: -10000
+                        y: -10000
+
+                        Repeater {
+                            model: clipListView.prewarmArmed ? clipListView.prewarmItems : []
+
+                            delegate: Item {
+                                required property var modelData
+
+                                width: 200
+                                height: 52
+
+                                Services.FluidText {
+                                    anchors.left: parent.left
+                                    anchors.top: parent.top
+                                    width: 180
+                                    height: 48
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: modelData.isImage ? "[Image]" : (modelData.preview || "")
+                                    textFormat: Text.PlainText
+                                    color: Services.Color.mOnSurface
+                                    basePixelSize: 13
+                                    elide: Text.ElideRight
+                                }
+                            }
                         }
                     }
                 }

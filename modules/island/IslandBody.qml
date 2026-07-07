@@ -53,6 +53,10 @@ Item {
         && !Services.IslandService.expanded
     readonly property bool launcherPageVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "launcher"
+    readonly property real clipboardPreviewExtraWidth: root.launcherPageVisible
+        && Services.IslandService.mode === "clipboard"
+        ? Services.IslandService.clipboardPreviewWidth
+        : 0
     readonly property bool overviewPageVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "overview"
     readonly property bool settingsCenterVisible: Services.IslandService.expanded
@@ -126,7 +130,7 @@ Item {
 
     // Target dimensions reuse the expanded island body instead of a second panel.
     property int targetW: Services.IslandService.expanded
-        ? expandedW
+        ? Math.min(Screen.width - 48, expandedW + clipboardPreviewExtraWidth)
         : (root.hostsCenterWidgetPicker
         ? centerWidgetPickerW
         : (root.hostsCenterWidgetSettings
