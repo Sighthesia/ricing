@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import "../../../services" as Services
 import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
+import "./" as ClockParts
 
 // Compact bar clock showing a configurable date/time string. While a transient
 // message is active the date collapses away unless compact mode is configured
@@ -80,12 +81,14 @@ Item {
             }
         }
 
-        // Time slot follows the configured clock format.
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Qt.formatDateTime(systemClock.date, root.timeFormat)
-            color: Services.Color.mOnSurface
-            font.bold: true
+        // Time slot uses a shared rolling-digit display.
+        ClockParts.RollingClockTime {
+            currentTime: systemClock.date
+            digitPixelSize: Services.TextSize.barContent
+            hourMutedColor: Services.Color.mOnSurfaceVariant
+            hourColor: Services.Color.mOnSurface
+            minuteMutedColor: Services.Color.mOnSurfaceVariant
+            minuteColor: Services.Color.mOnSurface
         }
     }
 }
