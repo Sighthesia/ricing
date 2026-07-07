@@ -16,7 +16,7 @@ Rectangle {
     // Expose hover state for parent preview tracking.
     readonly property bool hovered: mouseArea.containsMouse
     readonly property bool isPreviewable: modelData.isImage
-        || (modelData.preview && modelData.preview.length > 80)
+        || (modelData.preview && modelData.preview.length > 0)
 
     readonly property bool matchesFilter: {
         if (!query) return true

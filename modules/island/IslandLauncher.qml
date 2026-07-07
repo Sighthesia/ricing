@@ -987,8 +987,23 @@ Item {
                 _restingListWidth = Math.max(0, width - _outerInset * 2 - _previewSlotWidth)
             }
 
+            // All text items (short or long) and images are previewable.
             function _isPreviewable(item) {
-                return !!item
+                return item && (item.isImage || (item.preview && item.preview.length > 0))
+            }
+
+            // Preview width based on content type and length.
+            readonly property real _imagePreviewWidth: 300
+            readonly property real _longTextPreviewWidth: 420
+            readonly property real _shortTextPreviewWidth: 280
+            readonly property real _longTextThreshold: 80
+
+            function _previewWidthFor(item) {
+                if (!item) return 0
+                if (item.isImage) return _imagePreviewWidth
+                return item.preview && item.preview.length > _longTextThreshold
+                    ? _longTextPreviewWidth
+                    : _shortTextPreviewWidth
             }
 
             function _formatFirstSeen(firstSeenMs) {
@@ -1018,7 +1033,7 @@ Item {
                 clipRoot._previewActiveIndex = index
                 clipRoot._pendingPreviewIndex = index
                 clipRoot._pendingPreviewItem = item
-                var targetWidth = _forcedPreviewWidth
+                var targetWidth = _previewWidthFor(item)
                 clipRoot._previewSlotWidth = targetWidth
                 Services.IslandService.clipboardPreviewWidth = targetWidth
                 var preview = clipPreviewLoader.item
@@ -1057,7 +1072,7 @@ Item {
                 preview.active = false
                 preview.isImage = false
                 preview.previewText = ""
-                preview.targetPreviewWidth = _forcedPreviewWidth
+                preview.targetPreviewWidth = 0
                 Qt.callLater(function() {
                     if (preview && !preview.active)
                         preview.clipboardId = ""

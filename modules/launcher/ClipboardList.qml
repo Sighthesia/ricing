@@ -45,6 +45,20 @@ Item {
     Component.onCompleted: {
         Services.ClipboardService.list()
         prewarmTimer.start()
+        // Set initial resting preview slot so it's part of the opening layout.
+        clipPreview.targetPreviewWidth = root._restingPreviewWidth
+        // Defer heavy content until the open settles.
+        settleTimer.start()
+    }
+
+    // After the open settle completes, allow heavy preview content to load.
+    Timer {
+        id: settleTimer
+        interval: Services.Motion.number.contentDuration
+        repeat: false
+        onTriggered: {
+            root._deferHeavyContent = false
+        }
     }
 
     Timer {
@@ -68,10 +82,30 @@ Item {
     // Tracks the index of the currently hovered delegate (-1 if none).
     // Takes priority over keyboard selection so hover always wins.
     property int _hoverActiveIndex: -1
+    // Resting width for the preview slot so it is part of the opening layout.
+    readonly property real _restingPreviewWidth: 8
+    // Defer heavy preview content until the initial open settle completes.
+    property bool _deferHeavyContent: true
 
     // Check if an item qualifies for preview.
+    // All text items (short or long) and images are previewable.
     function _isPreviewable(item) {
-        return item && (item.isImage || (item.preview && item.preview.length > 80))
+        return item && (item.isImage || (item.preview && item.preview.length > 0))
+    }
+
+    // Preview width based on content type and length.
+    readonly property real _imagePreviewWidth: 300
+    readonly property real _longTextPreviewWidth: 420
+    readonly property real _shortTextPreviewWidth: 280
+    readonly property real _longTextThreshold: 80
+
+    function _previewWidthFor(item) {
+        if (!item) return root._restingPreviewWidth
+        if (item.isImage) return root._imagePreviewWidth
+        // Long text gets wider preview, short text gets narrower.
+        return item.preview && item.preview.length > root._longTextThreshold
+            ? root._longTextPreviewWidth
+            : root._shortTextPreviewWidth
     }
 
     // Called by each delegate on hover enter/leave. Hover always takes priority.
@@ -101,13 +135,14 @@ Item {
         clipPreview.isImage = item.isImage
         clipPreview.clipboardId = item.id
         clipPreview.previewText = item.preview || ""
+        clipPreview.deferHeavyContent = root._deferHeavyContent
         clipPreview.active = true
-        clipPreview.targetPreviewWidth = item.isImage ? 300 : 420
+        clipPreview.targetPreviewWidth = _previewWidthFor(item)
     }
 
-    // Clear the preview panel entirely.
+    // Clear the preview panel: collapse to resting width.
     function _clearPreview() {
-        clipPreview.targetPreviewWidth = 0
+        clipPreview.targetPreviewWidth = root._restingPreviewWidth
         clipPreview.active = false
         // Defer clipboardId clear so the fade-out renders without flicker.
         Qt.callLater(function() {

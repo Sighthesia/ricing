@@ -36,9 +36,12 @@ Item {
     readonly property int _textLineCount: _effectiveText.length > 0 ? _effectiveText.split(/\r?\n/).length : 0
     property bool _contentArmed: false
     readonly property real _contentEnterOffset: 10
-    // Real preview viewport height is provided by the host loader. The root item
+    // Real preview viewport height is provided by the host. The root item
     // itself stays at 1px so it does not participate in parent height measurement.
-    property real viewportHeight: 0
+    // Defaults to parent height so direct embedding (e.g. ClipboardList) works
+    // without an explicit binding. Hosts (e.g. IslandLauncher via Loader) can
+    // override this with an explicit binding to their own viewport size.
+    property real viewportHeight: parent ? parent.height : 0
 
     // React to preview activation.
     onActiveChanged: {
