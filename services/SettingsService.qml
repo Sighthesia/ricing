@@ -81,6 +81,29 @@ QtObject {
         return target
     }
 
+    // Migrate the clock format away from the old 12h/24h preset values.
+    function migrateClockTimeFormat() {
+        if (!adapter.widgetSettings || !adapter.widgetSettings.clock)
+            return false
+
+        var clockSettings = adapter.widgetSettings.clock
+        var currentFormat = clockSettings.timeFormat
+        var nextFormat = ""
+
+        if (currentFormat === "12h")
+            nextFormat = "yyyy.MM.dd|hh:mm"
+        else if (currentFormat === "24h")
+            nextFormat = "yyyy.MM.dd|HH:mm"
+        else
+            return false
+
+        if (currentFormat === nextFormat)
+            return false
+
+        clockSettings.timeFormat = nextFormat
+        return true
+    }
+
     function ensureWidgetInstanceSettingDefaults(widgetId, instanceKey) {
         if (!WidgetSettingsRegistry.isInstanceScoped(widgetId) || !instanceKey)
             return null
@@ -166,6 +189,8 @@ QtObject {
         onLoaded: {
             root.ensureWidgetSettingDefaults("clock")
             root.ensureWidgetSettingDefaults("active-window")
+            if (root.migrateClockTimeFormat())
+                root.save()
             root._bumpWidgetSettingsRevision()
         }
         onLoadFailed: error => {
@@ -236,7 +261,7 @@ QtObject {
 
                 property JsonObject clock: JsonObject {
                     property bool showDate: true
-                    property string timeFormat: "12h"
+                    property string timeFormat: "yyyy.MM.dd|HH:mm"
                     property bool showDateWhenSimplified: false
                 }
             }

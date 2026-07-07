@@ -13,6 +13,7 @@ Item {
     property bool isImage: false
     property string clipboardId: ""
     property string previewText: ""
+    property bool deferHeavyContent: false
     // Animated width driven by the host — zero when no preview is shown.
     property real targetPreviewWidth: 0
     readonly property real restingWidth: isImage ? 200 : 280
@@ -33,26 +34,53 @@ Item {
     readonly property string _effectiveText: _textContent.length > 0 ? _textContent : previewText
     readonly property int _textCharCount: _effectiveText.length
     readonly property int _textLineCount: _effectiveText.length > 0 ? _effectiveText.split(/\r?\n/).length : 0
+    property bool _contentArmed: false
+    readonly property real _contentEnterOffset: 10
+    // Real preview viewport height is provided by the host loader. The root item
+    // itself stays at 1px so it does not participate in parent height measurement.
+    property real viewportHeight: 0
 
     // React to preview activation.
     onActiveChanged: {
         if (active && clipboardId) {
-            loadContent()
+            scheduleContentLoad()
         } else if (!active) {
             clearContent()
         }
     }
     onClipboardIdChanged: {
         if (active && clipboardId) {
-            loadContent()
+            scheduleContentLoad()
         } else {
             clearContent()
         }
     }
+    onDeferHeavyContentChanged: {
+        if (!deferHeavyContent && active && clipboardId && !_contentArmed)
+            scheduleContentLoad()
+    }
 
-    function loadContent() {
+    function scheduleContentLoad() {
         _imageSource = ""
         _textContent = ""
+        _contentArmed = false
+        _loading = false
+        _requestedId = clipboardId
+
+        if (!clipboardId)
+            return
+
+        if (deferHeavyContent) {
+            contentArmTimer.restart()
+            return
+        }
+
+        loadContent()
+    }
+
+    function loadContent() {
+        contentArmTimer.stop()
+        _contentArmed = true
         _loading = true
         _requestedId = clipboardId
 
@@ -71,10 +99,22 @@ Item {
     }
 
     function clearContent() {
+        contentArmTimer.stop()
         _imageSource = ""
         _textContent = ""
+        _contentArmed = false
         _loading = false
         Services.ClipboardService.discardPreview(_requestedId)
+    }
+
+    Timer {
+        id: contentArmTimer
+        interval: Services.Motion.number.contentDuration
+        repeat: false
+        onTriggered: {
+            if (root.active && root.clipboardId)
+                root.loadContent()
+        }
     }
 
     Connections {
@@ -103,153 +143,206 @@ Item {
     }
 
     width: targetPreviewWidth
-    height: parent.height
-    clip: true
+    height: 1
+    implicitHeight: 1
+    clip: false
     visible: width > 1
 
-    // Glass panel background matching the launcher surface aesthetic.
-    Rectangle {
-        id: bg
-        anchors.fill: parent
-        anchors.rightMargin: -12 // extend clip slightly for smooth reveal
-        radius: 10
-        color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity * 0.9)
+    Item {
+        id: viewport
+        x: 0
+        y: 0
+        width: parent.width
+        height: root.viewportHeight
+        clip: true
 
         Rectangle {
+            id: bg
             anchors.fill: parent
-            radius: parent.radius
-            color: "transparent"
-            border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.25)
-            border.width: 1
-        }
-    }
+            anchors.rightMargin: -12 // extend clip slightly for smooth reveal
+            radius: 10
+            color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity * 0.9)
 
-    // Loading indicator.
-    BusyIndicator {
-        anchors.centerIn: parent
-        running: root._loading
-        visible: root._loading
-        width: 24
-        height: 24
-    }
-
-    // ---- Image preview (Column layout: image + metadata label) ----
-    Column {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: root.contentInset
-        anchors.topMargin: root.contentInset
-        anchors.bottomMargin: root.contentInset
-        width: root.contentWidth
-        spacing: 4
-        visible: root.isImage && !root._loading && root._imageSource.length > 0
-
-        // Image fills most of the space above the label.
-        Item {
-            width: root.contentWidth
-            height: parent.height - metaLabel.height - parent.spacing
-
-            Image {
+            Rectangle {
                 anchors.fill: parent
-                fillMode: Image.PreserveAspectFit
-                source: root._imageSource
-                smooth: true
-                mipmap: true
+                radius: parent.radius
+                color: "transparent"
+                border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.25)
+                border.width: 1
             }
         }
 
-        // Image metadata label.
-        Services.FluidText {
-            id: metaLabel
-            width: root.contentWidth
-            height: 18
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            text: {
-                if (!root.clipboardId) return ""
-                var preview = root.previewText || ""
-                if (preview.startsWith("[") && preview.endsWith("]"))
-                    return preview.replace(/^\[|\]$/g, "").toUpperCase() + " | #" + root.clipboardId
-                return "IMAGE | #" + root.clipboardId
-            }
-            color: Services.Color.mOnSurfaceVariant
-            basePixelSize: 10
-            opacity: 0.6
+        // Loading indicator.
+        BusyIndicator {
+            anchors.centerIn: parent
+            running: root._loading
+            visible: root._loading
+            width: 24
+            height: 24
         }
-    }
 
-    // ---- Text preview ----
-    Column {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: root.contentInset
-        anchors.topMargin: root.contentInset
-        anchors.bottomMargin: root.contentInset
-        width: root.contentWidth
-        spacing: 4
-        visible: !root.isImage && !root._loading
-
-        // Scrollable text content.
-        Item {
-            id: textScrollContainer
+        // ---- Image preview (Column layout: image + metadata label) ----
+        Column {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: root.contentInset
+            anchors.topMargin: root.contentInset
+            anchors.bottomMargin: root.contentInset
             width: root.contentWidth
-            height: parent.height - metaText.height - parent.spacing
-            clip: true
+            spacing: 4
+            visible: root._contentArmed && root.isImage
+            opacity: !root._loading && root._imageSource.length > 0 ? 1 : 0
+            x: !root._loading && root._imageSource.length > 0 ? 0 : root._contentEnterOffset
 
-            Flickable {
-                id: textFlick
-                anchors.fill: parent
-                contentWidth: parent.width
-                contentHeight: textContent.implicitHeight
-                interactive: true
-                boundsBehavior: Flickable.StopAtBounds
-                flickDeceleration: 2000
-
-                Services.FluidText {
-                    id: textContent
-                    width: textScrollContainer.width
-                    text: root._textContent
-                    wrapMode: Text.Wrap
-                    textFormat: Text.PlainText
-                    color: Services.Color.mOnSurface
-                    basePixelSize: 12
-                    useMonospace: false
-                    elide: Text.ElideNone
-                    maximumLineCount: 9999
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
                 }
+            }
+            Behavior on x {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
+                }
+            }
 
-                ScrollBar.vertical: ScrollBar {
-                    policy: ScrollBar.AsNeeded
-                    width: 4
-                    onWidthChanged: {
-                        if (width > 4) width = 4 // keep thin
+            // Image fills most of the space above the label.
+            Item {
+                width: root.contentWidth
+                height: parent.height - metaLabel.height - parent.spacing
+
+                Image {
+                    anchors.fill: parent
+                    fillMode: Image.PreserveAspectFit
+                    source: root._imageSource
+                    smooth: true
+                    mipmap: true
+                }
+            }
+
+            // Image metadata label.
+            Services.FluidText {
+                id: metaLabel
+                width: root.contentWidth
+                height: 18
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                text: {
+                    if (!root.clipboardId) return ""
+                    var preview = root.previewText || ""
+                    if (preview.startsWith("[") && preview.endsWith("]"))
+                        return preview.replace(/^\[|\]$/g, "").toUpperCase() + " | #" + root.clipboardId
+                    return "IMAGE | #" + root.clipboardId
+                }
+                color: Services.Color.mOnSurfaceVariant
+                basePixelSize: 10
+                opacity: 0.6
+            }
+        }
+
+        // ---- Text preview ----
+        Column {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: root.contentInset
+            anchors.topMargin: root.contentInset
+            anchors.bottomMargin: root.contentInset
+            width: root.contentWidth
+            spacing: 4
+            visible: root._contentArmed && !root.isImage
+            opacity: !root._loading && root._textContent.length > 0 ? 1 : 0
+            x: !root._loading && root._textContent.length > 0 ? 0 : root._contentEnterOffset
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
+                }
+            }
+            Behavior on x {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
+                }
+            }
+
+            // Scrollable text content.
+            Item {
+                id: textScrollContainer
+                width: root.contentWidth
+                height: parent.height - metaText.height - parent.spacing
+                clip: true
+
+                Flickable {
+                    id: textFlick
+                    anchors.fill: parent
+                    contentWidth: parent.width
+                    contentHeight: textContent.implicitHeight
+                    interactive: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    flickDeceleration: 2000
+
+                    Services.FluidText {
+                        id: textContent
+                        width: textScrollContainer.width
+                        text: root._textContent
+                        wrapMode: Text.Wrap
+                        textFormat: Text.PlainText
+                        color: Services.Color.mOnSurface
+                        basePixelSize: 12
+                        useMonospace: false
+                        elide: Text.ElideNone
+                        maximumLineCount: 9999
+                    }
+
+                    ScrollBar.vertical: ScrollBar {
+                        policy: ScrollBar.AsNeeded
+                        width: 4
+                        onWidthChanged: {
+                            if (width > 4) width = 4 // keep thin
+                        }
                     }
                 }
             }
+
+            Services.FluidText {
+                id: metaText
+                width: root.contentWidth
+                height: 16
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                text: root._textCharCount + " chars | " + root._textLineCount + " lines | #" + root.clipboardId
+                color: Services.Color.mOnSurfaceVariant
+                basePixelSize: 10
+                opacity: 0.68
+            }
         }
 
+        // Empty state for non-previewable items (shouldn't happen in practice).
         Services.FluidText {
-            id: metaText
-            width: root.contentWidth
-            height: 16
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            text: root._textCharCount + " chars | " + root._textLineCount + " lines | #" + root.clipboardId
+            anchors.centerIn: parent
+            text: "No preview available"
             color: Services.Color.mOnSurfaceVariant
-            basePixelSize: 10
-            opacity: 0.68
-        }
-    }
+            basePixelSize: 11
+            visible: root._contentArmed && !root.isImage && !root._loading
+            opacity: root._contentArmed && !root.isImage && !root._loading && root._textContent.length === 0 ? 0.5 : 0
+            x: root._contentArmed && !root.isImage && !root._loading && root._textContent.length === 0 ? 0 : root._contentEnterOffset
 
-    // Empty state for non-previewable items (shouldn't happen in practice).
-    Services.FluidText {
-        anchors.centerIn: parent
-        text: "No preview available"
-        color: Services.Color.mOnSurfaceVariant
-        basePixelSize: 11
-        opacity: 0.5
-        visible: !root.isImage && !root._loading && root._textContent.length === 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
+                }
+            }
+            Behavior on x {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
+                }
+            }
+        }
     }
 }

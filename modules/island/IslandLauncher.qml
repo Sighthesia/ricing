@@ -962,6 +962,7 @@ Item {
             property real _previewSlotWidth: 0
             readonly property real _outerInset: 4
             readonly property real _forcedPreviewWidth: 420
+            property bool _deferPreviewContentUntilSettled: true
 
             // Forwarded for keyboard navigation from IslandLauncher.qml.
             readonly property alias count: clipListView.count
@@ -1025,13 +1026,28 @@ Item {
                 preview.isImage = item.isImage
                 preview.clipboardId = item.id
                 preview.previewText = item.preview || ""
+                preview.deferHeavyContent = clipRoot._deferPreviewContentUntilSettled
                 preview.active = true
                 preview.targetPreviewWidth = targetWidth
                 Services.IslandService.clipboardPreviewWidth = targetWidth
             }
 
+            function _refreshPreviewFromCurrentItem() {
+                if (clipRoot._hoverActiveIndex >= 0)
+                    return
+
+                var items = clipRoot.allItems
+                if (clipListView.currentIndex >= 0 && clipListView.currentIndex < items.length) {
+                    clipRoot._previewActiveSource = "keyboard"
+                    clipRoot._updatePreviewToItem(clipListView.currentIndex, items[clipListView.currentIndex])
+                } else {
+                    clipRoot._clearPreview()
+                }
+            }
+
             function _clearPreview() {
                 previewClearTimer.stop()
+                previewAutoloadTimer.stop()
                 clipRoot._previewActiveIndex = -1
                 clipRoot._previewActiveSource = ""
                 clipRoot._pendingPreviewIndex = -1
@@ -1117,6 +1133,23 @@ Item {
                 })
             }
 
+            Timer {
+                id: previewSettleTimer
+                interval: Services.Motion.number.contentDuration
+                repeat: false
+                onTriggered: {
+                    clipRoot._deferPreviewContentUntilSettled = false
+                    previewAutoloadTimer.restart()
+                }
+            }
+
+            Timer {
+                id: previewAutoloadTimer
+                interval: Services.Motion.number.contentDuration
+                repeat: false
+                onTriggered: clipRoot._refreshPreviewFromCurrentItem()
+            }
+
             function nextVisibleIndex(from, direction) {
                 return clipListView.nextVisibleIndex(from, direction)
             }
@@ -1164,13 +1197,13 @@ Item {
                     height: parent.height
                     source: "../launcher/ClipboardPreview.qml"
                     width: clipRoot._previewSlotWidth
-                    clip: true
+                    clip: false
                     visible: width > 1
                     z: 1
                     onLoaded: {
                         item.x = 0
                         item.y = 0
-                        item.height = Qt.binding(function() { return clipPreviewLoader.height })
+                        item.viewportHeight = Qt.binding(function() { return clipPreviewLoader.height })
                         item.targetPreviewWidth = Qt.binding(function() { return clipPreviewLoader.width })
                         if (clipRoot._pendingPreviewItem)
                             clipRoot._updatePreviewToItem(clipRoot._pendingPreviewIndex, clipRoot._pendingPreviewItem)
@@ -1195,6 +1228,8 @@ Item {
                     function triggerOpenReveal() {
                         openRevealToken = root._openRevealToken
                         openRevealArmed = true
+                        clipRoot._deferPreviewContentUntilSettled = true
+                        previewSettleTimer.restart()
                         openRevealResetTimer.restart()
                     }
 
@@ -1319,7 +1354,8 @@ Item {
                         x: matchesFilter ? 0 : 30
                         visible: height > 1 || opacity > 0.01
                         radius: MenuVisuals.rowRadius
-                        color: clipMouse.containsMouse || (clipRoot._hoverActiveIndex < 0 && clipListView.currentIndex === index)
+                        color: (clipRoot._hoverActiveIndex === index)
+                            || (clipRoot._hoverActiveIndex < 0 && clipListView.currentIndex === index)
                             ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
                             : "transparent"
 

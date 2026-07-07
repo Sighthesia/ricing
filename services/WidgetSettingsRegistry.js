@@ -18,7 +18,7 @@ var _definitions = {
         panelKey: "clock",
         defaults: {
             showDate: true,
-            timeFormat: "12h",
+            timeFormat: "yyyy.MM.dd|HH:mm",
             showDateWhenSimplified: false,
         },
     },

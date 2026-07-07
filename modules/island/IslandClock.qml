@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "../../services" as Services
+import "../bar/widgets" as ClockParts
 
 // Compact clock display for the collapsed island state.
 Item {
@@ -35,13 +36,14 @@ Item {
             color: Services.Color.mOutline
         }
 
-        // Time: HH:mm
-        Services.FluidText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Qt.formatDateTime(systemClock.date, "hh:mm")
-            color: Services.Color.mOnSurface
-            basePixelSize: 12
-            font.bold: true
+        // Time uses the shared rolling-digit display.
+        ClockParts.RollingClockTime {
+            currentTime: systemClock.date
+            digitPixelSize: 12
+            hourMutedColor: Services.Color.mOnSurfaceVariant
+            hourColor: Services.Color.mOnSurface
+            minuteMutedColor: Services.Color.mOnSurfaceVariant
+            minuteColor: Services.Color.mOnSurface
         }
     }
 }

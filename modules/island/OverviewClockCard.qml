@@ -1,6 +1,8 @@
 import QtQuick
+import Quickshell
 import "../bar/MenuVisuals.js" as MenuVisuals
 import "../../services" as Services
+import "../bar/widgets" as ClockParts
 
 // Time + todo summary card for the overview control-center collage.
 // Bold time dominates the top half; a todo summary fills the bottom.
@@ -12,6 +14,11 @@ Rectangle {
     signal clicked()
     property var todoItems: []
     property int todoCount: 0
+
+    SystemClock {
+        id: systemClock
+        precision: SystemClock.Minutes
+    }
 
     radius: 16
     color: clockMouse.containsMouse
@@ -58,11 +65,14 @@ Rectangle {
         anchors.rightMargin: 14
         spacing: 2
 
-        Services.FluidText {
-            text: Qt.formatTime(new Date(), "hh:mm")
-            color: Services.Color.mOnSurface
-            basePixelSize: 32
-            font.bold: true
+        ClockParts.RollingClockTime {
+            currentTime: systemClock.date
+            digitPixelSize: 32
+            hourMutedColor: Services.Color.mOnSurfaceVariant
+            hourColor: Services.Color.mOnSurface
+            minuteMutedColor: Services.Color.mOnSurfaceVariant
+            minuteColor: Services.Color.mOnSurface
+            separatorOpacity: 0.65
         }
 
         Services.FluidText {
