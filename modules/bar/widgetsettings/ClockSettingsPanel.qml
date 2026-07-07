@@ -28,17 +28,17 @@ Column {
         }
     }
 
-    SettingDropdown {
+    SettingText {
         width: parent.width
-        settingLabel: "Time Format"
-        description: "Choose 12-hour or 24-hour clock output."
-        model: ["12h", "24h"]
-        currentValue: root.clockSettings ? root.clockSettings.timeFormat : "12h"
-        onSelected: value => {
+        settingLabel: "Clock Format"
+        description: "Use a Qt format string. Separate date and time with |, for example yyyy.MM.dd|HH:mm."
+        text: root.clockSettings ? root.clockSettings.timeFormat : "yyyy.MM.dd|HH:mm"
+        placeholderText: "yyyy.MM.dd|HH:mm"
+        onEdited: value => {
             if (!root.clockSettings)
                 return
 
-            root.clockSettings.timeFormat = value
+            root.clockSettings.timeFormat = value.trim()
         }
     }
 
