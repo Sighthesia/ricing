@@ -151,6 +151,26 @@ Item {
     clip: false
     visible: width > 1
 
+    // Background surface — outside the clipped viewport so the right-side
+    // rounded corners render fully visible instead of being clipped square.
+    Rectangle {
+        id: bg
+        x: 0
+        y: 0
+        width: parent.width
+        height: root.viewportHeight
+        radius: 10
+        color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity * 0.9)
+
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: "transparent"
+            border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.25)
+            border.width: 1
+        }
+    }
+
     Item {
         id: viewport
         x: 0
@@ -158,22 +178,6 @@ Item {
         width: parent.width
         height: root.viewportHeight
         clip: true
-
-        Rectangle {
-            id: bg
-            anchors.fill: parent
-            anchors.rightMargin: -12 // extend clip slightly for smooth reveal
-            radius: 10
-            color: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity * 0.9)
-
-            Rectangle {
-                anchors.fill: parent
-                radius: parent.radius
-                color: "transparent"
-                border.color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.25)
-                border.width: 1
-            }
-        }
 
         // Loading indicator.
         BusyIndicator {

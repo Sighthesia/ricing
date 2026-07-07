@@ -961,7 +961,8 @@ Item {
             property real _restingListWidth: 0
             property real _previewSlotWidth: 0
             readonly property real _outerInset: 4
-            readonly property real _forcedPreviewWidth: 420
+            // Fixed width — no longer collapses to 8px or varies by content type.
+            readonly property real _previewWidth: 300
             property bool _deferPreviewContentUntilSettled: true
 
             // Forwarded for keyboard navigation from IslandLauncher.qml.
@@ -980,7 +981,7 @@ Item {
 
             Component.onCompleted: {
                 _syncRestingListWidth()
-                _previewSlotWidth = _forcedPreviewWidth
+                _previewSlotWidth = _previewWidth
             }
 
             function _syncRestingListWidth() {
@@ -992,18 +993,8 @@ Item {
                 return item && (item.isImage || (item.preview && item.preview.length > 0))
             }
 
-            // Preview width based on content type and length.
-            readonly property real _imagePreviewWidth: 300
-            readonly property real _longTextPreviewWidth: 420
-            readonly property real _shortTextPreviewWidth: 280
-            readonly property real _longTextThreshold: 80
-
             function _previewWidthFor(item) {
-                if (!item) return 0
-                if (item.isImage) return _imagePreviewWidth
-                return item.preview && item.preview.length > _longTextThreshold
-                    ? _longTextPreviewWidth
-                    : _shortTextPreviewWidth
+                return clipRoot._previewWidth
             }
 
             function _formatFirstSeen(firstSeenMs) {
@@ -1072,7 +1063,7 @@ Item {
                 preview.active = false
                 preview.isImage = false
                 preview.previewText = ""
-                preview.targetPreviewWidth = 0
+                // targetPreviewWidth and _previewSlotWidth stay at clipRoot._previewWidth
                 Qt.callLater(function() {
                     if (preview && !preview.active)
                         preview.clipboardId = ""
