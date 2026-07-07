@@ -990,6 +990,24 @@ Item {
                 return !!item
             }
 
+            function _formatFirstSeen(firstSeenMs) {
+                if (!firstSeenMs)
+                    return ""
+                return Qt.formatDateTime(new Date(firstSeenMs), "MM-dd HH:mm")
+            }
+
+            function _dayKey(firstSeenMs) {
+                if (!firstSeenMs)
+                    return ""
+                return Qt.formatDateTime(new Date(firstSeenMs), "yyyy-MM-dd")
+            }
+
+            function _dayLabel(firstSeenMs) {
+                if (!firstSeenMs)
+                    return ""
+                return Qt.formatDateTime(new Date(firstSeenMs), "MM-dd")
+            }
+
             function _updatePreviewToItem(index, item) {
                 if (!item || !_isPreviewable(item)) {
                     _clearPreview()
@@ -1291,9 +1309,12 @@ Item {
 
                         width: ListView.view ? ListView.view.width : 200
                         readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
+                        readonly property bool showDayHeader: index === 0
+                            || clipRoot._dayKey(modelData.firstSeenMs)
+                                !== clipRoot._dayKey(clipRoot.allItems[index - 1].firstSeenMs)
                         property bool _contentRevealVisible: true
                         property int _seenOpenRevealToken: 0
-                        height: matchesFilter ? 52 : 0
+                        height: matchesFilter ? (showDayHeader ? 72 : 52) : 0
                         opacity: matchesFilter ? 1 : 0
                         x: matchesFilter ? 0 : 30
                         visible: height > 1 || opacity > 0.01
@@ -1343,19 +1364,58 @@ Item {
                             Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                             Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
-                            Services.FluidText {
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.top: parent.top
-                                height: 48
+                            Column {
+                                anchors.fill: parent
                                 anchors.leftMargin: MenuVisuals.listContentInset
                                 anchors.rightMargin: MenuVisuals.listContentInset
-                                verticalAlignment: Text.AlignVCenter
-                                text: modelData.isImage ? "[Image]" : (modelData.preview || "")
-                                textFormat: Text.PlainText
-                                color: Services.Color.mOnSurface
-                                basePixelSize: 13
-                                elide: Text.ElideRight
+                                anchors.topMargin: 2
+                                spacing: 2
+
+                                Item {
+                                    width: parent.width
+                                    height: clipDelegate.showDayHeader ? 16 : 0
+                                    visible: clipDelegate.showDayHeader
+
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        height: 1
+                                        color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.35)
+                                    }
+
+                                    Services.FluidText {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: clipRoot._dayLabel(modelData.firstSeenMs)
+                                        color: Services.Color.mOnSurfaceVariant
+                                        basePixelSize: 10
+                                        opacity: 0.9
+                                    }
+                                }
+
+                                Services.FluidText {
+                                    width: parent.width
+                                    height: 30
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: modelData.isImage ? "[Image]" : (modelData.preview || "")
+                                    textFormat: Text.PlainText
+                                    color: Services.Color.mOnSurface
+                                    basePixelSize: 13
+                                    elide: Text.ElideRight
+                                }
+
+                                Services.FluidText {
+                                    width: parent.width
+                                    height: 16
+                                    verticalAlignment: Text.AlignVCenter
+                                    horizontalAlignment: Text.AlignRight
+                                    text: clipRoot._formatFirstSeen(modelData.firstSeenMs) + " | #" + modelData.id
+                                    color: Services.Color.mOnSurfaceVariant
+                                    basePixelSize: 10
+                                    opacity: 0.72
+                                    elide: Text.ElideLeft
+                                }
                             }
                         }
 

@@ -10,6 +10,7 @@ Singleton {
     property bool available: false
     property var items: []
     property int revision: 0
+    property var _firstSeenById: ({})
 
     signal listCompleted
 
@@ -44,6 +45,8 @@ Singleton {
                     let id = tab >= 0 ? line.slice(0, tab) : line.split(" ")[0]
                     let preview = tab >= 0 ? line.slice(tab + 1) : line.slice(id.length + 1)
                     let lowerPreview = preview.toLowerCase()
+                    if (!root._firstSeenById[id])
+                        root._firstSeenById[id] = Date.now()
                     // cliphist image previews vary by version: bracketed mime,
                     // binary-data text, or an HTML img snippet.
                     let isImage = (preview.startsWith("[") && /image/.test(preview))
@@ -63,7 +66,7 @@ Singleton {
                         else
                             mime = "image/*"
                     }
-                    result.push({ id, preview, isImage, mime })
+                    result.push({ id, preview, isImage, mime, firstSeenMs: root._firstSeenById[id] })
                 }
                 root.items = result
                 root.revision++

@@ -28,9 +28,11 @@ Item {
     property string _imageSource: ""
     property string _textContent: ""
     property bool _loading: false
-    property bool _textExpanded: false
     // Track the last requested clipboardId so stale async results are ignored.
     property string _requestedId: ""
+    readonly property string _effectiveText: _textContent.length > 0 ? _textContent : previewText
+    readonly property int _textCharCount: _effectiveText.length
+    readonly property int _textLineCount: _effectiveText.length > 0 ? _effectiveText.split(/\r?\n/).length : 0
 
     // React to preview activation.
     onActiveChanged: {
@@ -51,7 +53,6 @@ Item {
     function loadContent() {
         _imageSource = ""
         _textContent = ""
-        _textExpanded = false
         _loading = true
         _requestedId = clipboardId
 
@@ -73,7 +74,6 @@ Item {
         _imageSource = ""
         _textContent = ""
         _loading = false
-        _textExpanded = false
         Services.ClipboardService.discardPreview(_requestedId)
     }
 
@@ -170,8 +170,8 @@ Item {
                 if (!root.clipboardId) return ""
                 var preview = root.previewText || ""
                 if (preview.startsWith("[") && preview.endsWith("]"))
-                    return preview.replace(/^\[|\]$/g, "").toUpperCase()
-                return "IMAGE"
+                    return preview.replace(/^\[|\]$/g, "").toUpperCase() + " | #" + root.clipboardId
+                return "IMAGE | #" + root.clipboardId
             }
             color: Services.Color.mOnSurfaceVariant
             basePixelSize: 10
@@ -195,7 +195,7 @@ Item {
         Item {
             id: textScrollContainer
             width: root.contentWidth
-            height: parent.height - (expandButton.visible ? expandButton.height + parent.spacing : 0)
+            height: parent.height - metaText.height - parent.spacing
             clip: true
 
             Flickable {
@@ -203,7 +203,7 @@ Item {
                 anchors.fill: parent
                 contentWidth: parent.width
                 contentHeight: textContent.implicitHeight
-                interactive: root._textExpanded
+                interactive: true
                 boundsBehavior: Flickable.StopAtBounds
                 flickDeceleration: 2000
 
@@ -214,14 +214,14 @@ Item {
                     wrapMode: Text.Wrap
                     textFormat: Text.PlainText
                     color: Services.Color.mOnSurface
-                    basePixelSize: root._textExpanded ? 12 : 11
-                    useMonospace: root._textExpanded
-                    elide: root._textExpanded ? Text.ElideNone : Text.ElideRight
-                    maximumLineCount: root._textExpanded ? 9999 : 6
+                    basePixelSize: 12
+                    useMonospace: false
+                    elide: Text.ElideNone
+                    maximumLineCount: 9999
                 }
 
                 ScrollBar.vertical: ScrollBar {
-                    policy: root._textExpanded ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                    policy: ScrollBar.AsNeeded
                     width: 4
                     onWidthChanged: {
                         if (width > 4) width = 4 // keep thin
@@ -230,30 +230,16 @@ Item {
             }
         }
 
-        // Expand/collapse toggle for full text content.
         Services.FluidText {
-            id: expandButton
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: root._textExpanded ? "▲ Collapse" : "▼ Expand"
-            color: Services.Color.mPrimary
+            id: metaText
+            width: root.contentWidth
+            height: 16
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            text: root._textCharCount + " chars | " + root._textLineCount + " lines | #" + root.clipboardId
+            color: Services.Color.mOnSurfaceVariant
             basePixelSize: 10
-            opacity: 0.7
-            visible: !root.isImage && !root._loading
-                && root._textContent.length > 80
-
-            MouseArea {
-                anchors.fill: parent
-                anchors.margins: -4
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    root._textExpanded = !root._textExpanded
-                    // When expanding, ensure we try to get full content.
-                    if (root._textExpanded && root._textContent.length <= root.previewText.length) {
-                        root._loading = true
-                        Services.ClipboardService.requestPreview(root.clipboardId, false)
-                    }
-                }
-            }
+            opacity: 0.68
         }
     }
 
