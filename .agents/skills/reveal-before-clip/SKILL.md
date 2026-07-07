@@ -64,6 +64,7 @@ When a surface is *growing* to host content, prefer to **reveal** the content in
 - **Use integer-safe thresholds.** `y + height <= availableHeight - 1` (or similar) avoids sub-pixel flicker and antialias seams.
 - **Disable interaction alongside visibility.** A row that is opacity 0 must also be `enabled: false`, so hover-driven popups do not open on the unseen row.
 - **The rectangular clip is a safety net, not a strategy.** It is for off-by-one pixels; the visual work is done by the reveal.
+- **Do not draw rounded background corners inside the clipped content viewport.** If the actual visible panel background lives inside a `clip: true` viewport, the viewport rectangle can square off the far corners. Keep the visible rounded background as a sibling or outer layer, and let the inner clipped viewport handle only payload overflow.
 
 **Warning Signs**
 

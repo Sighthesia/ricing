@@ -47,6 +47,7 @@ A Wayland (Quickshell) top bar grew a dockzone downward to host a hover popup. T
 - **Fixed outer, animated inner.** Give the outer surface a constant generous size; grow/clip content within it. Mirrors the proven smooth sibling.
 - **Pin reservation/exclusion separately from visible size.** A fixed tall window must still reserve only its resting footprint (e.g. exclusiveZone = bar height), and mask input to the resting shape until the popup is open.
 - **Keep the animation hot path allocation-free.** Don't rebuild model/metrics objects per frame; apply additive overrides to existing properties.
+- **For side previews and detail panes, fix the slot before the payload.** Keep the preview area at a constant width once that mode is open, and delay image decode / long-text layout / scroll setup until the host geometry has settled.
 - **Warning signs in other code**: an `implicitWidth/Height` of a window/top-level bound to animated content; a region/mask whose `item` geometry is driven by a running animation; a `property var`/model that re-runs a builder on every frame of a transition; "smooth here but janky there" between two surfaces doing nominally the same thing.
 
 ## Universal Verification Strategy
