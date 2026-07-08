@@ -7,15 +7,24 @@ import Quickshell.Io
 Singleton {
     id: root
 
+    readonly property string _cacheDir: Quickshell.cacheDir + "/afloat"
+    readonly property string _firstSeenCachePath: root._cacheDir + "/clipboard-first-seen.json"
+
     property bool available: false
     property var items: []
     property int revision: 0
     property var _firstSeenById: ({})
-    // Tracks whether new first-seen timestamps were recorded in the current list run.
+    property var _firstSeenBySignature: ({})
+    property var _pendingSignatureIds: []
+    property var _pendingSignatureRows: ({})
+    property var _signaturePendingById: ({})
     property bool _firstSeenDirty: false
 
-    // Persistence for first-seen timestamps across shell restarts.
-    // Debounced write follows LaunchCountService.qml pattern.
+    property Process _cacheDirProc: Process {
+        command: ["mkdir", "-p", root._cacheDir]
+        running: false
+    }
+
     Timer {
         id: firstSeenSaveTimer
         interval: 500
@@ -25,11 +34,14 @@ Singleton {
 
     FileView {
         id: firstSeenFile
-        path: Quickshell.cacheDir + "/clipboard-first-seen.json"
+        path: root._firstSeenCachePath
         blockLoading: true
         onLoadFailed: error => {
-            if (error === FileViewError.FileNotFound)
+            if (error === FileViewError.FileNotFound) {
+                if (!_cacheDirProc.running)
+                    _cacheDirProc.running = true
                 firstSeenFile.writeAdapter()
+            }
         }
 
         JsonAdapter {
@@ -64,7 +76,8 @@ Singleton {
             onStreamFinished: {
                 let lines = this.text.trim().split("\n")
                 let result = []
-                for (let line of lines) {
+                for (let index = 0; index < lines.length; index++) {
+                    let line = lines[index]
                     if (!line) continue
                     // cliphist separates id and preview with a tab
                     let tab = line.indexOf("\t")
@@ -73,7 +86,7 @@ Singleton {
                     let lowerPreview = preview.toLowerCase()
                     if (!root._firstSeenById[id]) {
                         root._firstSeenById[id] = Date.now()
-                        root._firstSeenDirty = true
+                        root._enqueueFirstSeenSignature(id, index)
                     }
                     // cliphist image previews vary by version: bracketed mime,
                     // binary-data text, or an HTML img snippet.
@@ -96,18 +109,44 @@ Singleton {
                     }
                     result.push({ id, preview, isImage, mime, firstSeenMs: root._firstSeenById[id] })
                 }
-                // Persist any newly-recorded first-seen timestamps.
-                if (root._firstSeenDirty) {
-                    root._firstSeenDirty = false
-                    firstSeenAdapter.firstSeenMap = root._firstSeenById
-                    firstSeenSaveTimer.restart()
-                }
                 root.items = result
                 root.revision++
                 root.listCompleted()
             }
         }
     }
+
+    property Process _firstSeenSignatureProc: Process {
+        id: firstSeenSignatureProc
+        command: []
+        running: false
+        stdout: StdioCollector {}
+        onExited: code => {
+            var id = root._currentSignatureId
+            var rowIndex = root._currentSignatureRow
+            var signature = stdout.text.trim()
+            root._currentSignatureId = ""
+            root._currentSignatureRow = -1
+            if (id)
+                delete root._signaturePendingById[id]
+            if (id && code === 0 && signature) {
+                var firstSeenMs = root._firstSeenBySignature[signature]
+                if (!firstSeenMs) {
+                    firstSeenMs = root._firstSeenById[id] || Date.now()
+                    root._firstSeenBySignature[signature] = firstSeenMs
+                    root._firstSeenDirty = true
+                }
+                root._firstSeenById[id] = firstSeenMs
+                root._applyFirstSeenToItems(id, firstSeenMs)
+                if (rowIndex >= 0)
+                    delete root._pendingSignatureRows[rowIndex]
+                root._persistFirstSeenMap()
+            }
+            root._processNextFirstSeenSignature()
+        }
+    }
+    property string _currentSignatureId: ""
+    property int _currentSignatureRow: -1
 
     // Fire-and-forget action processes; no output needed, errors are silently ignored
     // because clipboard ops are best-effort from the shell's perspective.
@@ -127,6 +166,55 @@ Singleton {
     function list() {
         if (!root.available || listProc.running) return
         listProc.running = true
+    }
+
+    function _enqueueFirstSeenSignature(id, rowIndex) {
+        if (!id || root._signaturePendingById[id])
+            return
+        root._signaturePendingById[id] = true
+        root._pendingSignatureRows[rowIndex] = true
+        root._pendingSignatureIds = root._pendingSignatureIds.concat([{ id, rowIndex }])
+        root._processNextFirstSeenSignature()
+    }
+
+    function _processNextFirstSeenSignature() {
+        if (firstSeenSignatureProc.running || !root._pendingSignatureIds.length)
+            return
+        var next = root._pendingSignatureIds[0]
+        root._pendingSignatureIds = root._pendingSignatureIds.slice(1)
+        root._currentSignatureId = next.id
+        root._currentSignatureRow = next.rowIndex
+        firstSeenSignatureProc.command = [
+            "sh", "-c",
+            'cliphist decode "$1" | sha256sum | cut -d" " -f1',
+            "afloat-clip-first-seen",
+            next.id,
+        ]
+        firstSeenSignatureProc.running = true
+    }
+
+    function _applyFirstSeenToItems(id, firstSeenMs) {
+        if (!id || !root.items.length)
+            return
+        var changed = false
+        var updatedItems = root.items.map(item => {
+            if (!item || item.id !== id)
+                return item
+            changed = true
+            return Object.assign({}, item, { firstSeenMs })
+        })
+        if (!changed)
+            return
+        root.items = updatedItems
+        root.revision++
+    }
+
+    function _persistFirstSeenMap() {
+        if (!root._firstSeenDirty)
+            return
+        root._firstSeenDirty = false
+        firstSeenAdapter.firstSeenMap = root._firstSeenBySignature
+        firstSeenSaveTimer.restart()
     }
 
     function copyItem(id: string) {
@@ -161,6 +249,7 @@ Singleton {
         if (!root.available) return
         Quickshell.execDetached(["cliphist", "wipe"])
         root.items = []
+        root._firstSeenById = ({})
         root.revision++
     }
 
@@ -233,9 +322,10 @@ Singleton {
     }
 
     Component.onCompleted: {
-        _checkProc.running = true
-        // Restore persisted first-seen timestamps across restarts.
+        if (!_cacheDirProc.running)
+            _cacheDirProc.running = true
         if (firstSeenAdapter.firstSeenMap)
-            root._firstSeenById = firstSeenAdapter.firstSeenMap
+            root._firstSeenBySignature = firstSeenAdapter.firstSeenMap
+        _checkProc.running = true
     }
 }
