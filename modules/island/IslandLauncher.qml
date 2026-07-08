@@ -1003,6 +1003,11 @@ Item {
                 return Qt.formatDateTime(new Date(firstSeenMs), "MM-dd HH:mm")
             }
 
+            function _firstSeenForId(id, fallbackMs) {
+                var resolved = Services.ClipboardService.firstSeenMsForId(id)
+                return resolved || fallbackMs || 0
+            }
+
             function _dayKey(firstSeenMs) {
                 if (!firstSeenMs)
                     return ""
@@ -1350,9 +1355,13 @@ Item {
 
                         width: ListView.view ? ListView.view.width : 200
                         readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
+                        readonly property int resolvedFirstSeenMs: clipRoot._firstSeenForId(modelData.id, modelData.firstSeenMs)
+                        readonly property int previousFirstSeenMs: index > 0
+                            ? clipRoot._firstSeenForId(clipRoot.allItems[index - 1].id, clipRoot.allItems[index - 1].firstSeenMs)
+                            : 0
                         readonly property bool showDayHeader: index === 0
-                            || clipRoot._dayKey(modelData.firstSeenMs)
-                                !== clipRoot._dayKey(clipRoot.allItems[index - 1].firstSeenMs)
+                            || clipRoot._dayKey(resolvedFirstSeenMs)
+                                !== clipRoot._dayKey(previousFirstSeenMs)
                         property bool _contentRevealVisible: true
                         property int _seenOpenRevealToken: 0
                         height: matchesFilter ? (showDayHeader ? 72 : 52) : 0
@@ -1429,7 +1438,7 @@ Item {
                                     Services.FluidText {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: clipRoot._dayLabel(modelData.firstSeenMs)
+                                        text: clipRoot._dayLabel(clipDelegate.resolvedFirstSeenMs)
                                         color: Services.Color.mOnSurfaceVariant
                                         basePixelSize: 10
                                         opacity: 0.9
@@ -1452,7 +1461,7 @@ Item {
                                     height: 16
                                     verticalAlignment: Text.AlignVCenter
                                     horizontalAlignment: Text.AlignRight
-                                    text: clipRoot._formatFirstSeen(modelData.firstSeenMs) + " | #" + modelData.id
+                                    text: clipRoot._formatFirstSeen(clipDelegate.resolvedFirstSeenMs) + " | #" + modelData.id
                                     color: Services.Color.mOnSurfaceVariant
                                     basePixelSize: 10
                                     opacity: 0.72

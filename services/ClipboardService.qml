@@ -51,6 +51,7 @@ Singleton {
     }
 
     signal listCompleted
+    signal firstSeenUpdated(string id, int firstSeenMs)
 
     // Probe for cliphist at startup so we never attempt commands on missing tools.
     property Process _checkProc: Process {
@@ -197,16 +198,24 @@ Singleton {
         if (!id || !root.items.length)
             return
         var changed = false
-        var updatedItems = root.items.map(item => {
+        for (var index = 0; index < root.items.length; index++) {
+            var item = root.items[index]
             if (!item || item.id !== id)
-                return item
+                continue
+            if (item.firstSeenMs === firstSeenMs)
+                return
+            item.firstSeenMs = firstSeenMs
             changed = true
-            return Object.assign({}, item, { firstSeenMs })
-        })
-        if (!changed)
-            return
-        root.items = updatedItems
-        root.revision++
+            break
+        }
+        if (changed)
+            root.firstSeenUpdated(id, firstSeenMs)
+    }
+
+    function firstSeenMsForId(id) {
+        if (!id)
+            return 0
+        return root._firstSeenById[id] || 0
     }
 
     function _persistFirstSeenMap() {
