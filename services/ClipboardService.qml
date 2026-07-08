@@ -11,6 +11,32 @@ Singleton {
     property var items: []
     property int revision: 0
     property var _firstSeenById: ({})
+    // Tracks whether new first-seen timestamps were recorded in the current list run.
+    property bool _firstSeenDirty: false
+
+    // Persistence for first-seen timestamps across shell restarts.
+    // Debounced write follows LaunchCountService.qml pattern.
+    Timer {
+        id: firstSeenSaveTimer
+        interval: 500
+        repeat: false
+        onTriggered: firstSeenFile.writeAdapter()
+    }
+
+    FileView {
+        id: firstSeenFile
+        path: Quickshell.cacheDir + "/clipboard-first-seen.json"
+        blockLoading: true
+        onLoadFailed: error => {
+            if (error === FileViewError.FileNotFound)
+                firstSeenFile.writeAdapter()
+        }
+
+        JsonAdapter {
+            id: firstSeenAdapter
+            property var firstSeenMap: ({})
+        }
+    }
 
     signal listCompleted
 
@@ -45,8 +71,10 @@ Singleton {
                     let id = tab >= 0 ? line.slice(0, tab) : line.split(" ")[0]
                     let preview = tab >= 0 ? line.slice(tab + 1) : line.slice(id.length + 1)
                     let lowerPreview = preview.toLowerCase()
-                    if (!root._firstSeenById[id])
+                    if (!root._firstSeenById[id]) {
                         root._firstSeenById[id] = Date.now()
+                        root._firstSeenDirty = true
+                    }
                     // cliphist image previews vary by version: bracketed mime,
                     // binary-data text, or an HTML img snippet.
                     let isImage = (preview.startsWith("[") && /image/.test(preview))
@@ -67,6 +95,12 @@ Singleton {
                             mime = "image/*"
                     }
                     result.push({ id, preview, isImage, mime, firstSeenMs: root._firstSeenById[id] })
+                }
+                // Persist any newly-recorded first-seen timestamps.
+                if (root._firstSeenDirty) {
+                    root._firstSeenDirty = false
+                    firstSeenAdapter.firstSeenMap = root._firstSeenById
+                    firstSeenSaveTimer.restart()
                 }
                 root.items = result
                 root.revision++
@@ -198,5 +232,10 @@ Singleton {
         Quickshell.execDetached(["rm", "-f", "/tmp/afloat-clip-preview-" + safeName + ".img"])
     }
 
-    Component.onCompleted: _checkProc.running = true
+    Component.onCompleted: {
+        _checkProc.running = true
+        // Restore persisted first-seen timestamps across restarts.
+        if (firstSeenAdapter.firstSeenMap)
+            root._firstSeenById = firstSeenAdapter.firstSeenMap
+    }
 }

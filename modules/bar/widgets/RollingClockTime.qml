@@ -18,7 +18,7 @@ Item {
     property int separatorWidth: 0
     property int separatorHeight: 0
     property color separatorColor: minuteColor
-    property real separatorOpacity: 0.3
+    property real separatorOpacity: 1.0
     property string separatorText: ":"
 
     readonly property string hourText: Qt.formatDateTime(root.currentTime, "hh")
@@ -42,8 +42,8 @@ Item {
 
             RollingDigit {
                 targetDigit: root.hourTens
-                digitColor: root.hourMutedColor
-                mutedDigitColor: root.hourMutedColor
+                digitColor: root.hourColor
+                mutedDigitColor: root.hourColor
                 digitPixelSize: root.digitPixelSize
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
@@ -76,8 +76,8 @@ Item {
 
             RollingDigit {
                 targetDigit: root.minuteTens
-                digitColor: root.minuteMutedColor
-                mutedDigitColor: root.minuteMutedColor
+                digitColor: root.minuteColor
+                mutedDigitColor: root.minuteColor
                 digitPixelSize: root.digitPixelSize
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily

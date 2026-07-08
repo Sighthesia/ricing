@@ -72,7 +72,6 @@ Rectangle {
             hourColor: Services.Color.mOnSurface
             minuteMutedColor: Services.Color.mOnSurfaceVariant
             minuteColor: Services.Color.mOnSurface
-            separatorOpacity: 0.65
         }
 
         Services.FluidText {
