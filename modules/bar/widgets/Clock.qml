@@ -81,14 +81,25 @@ Item {
             }
         }
 
-        // Time slot uses a shared rolling-digit display.
+    // Time slot uses a shared rolling-digit display.
         ClockParts.RollingClockTime {
             currentTime: systemClock.date
             digitPixelSize: Services.TextSize.barContent
+            digitScale: 1.0
+            digitSpacing: 0
+            separatorOpacity: 1.0
+            separatorColor: Services.Color.mOnSurface
+            secondSeparatorColor: Services.Color.mOnSurface
+            hourTransitionDuration: Services.Motion.color.transitionDuration * 8
+            minuteTransitionDuration: Services.Motion.color.transitionDuration * 4
+            secondTransitionDuration: Services.Motion.color.transitionDuration
+            transitionEasing: Services.Motion.color.transitionEasing
             hourMutedColor: Services.Color.mOnSurfaceVariant
             hourColor: Services.Color.mOnSurface
             minuteMutedColor: Services.Color.mOnSurfaceVariant
             minuteColor: Services.Color.mOnSurface
+            secondMutedColor: Services.Color.mOnSurfaceVariant
+            secondColor: Services.Color.mOnSurface
         }
     }
 }

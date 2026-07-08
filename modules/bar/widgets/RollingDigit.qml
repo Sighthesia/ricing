@@ -11,8 +11,11 @@ Item {
     property int digitPixelSize: Services.TextSize.barContent
     property real digitScale: 1.0
     property string digitFontFamily: ""
+    property int transitionDuration: 180
+    property real overscanFactor: 1.35
+    property var transitionEasing: Easing.InOutCubic
 
-    readonly property int digitHeight: Math.max(1, Math.round(root.digitPixelSize * 1.35))
+    readonly property int digitHeight: Math.max(1, Math.round(root.digitPixelSize * root.overscanFactor))
     readonly property int digitWidth: Math.max(1, Math.ceil(_digitMetrics.advanceWidth))
 
     width: digitWidth
@@ -32,8 +35,8 @@ Item {
 
     Behavior on _displayDigit {
         NumberAnimation {
-            duration: 180
-            easing.type: Easing.InOutCubic
+            duration: root.transitionDuration
+            easing.type: root.transitionEasing
         }
     }
 

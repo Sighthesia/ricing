@@ -14,10 +14,15 @@ Rectangle {
     signal clicked()
     property var todoItems: []
     property int todoCount: 0
+    readonly property real timeTransitionBaseDuration: Services.Motion.color.transitionDuration * 2
+    readonly property var timeTransitionEasing: Services.Motion.color.transitionEasing
+    readonly property int hourTransitionDuration: Math.max(1, Math.round(root.timeTransitionBaseDuration * 8))
+    readonly property int minuteTransitionDuration: Math.max(1, Math.round(root.timeTransitionBaseDuration * 4))
+    readonly property int secondTransitionDuration: Math.max(1, Math.round(root.timeTransitionBaseDuration))
 
     SystemClock {
         id: systemClock
-        precision: SystemClock.Minutes
+        precision: SystemClock.Seconds
     }
 
     radius: 16
@@ -67,11 +72,19 @@ Rectangle {
 
         ClockParts.RollingClockTime {
             currentTime: systemClock.date
+            showSeconds: true
             digitPixelSize: 32
+            digitFontFamily: Services.SettingsService.appearance.fontDefault
             hourMutedColor: Services.Color.mOnSurfaceVariant
             hourColor: Services.Color.mOnSurface
             minuteMutedColor: Services.Color.mOnSurfaceVariant
             minuteColor: Services.Color.mOnSurface
+            secondColor: Services.Color.mOnSurface
+            secondMutedColor: Services.Color.mOnSurfaceVariant
+            minuteTransitionDuration: root.minuteTransitionDuration
+            hourTransitionDuration: root.hourTransitionDuration
+            secondTransitionDuration: root.secondTransitionDuration
+            transitionEasing: root.timeTransitionEasing
         }
 
         Services.FluidText {
