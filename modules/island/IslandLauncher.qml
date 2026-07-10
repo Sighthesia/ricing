@@ -1004,6 +1004,7 @@ Item {
             }
 
             function _firstSeenForId(id, fallbackMs) {
+                var revision = Services.ClipboardService.firstSeenRevision
                 var resolved = Services.ClipboardService.firstSeenMsForId(id)
                 return resolved || fallbackMs || 0
             }
@@ -1355,8 +1356,8 @@ Item {
 
                         width: ListView.view ? ListView.view.width : 200
                         readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
-                        readonly property int resolvedFirstSeenMs: clipRoot._firstSeenForId(modelData.id, modelData.firstSeenMs)
-                        readonly property int previousFirstSeenMs: index > 0
+                        readonly property real resolvedFirstSeenMs: clipRoot._firstSeenForId(modelData.id, modelData.firstSeenMs)
+                        readonly property real previousFirstSeenMs: index > 0
                             ? clipRoot._firstSeenForId(clipRoot.allItems[index - 1].id, clipRoot.allItems[index - 1].firstSeenMs)
                             : 0
                         readonly property bool showDayHeader: index === 0

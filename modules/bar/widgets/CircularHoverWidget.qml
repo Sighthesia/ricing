@@ -34,11 +34,12 @@ Item {
     property real sidePadding: 6
     property bool clickable: false
     property bool showPointerCursor: true
+    property bool _exitHoldRunning: false
     property int activationButtons: Qt.LeftButton
     property real dockzoneRevealCenterX: -1
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
-    readonly property bool expanded: badgeArea.containsMouse || detailHover.hovered || hoverExitHoldTimer.running
+    readonly property bool expanded: badgeArea.containsMouse || detailHover.hovered || _exitHoldRunning
     readonly property real clampedProgress: progressValue < 0 ? -1 : Math.max(0, Math.min(1, progressValue))
     readonly property real detailCenterXInViewport: {
         if (dockzoneRevealTargetCenterX >= 0)
@@ -81,13 +82,27 @@ Item {
 
         interval: 300
         repeat: false
+        onTriggered: _exitHoldRunning = false
     }
 
-    onExpandedChanged: {
-        if (expanded)
+    Connections {
+        target: badgeArea
+        function onContainsMouseChanged() { _updateExitHold() }
+    }
+
+    Connections {
+        target: detailHover
+        function onHoveredChanged() { _updateExitHold() }
+    }
+
+    function _updateExitHold() {
+        if (badgeArea.containsMouse || detailHover.hovered) {
             hoverExitHoldTimer.stop()
-        else
+            _exitHoldRunning = false
+        } else {
             hoverExitHoldTimer.restart()
+            _exitHoldRunning = true
+        }
     }
 
     // Keep the circular badge persistent while the dockzone hosts the reveal.

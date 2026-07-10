@@ -7,22 +7,32 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property string _cacheDir: Quickshell.cacheDir + "/afloat"
+    readonly property string _userCacheRoot: (Quickshell.env("XDG_CACHE_HOME") || ((Quickshell.env("HOME") || "") + "/.cache"))
+    readonly property string _cacheDir: root._userCacheRoot + "/afloat"
     readonly property string _firstSeenCachePath: root._cacheDir + "/clipboard-first-seen.json"
 
     property bool available: false
     property var items: []
     property int revision: 0
+    property int firstSeenRevision: 0
     property var _firstSeenById: ({})
     property var _firstSeenBySignature: ({})
     property var _pendingSignatureIds: []
     property var _pendingSignatureRows: ({})
     property var _signaturePendingById: ({})
     property bool _firstSeenDirty: false
+    property bool _firstSeenCacheReady: false
+    property bool _createFirstSeenCache: false
 
     property Process _cacheDirProc: Process {
         command: ["mkdir", "-p", root._cacheDir]
         running: false
+        onExited: code => {
+            if (code === 0 && root._createFirstSeenCache) {
+                root._createFirstSeenCache = false
+                firstSeenFile.writeAdapter()
+            }
+        }
     }
 
     Timer {
@@ -36,11 +46,16 @@ Singleton {
         id: firstSeenFile
         path: root._firstSeenCachePath
         blockLoading: true
+        onLoaded: root._finishFirstSeenCacheLoad(firstSeenAdapter.firstSeenMap)
         onLoadFailed: error => {
             if (error === FileViewError.FileNotFound) {
+                root._createFirstSeenCache = true
                 if (!_cacheDirProc.running)
                     _cacheDirProc.running = true
-                firstSeenFile.writeAdapter()
+                root._finishFirstSeenCacheLoad({})
+            } else {
+                console.warn("ClipboardService: failed to load first-seen cache, error =", error)
+                root._finishFirstSeenCacheLoad({})
             }
         }
 
@@ -51,7 +66,7 @@ Singleton {
     }
 
     signal listCompleted
-    signal firstSeenUpdated(string id, int firstSeenMs)
+    signal firstSeenUpdated(string id, real firstSeenMs)
 
     // Probe for cliphist at startup so we never attempt commands on missing tools.
     property Process _checkProc: Process {
@@ -165,8 +180,16 @@ Singleton {
     }
 
     function list() {
-        if (!root.available || listProc.running) return
+        if (!root.available || !root._firstSeenCacheReady || listProc.running) return
         listProc.running = true
+    }
+
+    function _finishFirstSeenCacheLoad(firstSeenMap) {
+        if (root._firstSeenCacheReady)
+            return
+        root._firstSeenBySignature = firstSeenMap || ({})
+        root._firstSeenCacheReady = true
+        _checkProc.running = true
     }
 
     function _enqueueFirstSeenSignature(id, rowIndex) {
@@ -208,8 +231,10 @@ Singleton {
             changed = true
             break
         }
-        if (changed)
+        if (changed) {
+            root.firstSeenRevision++
             root.firstSeenUpdated(id, firstSeenMs)
+        }
     }
 
     function firstSeenMsForId(id) {
@@ -333,8 +358,5 @@ Singleton {
     Component.onCompleted: {
         if (!_cacheDirProc.running)
             _cacheDirProc.running = true
-        if (firstSeenAdapter.firstSeenMap)
-            root._firstSeenBySignature = firstSeenAdapter.firstSeenMap
-        _checkProc.running = true
     }
 }
