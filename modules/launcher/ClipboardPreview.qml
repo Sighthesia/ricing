@@ -73,10 +73,8 @@ Item {
         if (!clipboardId)
             return
 
-        if (deferHeavyContent) {
-            contentArmTimer.restart()
+        if (deferHeavyContent)
             return
-        }
 
         loadContent()
     }
@@ -198,7 +196,7 @@ Item {
             anchors.bottomMargin: root.contentInset
             width: root.contentWidth
             spacing: 4
-            visible: root._contentArmed && root.isImage
+            visible: root.active && root.isImage
             opacity: !root._loading && root._imageSource.length > 0 ? 1 : 0
             x: !root._loading && root._imageSource.length > 0 ? 0 : root._contentEnterOffset
 
@@ -249,6 +247,35 @@ Item {
             }
         }
 
+        // Keep the preview surface alive during deferred image decoding so the
+        // user sees a stable image-specific placeholder instead of a blank panel.
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.margins: root.contentInset
+            radius: 8
+            color: Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, 0.06)
+            visible: root.active && root.isImage && root._imageSource.length === 0
+            opacity: visible ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Services.Motion.number.contentDuration
+                    easing.type: Services.Motion.number.contentEasing
+                }
+            }
+
+            Services.FluidText {
+                anchors.centerIn: parent
+                text: "IMAGE"
+                color: Services.Color.mOnSurfaceVariant
+                basePixelSize: 11
+                opacity: 0.65
+            }
+        }
+
         // ---- Text preview ----
         Column {
             anchors.left: parent.left
@@ -259,9 +286,9 @@ Item {
             anchors.bottomMargin: root.contentInset
             width: root.contentWidth
             spacing: 4
-            visible: root._contentArmed && !root.isImage
-            opacity: !root._loading && root._textContent.length > 0 ? 1 : 0
-            x: !root._loading && root._textContent.length > 0 ? 0 : root._contentEnterOffset
+            visible: root.active && !root.isImage
+            opacity: root._effectiveText.length > 0 ? 1 : 0
+            x: root._effectiveText.length > 0 ? 0 : root._contentEnterOffset
 
             Behavior on opacity {
                 NumberAnimation {
@@ -295,7 +322,7 @@ Item {
                     Services.FluidText {
                         id: textContent
                         width: textScrollContainer.width
-                        text: root._textContent
+                        text: root._effectiveText
                         wrapMode: Text.Wrap
                         textFormat: Text.PlainText
                         color: Services.Color.mOnSurface

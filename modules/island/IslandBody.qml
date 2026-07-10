@@ -53,9 +53,7 @@ Item {
         && !Services.IslandService.expanded
     readonly property bool launcherPageVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "launcher"
-    // Fixed preview width in clipboard mode avoids outer surface resize jank.
-    // The inner islandClipboard layout redistributes list vs preview space
-    // internally without driving a layer-shell window commit every frame.
+    // Restore the wider clipboard list without coupling preview payload work to it.
     readonly property real clipboardPreviewExtraWidth: root.launcherPageVisible
         && Services.IslandService.mode === "clipboard"
         ? 420

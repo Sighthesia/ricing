@@ -197,9 +197,9 @@ Item {
                         if (listView) {
                             var idx2 = listView.currentIndex
                             if (Services.IslandService.mode === "clipboard") {
-                                var items = listView.allItems
-                                if (idx2 >= 0 && idx2 < items.length) {
-                                    Services.ClipboardService.copyItem(items[idx2].id)
+                                var clipboardItem = listView.itemAtIndex(idx2)
+                                if (clipboardItem) {
+                                    Services.ClipboardService.copyItem(clipboardItem.id)
                                     Services.IslandService.close()
                                 }
                             } else {
@@ -257,7 +257,7 @@ Item {
 
                 onLoaded: {
                     if (item && Services.IslandService.query.trim().length === 0) {
-                        item.currentIndex = 0
+                        item.currentIndex = item.firstVisibleIndex()
                     }
                 }
             }
@@ -974,6 +974,7 @@ Item {
                 if (!all || all.length === 0) return []
                 return all
             }
+            property var displayItems: _buildDisplayItems()
 
             onWidthChanged: {
                 _syncRestingListWidth()
@@ -1004,7 +1005,7 @@ Item {
             }
 
             function _firstSeenForId(id, fallbackMs) {
-                var revision = Services.ClipboardService.firstSeenRevision
+                var revision = Services.ClipboardService.firstSeenDisplayRevision
                 var resolved = Services.ClipboardService.firstSeenMsForId(id)
                 return resolved || fallbackMs || 0
             }
@@ -1019,6 +1020,54 @@ Item {
                 if (!firstSeenMs)
                     return ""
                 return Qt.formatDateTime(new Date(firstSeenMs), "MM-dd")
+            }
+
+            function _buildDisplayItems() {
+                var items = clipRoot.allItems
+                var rows = []
+                var previousDay = ""
+                for (var index = 0; index < items.length; index++) {
+                    var item = items[index]
+                    var firstSeenMs = clipRoot._firstSeenForId(item.id, item.firstSeenMs)
+                    var day = clipRoot._dayKey(firstSeenMs)
+                    if (day !== previousDay) {
+                        rows.push({ rowType: "separator", dayLabel: clipRoot._dayLabel(firstSeenMs) })
+                        previousDay = day
+                    }
+                    rows.push(Object.assign({}, item, { rowType: "item", clipIndex: index }))
+                }
+                return rows
+            }
+
+            function itemAtIndex(index) {
+                if (index < 0 || index >= clipRoot.displayItems.length)
+                    return null
+                var row = clipRoot.displayItems[index]
+                return row && row.rowType === "item" ? row : null
+            }
+
+            function firstVisibleIndex() {
+                for (var index = 0; index < clipRoot.displayItems.length; index++) {
+                    if (clipRoot._rowMatches(clipRoot.displayItems[index], clipListView.query))
+                        return index
+                }
+                return -1
+            }
+
+            function _rowMatches(row, query) {
+                if (!row)
+                    return false
+                if (row.rowType === "item")
+                    return clipListView.clipMatches(row, query)
+                var separatorIndex = clipRoot.displayItems.indexOf(row)
+                for (var index = separatorIndex + 1; index < clipRoot.displayItems.length; index++) {
+                    var next = clipRoot.displayItems[index]
+                    if (next.rowType === "separator")
+                        break
+                    if (clipListView.clipMatches(next, query))
+                        return true
+                }
+                return false
             }
 
             function _updatePreviewToItem(index, item) {
@@ -1048,10 +1097,10 @@ Item {
                 if (clipRoot._hoverActiveIndex >= 0)
                     return
 
-                var items = clipRoot.allItems
-                if (clipListView.currentIndex >= 0 && clipListView.currentIndex < items.length) {
+                var item = clipRoot.itemAtIndex(clipListView.currentIndex)
+                if (item) {
                     clipRoot._previewActiveSource = "keyboard"
-                    clipRoot._updatePreviewToItem(clipListView.currentIndex, items[clipListView.currentIndex])
+                    clipRoot._updatePreviewToItem(clipListView.currentIndex, item)
                 } else {
                     clipRoot._clearPreview()
                 }
@@ -1104,13 +1153,13 @@ Item {
             function _updatePreviewFromListPosition(mouseX, mouseY) {
                 previewClearTimer.stop()
                 var idx = clipListView.indexAt(mouseX, mouseY + clipListView.contentY)
-                if (idx < 0 || idx >= clipRoot.allItems.length) {
+                var item = clipRoot.itemAtIndex(idx)
+                if (!item) {
                     clipRoot._hoverActiveIndex = -1
                     previewClearTimer.restart()
                     return
                 }
 
-                var item = clipRoot.allItems[idx]
                 clipRoot._hoverActiveIndex = idx
                 if (clipRoot._isPreviewable(item)) {
                     clipRoot._previewActiveSource = "pointer"
@@ -1147,7 +1196,9 @@ Item {
 
             Timer {
                 id: previewSettleTimer
-                interval: Services.Motion.number.contentDuration
+                // Wait for the island's outer spring to settle before decoding
+                // images or laying out full clipboard text.
+                interval: 520
                 repeat: false
                 onTriggered: {
                     clipRoot._deferPreviewContentUntilSettled = false
@@ -1260,21 +1311,15 @@ Item {
                     }
 
                     property var prewarmItems: {
-                        const items = clipRoot.allItems
+                        const items = clipRoot.displayItems.filter(item => item.rowType === "item")
                         if (!items || items.length === 0) return []
                         return items.slice(0, Math.min(prewarmCount, items.length))
                     }
 
                     onQueryChanged: {
-                        var items = clipRoot.allItems
-                        for (var i = 0; i < items.length; i++) {
-                            if (clipMatches(items[i], query)) {
-                                clipListView.currentIndex = i
-                                clipListView.positionViewAtBeginning()
-                                return
-                            }
-                        }
-                        clipListView.currentIndex = 0
+                        clipListView.currentIndex = clipRoot.firstVisibleIndex()
+                        if (clipListView.currentIndex >= 0)
+                            clipListView.positionViewAtBeginning()
                     }
 
                     // Keyboard selection updates the preview when no delegate is hovered.
@@ -1282,11 +1327,10 @@ Item {
                         if (clipRoot._hoverActiveIndex >= 0)
                             return
 
-                        var items = clipRoot.allItems
-                        if (currentIndex >= 0 && currentIndex < items.length
-                            && clipRoot._isPreviewable(items[currentIndex])) {
+                        var item = clipRoot.itemAtIndex(currentIndex)
+                        if (item && clipRoot._isPreviewable(item)) {
                             clipRoot._previewActiveSource = "keyboard"
-                            clipRoot._updatePreviewToItem(currentIndex, items[currentIndex])
+                            clipRoot._updatePreviewToItem(currentIndex, item)
                         } else {
                             clipRoot._clearPreview()
                         }
@@ -1301,15 +1345,16 @@ Item {
                     function nextVisibleIndex(from, direction) {
                         var step = direction === "down" ? 1 : -1
                         var i = from + step
-                        while (i >= 0 && i < clipRoot.allItems.length) {
-                            if (clipMatches(clipRoot.allItems[i], query))
+                        while (i >= 0 && i < clipRoot.displayItems.length) {
+                            var row = clipRoot.displayItems[i]
+                            if (row.rowType === "item" && clipMatches(row, query))
                                 return i
                             i += step
                         }
                         return from
                     }
 
-                    model: clipRoot.allItems
+                    model: clipRoot.displayItems
 
                     Component.onCompleted: Services.ClipboardService.list()
 
@@ -1353,27 +1398,22 @@ Item {
                         // Expose hover state for parent preview tracking.
                         property var hoverHandler: clipRoot._onDelegateHoverChanged
                         readonly property bool hovered: clipMouse.containsMouse
+                        readonly property bool isSeparator: modelData.rowType === "separator"
 
                         width: ListView.view ? ListView.view.width : 200
-                        readonly property bool matchesFilter: clipListView.clipMatches(modelData, clipListView.query)
-                        readonly property real resolvedFirstSeenMs: clipRoot._firstSeenForId(modelData.id, modelData.firstSeenMs)
-                        readonly property real previousFirstSeenMs: index > 0
-                            ? clipRoot._firstSeenForId(clipRoot.allItems[index - 1].id, clipRoot.allItems[index - 1].firstSeenMs)
-                            : 0
-                        readonly property bool showDayHeader: index === 0
-                            || clipRoot._dayKey(resolvedFirstSeenMs)
-                                !== clipRoot._dayKey(previousFirstSeenMs)
+                        readonly property bool matchesFilter: clipRoot._rowMatches(modelData, clipListView.query)
+                        readonly property real resolvedFirstSeenMs: isSeparator ? 0 : clipRoot._firstSeenForId(modelData.id, modelData.firstSeenMs)
                         property bool _contentRevealVisible: true
                         property int _seenOpenRevealToken: 0
-                        height: matchesFilter ? (showDayHeader ? 72 : 52) : 0
+                        height: matchesFilter ? (isSeparator ? 24 : 52) : 0
                         opacity: matchesFilter ? 1 : 0
                         x: matchesFilter ? 0 : 30
                         visible: height > 1 || opacity > 0.01
-                        radius: MenuVisuals.rowRadius
-                        color: (clipRoot._hoverActiveIndex === index)
+                        radius: isSeparator ? 0 : MenuVisuals.rowRadius
+                        color: !isSeparator && ((clipRoot._hoverActiveIndex === index)
                             || (clipRoot._hoverActiveIndex < 0 && clipListView.currentIndex === index)
                             ? Qt.rgba(Services.Color.mOnSurface.r, Services.Color.mOnSurface.g, Services.Color.mOnSurface.b, MenuVisuals.hoverOpacity)
-                            : "transparent"
+                            : "transparent")
 
                         Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.InOutCubic } }
                         Behavior on x { NumberAnimation { duration: 190; easing.type: clipDelegate.matchesFilter ? Easing.OutCubic : Easing.InCubic } }
@@ -1382,7 +1422,7 @@ Item {
                         Component.onCompleted: maybeQueueOpenReveal()
 
                         function maybeQueueOpenReveal() {
-                            if (!ListView.view || !ListView.view.openRevealArmed || !matchesFilter)
+                            if (!ListView.view || !ListView.view.openRevealArmed || !matchesFilter || isSeparator)
                                 return
                             if (_seenOpenRevealToken === ListView.view.openRevealToken)
                                 return
@@ -1417,34 +1457,12 @@ Item {
                             Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
                             Column {
+                                visible: !clipDelegate.isSeparator
                                 anchors.fill: parent
                                 anchors.leftMargin: MenuVisuals.listContentInset
                                 anchors.rightMargin: MenuVisuals.listContentInset
                                 anchors.topMargin: 2
                                 spacing: 2
-
-                                Item {
-                                    width: parent.width
-                                    height: clipDelegate.showDayHeader ? 16 : 0
-                                    visible: clipDelegate.showDayHeader
-
-                                    Rectangle {
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        height: 1
-                                        color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.35)
-                                    }
-
-                                    Services.FluidText {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: clipRoot._dayLabel(clipDelegate.resolvedFirstSeenMs)
-                                        color: Services.Color.mOnSurfaceVariant
-                                        basePixelSize: 10
-                                        opacity: 0.9
-                                    }
-                                }
 
                                 Services.FluidText {
                                     width: parent.width
@@ -1469,12 +1487,36 @@ Item {
                                     elide: Text.ElideLeft
                                 }
                             }
+
+                            Item {
+                                visible: clipDelegate.isSeparator
+                                anchors.fill: parent
+                                anchors.leftMargin: MenuVisuals.listContentInset
+                                anchors.rightMargin: MenuVisuals.listContentInset
+
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    height: 1
+                                    color: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.35)
+                                }
+
+                                Services.FluidText {
+                                    anchors.centerIn: parent
+                                    text: modelData.dayLabel || ""
+                                    color: Services.Color.mOnSurfaceVariant
+                                    basePixelSize: 10
+                                    opacity: 0.9
+                                }
+                            }
                         }
 
                         MouseArea {
                             id: clipMouse
                             anchors.fill: parent
-                            hoverEnabled: true
+                            enabled: !clipDelegate.isSeparator
+                            hoverEnabled: enabled
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 clipListView.currentIndex = index

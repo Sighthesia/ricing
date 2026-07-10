@@ -15,6 +15,7 @@ Singleton {
     property var items: []
     property int revision: 0
     property int firstSeenRevision: 0
+    property int firstSeenDisplayRevision: 0
     property var _firstSeenById: ({})
     property var _firstSeenBySignature: ({})
     property var _pendingSignatureIds: []
@@ -23,6 +24,8 @@ Singleton {
     property bool _firstSeenDirty: false
     property bool _firstSeenCacheReady: false
     property bool _createFirstSeenCache: false
+    property bool _initialFirstSeenRecovery: false
+    property bool _firstListLoaded: false
 
     property Process _cacheDirProc: Process {
         command: ["mkdir", "-p", root._cacheDir]
@@ -127,6 +130,11 @@ Singleton {
                 }
                 root.items = result
                 root.revision++
+                if (!root._firstListLoaded) {
+                    root._firstListLoaded = true
+                    root._initialFirstSeenRecovery = true
+                    root._finishInitialFirstSeenRecovery()
+                }
                 root.listCompleted()
             }
         }
@@ -159,6 +167,7 @@ Singleton {
                 root._persistFirstSeenMap()
             }
             root._processNextFirstSeenSignature()
+            root._finishInitialFirstSeenRecovery()
         }
     }
     property string _currentSignatureId: ""
@@ -233,8 +242,17 @@ Singleton {
         }
         if (changed) {
             root.firstSeenRevision++
+            if (!root._initialFirstSeenRecovery)
+                root.firstSeenDisplayRevision++
             root.firstSeenUpdated(id, firstSeenMs)
         }
+    }
+
+    function _finishInitialFirstSeenRecovery() {
+        if (!root._initialFirstSeenRecovery || firstSeenSignatureProc.running || root._pendingSignatureIds.length)
+            return
+        root._initialFirstSeenRecovery = false
+        root.firstSeenDisplayRevision++
     }
 
     function firstSeenMsForId(id) {
