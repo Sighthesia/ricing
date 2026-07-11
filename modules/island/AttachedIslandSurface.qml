@@ -237,14 +237,50 @@ Item {
                 + " Z"
         }
 
+        // Glass strokes omit the screen-attached top edge while the fill stays closed.
+        readonly property string strokeOutline: {
+            var er = root.liveEarRadius
+            var bodyX = bodyRect.x
+            var bodyW = bodyRect.width
+            var bodyH = bodyRect.height
+
+            if (bodyW <= 0 || bodyH <= 0)
+                return ""
+
+            var bodyRightX = bodyX + bodyW
+            var radius = Math.min(root.bodyRadius, bodyW / 2, bodyH / 2)
+            var hasEars = leftEar.visible && rightEar.visible
+            var topInset = hasEars ? Math.min(er, Math.max(root.glassGlowWidth, root.glassHighlightWidth) + 2) : 2
+            var earTrimX = hasEars ? Math.sqrt(Math.max(0, er * er - topInset * topInset)) : 0
+
+            if (hasEars) {
+                return "M " + (bodyX + radius) + " " + bodyH
+                    + " Q " + bodyX + " " + bodyH + " " + bodyX + " " + (bodyH - radius)
+                    + " L " + bodyX + " " + er
+                    + " A " + er + " " + er + " 0 0 0 " + (bodyX - earTrimX) + " " + topInset
+                    + " M " + (bodyRightX + er - earTrimX) + " " + topInset
+                    + " A " + er + " " + er + " 0 0 0 " + bodyRightX + " " + er
+                    + " L " + bodyRightX + " " + (bodyH - radius)
+                    + " Q " + bodyRightX + " " + bodyH + " " + (bodyRightX - radius) + " " + bodyH
+            }
+
+            return "M " + (bodyX + radius) + " " + bodyH
+                + " Q " + bodyX + " " + bodyH + " " + bodyX + " " + (bodyH - radius)
+                + " L " + bodyX + " " + topInset
+                + " M " + bodyRightX + " " + topInset
+                + " L " + bodyRightX + " " + (bodyH - radius)
+                + " Q " + bodyRightX + " " + bodyH + " " + (bodyRightX - radius) + " " + bodyH
+        }
+
         // Low-energy theme glow keeps the silhouette legible on busy backdrops.
         ShapePath {
             fillColor: "transparent"
             strokeColor: root.glassGlowColor
             strokeWidth: root.glassGlowWidth
+            capStyle: ShapePath.FlatCap
 
             PathSvg {
-                path: silhouetteFill.outline
+                path: silhouetteFill.strokeOutline
             }
         }
 
@@ -263,9 +299,10 @@ Item {
             fillColor: "transparent"
             strokeColor: root.glassHighlightColor
             strokeWidth: root.glassHighlightWidth
+            capStyle: ShapePath.FlatCap
 
             PathSvg {
-                path: silhouetteFill.outline
+                path: silhouetteFill.strokeOutline
             }
         }
     }
