@@ -368,14 +368,56 @@ Item {
                 + " A " + er + " " + er + " 0 0 0 " + (bx - er) + " 0 Z"
         }
 
+        // Open contour for glass strokes: all exposed edges remain highlighted,
+        // while the screen-attached top edge deliberately has no outline.
+        readonly property string strokeOutline: {
+            var er = root.earRadius
+            var ox = root.visualOffsetX
+            var bx = root.visualBodyX
+            var bw = root.pushedBodyWidth
+            var bh = root.bodyHeight
+
+            if (bw <= 0 || bh <= 0)
+                return ""
+
+            var bodyRightX = bx + bw
+            var radius = Math.min(root.bodyRadius, bw / 2, bh / 2)
+
+            if (root.isLeftSection) {
+                return "M " + ox + " " + (bh + er)
+                    + " A " + er + " " + er + " 0 0 0 " + (ox + er) + " " + bh
+                    + " L " + (bodyRightX - radius) + " " + bh
+                    + " Q " + bodyRightX + " " + bh + " " + bodyRightX + " " + (bh - radius)
+                    + " L " + bodyRightX + " " + er
+                    + " A " + er + " " + er + " 0 0 0 " + (bodyRightX + er) + " 0"
+            } else if (root.isRightSection) {
+                return "M " + bodyRightX + " " + (bh + er)
+                    + " A " + er + " " + er + " 0 0 0 " + (bodyRightX - er) + " " + bh
+                    + " L " + (bx + radius) + " " + bh
+                    + " Q " + bx + " " + bh + " " + bx + " " + (bh - radius)
+                    + " L " + bx + " " + er
+                    + " A " + er + " " + er + " 0 0 0 " + ox + " 0"
+            }
+
+            return "M " + (bx - er) + " 0"
+                + " A " + er + " " + er + " 0 0 0 " + bx + " " + er
+                + " L " + bx + " " + (bh - radius)
+                + " Q " + bx + " " + bh + " " + (bx + radius) + " " + bh
+                + " L " + (bodyRightX - radius) + " " + bh
+                + " Q " + bodyRightX + " " + bh + " " + bodyRightX + " " + (bh - radius)
+                + " L " + bodyRightX + " " + er
+                + " A " + er + " " + er + " 0 0 0 " + (bodyRightX + er) + " 0"
+        }
+
         // Low-energy theme glow keeps the silhouette legible on busy backdrops.
         ShapePath {
             fillColor: "transparent"
             strokeColor: root.glassGlowColor
             strokeWidth: root.glassGlowWidth
+            capStyle: ShapePath.FlatCap
 
             PathSvg {
-                path: silhouetteFill.outline
+                path: silhouetteFill.strokeOutline
             }
         }
 
@@ -394,9 +436,10 @@ Item {
             fillColor: "transparent"
             strokeColor: root.glassHighlightColor
             strokeWidth: root.glassHighlightWidth
+            capStyle: ShapePath.FlatCap
 
             PathSvg {
-                path: silhouetteFill.outline
+                path: silhouetteFill.strokeOutline
             }
         }
     }
