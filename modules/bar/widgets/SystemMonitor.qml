@@ -7,12 +7,6 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
-    property real dockzoneRevealCenterX: -1
-    property real dockzoneRevealTargetCenterX: -1
-    property real dockzoneRevealViewportWidth: -1
-    property real dockzoneActualExpandHeight: 0
-    // Fixed detail viewport hover from the section-level hit target.
-    property bool detailViewportHovered: false
 
     readonly property var monitorSettings: Services.SettingsService.widgetSettingsObject(
         "system-monitor",
@@ -38,8 +32,8 @@ Item {
             : Services.Color.mPrimary)
     readonly property real dockzoneExpandHeight: metricsBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: metricsBadge.dockzoneExpandWidth
-    readonly property bool badgeActive: metricsBadge.pointerActive
-    readonly property bool badgeContainsMouse: metricsBadge.badgeContainsMouse
+    readonly property bool badgeActive: metricsBadge.badgeActive
+    readonly property Component detailComponent: metricsBadge.detailComponent
 
     implicitWidth: metricsBadge.implicitWidth
     implicitHeight: 30
@@ -55,32 +49,28 @@ Item {
         centerTextFontFamily: "Symbols Nerd Font"
         centerTextPixelSize: 10
         centerTextColor: root.cpuAccentColor
-        dockzoneRevealCenterX: root.dockzoneRevealCenterX
-        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
-        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
-        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
-        detailViewportHovered: root.detailViewportHovered
         progressValue: Services.SystemMonitorService.cpuUsage / 100
         progressColor: root.cpuAccentColor
-
-        Widgets.CompactHoverDetail {
-            iconText: "\uf201"
-            labelText: root.showCpu ? "CPU" : (root.showMemory ? "Memory" : "System")
-            valueText: root.showCpu ? Services.SystemMonitorService.cpuText : (root.showMemory ? Services.SystemMonitorService.memText : "Live")
-            secondaryText: {
-                var details = []
-                if (root.showMemory)
-                    details.push(root.memLabel)
-                if (root.showNetwork)
-                    details.push(root.netLabel)
-                if (root.showLoad)
-                    details.push(root.loadLabel)
-                return details.join("  ")
+        detailComponent: Component {
+            Widgets.CompactHoverDetail {
+                iconText: "\uf201"
+                labelText: root.showCpu ? "CPU" : (root.showMemory ? "Memory" : "System")
+                valueText: root.showCpu ? Services.SystemMonitorService.cpuText : (root.showMemory ? Services.SystemMonitorService.memText : "Live")
+                secondaryText: {
+                    var details = []
+                    if (root.showMemory)
+                        details.push(root.memLabel)
+                    if (root.showNetwork)
+                        details.push(root.netLabel)
+                    if (root.showLoad)
+                        details.push(root.loadLabel)
+                    return details.join("  ")
+                }
+                progressValue: root.showCpu
+                    ? Services.SystemMonitorService.cpuUsage / 100
+                    : (root.showMemory ? Services.SystemMonitorService.memPercent / 100 : 0)
+                accentColor: root.cpuAccentColor
             }
-            progressValue: root.showCpu
-                ? Services.SystemMonitorService.cpuUsage / 100
-                : (root.showMemory ? Services.SystemMonitorService.memPercent / 100 : 0)
-            accentColor: root.cpuAccentColor
         }
     }
 }

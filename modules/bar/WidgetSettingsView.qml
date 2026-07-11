@@ -15,17 +15,24 @@ Item {
     readonly property real rowGap: MenuVisuals.compactSpacing
     property real viewportWidth: idealContentWidth
     property real viewportHeight: contentHeight
+    property real hostRevealHeight: -1
+    property real hostRevealProgress: 1
+    property bool hostIsInteractive: true
     readonly property string activeWidgetId: Services.BarLayoutService.activeWidgetSettingsId
     readonly property string panelTitle: WidgetSettingsRegistry.title(activeWidgetId)
     readonly property string panelType: WidgetSettingsRegistry.panelKey(activeWidgetId)
     readonly property real contentWidth: Math.max(0, Math.min(viewportWidth, idealContentWidth))
     readonly property real contentHeight: panelColumn.implicitHeight + outerPadding * 2
-    readonly property real revealHeight: Math.max(0, height - 1)
+    readonly property real revealHeight: hostRevealHeight >= 0
+        ? Math.max(0, hostRevealHeight - 1)
+        : Math.max(0, height - 1)
 
     implicitWidth: idealContentWidth
     implicitHeight: contentHeight
     width: Math.max(0, viewportWidth)
     height: Math.min(viewportHeight, contentHeight)
+    opacity: hostRevealProgress
+    enabled: hostIsInteractive
 
     // Clip the settings surface to the live expanded viewport.
     Item {

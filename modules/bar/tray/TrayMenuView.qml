@@ -24,11 +24,17 @@ Item {
     // expands. The menu keeps its natural width for measurement and eliding,
     // but the rendered viewport is clipped to this live width.
     property real viewportWidth: menuWidth
+    // Shared dockzone reveal contract; defaults preserve measurement behavior.
+    property real hostRevealHeight: -1
+    property real hostRevealProgress: 1
+    property bool hostIsInteractive: true
     readonly property real contentHeight: menuStack.implicitHeight
     readonly property real widthProgress: menuWidth > 0 ? Math.max(0, Math.min(1, width / menuWidth)) : 1
     // Only reveal complete rows. Partial rows are where text/icons become
     // visible before the dockzone glass has expanded enough to contain them.
-    readonly property real revealHeight: Math.max(0, height - 1)
+    readonly property real revealHeight: hostRevealHeight >= 0
+        ? Math.max(0, hostRevealHeight - 1)
+        : Math.max(0, height - 1)
 
     implicitWidth: menuWidth
     implicitHeight: contentHeight
@@ -65,7 +71,7 @@ Item {
             x: 0
             anchors.top: parent.top
             clip: true
-            opacity: Math.min(1, root.widthProgress * 1.25)
+            opacity: Math.min(1, root.widthProgress * 1.25) * root.hostRevealProgress
 
             initialItem: subMenuComp.createObject(null, { handle: root.rootHandle, isSubMenu: false })
 
@@ -160,7 +166,7 @@ Item {
 
                     anchors.fill: parent
                     hoverEnabled: true
-                    enabled: backHeader.fullyRevealed
+                    enabled: root.hostIsInteractive && backHeader.fullyRevealed
                     cursorShape: Qt.PointingHandCursor
                     onClicked: menuStack.pop()
                 }
@@ -280,7 +286,7 @@ Item {
 
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                enabled: entry.modelData.enabled && entry.fullyRevealed
+                                enabled: root.hostIsInteractive && entry.modelData.enabled && entry.fullyRevealed
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     var e = entry.modelData

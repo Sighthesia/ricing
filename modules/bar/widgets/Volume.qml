@@ -11,16 +11,10 @@ Item {
     readonly property color accentColor: Services.VolumeService.sinkMuted
         ? Services.Color.mError
         : Services.Color.mPrimary
-    property real dockzoneRevealCenterX: -1
-    property real dockzoneRevealTargetCenterX: -1
-    property real dockzoneRevealViewportWidth: -1
-    property real dockzoneActualExpandHeight: 0
-    // Fixed detail viewport hover from the section-level hit target.
-    property bool detailViewportHovered: false
     readonly property real dockzoneExpandHeight: volumeBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: volumeBadge.dockzoneExpandWidth
-    readonly property bool badgeActive: volumeBadge.pointerActive
-    readonly property bool badgeContainsMouse: volumeBadge.badgeContainsMouse
+    readonly property bool badgeActive: volumeBadge.badgeActive
+    readonly property Component detailComponent: volumeBadge.detailComponent
 
     implicitWidth: volumeBadge.implicitWidth
     implicitHeight: 30
@@ -35,11 +29,6 @@ Item {
         centerTextFontFamily: "Symbols Nerd Font"
         centerTextPixelSize: 10
         centerTextColor: root.accentColor
-        dockzoneRevealCenterX: root.dockzoneRevealCenterX
-        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
-        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
-        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
-        detailViewportHovered: root.detailViewportHovered
         progressValue: root.displayVolume
         progressColor: root.accentColor
         onActivated: Services.VolumeService.toggleSinkMute()
@@ -48,16 +37,17 @@ Item {
             let delta = event.angleDelta.y > 0 ? step : -step
             Services.VolumeService.setSinkVolume(Services.VolumeService.sinkVolume + delta)
         }
-
-        Widgets.CompactHoverDetail {
-            iconText: Services.VolumeService.sinkMuted ? "\uf6a9" : "\uf028"
-            labelText: "Volume"
-            valueText: Services.VolumeService.sinkMuted ? "Muted" : (Math.round(Services.VolumeService.sinkVolume * 100) + "%")
-            secondaryText: Pipewire.defaultAudioSink ? Services.VolumeService.deviceLabel(Pipewire.defaultAudioSink) : ""
-            progressValue: root.displayVolume
-            accentColor: root.accentColor
-            interactive: true
-            onMoved: value => Services.VolumeService.setSinkVolume(value)
+        detailComponent: Component {
+            Widgets.CompactHoverDetail {
+                iconText: Services.VolumeService.sinkMuted ? "\uf6a9" : "\uf028"
+                labelText: "Volume"
+                valueText: Services.VolumeService.sinkMuted ? "Muted" : (Math.round(Services.VolumeService.sinkVolume * 100) + "%")
+                secondaryText: Pipewire.defaultAudioSink ? Services.VolumeService.deviceLabel(Pipewire.defaultAudioSink) : ""
+                progressValue: root.displayVolume
+                accentColor: root.accentColor
+                interactive: true
+                onMoved: value => Services.VolumeService.setSinkVolume(value)
+            }
         }
     }
 }

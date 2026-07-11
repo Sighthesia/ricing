@@ -13,15 +13,21 @@ Item {
     readonly property real cardSpacing: 4
     property real viewportWidth: idealContentWidth
     property real viewportHeight: contentHeight
+    property real hostRevealHeight: -1
+    property real hostRevealProgress: 1
+    property bool hostIsInteractive: true
     readonly property real contentHeight: contentColumn.implicitHeight + outerPadding * 2
-    readonly property real revealHeight: Math.max(0, height - 1)
-    readonly property real headerRevealProgress: Math.max(0, Math.min(1, (root.height - 8) / 40))
-    readonly property real listRevealProgress: Math.max(0, Math.min(1, (root.revealHeight - 72) / 80))
+    readonly property real revealHeight: hostRevealHeight >= 0
+        ? Math.max(0, hostRevealHeight - 1)
+        : Math.max(0, height - 1)
+    readonly property real headerRevealProgress: hostRevealProgress * Math.max(0, Math.min(1, (root.revealHeight - 8) / 40))
+    readonly property real listRevealProgress: hostRevealProgress * Math.max(0, Math.min(1, (root.revealHeight - 72) / 80))
 
     implicitWidth: idealContentWidth
     implicitHeight: contentHeight
     width: Math.max(0, viewportWidth)
     height: Math.min(viewportHeight, contentHeight)
+    enabled: hostIsInteractive
 
     function _filteredWidgets() {
         var all = Services.BarLayoutService.availableWidgets
@@ -98,13 +104,6 @@ Item {
                 opacity: root.listRevealProgress
                 width: parent.width
                 spacing: root.cardSpacing
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: Services.Motion.number.contentDuration
-                        easing.type: Services.Motion.number.contentEasing
-                    }
-                }
 
                 Repeater {
                     model: root._filteredWidgets()

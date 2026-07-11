@@ -9,35 +9,25 @@ Item {
     required property string widgetSource
     required property string screenName
     property real availableWidth: -1
-    property real dockzoneRevealCenterX: -1
-    property real dockzoneRevealTargetCenterX: -1
-    property real dockzoneRevealViewportWidth: -1
-    // Host's spring-applied actual expand height, for deriving in-phase reveal.
-    property real dockzoneActualExpandHeight: 0
-    // Active-detail tracking: BarSection sets this to the currently active widget's key.
-    // Only the matching wrapper forwards dockzoneActualExpandHeight to its widget.
-    property string activeDetailKey: ""
-    // Section-level fixed detail viewport hover state. Forwarded to the loaded
-    // widget so its CircularHoverWidget can gate detail viewport hover with
-    // dockzoneActualExpandHeight > 0 (active owner check).
-    property bool detailViewportHovered: false
+    // Detail component from the loaded widget for the unified expand host.
+    readonly property Component detailComponent: loader.item && loader.item.detailComponent !== undefined
+        ? loader.item.detailComponent
+        : null
     // Bound from the loaded widget's badgeActive when the widget exposes it.
     property bool badgeActive: false
-    // Badge-only hover — obsolete with stable hit-layer architecture.
-    // Kept as property to avoid breaking external readers.
-    property bool badgeContainsMouse: false
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     readonly property string widgetId: widgetEntry && widgetEntry.id ? widgetEntry.id : ""
-    readonly property bool isActiveDetailOwner: root.widgetInstanceKey.length > 0 && root.activeDetailKey === root.widgetInstanceKey
-    // Only the active detail owner may consume the host's actual expand height for reveal.
-    // All other widgets see 0 so their details stay hidden even while the host is expanded.
-    readonly property real gatedActualExpandHeight: root.isActiveDetailOwner ? root.dockzoneActualExpandHeight : 0
     readonly property real dockzoneExpandHeight: root._dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: root._dockzoneExpandWidth
     readonly property bool localPointerIntent: pointerHover.hovered
     readonly property real centerXInRoot: width > 0 ? mapToItem(null, width / 2, height / 2).x : 0
     property real _dockzoneExpandHeight: 0
     property real _dockzoneExpandWidth: 0
+    // Persistent expand for widgets whose expand is always-on (e.g. Media lyrics).
+    // Forwarded to BarSection as a latest-wins request displaced by interactive content.
+    property bool persistentExpandActive: false
+    property real persistentExpandHeight: 0
+    property real persistentExpandWidth: 0
     objectName: widgetInstanceKey
 
     implicitHeight: loader.item ? loader.item.implicitHeight : 0
@@ -134,32 +124,23 @@ Item {
             if (item.availableWidth !== undefined)
                 item.availableWidth = Qt.binding(function() { return root.availableWidth })
 
-            if (item.dockzoneRevealCenterX !== undefined)
-                item.dockzoneRevealCenterX = Qt.binding(function() { return root.dockzoneRevealCenterX })
-
-            if (item.dockzoneRevealTargetCenterX !== undefined)
-                item.dockzoneRevealTargetCenterX = Qt.binding(function() { return root.dockzoneRevealTargetCenterX })
-
-            if (item.dockzoneRevealViewportWidth !== undefined)
-                item.dockzoneRevealViewportWidth = Qt.binding(function() { return root.dockzoneRevealViewportWidth })
-
-            if (item.dockzoneActualExpandHeight !== undefined)
-                item.dockzoneActualExpandHeight = Qt.binding(function() { return root.gatedActualExpandHeight })
-
-            if (item.detailViewportHovered !== undefined)
-                item.detailViewportHovered = Qt.binding(function() { return root.detailViewportHovered })
-
             if (item.badgeActive !== undefined)
                 root.badgeActive = Qt.binding(function() { return item.badgeActive })
-
-            if (item.badgeContainsMouse !== undefined)
-                root.badgeContainsMouse = Qt.binding(function() { return item.badgeContainsMouse })
 
             root._dockzoneExpandHeight = item.dockzoneExpandHeight !== undefined
                 ? item.dockzoneExpandHeight
                 : 0
             root._dockzoneExpandWidth = item.dockzoneExpandWidth !== undefined
                 ? item.dockzoneExpandWidth
+                : 0
+            root.persistentExpandActive = item.persistentExpandActive !== undefined
+                ? item.persistentExpandActive
+                : false
+            root.persistentExpandHeight = item.persistentExpandHeight !== undefined
+                ? item.persistentExpandHeight
+                : 0
+            root.persistentExpandWidth = item.persistentExpandWidth !== undefined
+                ? item.persistentExpandWidth
                 : 0
         }
     }
@@ -177,6 +158,24 @@ Item {
         function onDockzoneExpandWidthChanged() {
             root._dockzoneExpandWidth = loader.item && loader.item.dockzoneExpandWidth !== undefined
                 ? loader.item.dockzoneExpandWidth
+                : 0
+        }
+
+        function onPersistentExpandActiveChanged() {
+            root.persistentExpandActive = loader.item && loader.item.persistentExpandActive !== undefined
+                ? loader.item.persistentExpandActive
+                : false
+        }
+
+        function onPersistentExpandHeightChanged() {
+            root.persistentExpandHeight = loader.item && loader.item.persistentExpandHeight !== undefined
+                ? loader.item.persistentExpandHeight
+                : 0
+        }
+
+        function onPersistentExpandWidthChanged() {
+            root.persistentExpandWidth = loader.item && loader.item.persistentExpandWidth !== undefined
+                ? loader.item.persistentExpandWidth
                 : 0
         }
     }

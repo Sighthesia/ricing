@@ -12,6 +12,9 @@ Item {
     property real progressValue: 0
     property color accentColor: Services.Color.mPrimary
     property bool interactive: false
+    property real hostRevealProgress: 1
+    property real hostRevealHeight: -1
+    property bool hostIsInteractive: true
 
     signal moved(real value)
 
@@ -19,6 +22,8 @@ Item {
 
     implicitWidth: 174
     implicitHeight: secondaryLabel.visible ? 58 : 48
+    opacity: hostRevealProgress
+    enabled: hostIsInteractive
 
     // Align the header tightly so the expanded body does not feel hollow.
     Row {

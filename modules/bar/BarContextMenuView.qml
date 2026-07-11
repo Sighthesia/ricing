@@ -13,14 +13,21 @@ Item {
     readonly property real separatorInset: MenuVisuals.separatorInset
     property real viewportWidth: menuContentWidth
     property real viewportHeight: contentHeight
+    property real hostRevealHeight: -1
+    property real hostRevealProgress: 1
+    property bool hostIsInteractive: true
     readonly property real menuContentWidth: idealContentWidth
     readonly property real contentHeight: menuColumn.implicitHeight + outerPadding * 2
-    readonly property real revealHeight: Math.max(0, height - 1)
+    readonly property real revealHeight: hostRevealHeight >= 0
+        ? Math.max(0, hostRevealHeight - 1)
+        : Math.max(0, height - 1)
 
     implicitWidth: menuContentWidth
     implicitHeight: contentHeight
     width: Math.max(0, viewportWidth)
     height: Math.min(viewportHeight, contentHeight)
+    opacity: hostRevealProgress
+    enabled: hostIsInteractive
 
     // Clip the full menu content to the live expanded viewport.
     Item {

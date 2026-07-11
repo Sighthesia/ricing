@@ -7,16 +7,10 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
-    property real dockzoneRevealCenterX: -1
-    property real dockzoneRevealTargetCenterX: -1
-    property real dockzoneRevealViewportWidth: -1
-    property real dockzoneActualExpandHeight: 0
-    // Fixed detail viewport hover from the section-level hit target.
-    property bool detailViewportHovered: false
     readonly property real dockzoneExpandHeight: btBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: btBadge.dockzoneExpandWidth
-    readonly property bool badgeActive: btBadge.pointerActive
-    readonly property bool badgeContainsMouse: btBadge.badgeContainsMouse
+    readonly property bool badgeActive: btBadge.badgeActive
+    readonly property Component detailComponent: btBadge.detailComponent
 
     visible: Services.BluetoothService.bluetoothAvailable
     implicitWidth: visible ? btBadge.implicitWidth : 0
@@ -46,32 +40,28 @@ Item {
         centerTextFontFamily: "Symbols Nerd Font"
         centerTextPixelSize: 10
         centerTextColor: root.stateColor
-        dockzoneRevealCenterX: root.dockzoneRevealCenterX
-        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
-        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
-        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
-        detailViewportHovered: root.detailViewportHovered
         progressValue: -1
         progressColor: root.stateColor
         onActivated: Services.BluetoothService.setBluetoothEnabled(!Services.BluetoothService.enabled)
+        detailComponent: Component {
+            Widgets.CompactHoverDetail {
+                iconText: root.collapsedIcon
+                labelText: "Bluetooth"
+                valueText: {
+                    if (!Services.BluetoothService.enabled) return "Off"
+                    var n = Services.BluetoothService.connectedDevices.length
+                    return n > 0 ? (n + " connected") : "On"
+                }
+                progressValue: 0
+                accentColor: root.stateColor
+                interactive: false
 
-        Widgets.CompactHoverDetail {
-            iconText: root.collapsedIcon
-            labelText: "Bluetooth"
-            valueText: {
-                if (!Services.BluetoothService.enabled) return "Off"
-                var n = Services.BluetoothService.connectedDevices.length
-                return n > 0 ? (n + " connected") : "On"
-            }
-            progressValue: 0
-            accentColor: root.stateColor
-            interactive: false
-
-            secondaryText: {
-                if (!Services.BluetoothService.enabled) return ""
-                var cd = Services.BluetoothService.connectedDevices
-                if (cd.length === 0) return Services.BluetoothService.scanningActive ? "Scanning…" : "No devices connected"
-                return cd.slice(0, 2).map(d => d.name || d.deviceName || "Device").join(" · ")
+                secondaryText: {
+                    if (!Services.BluetoothService.enabled) return ""
+                    var cd = Services.BluetoothService.connectedDevices
+                    if (cd.length === 0) return Services.BluetoothService.scanningActive ? "Scanning…" : "No devices connected"
+                    return cd.slice(0, 2).map(d => d.name || d.deviceName || "Device").join(" · ")
+                }
             }
         }
     }

@@ -7,16 +7,10 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
-    property real dockzoneRevealCenterX: -1
-    property real dockzoneRevealTargetCenterX: -1
-    property real dockzoneRevealViewportWidth: -1
-    property real dockzoneActualExpandHeight: 0
-    // Fixed detail viewport hover from the section-level hit target.
-    property bool detailViewportHovered: false
     readonly property real dockzoneExpandHeight: batteryBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: batteryBadge.dockzoneExpandWidth
-    readonly property bool badgeActive: batteryBadge.pointerActive
-    readonly property bool badgeContainsMouse: batteryBadge.badgeContainsMouse
+    readonly property bool badgeActive: batteryBadge.badgeActive
+    readonly property Component detailComponent: batteryBadge.detailComponent
 
     visible: Services.BatteryService.available
     implicitWidth: visible ? batteryBadge.implicitWidth : 0
@@ -58,21 +52,17 @@ Item {
         centerText: root.collapsedText
         centerTextPixelSize: 10
         centerTextColor: root.stateColor
-        dockzoneRevealCenterX: root.dockzoneRevealCenterX
-        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
-        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
-        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
-        detailViewportHovered: root.detailViewportHovered
         progressValue: Services.BatteryService.percentage / 100
         progressColor: root.stateColor
-
-        Widgets.CompactHoverDetail {
-            iconText: root.collapsedText
-            labelText: "Battery"
-            valueText: Services.BatteryService.percentage + "%"
-            secondaryText: root.detailStateText
-            progressValue: Services.BatteryService.percentage / 100
-            accentColor: root.stateColor
+        detailComponent: Component {
+            Widgets.CompactHoverDetail {
+                iconText: root.collapsedText
+                labelText: "Battery"
+                valueText: Services.BatteryService.percentage + "%"
+                secondaryText: root.detailStateText
+                progressValue: Services.BatteryService.percentage / 100
+                accentColor: root.stateColor
+            }
         }
     }
 }

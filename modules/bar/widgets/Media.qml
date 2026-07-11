@@ -65,6 +65,11 @@ Item {
     readonly property real dockzoneExpandHeight: root.lyricHeightExpanded
         ? (root.lyricExtraHeight > 0 ? root.lyricExtraHeight + root.lyricBottomPadding : 0)
         : 0
+    // Unified Expand Host protocol: persistent expand for lyrics overflow.
+    // Behaves as a latest-wins request displaced by hover details and menus.
+    readonly property bool persistentExpandActive: root.lyricHeightExpanded
+    readonly property real persistentExpandHeight: root.dockzoneExpandHeight
+    readonly property real persistentExpandWidth: 0
     readonly property real compactCenterY: root.compactBaseHeight / 2
 
     property string currentText: root._displayText

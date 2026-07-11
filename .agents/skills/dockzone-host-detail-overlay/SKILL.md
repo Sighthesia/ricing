@@ -41,6 +41,15 @@ If this chain exists for hover detail, cut it at section aggregation and use the
 - Retain the departing owner during host collapse so its content can follow the actual glass height instead of hard-cutting.
 - Do not use the shared host height alone as visibility state: without an owner gate, every detail instance reveals simultaneously.
 
+## Unified Expand Host
+
+- When hover details and menus share a dockzone, use one section-owned latest-wins request owner and one visible payload path.
+- A non-null request replacing another non-null request is visually atomic: destroy the old payload before the new owner renders. Do not cross-fade unrelated detail and menu content in the same host.
+- Retain an outgoing payload only for a non-null-to-null close. Keep it until the host's actual animated expand height reaches zero, then unload it.
+- Keep request state, visual owner state, and host geometry distinct. A request replacement must not accidentally preserve an old visual owner at the new menu's dimensions.
+- Drive every payload's opacity, offset, row reveal, and interaction gate from the same actual host reveal height/progress. Per-view clips are safety guards, not independent lifecycle owners.
+- Tray menus with asynchronously arriving DBus rows must report their live implicit dimensions to the active request. Do not freeze the host height from the first empty-menu measurement.
+
 ## Joint Pointer Domain
 
 - Treat the active badge and its visible detail as one pointer domain; leaving the badge alone must not start collapse while the pointer is inside the detail.
@@ -66,3 +75,5 @@ If this chain exists for hover detail, cut it at section aggregation and use the
 - Move badge to detail and hold the pointer still during collapse tests; the host must not repeatedly reopen as geometry passes under the pointer.
 - Inspect slow motion: detail should slide and fade with host growth, not be exposed by a clip.
 - Verify badge-to-detail pointer travel, tray/menu paths, and `timeout 5 qs -p .`.
+- Verify `detail -> tray`, `detail -> context menu`, and `tray -> detail`: exactly one payload may paint or receive input at every frame.
+- Verify `detail -> closed` separately: the same detail remains visible only while the host contracts, then unloads at zero reveal.

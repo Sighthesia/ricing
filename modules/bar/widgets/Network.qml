@@ -7,16 +7,10 @@ Item {
     id: root
 
     property string widgetInstanceKey: ""
-    property real dockzoneRevealCenterX: -1
-    property real dockzoneRevealTargetCenterX: -1
-    property real dockzoneRevealViewportWidth: -1
-    property real dockzoneActualExpandHeight: 0
-    // Fixed detail viewport hover from the section-level hit target.
-    property bool detailViewportHovered: false
     readonly property real dockzoneExpandHeight: wifiBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: wifiBadge.dockzoneExpandWidth
-    readonly property bool badgeActive: wifiBadge.pointerActive
-    readonly property bool badgeContainsMouse: wifiBadge.badgeContainsMouse
+    readonly property bool badgeActive: wifiBadge.badgeActive
+    readonly property Component detailComponent: wifiBadge.detailComponent
 
     visible: Services.NetworkService.wifiAvailable
     implicitWidth: visible ? wifiBadge.implicitWidth : 0
@@ -49,40 +43,36 @@ Item {
         centerTextFontFamily: "Symbols Nerd Font"
         centerTextPixelSize: 10
         centerTextColor: root.stateColor
-        dockzoneRevealCenterX: root.dockzoneRevealCenterX
-        dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
-        dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
-        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
-        detailViewportHovered: root.detailViewportHovered
         progressValue: Services.NetworkService.wifiConnected ? root.connectedSignalFraction : -1
         progressColor: root.stateColor
         onActivated: Services.NetworkService.setWifiEnabled(!Services.NetworkService.wifiEnabled)
-
-        Widgets.CompactHoverDetail {
-            iconText: root.collapsedIcon
-            labelText: "Wi-Fi"
-            valueText: {
-                if (!Services.NetworkService.wifiEnabled) return "Off"
-                if (Services.NetworkService.connecting) return "…"
-                if (Services.NetworkService.wifiConnected) {
-                    var connectedNet = Object.values(Services.NetworkService.networks).find(n => n.connected)
-                    return connectedNet ? Math.round(connectedNet.signal) + "%" : "Connected"
+        detailComponent: Component {
+            Widgets.CompactHoverDetail {
+                iconText: root.collapsedIcon
+                labelText: "Wi-Fi"
+                valueText: {
+                    if (!Services.NetworkService.wifiEnabled) return "Off"
+                    if (Services.NetworkService.connecting) return "…"
+                    if (Services.NetworkService.wifiConnected) {
+                        var connectedNet = Object.values(Services.NetworkService.networks).find(n => n.connected)
+                        return connectedNet ? Math.round(connectedNet.signal) + "%" : "Connected"
+                    }
+                    return Services.NetworkService.scanningActive ? "Scanning" : "On"
                 }
-                return Services.NetworkService.scanningActive ? "Scanning" : "On"
-            }
-            progressValue: Services.NetworkService.wifiConnected ? root.connectedSignalFraction : 0
-            accentColor: root.stateColor
-            interactive: false
+                progressValue: Services.NetworkService.wifiConnected ? root.connectedSignalFraction : 0
+                accentColor: root.stateColor
+                interactive: false
 
-            secondaryText: {
-                if (!Services.NetworkService.wifiEnabled) return ""
-                if (Services.NetworkService.connecting) return Services.NetworkService.connectingTo
-                if (Services.NetworkService.wifiConnected) {
-                    var connectedNet = Object.values(Services.NetworkService.networks).find(n => n.connected)
-                    return connectedNet ? connectedNet.ssid : ""
+                secondaryText: {
+                    if (!Services.NetworkService.wifiEnabled) return ""
+                    if (Services.NetworkService.connecting) return Services.NetworkService.connectingTo
+                    if (Services.NetworkService.wifiConnected) {
+                        var connectedNet = Object.values(Services.NetworkService.networks).find(n => n.connected)
+                        return connectedNet ? connectedNet.ssid : ""
+                    }
+                    var count = Object.keys(Services.NetworkService.networks).length
+                    return count > 0 ? count + " networks found" : (Services.NetworkService.scanningActive ? "Scanning…" : "No networks")
                 }
-                var count = Object.keys(Services.NetworkService.networks).length
-                return count > 0 ? count + " networks found" : (Services.NetworkService.scanningActive ? "Scanning…" : "No networks")
             }
         }
     }
