@@ -11,9 +11,12 @@ Item {
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
     property real dockzoneActualExpandHeight: 0
+    // Fixed detail viewport hover from the section-level hit target.
+    property bool detailViewportHovered: false
     readonly property real dockzoneExpandHeight: wifiBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: wifiBadge.dockzoneExpandWidth
     readonly property bool badgeActive: wifiBadge.pointerActive
+    readonly property bool badgeContainsMouse: wifiBadge.badgeContainsMouse
 
     visible: Services.NetworkService.wifiAvailable
     implicitWidth: visible ? wifiBadge.implicitWidth : 0
@@ -50,6 +53,7 @@ Item {
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
+        detailViewportHovered: root.detailViewportHovered
         progressValue: Services.NetworkService.wifiConnected ? root.connectedSignalFraction : -1
         progressColor: root.stateColor
         onActivated: Services.NetworkService.setWifiEnabled(!Services.NetworkService.wifiEnabled)

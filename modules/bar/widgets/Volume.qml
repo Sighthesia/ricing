@@ -15,9 +15,12 @@ Item {
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
     property real dockzoneActualExpandHeight: 0
+    // Fixed detail viewport hover from the section-level hit target.
+    property bool detailViewportHovered: false
     readonly property real dockzoneExpandHeight: volumeBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: volumeBadge.dockzoneExpandWidth
     readonly property bool badgeActive: volumeBadge.pointerActive
+    readonly property bool badgeContainsMouse: volumeBadge.badgeContainsMouse
 
     implicitWidth: volumeBadge.implicitWidth
     implicitHeight: 30
@@ -36,6 +39,7 @@ Item {
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
+        detailViewportHovered: root.detailViewportHovered
         progressValue: root.displayVolume
         progressColor: root.accentColor
         onActivated: Services.VolumeService.toggleSinkMute()

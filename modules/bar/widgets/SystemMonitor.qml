@@ -11,6 +11,8 @@ Item {
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
     property real dockzoneActualExpandHeight: 0
+    // Fixed detail viewport hover from the section-level hit target.
+    property bool detailViewportHovered: false
 
     readonly property var monitorSettings: Services.SettingsService.widgetSettingsObject(
         "system-monitor",
@@ -37,6 +39,7 @@ Item {
     readonly property real dockzoneExpandHeight: metricsBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: metricsBadge.dockzoneExpandWidth
     readonly property bool badgeActive: metricsBadge.pointerActive
+    readonly property bool badgeContainsMouse: metricsBadge.badgeContainsMouse
 
     implicitWidth: metricsBadge.implicitWidth
     implicitHeight: 30
@@ -56,6 +59,7 @@ Item {
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
+        detailViewportHovered: root.detailViewportHovered
         progressValue: Services.SystemMonitorService.cpuUsage / 100
         progressColor: root.cpuAccentColor
 

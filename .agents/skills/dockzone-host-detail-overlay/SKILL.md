@@ -41,9 +41,28 @@ If this chain exists for hover detail, cut it at section aggregation and use the
 - Retain the departing owner during host collapse so its content can follow the actual glass height instead of hard-cutting.
 - Do not use the shared host height alone as visibility state: without an owner gate, every detail instance reveals simultaneously.
 
+## Joint Pointer Domain
+
+- Treat the active badge and its visible detail as one pointer domain; leaving the badge alone must not start collapse while the pointer is inside the detail.
+- Track explicit badge intent with a fixed HoverHandler scoped to the unscaled badge hit box, not the animated badge visual or a tall transit MouseArea.
+- Own detail hover at a fixed section-level overlay viewport; do not read hover from the animated detail slot's height or position.
+- Route overlay pointer presence only to the current active detail owner, and keep the overlay handler passive so detail controls still receive input.
+- With stable hit layers, remove contraction-direction and pending-claim workarounds instead of stacking them on top.
+- Always allow an explicit badge hover to claim immediately, including while another detail is contracting.
+- End visual contraction from the host's actual animated height rather than a timer or stale requested height.
+
+## Active Detail Host
+
+- Prefer one section-owned active detail host over forwarding a full-body overlay hover state into every widget.
+- Scope its pointer catcher below the top badge band and size it from the actual visible detail expansion only.
+- Disable the host whenever tray, context menu, widget picker, or widget settings content owns the dockzone.
+- Route host pointer presence only to the active detail key; never let the host cover the badge row or compete with menu controls.
+- Keep the host handler passive so sliders and other detail controls retain pointer grabs.
+
 ## Verification
 
 - With a hover detail open, assert the host body width, pushed-body width, and ear position remain at resting values.
 - Hover across several widgets and assert that exactly one detail is visible and interactive on every frame.
+- Move badge to detail and hold the pointer still during collapse tests; the host must not repeatedly reopen as geometry passes under the pointer.
 - Inspect slow motion: detail should slide and fade with host growth, not be exposed by a clip.
 - Verify badge-to-detail pointer travel, tray/menu paths, and `timeout 5 qs -p .`.

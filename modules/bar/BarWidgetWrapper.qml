@@ -17,8 +17,15 @@ Item {
     // Active-detail tracking: BarSection sets this to the currently active widget's key.
     // Only the matching wrapper forwards dockzoneActualExpandHeight to its widget.
     property string activeDetailKey: ""
+    // Section-level fixed detail viewport hover state. Forwarded to the loaded
+    // widget so its CircularHoverWidget can gate detail viewport hover with
+    // dockzoneActualExpandHeight > 0 (active owner check).
+    property bool detailViewportHovered: false
     // Bound from the loaded widget's badgeActive when the widget exposes it.
     property bool badgeActive: false
+    // Badge-only hover — obsolete with stable hit-layer architecture.
+    // Kept as property to avoid breaking external readers.
+    property bool badgeContainsMouse: false
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     readonly property string widgetId: widgetEntry && widgetEntry.id ? widgetEntry.id : ""
     readonly property bool isActiveDetailOwner: root.widgetInstanceKey.length > 0 && root.activeDetailKey === root.widgetInstanceKey
@@ -139,8 +146,14 @@ Item {
             if (item.dockzoneActualExpandHeight !== undefined)
                 item.dockzoneActualExpandHeight = Qt.binding(function() { return root.gatedActualExpandHeight })
 
+            if (item.detailViewportHovered !== undefined)
+                item.detailViewportHovered = Qt.binding(function() { return root.detailViewportHovered })
+
             if (item.badgeActive !== undefined)
                 root.badgeActive = Qt.binding(function() { return item.badgeActive })
+
+            if (item.badgeContainsMouse !== undefined)
+                root.badgeContainsMouse = Qt.binding(function() { return item.badgeContainsMouse })
 
             root._dockzoneExpandHeight = item.dockzoneExpandHeight !== undefined
                 ? item.dockzoneExpandHeight

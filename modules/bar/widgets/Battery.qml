@@ -11,9 +11,12 @@ Item {
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
     property real dockzoneActualExpandHeight: 0
+    // Fixed detail viewport hover from the section-level hit target.
+    property bool detailViewportHovered: false
     readonly property real dockzoneExpandHeight: batteryBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: batteryBadge.dockzoneExpandWidth
     readonly property bool badgeActive: batteryBadge.pointerActive
+    readonly property bool badgeContainsMouse: batteryBadge.badgeContainsMouse
 
     visible: Services.BatteryService.available
     implicitWidth: visible ? batteryBadge.implicitWidth : 0
@@ -59,6 +62,7 @@ Item {
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
+        detailViewportHovered: root.detailViewportHovered
         progressValue: Services.BatteryService.percentage / 100
         progressColor: root.stateColor
 

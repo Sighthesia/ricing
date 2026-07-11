@@ -35,6 +35,9 @@ Item {
     property bool clickable: false
     property bool showPointerCursor: true
     property bool _exitHoldRunning: false
+    // Stable detail viewport hover: section-level fixed hit area.
+    // Only meaningful when dockzoneActualExpandHeight > 0 (active owner).
+    property bool detailViewportHovered: false
     property int activationButtons: Qt.LeftButton
     // Actual spring-applied expand height of the host dockzone, passed down
     // so detail reveal tracks the glass body at every frame instead of using
@@ -43,7 +46,12 @@ Item {
     property real dockzoneRevealCenterX: -1
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
-    readonly property bool expanded: badgeArea.containsMouse || detailHover.hovered || _exitHoldRunning
+    // Ownership from two fixed hit layers only: the stable badge hit area and
+    // the section-level fixed detail viewport. Animated geometry (scaled badge,
+    // sliding detailSlot) never directly drives hover ownership.
+    readonly property bool expanded: badgeArea.containsMouse
+        || (dockzoneActualExpandHeight > 0 && root.detailViewportHovered)
+        || _exitHoldRunning
     readonly property real clampedProgress: progressValue < 0 ? -1 : Math.max(0, Math.min(1, progressValue))
     readonly property real detailCenterXInViewport: {
         if (dockzoneRevealTargetCenterX >= 0)
@@ -78,11 +86,19 @@ Item {
         ? Math.min(1, Math.max(0, root.dockzoneActualExpandHeight / detailSlot.expandedHeight))
         : 0
 
-    // Direct pointer interest: the cursor is on this widget's badge or detail area.
-    // Excludes _exitHoldRunning so the active-detail owner always tracks the pointer
-    // rather than a deferred exit timer. Used by BarSection to decide which widget
-    // may consume dockzoneActualExpandHeight for its detail.
-    readonly property bool pointerActive: badgeArea.containsMouse || detailHover.hovered
+    // Direct pointer interest: the cursor is on this widget's fixed badge hit
+    // target or the section-level fixed detail viewport. Animated geometry never
+    // participates. Used by BarSection to decide which widget may consume
+    // dockzoneActualExpandHeight for its detail.
+    readonly property bool pointerActive: badgeArea.containsMouse
+        || (dockzoneActualExpandHeight > 0 && root.detailViewportHovered)
+
+    // Badge-active signal for BarSection ownership tracking.
+    readonly property bool badgeActive: pointerActive
+
+    // Badge-only hover state: true when the pointer is over the stable badge hit
+    // target (root-level HoverHandler, not inside the scaled badgeSlot).
+    readonly property bool badgeContainsMouse: badgeHover.hovered
 
     // Report only binary target height to break the old feedback loop where
     // the widget's own smooth _revealProgress drove the host target, causing
@@ -105,13 +121,13 @@ Item {
     onProgressColorChanged: ringCanvas.requestPaint()
     onTrackColorChanged: ringCanvas.requestPaint()
 
-    // Hold the reveal briefly after the pointer leaves so the geometry can
-    // settle and the user can travel from the badge into the detail body
-    // without the dockzone collapsing mid-transit.
+    // Safety bridge for the minimal gap between the fixed badge hit target
+    // and the section-level fixed detail viewport. The gap is typically 3-5px
+    // (badge bottom to topBandHeight), so the hold interval is kept short.
     Timer {
         id: hoverExitHoldTimer
 
-        interval: 300
+        interval: 150
         repeat: false
         onTriggered: _exitHoldRunning = false
     }
@@ -121,13 +137,17 @@ Item {
         function onContainsMouseChanged() { _updateExitHold() }
     }
 
+    // Track the detail viewport hover at the root level so the exit hold
+    // timer is cancelled when the pointer is over the fixed detail area,
+    // even though detailHover no longer lives inside the animated detailSlot.
     Connections {
-        target: detailHover
-        function onHoveredChanged() { _updateExitHold() }
+        target: root
+        function onDetailViewportHoveredChanged() { _updateExitHold() }
     }
 
     function _updateExitHold() {
-        if (badgeArea.containsMouse || detailHover.hovered) {
+        var detailActive = dockzoneActualExpandHeight > 0 && root.detailViewportHovered
+        if (badgeArea.containsMouse || detailActive) {
             hoverExitHoldTimer.stop()
             _exitHoldRunning = false
         } else {
@@ -208,6 +228,14 @@ Item {
                 font.bold: root.centerTextFontFamily === ""
             }
         }
+
+    }
+
+    // Stable badge-only hover detection at the root level (not inside the
+    // scaled badgeSlot) so the hit target does not wobble during the
+    // 1.0→1.04 badge scale animation.
+    HoverHandler {
+        id: badgeHover
     }
 
     // Reveal the detail row below the bar line inside the expanded dockzone viewport.
@@ -242,22 +270,19 @@ Item {
             spacing: 6
         }
 
-        HoverHandler {
-            id: detailHover
-        }
     }
 
     // Track hover and optional click activation over the compact badge surface.
-    // The hit area spans the badge and the full reveal height below it so the
-    // pointer can travel into the detail body without a gap that would close
-    // the loop (badge loses hover before the detail HoverHandler engages).
+    // The hit target has a fixed height (implicitHeight only) so it never grows
+    // or shrinks with the animated detail — ownership stays stable. Detail
+    // hover is tracked by the section-level fixed detail viewport instead.
     MouseArea {
         id: badgeArea
 
         x: 0
         y: 0
         width: parent.width
-        height: parent.implicitHeight + detailSlot.expandedHeight
+        height: root.implicitHeight
         hoverEnabled: true
         acceptedButtons: root.clickable ? root.activationButtons : Qt.NoButton
         cursorShape: root.showPointerCursor ? Qt.PointingHandCursor : Qt.ArrowCursor

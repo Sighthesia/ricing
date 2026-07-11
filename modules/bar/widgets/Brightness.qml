@@ -10,9 +10,12 @@ Item {
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
     property real dockzoneActualExpandHeight: 0
+    // Fixed detail viewport hover from the section-level hit target.
+    property bool detailViewportHovered: false
     readonly property real dockzoneExpandHeight: brightnessBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: brightnessBadge.dockzoneExpandWidth
     readonly property bool badgeActive: brightnessBadge.pointerActive
+    readonly property bool badgeContainsMouse: brightnessBadge.badgeContainsMouse
 
     implicitWidth: brightnessBadge.implicitWidth
     implicitHeight: 30
@@ -30,6 +33,7 @@ Item {
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
+        detailViewportHovered: root.detailViewportHovered
         progressValue: Services.BrightnessService.brightness
         progressColor: Services.Color.mPrimary
         onWheel: event => {

@@ -43,18 +43,32 @@ Item {
     property real dockzoneContentExpandHeight: 0
     property real dockzoneContentExpandWidth: 0
 
-    // Single active detail owner: only the widget whose badge the pointer is directly
-    // over (or was most recently over within activeClearTimer's window) may consume the
-    // host's actual expand height for its detail reveal. All other widgets see 0 and
-    // keep their details hidden, even while the shared host body is expanded.
+    // Single active detail owner: only the widget whose stable badge or the fixed
+    // detail viewport the pointer is over (or was most recently over within
+    // activeClearTimer's window) may consume the host's actual expand height for
+    // its detail reveal. Ownership comes from non-animated hit layers only — the
+    // stable badge hit target and the section-level fixed detail viewport.
+    // Animated geometry (scaled badge, sliding detailSlot) never participates.
     property string activeDetailKey: ""
     // Delay clearing the active key after pointer leaves the last active widget, so
     // the formerly-active widget's detail may track the host spring collapse gracefully.
     property Timer activeClearTimer: Timer {
         interval: 600
         repeat: false
-        onTriggered: root.activeDetailKey = ""
+        onTriggered: {
+            // If the pointer re-entered the fixed detail viewport while the
+            // timer was running, keep the active widget alive.
+            if (root._detailViewportHovered && root.activeDetailKey !== "")
+                root.activeClearTimer.restart()
+            else
+                root.activeDetailKey = ""
+        }
     }
+
+    // Fixed detail viewport hit target: a non-animated rectangle covering the
+    // body below the widget row. This replaces the per-widget animated detail
+    // HoverHandler (detailHover) that wobbled during expansion/contraction.
+    property bool _detailViewportHovered: false
 
     function reportActiveInterest(instanceKey, active) {
         if (!instanceKey)
@@ -64,8 +78,8 @@ Item {
             root.activeClearTimer.stop()
             root.activeDetailKey = instanceKey
         } else if (root.activeDetailKey === instanceKey) {
-            // Pointer left this widget — delay clearing so the detail can track the
-            // host spring collapse if no other widget claims interest.
+            // Pointer left this widget's badge — delay clearing so the detail
+            // can track the host spring collapse if no other widget claims.
             root.activeClearTimer.restart()
         }
     }
@@ -418,19 +432,38 @@ Item {
                 }
 
 
-    // Non-layout-contributing hover-detail overlay viewport.
-    // Positioned over the visual body area but never clips or feeds
-    // parent geometry. Details center within this viewport.
+    // Scoped detail viewport: covers only the expanded detail area below the
+    // widget row, never the badge row itself. Disabled during tray/context/
+    // picker/settings menus so those surfaces own their own pointer routing.
+    // Routes pointer presence only to the current active detail owner.
                 Item {
                     id: hoverDetailOverlay
 
                     z: 3
                     x: parent.visualBodyX
-                    y: parent.bodyY
+                    y: parent.bodyY + parent.topBandHeight
                     width: parent.pushedBodyWidth
-                    height: parent.bodyHeight
+                    height: Math.max(0, parent.bodyHeight - parent.topBandHeight)
                     // No clip — details extend freely beyond body bounds.
                     // No implicit width/height — does not contribute to layout.
+                    // Disabled during tray/context/picker/settings menus so
+                    // those surfaces own their own pointer routing.
+                    enabled: !dockzone.hostsTrayMenu && !dockzone.hostsContextMenu
+                        && !root.hostsWidgetPicker && !root.hostsWidgetSettings
+
+                    // Scoped detail viewport hit target: covers only the
+                    // expanded detail area below the widget row. Combined
+                    // with the per-widget stable badge hit target (badgeArea
+                    // with fixed implicitHeight), this replaces the old
+                    // animated detailHover HoverHandler that moved with
+                    // the expand/contract animation. Only routes pointer
+                    // presence when there is an active detail owner.
+                    HoverHandler {
+                        onHoveredChanged: {
+                            if (root.activeDetailKey !== "")
+                                root._detailViewportHovered = hovered
+                        }
+                    }
                 }
 
                 // Lay out widgets for this section in order.
@@ -484,6 +517,7 @@ Item {
                                     dockzoneRevealViewportWidth: hoverDetailOverlay.width
                                     dockzoneActualExpandHeight: dockzone.expandHeight
                                     activeDetailKey: root.activeDetailKey
+                                    detailViewportHovered: root._detailViewportHovered
                                     readonly property real widgetCenterXInSection: x + width / 2
                                     readonly property real widgetRowWidth: sectionRow.implicitWidth
 

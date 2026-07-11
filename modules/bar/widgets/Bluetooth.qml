@@ -11,9 +11,12 @@ Item {
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
     property real dockzoneActualExpandHeight: 0
+    // Fixed detail viewport hover from the section-level hit target.
+    property bool detailViewportHovered: false
     readonly property real dockzoneExpandHeight: btBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: btBadge.dockzoneExpandWidth
     readonly property bool badgeActive: btBadge.pointerActive
+    readonly property bool badgeContainsMouse: btBadge.badgeContainsMouse
 
     visible: Services.BluetoothService.bluetoothAvailable
     implicitWidth: visible ? btBadge.implicitWidth : 0
@@ -47,6 +50,7 @@ Item {
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
         dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
+        detailViewportHovered: root.detailViewportHovered
         progressValue: -1
         progressColor: root.stateColor
         onActivated: Services.BluetoothService.setBluetoothEnabled(!Services.BluetoothService.enabled)
