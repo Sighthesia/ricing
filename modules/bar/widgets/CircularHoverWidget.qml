@@ -50,12 +50,23 @@ Item {
 
         return dockzoneRevealViewportWidth / 2
     }
+    // Use the viewport reference center when valid viewport geometry is available,
+    // falling back to the widget's own center only when viewport is uninitialized.
+    // DO NOT check dockzoneRevealCenterX < 0 — that catches legitimate cases where
+    // a widget's center lies left of the sectionClip origin (e.g. overflow or early
+    // layout), and the math still resolves to the correct viewport center.
     readonly property real detailCenterXInWidget: {
-        if (dockzoneRevealCenterX < 0 || dockzoneRevealViewportWidth <= 0)
+        if (dockzoneRevealViewportWidth <= 0)
             return root.width / 2
 
         return root.width / 2 + (root.detailCenterXInViewport - dockzoneRevealCenterX)
     }
+
+    // Reference center for detail horizontal placement within the widget.
+    // Maps the viewport center into widget-local coordinates.
+    readonly property real _detailHorizontalRef: root.width / 2
+        + (root.detailCenterXInViewport - dockzoneRevealCenterX)
+
     readonly property real dockzoneExpandHeight: detailRow.implicitWidth > 0
         ? (root.expanded ? detailSlot.expandedHeight : 0)
         : 0
@@ -188,7 +199,7 @@ Item {
         property real revealHeight: root.expanded ? expandedHeight : 0
 
         z: 2
-        x: root.detailCenterXInWidget - width / 2
+        x: root._detailHorizontalRef - width / 2  // centered in viewport
         y: root.implicitHeight + root.contentSpacing - (root.expanded ? 0 : 5)
         width: detailRow.implicitWidth
         height: revealHeight

@@ -88,16 +88,15 @@ Item {
 
         root._dockzoneExpandWidths = nextMap
 
-        var nextWidth = 0
-        var keys = Object.keys(nextMap)
-        for (var index = 0; index < keys.length; index += 1) {
-            var entry = nextMap[keys[index]]
-            var rowCenterX = entry.rowWidth / 2
-            var centerOffset = Math.abs((entry.centerX || rowCenterX) - rowCenterX)
-            nextWidth = Math.max(nextWidth, entry.width + centerOffset * 2)
-        }
-
-        root.dockzoneContentExpandWidth = nextWidth
+        // Hover detail widths no longer inflate dockzone body width.
+        // The detail overlay uses viewport-relative positioning via
+        // dockzoneRevealTargetCenterX (hoverDetailOverlay.width/2), so all
+        // details share the same horizontal baseline without needing
+        // the body to widen. Preserve entry lifecycle tracking above
+        // for potential future use. Tray/menu/widget-picker expansion
+        // paths use activeMenuW independently. See v1 overlay-viewport
+        // separation.
+        root.dockzoneContentExpandWidth = 0
     }
 
     // Preserve a small hit target so an empty dockzone can still reopen the widget picker.
@@ -392,6 +391,21 @@ Item {
                 }
 
 
+    // Non-layout-contributing hover-detail overlay viewport.
+    // Positioned over the visual body area but never clips or feeds
+    // parent geometry. Details center within this viewport.
+                Item {
+                    id: hoverDetailOverlay
+
+                    z: 3
+                    x: parent.visualBodyX
+                    y: parent.bodyY
+                    width: parent.pushedBodyWidth
+                    height: parent.bodyHeight
+                    // No clip — details extend freely beyond body bounds.
+                    // No implicit width/height — does not contribute to layout.
+                }
+
                 // Lay out widgets for this section in order.
                 Item {
                     id: sectionClip
@@ -401,59 +415,67 @@ Item {
                     y: parent.bodyY
                     width: parent.pushedBodyWidth
                     height: parent.topBandHeight + dockzone.contentExpandH
-                    clip: true
 
-                    // Lay out widgets in the moving body while clipping to its visible width.
-                    // Pinned to the natural resting body width so hover-driven
-                    // expandWidth does not recenter the row and displace edge
-                    // widgets away from the cursor (which would close the loop).
-                    Row {
-                        id: sectionRow
+                    // NO clip on this container — hover details are inside it and would
+                    // be horizontally clipped when detailWidth > pushedBodyWidth.
+                    // Details are centered in the viewport; clipping at pushedBodyWidth
+                    // would cut their sides. Row overflow is visually contained by the
+                    // glass body and adjacent section z-order; the per-widget BadgeArea
+                    // hit-test is unaffected.
+                    Item {
+                        id: rowClip
 
-                        x: parent.parent.bodyX
-                            + (parent.parent.naturalBodyWidth - width) / 2
-                            + (root.sectionName === "right" ? parent.parent.bodyShrinkX : (root.sectionName === "left" ? -parent.parent.bodyShrinkX : 0))
-                            - sectionClip.x
-                        y: (parent.parent.topBandHeight - height) / 2
-                        spacing: BarLayoutSections.widgetSpacing
+                        anchors.fill: parent
 
-                        // Instantiate each managed widget in sequence.
-                        Repeater {
-                            model: root.sectionModel.length
+                        // Lay out widgets in the moving body.
+                        // Pinned to the natural resting body width so hover-driven
+                        // expandWidth does not recenter the row and displace edge
+                        // widgets away from the cursor (which would close the loop).
+                        Row {
+                            id: sectionRow
 
-                            // Keep each widget wrapper as the delegate so its implicit size drives the row.
-                            BarWidgetWrapper {
-                                required property int index
+                            x: dockzone.bodyX
+                                + (dockzone.naturalBodyWidth - width) / 2
+                                + (root.sectionName === "right" ? dockzone.bodyShrinkX : (root.sectionName === "left" ? -dockzone.bodyShrinkX : 0))
+                                - sectionClip.x
+                            y: (dockzone.topBandHeight - height) / 2
+                            spacing: BarLayoutSections.widgetSpacing
 
-                                screenName: root.screenName
-                                widgetEntry: root.sectionModel[index]
-                                widgetSource: Qt.resolvedUrl(widgetEntry.source)
-                                dockzoneRevealCenterX: sectionRow.x + x + width / 2
-                                dockzoneRevealTargetCenterX: sectionClip.width / 2
-                                    + (root.sectionName === "right"
-                                        ? dockzone.bodyShrinkX / 2
-                                        : (root.sectionName === "left" ? -dockzone.bodyShrinkX / 2 : 0))
-                                dockzoneRevealViewportWidth: sectionClip.width
-                                readonly property real widgetCenterXInSection: x + width / 2
-                                readonly property real widgetRowWidth: sectionRow.implicitWidth
+                            // Instantiate each managed widget in sequence.
+                            Repeater {
+                                model: root.sectionModel.length
 
-                                onLocalPointerIntentChanged: surfaceRoot.syncCenterFloatingValidationIntent()
-                                onDockzoneExpandHeightChanged: root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
-                                onDockzoneExpandWidthChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
-                                onWidgetCenterXInSectionChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
-                                onWidgetRowWidthChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
-                                Component.onCompleted: {
-                                    root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
-                                    root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                // Keep each widget wrapper as the delegate so its implicit size drives the row.
+                                BarWidgetWrapper {
+                                    required property int index
+
+                                    screenName: root.screenName
+                                    widgetEntry: root.sectionModel[index]
+                                    widgetSource: Qt.resolvedUrl(widgetEntry.source)
+                                    dockzoneRevealCenterX: sectionRow.x + x + width / 2
+                                    dockzoneRevealTargetCenterX: hoverDetailOverlay.width / 2
+                                    dockzoneRevealViewportWidth: hoverDetailOverlay.width
+                                    readonly property real widgetCenterXInSection: x + width / 2
+                                    readonly property real widgetRowWidth: sectionRow.implicitWidth
+
+                                    onLocalPointerIntentChanged: surfaceRoot.syncCenterFloatingValidationIntent()
+                                    onDockzoneExpandHeightChanged: root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
+                                    onDockzoneExpandWidthChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                    onWidgetCenterXInSectionChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                    onWidgetRowWidthChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                    Component.onCompleted: {
+                                        root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
+                                        root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                    }
+                                    Component.onDestruction: {
+                                        root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, 0)
+                                        root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, 0)
+                                    }
                                 }
-                                Component.onDestruction: {
-                                    root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, 0)
-                                    root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, 0)
-                                }
+
                             }
 
                         }
-
                     }
                 }
 
