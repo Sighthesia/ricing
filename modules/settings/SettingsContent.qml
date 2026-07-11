@@ -114,16 +114,6 @@ Item {
             }
 
             SettingSlider {
-                id: barBgOpacity
-                settingLabel: "Background Opacity"
-                from: 0; to: 1; stepSize: 0.05
-                value: Services.SettingsService.bar.backgroundOpacity
-                width: parent.width
-                filterVisible: root.settingMatches(settingLabel)
-                onMoved: v => { Services.SettingsService.bar.backgroundOpacity = v }
-            }
-
-            SettingSlider {
                 id: barCornerRadius
                 settingLabel: "Corner Radius"
                 from: 0; to: 24; stepSize: 2
@@ -145,8 +135,11 @@ Item {
                 basePixelSize: 14
                 topPadding: 8
                 height: (appWallpaper.filterVisible || appColorScheme.filterVisible || appPanelOpacity.filterVisible ||
-                         appCornerRadius.filterVisible || appBlur.filterVisible || appRipplePulse.filterVisible ||
-                         appRippleFullscreen.filterVisible ||
+                         appCornerRadius.filterVisible || appBlur.filterVisible ||
+                         appBlurPasses.filterVisible || appBlurOffset.filterVisible ||
+                         appBlurNoise.filterVisible || appBlurSaturation.filterVisible ||
+                         appBlurSurfaceOpacity.filterVisible ||
+                         appRipplePulse.filterVisible || appRippleFullscreen.filterVisible ||
                          appOverviewBg.filterVisible || appOverviewSolid.filterVisible ||
                          appOverviewBlur.filterVisible || appOverviewTint.filterVisible ||
                          fontDefault.filterVisible || fontFixed.filterVisible ||
@@ -205,6 +198,61 @@ Item {
                 width: parent.width
                 filterVisible: root.settingMatches(settingLabel)
                 onToggled: v => { Services.SettingsService.appearance.enableBlur = v }
+            }
+
+            SettingSlider {
+                id: appBlurPasses
+                settingLabel: "Blur Passes"
+                description: "Higher = stronger blur, more GPU cost"
+                from: 1; to: 6; stepSize: 1
+                value: Services.SettingsService.appearance.blurPasses
+                width: parent.width
+                filterVisible: Services.SettingsService.appearance.enableBlur && root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.blurPasses = v }
+            }
+
+            SettingSlider {
+                id: appBlurOffset
+                settingLabel: "Blur Offset"
+                description: "Higher = softer blur, may cause artifacts"
+                from: 0.5; to: 6; stepSize: 0.5
+                value: Services.SettingsService.appearance.blurOffset
+                width: parent.width
+                filterVisible: Services.SettingsService.appearance.enableBlur && root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.blurOffset = v }
+            }
+
+            SettingSlider {
+                id: appBlurNoise
+                settingLabel: "Blur Noise"
+                description: "Reduces color banding"
+                from: 0; to: 0.1; stepSize: 0.005
+                value: Services.SettingsService.appearance.blurNoise
+                width: parent.width
+                filterVisible: Services.SettingsService.appearance.enableBlur && root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.blurNoise = v }
+            }
+
+            SettingSlider {
+                id: appBlurSaturation
+                settingLabel: "Blur Saturation"
+                description: "Color intensity of blurred background"
+                from: 0.5; to: 3; stepSize: 0.1
+                value: Services.SettingsService.appearance.blurSaturation
+                width: parent.width
+                filterVisible: Services.SettingsService.appearance.enableBlur && root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.blurSaturation = v }
+            }
+
+            SettingSlider {
+                id: appBlurSurfaceOpacity
+                settingLabel: "Blur Surface Opacity"
+                description: "Surface tint opacity when blur is enabled (0 = fully transparent)"
+                from: 0.1; to: 1; stepSize: 0.05
+                value: Services.SettingsService.appearance.blurSurfaceOpacity
+                width: parent.width
+                filterVisible: Services.SettingsService.appearance.enableBlur && root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.blurSurfaceOpacity = v }
             }
 
             SettingToggle {

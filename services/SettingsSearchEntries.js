@@ -11,7 +11,6 @@ var settingsEntries = [
     { label: "Bar Position", category: "Bar", description: "Top or bottom placement", targetCategory: "bar" },
     { label: "Floating", category: "Bar", description: "Enable floating bar mode", targetCategory: "bar" },
     { label: "Floating Margin", category: "Bar", description: "Edge margin when floating", targetCategory: "bar" },
-    { label: "Background Opacity", category: "Bar", description: "Bar background transparency", targetCategory: "bar" },
     { label: "Corner Radius", category: "Bar", description: "Bar corner rounding", targetCategory: "bar" },
 
     // ── Appearance ──

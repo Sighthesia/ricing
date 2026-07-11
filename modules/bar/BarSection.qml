@@ -262,8 +262,8 @@ Item {
                 // Loader-created instance or an animated viewport).
                 readonly property real menuW: persistentTrayMenu.implicitWidth
                 readonly property real menuH: persistentTrayMenu.implicitHeight
-                readonly property real contextMenuW: contextMenuMeasure.implicitWidth
-                readonly property real contextMenuH: contextMenuMeasure.implicitHeight
+                readonly property real contextMenuW: persistentContextMenu.implicitWidth
+                readonly property real contextMenuH: persistentContextMenu.implicitHeight
                 readonly property real widgetPickerW: widgetPickerMeasure.implicitWidth
                 readonly property real widgetPickerH: widgetPickerMeasure.implicitHeight
                 readonly property real widgetSettingsW: widgetSettingsMeasure.implicitWidth
@@ -277,13 +277,6 @@ Item {
                 readonly property real pickerClipInset: Math.max(6, dockzone.bodyRadius * 0.45)
                 readonly property real menuAnchorX: Services.BarLayoutService.contextMenuX
                     - surfaceRoot.mapToItem(null, 0, 0).x
-
-                // Measure the context menu without clipping so the host can expand first.
-                BarContextMenuView {
-                    id: contextMenuMeasure
-                    visible: false
-                    enabled: false
-                }
 
                 // Measure the widget picker without clipping so the host can expand first.
                 WidgetPickerView {
@@ -487,14 +480,55 @@ Item {
                         }
                     }
 
-                    // Active content renderer: creates the current expand component
-                    // for non-tray content (detail, context, picker, settings).
-                    // Tray content uses the persistent renderer above instead so
-                    // the Loader never creates/destroys a menu instance.
+                    // Persistent bar context menu renderer. Like the tray view,
+                    // this same instance measures, reveals, and receives input.
+                    BarContextMenuView {
+                        id: persistentContextMenu
+
+                        readonly property bool isContextOwner: (root.expandRequest && root.expandRequest.type === "context")
+                            || (!root.expandRequest && root._closingExpandRequest
+                                && root._closingExpandRequest.type === "context")
+                        visible: isContextOwner
+                        enabled: root.expandRequest !== null && root.expandRequest.type === "context"
+                        viewportWidth: parent ? parent.width : 0
+                        viewportHeight: parent ? parent.height : 0
+                        x: (parent.width - width) / 2
+                        y: (1 - expandHost.revealProgress) * 8
+                        width: Math.min(implicitWidth, parent ? parent.width : implicitWidth)
+                        height: parent ? parent.height : implicitHeight
+                        clip: true
+                        opacity: expandHost.revealProgress
+                        hostRevealProgress: expandHost.revealProgress
+                        hostRevealHeight: expandHost.revealHeight
+                        hostIsInteractive: root.expandRequest !== null && root.expandRequest.type === "context"
+
+                        // Keep the active request in sync if menu state changes
+                        // alter the visible row set or its natural height.
+                        onImplicitWidthChanged: _syncContextExpandDimensions()
+                        onImplicitHeightChanged: _syncContextExpandDimensions()
+
+                        function _syncContextExpandDimensions() {
+                            if (root.expandRequest && root.expandRequest.sourceKey === "context") {
+                                var req = root.expandRequest
+                                root.expandRequest = ({
+                                    sourceKey: req.sourceKey,
+                                    type: req.type,
+                                    component: req.component,
+                                    expandWidth: Math.max(0, persistentContextMenu.implicitWidth),
+                                    expandHeight: Math.max(0, persistentContextMenu.implicitHeight + 8 + dockzone.menuClipInset),
+                                })
+                            }
+                        }
+                    }
+
+                    // Active content renderer for details, picker, and settings.
+                    // Tray and context menus use persistent instances above.
                     Loader {
                         id: expandContentLoader
 
-                        active: root.expandRequest !== null && root.expandRequest.type !== "tray"
+                        active: root.expandRequest !== null
+                            && root.expandRequest.type !== "tray"
+                            && root.expandRequest.type !== "context"
                         // Center all expand content in the host viewport.
                         x: (parent.width - width) / 2
                         y: (1 - expandHost.revealProgress) * 8
@@ -697,16 +731,6 @@ Item {
 
             }
 
-            // Menu Components for the unified expand host.
-            // Declared on surfaceRoot so they capture the correct QML scope.
-            Component {
-                id: contextMenuHostComponent
-                BarContextMenuView {
-                    viewportWidth: parent ? parent.width : 0
-                    viewportHeight: parent ? parent.height : 0
-                }
-            }
-
             Component {
                 id: widgetPickerHostComponent
                 WidgetPickerView {
@@ -748,7 +772,7 @@ Item {
                     if (root.hostsContextMenu) {
                         root.submitExpandRequest(
                             "context", "context",
-                            contextMenuHostComponent,
+                            null,
                             dockzone.contextMenuW,
                             dockzone.contextMenuH + 8 + dockzone.menuClipInset
                         )

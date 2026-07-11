@@ -7,7 +7,7 @@ Item {
 
     default property alias contentData: contentHost.data
 
-    property color surfaceColor: Qt.rgba(Services.Color.mSurface.r, Services.Color.mSurface.g, Services.Color.mSurface.b, 0.62)
+    property color surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
     property color outlineColor: Services.Color.mOutline
     property real radius: 16
     property real borderWidth: 1

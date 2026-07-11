@@ -17,7 +17,7 @@ QtObject {
     readonly property alias widgetInstanceSettings: adapter.widgetInstanceSettings
     property int widgetSettingsRevision: 0
     readonly property real panelSurfaceOpacity: appearance.enableBlur
-        ? Math.min(appearance.panelOpacity, 0.62)
+        ? appearance.blurSurfaceOpacity
         : appearance.panelOpacity
     // Blur-region edge inset for attached surfaces (bar dockzones, island).
     // Zero so the hard-edged wl_region reaches the painted arc/edge and the
@@ -211,7 +211,6 @@ QtObject {
                 property string position: "top"
                 property bool floating: false
                 property int floatingMargin: 4
-                property real backgroundOpacity: 0.85
                 property int cornerRadius: 12
             }
 
@@ -221,6 +220,11 @@ QtObject {
    property real panelOpacity: 0.9
              property int cornerRadius: 12
                 property bool enableBlur: true
+                property int blurPasses: 2
+                property real blurOffset: 1.25
+                property real blurNoise: 0.02
+                property real blurSaturation: 1.0
+                property real blurSurfaceOpacity: 0.35
                 property bool ripplePulseEnabled: true
                 property bool ripplePulseFullscreen: false
                 // Font family — empty string means system default (Qt.application.font.family)
