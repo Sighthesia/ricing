@@ -10,8 +10,10 @@ Item {
     property real dockzoneRevealCenterX: -1
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
+    property real dockzoneActualExpandHeight: 0
     readonly property real dockzoneExpandHeight: batteryBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: batteryBadge.dockzoneExpandWidth
+    readonly property bool badgeActive: batteryBadge.pointerActive
 
     visible: Services.BatteryService.available
     implicitWidth: visible ? batteryBadge.implicitWidth : 0
@@ -56,6 +58,7 @@ Item {
         dockzoneRevealCenterX: root.dockzoneRevealCenterX
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
+        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
         progressValue: Services.BatteryService.percentage / 100
         progressColor: root.stateColor
 

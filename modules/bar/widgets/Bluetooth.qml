@@ -10,8 +10,10 @@ Item {
     property real dockzoneRevealCenterX: -1
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
+    property real dockzoneActualExpandHeight: 0
     readonly property real dockzoneExpandHeight: btBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: btBadge.dockzoneExpandWidth
+    readonly property bool badgeActive: btBadge.pointerActive
 
     visible: Services.BluetoothService.bluetoothAvailable
     implicitWidth: visible ? btBadge.implicitWidth : 0
@@ -44,6 +46,7 @@ Item {
         dockzoneRevealCenterX: root.dockzoneRevealCenterX
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
+        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
         progressValue: -1
         progressColor: root.stateColor
         onActivated: Services.BluetoothService.setBluetoothEnabled(!Services.BluetoothService.enabled)

@@ -10,6 +10,7 @@ Item {
     property real dockzoneRevealCenterX: -1
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
+    property real dockzoneActualExpandHeight: 0
 
     readonly property var monitorSettings: Services.SettingsService.widgetSettingsObject(
         "system-monitor",
@@ -35,6 +36,7 @@ Item {
             : Services.Color.mPrimary)
     readonly property real dockzoneExpandHeight: metricsBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: metricsBadge.dockzoneExpandWidth
+    readonly property bool badgeActive: metricsBadge.pointerActive
 
     implicitWidth: metricsBadge.implicitWidth
     implicitHeight: 30
@@ -53,6 +55,7 @@ Item {
         dockzoneRevealCenterX: root.dockzoneRevealCenterX
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
+        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
         progressValue: Services.SystemMonitorService.cpuUsage / 100
         progressColor: root.cpuAccentColor
 

@@ -43,6 +43,33 @@ Item {
     property real dockzoneContentExpandHeight: 0
     property real dockzoneContentExpandWidth: 0
 
+    // Single active detail owner: only the widget whose badge the pointer is directly
+    // over (or was most recently over within activeClearTimer's window) may consume the
+    // host's actual expand height for its detail reveal. All other widgets see 0 and
+    // keep their details hidden, even while the shared host body is expanded.
+    property string activeDetailKey: ""
+    // Delay clearing the active key after pointer leaves the last active widget, so
+    // the formerly-active widget's detail may track the host spring collapse gracefully.
+    property Timer activeClearTimer: Timer {
+        interval: 600
+        repeat: false
+        onTriggered: root.activeDetailKey = ""
+    }
+
+    function reportActiveInterest(instanceKey, active) {
+        if (!instanceKey)
+            return
+
+        if (active) {
+            root.activeClearTimer.stop()
+            root.activeDetailKey = instanceKey
+        } else if (root.activeDetailKey === instanceKey) {
+            // Pointer left this widget — delay clearing so the detail can track the
+            // host spring collapse if no other widget claims interest.
+            root.activeClearTimer.restart()
+        }
+    }
+
     implicitHeight: surfaceLoader.item ? surfaceLoader.item.implicitHeight : Services.BarLayoutService.barHeight
     implicitWidth: root.hasSectionContent
         ? (surfaceLoader.item ? surfaceLoader.item.implicitWidth : 0)
@@ -455,6 +482,8 @@ Item {
                                     dockzoneRevealCenterX: sectionRow.x + x + width / 2
                                     dockzoneRevealTargetCenterX: hoverDetailOverlay.width / 2
                                     dockzoneRevealViewportWidth: hoverDetailOverlay.width
+                                    dockzoneActualExpandHeight: dockzone.expandHeight
+                                    activeDetailKey: root.activeDetailKey
                                     readonly property real widgetCenterXInSection: x + width / 2
                                     readonly property real widgetRowWidth: sectionRow.implicitWidth
 
@@ -463,6 +492,7 @@ Item {
                                     onDockzoneExpandWidthChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
                                     onWidgetCenterXInSectionChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
                                     onWidgetRowWidthChanged: root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)
+                                    onBadgeActiveChanged: root.reportActiveInterest(widgetInstanceKey, badgeActive)
                                     Component.onCompleted: {
                                         root.reportWidgetDockzoneExpandHeight(widgetInstanceKey, dockzoneExpandHeight)
                                         root.reportWidgetDockzoneExpandWidth(widgetInstanceKey, dockzoneExpandWidth, widgetCenterXInSection, widgetRowWidth)

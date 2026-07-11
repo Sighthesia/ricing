@@ -10,8 +10,10 @@ Item {
     property real dockzoneRevealCenterX: -1
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
+    property real dockzoneActualExpandHeight: 0
     readonly property real dockzoneExpandHeight: wifiBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: wifiBadge.dockzoneExpandWidth
+    readonly property bool badgeActive: wifiBadge.pointerActive
 
     visible: Services.NetworkService.wifiAvailable
     implicitWidth: visible ? wifiBadge.implicitWidth : 0
@@ -47,6 +49,7 @@ Item {
         dockzoneRevealCenterX: root.dockzoneRevealCenterX
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
+        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
         progressValue: Services.NetworkService.wifiConnected ? root.connectedSignalFraction : -1
         progressColor: root.stateColor
         onActivated: Services.NetworkService.setWifiEnabled(!Services.NetworkService.wifiEnabled)

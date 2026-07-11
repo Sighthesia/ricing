@@ -14,8 +14,10 @@ Item {
     property real dockzoneRevealCenterX: -1
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
+    property real dockzoneActualExpandHeight: 0
     readonly property real dockzoneExpandHeight: volumeBadge.dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: volumeBadge.dockzoneExpandWidth
+    readonly property bool badgeActive: volumeBadge.pointerActive
 
     implicitWidth: volumeBadge.implicitWidth
     implicitHeight: 30
@@ -33,6 +35,7 @@ Item {
         dockzoneRevealCenterX: root.dockzoneRevealCenterX
         dockzoneRevealTargetCenterX: root.dockzoneRevealTargetCenterX
         dockzoneRevealViewportWidth: root.dockzoneRevealViewportWidth
+        dockzoneActualExpandHeight: root.dockzoneActualExpandHeight
         progressValue: root.displayVolume
         progressColor: root.accentColor
         onActivated: Services.VolumeService.toggleSinkMute()

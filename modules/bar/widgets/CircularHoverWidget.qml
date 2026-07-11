@@ -36,6 +36,10 @@ Item {
     property bool showPointerCursor: true
     property bool _exitHoldRunning: false
     property int activationButtons: Qt.LeftButton
+    // Actual spring-applied expand height of the host dockzone, passed down
+    // so detail reveal tracks the glass body at every frame instead of using
+    // an independent easing (which can dephase from the host spring).
+    property real dockzoneActualExpandHeight: 0
     property real dockzoneRevealCenterX: -1
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
@@ -67,6 +71,22 @@ Item {
     readonly property real _detailHorizontalRef: root.width / 2
         + (root.detailCenterXInViewport - dockzoneRevealCenterX)
 
+    // Reveal progress derived from the host's spring-applied expand height
+    // so detail height/y/opacity stay phase-tight with the glass body at
+    // every frame.  No independent easing — the host spring drives both.
+    readonly property real _revealProgress: detailSlot.expandedHeight > 0
+        ? Math.min(1, Math.max(0, root.dockzoneActualExpandHeight / detailSlot.expandedHeight))
+        : 0
+
+    // Direct pointer interest: the cursor is on this widget's badge or detail area.
+    // Excludes _exitHoldRunning so the active-detail owner always tracks the pointer
+    // rather than a deferred exit timer. Used by BarSection to decide which widget
+    // may consume dockzoneActualExpandHeight for its detail.
+    readonly property bool pointerActive: badgeArea.containsMouse || detailHover.hovered
+
+    // Report only binary target height to break the old feedback loop where
+    // the widget's own smooth _revealProgress drove the host target, causing
+    // the host spring to chase a 180ms eased value (frame-by-frame aggregation).
     readonly property real dockzoneExpandHeight: detailRow.implicitWidth > 0
         ? (root.expanded ? detailSlot.expandedHeight : 0)
         : 0
@@ -196,29 +216,21 @@ Item {
 
         property real expandedHeight: root.contentSpacing + detailRow.implicitHeight + 8
         property real expandedWidth: detailRow.implicitWidth + 24
-        property real revealHeight: root.expanded ? expandedHeight : 0
+        property real revealHeight: root._revealProgress * expandedHeight
 
         z: 2
         x: root._detailHorizontalRef - width / 2  // centered in viewport
-        y: root.implicitHeight + root.contentSpacing - (root.expanded ? 0 : 5)
+        // Slide up from the host's visible bottom edge as the glass expands.
+        y: root.implicitHeight + root.contentSpacing
+            + (1 - root._revealProgress) * expandedHeight * 0.3
         width: detailRow.implicitWidth
         height: revealHeight
-        opacity: root.expanded ? 1 : 0
+        // Squared progress: content fades in late (arrives with the glass)
+        // but fades out early (leaves before the glass retracts).
+        opacity: root._revealProgress * root._revealProgress
         clip: true
         visible: height > 0 || opacity > 0
         transformOrigin: Item.Top
-
-        Behavior on revealHeight {
-            NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-        }
-
-        Behavior on y {
-            NumberAnimation { duration: Services.Motion.number.contentDuration; easing.type: Services.Motion.number.contentEasing }
-        }
-
-        Behavior on opacity {
-            NumberAnimation { duration: Services.Motion.number.shortDuration; easing.type: Services.Motion.number.shortEasing }
-        }
 
         // Host the expanded text row after the top reveal gap without replacing the badge.
         Row {

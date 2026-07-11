@@ -12,8 +12,19 @@ Item {
     property real dockzoneRevealCenterX: -1
     property real dockzoneRevealTargetCenterX: -1
     property real dockzoneRevealViewportWidth: -1
+    // Host's spring-applied actual expand height, for deriving in-phase reveal.
+    property real dockzoneActualExpandHeight: 0
+    // Active-detail tracking: BarSection sets this to the currently active widget's key.
+    // Only the matching wrapper forwards dockzoneActualExpandHeight to its widget.
+    property string activeDetailKey: ""
+    // Bound from the loaded widget's badgeActive when the widget exposes it.
+    property bool badgeActive: false
     readonly property string widgetInstanceKey: widgetEntry && widgetEntry.instanceKey ? widgetEntry.instanceKey : ""
     readonly property string widgetId: widgetEntry && widgetEntry.id ? widgetEntry.id : ""
+    readonly property bool isActiveDetailOwner: root.widgetInstanceKey.length > 0 && root.activeDetailKey === root.widgetInstanceKey
+    // Only the active detail owner may consume the host's actual expand height for reveal.
+    // All other widgets see 0 so their details stay hidden even while the host is expanded.
+    readonly property real gatedActualExpandHeight: root.isActiveDetailOwner ? root.dockzoneActualExpandHeight : 0
     readonly property real dockzoneExpandHeight: root._dockzoneExpandHeight
     readonly property real dockzoneExpandWidth: root._dockzoneExpandWidth
     readonly property bool localPointerIntent: pointerHover.hovered
@@ -124,6 +135,12 @@ Item {
 
             if (item.dockzoneRevealViewportWidth !== undefined)
                 item.dockzoneRevealViewportWidth = Qt.binding(function() { return root.dockzoneRevealViewportWidth })
+
+            if (item.dockzoneActualExpandHeight !== undefined)
+                item.dockzoneActualExpandHeight = Qt.binding(function() { return root.gatedActualExpandHeight })
+
+            if (item.badgeActive !== undefined)
+                root.badgeActive = Qt.binding(function() { return item.badgeActive })
 
             root._dockzoneExpandHeight = item.dockzoneExpandHeight !== undefined
                 ? item.dockzoneExpandHeight
