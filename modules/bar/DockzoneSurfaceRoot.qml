@@ -199,6 +199,8 @@ Item {
     readonly property int bodyRadius: metrics.bodyRadius
     readonly property bool isLeftSection: root.section === "left"
     readonly property bool isRightSection: root.section === "right"
+    // Fill/blur overscan hides the Shape antialiasing seam where center meets the screen edge.
+    readonly property int centerTopOverscan: root.isLeftSection || root.isRightSection ? 0 : 2
     readonly property int earBlurStripCount: Math.max(0, root.earRadius - Services.SettingsService.blurRegionInset * 2)
     // Use the natural (un-extended) body width for push/shrink math so
     // hover-driven expandWidth cannot feed back into section displacement
@@ -448,6 +450,20 @@ Item {
         }
     }
 
+    // Opaque top strip covers the center surface's screen-edge antialiasing seam.
+    Rectangle {
+        id: centerTopSeamCover
+
+        z: 1
+        x: root.visualBodyX - root.earRadius
+        y: 0
+        width: root.pushedBodyWidth + root.earRadius * 2
+        height: root.centerTopOverscan
+        color: root.fillColor
+        antialiasing: false
+        visible: root.centerTopOverscan > 0 && root.model.state.visibilityProgress > 0
+    }
+
     // Mask the shared screen-origin ripple to this dockzone surface only.
     Item {
         id: rippleLayer
@@ -533,13 +549,13 @@ Item {
     // Keep the bar blur source in normal item geometry, not inside Canvas paint nodes.
     // Full-size: the blur region matches the painted body edge so the acrylic
     // covers the fill completely with no un-blurred semi-transparent rim.
-        Item {
-            id: centerBodyBlurSource
+    Item {
+        id: centerBodyBlurSource
 
         x: centerBody.x + root.blurSourceOffsetX
-        y: centerBody.y
+        y: centerBody.y - root.centerTopOverscan
         width: centerBody.width
-        height: centerBody.height
+        height: centerBody.height + root.centerTopOverscan
     }
 
     // Blur strips for the left top ear; each strip follows the Canvas arc math.
