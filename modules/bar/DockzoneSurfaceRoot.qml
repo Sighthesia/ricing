@@ -175,7 +175,26 @@ Item {
 
     // Visual constants from model metrics.
     readonly property color fillColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
-    readonly property color borderColor: Qt.rgba(Services.Color.mOutline.r, Services.Color.mOutline.g, Services.Color.mOutline.b, 0.3)
+    readonly property color glassThemeColor: Services.SettingsService.appearance.glassThemeAdaptive
+        ? Services.Color.mPrimary
+        : Services.Color.mOutline
+    readonly property color glassHighlightBaseColor: Services.SettingsService.appearance.glassThemeAdaptive
+        ? Services.Color.mPrimary
+        : Services.Color.mOnSurface
+    property real glassGlowWidth: Services.SettingsService.appearance.glassGlowWidth
+    property real glassHighlightWidth: Services.SettingsService.appearance.glassHighlightWidth
+    property color glassGlowColor: Qt.rgba(
+        root.glassThemeColor.r,
+        root.glassThemeColor.g,
+        root.glassThemeColor.b,
+        Services.SettingsService.appearance.glassGlowIntensity * (root.hoverIntent ? 1.35 : 1)
+    )
+    property color glassHighlightColor: Qt.rgba(
+        root.glassHighlightBaseColor.r,
+        root.glassHighlightBaseColor.g,
+        root.glassHighlightBaseColor.b,
+        Services.SettingsService.appearance.glassHighlightIntensity * (root.hoverIntent ? 1.25 : 1)
+    )
     readonly property int earRadius: metrics.earRadius
     readonly property int bodyRadius: metrics.bodyRadius
     readonly property bool isLeftSection: root.section === "left"
@@ -196,6 +215,28 @@ Item {
     readonly property bool blurVisible: root.model.state.visibilityProgress > 0
         && (!root.isLeftSection || root.residualPushOffsetX < root.pushedBodyWidth)
         && (!root.isRightSection || root.residualPushOffsetX < root.pushedBodyWidth)
+
+    Behavior on glassGlowColor {
+        ColorAnimation {
+            duration: root.hoverIntent ? 180 : 260
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    Behavior on glassHighlightColor {
+        ColorAnimation {
+            duration: root.hoverIntent ? 180 : 260
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    Behavior on glassGlowWidth {
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
+
+    Behavior on glassHighlightWidth {
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
 
     function _earCutX(localY) {
         var radius = Math.max(1, root.earRadius)
@@ -327,10 +368,32 @@ Item {
                 + " A " + er + " " + er + " 0 0 0 " + (bx - er) + " 0 Z"
         }
 
+        // Low-energy theme glow keeps the silhouette legible on busy backdrops.
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: root.glassGlowColor
+            strokeWidth: root.glassGlowWidth
+
+            PathSvg {
+                path: silhouetteFill.outline
+            }
+        }
+
+        // Surface fill remains geometrically identical to the existing shell.
         ShapePath {
             fillColor: root.fillColor
-            strokeColor: root.borderColor
-            strokeWidth: 1
+            strokeWidth: 0
+
+            PathSvg {
+                path: silhouetteFill.outline
+            }
+        }
+
+        // Fine refractive highlight provides the primary liquid-glass edge.
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: root.glassHighlightColor
+            strokeWidth: root.glassHighlightWidth
 
             PathSvg {
                 path: silhouetteFill.outline

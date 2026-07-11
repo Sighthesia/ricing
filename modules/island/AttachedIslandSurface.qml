@@ -20,6 +20,27 @@ Item {
     property int targetRadius: 14
     property int earRadius: 24
     property color surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
+    property bool highlightIntent: false
+    readonly property color glassThemeColor: Services.SettingsService.appearance.glassThemeAdaptive
+        ? Services.Color.mPrimary
+        : Services.Color.mOutline
+    readonly property color glassHighlightBaseColor: Services.SettingsService.appearance.glassThemeAdaptive
+        ? Services.Color.mPrimary
+        : Services.Color.mOnSurface
+    property real glassGlowWidth: Services.SettingsService.appearance.glassGlowWidth
+    property real glassHighlightWidth: Services.SettingsService.appearance.glassHighlightWidth
+    property color glassGlowColor: Qt.rgba(
+        root.glassThemeColor.r,
+        root.glassThemeColor.g,
+        root.glassThemeColor.b,
+        Services.SettingsService.appearance.glassGlowIntensity * (highlightIntent ? 1.35 : 1)
+    )
+    property color glassHighlightColor: Qt.rgba(
+        root.glassHighlightBaseColor.r,
+        root.glassHighlightBaseColor.g,
+        root.glassHighlightBaseColor.b,
+        Services.SettingsService.appearance.glassHighlightIntensity * (highlightIntent ? 1.25 : 1)
+    )
     property real rippleScreenX: 0
     property real rippleScreenY: 0
     property real rippleScreenWidth: Screen.width
@@ -49,6 +70,28 @@ Item {
     }
 
     readonly property int earBlurStripCount: Math.max(0, root.liveEarRadius - Services.SettingsService.blurRegionInset * 2)
+
+    Behavior on glassGlowColor {
+        ColorAnimation {
+            duration: root.highlightIntent ? 180 : 260
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    Behavior on glassHighlightColor {
+        ColorAnimation {
+            duration: root.highlightIntent ? 180 : 260
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    Behavior on glassGlowWidth {
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
+
+    Behavior on glassHighlightWidth {
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
 
     function _earCutX(localY) {
         var radius = Math.max(1, root.liveEarRadius)
@@ -194,9 +237,32 @@ Item {
                 + " Z"
         }
 
+        // Low-energy theme glow keeps the silhouette legible on busy backdrops.
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: root.glassGlowColor
+            strokeWidth: root.glassGlowWidth
+
+            PathSvg {
+                path: silhouetteFill.outline
+            }
+        }
+
+        // Surface fill remains geometrically identical to the existing shell.
         ShapePath {
             fillColor: root.surfaceColor
             strokeWidth: 0
+
+            PathSvg {
+                path: silhouetteFill.outline
+            }
+        }
+
+        // Fine refractive highlight provides the primary liquid-glass edge.
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: root.glassHighlightColor
+            strokeWidth: root.glassHighlightWidth
 
             PathSvg {
                 path: silhouetteFill.outline

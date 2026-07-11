@@ -136,10 +136,13 @@ Item {
                 topPadding: 8
                 height: (appWallpaper.filterVisible || appColorScheme.filterVisible || appPanelOpacity.filterVisible ||
                          appCornerRadius.filterVisible || appBlur.filterVisible ||
-                         appBlurPasses.filterVisible || appBlurOffset.filterVisible ||
-                         appBlurNoise.filterVisible || appBlurSaturation.filterVisible ||
-                         appBlurSurfaceOpacity.filterVisible ||
-                         appRipplePulse.filterVisible || appRippleFullscreen.filterVisible ||
+                          appBlurPasses.filterVisible || appBlurOffset.filterVisible ||
+                          appBlurNoise.filterVisible || appBlurSaturation.filterVisible ||
+                          appBlurSurfaceOpacity.filterVisible ||
+                          appGlassHighlightWidth.filterVisible || appGlassHighlightIntensity.filterVisible ||
+                          appGlassGlowWidth.filterVisible || appGlassGlowIntensity.filterVisible ||
+                          appGlassThemeAdaptive.filterVisible ||
+                          appRipplePulse.filterVisible || appRippleFullscreen.filterVisible ||
                          appOverviewBg.filterVisible || appOverviewSolid.filterVisible ||
                          appOverviewBlur.filterVisible || appOverviewTint.filterVisible ||
                          fontDefault.filterVisible || fontFixed.filterVisible ||
@@ -253,6 +256,67 @@ Item {
                 width: parent.width
                 filterVisible: Services.SettingsService.appearance.enableBlur && root.settingMatches(settingLabel)
                 onMoved: v => { Services.SettingsService.appearance.blurSurfaceOpacity = v }
+            }
+
+            // Keep the liquid-glass edge independently adjustable from compositor blur.
+            SettingSlider {
+                id: appGlassHighlightWidth
+                settingLabel: "Glass Highlight Width"
+                description: "Thickness of the fine refractive edge"
+                from: 1; to: 4; stepSize: 1
+                value: Services.SettingsService.appearance.glassHighlightWidth
+                suffix: "px"
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.glassHighlightWidth = v }
+            }
+
+            // Control the brightness of the refractive glass edge.
+            SettingSlider {
+                id: appGlassHighlightIntensity
+                settingLabel: "Glass Highlight Intensity"
+                description: "Brightness of the refractive edge"
+                from: 0.1; to: 1; stepSize: 0.05
+                value: Services.SettingsService.appearance.glassHighlightIntensity
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.glassHighlightIntensity = v }
+            }
+
+            // Control the soft outer glow without changing surface geometry.
+            SettingSlider {
+                id: appGlassGlowWidth
+                settingLabel: "Theme Glow Width"
+                description: "Spread of the soft outer glow"
+                from: 1; to: 10; stepSize: 1
+                value: Services.SettingsService.appearance.glassGlowWidth
+                suffix: "px"
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.glassGlowWidth = v }
+            }
+
+            // Control the theme-color contribution around glass edges.
+            SettingSlider {
+                id: appGlassGlowIntensity
+                settingLabel: "Theme Glow Intensity"
+                description: "Strength of the theme-color outer glow"
+                from: 0; to: 0.6; stepSize: 0.05
+                value: Services.SettingsService.appearance.glassGlowIntensity
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onMoved: v => { Services.SettingsService.appearance.glassGlowIntensity = v }
+            }
+
+            // Switch between wallpaper-derived color and a neutral glass edge.
+            SettingToggle {
+                id: appGlassThemeAdaptive
+                settingLabel: "Theme Adaptation"
+                description: "Match glass highlights to wallpaper-derived theme colors"
+                checked: Services.SettingsService.appearance.glassThemeAdaptive
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onToggled: v => { Services.SettingsService.appearance.glassThemeAdaptive = v }
             }
 
             SettingToggle {

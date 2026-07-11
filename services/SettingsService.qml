@@ -225,6 +225,11 @@ QtObject {
                 property real blurNoise: 0.02
                 property real blurSaturation: 1.0
                 property real blurSurfaceOpacity: 0.35
+                property real glassHighlightWidth: 2
+                property real glassHighlightIntensity: 0.56
+                property real glassGlowWidth: 5
+                property real glassGlowIntensity: 0.22
+                property bool glassThemeAdaptive: true
                 property bool ripplePulseEnabled: true
                 property bool ripplePulseFullscreen: false
                 // Font family — empty string means system default (Qt.application.font.family)
