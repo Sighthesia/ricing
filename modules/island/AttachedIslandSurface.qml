@@ -254,14 +254,14 @@ Item {
             var earTrimX = hasEars ? Math.sqrt(Math.max(0, er * er - topInset * topInset)) : 0
 
             if (hasEars) {
-                return "M " + (bodyX + radius) + " " + bodyH
-                    + " Q " + bodyX + " " + bodyH + " " + bodyX + " " + (bodyH - radius)
-                    + " L " + bodyX + " " + er
-                    + " A " + er + " " + er + " 0 0 0 " + (bodyX - earTrimX) + " " + topInset
-                    + " M " + (bodyRightX + er - earTrimX) + " " + topInset
-                    + " A " + er + " " + er + " 0 0 0 " + bodyRightX + " " + er
-                    + " L " + bodyRightX + " " + (bodyH - radius)
-                    + " Q " + bodyRightX + " " + bodyH + " " + (bodyRightX - radius) + " " + bodyH
+                return "M " + (bodyX - earTrimX) + " " + topInset
+                    + " A " + er + " " + er + " 0 0 0 " + bodyX + " " + er
+                    + " L " + bodyX + " " + (bodyH - radius)
+                    + " Q " + bodyX + " " + bodyH + " " + (bodyX + radius) + " " + bodyH
+                    + " L " + (bodyRightX - radius) + " " + bodyH
+                    + " Q " + bodyRightX + " " + bodyH + " " + bodyRightX + " " + (bodyH - radius)
+                    + " L " + bodyRightX + " " + er
+                    + " A " + er + " " + er + " 0 0 0 " + (bodyRightX + er - earTrimX) + " " + topInset
             }
 
             return "M " + (bodyX + radius) + " " + bodyH
