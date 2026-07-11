@@ -333,7 +333,6 @@ Item {
 
             var bodyRightX = bx + bw
             var radius = Math.min(root.bodyRadius, bw / 2, bh / 2)
-
             if (root.isLeftSection) {
                 // Body (bodyX=0) + top-right ear + bottom-left ear.
                 return "M " + ox + " 0"
@@ -382,6 +381,9 @@ Item {
 
             var bodyRightX = bx + bw
             var radius = Math.min(root.bodyRadius, bw / 2, bh / 2)
+            // Keep the widest glow clear of the screen edge, including its cap.
+            var topInset = Math.min(er, Math.max(root.glassGlowWidth, root.glassHighlightWidth) + 2)
+            var earTrimX = Math.sqrt(Math.max(0, er * er - topInset * topInset))
 
             if (root.isLeftSection) {
                 return "M " + ox + " " + (bh + er)
@@ -399,14 +401,16 @@ Item {
                     + " A " + er + " " + er + " 0 0 0 " + ox + " 0"
             }
 
-            return "M " + (bx - er) + " 0"
-                + " A " + er + " " + er + " 0 0 0 " + bx + " " + er
-                + " L " + bx + " " + (bh - radius)
-                + " Q " + bx + " " + bh + " " + (bx + radius) + " " + bh
-                + " L " + (bodyRightX - radius) + " " + bh
-                + " Q " + bodyRightX + " " + bh + " " + bodyRightX + " " + (bh - radius)
-                + " L " + bodyRightX + " " + er
-                + " A " + er + " " + er + " 0 0 0 " + (bodyRightX + er) + " 0"
+            // Center uses two lower-anchored segments so neither the line nor
+            // the stroke caps can reach the screen-attached top edge.
+            return "M " + (bx + radius) + " " + bh
+                + " Q " + bx + " " + bh + " " + bx + " " + (bh - radius)
+                + " L " + bx + " " + er
+                + " A " + er + " " + er + " 0 0 0 " + (bx - earTrimX) + " " + topInset
+                + " M " + (bodyRightX + er - earTrimX) + " " + topInset
+                + " A " + er + " " + er + " 0 0 0 " + bodyRightX + " " + er
+                + " L " + bodyRightX + " " + (bh - radius)
+                + " Q " + bodyRightX + " " + bh + " " + (bodyRightX - radius) + " " + bh
         }
 
         // Low-energy theme glow keeps the silhouette legible on busy backdrops.
