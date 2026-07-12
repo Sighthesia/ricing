@@ -393,7 +393,7 @@ Item {
                     + " L " + (bodyRightX - radius) + " " + bh
                     + " Q " + bodyRightX + " " + bh + " " + bodyRightX + " " + (bh - radius)
                     + " L " + bodyRightX + " " + er
-                    + " A " + er + " " + er + " 0 0 0 " + (bodyRightX + er) + " 0"
+                    + " A " + er + " " + er + " 0 0 1 " + (bodyRightX + er) + " 0"
             } else if (root.isRightSection) {
                 return "M " + bodyRightX + " " + (bh + er)
                     + " A " + er + " " + er + " 0 0 0 " + (bodyRightX - er) + " " + bh

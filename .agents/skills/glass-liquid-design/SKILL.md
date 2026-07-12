@@ -84,12 +84,6 @@ Use this reusable shape for compact surfaces that must feel anchored to an edge.
 - If future large-scale motion requires strict ear-body continuity, treat separate overlay-ear ownership as a transitional workaround rather than the final architecture.
 - For ambitious ear/body morphing, prefer one shared geometry owner and one shared parameter model over multiple windows or independently animated shape owners.
 
-### Attached Outline Rule
-
-- When removing the screen-attached top highlight, derive the open stroke from the filled silhouette: preserve both complete ear arcs, side edges, and bottom edge, and omit only the final top connection.
-- Do not shorten an ear arc to hide its top endpoint. Start and end the open path just outside the visible top boundary so the screen clips the lead-in, not the ear itself.
-- If the stroke path traverses the filled silhouette in reverse, reverse each SVG arc sweep direction too; otherwise an ear can render on the wrong side or disappear despite valid path syntax.
-
 ### Background Hover Expand / Reset Pattern
 
 - For dockzone-adjacent backgrounds, treat hover as a geometry expansion first and a visual highlight second.
