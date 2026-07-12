@@ -389,7 +389,7 @@ Item {
 
             if (root.isLeftSection) {
                 return "M " + ox + " " + (bh + er)
-                    + " A " + er + " " + er + " 0 0 0 " + (ox + er) + " " + bh
+                    + " A " + er + " " + er + " 0 0 1 " + (ox + er) + " " + bh
                     + " L " + (bodyRightX - radius) + " " + bh
                     + " Q " + bodyRightX + " " + bh + " " + bodyRightX + " " + (bh - radius)
                     + " L " + bodyRightX + " " + er
