@@ -251,17 +251,20 @@ Item {
             var radius = Math.min(root.bodyRadius, bodyW / 2, bodyH / 2)
             var hasEars = leftEar.visible && rightEar.visible
             var topInset = hasEars ? Math.min(er, Math.max(root.glassGlowWidth, root.glassHighlightWidth) + 2) : 2
-            var earTrimX = hasEars ? Math.sqrt(Math.max(0, er * er - topInset * topInset)) : 0
 
             if (hasEars) {
-                return "M " + (bodyX - earTrimX) + " " + topInset
-                    + " A " + er + " " + er + " 0 0 0 " + bodyX + " " + er
+                // Enter from above the visible surface so both full ear arcs remain stroked
+                // without a connecting top edge.
+                return "M " + leftEar.x + " " + (-topInset)
+                    + " L " + leftEar.x + " 0"
+                    + " A " + er + " " + er + " 0 0 1 " + bodyX + " " + er
                     + " L " + bodyX + " " + (bodyH - radius)
                     + " Q " + bodyX + " " + bodyH + " " + (bodyX + radius) + " " + bodyH
                     + " L " + (bodyRightX - radius) + " " + bodyH
                     + " Q " + bodyRightX + " " + bodyH + " " + bodyRightX + " " + (bodyH - radius)
                     + " L " + bodyRightX + " " + er
-                    + " A " + er + " " + er + " 0 0 0 " + (bodyRightX + er - earTrimX) + " " + topInset
+                    + " A " + er + " " + er + " 0 0 1 " + (bodyRightX + er) + " 0"
+                    + " L " + (bodyRightX + er) + " " + (-topInset)
             }
 
             return "M " + (bodyX + radius) + " " + bodyH

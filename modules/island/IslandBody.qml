@@ -280,6 +280,7 @@ Item {
         targetRadius: root.targetR
         earRadius: root.earRadius
         surfaceColor: root.surfaceColor
+        highlightIntent: hoverHandler.hovered
         rippleScreenX: root.screenX
         rippleScreenY: root.screenY
         rippleScreenWidth: root.screenWidth
