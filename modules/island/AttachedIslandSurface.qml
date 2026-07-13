@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
+import "../shaders"
 import "../../services" as Services
 
 // Reusable attached-island shell: a center body plus edge-attached ears that
@@ -29,16 +30,30 @@ Item {
         : Services.Color.mOnSurface
     property real glassGlowWidth: Services.SettingsService.appearance.glassGlowWidth
     property real glassHighlightWidth: Services.SettingsService.appearance.glassHighlightWidth
+
+    // Wallpaper-driven glass edge color sampler.
+    GlassEdgeEffect {
+        id: edgeSampler
+        surfaceScreenX: root.rippleScreenX + (root.rippleScreenWidth - root.width) / 2
+        surfaceScreenY: root.rippleScreenY
+        surfaceWidth: root.width
+        surfaceHeight: root.height
+        screenWidth: root.rippleScreenWidth
+        screenHeight: root.rippleScreenHeight
+        fallbackColor: root.glassThemeColor
+        fallbackHighlightColor: root.glassHighlightBaseColor
+    }
+
     property color glassGlowColor: Qt.rgba(
-        root.glassThemeColor.r,
-        root.glassThemeColor.g,
-        root.glassThemeColor.b,
+        edgeSampler.baseColor.r,
+        edgeSampler.baseColor.g,
+        edgeSampler.baseColor.b,
         Services.SettingsService.appearance.glassGlowIntensity * (highlightIntent ? 1.35 : 1)
     )
     property color glassHighlightColor: Qt.rgba(
-        root.glassHighlightBaseColor.r,
-        root.glassHighlightBaseColor.g,
-        root.glassHighlightBaseColor.b,
+        edgeSampler.baseHighlightColor.r,
+        edgeSampler.baseHighlightColor.g,
+        edgeSampler.baseHighlightColor.b,
         Services.SettingsService.appearance.glassHighlightIntensity * (highlightIntent ? 1.25 : 1)
     )
     property real rippleScreenX: 0

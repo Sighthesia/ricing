@@ -2,6 +2,7 @@ import "."
 import "DockzoneSurfaceModel.js" as Model
 import QtQuick
 import QtQuick.Shapes
+import "../shaders"
 import "../../services" as Services
 
 // Surface-local owner for a dockzone path — first validated on center.
@@ -183,16 +184,30 @@ Item {
         : Services.Color.mOnSurface
     property real glassGlowWidth: Services.SettingsService.appearance.glassGlowWidth
     property real glassHighlightWidth: Services.SettingsService.appearance.glassHighlightWidth
+
+    // Wallpaper-driven glass edge color sampler.
+    GlassEdgeEffect {
+        id: edgeSampler
+        surfaceScreenX: root.screenX + root.windowX + root.visualBodyX
+        surfaceScreenY: root.screenY + root.bodyY
+        surfaceWidth: root.pushedBodyWidth
+        surfaceHeight: root.bodyHeight
+        screenWidth: root.screenWidth
+        screenHeight: root.screenHeight
+        fallbackColor: root.glassThemeColor
+        fallbackHighlightColor: root.glassHighlightBaseColor
+    }
+
     property color glassGlowColor: Qt.rgba(
-        root.glassThemeColor.r,
-        root.glassThemeColor.g,
-        root.glassThemeColor.b,
+        edgeSampler.baseColor.r,
+        edgeSampler.baseColor.g,
+        edgeSampler.baseColor.b,
         Services.SettingsService.appearance.glassGlowIntensity * (root.hoverIntent ? 1.35 : 1)
     )
     property color glassHighlightColor: Qt.rgba(
-        root.glassHighlightBaseColor.r,
-        root.glassHighlightBaseColor.g,
-        root.glassHighlightBaseColor.b,
+        edgeSampler.baseHighlightColor.r,
+        edgeSampler.baseHighlightColor.g,
+        edgeSampler.baseHighlightColor.b,
         Services.SettingsService.appearance.glassHighlightIntensity * (root.hoverIntent ? 1.25 : 1)
     )
     readonly property int earRadius: metrics.earRadius
