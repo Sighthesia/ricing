@@ -52,6 +52,7 @@ var _definitions = {
             spectrumHeight: 100,
             spectrumMaxHeight: 100,
             spectrumGain: 100,
+            spectrumExpandWithHeight: false,
             spectrumBarWidth: 42,
             spectrumSpacing: 0,
         },

@@ -330,7 +330,9 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: Math.min(parent.height, Math.max(16, root.collapsedH + root.centerWidgetExpandHeight))
+                height: Services.SpectrumService.dockzoneExpandWithHeight
+                    ? parent.height
+                    : Math.min(parent.height, Math.max(16, root.collapsedH + root.centerWidgetExpandHeight))
                 visible: root.showCenterSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
                 z: 0
                 clip: false

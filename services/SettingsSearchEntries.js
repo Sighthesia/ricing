@@ -10,6 +10,7 @@ var settingsEntries = [
     { label: "Bar Height", category: "Bar", description: "Status bar height in pixels", targetCategory: "bar" },
     { label: "Max Spectrum Height", category: "Media", description: "Cap the maximum height of spectrum bars", targetCategory: "media" },
     { label: "Spectrum Gain", category: "Media", description: "Boost quiet audio spectrum bars", targetCategory: "media" },
+    { label: "Spectrum Expand", category: "Media", description: "Let spectrum fill expanded island height", targetCategory: "media" },
     { label: "Bar Position", category: "Bar", description: "Top or bottom placement", targetCategory: "bar" },
     { label: "Floating", category: "Bar", description: "Enable floating bar mode", targetCategory: "bar" },
     { label: "Floating Margin", category: "Bar", description: "Edge margin when floating", targetCategory: "bar" },

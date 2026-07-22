@@ -48,9 +48,9 @@ Column {
     SettingSlider {
         width: parent.width
         settingLabel: "Spectrum Height"
-        description: "Adjust how tall the dockzone spectrum can grow."
+        description: "Amplitude multiplier for spectrum bars (100% = natural)."
         from: 50
-        to: 200
+        to: 100
         stepSize: 5
         suffix: "%"
         value: root.mediaSettings ? root.mediaSettings.spectrumHeight : 100
@@ -92,6 +92,19 @@ Column {
             "media",
             root.instanceKey,
             "spectrumGain",
+            value
+        )
+    }
+
+    SettingToggle {
+        width: parent.width
+        settingLabel: "Spectrum Expand"
+        description: "Let the spectrum fill the entire island height when expanded."
+        checked: root.mediaSettings ? root.mediaSettings.spectrumExpandWithHeight : false
+        onToggled: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "spectrumExpandWithHeight",
             value
         )
     }

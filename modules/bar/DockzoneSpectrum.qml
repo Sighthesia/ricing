@@ -14,7 +14,7 @@ Item {
     property real gain: Services.SpectrumService.dockzoneGain
     property real barWidthRatio: Services.SpectrumService.dockzoneBarWidthRatio
     property real barSpacing: Services.SpectrumService.dockzoneSpacing
-    property color barColor: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.34)
+    property color barColor: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.55)
     // When > 0, overrides the reference height for maxHeightRatio clamping.
     // Typically set to the status bar height so maxHeightRatio caps against the full bar.
     property real barHeightAnchor: 0

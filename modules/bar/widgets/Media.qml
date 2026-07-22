@@ -38,6 +38,9 @@ Item {
             ? root.mediaSettings.spectrumGain
             : 100
     ) / 100)
+    readonly property bool spectrumExpandWithHeight: root.mediaSettings && root.mediaSettings.spectrumExpandWithHeight !== undefined
+        ? root.mediaSettings.spectrumExpandWithHeight
+        : false
     readonly property real spectrumBarWidthRatio: Math.max(0.05, Math.min(1, (
         root.mediaSettings && root.mediaSettings.spectrumBarWidth !== undefined
             ? root.mediaSettings.spectrumBarWidth
@@ -203,6 +206,7 @@ Item {
         Services.SpectrumService.dockzoneHeightScale = root.spectrumHeightScale
         Services.SpectrumService.dockzoneMaxHeightRatio = root.spectrumMaxHeightRatio
         Services.SpectrumService.dockzoneGain = root.spectrumGain
+        Services.SpectrumService.dockzoneExpandWithHeight = root.spectrumExpandWithHeight
         Services.SpectrumService.dockzoneBarWidthRatio = root.spectrumBarWidthRatio
         Services.SpectrumService.dockzoneSpacing = root.spectrumSpacing
     }
