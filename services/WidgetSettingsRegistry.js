@@ -50,6 +50,8 @@ var _definitions = {
             lyricsDisplayMode: "Original",
             maxWidth: 240,
             spectrumHeight: 100,
+            spectrumMaxHeight: 100,
+            spectrumGain: 100,
             spectrumBarWidth: 42,
             spectrumSpacing: 0,
         },

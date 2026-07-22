@@ -330,11 +330,10 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: 1
-                height: Math.min(parent.height, Math.max(16, root.collapsedH - 12))
+                height: Math.min(parent.height, Math.max(16, root.collapsedH + root.centerWidgetExpandHeight))
                 visible: root.showCenterSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
                 z: 0
-                clip: true
+                clip: false
                 opacity: Services.SpectrumService.isIdle ? 0 : 1
 
                 Behavior on opacity {
@@ -345,7 +344,7 @@ Item {
                     anchors.fill: parent
                     anchors.leftMargin: 0
                     anchors.rightMargin: 0
-                    anchors.topMargin: 8
+                    anchors.topMargin: 0
                     anchors.bottomMargin: 0
                     values: Services.SpectrumService.values
                 }
@@ -594,7 +593,7 @@ Item {
                     height: compactLauncher._localQuery.trim().length === 0
                         ? 52
                         : Math.min(root.launcherCardMaxHeight, Math.max(52, parent.height - y))
-                    clip: true
+                clip: false
                     radius: 16
                     // Cascade tier 1: the search bar appears first, settling
                     // before the control-center cards start their entrance.

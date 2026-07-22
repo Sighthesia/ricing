@@ -64,6 +64,40 @@ Column {
 
     SettingSlider {
         width: parent.width
+        settingLabel: "Max Spectrum Height"
+        description: "Cap the maximum height of spectrum bars relative to the bar height."
+        from: 20
+        to: 100
+        stepSize: 5
+        suffix: "%"
+        value: root.mediaSettings ? root.mediaSettings.spectrumMaxHeight : 100
+        onMoved: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "spectrumMaxHeight",
+            value
+        )
+    }
+
+    SettingSlider {
+        width: parent.width
+        settingLabel: "Spectrum Gain"
+        description: "Boost quiet audio so bars reach higher at low volume."
+        from: 50
+        to: 300
+        stepSize: 10
+        suffix: "%"
+        value: root.mediaSettings ? root.mediaSettings.spectrumGain : 100
+        onMoved: value => Services.SettingsService.setWidgetInstanceSettingValue(
+            "media",
+            root.instanceKey,
+            "spectrumGain",
+            value
+        )
+    }
+
+    SettingSlider {
+        width: parent.width
         settingLabel: "Spectrum Bar Width"
         description: "Adjust how wide each spectrum bar can be."
         from: 20

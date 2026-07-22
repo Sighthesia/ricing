@@ -28,6 +28,16 @@ Item {
             ? root.mediaSettings.spectrumHeight
             : 100
     ) / 100)
+    readonly property real spectrumMaxHeightRatio: Math.max(0.1, Math.min(1, (
+        root.mediaSettings && root.mediaSettings.spectrumMaxHeight !== undefined
+            ? root.mediaSettings.spectrumMaxHeight
+            : 100
+    ) / 100))
+    readonly property real spectrumGain: Math.max(0.5, (
+        root.mediaSettings && root.mediaSettings.spectrumGain !== undefined
+            ? root.mediaSettings.spectrumGain
+            : 100
+    ) / 100)
     readonly property real spectrumBarWidthRatio: Math.max(0.05, Math.min(1, (
         root.mediaSettings && root.mediaSettings.spectrumBarWidth !== undefined
             ? root.mediaSettings.spectrumBarWidth
@@ -191,6 +201,8 @@ Item {
 
     function syncSpectrumSettings() {
         Services.SpectrumService.dockzoneHeightScale = root.spectrumHeightScale
+        Services.SpectrumService.dockzoneMaxHeightRatio = root.spectrumMaxHeightRatio
+        Services.SpectrumService.dockzoneGain = root.spectrumGain
         Services.SpectrumService.dockzoneBarWidthRatio = root.spectrumBarWidthRatio
         Services.SpectrumService.dockzoneSpacing = root.spectrumSpacing
     }

@@ -10,9 +10,14 @@ Item {
     property string style: "bars"
     property bool mirror: true
     property real heightScale: Services.SpectrumService.dockzoneHeightScale
+    property real maxHeightRatio: Services.SpectrumService.dockzoneMaxHeightRatio
+    property real gain: Services.SpectrumService.dockzoneGain
     property real barWidthRatio: Services.SpectrumService.dockzoneBarWidthRatio
     property real barSpacing: Services.SpectrumService.dockzoneSpacing
     property color barColor: Qt.rgba(Services.Color.mPrimary.r, Services.Color.mPrimary.g, Services.Color.mPrimary.b, 0.34)
+    // When > 0, overrides the reference height for maxHeightRatio clamping.
+    // Typically set to the status bar height so maxHeightRatio caps against the full bar.
+    property real barHeightAnchor: 0
 
     readonly property int valuesCount: (root.values && root.values.length !== undefined) ? root.values.length : 0
     readonly property int mirroredCount: root.mirror ? root.valuesCount * 2 : root.valuesCount
@@ -21,6 +26,8 @@ Item {
     readonly property real slotWidth: root.totalElements > 0 ? Math.max(0, (root.width - root.totalSpacing) / root.totalElements) : 0
     readonly property real floorInset: 4
     readonly property real usableHeight: Math.max(0, root.height - root.floorInset)
+    // Anchor-based cap so maxHeightRatio is meaningful even when the container is small.
+    readonly property real maxBarHeight: (root.barHeightAnchor > 0 ? root.barHeightAnchor : root.height) * root.maxHeightRatio
 
     // Map from flat index to value index considering mirror mode.
     function valueIndex(i) {
@@ -36,7 +43,7 @@ Item {
         delegate: Rectangle {
             readonly property int vi: root.valueIndex(index)
             readonly property real amplitude: (root.values && root.values[vi] !== undefined) ? root.values[vi] : 0
-            readonly property real scaledAmplitude: Math.max(0, Math.min(1, amplitude * Math.max(0.1, root.heightScale)))
+            readonly property real scaledAmplitude: Math.max(0, amplitude * root.gain * Math.max(0.1, root.heightScale))
             readonly property real emphasis: {
                 if (root.totalElements <= 1)
                     return 1
@@ -51,7 +58,7 @@ Item {
                 : Math.max(1, root.slotWidth * Math.max(0.05, Math.min(1, root.barWidthRatio)))
             height: root.style === "dots"
                 ? width
-                : root.usableHeight * scaledAmplitude
+                : Math.min(root.maxBarHeight, root.usableHeight * scaledAmplitude)
             radius: root.style === "dots" ? width / 2 : width / 2
             x: index * (root.slotWidth + Math.max(0, root.barSpacing)) + ((root.slotWidth - width) / 2)
             y: root.style === "dots"
@@ -99,9 +106,9 @@ Item {
                 }
 
                 const amp = (root.values && root.values[vi] !== undefined) ? root.values[vi] : 0
-                const scaledAmp = Math.max(0, Math.min(1, amp * Math.max(0.1, root.heightScale)))
+                const scaledAmp = Math.max(0, amp * root.gain * Math.max(0.1, root.heightScale))
                 const cx = i === 0 ? 0 : (i === total ? w : i * (slotW + spacing) + slotW / 2)
-                const cy = h - root.floorInset - usable * scaledAmp
+                const cy = h - root.floorInset - Math.min(root.maxBarHeight, usable * scaledAmp)
                 ctx.lineTo(cx, cy)
             }
 
