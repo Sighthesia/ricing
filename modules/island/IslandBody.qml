@@ -242,6 +242,7 @@ Item {
             Services.SpectrumService.unregisterComponent("island-center:" + root.screenName)
 
         Services.IslandService.setCenterSurfaceWidth(root.screenName, 0)
+        Services.IslandService.setCenterHover(root.screenName, false)
     }
     onShowCenterSpectrumChanged: syncSpectrumRegistration()
     onWidthChanged: Services.IslandService.setCenterSurfaceWidth(root.screenName, width)
@@ -267,6 +268,8 @@ Item {
     // Passive hover tracking for the collapsed island geometry.
     HoverHandler {
         id: hoverHandler
+
+        onHoveredChanged: Services.IslandService.setCenterHover(root.screenName, hovered)
     }
 
     // Shared attached-island silhouette shell; hosts island content in its body.

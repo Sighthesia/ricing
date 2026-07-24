@@ -19,6 +19,8 @@ Item {
         Services.WindowHintService.centerSurfaceWidthFor(root.screenName)
     )
     readonly property real centerSurfaceLeft: root.width > 0 ? (root.width - root.centerSurfaceWidth) / 2 : 0
+    readonly property bool centerContentLiftActive: Services.IslandService.centerHoverFor(root.screenName)
+        || Services.WindowHintService.hintVisible
     readonly property real leftSectionPush: root.centerSurfaceWidth > 0
         ? Math.max(0, leftSection.width - root.centerSurfaceLeft)
         : 0
@@ -129,6 +131,7 @@ Item {
         screenWidth: root.screenWidth
         screenHeight: root.screenHeight
         sectionPushOffsetX: root.leftSectionPushVisual
+        contentLiftActive: root.centerContentLiftActive
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.leftMargin: -leftSection.residualPushOffsetX
@@ -165,6 +168,7 @@ Item {
         screenWidth: root.screenWidth
         screenHeight: root.screenHeight
         sectionPushOffsetX: root.rightSectionPushVisual
+        contentLiftActive: root.centerContentLiftActive
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: -rightSection.residualPushOffsetX

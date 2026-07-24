@@ -13,6 +13,7 @@ Singleton {
     property string panelPage: "overview"
     property real clipboardPreviewWidth: 0
     property var centerSurfaceWidths: ({})
+    property var centerHoverStates: ({})
     // Pre-filter text for the settings center when opened from a search
     // result. Set before showSettingsCenter() and consumed once by
     // SettingsContent on load, then reset.
@@ -54,6 +55,19 @@ Singleton {
             return 0
 
         return centerSurfaceWidths[screenName] || 0
+    }
+
+    function setCenterHover(screenName, hovered) {
+        var nextStates = Object.assign({}, centerHoverStates)
+
+        if (screenName)
+            nextStates[screenName] = !!hovered
+
+        centerHoverStates = nextStates
+    }
+
+    function centerHoverFor(screenName) {
+        return !!(screenName && centerHoverStates[screenName])
     }
 
     function triggerRipplePulse() {

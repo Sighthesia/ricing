@@ -16,6 +16,7 @@ Item {
     required property real screenHeight
     property real blurSourceOffsetX: 0
     property real sectionPushOffsetX: 0
+    property bool contentLiftActive: false
     property bool floatingValidationIntent: false
     readonly property var sectionModel: Services.BarLayoutService.sectionWidgets(sectionName)
     readonly property bool hasSectionContent: root.sectionModel.length > 0
@@ -613,12 +614,24 @@ Item {
                         Row {
                             id: sectionRow
 
+                            readonly property real contentScale: root.sectionName === "left" || root.sectionName === "right"
+                                ? (root.contentLiftActive ? 1.035 : 1)
+                                : 1
+
                             x: dockzone.bodyX
                                 + (dockzone.naturalBodyWidth - width) / 2
                                 + (root.sectionName === "right" ? dockzone.bodyShrinkX : (root.sectionName === "left" ? -dockzone.bodyShrinkX : 0))
                                 - sectionClip.x
                             y: (dockzone.topBandHeight - height) / 2
                             spacing: BarLayoutSections.widgetSpacing
+                            scale: contentScale
+
+                            Behavior on scale {
+                                NumberAnimation {
+                                    duration: root.contentLiftActive ? 180 : 260
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
 
                             // Instantiate each managed widget in sequence.
                             Repeater {
