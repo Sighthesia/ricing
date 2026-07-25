@@ -360,6 +360,8 @@ Item {
             // active message grows the island (layout push, no overlap). The
             // row is pinned to the top band so the clock and the message head
             // align while the body grows downward for long bodies.
+            // Scale the collapsed row to match the left/right dockzone content
+            // lift (1.035) on hover, using the same easing and duration.
             Row {
                 id: collapsedRow
 
@@ -371,6 +373,14 @@ Item {
                 anchors.topMargin: Math.max(0, (root.collapsedH - root.collapsedContentHeight) / 2)
                 spacing: 8
                 opacity: 1
+                scale: hoverHandler.hovered ? 1.035 : 1.0
+
+                Behavior on scale {
+                    NumberAnimation {
+                        duration: hoverHandler.hovered ? 180 : 260
+                        easing.type: Easing.OutCubic
+                    }
+                }
 
                 // Wrap the collapsed center content so the spectrum can size to the managed widget block.
                 Item {
