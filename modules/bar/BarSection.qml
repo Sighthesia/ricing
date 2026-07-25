@@ -615,7 +615,7 @@ Item {
                             id: sectionRow
 
                             readonly property real contentScale: root.sectionName === "left" || root.sectionName === "right"
-                                ? (root.contentLiftActive ? 1.035 : 1)
+                                ? (root.contentLiftActive || sectionHoverHandler.hovered ? 1.035 : 1)
                                 : 1
 
                             x: dockzone.bodyX
@@ -628,7 +628,7 @@ Item {
 
                             Behavior on scale {
                                 NumberAnimation {
-                                    duration: root.contentLiftActive ? 180 : 260
+                                    duration: (root.contentLiftActive || sectionHoverHandler.hovered) ? 180 : 260
                                     easing.type: Easing.OutCubic
                                 }
                             }
