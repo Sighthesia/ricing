@@ -40,6 +40,9 @@ Item {
     property real _detachProgress: 0
     property real _morphProgress: 0
     property real _hoverProgress: 0
+    // Public alias so children (widget row) can derive scale/displacement from the
+    // same continuous spring-animated hover progress the shell uses.
+    readonly property real hoverProgress: root._hoverProgress
     // Map a target semantic state to canonical progress targets.
     function _targetsForState(state) {
         if (state === "hidden" || state === "exiting")

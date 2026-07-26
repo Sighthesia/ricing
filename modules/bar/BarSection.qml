@@ -616,7 +616,7 @@ Item {
 
                             readonly property real contentScale: root.sectionName === "left" || root.sectionName === "right"
                                 ? (root.contentLiftActive || sectionHoverHandler.hovered ? 1.035 : 1)
-                                : 1
+                                : 1 + Math.min(1, Math.max(0, dockzone.hoverProgress)) * 0.035
 
                             x: dockzone.bodyX
                                 + (dockzone.naturalBodyWidth - width) / 2
@@ -626,7 +626,10 @@ Item {
                             spacing: BarLayoutSections.widgetSpacing
                             scale: contentScale
 
+                            // Center content derives from dockzone's spring-animated
+                            // hoverProgress; no additional animation needed.
                             Behavior on scale {
+                                enabled: root.sectionName !== "center"
                                 NumberAnimation {
                                     duration: (root.contentLiftActive || sectionHoverHandler.hovered) ? 180 : 260
                                     easing.type: Easing.OutCubic
