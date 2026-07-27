@@ -9,9 +9,12 @@ var _hiddenOffsetY = -4;
 
 // Hover geometry lifts are intentionally modest so the dockzone breathes
 // without forcing large layout jumps.
-var _centerHoverWidthLift = 20;
+// Center uses dedicated edge-matched lifts (mirroring left/right amplitude)
+// via its own section-specific branch so shared model changes do not affect
+// left or right state.
+var _centerHoverWidthLift = 12;
 var _edgeHoverWidthLift = 12;
-var _centerHoverHeightLift = 8;
+var _centerHoverHeightLift = 6;
 var _edgeHoverHeightLift = 6;
 var _hoverRadiusLift = 6;
 

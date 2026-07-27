@@ -22,6 +22,13 @@ Item {
     property int earRadius: 24
     property color surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
     property bool highlightIntent: false
+    property bool hoverIntent: false
+    property bool hoverEnabled: false
+    property real hoverWidthLift: 0
+    property real hoverHeightLift: 0
+    property real hoverRadiusLift: 0
+    property real _hoverProgress: 0
+    readonly property real hoverProgress: root._hoverProgress
     readonly property color glassThemeColor: Services.SettingsService.appearance.glassThemeAdaptive
         ? Services.Color.mPrimary
         : Services.Color.mOutline
@@ -61,12 +68,24 @@ Item {
     property real rippleScreenWidth: Screen.width
     property real rippleScreenHeight: Screen.height
 
-    // Animated size: body width grows by the two ear radii, matching the
-    // legacy IslandBody size semantics (targetW + earRadius*2 / targetH).
+    // Physical geometry always follows the target-based island transition.
+    // Hover is a visual transform below so it never disables a later Window Hint
+    // height transition on this persistent surface.
     width: targetBodyWidth + earRadius * 2
     height: targetBodyHeight
     implicitWidth: width
     implicitHeight: height
+
+    transform: Scale {
+        origin.x: root.width / 2
+        origin.y: 0
+        readonly property real hoverBlend: root.hoverEnabled ? root.hoverProgress : 0
+        readonly property real hoverScale: 1 + hoverBlend * 0.03
+        // Match the dockzone's 12px/6px hover envelope without changing the
+        // persistent surface geometry that Window Hint animates.
+        xScale: hoverScale * (1 + root.hoverWidthLift * hoverBlend / Math.max(1, root.width))
+        yScale: hoverScale * (1 + root.hoverHeightLift * hoverBlend / Math.max(1, root.height))
+    }
 
     // Animated corner radius, exposed so callers can read the live value.
     property real bodyRadius: targetRadius
@@ -158,9 +177,19 @@ Item {
         root._stripParts(rightEarBlurStrips, rightEar.visible)
     )
 
-    // SpringAnimation for organic feel. Direction-aware damping makes the
-    // expand lively (lower damping) and the collapse settle cleanly (higher
-    // damping), driven off the dedicated island-expand spring profile.
+    onHoverIntentChanged: _hoverProgress = hoverIntent ? 1 : 0
+
+    Behavior on _hoverProgress {
+        SpringAnimation {
+            spring: Services.Motion.hover.spring
+            damping: Services.Motion.hover.damping
+            mass: Services.Motion.hover.mass
+            epsilon: Services.Motion.hover.epsilon
+        }
+    }
+
+    // Expanded island geometry keeps its existing heavier profile. Collapsed
+    // hover geometry is already driven by the shared hover progress above.
     property real wDamping: Services.Motion.islandExpand.dampingCollapse
     property real hDamping: Services.Motion.islandExpand.dampingCollapse
     property real rDamping: Services.Motion.islandExpand.dampingCollapse

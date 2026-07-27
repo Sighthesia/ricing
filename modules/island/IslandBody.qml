@@ -27,8 +27,8 @@ Item {
     readonly property int earRadius: 24
     readonly property int collapsedHorizontalPadding: 16
     readonly property int hoverWLift: 12
-    readonly property int hoverHLift: 4
-    readonly property int hoverRadiusLift: 2
+    readonly property int hoverHLift: 6
+    readonly property int hoverRadiusLift: 6
     readonly property int expandedW: Math.min(620, Screen.width - 48)
     readonly property int expandedH: Math.min(620, Screen.height - 96)
     // Sum of the overview collage rows (launcher + gaps + cards), so
@@ -96,7 +96,8 @@ Item {
     readonly property real messageContentHeight: Services.TransientMessageService.active
         ? Math.max(root.managedContentHeight, collapsedRow.implicitHeight + 12)
         : root.managedContentHeight
-    readonly property real collapsedCapsuleWidth: collapsedContentWidth + (hoverHandler.hovered ? hoverWLift : 0)
+    readonly property real hoverProgress: surface.hoverProgress
+    readonly property real collapsedCapsuleWidth: collapsedContentWidth
     readonly property real liveBodyWidth: Math.max(0, root.width - root.earRadius * 2)
     readonly property real collapsedWidthProgress: root.collapsedCapsuleWidth > 0
         ? Math.max(0, Math.min(1, root.liveBodyWidth / root.collapsedCapsuleWidth))
@@ -153,7 +154,7 @@ Item {
         ? Math.max(messageContentHeight, collapsedH) + centerContextMenuH + 8 + centerContextMenuClipInset
         : (Services.IslandService.windowHintActive
         ? windowHintH
-        : messageContentHeight + (hoverHandler.hovered ? hoverHLift : 0)))))
+        : messageContentHeight))))
     property int targetR: Services.IslandService.expanded
         ? 24
         : (root.hostsCenterWidgetPicker
@@ -164,7 +165,7 @@ Item {
         ? 14
         : (Services.IslandService.windowHintActive
         ? 24
-        : 14 + (hoverHandler.hovered ? hoverRadiusLift : 0)))))
+        : 14))))
 
     // Size mirrors the surface's animated geometry so external consumers
     // (IslandWindow hit region) keep tracking the live island bounds.
@@ -284,6 +285,15 @@ Item {
         earRadius: root.earRadius
         surfaceColor: root.surfaceColor
         highlightIntent: hoverHandler.hovered
+        hoverIntent: hoverHandler.hovered
+        hoverEnabled: !Services.IslandService.expanded
+            && !root.hostsCenterWidgetPicker
+            && !root.hostsCenterWidgetSettings
+            && !root.hostsCenterContextMenu
+            && !Services.IslandService.windowHintActive
+        hoverWidthLift: root.hoverWLift
+        hoverHeightLift: root.hoverHLift
+        hoverRadiusLift: root.hoverRadiusLift
         rippleScreenX: root.screenX
         rippleScreenY: root.screenY
         rippleScreenWidth: root.screenWidth
@@ -360,8 +370,8 @@ Item {
             // active message grows the island (layout push, no overlap). The
             // row is pinned to the top band so the clock and the message head
             // align while the body grows downward for long bodies.
-            // Scale the collapsed row to match the left/right dockzone content
-            // lift (1.035) on hover, using the same easing and duration.
+            // The row and the shell share one continuous hover progress, so the
+            // content cannot finish before the visible outline catches up.
             Row {
                 id: collapsedRow
 
@@ -370,16 +380,22 @@ Item {
                 // Center the row's top item in the bar-height band so the clock
                 // stays vertically centered while the body grows downward for
                 // long message bodies.
-                anchors.topMargin: Math.max(0, (root.collapsedH - root.collapsedContentHeight) / 2)
+                // Window Hint and menus grow the body below this top band. Only
+                // the hover lift may move the collapsed row with the shell.
+                anchors.topMargin: Math.max(0, (root.collapsedH + root.hoverHLift * root.hoverProgress - root.collapsedContentHeight) / 2)
                 spacing: 8
                 opacity: 1
-                scale: hoverHandler.hovered ? 1.035 : 1.0
+                // The shell owns the hover scale. A second row scale would
+                // compound the transform and make the content outgrow it.
+                scale: 1
 
-                Behavior on scale {
-                    NumberAnimation {
-                        duration: hoverHandler.hovered ? 180 : 260
-                        easing.type: Easing.OutCubic
-                    }
+                // Keep the shell's 6px vertical hover envelope on the outline
+                // without stretching the hosted bar content vertically.
+                transform: Scale {
+                    origin.x: collapsedRow.width / 2
+                    origin.y: collapsedRow.height / 2
+                    yScale: 1 / ((1 + root.hoverProgress * 0.03)
+                        * (1 + root.hoverHLift * root.hoverProgress / Math.max(1, surface.height)))
                 }
 
                 // Wrap the collapsed center content so the spectrum can size to the managed widget block.
