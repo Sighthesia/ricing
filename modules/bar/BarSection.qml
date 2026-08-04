@@ -16,7 +16,6 @@ Item {
     required property real screenHeight
     property real blurSourceOffsetX: 0
     property real sectionPushOffsetX: 0
-    property bool contentLiftActive: false
     property bool floatingValidationIntent: false
     readonly property var sectionModel: Services.BarLayoutService.sectionWidgets(sectionName)
     readonly property bool hasSectionContent: root.sectionModel.length > 0
@@ -615,7 +614,7 @@ Item {
                             id: sectionRow
 
                             readonly property real contentScale: root.sectionName === "left" || root.sectionName === "right"
-                                ? (root.contentLiftActive || sectionHoverHandler.hovered ? 1.035 : 1)
+                                ? (sectionHoverHandler.hovered ? 1.035 : 1)
                                 : 1 + Math.min(1, Math.max(0, dockzone.hoverProgress)) * 0.035
 
                             x: dockzone.bodyX
@@ -631,7 +630,7 @@ Item {
                             Behavior on scale {
                                 enabled: root.sectionName !== "center"
                                 NumberAnimation {
-                                    duration: (root.contentLiftActive || sectionHoverHandler.hovered) ? 180 : 260
+                                    duration: sectionHoverHandler.hovered ? 180 : 260
                                     easing.type: Easing.OutCubic
                                 }
                             }

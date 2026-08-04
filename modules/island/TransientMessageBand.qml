@@ -29,15 +29,20 @@ Item {
         if (rawIcon.indexOf("/") !== -1 || rawIcon.indexOf(":") !== -1) return rawIcon
         return Quickshell.iconPath(rawIcon, true)
     }
-    readonly property bool showArt: kind === "media" && rawIcon !== "" && artImage.status === Image.Ready
+    readonly property bool showArt: kind === "media"
+        && Services.SettingsService.appearance.transientMediaCover
+        && rawIcon !== "" && artImage.status === Image.Ready
     readonly property bool showAppIcon: kind === "notification" && iconSource !== "" && appIcon.status === Image.Ready
     readonly property bool showGlyph: glyph !== "" && !showArt && !showAppIcon
     readonly property bool showFallbackBell: kind === "notification" && !showAppIcon && !showGlyph
     readonly property bool hasLeading: showArt || showAppIcon || showGlyph || showFallbackBell
 
     // Zero size when idle so the island returns to its bare clock size.
+    // Height fits the actual content: the head row stays as the base so no
+    // empty space remains when the body/author line is absent.
     implicitWidth: (card.implicitWidth + 12) * root.revealProgress
-    implicitHeight: 26 + Math.max(0, card.implicitHeight - 26) * root.revealProgress
+    implicitHeight: headRow.implicitHeight
+        + Math.max(0, card.implicitHeight - headRow.implicitHeight) * root.revealProgress
     clip: true
     visible: Services.TransientMessageService.active || root.revealProgress > 0.01
 

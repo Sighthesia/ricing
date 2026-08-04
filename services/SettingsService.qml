@@ -232,6 +232,9 @@ QtObject {
                 property bool glassThemeAdaptive: true
                 property bool ripplePulseEnabled: true
                 property bool ripplePulseFullscreen: false
+                // Show album art in media transient messages (off by default since
+                // the adjacent media widget already displays the cover).
+                property bool transientMediaCover: false
                 // Font family — empty string means system default (Qt.application.font.family)
                 property string fontDefault: ""
                 property string fontFixed: "monospace"

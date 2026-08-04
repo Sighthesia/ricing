@@ -143,7 +143,8 @@ Item {
                           appGlassGlowWidth.filterVisible || appGlassGlowIntensity.filterVisible ||
                           appGlassThemeAdaptive.filterVisible ||
                           appRipplePulse.filterVisible || appRippleFullscreen.filterVisible ||
-                         appOverviewBg.filterVisible || appOverviewSolid.filterVisible ||
+                          appTransientMediaCover.filterVisible ||
+                          appOverviewBg.filterVisible || appOverviewSolid.filterVisible ||
                          appOverviewBlur.filterVisible || appOverviewTint.filterVisible ||
                          fontDefault.filterVisible || fontFixed.filterVisible ||
                          fontDefaultScale.filterVisible || fontFixedScale.filterVisible) ? implicitHeight : 0
@@ -337,6 +338,18 @@ Item {
                 width: parent.width
                 filterVisible: Services.SettingsService.appearance.ripplePulseEnabled && root.settingMatches(settingLabel)
                 onToggled: v => { Services.SettingsService.appearance.ripplePulseFullscreen = v }
+            }
+
+            // Control whether media transient messages show album art, which
+            // duplicates the cover already displayed by the adjacent media widget.
+            SettingToggle {
+                id: appTransientMediaCover
+                settingLabel: "Transient Media Cover"
+                description: "Show album cover in media transient messages"
+                checked: Services.SettingsService.appearance.transientMediaCover
+                width: parent.width
+                filterVisible: root.settingMatches(settingLabel)
+                onToggled: v => { Services.SettingsService.appearance.transientMediaCover = v }
             }
 
             SettingToggle {

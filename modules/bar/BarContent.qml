@@ -129,7 +129,6 @@ Item {
         screenWidth: root.screenWidth
         screenHeight: root.screenHeight
         sectionPushOffsetX: root.leftSectionPushVisual
-        contentLiftActive: Services.WindowHintService.hintVisible
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.leftMargin: -leftSection.residualPushOffsetX
@@ -166,7 +165,6 @@ Item {
         screenWidth: root.screenWidth
         screenHeight: root.screenHeight
         sectionPushOffsetX: root.rightSectionPushVisual
-        contentLiftActive: Services.WindowHintService.hintVisible
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: -rightSection.residualPushOffsetX
