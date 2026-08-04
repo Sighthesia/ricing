@@ -97,6 +97,16 @@ Item {
         ? Math.max(root.managedContentHeight, collapsedRow.implicitHeight + 12)
         : root.managedContentHeight
     readonly property real hoverProgress: surface.hoverProgress
+    // The hover envelope is only eligible while the collapsed island is not
+    // about to be replaced by an expand (launcher, context menu, widget picker,
+    // widget settings, window hint). The condition feeds hoverIntent so the
+    // enlargement releases through the spring instead of snapping off the
+    // instant an expand panel opens.
+    readonly property bool surfaceHoverEnabled: !Services.IslandService.expanded
+        && !root.hostsCenterWidgetPicker
+        && !root.hostsCenterWidgetSettings
+        && !root.hostsCenterContextMenu
+        && !Services.IslandService.windowHintActive
     readonly property real collapsedCapsuleWidth: collapsedContentWidth
     readonly property real liveBodyWidth: Math.max(0, root.width - root.earRadius * 2)
     readonly property real collapsedWidthProgress: root.collapsedCapsuleWidth > 0
@@ -285,12 +295,7 @@ Item {
         earRadius: root.earRadius
         surfaceColor: root.surfaceColor
         highlightIntent: hoverHandler.hovered
-        hoverIntent: hoverHandler.hovered
-        hoverEnabled: !Services.IslandService.expanded
-            && !root.hostsCenterWidgetPicker
-            && !root.hostsCenterWidgetSettings
-            && !root.hostsCenterContextMenu
-            && !Services.IslandService.windowHintActive
+        hoverIntent: root.surfaceHoverEnabled && hoverHandler.hovered
         hoverWidthLift: root.hoverWLift
         hoverHeightLift: root.hoverHLift
         hoverRadiusLift: root.hoverRadiusLift

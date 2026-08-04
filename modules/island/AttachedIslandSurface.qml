@@ -23,7 +23,6 @@ Item {
     property color surfaceColor: Qt.alpha(Services.Color.mSurface, Services.SettingsService.panelSurfaceOpacity)
     property bool highlightIntent: false
     property bool hoverIntent: false
-    property bool hoverEnabled: false
     property real hoverWidthLift: 0
     property real hoverHeightLift: 0
     property real hoverRadiusLift: 0
@@ -79,7 +78,11 @@ Item {
     transform: Scale {
         origin.x: root.width / 2
         origin.y: 0
-        readonly property real hoverBlend: root.hoverEnabled ? root.hoverProgress : 0
+        // The hover envelope follows the spring-animated hoverProgress directly
+        // so it can never snap off. The caller gates hoverIntent itself when an
+        // expand opens, letting the spring ease the enlargement out in step with
+        // the shell's growth instead of jumping back to rest size instantly.
+        readonly property real hoverBlend: root.hoverProgress
         readonly property real hoverScale: 1 + hoverBlend * 0.03
         // Match the dockzone's 12px/6px hover envelope without changing the
         // persistent surface geometry that Window Hint animates.
