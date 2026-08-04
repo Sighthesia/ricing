@@ -49,7 +49,6 @@ Item {
     readonly property var centerWidgets: Services.BarLayoutService.sectionWidgets("center")
     readonly property bool showManagedCenterWidgets: root.centerWidgets.length > 0
     readonly property bool showCenterSpectrum: root.showManagedCenterWidgets
-        && !Services.IslandService.windowHintActive
         && !Services.IslandService.expanded
     readonly property bool launcherPageVisible: Services.IslandService.expanded
         && Services.IslandService.panelPage === "launcher"
@@ -138,7 +137,18 @@ Item {
         root.collapsedContentWidth,
         Math.min(hintStage.stageWidth + 32, Screen.width - root.earRadius * 2)
     )
-    readonly property int windowHintH: root.collapsedH + hintStage.stageHeight + 24
+    // Island footprint that wraps just the collapsed row + workspace stage.
+    readonly property real hintStageFootprint: root.collapsedH + 12 + hintStage.stageHeight + 12
+    // Spectrum band height while the hint is held: a small fixed strip pinned to
+    // the island's lower edge (the collapsed content height), so the spectrum
+    // does not stretch to fill the tall hint body. The strip keeps this size
+    // through the hint exit collapse so it never pops when the island returns
+    // to rest.
+    readonly property real hintSpectrumBandHeight: Services.IslandService.windowHintActive
+        || !hintStage.exitComplete
+        ? Math.max(16, root.collapsedH + root.centerWidgetExpandHeight)
+        : 0
+    readonly property int windowHintH: Math.round(root.hintStageFootprint)
 
     // Target dimensions reuse the expanded island body instead of a second panel.
     property int targetW: Services.IslandService.expanded
@@ -348,9 +358,14 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: Services.SpectrumService.dockzoneExpandWithHeight
-                    ? parent.height
-                    : Math.min(parent.height, Math.max(16, root.collapsedH + root.centerWidgetExpandHeight))
+                // During the window hint the band is the fixed small strip at
+                // the island's lower edge (kept through the exit collapse); at
+                // rest it keeps the collapsed band or the media setting.
+                height: Services.IslandService.windowHintActive || !hintStage.exitComplete
+                    ? root.hintSpectrumBandHeight
+                    : (Services.SpectrumService.dockzoneExpandWithHeight
+                        ? parent.height
+                        : Math.min(parent.height, Math.max(16, root.collapsedH + root.centerWidgetExpandHeight)))
                 visible: root.showCenterSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
                 z: 0
                 clip: false
@@ -843,14 +858,16 @@ Item {
         // --- Window-hint extension: the workspace stage rendered inside the
         // island body. In the launcher-conflict case only the title row shows
         // (titleRowOnly) and overlays the launcher's lower half; otherwise the
-        // full vertical workspace stage fills the extended body. ---
+        // full vertical workspace stage fills the extended body. The stage sits
+        // above the collapsed layer so the capsules overlay the bottom spectrum
+        // band behind them. ---
         Item {
             id: windowHintContent
             anchors.fill: parent
             anchors.topMargin: root.collapsedH + 12
             opacity: Services.IslandService.windowHintActive || !hintStage.exitComplete ? 1 : 0
             visible: opacity > 0.01
-            z: 0
+            z: 2
 
             Behavior on opacity {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
