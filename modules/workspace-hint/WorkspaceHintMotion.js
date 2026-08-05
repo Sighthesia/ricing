@@ -279,6 +279,11 @@ function workspaceMetrics(host, slotPosition) {
     var topY = 0
     var centerY = host._workspaceSideHeight + host._workspaceColumnGap
     var bottomY = centerY + host._workspacePrimaryHeight + host._workspaceColumnGap
+    // Sliding past the stage edge fades the capsule out (0.5 at the edge to 0 a
+    // full slot out), so capsules that retire during a workspace switch dissolve
+    // while they travel instead of freezing at a ghost 0.45 and popping when
+    // the slots settle. Entering capsules fade back in the same way as they
+    // slide up into the visible window.
     if (slotPosition < -1) {
         var beforeOverflow = Math.min(1, -1 - slotPosition)
         return {
@@ -287,7 +292,7 @@ function workspaceMetrics(host, slotPosition) {
             width: sideWidth,
             height: host._workspaceSideHeight,
             emphasis: 0,
-            opacity: 0.45
+            opacity: _lerp(0.5, 0, beforeOverflow)
         }
     }
 
@@ -299,7 +304,7 @@ function workspaceMetrics(host, slotPosition) {
             width: sideWidth,
             height: host._workspaceSideHeight,
             emphasis: 0,
-            opacity: 0.45
+            opacity: _lerp(0.5, 0, afterOverflow)
         }
     }
 

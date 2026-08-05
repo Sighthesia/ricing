@@ -27,6 +27,14 @@ Item {
     property int screenWidth: 1
     // Side inset reserved so edge ears remain fully visible.
     property int capsuleEdgeInset: 24
+    // Optional host-body sync for island embedding. When a host supplies its
+    // live body height and the stage's inset from the body top, capsules near
+    // the body's lower edge fade in together with the host's expansion spring
+    // so a newly-added bottom capsule never appears before the island bottom
+    // reaches it. Floating-capsule mode leaves these at defaults and disables
+    // the sync.
+    property real hostBodyHeight: -1
+    property real hostBodyTopInset: 0
 
     // --- Exposed geometry ---
     readonly property int stageWidth: _workspaceStageWidth + (_workspaceStagePadding * 2)
@@ -34,6 +42,23 @@ Item {
     readonly property Item hitRegionItem: stageHitRegion
     // Expose the live capsule items so a host window can build its blur region.
     readonly property var capsuleItems: stageRepeater.count > 0 ? workspaceStage.children : []
+    // Y offset of the slot stage within this view, so host-body coverage math
+    // can map a capsule's stage-space position into host coordinates.
+    readonly property real stageContentY: workspaceStage.y
+    // Bottom edge (in view coordinates) of the currently-rendered capsule
+    // content, floored at the settled stage height. The island sizes its hint
+    // footprint from this live extent so a capsule that enters at the stage's
+    // lower edge during a workspace switch is always hosted — the body grows to
+    // contain it instead of clipping it until the slots settle.
+    readonly property real stageContentBottom: {
+        var bottom = _workspaceVisibleStageHeight
+        for (var i = 0; i < stageRepeater.count; i++) {
+            var item = stageRepeater.itemAt(i)
+            if (item && item.visible)
+                bottom = Math.max(bottom, workspaceStage.y + item.visibleY + item.height)
+        }
+        return bottom
+    }
     readonly property bool exitComplete: !active
         && _stageTopProgress <= 0.001
         && _stageMiddleProgress <= 0.001
@@ -366,6 +391,30 @@ for (let index = 0; index < text.length; index++) {
         _stageTopProgress = top
     _stageMiddleProgress = middle
      _stageBottomProgress = bottom
+    }
+
+    // The host-body bottom sync engages only after the reveal cascade settles,
+    // so the island's own reveal animation still owns the initial entry feel.
+    // During a held-hint workspace switch the cascade is already at 1, so the
+    // sync applies and lets new bottom capsules emerge with the island spring.
+    readonly property bool _bodySyncReady: _stageTopProgress >= 0.999
+        && _stageMiddleProgress >= 0.999
+        && _stageBottomProgress >= 0.999
+
+    // Fraction of a capsule (at the given stage-space top and height) that the
+    // host body currently covers from its lower edge, 0..1. Capsules below the
+    // island's live bottom edge fade proportionally, so they appear exactly as
+    // the expansion spring reaches them. No-op (1) for floating hosts.
+    function hostBodyCoverageFor(stageY, height) {
+        if (root.hostBodyHeight < 0 || !root._bodySyncReady)
+            return 1
+
+        var islandTop = root.hostBodyTopInset + root.stageContentY + stageY
+        var islandBottom = root.hostBodyHeight
+        if (islandTop >= islandBottom)
+            return 0
+
+        return Math.max(0, Math.min(1, (islandBottom - Math.max(0, islandTop)) / Math.max(1, height)))
     }
 
     // Staggered reveal in, staggered reverse out — mirrors the legacy timing.

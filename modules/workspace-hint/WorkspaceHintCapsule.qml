@@ -65,9 +65,20 @@ Item {
     readonly property color _textColor: root._isEmptyWorkspace
         ? (root._isPrimaryCapsule ? Services.Color.mOnSurface : Services.Color.mOnSurfaceVariant)
         : Services.Color.mOnSurface
-    readonly property real _capsuleOpacity: root._isEmptyWorkspace
-        ? Math.max(root._metrics.opacity, 0.62)
-        : root._metrics.opacity
+    readonly property real _capsuleOpacity: {
+        const base = root._metrics.opacity
+        // Keep the empty-workspace readability floor only inside the visible
+        // window; past the stage edge it must be allowed to fade out fully with
+        // the overflow ramp or a retiring empty capsule would pop at settle.
+        if (root._isEmptyWorkspace && Math.abs(root.slotPosition) <= 1)
+            return Math.max(base, 0.62)
+        return base
+    }
+    // Host-body coverage: 1 when the island has grown to contain this capsule,
+    // < 1 while the island's spring still lags its lower edge. Multiplied into
+    // opacity so a newly-added bottom capsule emerges in sync with the island
+    // instead of appearing first and being clipped.
+    readonly property real _bodyCoverage: host.hostBodyCoverageFor(root.y, root.height)
     readonly property bool blurActive: !!(
         root.capsule
         && root.capsule.isCurrent
@@ -189,7 +200,7 @@ Item {
     y: root._screenStartY + ((root._targetY - root._screenStartY) * root._revealProgress)
     width: root._collapsedDiameter + ((root._targetWidth - root._collapsedDiameter) * root._revealProgress)
     height: root._metrics.height
-    opacity: root.capsule && root.capsule.visible ? root._capsuleOpacity * root._revealOpacityFactor : 0
+    opacity: root.capsule && root.capsule.visible ? root._capsuleOpacity * root._revealOpacityFactor * root._bodyCoverage : 0
     visible: root.capsule !== null && opacity > 0
     clip: false
 

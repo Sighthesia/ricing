@@ -137,8 +137,10 @@ Item {
         root.collapsedContentWidth,
         Math.min(hintStage.stageWidth + 32, Screen.width - root.earRadius * 2)
     )
-    // Island footprint that wraps just the collapsed row + workspace stage.
-    readonly property real hintStageFootprint: root.collapsedH + 12 + hintStage.stageHeight + 12
+    // Island footprint that wraps the collapsed row + the live capsule extent,
+    // so during a workspace switch the body grows to host the transitional
+    // bottom capsule instead of clipping it until the slots settle.
+    readonly property real hintStageFootprint: root.collapsedH + 12 + hintStage.stageContentBottom + 12
     // Spectrum band height while the hint is held: a small fixed strip pinned to
     // the island's lower edge (the collapsed content height), so the spectrum
     // does not stretch to fill the tall hint body. The strip keeps this size
@@ -887,6 +889,11 @@ Item {
                 stageTargetY: 12
                 screenWidth: Screen.width
                 capsuleEdgeInset: root.earRadius
+                // Feed the island's live body height so the stage can fade new
+                // bottom capsules in step with the expansion spring instead of
+                // letting them appear before the island bottom reaches them.
+                hostBodyHeight: root.height
+                hostBodyTopInset: root.collapsedH + 12
             }
         }
 
