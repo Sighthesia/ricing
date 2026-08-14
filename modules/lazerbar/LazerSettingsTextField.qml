@@ -8,6 +8,7 @@ FocusScope {
     property string placeholderText: ""
     property bool enabled: true
     property bool rowEnabled: true
+    property real availableWidth: Infinity
     property string accessibleName: ""
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property bool focusVisible: editor.activeFocus
@@ -18,7 +19,7 @@ FocusScope {
 
     implicitWidth: 240
     implicitHeight: 38
-    width: parent && parent.width > 0 ? Math.min(implicitWidth, parent.width) : implicitWidth
+    width: Math.min(implicitWidth, availableWidth)
     height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     activeFocusOnTab: effectiveEnabled

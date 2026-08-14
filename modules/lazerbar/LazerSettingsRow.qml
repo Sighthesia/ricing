@@ -10,7 +10,8 @@ Item {
     readonly property bool contentEnabled: enabled
     default property alias control: controlHost.data
     readonly property Item controlItem: controlHost.data.length > 0 ? controlHost.data[0] : null
-    readonly property bool controlSupportsRowEnabled: controlItem !== null && controlItem.hasOwnProperty("rowEnabled")
+    readonly property bool controlSupportsRowEnabled: controlItem !== null && controlItem.rowEnabled !== undefined
+    readonly property bool controlSupportsAvailableWidth: controlItem !== null && controlItem.availableWidth !== undefined
     readonly property bool compactLayout: width < 480
 
     implicitWidth: 640
@@ -28,6 +29,14 @@ Item {
         property: "rowEnabled"
         value: root.enabled
         when: root.controlSupportsRowEnabled
+    }
+
+    // Give built-in controls a one-way width budget without owning their width.
+    Binding {
+        target: root.controlItem
+        property: "availableWidth"
+        value: controlHost.width
+        when: root.controlSupportsAvailableWidth
     }
 
     // Paint the quiet grouped row surface.
@@ -78,9 +87,10 @@ Item {
         y: compactLayout ? textColumn.y + textColumn.height + 12 : Math.max(16, (root.height - height) / 2)
         width: compactLayout
                ? Math.max(0, root.width - 32)
-               : Math.min(controlItem && controlItem.width > 0
-                          ? controlItem.width
-                          : (controlItem ? controlItem.implicitWidth : 0),
+               : Math.min(controlSupportsAvailableWidth
+                          ? (controlItem ? controlItem.implicitWidth : 0)
+                          : Math.max(controlItem && controlItem.width > 0 ? controlItem.width : 0,
+                                     controlItem ? controlItem.implicitWidth : 0),
                           Math.max(0, root.width - 32))
         height: controlItem && controlItem.height > 0
                 ? controlItem.height

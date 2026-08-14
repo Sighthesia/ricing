@@ -7,6 +7,7 @@ Item {
     property bool checked: false
     property bool enabled: true
     property bool rowEnabled: true
+    property real availableWidth: Infinity
     property string accessibleName: ""
     signal toggled(bool checked)
 
@@ -19,7 +20,7 @@ Item {
 
     implicitWidth: 46
     implicitHeight: 26
-    width: parent && parent.width > 0 ? Math.min(implicitWidth, parent.width) : implicitWidth
+    width: Math.min(implicitWidth, availableWidth)
     height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     activeFocusOnTab: effectiveEnabled
