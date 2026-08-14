@@ -64,9 +64,12 @@ function visualState(enabled, active, hovered, pressed) {
 }
 
 function nextOverlay(current, requested) {
-    var active = current == null ? "" : String(current)
-    var target = requested == null ? "" : String(requested)
-    return active === target ? "" : target
+    var activeCandidate = current == null ? "" : String(current)
+    var active = activeCandidate === "settings" || activeCandidate === "music" ? activeCandidate : ""
+    var targetCandidate = requested == null ? "" : String(requested)
+    if (targetCandidate !== "settings" && targetCandidate !== "music")
+        return active
+    return active === targetCandidate ? "" : targetCandidate
 }
 
 function popupOrigin(anchorCenterX, popupWidth, screenWidth) {

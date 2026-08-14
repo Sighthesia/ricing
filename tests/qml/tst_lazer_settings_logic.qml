@@ -1,5 +1,6 @@
 import QtQuick
 import QtTest
+import "../../modules/lazerbar" as Lazer
 import "../../modules/lazerbar/LazerBarLogic.js" as BarLogic
 import "../../modules/lazerbar/LazerSettingsLogic.js" as SettingsLogic
 
@@ -12,9 +13,33 @@ Item {
             compare(BarLogic.nextOverlay("", "settings"), "settings")
             compare(BarLogic.nextOverlay("settings", "settings"), "")
             compare(BarLogic.nextOverlay("music", "settings"), "settings")
+            compare(BarLogic.nextOverlay(null, null), "")
+            compare(BarLogic.nextOverlay("unknown", "settings"), "settings")
+            compare(BarLogic.nextOverlay("settings", "unknown"), "settings")
+            compare(BarLogic.nextOverlay("unknown", "unknown"), "")
         }
 
         function test_panelGeometry() {
+            compare(SettingsLogic.panelWidth(0), 0)
+            compare(SettingsLogic.panelWidth(16), 0)
+            compare(SettingsLogic.panelWidth(240), 208)
+            compare(SettingsLogic.panelWidth(319), 287)
+            compare(SettingsLogic.panelWidth(320), 288)
+            compare(SettingsLogic.panelWidth(351), 319)
+            compare(SettingsLogic.panelWidth(352), 320)
+            compare(SettingsLogic.panelWidth(791), 759)
+            compare(SettingsLogic.panelWidth(792), 760)
+            compare(SettingsLogic.panelHeight(0), 0)
+            compare(SettingsLogic.panelHeight(16), 0)
+            compare(SettingsLogic.panelHeight(240), 208)
+            compare(SettingsLogic.panelHeight(319), 287)
+            compare(SettingsLogic.panelHeight(320), 288)
+            compare(SettingsLogic.panelHeight(351), 319)
+            compare(SettingsLogic.panelHeight(352), 320)
+            compare(SettingsLogic.panelHeight(551), 519)
+            compare(SettingsLogic.panelHeight(552), 520)
+            compare(SettingsLogic.panelHeight(791), 617)
+            compare(SettingsLogic.panelHeight(792), 618)
             compare(SettingsLogic.panelWidth(1920), 1040)
             compare(SettingsLogic.panelWidth(900), 760)
             compare(SettingsLogic.panelWidth(600), 568)
@@ -31,19 +56,78 @@ Item {
         }
 
         function test_notificationAnchors() {
-            var anchors = SettingsLogic.notificationAnchors("bottom-left")
+            var anchors = SettingsLogic.notificationAnchors("top-left")
+            compare(anchors.top, true)
+            compare(anchors.bottom, false)
+            compare(anchors.left, true)
+            compare(anchors.right, false)
+
+            anchors = SettingsLogic.notificationAnchors("top-right")
+            compare(anchors.top, true)
+            compare(anchors.bottom, false)
+            compare(anchors.left, false)
+            compare(anchors.right, true)
+
+            anchors = SettingsLogic.notificationAnchors("bottom-left")
             compare(anchors.top, false)
             compare(anchors.bottom, true)
             compare(anchors.left, true)
             compare(anchors.right, false)
+
+            anchors = SettingsLogic.notificationAnchors("bottom-right")
+            compare(anchors.top, false)
+            compare(anchors.bottom, true)
+            compare(anchors.left, false)
+            compare(anchors.right, true)
+
+            anchors = SettingsLogic.notificationAnchors("unknown")
+            compare(anchors.top, true)
+            compare(anchors.bottom, false)
+            compare(anchors.left, false)
+            compare(anchors.right, true)
+
+            anchors = SettingsLogic.notificationAnchors(null)
+            compare(anchors.top, true)
+            compare(anchors.bottom, false)
+            compare(anchors.left, false)
+            compare(anchors.right, true)
         }
 
         function test_clampAndInvalidValues() {
             compare(SettingsLogic.clamp(12, 0, 10), 10)
             compare(SettingsLogic.clamp(-2, 0, 10), 0)
             compare(SettingsLogic.clamp(4, 10, 0), 4)
-            compare(SettingsLogic.panelWidth(NaN), 320)
-            compare(SettingsLogic.panelHeight(Infinity), 320)
+            compare(SettingsLogic.clamp(NaN, 0, 10), 0)
+            compare(SettingsLogic.clamp(Infinity, 0, 10), 0)
+            compare(SettingsLogic.panelWidth(NaN), 0)
+            compare(SettingsLogic.panelWidth(Infinity), 0)
+            compare(SettingsLogic.panelWidth("invalid"), 0)
+            compare(SettingsLogic.panelHeight(NaN), 0)
+            compare(SettingsLogic.panelHeight(Infinity), 0)
+            compare(SettingsLogic.panelHeight("invalid"), 0)
+            compare(SettingsLogic.navigationWidth(NaN), 168)
+            compare(SettingsLogic.categoryDirection(NaN, 1), 0)
+            compare(SettingsLogic.categoryDirection(1, Infinity), 0)
+            compare(SettingsLogic.timeoutSecondsToMs(NaN), 2000)
+            compare(SettingsLogic.timeoutSecondsToMs(Infinity), 2000)
+        }
+
+        function test_themeTokens() {
+            compare(Lazer.LazerTheme.settingsPanel, "#f21d1c22")
+            compare(Lazer.LazerTheme.settingsPanelBorder, "#38ffffff")
+            compare(Lazer.LazerTheme.settingsRail, "#2418171c")
+            compare(Lazer.LazerTheme.settingsRow, "#141d1c22")
+            compare(Lazer.LazerTheme.settingsRowHover, "#241f2028")
+            compare(Lazer.LazerTheme.settingsSelected, "#40eb1c60")
+            compare(Lazer.LazerTheme.settingsScrimOpacity, 0.6)
+            compare(Lazer.LazerTheme.settingsRadius, 16)
+        }
+
+        function test_motionTokens() {
+            compare(Lazer.MotionTokens.settingsEnter, 320)
+            compare(Lazer.MotionTokens.settingsExit, 240)
+            compare(Lazer.MotionTokens.settingsScrim, 180)
+            compare(Lazer.MotionTokens.settingsCategory, 160)
         }
     }
 }

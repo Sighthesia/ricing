@@ -17,25 +17,27 @@ function clamp(value, minimum, maximum) {
 function panelWidth(availableWidth) {
     var width = Number(availableWidth)
     if (!isFinite(width))
-        return 320
+        return 0
     width = Math.max(0, width)
     if (width < narrowWidthBreakpoint)
-        return Math.max(320, width - 32)
+        return Math.max(0, width - 32)
     return Math.round(clamp(width * 0.8, 760, 1040))
 }
 
 function panelHeight(availableHeight) {
     var height = Number(availableHeight)
     if (!isFinite(height))
-        return 320
+        return 0
     height = Math.max(0, height)
     if (height < narrowHeightBreakpoint)
-        return Math.max(320, height - 32)
+        return Math.max(0, height - 32)
     return Math.round(clamp(height * 0.78, 520, 760))
 }
 
 function navigationWidth(width) {
     var value = Number(width)
+    if (!isFinite(value))
+        return 168
     return isFinite(value) && value < 760 ? 168 : 216
 }
 
@@ -53,6 +55,9 @@ function timeoutSecondsToMs(seconds) {
 
 function notificationAnchors(position) {
     var normalized = position == null ? "top-right" : String(position)
+    if (normalized !== "top-left" && normalized !== "top-right"
+            && normalized !== "bottom-left" && normalized !== "bottom-right")
+        normalized = "top-right"
     var bottom = normalized.indexOf("bottom-") === 0
     var left = normalized === "top-left" || normalized === "bottom-left"
     return {

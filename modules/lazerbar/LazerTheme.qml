@@ -31,7 +31,7 @@ QtObject {
     readonly property color settingsRail: "#2418171C"
     readonly property color settingsRow: "#141D1C22"
     readonly property color settingsRowHover: "#241F2028"
-    readonly property color settingsSelected: "#40FF66AA"
+    readonly property color settingsSelected: "#40EB1C60"
     readonly property real settingsScrimOpacity: 0.6
     readonly property int settingsRadius: 16
 
