@@ -19,6 +19,11 @@ QtObject {
     readonly property color divider: "#2E2C32"
     readonly property color popupBackground: "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"
+    readonly property color osuButtonActive: "#EB1C60"
+    readonly property color osuButtonHover: "#333744"
+    readonly property color musicBackground: "#E612131A"
+    readonly property color musicGold: "#FFD000"
+    readonly property color musicMuted: "#A0A0A0"
 
     readonly property int barHeight: 46
     readonly property int bottomRadius: 14

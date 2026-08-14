@@ -14,3 +14,4 @@ UtilityZone 1.0 UtilityZone.qml
 StatusZone 1.0 StatusZone.qml
 BarBackground 1.0 BarBackground.qml
 TopBar 1.0 TopBar.qml
+OsuTopBarButton 1.0 OsuTopBarButton.qml
