@@ -26,6 +26,9 @@ Out of scope:
 - Media playback integration
 - Persisting the selected game mode or bell state across shell restarts
 - Recreating osu! trademarks or copying proprietary assets
+- Ripple effects, page-content transitions, list filtering, and card reordering
+- Cascading submenus; `DropdownMenu` and `ContextMenu` support one menu level in this release
+- React, CSS, or Tailwind implementations; the requested interaction contract is implemented as native QML components
 
 ## Selected Direction
 
@@ -147,7 +150,7 @@ Icons are bundled SVG files. They are original generic geometric representations
 
 ## Motion Tokens
 
-A `MotionTokens` singleton exposes only these durations:
+A `MotionTokens` singleton exposes these base durations:
 
 - Instant feedback: 70ms
 - Fast feedback: 100ms
@@ -155,16 +158,37 @@ A `MotionTokens` singleton exposes only these durations:
 - Panel entrance: 240ms
 - Extended transition: 320ms
 
-The primary easing curve is cubic-bezier `(0.22, 1, 0.36, 1)`, represented in QML with `Easing.BezierSpline`.
+Backdrop fades use a dedicated 120ms duration where explicitly specified below. This is the only duration outside the five base duration tokens.
+
+The easing tokens are represented in QML with `Easing.BezierSpline`:
+
+- `outSoft`: cubic-bezier `(0.22, 1, 0.36, 1)`; primary interaction easing
+- `outStd`: cubic-bezier `(0.2, 0, 0, 1)`; active-indicator movement
+- `inStd`: cubic-bezier `(0.4, 0, 1, 1)`; reserved for opacity-only departure where needed
+- `inOut`: cubic-bezier `(0.4, 0, 0.2, 1)`; coordinated state changes
+
+Shared value tokens are:
+
+- Hover scale: `1.015`
+- Press scale: `0.985`
+- Popup initial scale: `0.98`
+- Popup initial Y offset: `-4px`
+- Overlay panel initial Y offset: `8px`
+- Button press Y offset: `1px`
+- Backdrop opacity: `0.55`
+- Disabled opacity: `0.45`
 
 Interactive transitions follow these rules:
 
-- Hover: background and foreground brighten and scale reaches `1.015` in 100ms.
-- Press: scale reaches `0.985` and vertical translation reaches 1px in 70ms.
-- Release: transform returns in 100ms.
-- Active state: accent background or foreground changes in 160ms.
-- Mode indicator: position slides in 160ms rather than flashing.
+- Hover: background alpha increases by 6% to 10%, foreground brightness increases by 8% to 12%, and scale reaches `1.015` in 100ms with `outSoft`.
+- Hover transforms activate only for a pointer capable of hover. Touch input enters the press path without retaining a hover transform.
+- Press: scale reaches `0.985`, vertical translation reaches 1px, and the background becomes one step darker than hover in 70ms.
+- Release: transform returns in 100ms with `outSoft`.
+- Active state: accent background and foreground change in 160ms.
+- Mode indicator: position slides in 160ms with `outStd` rather than flashing.
 - Disabled: pointer and keyboard activation are blocked; opacity and color transition instead of hard-cutting.
+- Repeated directional-key navigation moves focus and the active indicator without replaying button-scale feedback. `Enter` and `Space` retain the 70ms press response.
+- Rapid state changes retarget `Behavior` or property animations from their current values. They must not restart a fixed keyframe sequence from the initial state.
 
 ## Reduced Motion
 
@@ -175,6 +199,7 @@ When reduced motion is enabled:
 - Remove scale animation.
 - Remove translation and sliding animation.
 - Preserve short opacity and color transitions.
+- Apply popup and overlay shadows at their final value instead of animating shadow depth.
 - Move focus and active state immediately where movement would otherwise be required.
 - Preserve all state and keyboard behavior.
 
@@ -188,7 +213,7 @@ All reusable interactive controls support:
 - `active`
 - `disabled`
 
-State priority is `disabled`, `pressed`, `active`, `hover`, then `rest`. Focus-visible presentation is independent and remains visible when keyboard focus is present.
+`rest` or `active` supplies the persistent base state. `hover` and `pressed` are temporary interaction layers applied over that base, so pressing an active control does not remove its accent treatment. `disabled` overrides all visual and interaction states. Focus-visible presentation is independent and remains visible when keyboard focus is present.
 
 The mode selector and notification bell are the only controls that change local state in this release. Other top-bar controls provide visual pointer and keyboard feedback but intentionally perform no business action.
 
@@ -217,21 +242,27 @@ Open transition:
 - Opacity `0 -> 1`
 - Y offset `-4 -> 0`
 - Scale `0.98 -> 1`
+- Shadow changes from the resting surface shadow to the floating-layer shadow
 - Duration 160ms
+- Easing `outSoft`
+- Transform origin is the trigger-facing top corner, selected from the resolved anchor position
 
-Close transition uses the reverse values over 100ms. Pointer interaction is disabled as soon as closing begins to prevent click-through or stale activation. Arrow keys change the current item, Enter activates it, and Escape closes the menu.
+Close transition uses opacity `1 -> 0`, Y offset `0 -> -4`, and scale `1 -> 0.98` over 100ms. Pointer interaction is disabled as soon as closing begins to prevent click-through or stale activation. Arrow keys change the current item, Enter activates it, and Escape closes the menu.
+
+Menu-item hover uses a white highlight between 6% and 10% opacity. Its icon and primary label brighten together, while an optional shortcut label brightens only one muted-text step and remains subordinate.
 
 ### ContextMenu
 
-`ContextMenu` shares the menu model, keyboard behavior, states, and motion tokens with `DropdownMenu`, but positions itself from a pointer-provided anchor point. It clamps to the available screen area.
+`ContextMenu` shares the menu model, keyboard behavior, states, item hover treatment, and motion tokens with `DropdownMenu`, but positions itself from a pointer-provided anchor point. It clamps to the available screen area and resolves its transform origin to the nearest top corner. Cascading submenus are outside this release.
 
 ### ModalOverlay
 
 `ModalOverlay` provides a focus-contained modal surface.
 
 - Backdrop fades in over 120ms.
-- Panel fades and rises over 240ms.
-- Closing uses faster reverse transitions.
+- Backdrop opacity moves from `0` to `0.55`.
+- Panel opacity moves from `0` to `1`, Y offset from `8` to `0`, and scale may move from `0.985` to `1` over 240ms with `outSoft`.
+- Closing moves the panel through the reverse opacity and transform path over 160ms and fades the backdrop over 100ms.
 - Pointer interaction outside the panel is blocked while open and closing.
 - Tab navigation remains inside the modal.
 - Escape closes the modal and restores opener focus.
@@ -289,10 +320,14 @@ QML component tests cover:
 - Persistent indicator target changes instead of replacement
 - Bell state toggling
 - Button state priority for rest, hover, pressed, active, and disabled
+- Active-state persistence while hover and press feedback are layered over it
 - Reduced-motion transform suppression
+- Hover transform suppression for input that does not support hover
 - Dropdown and context-menu focus navigation
+- Dropdown and context-menu transform-origin resolution
+- Immediate pointer blocking and exact 100ms reverse values during menu close
 - Escape close and focus restoration
-- Modal focus containment and immediate interaction blocking during close
+- Modal focus containment, exact enter/exit values, and immediate interaction blocking during close
 
 Existing backend tests must continue to pass.
 
@@ -310,6 +345,8 @@ Implementation is complete only when:
 - Narrow layouts never overlap the left and status zones.
 - Keyboard focus order and Escape behavior work without a pointer.
 - Reduced-motion mode removes scale and positional movement.
+- Popup origins visually connect each menu to its trigger or context position.
+- Overlay close uses a 160ms panel transition and 100ms backdrop transition.
 
 ## Risks
 
