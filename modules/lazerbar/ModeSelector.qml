@@ -16,7 +16,7 @@ Item {
     readonly property real indicatorX: indicator.x
     signal modeSelected(string mode)
 
-    implicitWidth: row.implicitWidth
+    implicitWidth: row.implicitWidth + 10
     implicitHeight: LazerTheme.targetSize + 4
     activeFocusOnTab: true
 
@@ -31,8 +31,26 @@ Item {
     Keys.onLeftPressed: event => { moveSelection(-1); event.accepted = true }
     Keys.onRightPressed: event => { moveSelection(1); event.accepted = true }
 
+    // Tie all four modes together with one quiet recessed capsule.
+    Rectangle {
+        anchors.fill: parent
+        anchors.topMargin: 1
+        anchors.bottomMargin: 1
+        radius: 9
+        color: LazerTheme.modeContainer
+        border.width: 1
+        border.color: LazerTheme.modeContainerBorder
+        transform: Scale {
+            origin.x: root.width / 2
+            origin.y: root.height
+            xScale: 0.97
+            yScale: 1
+        }
+    }
+
     Row {
         id: row
+        x: 5
         spacing: LazerTheme.inlineGap
 
         Repeater {

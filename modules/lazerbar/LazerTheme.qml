@@ -4,10 +4,12 @@ import QtQuick
 // Centralize the lazer bar's dark visual language.
 QtObject {
     readonly property color bgDark: "#18171C"
+    readonly property color modeContainer: "#241F272B"
+    readonly property color modeContainerBorder: "#0FFFFFFF"
     readonly property color osuPink: "#FF66AA"
     readonly property color osuGreen: "#00FFA2"
     readonly property color iconInactive: "#A0A0A0"
-    readonly property color textPrimary: "#F7F5F8"
+    readonly property color textPrimary: "#FFFFFF"
     readonly property color textMuted: "#B8B4BC"
     readonly property color hoverForeground: "#FFFFFF"
     readonly property color hoverFill: "#18FFFFFF"
@@ -19,7 +21,7 @@ QtObject {
     readonly property color popupBorder: "#24FFFFFF"
 
     readonly property int barHeight: 46
-    readonly property int bottomRadius: 12
+    readonly property int bottomRadius: 14
     readonly property int iconSize: 20
     readonly property int targetSize: 32
     readonly property int groupGap: 12

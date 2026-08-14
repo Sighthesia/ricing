@@ -41,8 +41,8 @@ Item {
         }
         Column {
             spacing: 0
-            Text { text: root.currentTimeText; color: LazerTheme.textPrimary; font.family: "monospace"; font.pixelSize: 13 }
-            Text { text: root.uptimeText; color: LazerTheme.osuPink; font.family: "monospace"; font.pixelSize: 9 }
+            Text { text: root.currentTimeText; color: "#FFFFFF"; font.family: "monospace"; font.pixelSize: 13 }
+            Text { width: parent.width; horizontalAlignment: Text.AlignLeft; text: root.uptimeText; color: "#FF66AA"; font.family: "monospace"; font.pixelSize: 9 }
         }
     }
 }

@@ -25,7 +25,7 @@ Variants {
         PanelWindow {
             id: leftWindow
             screen: screenScope.modelData
-            color: LazerTheme.bgDark
+            color: "transparent"
             implicitWidth: leftContent.implicitWidth + screenScope.sidePadding * 2
             implicitHeight: LazerTheme.barHeight
             exclusionMode: ExclusionMode.Ignore
@@ -37,7 +37,7 @@ Variants {
         PanelWindow {
             id: utilityWindow
             screen: screenScope.modelData
-            color: LazerTheme.bgDark
+            color: "transparent"
             implicitWidth: utilityContent.implicitWidth + screenScope.sidePadding * 2
             implicitHeight: LazerTheme.barHeight
             exclusionMode: ExclusionMode.Ignore
@@ -54,7 +54,7 @@ Variants {
         PanelWindow {
             id: statusWindow
             screen: screenScope.modelData
-            color: LazerTheme.bgDark
+            color: "transparent"
             implicitWidth: statusContent.implicitWidth + screenScope.sidePadding * 2
             implicitHeight: LazerTheme.barHeight
             exclusionMode: ExclusionMode.Ignore
