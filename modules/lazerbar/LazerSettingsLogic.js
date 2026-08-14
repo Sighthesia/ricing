@@ -20,7 +20,7 @@ function panelWidth(availableWidth) {
         return 0
     width = Math.max(0, width)
     if (width < narrowWidthBreakpoint)
-        return Math.max(0, width - 32)
+        return Math.min(width, Math.max(320, width - 32))
     return Math.round(clamp(width * 0.8, 760, 1040))
 }
 
@@ -30,7 +30,7 @@ function panelHeight(availableHeight) {
         return 0
     height = Math.max(0, height)
     if (height < narrowHeightBreakpoint)
-        return Math.max(0, height - 32)
+        return Math.min(height, Math.max(320, height - 32))
     return Math.round(clamp(height * 0.78, 520, 760))
 }
 
