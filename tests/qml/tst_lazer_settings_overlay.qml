@@ -166,10 +166,14 @@ Item {
             wait(40)
             verify(overlay.progress > 0)
             verify(overlay.progress < closingProgress)
+            var progressBeforeReopen = overlay.progress
             overlay.openFrom(opener, -1)
             compare(overlay.phase, "opening")
-            verify(overlay.progress >= closingProgress)
+            verify(overlay.progress > 0)
+            verify(overlay.progress <= progressBeforeReopen + 0.02)
             compare(overlay.entryDirection, -1)
+            wait(40)
+            verify(overlay.progress > progressBeforeReopen)
             tryCompare(overlay, "phase", "open", 650)
             compare(overlay.progress, 1)
         }
