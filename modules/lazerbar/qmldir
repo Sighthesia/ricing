@@ -25,3 +25,5 @@ LazerSettingsTextField 1.0 LazerSettingsTextField.qml
 LazerSettingsAppearance 1.0 LazerSettingsAppearance.qml
 LazerSettingsBar 1.0 LazerSettingsBar.qml
 LazerSettingsNotifications 1.0 LazerSettingsNotifications.qml
+LazerSettingsNavItem 1.0 LazerSettingsNavItem.qml
+LazerSettingsPanel 1.0 LazerSettingsPanel.qml
