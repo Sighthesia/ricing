@@ -9,3 +9,6 @@ ContextMenu 1.0 ContextMenu.qml
 ModalOverlay 1.0 ModalOverlay.qml
 ClockWidget 1.0 ClockWidget.qml
 UserProfile 1.0 UserProfile.qml
+LeftZone 1.0 LeftZone.qml
+UtilityZone 1.0 UtilityZone.qml
+StatusZone 1.0 StatusZone.qml
