@@ -63,6 +63,12 @@ function visualState(enabled, active, hovered, pressed) {
     return "rest"
 }
 
+function nextOverlay(current, requested) {
+    var active = current == null ? "" : String(current)
+    var target = requested == null ? "" : String(requested)
+    return active === target ? "" : target
+}
+
 function popupOrigin(anchorCenterX, popupWidth, screenWidth) {
     var center = Number(anchorCenterX) || 0
     var width = Math.max(0, Number(popupWidth) || 0)

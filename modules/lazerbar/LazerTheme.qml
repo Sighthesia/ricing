@@ -25,6 +25,16 @@ QtObject {
     readonly property color musicGold: "#FFD000"
     readonly property color musicMuted: "#A0A0A0"
 
+    // Settings overlay surfaces use the same dark glass language as the bar.
+    readonly property color settingsPanel: "#F21D1C22"
+    readonly property color settingsPanelBorder: "#38FFFFFF"
+    readonly property color settingsRail: "#2418171C"
+    readonly property color settingsRow: "#141D1C22"
+    readonly property color settingsRowHover: "#241F2028"
+    readonly property color settingsSelected: "#40FF66AA"
+    readonly property real settingsScrimOpacity: 0.6
+    readonly property int settingsRadius: 16
+
     readonly property int barHeight: 46
     readonly property int bottomRadius: 14
     readonly property int iconSize: 20

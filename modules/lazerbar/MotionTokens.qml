@@ -13,6 +13,12 @@ QtObject {
     readonly property int page: 320
     readonly property int backdropEnter: 120
 
+    // Settings overlay timings remain explicit so the host geometry never animates.
+    readonly property int settingsEnter: 320
+    readonly property int settingsExit: 240
+    readonly property int settingsScrim: 180
+    readonly property int settingsCategory: 160
+
     readonly property var outSoft: [0.22, 1.0, 0.36, 1.0, 1.0, 1.0]
     readonly property var outStd: [0.2, 0.0, 0.0, 1.0, 1.0, 1.0]
     readonly property var inStd: [0.4, 0.0, 1.0, 1.0, 1.0, 1.0]
