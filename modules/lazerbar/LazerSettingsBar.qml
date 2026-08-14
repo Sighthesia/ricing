@@ -17,6 +17,10 @@ Flickable {
 
     function save() { if (root.saveCallback) root.saveCallback() }
 
+    function normalizePosition(value) {
+        return value === "bottom" ? "bottom" : "top"
+    }
+
     // Keep top-bar controls grouped in one vertically scrollable column.
     Column {
         id: pageColumn; width: root.width; spacing: 8
@@ -27,7 +31,7 @@ Flickable {
         }
         LazerSettingsRow {
             width: pageColumn.width - 16; x: 8; labelText: "栏位置"
-            LazerSettingsChoice { id: positionChoiceControl; model: [{ value: "top", label: "顶部" }, { value: "bottom", label: "底部" }]; currentValue: root.settingsObject ? root.settingsObject.position : "top"; onValueSelected: function(value) { if (root.settingsObject && (value === "top" || value === "bottom")) { root.settingsObject.position = value; root.save() } } }
+            LazerSettingsChoice { id: positionChoiceControl; model: [{ value: "top", label: "顶部" }, { value: "bottom", label: "底部" }]; currentValue: root.normalizePosition(root.settingsObject ? root.settingsObject.position : "top"); onValueSelected: function(value) { if (root.settingsObject && (value === "top" || value === "bottom")) { root.settingsObject.position = value; root.save() } } }
         }
         LazerSettingsRow {
             width: pageColumn.width - 16; x: 8; labelText: "浮动模式"

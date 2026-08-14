@@ -28,6 +28,10 @@ Flickable {
             root.saveCallback()
     }
 
+    function normalizeColorScheme(value) {
+        return value === "dark" || value === "light" || value === "auto" ? value : "auto"
+    }
+
     // Keep appearance controls grouped in one vertically scrollable column.
     Column {
         id: pageColumn
@@ -70,7 +74,7 @@ Flickable {
             LazerSettingsChoice {
                 id: colorSchemeChoiceControl
                 model: [{ value: "auto", label: "自动" }, { value: "dark", label: "深色" }, { value: "light", label: "浅色" }]
-                currentValue: root.settingsObject ? root.settingsObject.colorScheme : "auto"
+                currentValue: root.normalizeColorScheme(root.settingsObject ? root.settingsObject.colorScheme : "auto")
                 onValueSelected: function(value) {
                     if (root.settingsObject && (value === "auto" || value === "dark" || value === "light")) {
                         root.settingsObject.colorScheme = value

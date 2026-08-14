@@ -152,6 +152,31 @@ Item {
             compare(notificationSettings.position, "top-right")
         }
 
+        function test_invalidChoiceValuesRecoverWithoutLoadMutation() {
+            saveState.count = 0
+            appearanceSettings.colorScheme = "invalid"
+            barSettings.position = "invalid"
+            notificationSettings.position = "invalid"
+            compare(appearancePage.colorSchemeChoice.currentValue, "auto")
+            compare(appearancePage.colorSchemeChoice.displayLabel, "自动")
+            compare(barPage.positionChoice.currentValue, "top")
+            compare(barPage.positionChoice.displayLabel, "顶部")
+            compare(notificationsPage.positionChoice.currentValue, "top-right")
+            compare(notificationsPage.positionChoice.displayLabel, "右上")
+            compare(saveState.count, 0)
+
+            appearancePage.colorSchemeChoice.selectValue("dark")
+            compare(appearanceSettings.colorScheme, "dark")
+            compare(saveState.count, 1)
+            barPage.positionChoice.selectNext(1)
+            compare(barSettings.position, "bottom")
+            compare(saveState.count, 2)
+            notificationsPage.positionChoice.forceActiveFocus()
+            keyPress(Qt.Key_Left)
+            compare(notificationSettings.position, "top-left")
+            compare(saveState.count, 3)
+        }
+
         function test_dependenciesDisableWithoutChangingValue() {
             appearanceSettings.blurSurfaceOpacity = 0.65
             appearanceSettings.enableBlur = false
