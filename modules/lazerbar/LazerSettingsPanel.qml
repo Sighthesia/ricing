@@ -13,13 +13,13 @@ Item {
     property var wallpaperService: null
     property bool interactive: true
     property string selectedCategory: "appearance"
-    property real availableWidth: width
-    property real availableHeight: height
+    property real availableWidth: 1040
+    property real availableHeight: 760
     readonly property int selectedIndex: categoryIndex(selectedCategory)
     readonly property int contentTransitionDirection: _transitionDirection
     readonly property real panelWidth: Logic.panelWidth(availableWidth)
     readonly property real panelHeight: Logic.panelHeight(availableHeight)
-    readonly property real navigationWidth: Logic.navigationWidth(panelWidth)
+    readonly property real navigationWidth: Logic.navigationWidth(width)
     readonly property real railWidth: navigationWidth
     readonly property int categoryTransitionDuration: 160
     readonly property var contentTransitionEasing: MotionTokens.outSoft
@@ -48,6 +48,7 @@ Item {
     property bool _syncingCategory: false
     property int _lastSelectedIndex: 0
     property bool transitionsEnabled: true
+    property int transitionToken: 0
 
     function categoryIndex(category) {
         return category === "appearance" ? 0 : category === "bar" ? 1 : category === "notifications" ? 2 : -1
@@ -81,6 +82,8 @@ Item {
     function syncPages(previousIndex, nextIndex) {
         var direction = Logic.categoryDirection(previousIndex, nextIndex)
         _transitionDirection = direction
+        transitionToken += 1
+        var token = transitionToken
         var pages = [appearancePage, barPage, notificationPage]
         var incoming = pages[nextIndex]
         transitionsEnabled = false
@@ -93,6 +96,8 @@ Item {
             incoming.opacity = 0
         }
         Qt.callLater(function() {
+            if (token !== root.transitionToken)
+                return
             transitionsEnabled = !MotionTokens.reducedMotion
             for (var j = 0; j < pages.length; j++) {
                 if (j === nextIndex) {
@@ -155,16 +160,19 @@ Item {
     Connections {
         target: MotionTokens
         function onReducedMotionChanged() {
-            if (!MotionTokens.reducedMotion)
-                return
+            transitionToken += 1
             transitionsEnabled = false
-            appearancePage.x = 0
-            barPage.x = 0
-            notificationPage.x = 0
-            Qt.callLater(function() {
-                if (!MotionTokens.reducedMotion)
-                    transitionsEnabled = true
-            })
+            if (MotionTokens.reducedMotion) {
+                appearancePage.x = 0
+                barPage.x = 0
+                notificationPage.x = 0
+                appearancePage.opacity = root.selectedIndex === 0 ? 1 : 0
+                barPage.opacity = root.selectedIndex === 1 ? 1 : 0
+                notificationPage.opacity = root.selectedIndex === 2 ? 1 : 0
+                transitionsEnabled = false
+            } else {
+                transitionsEnabled = true
+            }
         }
     }
 

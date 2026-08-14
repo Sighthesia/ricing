@@ -67,11 +67,11 @@ Item {
         panel.width = 700
         panel.availableWidth = 700
         compare(panel.railWidth, 168)
-        panel.availableWidth = 1000
-        compare(panel.panelWidth, 800)
-        compare(panel.navigationWidth, 216)
-        panel.availableWidth = 700
+        panel.availableWidth = 1200
+        compare(panel.panelWidth, 960)
         compare(panel.navigationWidth, 168)
+        panel.width = 840
+        compare(panel.navigationWidth, 216)
             verify(panel.appearanceNav.selected)
             verify(!panel.barNav.selected)
             verify(!panel.notificationNav.selected)
@@ -178,6 +178,29 @@ Item {
             verify(panel.notificationPage.enabled)
             verify(!panel.appearancePage.activeFocus)
         verify(!panel.barPage.activeFocus)
+    }
+
+    function test_transitionTokenRejectsStaleCallLaterCallbacks() {
+        panel.selectCategory("appearance")
+        panel.selectCategory("bar")
+        panel.selectCategory("notifications")
+        wait(1)
+        verify(panel.barPage.opacity < 1)
+        compare(panel.selectedCategory, "notifications")
+        tryCompare(panel.notificationPage, "opacity", 1, 300)
+        compare(panel.barPage.opacity, 0)
+    }
+
+    function test_reducedMotionCanResumeCrossfade() {
+        Lazer.MotionTokens.reducedMotionOverride = true
+        panel.selectCategory("appearance")
+        compare(panel.appearancePage.x, 0)
+        Lazer.MotionTokens.reducedMotionOverride = false
+        panel.selectCategory("bar")
+        wait(80)
+        verify(panel.barPage.opacity > 0 && panel.barPage.opacity < 1)
+        verify(panel.appearancePage.opacity > 0 && panel.appearancePage.opacity < 1)
+        tryCompare(panel.barPage, "opacity", 1, 300)
     }
 
     function test_escapeClosesFromNavigationCloseButtonAndPage() {
