@@ -17,3 +17,8 @@ TopBar 1.0 TopBar.qml
 OsuTopBarButton 1.0 OsuTopBarButton.qml
 MusicControlButton 1.0 MusicControlButton.qml
 OsuMusicOverlay 1.0 OsuMusicOverlay.qml
+LazerSettingsRow 1.0 LazerSettingsRow.qml
+LazerSettingsToggle 1.0 LazerSettingsToggle.qml
+LazerSettingsSlider 1.0 LazerSettingsSlider.qml
+LazerSettingsChoice 1.0 LazerSettingsChoice.qml
+LazerSettingsTextField 1.0 LazerSettingsTextField.qml
