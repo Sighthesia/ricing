@@ -28,7 +28,7 @@ Variants {
             color: LazerTheme.bgDark
             implicitWidth: leftContent.implicitWidth + screenScope.sidePadding * 2
             implicitHeight: LazerTheme.barHeight
-            exclusiveZone: 0
+            exclusionMode: ExclusionMode.Ignore
             anchors { top: true; left: true }
             LeftZone { id: leftContent; anchors.centerIn: parent }
         }
@@ -40,7 +40,7 @@ Variants {
             color: LazerTheme.bgDark
             implicitWidth: utilityContent.implicitWidth + screenScope.sidePadding * 2
             implicitHeight: LazerTheme.barHeight
-            exclusiveZone: 0
+            exclusionMode: ExclusionMode.Ignore
             anchors { top: true; right: true }
             margins { right: statusWindow.implicitWidth + screenScope.safetyGap }
             UtilityZone {
@@ -57,7 +57,7 @@ Variants {
             color: LazerTheme.bgDark
             implicitWidth: statusContent.implicitWidth + screenScope.sidePadding * 2
             implicitHeight: LazerTheme.barHeight
-            exclusiveZone: 0
+            exclusionMode: ExclusionMode.Ignore
             anchors { top: true; right: true }
             StatusZone {
                 id: statusContent
