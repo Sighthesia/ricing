@@ -1,3 +1,4 @@
 module Afloat.LazerBar
 singleton LazerTheme 1.0 LazerTheme.qml
 singleton MotionTokens 1.0 MotionTokens.qml
+IconButton 1.0 IconButton.qml
