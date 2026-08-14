@@ -12,6 +12,13 @@ Item {
     QtObject { id: choiceHolder; property string value: "auto" }
     QtObject { id: textHolder; property string value: "  wallpaper.png  " }
 
+    // Keep a non-settings child here to verify Row's guarded contract.
+    Lazer.LazerSettingsRow {
+        id: plainRow
+        width: 160
+        Rectangle { width: 20; height: 20 }
+    }
+
     Lazer.LazerSettingsRow {
         id: row
         width: 220
@@ -204,11 +211,26 @@ Item {
             compare(textHolder.value, "")
             compare(clearSpy.count, 1)
             textField.enabled = false
+            textField.focus = false
             textField.commit()
             textField.clear()
             compare(commitSpy.count, 1)
             compare(clearSpy.count, 1)
             compare(textField.activeFocusOnTab, false)
+        }
+
+        function test_textFieldOwnsFocusAndPreservesBinding() {
+            textField.focusEditor()
+            verify(textField.activeFocus)
+            verify(textField.editorItem.activeFocus)
+            textField.editorItem.insert(textField.editorItem.cursorPosition, "typed")
+            compare(textField.text, "  wallpaper.png  typed")
+            textField.commit()
+            compare(textHolder.value, "wallpaper.png  typed")
+            textHolder.value = "external.png"
+            compare(textField.text, "external.png")
+            textField.enabled = false
+            verify(!textField.editorItem.activeFocus)
         }
 
         function test_focusVisibleAndReducedMotion() {
@@ -223,6 +245,7 @@ Item {
             compare(row.controlItem, rowTextField)
             verify(row.controlItem.width > 0)
             verify(row.controlItem.height > 0)
+            compare(row.controlItem.width, row.controlItem.implicitWidth)
             verify(row.labelTextItem.right <= row.controlItem.left)
             verify(row.descriptionTextItem.right <= row.controlItem.left)
             row.enabled = false
@@ -233,6 +256,26 @@ Item {
             compare(choice.activeFocusOnTab, true)
             choice.enabled = false
             compare(choice.activeFocusOnTab, false)
+            compare(plainRow.controlSupportsRowEnabled, false)
+            verify(plainRow.controlItem.width > 0)
+            verify(plainRow.controlItem.height > 0)
+        }
+
+        function test_rowWidthBindingRemainsOwnedByParent() {
+            var holder = Qt.createQmlObject('import QtQuick; QtObject { property real value: 300 }', row)
+            rowTextField.width = Qt.binding(function() { return holder.value })
+            compare(rowTextField.width, 300)
+            holder.value = 180
+            compare(rowTextField.width, 180)
+        }
+
+        function test_sliderReverseTrackMapping() {
+            slider.from = 10
+            slider.to = 0
+            slider.stepSize = 3
+            compare(slider.valueForTrackPosition(0), 10)
+            compare(slider.valueForTrackPosition(slider.trackItem.width), 0)
+            compare(slider.valueForTrackPosition(slider.trackItem.width / 2), 4)
         }
     }
 }

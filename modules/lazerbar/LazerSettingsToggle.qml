@@ -19,6 +19,8 @@ Item {
 
     implicitWidth: 46
     implicitHeight: 26
+    width: implicitWidth
+    height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     activeFocusOnTab: effectiveEnabled
     Accessible.role: Accessible.CheckBox

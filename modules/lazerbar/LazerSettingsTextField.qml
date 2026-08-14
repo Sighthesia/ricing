@@ -1,7 +1,7 @@
 import QtQuick
 
-// Keep text editing isolated from persistence and expose explicit commit actions.
-Item {
+// Keep text editing isolated from persistence and own keyboard focus reliably.
+FocusScope {
     id: root
 
     property alias text: editor.text
@@ -11,19 +11,36 @@ Item {
     property string accessibleName: ""
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property bool focusVisible: editor.activeFocus
+    readonly property Item editorItem: editor
     signal textCommitted(string text)
     signal clearRequested()
 
     implicitWidth: 240
     implicitHeight: 38
+    width: implicitWidth
+    height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     activeFocusOnTab: effectiveEnabled
     Accessible.role: Accessible.EditableText
     Accessible.name: accessibleName
 
+    function focusEditor() {
+        if (effectiveEnabled)
+            editor.forceActiveFocus()
+    }
+
+    onActiveFocusChanged: {
+        if (activeFocus && effectiveEnabled && !editor.activeFocus)
+            editor.forceActiveFocus()
+    }
+
     onEffectiveEnabledChanged: {
-        if (!effectiveEnabled && editor.activeFocus)
-            editor.focus = false
+        if (!effectiveEnabled) {
+            if (editor.activeFocus)
+                editor.focus = false
+            if (activeFocus)
+                focus = false
+        }
     }
 
     function commit() {
@@ -58,6 +75,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         clip: true
         enabled: root.effectiveEnabled
+        focus: root.effectiveEnabled && root.activeFocus
         color: LazerTheme.textPrimary
         selectionColor: LazerTheme.osuPink
         font.pixelSize: 13

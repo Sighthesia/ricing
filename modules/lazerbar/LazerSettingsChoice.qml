@@ -16,6 +16,8 @@ Item {
 
     implicitWidth: 190
     implicitHeight: 36
+    width: implicitWidth
+    height: implicitHeight
     activeFocusOnTab: effectiveEnabled
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     Accessible.role: Accessible.ComboBox

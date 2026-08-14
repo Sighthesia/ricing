@@ -20,6 +20,8 @@ Item {
 
     implicitWidth: 180
     implicitHeight: 36
+    width: implicitWidth
+    height: implicitHeight
     focus: true
     activeFocusOnTab: effectiveEnabled
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
@@ -61,8 +63,6 @@ Item {
         if (track.width <= 0 || from === to)
             return normalized(from)
         var fraction = Math.max(0, Math.min(1, Number(position) / track.width))
-        if (to < from)
-            fraction = 1 - fraction
         return normalized(from + (to - from) * fraction)
     }
 

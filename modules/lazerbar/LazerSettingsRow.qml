@@ -10,6 +10,7 @@ Item {
     readonly property bool contentEnabled: enabled
     default property alias control: controlHost.data
     readonly property Item controlItem: controlHost.data.length > 0 ? controlHost.data[0] : null
+    readonly property bool controlSupportsRowEnabled: controlItem !== null && controlItem.hasOwnProperty("rowEnabled")
 
     implicitWidth: 640
     readonly property real textRegionWidth: textColumn.width
@@ -23,20 +24,8 @@ Item {
         target: root.controlItem
         property: "rowEnabled"
         value: root.enabled
-        when: root.controlItem !== null
+        when: root.controlSupportsRowEnabled
     }
-
-    function ensureControlSize() {
-        if (!controlItem)
-            return
-        if (controlItem.width <= 0)
-            controlItem.width = controlItem.implicitWidth
-        if (controlItem.height <= 0)
-            controlItem.height = controlItem.implicitHeight
-    }
-
-    Component.onCompleted: ensureControlSize()
-    onChildrenChanged: ensureControlSize()
 
     // Paint the quiet grouped row surface.
     Rectangle {
@@ -53,8 +42,7 @@ Item {
         id: textColumn
         anchors.left: parent.left
         anchors.leftMargin: 16
-        anchors.right: controlHost.left
-        anchors.rightMargin: 16
+        width: Math.max(0, controlHost.x - x - 16)
         anchors.verticalCenter: parent.verticalCenter
         spacing: 3
 
