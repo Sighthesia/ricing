@@ -15,6 +15,7 @@ Item {
     readonly property bool focusVisible: activeFocus
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property bool hoverHandlerEnabled: hoverHandler.enabled
+    readonly property bool thumbBehaviorEnabled: thumbBehavior.enabled
 
     implicitWidth: 46
     implicitHeight: 26
@@ -58,6 +59,7 @@ Item {
             color: LazerTheme.textPrimary
 
             Behavior on x {
+                id: thumbBehavior
                 enabled: !MotionTokens.reducedMotion
                 NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
             }

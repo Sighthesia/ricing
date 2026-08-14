@@ -40,6 +40,8 @@ Item {
         var clamped = Math.max(low, Math.min(high, number))
         if (start === end)
             return start
+        if (clamped === start || clamped === end)
+            return clamped
         var direction = end >= start ? 1 : -1
         var steps = Math.round((clamped - start) / (step * direction))
         return Math.max(low, Math.min(high, start + steps * step * direction))
@@ -47,13 +49,22 @@ Item {
 
     function setValue(candidate) {
         var next = normalized(candidate)
-        if (next === displayValue)
+        if (next === Number(value))
             return
         valueModified(next)
     }
 
     function increase() { if (effectiveEnabled) setValue(displayValue + stepSize) }
     function decrease() { if (effectiveEnabled) setValue(displayValue - stepSize) }
+
+    function valueForTrackPosition(position) {
+        if (track.width <= 0 || from === to)
+            return normalized(from)
+        var fraction = Math.max(0, Math.min(1, Number(position) / track.width))
+        if (to < from)
+            fraction = 1 - fraction
+        return normalized(from + (to - from) * fraction)
+    }
 
     Keys.onPressed: event => {
         if (!root.effectiveEnabled)
@@ -122,12 +133,7 @@ Item {
         parent: track
         enabled: root.effectiveEnabled
         onTapped: point => {
-            if (track.width <= 0 || root.from === root.to)
-                return
-            var fraction = Math.max(0, Math.min(1, point.position.x / track.width))
-            if (root.to < root.from)
-                fraction = 1 - fraction
-            root.setValue(root.from + (root.to - root.from) * fraction)
+            root.setValue(root.valueForTrackPosition(point.position.x))
         }
     }
 

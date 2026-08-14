@@ -20,7 +20,6 @@ Item {
         Lazer.LazerSettingsTextField {
             id: rowTextField
             text: textHolder.value
-            rowEnabled: row.contentEnabled
             onTextCommitted: next => textHolder.value = next
             onClearRequested: textHolder.value = ""
         }
@@ -138,9 +137,12 @@ Item {
         function test_sliderSafeRangesAndReducedMotion() {
             slider.from = 10
             slider.to = 0
+            slider.stepSize = 3
             sliderHolder.value = 9
-            compare(slider.displayValue, 8)
-            verify(slider.normalizedFraction > 0)
+            compare(slider.displayValue, 10)
+            compare(slider.normalizedFraction, 0)
+            compare(slider.normalized(0), 0)
+            compare(slider.normalized(9), 10)
             slider.setValue(10)
             compare(sliderHolder.value, 10)
             slider.setValue(0)
@@ -149,6 +151,8 @@ Item {
             slider.to = 4
             sliderHolder.value = 4
             compare(slider.normalizedFraction, 0)
+            compare(slider.valueForTrackPosition(0), 4)
+            compare(slider.valueForTrackPosition(slider.trackItem.width), 4)
             var beforeEqualRange = sliderSpy.count
             slider.setValue(4)
             compare(sliderSpy.count, beforeEqualRange)
@@ -161,6 +165,11 @@ Item {
             choice.selectValue("missing")
             compare(choiceHolder.value, "auto")
             compare(choiceSpy.count, 0)
+            choiceHolder.value = "missing"
+            compare(choice.displayLabel, "")
+            choice.selectNext(1)
+            compare(choiceSpy.count, 0)
+            choiceHolder.value = "auto"
             choice.selectValue("dark")
             compare(choiceHolder.value, "dark")
             compare(choiceSpy.count, 1)
@@ -212,6 +221,8 @@ Item {
         function test_rowHasMinimumHeightAndDefaultControl() {
             verify(row.implicitHeight >= 56)
             compare(row.controlItem, rowTextField)
+            verify(row.controlItem.width > 0)
+            verify(row.controlItem.height > 0)
             verify(row.labelTextItem.right <= row.controlItem.left)
             verify(row.descriptionTextItem.right <= row.controlItem.left)
             row.enabled = false
@@ -219,6 +230,9 @@ Item {
             compare(row.contentEnabled, false)
             compare(rowTextField.rowEnabled, false)
             compare(rowTextField.activeFocusOnTab, false)
+            compare(choice.activeFocusOnTab, true)
+            choice.enabled = false
+            compare(choice.activeFocusOnTab, false)
         }
     }
 }

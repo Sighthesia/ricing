@@ -22,8 +22,8 @@ Item {
     Accessible.name: accessibleName
 
     onEffectiveEnabledChanged: {
-        if (!effectiveEnabled && activeFocus)
-            focus = false
+        if (!effectiveEnabled && editor.activeFocus)
+            editor.focus = false
     }
 
     function commit() {

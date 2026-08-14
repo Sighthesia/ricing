@@ -18,6 +18,26 @@ Item {
     height: implicitHeight
     opacity: root.enabled ? 1 : MotionTokens.disabledOpacity
 
+    // Propagate availability to the single injected control.
+    Binding {
+        target: root.controlItem
+        property: "rowEnabled"
+        value: root.enabled
+        when: root.controlItem !== null
+    }
+
+    function ensureControlSize() {
+        if (!controlItem)
+            return
+        if (controlItem.width <= 0)
+            controlItem.width = controlItem.implicitWidth
+        if (controlItem.height <= 0)
+            controlItem.height = controlItem.implicitHeight
+    }
+
+    Component.onCompleted: ensureControlSize()
+    onChildrenChanged: ensureControlSize()
+
     // Paint the quiet grouped row surface.
     Rectangle {
         id: surface
