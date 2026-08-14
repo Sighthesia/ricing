@@ -15,6 +15,7 @@ Item {
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
     readonly property bool effectiveEnabled: enabled && rowEnabled
+    readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property real displayValue: normalized(value)
     readonly property string displayText: Number(displayValue).toLocaleString(Qt.locale(), 'f', 0) + suffix
     readonly property bool focusVisible: activeFocus
@@ -22,7 +23,7 @@ Item {
 
     implicitWidth: 180
     implicitHeight: 36
-    width: Math.min(Math.max(0, requestedWidth), availableWidth)
+    width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     focus: true
     activeFocusOnTab: effectiveEnabled
@@ -113,11 +114,11 @@ Item {
         }
     }
 
-    Text {
+        Text {
         id: valueLabel
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        width: 48
+        width: Math.min(48, Math.max(0, root.width))
         horizontalAlignment: Text.AlignRight
         text: root.displayText
         color: LazerTheme.textPrimary

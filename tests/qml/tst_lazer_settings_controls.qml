@@ -70,6 +70,9 @@ Item {
         onTextCommitted: next => textHolder.value = next
         onClearRequested: textHolder.value = ""
     }
+    Lazer.LazerSettingsTextField { id: secondTextField; text: "second" }
+    Lazer.LazerSettingsToggle { id: invalidWidthToggle; availableWidth: -20 }
+    Lazer.LazerSettingsSlider { id: invalidWidthSlider; availableWidth: NaN }
 
     SignalSpy { id: toggleSpy; target: toggle; signalName: "toggled" }
     SignalSpy { id: sliderSpy; target: slider; signalName: "valueModified" }
@@ -88,6 +91,7 @@ Item {
             slider.from = 0
             slider.to = 10
             slider.stepSize = 2
+            slider.requestedWidth = slider.implicitWidth
             sliderHolder.value = 4
             sliderSpy.clear()
             choice.enabled = true
@@ -230,9 +234,12 @@ Item {
         }
 
         function test_textFieldOwnsFocusAndPreservesBinding() {
+            verify(!textField.activeFocus)
+            verify(!secondTextField.activeFocus)
             textField.focusEditor()
             verify(textField.activeFocus)
             verify(textField.editorItem.activeFocus)
+            verify(!secondTextField.editorItem.activeFocus)
             textField.editorItem.insert(textField.editorItem.cursorPosition, "typed")
             compare(textField.text, "  wallpaper.png  ")
             compare(textField.editorItem.text, "  wallpaper.png  typed")
@@ -250,6 +257,15 @@ Item {
             compare(textField.text, "external.png")
             textField.enabled = false
             verify(!textField.editorItem.activeFocus)
+        }
+
+        function test_invalidAvailableWidthsStaySafe() {
+            verify(invalidWidthToggle.width >= 0)
+            verify(isFinite(invalidWidthToggle.width))
+            verify(invalidWidthSlider.width >= 0)
+            verify(isFinite(invalidWidthSlider.width))
+            slider.requestedWidth = 0
+            verify(slider.trackItem.width >= 0)
         }
 
         function test_focusVisibleAndReducedMotion() {

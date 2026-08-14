@@ -12,6 +12,7 @@ FocusScope {
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
     readonly property bool effectiveEnabled: enabled && rowEnabled
+    readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property bool focusVisible: editor.activeFocus
     readonly property Item editorItem: editor
     property bool syncingEditor: false
@@ -22,7 +23,7 @@ FocusScope {
 
     implicitWidth: 240
     implicitHeight: 38
-    width: Math.min(Math.max(0, requestedWidth), availableWidth)
+    width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     activeFocusOnTab: effectiveEnabled
@@ -63,6 +64,10 @@ FocusScope {
                 editor.focus = false
             if (activeFocus)
                 focus = false
+            if (pendingExternalText) {
+                pendingExternalText = false
+                syncEditorFromText()
+            }
         }
     }
 
@@ -109,11 +114,16 @@ FocusScope {
         anchors.verticalCenter: parent.verticalCenter
         clip: true
         enabled: root.effectiveEnabled
-        focus: true
         color: LazerTheme.textPrimary
         selectionColor: LazerTheme.osuPink
         font.pixelSize: 13
         onAccepted: root.commit()
+        onActiveFocusChanged: {
+            if (!activeFocus && root.pendingExternalText) {
+                root.pendingExternalText = false
+                root.syncEditorFromText()
+            }
+        }
     }
 
     Text {

@@ -12,13 +12,14 @@ Item {
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
     readonly property bool effectiveEnabled: enabled && rowEnabled
+    readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property string displayLabel: labelFor(currentValue)
     readonly property bool focusVisible: activeFocus
     signal valueSelected(string value)
 
     implicitWidth: 190
     implicitHeight: 36
-    width: Math.min(Math.max(0, requestedWidth), availableWidth)
+    width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     activeFocusOnTab: effectiveEnabled
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity

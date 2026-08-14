@@ -16,12 +16,13 @@ Item {
     readonly property bool pressed: tapHandler.pressed
     readonly property bool focusVisible: activeFocus
     readonly property bool effectiveEnabled: enabled && rowEnabled
+    readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property bool hoverHandlerEnabled: hoverHandler.enabled
     readonly property bool thumbBehaviorEnabled: thumbBehavior.enabled
 
     implicitWidth: 46
     implicitHeight: 26
-    width: Math.min(Math.max(0, requestedWidth), availableWidth)
+    width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     activeFocusOnTab: effectiveEnabled
