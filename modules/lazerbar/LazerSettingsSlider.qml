@@ -59,6 +59,11 @@ Item {
     function increase() { if (effectiveEnabled) setValue(displayValue + stepSize) }
     function decrease() { if (effectiveEnabled) setValue(displayValue - stepSize) }
 
+    function moveAlongTrack(delta) {
+        if (effectiveEnabled)
+            setValue(displayValue + (to >= from ? stepSize : -stepSize) * delta)
+    }
+
     function valueForTrackPosition(position) {
         if (track.width <= 0 || from === to)
             return normalized(from)
@@ -70,10 +75,10 @@ Item {
         if (!root.effectiveEnabled)
             return
         if (event.key === Qt.Key_Left) {
-            decrease()
+            moveAlongTrack(-1)
             event.accepted = true
         } else if (event.key === Qt.Key_Right) {
-            increase()
+            moveAlongTrack(1)
             event.accepted = true
         }
     }

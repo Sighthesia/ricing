@@ -4,7 +4,7 @@ import QtQuick
 FocusScope {
     id: root
 
-    property alias text: editor.text
+    property string text: ""
     property string placeholderText: ""
     property bool enabled: true
     property bool rowEnabled: true
@@ -12,6 +12,7 @@ FocusScope {
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property bool focusVisible: editor.activeFocus
     readonly property Item editorItem: editor
+    property bool syncingEditor: false
     signal textCommitted(string text)
     signal clearRequested()
 
@@ -28,6 +29,17 @@ FocusScope {
         if (effectiveEnabled)
             editor.forceActiveFocus()
     }
+
+    function syncEditorFromText() {
+        if (syncingEditor || editor.text === root.text)
+            return
+        syncingEditor = true
+        editor.text = root.text
+        syncingEditor = false
+    }
+
+    onTextChanged: syncEditorFromText()
+    Component.onCompleted: syncEditorFromText()
 
     onActiveFocusChanged: {
         if (activeFocus && effectiveEnabled && !editor.activeFocus)

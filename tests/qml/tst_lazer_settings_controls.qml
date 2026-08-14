@@ -232,7 +232,8 @@ Item {
             verify(textField.activeFocus)
             verify(textField.editorItem.activeFocus)
             textField.editorItem.insert(textField.editorItem.cursorPosition, "typed")
-            compare(textField.text, "  wallpaper.png  typed")
+            compare(textField.text, "  wallpaper.png  ")
+            compare(textField.editorItem.text, "  wallpaper.png  typed")
             textField.commit()
             compare(textHolder.value, "wallpaper.png  typed")
             textHolder.value = "external.png"
@@ -292,6 +293,12 @@ Item {
             slider.from = 10
             slider.to = 0
             slider.stepSize = 3
+            sliderHolder.value = 10
+            slider.forceActiveFocus()
+            keyPress(Qt.Key_Right)
+            compare(sliderHolder.value, 7)
+            keyPress(Qt.Key_Left)
+            compare(sliderHolder.value, 10)
             compare(slider.valueForTrackPosition(0), 10)
             compare(slider.valueForTrackPosition(slider.trackItem.width), 0)
             compare(slider.valueForTrackPosition(slider.trackItem.width / 2), 4)

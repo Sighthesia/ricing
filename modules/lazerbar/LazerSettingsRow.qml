@@ -78,8 +78,13 @@ Item {
         y: compactLayout ? textColumn.y + textColumn.height + 12 : Math.max(16, (root.height - height) / 2)
         width: compactLayout
                ? Math.max(0, root.width - 32)
-               : Math.min(controlItem ? controlItem.implicitWidth : 0, Math.max(0, root.width - 32))
-        height: controlItem ? controlItem.implicitHeight : 0
+               : Math.min(controlItem && controlItem.width > 0
+                          ? controlItem.width
+                          : (controlItem ? controlItem.implicitWidth : 0),
+                          Math.max(0, root.width - 32))
+        height: controlItem && controlItem.height > 0
+                ? controlItem.height
+                : (controlItem ? controlItem.implicitHeight : 0)
     }
 
     HoverHandler { id: rowHover; enabled: root.enabled }
