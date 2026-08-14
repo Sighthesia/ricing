@@ -12,3 +12,5 @@ UserProfile 1.0 UserProfile.qml
 LeftZone 1.0 LeftZone.qml
 UtilityZone 1.0 UtilityZone.qml
 StatusZone 1.0 StatusZone.qml
+BarBackground 1.0 BarBackground.qml
+TopBar 1.0 TopBar.qml

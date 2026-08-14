@@ -4,7 +4,7 @@ import "../../modules/lazerbar" as Lazer
 
 // Verify uptime formatting and profile fallback behavior.
 Item {
-    Lazer.ClockWidget { id: clock; testMode: true }
+    Lazer.ClockWidget { id: clock; testMode: true; enableSystemUptime: false }
     Lazer.UserProfile { id: profile }
     TestCase {
         name: "LazerStatusWidgets"

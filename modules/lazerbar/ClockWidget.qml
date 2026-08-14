@@ -6,6 +6,7 @@ Item {
     id: root
     property bool testMode: false
     property string testUptimeText: ""
+    property bool enableSystemUptime: true
     property string currentTimeText: "00:00:00"
     property string uptimeText: "已运行 --:--:--"
     implicitWidth: content.implicitWidth
@@ -18,15 +19,14 @@ Item {
     function refresh() {
         currentTimeText = Qt.formatTime(new Date(), "hh:mm:ss")
         if (testMode) applyUptime(testUptimeText)
-        else {
-            var request = new XMLHttpRequest()
-            request.onreadystatechange = function() {
-                if (request.readyState === XMLHttpRequest.DONE)
-                    root.applyUptime(request.status === 0 || request.status === 200 ? request.responseText : "")
-            }
-            request.open("GET", "file:///proc/uptime")
-            request.send()
-        }
+        else if (uptimeReader.item) uptimeReader.item.reload()
+    }
+
+    Loader {
+        id: uptimeReader
+        active: root.enableSystemUptime && !root.testMode
+        source: "UptimeReader.qml"
+        onLoaded: item.loaded.connect(root.applyUptime)
     }
     Timer { interval: 1000; repeat: true; running: true; triggeredOnStart: true; onTriggered: root.refresh() }
 
