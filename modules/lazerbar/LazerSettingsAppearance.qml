@@ -1,18 +1,18 @@
 import QtQuick
-import "../../services" as Services
 
 // Present the supported appearance settings in a scrollable category page.
 Flickable {
     id: root
-    property var settingsObject: Services.SettingsService.appearance
-    property var saveCallback: function() { Services.SettingsService.save() }
-    property var wallpaperService: Services.WallpaperService
+    property var settingsObject: null
+    property var saveCallback: null
+    property var wallpaperService: null
     property string title: "外观"
     property alias wallpaperField: wallpaperFieldControl
     property alias colorSchemeChoice: colorSchemeChoiceControl
     property alias panelOpacitySlider: panelOpacitySliderControl
     property alias enableBlurToggle: enableBlurToggleControl
     property alias blurSurfaceOpacitySlider: blurSurfaceOpacitySliderControl
+    property alias blurSurfaceSlider: blurSurfaceOpacitySliderControl
     property alias glassHighlightIntensitySlider: glassHighlightIntensitySliderControl
     property alias glassGlowIntensitySlider: glassGlowIntensitySliderControl
     property alias glassThemeAdaptiveToggle: glassThemeAdaptiveToggleControl

@@ -1,11 +1,10 @@
 import QtQuick
-import "../../services" as Services
 
 // Present the supported notification settings in a scrollable category page.
 Flickable {
     id: root
-    property var settingsObject: Services.SettingsService.notifications
-    property var saveCallback: function() { Services.SettingsService.save() }
+    property var settingsObject: null
+    property var saveCallback: null
     property string title: "通知"
     property alias dndToggle: dndToggleControl
     property alias maxVisibleSlider: maxVisibleSliderControl

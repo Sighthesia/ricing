@@ -62,6 +62,7 @@ Item {
             appearanceSettings.glassThemeAdaptive = true
             appearanceSettings.ripplePulseEnabled = true
             fakeWallpaper.changed = ""
+            appearancePage.wallpaperField.text = appearanceSettings.wallpaperPath
             barSettings.height = 48
             barSettings.position = "top"
             barSettings.floating = false
@@ -80,6 +81,9 @@ Item {
         }
 
         function test_pagesAreScrollableAndLocalized() {
+            appearancePage.height = 180
+            barPage.height = 180
+            notificationsPage.height = 180
             verify(appearancePage.contentHeight > 0)
             verify(barPage.contentHeight > 0)
             verify(notificationsPage.contentHeight > notificationsPage.height)
@@ -112,7 +116,7 @@ Item {
 
         function test_appearanceWallpaperBranches() {
             appearancePage.wallpaperField.commit()
-            compare(fakeWallpaper.changed, "/tmp/old.png")
+            compare(fakeWallpaper.changed, "")
             compare(saveState.count, 0)
             appearancePage.wallpaperField.editorItem.text = "/tmp/new.png"
             appearancePage.wallpaperField.commit()

@@ -1,11 +1,10 @@
 import QtQuick
-import "../../services" as Services
 
 // Present the supported top-bar settings in a scrollable category page.
 Flickable {
     id: root
-    property var settingsObject: Services.SettingsService.bar
-    property var saveCallback: function() { Services.SettingsService.save() }
+    property var settingsObject: null
+    property var saveCallback: null
     property string title: "顶部栏"
     property alias heightSlider: heightSliderControl
     property alias positionChoice: positionChoiceControl
