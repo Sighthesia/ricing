@@ -11,11 +11,14 @@ Item {
     default property alias control: controlHost.data
     readonly property Item controlItem: controlHost.data.length > 0 ? controlHost.data[0] : null
     readonly property bool controlSupportsRowEnabled: controlItem !== null && controlItem.hasOwnProperty("rowEnabled")
+    readonly property bool compactLayout: width < 480
 
     implicitWidth: 640
     readonly property real textRegionWidth: textColumn.width
     readonly property real controlRegionLeft: controlHost.x
-    implicitHeight: Math.max(56, textColumn.implicitHeight + 24)
+    implicitHeight: compactLayout
+                   ? 16 + textColumn.implicitHeight + 12 + controlHost.height + 16
+                   : Math.max(56, Math.max(textColumn.implicitHeight, controlHost.height) + 32)
     height: implicitHeight
     opacity: root.enabled ? 1 : MotionTokens.disabledOpacity
 
@@ -40,10 +43,11 @@ Item {
     // Present the setting copy without coupling it to a service.
     Column {
         id: textColumn
-        anchors.left: parent.left
-        anchors.leftMargin: 16
-        width: Math.max(0, controlHost.x - x - 16)
-        anchors.verticalCenter: parent.verticalCenter
+        x: 16
+        y: compactLayout ? 16 : Math.max(16, (root.height - height) / 2)
+        width: compactLayout
+               ? Math.max(0, root.width - 32)
+               : Math.max(0, controlHost.x - x - 16)
         spacing: 3
 
         Text {
@@ -70,11 +74,12 @@ Item {
     // Reserve the right edge for the caller-provided control.
     Item {
         id: controlHost
-        anchors.right: parent.right
-        anchors.rightMargin: 16
-        anchors.verticalCenter: parent.verticalCenter
-        implicitWidth: childrenRect.width
-        implicitHeight: childrenRect.height
+        x: compactLayout ? 16 : root.width - width - 16
+        y: compactLayout ? textColumn.y + textColumn.height + 12 : Math.max(16, (root.height - height) / 2)
+        width: compactLayout
+               ? Math.max(0, root.width - 32)
+               : Math.min(controlItem ? controlItem.implicitWidth : 0, Math.max(0, root.width - 32))
+        height: controlItem ? controlItem.implicitHeight : 0
     }
 
     HoverHandler { id: rowHover; enabled: root.enabled }

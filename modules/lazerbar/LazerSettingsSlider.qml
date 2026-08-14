@@ -20,7 +20,7 @@ Item {
 
     implicitWidth: 180
     implicitHeight: 36
-    width: implicitWidth
+    width: parent && parent.width > 0 ? Math.min(implicitWidth, parent.width) : implicitWidth
     height: implicitHeight
     focus: true
     activeFocusOnTab: effectiveEnabled

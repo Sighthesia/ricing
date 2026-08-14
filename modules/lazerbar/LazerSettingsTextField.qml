@@ -17,7 +17,7 @@ FocusScope {
 
     implicitWidth: 240
     implicitHeight: 38
-    width: implicitWidth
+    width: parent && parent.width > 0 ? Math.min(implicitWidth, parent.width) : implicitWidth
     height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     activeFocusOnTab: effectiveEnabled
@@ -75,7 +75,7 @@ FocusScope {
         anchors.verticalCenter: parent.verticalCenter
         clip: true
         enabled: root.effectiveEnabled
-        focus: root.effectiveEnabled && root.activeFocus
+        focus: true
         color: LazerTheme.textPrimary
         selectionColor: LazerTheme.osuPink
         font.pixelSize: 13

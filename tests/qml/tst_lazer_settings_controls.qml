@@ -21,11 +21,19 @@ Item {
 
     Lazer.LazerSettingsRow {
         id: row
-        width: 220
+        width: 520
         labelText: "设置"
         descriptionText: "这是一段很长的中文说明，用于验证窄宽布局不会和右侧控件重叠。"
+        Lazer.LazerSettingsToggle { id: rowToggle }
+    }
+
+    Lazer.LazerSettingsRow {
+        id: compactRow
+        width: 220
+        labelText: "窄屏设置"
+        descriptionText: "紧凑布局说明"
         Lazer.LazerSettingsTextField {
-            id: rowTextField
+            id: compactTextField
             text: textHolder.value
             onTextCommitted: next => textHolder.value = next
             onClearRequested: textHolder.value = ""
@@ -242,31 +250,42 @@ Item {
 
         function test_rowHasMinimumHeightAndDefaultControl() {
             verify(row.implicitHeight >= 56)
-            compare(row.controlItem, rowTextField)
+            compare(row.compactLayout, false)
+            compare(row.controlItem, rowToggle)
+            verify(row.textRegionWidth > 0)
             verify(row.controlItem.width > 0)
             verify(row.controlItem.height > 0)
-            compare(row.controlItem.width, row.controlItem.implicitWidth)
+            verify(row.controlItem.x >= 0)
+            verify(row.controlItem.x + row.controlItem.width <= row.width - 16)
             verify(row.labelTextItem.right <= row.controlItem.left)
             verify(row.descriptionTextItem.right <= row.controlItem.left)
             row.enabled = false
             compare(row.opacity, Lazer.MotionTokens.disabledOpacity)
             compare(row.contentEnabled, false)
-            compare(rowTextField.rowEnabled, false)
-            compare(rowTextField.activeFocusOnTab, false)
+            compare(rowToggle.rowEnabled, false)
             compare(choice.activeFocusOnTab, true)
             choice.enabled = false
             compare(choice.activeFocusOnTab, false)
             compare(plainRow.controlSupportsRowEnabled, false)
-            verify(plainRow.controlItem.width > 0)
-            verify(plainRow.controlItem.height > 0)
+        }
+
+        function test_compactRowStacksTextAndControl() {
+            compare(compactRow.compactLayout, true)
+            verify(compactRow.textRegionWidth > 0)
+            verify(compactTextField.width <= 188)
+            verify(compactTextField.x >= 0)
+            verify(compactTextField.x + compactTextField.width <= compactRow.width - 16)
+            verify(compactRow.labelTextItem.bottom <= compactTextField.top)
+            verify(compactRow.descriptionTextItem.bottom <= compactTextField.top)
+            verify(compactRow.height >= compactRow.implicitHeight)
         }
 
         function test_rowWidthBindingRemainsOwnedByParent() {
             var holder = Qt.createQmlObject('import QtQuick; QtObject { property real value: 300 }', row)
-            rowTextField.width = Qt.binding(function() { return holder.value })
-            compare(rowTextField.width, 300)
+            rowToggle.width = Qt.binding(function() { return holder.value })
+            compare(rowToggle.width, 300)
             holder.value = 180
-            compare(rowTextField.width, 180)
+            compare(rowToggle.width, 180)
         }
 
         function test_sliderReverseTrackMapping() {

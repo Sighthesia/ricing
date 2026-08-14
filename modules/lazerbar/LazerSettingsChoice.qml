@@ -16,7 +16,7 @@ Item {
 
     implicitWidth: 190
     implicitHeight: 36
-    width: implicitWidth
+    width: parent && parent.width > 0 ? Math.min(implicitWidth, parent.width) : implicitWidth
     height: implicitHeight
     activeFocusOnTab: effectiveEnabled
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
