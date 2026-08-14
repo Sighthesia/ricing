@@ -35,6 +35,8 @@ Item {
             panel.selectedCategory = "appearance"
             panel.width = 840
             panel.height = 560
+            panel.availableWidth = 840
+            panel.availableHeight = 560
             panel.appearancePage.contentY = 0
             panel.barPage.contentY = 0
             panel.notificationPage.contentY = 0
@@ -57,13 +59,19 @@ Item {
             compare(panel.appearancePage.saveCallback, saveService.save)
         }
 
-        function test_sizesRailAndUsesOneIndicator() {
+    function test_sizesRailAndUsesOneIndicator() {
             compare(panel.selectedIndex, 0)
             compare(panel.navigationWidth, panel.railWidth)
             compare(panel.railWidth, 216)
             compare(panel.indicatorCount, 1)
-            panel.width = 700
-            compare(panel.railWidth, 168)
+        panel.width = 700
+        panel.availableWidth = 700
+        compare(panel.railWidth, 168)
+        panel.availableWidth = 1000
+        compare(panel.panelWidth, 800)
+        compare(panel.navigationWidth, 216)
+        panel.availableWidth = 700
+        compare(panel.navigationWidth, 168)
             verify(panel.appearanceNav.selected)
             verify(!panel.barNav.selected)
             verify(!panel.notificationNav.selected)
@@ -101,17 +109,21 @@ Item {
             compare(closeSpy.count, 1)
         }
 
-        function test_crossfadeUsesReducedMotionOnlyForTranslation() {
-            panel.selectCategory("bar")
-            wait(80)
-            verify(panel.barPage.opacity > 0 && panel.appearancePage.opacity < 1)
+    function test_crossfadeUsesReducedMotionOnlyForTranslation() {
+        panel.selectedCategory = "appearance"
+        panel.syncPages(0, 0)
+        panel.selectCategory("bar")
+        wait(80)
+        verify(panel.barPage.opacity > 0 && panel.appearancePage.opacity < 1)
+        verify(panel.barPage.x > 0 && panel.barPage.x < 8)
             tryCompare(panel.appearancePage, "opacity", 0, 300)
             Lazer.MotionTokens.reducedMotionOverride = true
             panel.selectCategory("notifications")
             compare(panel.notificationPage.x, 0)
             compare(panel.categoryTransitionDuration, 160)
-            compare(panel.contentTransitionEasing, Lazer.MotionTokens.outSoft)
-        }
+        compare(panel.contentTransitionEasing, Lazer.MotionTokens.outSoft)
+        compare(panel.indicator.y, panel.contentTop + 14 + panel.selectedIndex * 48)
+    }
 
         function test_ownedStringContractAndInvalidDirectAssignmentRecovery() {
             panel.selectCategory("notifications")
@@ -156,7 +168,7 @@ Item {
             verify(panel.currentNav.activeFocus)
         }
 
-        function test_fastRetargetEndsAtLatestCategoryAndHiddenPagesAreInactive() {
+    function test_fastRetargetEndsAtLatestCategoryAndHiddenPagesAreInactive() {
             panel.selectCategory("bar")
             panel.selectCategory("notifications")
             tryCompare(panel, "selectedCategory", "notifications", 300)
@@ -165,7 +177,31 @@ Item {
             verify(!panel.barPage.enabled)
             verify(panel.notificationPage.enabled)
             verify(!panel.appearancePage.activeFocus)
-            verify(!panel.barPage.activeFocus)
-        }
+        verify(!panel.barPage.activeFocus)
     }
+
+    function test_escapeClosesFromNavigationCloseButtonAndPage() {
+        panel.focusNavigation()
+        closeSpy.clear()
+        keyPress(Qt.Key_Escape)
+        compare(closeSpy.count, 1)
+        panel.closeButton.forceActiveFocus()
+        keyPress(Qt.Key_Escape)
+        compare(closeSpy.count, 2)
+        panel.appearancePage.forceActiveFocus()
+        keyPress(Qt.Key_Escape)
+        compare(closeSpy.count, 3)
+    }
+
+    function test_indicatorBindingFollowsCategoryWhenReducedMotionChanges() {
+        Lazer.MotionTokens.reducedMotionOverride = true
+        panel.selectCategory("notifications")
+        compare(panel.indicator.y, panel.contentTop + 14 + 2 * 48)
+        compare(panel.appearancePage.x, 0)
+        compare(panel.barPage.x, 0)
+        compare(panel.notificationPage.x, 0)
+        panel.selectCategory("appearance")
+        compare(panel.indicator.y, panel.contentTop + 14)
+    }
+}
 }

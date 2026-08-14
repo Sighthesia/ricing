@@ -19,7 +19,7 @@ Item {
     readonly property int contentTransitionDirection: _transitionDirection
     readonly property real panelWidth: Logic.panelWidth(availableWidth)
     readonly property real panelHeight: Logic.panelHeight(availableHeight)
-    readonly property real navigationWidth: Logic.navigationWidth(width)
+    readonly property real navigationWidth: Logic.navigationWidth(panelWidth)
     readonly property real railWidth: navigationWidth
     readonly property int categoryTransitionDuration: 160
     readonly property var contentTransitionEasing: MotionTokens.outSoft
@@ -36,6 +36,7 @@ Item {
     property alias barNav: barNav
     property alias notificationNav: notificationNav
     property alias closeButton: closeButton
+    property alias indicator: indicator
 
     implicitWidth: panelWidth
     implicitHeight: panelHeight
@@ -46,6 +47,7 @@ Item {
     property int _transitionDirection: 0
     property bool _syncingCategory: false
     property int _lastSelectedIndex: 0
+    property bool transitionsEnabled: true
 
     function categoryIndex(category) {
         return category === "appearance" ? 0 : category === "bar" ? 1 : category === "notifications" ? 2 : -1
@@ -79,22 +81,33 @@ Item {
     function syncPages(previousIndex, nextIndex) {
         var direction = Logic.categoryDirection(previousIndex, nextIndex)
         _transitionDirection = direction
-        setPageState(appearancePage, 0, nextIndex, direction)
-        setPageState(barPage, 1, nextIndex, direction)
-        setPageState(notificationPage, 2, nextIndex, direction)
-    }
-
-    function setPageState(page, index, nextIndex, direction) {
-        var active = index === nextIndex
-        page.enabled = active && root.interactive
-        page.activeFocusOnTab = page.enabled
-        if (active) {
-            page.opacity = 1
-            page.x = 0
-        } else {
-            page.opacity = 0
-            page.x = MotionTokens.reducedMotion ? 0 : (direction >= 0 ? -8 : 8)
+        var pages = [appearancePage, barPage, notificationPage]
+        var incoming = pages[nextIndex]
+        transitionsEnabled = false
+        for (var i = 0; i < pages.length; i++) {
+            pages[i].enabled = i === nextIndex && root.interactive
+            pages[i].activeFocusOnTab = pages[i].enabled
         }
+        if (incoming.opacity <= 0) {
+            incoming.x = MotionTokens.reducedMotion ? 0 : direction * 8
+            incoming.opacity = 0
+        }
+        Qt.callLater(function() {
+            transitionsEnabled = !MotionTokens.reducedMotion
+            for (var j = 0; j < pages.length; j++) {
+                if (j === nextIndex) {
+                    pages[j].x = 0
+                    pages[j].opacity = 1
+                } else if (j === previousIndex && pages[j].opacity > 0) {
+                    pages[j].x = MotionTokens.reducedMotion ? 0 : -direction * 8
+                    pages[j].opacity = 0
+                } else {
+                    pages[j].opacity = 0
+                    if (MotionTokens.reducedMotion)
+                        pages[j].x = 0
+                }
+            }
+        })
     }
 
     function focusNavigation() {
@@ -144,10 +157,14 @@ Item {
         function onReducedMotionChanged() {
             if (!MotionTokens.reducedMotion)
                 return
+            transitionsEnabled = false
             appearancePage.x = 0
             barPage.x = 0
             notificationPage.x = 0
-            indicator.y = root.contentTop + 10 + root.selectedIndex * 48
+            Qt.callLater(function() {
+                if (!MotionTokens.reducedMotion)
+                    transitionsEnabled = true
+            })
         }
     }
 
@@ -228,8 +245,8 @@ Item {
             saveCallback: root.saveCallback
             wallpaperService: root.wallpaperService
             opacity: 0
-            Behavior on opacity { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-            Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            Behavior on x { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
         }
 
         // Persist the bar page so its scroll position survives navigation.
@@ -240,8 +257,8 @@ Item {
             settingsObject: root.barSettings
             saveCallback: root.saveCallback
             opacity: 0
-            Behavior on opacity { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-            Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            Behavior on x { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
         }
 
         // Persist the notification page so its scroll position survives navigation.
@@ -252,8 +269,8 @@ Item {
             settingsObject: root.notificationSettings
             saveCallback: root.saveCallback
             opacity: 0
-            Behavior on opacity { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-            Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            Behavior on x { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
         }
     }
 
@@ -261,12 +278,12 @@ Item {
     Rectangle {
         id: indicator
         x: 6
-        y: root.contentTop + 10 + root.selectedIndex * 48
+        y: root.contentTop + 14 + root.selectedIndex * 48
         width: 4
         height: 24
         radius: 2
         color: LazerTheme.osuPink
-        Behavior on y { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+        Behavior on y { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
     }
 
     // Host the three persistent category controls in the navigation rail.
@@ -294,5 +311,13 @@ Item {
             root.requestClose()
             event.accepted = true
         }
+    }
+
+    // Catch Escape for the active panel regardless of which child owns focus.
+    Shortcut {
+        sequence: "Escape"
+        enabled: root.interactive
+        context: Qt.WindowShortcut
+        onActivated: root.requestClose()
     }
 }
