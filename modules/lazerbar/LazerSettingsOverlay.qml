@@ -71,6 +71,21 @@ Item {
         closeAndRestoreFocus()
     }
 
+    // Keep the modal focus ring explicit instead of relying on child Keys handlers.
+    function cycleFocus(backward) {
+        if (!interactive)
+            return
+        if (panel.closeButton.activeFocus) {
+            panel.currentNav.forceActiveFocus()
+        } else if (panel.currentNav.activeFocus) {
+            panel.closeButton.forceActiveFocus()
+        } else if (backward) {
+            panel.closeButton.forceActiveFocus()
+        } else {
+            panel.currentNav.forceActiveFocus()
+        }
+    }
+
     function close(restoreFocus) {
         if (phase === "closed" || phase === "closing")
             return
@@ -120,15 +135,27 @@ Item {
             if (!root.interactive)
                 return
             if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                if (event.key === Qt.Key_Backtab || panel.currentNav.activeFocus)
-                    panel.closeButton.forceActiveFocus()
-                else
-                    panel.currentNav.forceActiveFocus()
+                var backward = event.key === Qt.Key_Backtab
+                        || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))
+                root.cycleFocus(backward)
                 event.accepted = true
             }
         }
         onCloseRequested: root.requestClose()
+
     }
+
+    // Route every visible navigation entry into the modal close affordance.
+    Binding { target: panel.appearanceNav; property: "KeyNavigation.tab"; value: panel.closeButton }
+    Binding { target: panel.appearanceNav; property: "KeyNavigation.backtab"; value: panel.closeButton }
+    Binding { target: panel.barNav; property: "KeyNavigation.tab"; value: panel.closeButton }
+    Binding { target: panel.barNav; property: "KeyNavigation.backtab"; value: panel.closeButton }
+    Binding { target: panel.notificationNav; property: "KeyNavigation.tab"; value: panel.closeButton }
+    Binding { target: panel.notificationNav; property: "KeyNavigation.backtab"; value: panel.closeButton }
+
+    // Keep the return edge tied to whichever category is currently selected.
+    Binding { target: panel.closeButton; property: "KeyNavigation.tab"; value: panel.currentNav }
+    Binding { target: panel.closeButton; property: "KeyNavigation.backtab"; value: panel.currentNav }
 
     NumberAnimation {
         id: panelMotion

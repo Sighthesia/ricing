@@ -98,15 +98,34 @@ Item {
             overlay.openFrom(opener, 1)
             tryCompare(overlay, "phase", "open", 400)
             overlay.panel.currentNav.forceActiveFocus()
+            verify(overlay.panel.currentNav.activeFocus)
             keyPress(Qt.Key_Tab)
-            verify(overlay.panel.closeButton.activeFocus || overlay.panel.currentNav.activeFocus)
+            verify(overlay.panel.closeButton.activeFocus)
             overlay.panel.closeButton.forceActiveFocus()
             keyPress(Qt.Key_Tab)
             verify(overlay.panel.currentNav.activeFocus)
             overlay.panel.currentNav.forceActiveFocus()
             keyPress(Qt.Key_Backtab)
             verify(overlay.panel.closeButton.activeFocus)
+            overlay.panel.closeButton.forceActiveFocus()
+            keyPress(Qt.Key_Tab, Qt.ShiftModifier)
+            verify(overlay.panel.currentNav.activeFocus)
             verify(!opener.activeFocus)
+        }
+
+        function test_cycleFocusMethodUsesModalRing() {
+            overlay.openFrom(opener, 1)
+            tryCompare(overlay, "phase", "open", 400)
+            overlay.panel.currentNav.forceActiveFocus()
+            overlay.cycleFocus(false)
+            verify(overlay.panel.closeButton.activeFocus)
+            overlay.cycleFocus(false)
+            verify(overlay.panel.currentNav.activeFocus)
+            overlay.cycleFocus(true)
+            verify(overlay.panel.closeButton.activeFocus)
+            overlay.panel.forceActiveFocus()
+            overlay.cycleFocus(true)
+            verify(overlay.panel.closeButton.activeFocus)
         }
 
         function test_reopenFromClosingRetargetsCurrentProgress() {
