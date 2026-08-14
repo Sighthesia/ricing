@@ -8,12 +8,13 @@ Item {
     property bool interactive: phase === "opening" || phase === "open"
     property Item opener: null
     property real progress: 0
+    property real backdropProgress: 0
     readonly property real backdropTargetOpacity: MotionTokens.backdropOpacity
     readonly property int backdropEnterDuration: MotionTokens.backdropEnter
     readonly property int panelEnterDuration: MotionTokens.slow
     readonly property int panelExitDuration: MotionTokens.medium
     readonly property int backdropExitDuration: MotionTokens.fast
-    readonly property real backdropOpacity: progress * backdropTargetOpacity
+    readonly property real backdropOpacity: backdropProgress * backdropTargetOpacity
     readonly property real panelProgress: progress
     signal closed
 
@@ -26,6 +27,9 @@ Item {
         motion.duration = panelEnterDuration
         motion.to = 1
         motion.restart()
+        backdropMotion.duration = backdropEnterDuration
+        backdropMotion.to = 1
+        backdropMotion.restart()
         body.forceActiveFocus()
     }
     function closeAndRestoreFocus() {
@@ -34,6 +38,9 @@ Item {
         motion.duration = panelExitDuration
         motion.to = 0
         motion.restart()
+        backdropMotion.duration = backdropExitDuration
+        backdropMotion.to = 0
+        backdropMotion.restart()
     }
 
     Keys.onEscapePressed: event => { closeAndRestoreFocus(); event.accepted = true }
@@ -65,5 +72,12 @@ Item {
                 root.closed()
             }
         }
+    }
+    NumberAnimation {
+        id: backdropMotion
+        target: root
+        property: "backdropProgress"
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: MotionTokens.outSoft
     }
 }

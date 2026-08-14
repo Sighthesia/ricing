@@ -42,7 +42,7 @@ Variants {
             implicitHeight: LazerTheme.barHeight
             exclusiveZone: 0
             anchors { top: true; right: true }
-            margins.right: statusWindow.implicitWidth + screenScope.safetyGap
+            margins { right: statusWindow.implicitWidth + screenScope.safetyGap }
             UtilityZone {
                 id: utilityContent
                 anchors.centerIn: parent

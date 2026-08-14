@@ -31,6 +31,9 @@ Item {
         opener = anchorItem
         originName = Logic.popupOrigin(anchorItem ? anchorItem.x + anchorItem.width / 2 : 0,
                                        implicitWidth, screenWidth || 1920)
+        beginOpen()
+    }
+    function beginOpen() {
         phase = "opening"
         progressAnimation.duration = openDuration
         progressAnimation.to = 1

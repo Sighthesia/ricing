@@ -13,9 +13,6 @@ DropdownMenu {
         x = popupX
         y = popupY
         originName = point.x + implicitWidth > rect.x + rect.width ? "topRight" : "topLeft"
-        phase = "opening"
-        progress = 1
-        phase = "open"
-        forceActiveFocus()
+        beginOpen()
     }
 }

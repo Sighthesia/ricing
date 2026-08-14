@@ -18,7 +18,7 @@ Item {
         function init() {
             dropdown.phase = "closed"; dropdown.progress = 0
             contextMenu.phase = "closed"; contextMenu.progress = 0
-            modal.phase = "closed"; modal.progress = 0
+            modal.phase = "closed"; modal.progress = 0; modal.backdropProgress = 0
         }
 
         function test_dropdownLifecycle() {
@@ -36,9 +36,11 @@ Item {
 
         function test_contextClamp() {
             contextMenu.openAtPoint(Qt.point(790, 590), Qt.rect(0, 0, 800, 600))
+            compare(contextMenu.phase, "opening")
             verify(contextMenu.popupX + contextMenu.implicitWidth <= 800)
             verify(contextMenu.popupY + contextMenu.implicitHeight <= 600)
             compare(contextMenu.originName, "topRight")
+            tryCompare(contextMenu, "phase", "open", 250)
         }
 
         function test_modalTimingAndBlocking() {
@@ -48,6 +50,8 @@ Item {
             compare(modal.panelExitDuration, 160)
             compare(modal.backdropExitDuration, 100)
             modal.openFrom(opener)
+            tryCompare(modal, "backdropProgress", 1, 180)
+            verify(modal.progress < 1)
             tryCompare(modal, "phase", "open", 340)
             modal.closeAndRestoreFocus()
             compare(modal.interactive, false)
