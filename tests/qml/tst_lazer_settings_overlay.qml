@@ -36,6 +36,8 @@ Item {
             compare(overlay.panel.availableHeight, host.height)
             compare(overlay.panel.width, overlay.panel.panelWidth)
             compare(overlay.panel.height, overlay.panel.panelHeight)
+            compare(overlay.panel.y, 0)
+            compare(overlay.panelHost.y - overlay.panelRestY, overlay.panelOffsetY)
             compare(overlay.panelEnterDuration, 320)
             compare(overlay.panelExitDuration, 240)
             compare(overlay.scrimDuration, 180)
@@ -48,7 +50,8 @@ Item {
             verify(overlay.interactive)
             verify(overlay.blocksDesktop)
             compare(overlay.entryDirection, -1)
-            verify(overlay.panel.y < 0)
+            verify(overlay.panelOffsetY < 0)
+            compare(overlay.panelHost.y - overlay.panelRestY, overlay.panelOffsetY)
             tryCompare(overlay, "phase", "open", 400)
             compare(overlay.progress, 1)
             compare(overlay.scrimProgress, 1)
@@ -62,26 +65,29 @@ Item {
             verify(!overlay.blocksDesktop)
 
             overlay.openFrom(opener, 1)
-            verify(overlay.panel.y > 0)
+            verify(overlay.panelOffsetY > 0)
+            verify(overlay.panelHost.y > overlay.panelRestY)
             tryCompare(overlay, "phase", "open", 400)
         }
 
         function test_reducedMotionKeepsOpacityButRemovesTranslation() {
             Lazer.MotionTokens.reducedMotionOverride = true
             overlay.openFrom(opener, -1)
-            compare(overlay.panel.y, 0)
+            compare(overlay.panelOffsetY, 0)
+            compare(overlay.panelHost.y, overlay.panelRestY)
             verify(overlay.panel.opacity < 1)
             tryCompare(overlay, "phase", "open", 120)
-            compare(overlay.panel.y, 0)
+            compare(overlay.panelOffsetY, 0)
             overlay.closeWithoutFocusRestore()
-            compare(overlay.panel.y, 0)
+            compare(overlay.panelOffsetY, 0)
             tryCompare(overlay, "phase", "closed", 120)
             Lazer.MotionTokens.reducedMotionOverride = false
 
             overlay.openFrom(opener, 1)
-            verify(overlay.panel.y > 0)
+            verify(overlay.panelOffsetY > 0)
+            compare(overlay.panelHost.y - overlay.panelRestY, overlay.panelOffsetY)
             wait(70)
-            verify(overlay.panel.y < overlay.panel.height)
+            verify(overlay.panelOffsetY < overlay.panelHost.height)
             tryCompare(overlay, "phase", "open", 400)
         }
 

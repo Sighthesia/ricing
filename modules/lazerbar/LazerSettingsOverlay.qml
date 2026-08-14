@@ -16,7 +16,13 @@ Item {
     readonly property int panelExitDuration: 240
     readonly property int scrimDuration: 180
     property alias panel: panel
+    property alias panelHost: panelHost
     property alias scrim: scrim
+    readonly property real panelRestY: (height - panelHost.height) / 2
+    readonly property real panelOffsetY: MotionTokens.reducedMotion
+            ? 0 : entryDirection * panelHost.height * (1 - progress)
+    readonly property real panelOpacity: progress
+    readonly property real scrimOpacity: scrimProgress * scrimTargetOpacity
     signal closed
     signal closeRequested
 
@@ -109,7 +115,7 @@ Item {
         id: scrim
         anchors.fill: parent
         color: "black"
-        opacity: root.scrimProgress * root.scrimTargetOpacity
+        opacity: root.scrimOpacity
         visible: root.blocksDesktop
 
         TapHandler {
@@ -123,7 +129,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: panel.panelWidth
         height: panel.panelHeight
-        y: 0
+        y: root.panelRestY + root.panelOffsetY
 
         // Close and navigation are the modal's tab boundary until page controls are extended.
         Keys.priority: Keys.BeforeItem
@@ -152,8 +158,7 @@ Item {
             availableWidth: root.width
             availableHeight: root.height
             interactive: root.interactive
-            opacity: root.progress
-            y: MotionTokens.reducedMotion ? 0 : root.entryDirection * height * (1 - root.progress)
+            opacity: root.panelOpacity
             onCloseRequested: root.requestClose()
         }
     }
@@ -194,13 +199,4 @@ Item {
         easing.type: Easing.BezierSpline
     }
 
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (!MotionTokens.reducedMotion)
-                return
-            panel.x = panel.x
-            panel.y = 0
-        }
-    }
 }
