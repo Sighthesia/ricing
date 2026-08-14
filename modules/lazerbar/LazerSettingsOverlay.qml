@@ -48,10 +48,12 @@ Item {
 
         _motionToken += 1
         phase = "opening"
+        panelMotion.stop()
         panelMotion.duration = MotionTokens.reducedMotion ? 1 : panelEnterDuration
         panelMotion.easing.type = Easing.OutQuint
         panelMotion.to = 1
         panelMotion.restart()
+        scrimMotion.stop()
         scrimMotion.duration = MotionTokens.reducedMotion ? 1 : scrimDuration
         scrimMotion.easing.type = Easing.OutCubic
         scrimMotion.to = 1
@@ -97,15 +99,29 @@ Item {
             return
         _motionToken += 1
         phase = "closing"
+        panelMotion.stop()
         panelMotion.duration = MotionTokens.reducedMotion ? 1 : panelExitDuration
         panelMotion.easing.type = Easing.InCubic
         panelMotion.to = 0
         panelMotion.restart()
+        scrimMotion.stop()
         scrimMotion.duration = MotionTokens.reducedMotion ? 1 : scrimDuration
         scrimMotion.easing.type = Easing.InCubic
         scrimMotion.to = 0
         scrimMotion.restart()
         _restoreFocus = restoreFocus
+    }
+
+    // Reset test and host teardown state without emitting lifecycle signals or restoring focus.
+    function resetImmediately() {
+        panelMotion.stop()
+        scrimMotion.stop()
+        _motionToken += 1
+        phase = "closed"
+        progress = 0
+        scrimProgress = 0
+        opener = null
+        _restoreFocus = false
     }
 
     property bool _restoreFocus: true

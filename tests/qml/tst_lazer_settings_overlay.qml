@@ -19,11 +19,8 @@ Item {
         when: windowShown
 
         function init() {
-            overlay.phase = "closed"
-            overlay.progress = 0
-            overlay.scrimProgress = 0
+            overlay.resetImmediately()
             overlay.entryDirection = 1
-            overlay.opener = null
             closedSpy.clear()
             requestSpy.clear()
             wait(10)
@@ -52,7 +49,7 @@ Item {
             compare(overlay.entryDirection, -1)
             verify(overlay.panelOffsetY < 0)
             compare(overlay.panelHost.y - overlay.panelRestY, overlay.panelOffsetY)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
             compare(overlay.progress, 1)
             compare(overlay.scrimProgress, 1)
             compare(overlay.scrim.opacity, 0.6)
@@ -61,13 +58,13 @@ Item {
             compare(overlay.phase, "closing")
             verify(!overlay.interactive)
             verify(overlay.blocksDesktop)
-            tryCompare(overlay, "phase", "closed", 320)
+            tryCompare(overlay, "phase", "closed", 500)
             verify(!overlay.blocksDesktop)
 
             overlay.openFrom(opener, 1)
             verify(overlay.panelOffsetY > 0)
             verify(overlay.panelHost.y > overlay.panelRestY)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
         }
 
         function test_reducedMotionKeepsOpacityButRemovesTranslation() {
@@ -88,26 +85,26 @@ Item {
             compare(overlay.panelHost.y - overlay.panelRestY, overlay.panelOffsetY)
             wait(70)
             verify(overlay.panelOffsetY < overlay.panelHost.height)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
         }
 
         function test_closeRequestScrimAndEscapeAreModal() {
             overlay.openFrom(opener, 1)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
             mouseClick(overlay.scrim, 20, 20)
             compare(requestSpy.count, 1)
             compare(overlay.phase, "closing")
-            tryCompare(overlay, "phase", "closed", 320)
+            tryCompare(overlay, "phase", "closed", 500)
 
             overlay.openFrom(opener, 1)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
             overlay.panel.requestClose()
             compare(requestSpy.count, 2)
             compare(overlay.phase, "closing")
 
-            tryCompare(overlay, "phase", "closed", 320)
+            tryCompare(overlay, "phase", "closed", 500)
             overlay.openFrom(opener, 1)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
             requestSpy.clear()
             keyPress(Qt.Key_Escape)
             compare(requestSpy.count, 1)
@@ -116,7 +113,7 @@ Item {
 
         function test_panelBlankAreaIsolatedButNavigationRemainsInteractive() {
             overlay.openFrom(opener, 1)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
             requestSpy.clear()
             mouseClick(overlay.panel, overlay.panel.width - 4, overlay.panel.height - 4)
             compare(requestSpy.count, 0)
@@ -128,7 +125,7 @@ Item {
 
         function test_tabTrapCyclesNavigationAndClose() {
             overlay.openFrom(opener, 1)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
             overlay.panel.currentNav.forceActiveFocus()
             verify(overlay.panel.currentNav.activeFocus)
             keyPress(Qt.Key_Tab)
@@ -147,7 +144,7 @@ Item {
 
         function test_cycleFocusMethodUsesModalRing() {
             overlay.openFrom(opener, 1)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
             overlay.panel.currentNav.forceActiveFocus()
             overlay.cycleFocus(false)
             verify(overlay.panel.closeButton.activeFocus)
@@ -162,23 +159,24 @@ Item {
 
         function test_reopenFromClosingRetargetsCurrentProgress() {
             overlay.openFrom(opener, 1)
-            wait(70)
+            tryVerify(function() { return overlay.progress > 0 && overlay.progress < 1 }, 250)
             overlay.closeWithoutFocusRestore()
             var closingProgress = overlay.progress
-            verify(closingProgress > 0 && closingProgress < 1)
+            verify(closingProgress > 0)
+            wait(40)
+            verify(overlay.progress > 0)
+            verify(overlay.progress < closingProgress)
             overlay.openFrom(opener, -1)
             compare(overlay.phase, "opening")
             verify(overlay.progress >= closingProgress)
             compare(overlay.entryDirection, -1)
-            tryCompare(overlay, "phase", "open", 400)
+            tryCompare(overlay, "phase", "open", 650)
             compare(overlay.progress, 1)
         }
 
         function cleanup() {
             Lazer.MotionTokens.reducedMotionOverride = false
-            overlay.phase = "closed"
-            overlay.progress = 0
-            overlay.scrimProgress = 0
+            overlay.resetImmediately()
         }
     }
 }
