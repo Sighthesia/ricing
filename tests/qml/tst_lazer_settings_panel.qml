@@ -23,14 +23,15 @@ Item {
         saveCallback: saveService.save
         wallpaperService: wallpaperService
     }
-    SignalSpy { id: escapeSpy; target: panel; signalName: "escapeRequested" }
+    SignalSpy { id: closeSpy; target: panel; signalName: "closeRequested" }
+    SignalSpy { id: categorySpy; target: panel; signalName: "categoryChanged" }
 
     TestCase {
         name: "LazerSettingsPanel"
 
         function init() {
             panel.interactive = true
-            panel.selectedCategory = 0
+            panel.selectedCategory = "appearance"
             panel.width = 840
             panel.height = 560
             Lazer.MotionTokens.reducedMotionOverride = false
@@ -53,6 +54,8 @@ Item {
         }
 
         function test_sizesRailAndUsesOneIndicator() {
+            compare(panel.selectedIndex, 0)
+            compare(panel.navigationWidth, panel.railWidth)
             compare(panel.railWidth, 216)
             compare(panel.indicatorCount, 1)
             panel.width = 700
@@ -64,43 +67,101 @@ Item {
 
         function test_switchKeepsScrollPositionAndDisablesHiddenPages() {
             panel.appearancePage.contentY = 36
-            panel.selectCategory(1)
+            panel.selectCategory("bar")
             compare(panel.appearancePage.contentY, 36)
             verify(!panel.appearancePage.enabled)
             verify(panel.barPage.enabled)
             verify(!panel.notificationPage.enabled)
             tryCompare(panel.barPage, "opacity", 1, 300)
-            panel.selectCategory(2)
+            panel.selectCategory("notifications")
             verify(panel.notificationPage.enabled)
             verify(!panel.barPage.enabled)
         }
 
         function test_keyboardNavigationAndEscapeAreInteractiveGated() {
-            panel.forceActiveFocus()
+            panel.focusNavigation()
             keyPress(Qt.Key_Down)
-            compare(panel.selectedCategory, 1)
+            compare(panel.selectedCategory, "bar")
             keyPress(Qt.Key_Down)
-            compare(panel.selectedCategory, 2)
+            compare(panel.selectedCategory, "notifications")
             keyPress(Qt.Key_Up)
-            compare(panel.selectedCategory, 1)
+            compare(panel.selectedCategory, "bar")
             keyPress(Qt.Key_Enter)
-            compare(panel.selectedCategory, 1)
+            compare(panel.selectedCategory, "bar")
             panel.interactive = false
             keyPress(Qt.Key_Down)
-            compare(panel.selectedCategory, 1)
+            compare(panel.selectedCategory, "bar")
             panel.interactive = true
-            escapeSpy.clear()
+            closeSpy.clear()
             keyPress(Qt.Key_Escape)
-            compare(escapeSpy.count, 1)
+            compare(closeSpy.count, 1)
         }
 
         function test_crossfadeUsesReducedMotionOnlyForTranslation() {
-            panel.selectCategory(1)
-            verify(panel.barPage.x === 0 || panel.barPage.x === 8 || panel.barPage.x === -8)
+            panel.selectCategory("bar")
+            wait(80)
+            verify(panel.barPage.opacity > 0 && panel.appearancePage.opacity < 1)
+            tryCompare(panel.appearancePage, "opacity", 0, 300)
             Lazer.MotionTokens.reducedMotionOverride = true
-            panel.selectCategory(2)
+            panel.selectCategory("notifications")
             compare(panel.notificationPage.x, 0)
             compare(panel.categoryTransitionDuration, 160)
+            compare(panel.contentTransitionEasing, Lazer.MotionTokens.outSoft)
+        }
+
+        function test_ownedStringContractAndInvalidDirectAssignmentRecovery() {
+            panel.selectCategory("notifications")
+            compare(panel.selectedIndex, 2)
+            compare(categorySpy.count, 1)
+            panel.selectedCategory = "invalid"
+            tryCompare(panel, "selectedCategory", "appearance", 300)
+            compare(panel.selectedIndex, 0)
+            verify(panel.appearancePage.enabled)
+            verify(!panel.notificationPage.enabled)
+            panel.selectCategory("invalid")
+            compare(panel.selectedCategory, "appearance")
+        }
+
+        function test_dimensionsStayNonNegativeAtExtremes() {
+            panel.availableWidth = -100
+            panel.availableHeight = -100
+            verify(panel.panelWidth >= 0)
+            verify(panel.panelHeight >= 0)
+            verify(panel.width >= 0)
+            verify(panel.height >= 0)
+            panel.availableWidth = 1200
+            panel.availableHeight = 900
+            compare(panel.implicitWidth, panel.panelWidth)
+            compare(panel.implicitHeight, panel.panelHeight)
+        }
+
+        function test_focusAndCloseControlsUseKeyboardContracts() {
+            mouseClick(panel.barNav, panel.barNav.width / 2, panel.barNav.height / 2)
+            compare(panel.selectedCategory, "bar")
+            verify(panel.barNav.activeFocus)
+            panel.focusFirstControl()
+            verify(panel.activeFocus || panel.currentNav.activeFocus)
+            panel.closeButton.forceActiveFocus()
+            closeSpy.clear()
+            keyPress(Qt.Key_Space)
+            compare(closeSpy.count, 1)
+            panel.closeButton.forceActiveFocus()
+            keyPress(Qt.Key_Return)
+            compare(closeSpy.count, 2)
+            panel.focusNavigation()
+            verify(panel.currentNav.activeFocus)
+        }
+
+        function test_fastRetargetEndsAtLatestCategoryAndHiddenPagesAreInactive() {
+            panel.selectCategory("bar")
+            panel.selectCategory("notifications")
+            tryCompare(panel, "selectedCategory", "notifications", 300)
+            tryCompare(panel.notificationPage, "opacity", 1, 300)
+            verify(!panel.appearancePage.enabled)
+            verify(!panel.barPage.enabled)
+            verify(panel.notificationPage.enabled)
+            verify(!panel.appearancePage.activeFocus)
+            verify(!panel.barPage.activeFocus)
         }
     }
 }

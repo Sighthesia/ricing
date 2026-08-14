@@ -7,8 +7,9 @@ Item {
     property string label: ""
     property bool selected: false
     property bool interactive: true
-    property int index: 0
+    property string category: "appearance"
     signal activated
+    signal moveRequested(int direction)
 
     implicitWidth: 184
     implicitHeight: 44
@@ -22,7 +23,7 @@ Item {
         anchors.fill: parent
         anchors.margins: 2
         radius: 12
-        color: root.selected ? LazerTheme.settingsSelected : (mouse.containsMouse ? LazerTheme.settingsRowHover : "transparent")
+        color: root.selected ? LazerTheme.settingsSelected : (hoverHandler.hovered ? LazerTheme.settingsRowHover : "transparent")
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
@@ -37,13 +38,12 @@ Item {
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
-    // Capture pointer and keyboard activation through one interactive item.
-    MouseArea {
-        id: mouse
-        anchors.fill: parent
+    // Capture pointer hover and activation without a competing visual parent.
+    HoverHandler { id: hoverHandler; enabled: root.interactive }
+    TapHandler {
+        id: tapHandler
         enabled: root.interactive
-        hoverEnabled: true
-        onClicked: root.activated()
+        onTapped: { root.forceActiveFocus(); root.activated() }
     }
 
     Keys.onPressed: event => {
@@ -51,6 +51,9 @@ Item {
             return
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
             root.activated()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+            root.moveRequested(event.key === Qt.Key_Down ? 1 : -1)
             event.accepted = true
         }
     }
