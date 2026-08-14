@@ -2,30 +2,23 @@
 
 ## Project
 
-Afloat is a Wayland desktop shell built with **Quickshell** (QML-based compositor shell framework). Entry point: `shell.qml`.
+Afloat is a Wayland desktop shell built with **Quickshell** (QML-based compositor shell framework).
+
+This branch (`backend-only`) contains only the **backend** layer — services, scripts, and backend tests. The **frontend** (`modules/`, `shell.qml`) was intentionally removed to enable a clean frontend rewrite. Rebuild the UI surface modules against the services below.
 
 ## Architecture
 
-- `shell.qml` — root `ShellRoot` that instantiates all window surfaces
-- `modules/` — UI surface modules, each owning one `PanelWindow` type:
-  - `bar/` — top status bar, widget system, dockzone surfaces, context menu, widget picker
-  - `island/` — dynamic island (collapsed clock + expanded launcher)
-  - `background/` — wallpaper and screen-corner overlays
-  - `launcher/` — full-screen app launcher overlay
-  - `notification/` — transient notification popups
-  - `osd/` — volume/brightness/media OSD popup
-  - `settings/` — settings panel popup
-  - `workspace-hint/` — workspace/window hint OSD (mod-key held)
 - `services/` — **singleton QML services** (registered in `services/qmldir`). All services are `singleton` types imported as `Services.*`. Key ones: `IslandService`, `BarLayoutService`, `SettingsService`, `ColorService`, `NiriService`, `VolumeService`, `MediaService`, `WindowHintService`.
 - `services/barlayout/` — bar layout JS modules (sections, persistence, drag, model)
 - `scripts/` — Python helpers: `afloat-ipc` (IPC via `qs ipc`), `netease_web_lyrics_bridge.py`, `theming/`, `window_hint_trigger.py`
+- `tests/qml/` — backend QML tests (`QtTest.TestCase`), run per test file
 
 ## Running
 
 - Quickshell launches this config: `qs -p /path/to/afloat` (or symlink)
 - IPC calls: `scripts/afloat-ipc <target> <function> [args...]`
-- QML tests: `qs -p tests/qml` or individual test files via `QtTest.TestCase`
-- **After every QML change**, run `timeout 5 qs -p .` and fix any WARN/ERROR lines before considering the task done.
+- QML tests: run individual test files via `qs -p tests/qml/tst_*.qml`
+- **After every QML change**, run the relevant backend tests and fix any WARN/ERROR lines before considering the task done.
 
 ## Conventions
 

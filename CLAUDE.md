@@ -1,5 +1,7 @@
 Read [AGENTS.md](AGENTS.md) before starting any task.
 
+This branch (`backend-only`) keeps only the backend layer (`services/`, `scripts/`, `tests/qml/`). The frontend (`modules/`, `shell.qml`) was removed for a clean rewrite.
+
 ## Skills
 
 Load these for detailed context on specific topics:
