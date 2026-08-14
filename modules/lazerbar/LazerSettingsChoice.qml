@@ -16,7 +16,7 @@ Item {
 
     implicitWidth: 190
     implicitHeight: 36
-    activeFocusOnTab: true
+    activeFocusOnTab: effectiveEnabled
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     Accessible.role: Accessible.ComboBox
     Accessible.name: accessibleName
@@ -60,6 +60,11 @@ Item {
             selectNext(1)
             event.accepted = true
         }
+    }
+
+    onEffectiveEnabledChanged: {
+        if (!effectiveEnabled && activeFocus)
+            focus = false
     }
 
     // Keep one highlighted choice label and indicator visible at all times.

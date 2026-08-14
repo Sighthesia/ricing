@@ -10,13 +10,20 @@ Item {
     QtObject { id: toggleHolder; property bool value: false }
     QtObject { id: sliderHolder; property real value: 4 }
     QtObject { id: choiceHolder; property string value: "auto" }
+    QtObject { id: textHolder; property string value: "  wallpaper.png  " }
 
     Lazer.LazerSettingsRow {
         id: row
         width: 220
         labelText: "设置"
         descriptionText: "这是一段很长的中文说明，用于验证窄宽布局不会和右侧控件重叠。"
-        Lazer.LazerSettingsToggle { id: rowToggle }
+        Lazer.LazerSettingsTextField {
+            id: rowTextField
+            text: textHolder.value
+            rowEnabled: row.contentEnabled
+            onTextCommitted: next => textHolder.value = next
+            onClearRequested: textHolder.value = ""
+        }
     }
 
     Lazer.LazerSettingsToggle {
@@ -44,8 +51,10 @@ Item {
     }
     Lazer.LazerSettingsTextField {
         id: textField
-        text: "  wallpaper.png  "
+        text: textHolder.value
         placeholderText: "壁纸路径"
+        onTextCommitted: next => textHolder.value = next
+        onClearRequested: textHolder.value = ""
     }
 
     SignalSpy { id: toggleSpy; target: toggle; signalName: "toggled" }
@@ -62,13 +71,16 @@ Item {
             toggleHolder.value = false
             toggleSpy.clear()
             slider.enabled = true
+            slider.from = 0
+            slider.to = 10
+            slider.stepSize = 2
             sliderHolder.value = 4
             sliderSpy.clear()
             choice.enabled = true
             choiceHolder.value = "auto"
             choiceSpy.clear()
             textField.enabled = true
-            textField.text = "  wallpaper.png  "
+            textHolder.value = "  wallpaper.png  "
             commitSpy.clear()
             clearSpy.clear()
             Lazer.MotionTokens.reducedMotionOverride = false
@@ -126,15 +138,23 @@ Item {
         function test_sliderSafeRangesAndReducedMotion() {
             slider.from = 10
             slider.to = 0
-            sliderHolder.value = 8
+            sliderHolder.value = 9
             compare(slider.displayValue, 8)
             verify(slider.normalizedFraction > 0)
+            slider.setValue(10)
+            compare(sliderHolder.value, 10)
+            slider.setValue(0)
+            compare(sliderHolder.value, 0)
             slider.from = 4
             slider.to = 4
             sliderHolder.value = 4
             compare(slider.normalizedFraction, 0)
+            var beforeEqualRange = sliderSpy.count
+            slider.setValue(4)
+            compare(sliderSpy.count, beforeEqualRange)
             Lazer.MotionTokens.reducedMotionOverride = true
             compare(slider.trackFillBehaviorEnabled, false)
+            verify(slider.trackTapEnabled)
         }
 
         function test_choiceRejectsUnknownValues() {
@@ -168,14 +188,18 @@ Item {
             textField.commit()
             compare(commitSpy.count, 1)
             compare(commitSpy.signalArguments[0][0], "wallpaper.png")
+            compare(textHolder.value, "wallpaper.png")
+            textHolder.value = "external.png"
+            compare(textField.text, "external.png")
             textField.clear()
-            compare(textField.text, "")
+            compare(textHolder.value, "")
             compare(clearSpy.count, 1)
             textField.enabled = false
             textField.commit()
             textField.clear()
             compare(commitSpy.count, 1)
             compare(clearSpy.count, 1)
+            compare(textField.activeFocusOnTab, false)
         }
 
         function test_focusVisibleAndReducedMotion() {
@@ -187,12 +211,14 @@ Item {
 
         function test_rowHasMinimumHeightAndDefaultControl() {
             verify(row.implicitHeight >= 56)
-            compare(row.controlItem, rowToggle)
-            verify(row.textRegionWidth <= row.controlRegionLeft - 16)
+            compare(row.controlItem, rowTextField)
+            verify(row.labelTextItem.right <= row.controlItem.left)
+            verify(row.descriptionTextItem.right <= row.controlItem.left)
             row.enabled = false
             compare(row.opacity, Lazer.MotionTokens.disabledOpacity)
-            compare(rowToggle.rowEnabled, false)
-            verify(!rowToggle.hoverHandlerEnabled)
+            compare(row.contentEnabled, false)
+            compare(rowTextField.rowEnabled, false)
+            compare(rowTextField.activeFocusOnTab, false)
         }
     }
 }

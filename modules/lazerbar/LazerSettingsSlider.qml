@@ -13,7 +13,6 @@ Item {
     property bool rowEnabled: true
     property string accessibleName: ""
     readonly property bool effectiveEnabled: enabled && rowEnabled
-    readonly property bool trackFillBehaviorEnabled: !MotionTokens.reducedMotion
     readonly property real displayValue: normalized(value)
     readonly property string displayText: Number(displayValue).toLocaleString(Qt.locale(), 'f', 0) + suffix
     readonly property bool focusVisible: activeFocus
@@ -22,26 +21,34 @@ Item {
     implicitWidth: 180
     implicitHeight: 36
     focus: true
-    activeFocusOnTab: true
+    activeFocusOnTab: effectiveEnabled
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     Accessible.role: Accessible.Slider
     Accessible.name: accessibleName
 
     function normalized(candidate) {
-        var low = Math.min(Number(from), Number(to))
-        var high = Math.max(Number(from), Number(to))
+        var start = Number(from)
+        var end = Number(to)
+        var low = Math.min(start, end)
+        var high = Math.max(start, end)
         var step = Number(stepSize)
         if (!isFinite(step) || step <= 0)
             step = 1
         var number = Number(candidate)
         if (!isFinite(number))
-            number = low
+            number = start
         var clamped = Math.max(low, Math.min(high, number))
-        return Math.max(low, Math.min(high, low + Math.round((clamped - low) / step) * step))
+        if (start === end)
+            return start
+        var direction = end >= start ? 1 : -1
+        var steps = Math.round((clamped - start) / (step * direction))
+        return Math.max(low, Math.min(high, start + steps * step * direction))
     }
 
     function setValue(candidate) {
         var next = normalized(candidate)
+        if (next === displayValue)
+            return
         valueModified(next)
     }
 
@@ -60,6 +67,11 @@ Item {
         }
     }
 
+    onEffectiveEnabledChanged: {
+        if (!effectiveEnabled && activeFocus)
+            focus = false
+    }
+
     // Show the persistent track and thumb while animating only visual state.
     Rectangle {
         id: track
@@ -76,6 +88,7 @@ Item {
             radius: 2
             color: LazerTheme.osuPink
             Behavior on width {
+                id: fillBehavior
                 enabled: !MotionTokens.reducedMotion
                 NumberAnimation { duration: MotionTokens.fast }
             }
@@ -103,16 +116,22 @@ Item {
     }
 
     HoverHandler { id: hoverHandler; enabled: root.effectiveEnabled }
+    // Map pointer positions in the track, excluding the value label.
     TapHandler {
-        id: tapHandler
+        id: trackTapHandler
+        parent: track
         enabled: root.effectiveEnabled
         onTapped: point => {
-            if (root.width <= 0 || root.from === root.to)
+            if (track.width <= 0 || root.from === root.to)
                 return
-            var fraction = Math.max(0, Math.min(1, point.position.x / root.width))
+            var fraction = Math.max(0, Math.min(1, point.position.x / track.width))
             if (root.to < root.from)
                 fraction = 1 - fraction
             root.setValue(root.from + (root.to - root.from) * fraction)
         }
     }
+
+    readonly property Item trackItem: track
+    readonly property bool trackTapEnabled: trackTapHandler.enabled
+    readonly property bool trackFillBehaviorEnabled: fillBehavior.enabled
 }

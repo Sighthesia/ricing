@@ -7,29 +7,34 @@ Item {
     property alias text: editor.text
     property string placeholderText: ""
     property bool enabled: true
+    property bool rowEnabled: true
     property string accessibleName: ""
+    readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property bool focusVisible: editor.activeFocus
     signal textCommitted(string text)
     signal clearRequested()
 
     implicitWidth: 240
     implicitHeight: 38
-    opacity: enabled ? 1 : MotionTokens.disabledOpacity
-    activeFocusOnTab: enabled
+    opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
+    activeFocusOnTab: effectiveEnabled
     Accessible.role: Accessible.EditableText
     Accessible.name: accessibleName
 
+    onEffectiveEnabledChanged: {
+        if (!effectiveEnabled && activeFocus)
+            focus = false
+    }
+
     function commit() {
-        if (!root.enabled)
+        if (!root.effectiveEnabled)
             return
-        editor.text = editor.text.trim()
-        textCommitted(editor.text)
+        textCommitted(editor.text.trim())
     }
 
     function clear() {
-        if (!root.enabled)
+        if (!root.effectiveEnabled)
             return
-        editor.text = ""
         clearRequested()
     }
 
@@ -52,7 +57,7 @@ Item {
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         clip: true
-        enabled: root.enabled
+        enabled: root.effectiveEnabled
         color: LazerTheme.textPrimary
         selectionColor: LazerTheme.osuPink
         font.pixelSize: 13
@@ -68,6 +73,6 @@ Item {
         font.pixelSize: 13
     }
 
-    HoverHandler { id: fieldHover; enabled: root.enabled }
-    TapHandler { enabled: root.enabled; onTapped: editor.forceActiveFocus() }
+    HoverHandler { id: fieldHover; enabled: root.effectiveEnabled }
+    TapHandler { enabled: root.effectiveEnabled; onTapped: editor.forceActiveFocus() }
 }

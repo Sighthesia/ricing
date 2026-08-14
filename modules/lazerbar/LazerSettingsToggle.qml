@@ -23,6 +23,11 @@ Item {
     Accessible.role: Accessible.CheckBox
     Accessible.name: accessibleName
 
+    onEffectiveEnabledChanged: {
+        if (!effectiveEnabled && activeFocus)
+            focus = false
+    }
+
     function activate() {
         if (!root.effectiveEnabled)
             return
