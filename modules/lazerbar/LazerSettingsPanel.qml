@@ -315,17 +315,6 @@ Item {
             var next = root.selectedIndex + (event.key === Qt.Key_Down ? 1 : -1)
             root.selectCategory(categoryAt(next))
             event.accepted = true
-        } else if (event.key === Qt.Key_Escape) {
-            root.requestClose()
-            event.accepted = true
         }
-    }
-
-    // Catch Escape for the active panel regardless of which child owns focus.
-    Shortcut {
-        sequence: "Escape"
-        enabled: root.interactive
-        context: Qt.WindowShortcut
-        onActivated: root.requestClose()
     }
 }

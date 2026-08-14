@@ -118,16 +118,12 @@ Item {
     }
 
     // Keep panel dimensions derived from the fixed host, never from animated geometry.
-    LazerSettingsPanel {
-        id: panel
+    Item {
+        id: panelHost
         anchors.horizontalCenter: parent.horizontalCenter
         width: panel.panelWidth
         height: panel.panelHeight
-        availableWidth: root.width
-        availableHeight: root.height
-        interactive: root.interactive
-        opacity: root.progress
-        y: MotionTokens.reducedMotion ? 0 : root.entryDirection * panel.height * (1 - root.progress)
+        y: 0
 
         // Close and navigation are the modal's tab boundary until page controls are extended.
         Keys.priority: Keys.BeforeItem
@@ -141,8 +137,25 @@ Item {
                 event.accepted = true
             }
         }
-        onCloseRequested: root.requestClose()
 
+        // Shield empty panel clicks at the host boundary without intercepting child controls.
+        TapHandler {
+            acceptedButtons: Qt.AllButtons
+            gesturePolicy: TapHandler.WithinBounds
+            onTapped: event => event.accepted = true
+        }
+
+        LazerSettingsPanel {
+            id: panel
+            anchors.fill: parent
+            z: 1
+            availableWidth: root.width
+            availableHeight: root.height
+            interactive: root.interactive
+            opacity: root.progress
+            y: MotionTokens.reducedMotion ? 0 : root.entryDirection * height * (1 - root.progress)
+            onCloseRequested: root.requestClose()
+        }
     }
 
     // Route every visible navigation entry into the modal close affordance.

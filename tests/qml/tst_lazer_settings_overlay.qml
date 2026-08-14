@@ -77,6 +77,12 @@ Item {
             compare(overlay.panel.y, 0)
             tryCompare(overlay, "phase", "closed", 120)
             Lazer.MotionTokens.reducedMotionOverride = false
+
+            overlay.openFrom(opener, 1)
+            verify(overlay.panel.y > 0)
+            wait(70)
+            verify(overlay.panel.y < overlay.panel.height)
+            tryCompare(overlay, "phase", "open", 400)
         }
 
         function test_closeRequestScrimAndEscapeAreModal() {
@@ -92,6 +98,26 @@ Item {
             overlay.panel.requestClose()
             compare(requestSpy.count, 2)
             compare(overlay.phase, "closing")
+
+            tryCompare(overlay, "phase", "closed", 320)
+            overlay.openFrom(opener, 1)
+            tryCompare(overlay, "phase", "open", 400)
+            requestSpy.clear()
+            keyPress(Qt.Key_Escape)
+            compare(requestSpy.count, 1)
+            compare(overlay.phase, "closing")
+        }
+
+        function test_panelBlankAreaIsolatedButNavigationRemainsInteractive() {
+            overlay.openFrom(opener, 1)
+            tryCompare(overlay, "phase", "open", 400)
+            requestSpy.clear()
+            mouseClick(overlay.panel, overlay.panel.width - 4, overlay.panel.height - 4)
+            compare(requestSpy.count, 0)
+            compare(overlay.phase, "open")
+
+            mouseClick(overlay.panel.barNav, overlay.panel.barNav.width / 2, overlay.panel.barNav.height / 2)
+            compare(overlay.panel.selectedCategory, "bar")
         }
 
         function test_tabTrapCyclesNavigationAndClose() {

@@ -105,7 +105,7 @@ Item {
             compare(panel.selectedCategory, "bar")
             panel.interactive = true
             closeSpy.clear()
-            keyPress(Qt.Key_Escape)
+            panel.requestClose()
             compare(closeSpy.count, 1)
         }
 
@@ -203,17 +203,14 @@ Item {
         tryCompare(panel.barPage, "opacity", 1, 300)
     }
 
-    function test_escapeClosesFromNavigationCloseButtonAndPage() {
-        panel.focusNavigation()
-        closeSpy.clear()
-        keyPress(Qt.Key_Escape)
-        compare(closeSpy.count, 1)
-        panel.closeButton.forceActiveFocus()
-        keyPress(Qt.Key_Escape)
-        compare(closeSpy.count, 2)
-        panel.appearancePage.forceActiveFocus()
-        keyPress(Qt.Key_Escape)
-        compare(closeSpy.count, 3)
+    function test_closeButtonOwnsPanelCloseContract() {
+         panel.focusNavigation()
+         closeSpy.clear()
+         panel.closeButton.forceActiveFocus()
+         keyPress(Qt.Key_Space)
+         compare(closeSpy.count, 1)
+         panel.requestClose()
+         compare(closeSpy.count, 2)
     }
 
     function test_indicatorBindingFollowsCategoryWhenReducedMotionChanges() {
