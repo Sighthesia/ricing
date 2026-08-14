@@ -25,7 +25,6 @@ Item {
     implicitHeight: 36
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
-    focus: true
     activeFocusOnTab: effectiveEnabled
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     Accessible.role: Accessible.Slider
@@ -141,6 +140,7 @@ Item {
         parent: track
         enabled: root.effectiveEnabled
         onTapped: point => {
+            root.forceActiveFocus()
             root.setValue(root.valueForTrackPosition(point.position.x))
         }
     }

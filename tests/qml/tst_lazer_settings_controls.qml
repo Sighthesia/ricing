@@ -54,6 +54,7 @@ Item {
         value: sliderHolder.value
         onValueModified: next => sliderHolder.value = next
     }
+    Lazer.LazerSettingsSlider { id: secondSlider; value: 2 }
     Lazer.LazerSettingsChoice {
         id: choice
         model: [
@@ -93,6 +94,8 @@ Item {
             slider.stepSize = 2
             slider.requestedWidth = slider.implicitWidth
             sliderHolder.value = 4
+            slider.focus = false
+            secondSlider.focus = false
             sliderSpy.clear()
             choice.enabled = true
             choiceHolder.value = "auto"
@@ -153,6 +156,14 @@ Item {
             compare(sliderHolder.value, 6)
             keyPress(Qt.Key_Left)
             compare(sliderHolder.value, 4)
+        }
+
+        function test_slidersDoNotClaimInitialFocus() {
+            verify(!slider.activeFocus)
+            verify(!secondSlider.activeFocus)
+            slider.forceActiveFocus()
+            verify(slider.activeFocus)
+            verify(!secondSlider.activeFocus)
         }
 
         function test_sliderSafeRangesAndReducedMotion() {

@@ -14,6 +14,20 @@ Item {
     readonly property bool controlSupportsAvailableWidth: controlItem !== null && controlItem.availableWidth !== undefined
     readonly property bool controlSupportsRequestedWidth: controlItem !== null && controlItem.requestedWidth !== undefined
     readonly property bool compactLayout: width < 480
+    readonly property real safeRequestedWidth: controlSupportsRequestedWidth
+                                          && isFinite(Number(controlItem.requestedWidth))
+                                          ? Math.max(0, Number(controlItem.requestedWidth))
+                                          : (controlItem && isFinite(Number(controlItem.implicitWidth))
+                                             ? Math.max(0, Number(controlItem.implicitWidth)) : 0)
+    readonly property real safeControlWidth: controlItem && isFinite(Number(controlItem.width))
+                                             ? Math.max(0, Number(controlItem.width)) : 0
+    readonly property real safeImplicitWidth: controlItem && isFinite(Number(controlItem.implicitWidth))
+                                               ? Math.max(0, Number(controlItem.implicitWidth)) : 0
+    readonly property real safeControlHeight: controlItem && isFinite(Number(controlItem.height))
+                                              && Number(controlItem.height) > 0
+                                              ? Number(controlItem.height)
+                                              : (controlItem && isFinite(Number(controlItem.implicitHeight))
+                                                 ? Math.max(0, Number(controlItem.implicitHeight)) : 0)
 
     implicitWidth: 640
     readonly property real textRegionWidth: textColumn.width
@@ -89,13 +103,10 @@ Item {
         width: compactLayout
                ? Math.max(0, root.width - 32)
                : Math.min(controlSupportsRequestedWidth
-                          ? (controlItem ? controlItem.requestedWidth : 0)
-                          : Math.max(controlItem && controlItem.width > 0 ? controlItem.width : 0,
-                                     controlItem ? controlItem.implicitWidth : 0),
+                          ? safeRequestedWidth
+                          : Math.max(safeControlWidth, safeImplicitWidth),
                           Math.max(0, root.width - 32))
-        height: controlItem && controlItem.height > 0
-                ? controlItem.height
-                : (controlItem ? controlItem.implicitHeight : 0)
+        height: safeControlHeight
     }
 
     HoverHandler { id: rowHover; enabled: root.enabled }
