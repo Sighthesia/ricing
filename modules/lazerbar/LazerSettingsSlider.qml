@@ -12,6 +12,7 @@ Item {
     property bool enabled: true
     property bool rowEnabled: true
     property real availableWidth: Infinity
+    property real requestedWidth: implicitWidth
     property string accessibleName: ""
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real displayValue: normalized(value)
@@ -21,7 +22,7 @@ Item {
 
     implicitWidth: 180
     implicitHeight: 36
-    width: Math.min(implicitWidth, availableWidth)
+    width: Math.min(Math.max(0, requestedWidth), availableWidth)
     height: implicitHeight
     focus: true
     activeFocusOnTab: effectiveEnabled

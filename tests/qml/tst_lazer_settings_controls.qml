@@ -94,6 +94,8 @@ Item {
             choiceHolder.value = "auto"
             choiceSpy.clear()
             textField.enabled = true
+            textField.focus = false
+            textField.editorItem.focus = false
             textHolder.value = "  wallpaper.png  "
             commitSpy.clear()
             clearSpy.clear()
@@ -234,8 +236,16 @@ Item {
             textField.editorItem.insert(textField.editorItem.cursorPosition, "typed")
             compare(textField.text, "  wallpaper.png  ")
             compare(textField.editorItem.text, "  wallpaper.png  typed")
+            textHolder.value = "external-while-editing.png"
+            compare(textField.text, "external-while-editing.png")
+            compare(textField.editorItem.text, "  wallpaper.png  typed")
+            textField.focus = false
+            compare(textField.editorItem.text, "external-while-editing.png")
+            textField.focusEditor()
+            textField.editorItem.selectAll()
+            textField.editorItem.text = "  committed.png  "
             textField.commit()
-            compare(textHolder.value, "wallpaper.png  typed")
+            compare(textHolder.value, "committed.png")
             textHolder.value = "external.png"
             compare(textField.text, "external.png")
             textField.enabled = false
@@ -283,9 +293,11 @@ Item {
 
         function test_rowWidthBindingRemainsOwnedByParent() {
             var holder = Qt.createQmlObject('import QtQuick; QtObject { property real value: 300 }', row)
-            rowToggle.width = Qt.binding(function() { return holder.value })
-            compare(rowToggle.width, 300)
+            rowToggle.requestedWidth = Qt.binding(function() { return holder.value })
+            compare(rowToggle.requestedWidth, 300)
+            verify(rowToggle.width <= row.width - 32)
             holder.value = 180
+            compare(rowToggle.requestedWidth, 180)
             compare(rowToggle.width, 180)
         }
 

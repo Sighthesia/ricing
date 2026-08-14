@@ -9,17 +9,20 @@ FocusScope {
     property bool enabled: true
     property bool rowEnabled: true
     property real availableWidth: Infinity
+    property real requestedWidth: implicitWidth
     property string accessibleName: ""
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property bool focusVisible: editor.activeFocus
     readonly property Item editorItem: editor
     property bool syncingEditor: false
+    property bool pendingExternalText: false
+    property bool committing: false
     signal textCommitted(string text)
     signal clearRequested()
 
     implicitWidth: 240
     implicitHeight: 38
-    width: Math.min(implicitWidth, availableWidth)
+    width: Math.min(Math.max(0, requestedWidth), availableWidth)
     height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     activeFocusOnTab: effectiveEnabled
@@ -39,7 +42,14 @@ FocusScope {
         syncingEditor = false
     }
 
-    onTextChanged: syncEditorFromText()
+    onTextChanged: {
+        if (editor.activeFocus && !committing) {
+            pendingExternalText = true
+            return
+        }
+        pendingExternalText = false
+        syncEditorFromText()
+    }
     Component.onCompleted: syncEditorFromText()
 
     onActiveFocusChanged: {
@@ -56,10 +66,21 @@ FocusScope {
         }
     }
 
+    onFocusChanged: {
+        if (!focus && pendingExternalText) {
+            pendingExternalText = false
+            syncEditorFromText()
+        }
+    }
+
     function commit() {
         if (!root.effectiveEnabled)
             return
+        committing = true
         textCommitted(editor.text.trim())
+        committing = false
+        pendingExternalText = false
+        syncEditorFromText()
     }
 
     function clear() {

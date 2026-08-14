@@ -9,6 +9,7 @@ Item {
     property bool enabled: true
     property bool rowEnabled: true
     property real availableWidth: Infinity
+    property real requestedWidth: implicitWidth
     property string accessibleName: ""
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property string displayLabel: labelFor(currentValue)
@@ -17,7 +18,7 @@ Item {
 
     implicitWidth: 190
     implicitHeight: 36
-    width: Math.min(implicitWidth, availableWidth)
+    width: Math.min(Math.max(0, requestedWidth), availableWidth)
     height: implicitHeight
     activeFocusOnTab: effectiveEnabled
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
