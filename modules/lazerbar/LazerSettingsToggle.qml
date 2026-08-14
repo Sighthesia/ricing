@@ -6,25 +6,27 @@ Item {
 
     property bool checked: false
     property bool enabled: true
+    property bool rowEnabled: true
     property string accessibleName: ""
     signal toggled(bool checked)
 
     readonly property bool hovered: hoverHandler.hovered
     readonly property bool pressed: tapHandler.pressed
     readonly property bool focusVisible: activeFocus
+    readonly property bool effectiveEnabled: enabled && rowEnabled
+    readonly property bool hoverHandlerEnabled: hoverHandler.enabled
 
     implicitWidth: 46
     implicitHeight: 26
-    opacity: enabled ? 1 : MotionTokens.disabledOpacity
-    activeFocusOnTab: enabled
+    opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
+    activeFocusOnTab: effectiveEnabled
     Accessible.role: Accessible.CheckBox
     Accessible.name: accessibleName
 
     function activate() {
-        if (!root.enabled)
+        if (!root.effectiveEnabled)
             return
-        root.checked = !root.checked
-        root.toggled(root.checked)
+        root.toggled(!root.checked)
     }
 
     Keys.onSpacePressed: event => { activate(); event.accepted = true }
@@ -57,6 +59,6 @@ Item {
         }
     }
 
-    HoverHandler { id: hoverHandler; enabled: root.enabled }
-    TapHandler { id: tapHandler; enabled: root.enabled; onTapped: root.activate() }
+    HoverHandler { id: hoverHandler; enabled: root.effectiveEnabled }
+    TapHandler { id: tapHandler; enabled: root.effectiveEnabled; onTapped: root.activate() }
 }

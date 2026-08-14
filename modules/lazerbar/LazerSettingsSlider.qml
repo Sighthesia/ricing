@@ -10,17 +10,20 @@ Item {
     property real stepSize: 1
     property string suffix: ""
     property bool enabled: true
+    property bool rowEnabled: true
     property string accessibleName: ""
-    readonly property string displayText: Number(value).toLocaleString(Qt.locale(), 'f', 0) + suffix
+    readonly property bool effectiveEnabled: enabled && rowEnabled
+    readonly property bool trackFillBehaviorEnabled: !MotionTokens.reducedMotion
+    readonly property real displayValue: normalized(value)
+    readonly property string displayText: Number(displayValue).toLocaleString(Qt.locale(), 'f', 0) + suffix
     readonly property bool focusVisible: activeFocus
-    readonly property real effectiveScale: MotionTokens.reducedMotion ? 1 : (hoverHandler.hovered ? MotionTokens.hoverScale : 1)
     signal valueModified(real value)
 
     implicitWidth: 180
     implicitHeight: 36
     focus: true
     activeFocusOnTab: true
-    opacity: enabled ? 1 : MotionTokens.disabledOpacity
+    opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     Accessible.role: Accessible.Slider
     Accessible.name: accessibleName
 
@@ -39,25 +42,14 @@ Item {
 
     function setValue(candidate) {
         var next = normalized(candidate)
-        if (next === value)
-            return
-        value = next
         valueModified(next)
     }
 
-    function increase() { if (enabled) setValue(value + stepSize) }
-    function decrease() { if (enabled) setValue(value - stepSize) }
-
-    onValueChanged: {
-        var next = normalized(value)
-        if (next !== value) {
-            value = next
-            return
-        }
-    }
+    function increase() { if (effectiveEnabled) setValue(displayValue + stepSize) }
+    function decrease() { if (effectiveEnabled) setValue(displayValue - stepSize) }
 
     Keys.onPressed: event => {
-        if (!root.enabled)
+        if (!root.effectiveEnabled)
             return
         if (event.key === Qt.Key_Left) {
             decrease()
@@ -79,11 +71,14 @@ Item {
         color: LazerTheme.settingsRowHover
 
         Rectangle {
-            width: parent.width * ((root.value - root.from) / Math.max(1, root.to - root.from))
+            width: parent.width * root.normalizedFraction
             height: parent.height
             radius: 2
             color: LazerTheme.osuPink
-            Behavior on width { NumberAnimation { duration: MotionTokens.fast } }
+            Behavior on width {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast }
+            }
         }
     }
 
@@ -98,10 +93,26 @@ Item {
         font.pixelSize: 13
     }
 
-    HoverHandler { id: hoverHandler; enabled: root.enabled }
+    readonly property real normalizedFraction: {
+        var low = Math.min(Number(from), Number(to))
+        var high = Math.max(Number(from), Number(to))
+        if (high === low)
+            return 0
+        var fraction = (displayValue - low) / (high - low)
+        return to < from ? 1 - fraction : fraction
+    }
+
+    HoverHandler { id: hoverHandler; enabled: root.effectiveEnabled }
     TapHandler {
         id: tapHandler
-        enabled: root.enabled
-        onTapped: point => root.setValue(root.from + (root.to - root.from) * point.position.x / root.width)
+        enabled: root.effectiveEnabled
+        onTapped: point => {
+            if (root.width <= 0 || root.from === root.to)
+                return
+            var fraction = Math.max(0, Math.min(1, point.position.x / root.width))
+            if (root.to < root.from)
+                fraction = 1 - fraction
+            root.setValue(root.from + (root.to - root.from) * fraction)
+        }
     }
 }

@@ -14,15 +14,21 @@ Item {
 
     implicitWidth: 240
     implicitHeight: 38
+    opacity: enabled ? 1 : MotionTokens.disabledOpacity
+    activeFocusOnTab: enabled
     Accessible.role: Accessible.EditableText
     Accessible.name: accessibleName
 
     function commit() {
+        if (!root.enabled)
+            return
         editor.text = editor.text.trim()
         textCommitted(editor.text)
     }
 
     function clear() {
+        if (!root.enabled)
+            return
         editor.text = ""
         clearRequested()
     }

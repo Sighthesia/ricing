@@ -7,21 +7,31 @@ Item {
     width: 760
     height: 480
 
+    QtObject { id: toggleHolder; property bool value: false }
+    QtObject { id: sliderHolder; property real value: 4 }
+    QtObject { id: choiceHolder; property string value: "auto" }
+
     Lazer.LazerSettingsRow {
         id: row
+        width: 220
         labelText: "设置"
-        descriptionText: "说明文字"
+        descriptionText: "这是一段很长的中文说明，用于验证窄宽布局不会和右侧控件重叠。"
         Lazer.LazerSettingsToggle { id: rowToggle }
     }
 
-    Lazer.LazerSettingsToggle { id: toggle }
+    Lazer.LazerSettingsToggle {
+        id: toggle
+        checked: toggleHolder.value
+        onToggled: next => toggleHolder.value = next
+    }
     Lazer.LazerSettingsSlider {
         id: slider
         from: 0
         to: 10
         stepSize: 2
         suffix: "%"
-        value: 4
+        value: sliderHolder.value
+        onValueModified: next => sliderHolder.value = next
     }
     Lazer.LazerSettingsChoice {
         id: choice
@@ -29,7 +39,8 @@ Item {
             { value: "auto", label: "自动" },
             { value: "dark", label: "深色模式" }
         ]
-        currentValue: "auto"
+        currentValue: choiceHolder.value
+        onValueSelected: next => choiceHolder.value = next
     }
     Lazer.LazerSettingsTextField {
         id: textField
@@ -48,13 +59,13 @@ Item {
 
         function init() {
             toggle.enabled = true
-            toggle.checked = false
+            toggleHolder.value = false
             toggleSpy.clear()
             slider.enabled = true
-            slider.value = 4
+            sliderHolder.value = 4
             sliderSpy.clear()
             choice.enabled = true
-            choice.currentValue = "auto"
+            choiceHolder.value = "auto"
             choiceSpy.clear()
             textField.enabled = true
             textField.text = "  wallpaper.png  "
@@ -67,49 +78,90 @@ Item {
 
         function test_toggleActivationAndDisabledBlocking() {
             toggle.activate()
-            compare(toggle.checked, true)
+            compare(toggleHolder.value, true)
             compare(toggleSpy.count, 1)
             compare(toggleSpy.signalArguments[0][0], true)
 
             toggle.enabled = false
             toggle.activate()
-            compare(toggle.checked, true)
+            compare(toggleHolder.value, true)
             compare(toggleSpy.count, 1)
         }
 
+        function test_toggleKeyboardActivation() {
+            toggle.forceActiveFocus()
+            keyPress(Qt.Key_Return)
+            compare(toggleHolder.value, true)
+            keyPress(Qt.Key_Space)
+            compare(toggleHolder.value, false)
+        }
+
         function test_sliderNormalizesStepsAndSuffix() {
-            slider.value = 99
-            compare(slider.value, 10)
+            sliderHolder.value = 99
+            compare(slider.displayValue, 10)
             compare(slider.displayText, "10%")
-            slider.value = 5
-            compare(slider.value, 6)
+            sliderHolder.value = 5
+            compare(slider.displayValue, 6)
             slider.increase()
-            compare(slider.value, 8)
+            compare(sliderHolder.value, 8)
             slider.decrease()
-            compare(slider.value, 6)
+            compare(sliderHolder.value, 6)
             verify(sliderSpy.count >= 1)
+            sliderHolder.value = 3
+            compare(slider.displayValue, 4)
         }
 
         function test_sliderDisabledAndKeyboardBehavior() {
             slider.enabled = false
             slider.increase()
-            compare(slider.value, 4)
+            compare(sliderHolder.value, 4)
             slider.enabled = true
             slider.forceActiveFocus()
             keyPress(Qt.Key_Right)
-            compare(slider.value, 6)
+            compare(sliderHolder.value, 6)
             keyPress(Qt.Key_Left)
-            compare(slider.value, 4)
+            compare(sliderHolder.value, 4)
+        }
+
+        function test_sliderSafeRangesAndReducedMotion() {
+            slider.from = 10
+            slider.to = 0
+            sliderHolder.value = 8
+            compare(slider.displayValue, 8)
+            verify(slider.normalizedFraction > 0)
+            slider.from = 4
+            slider.to = 4
+            sliderHolder.value = 4
+            compare(slider.normalizedFraction, 0)
+            Lazer.MotionTokens.reducedMotionOverride = true
+            compare(slider.trackFillBehaviorEnabled, false)
         }
 
         function test_choiceRejectsUnknownValues() {
             choice.selectValue("missing")
-            compare(choice.currentValue, "auto")
+            compare(choiceHolder.value, "auto")
             compare(choiceSpy.count, 0)
             choice.selectValue("dark")
-            compare(choice.currentValue, "dark")
+            compare(choiceHolder.value, "dark")
             compare(choiceSpy.count, 1)
             compare(choiceSpy.signalArguments[0][0], "dark")
+            compare(choice.displayLabel, "深色模式")
+        }
+
+        function test_choiceKeyboardAndDisabledBlocking() {
+            choiceHolder.value = "auto"
+            choice.forceActiveFocus()
+            keyPress(Qt.Key_Right)
+            compare(choiceHolder.value, "dark")
+            keyPress(Qt.Key_Left)
+            compare(choiceHolder.value, "auto")
+            keyPress(Qt.Key_Enter)
+            compare(choiceHolder.value, "dark")
+            keyPress(Qt.Key_Space)
+            compare(choiceHolder.value, "auto")
+            choice.enabled = false
+            keyPress(Qt.Key_Right)
+            compare(choiceHolder.value, "auto")
         }
 
         function test_textTrimsCommitAndClears() {
@@ -119,18 +171,28 @@ Item {
             textField.clear()
             compare(textField.text, "")
             compare(clearSpy.count, 1)
+            textField.enabled = false
+            textField.commit()
+            textField.clear()
+            compare(commitSpy.count, 1)
+            compare(clearSpy.count, 1)
         }
 
         function test_focusVisibleAndReducedMotion() {
             slider.forceActiveFocus()
             verify(slider.focusVisible)
             Lazer.MotionTokens.reducedMotionOverride = true
-            compare(slider.effectiveScale, 1)
+            compare(slider.trackFillBehaviorEnabled, false)
         }
 
         function test_rowHasMinimumHeightAndDefaultControl() {
             verify(row.implicitHeight >= 56)
             compare(row.controlItem, rowToggle)
+            verify(row.textRegionWidth <= row.controlRegionLeft - 16)
+            row.enabled = false
+            compare(row.opacity, Lazer.MotionTokens.disabledOpacity)
+            compare(rowToggle.rowEnabled, false)
+            verify(!rowToggle.hoverHandlerEnabled)
         }
     }
 }

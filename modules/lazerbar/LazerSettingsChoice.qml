@@ -7,14 +7,17 @@ Item {
     property var model: []
     property string currentValue: ""
     property bool enabled: true
+    property bool rowEnabled: true
     property string accessibleName: ""
+    readonly property bool effectiveEnabled: enabled && rowEnabled
+    readonly property string displayLabel: labelFor(currentValue)
     readonly property bool focusVisible: activeFocus
     signal valueSelected(string value)
 
     implicitWidth: 190
     implicitHeight: 36
-    activeFocusOnTab: enabled
-    opacity: enabled ? 1 : MotionTokens.disabledOpacity
+    activeFocusOnTab: true
+    opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     Accessible.role: Accessible.ComboBox
     Accessible.name: accessibleName
 
@@ -25,11 +28,17 @@ Item {
         return false
     }
 
+    function labelFor(candidate) {
+        for (var i = 0; i < model.length; i++)
+            if (String(model[i].value) === String(candidate))
+                return String(model[i].label)
+        return ""
+    }
+
     function selectValue(candidate) {
-        if (!enabled || !validValue(candidate) || String(candidate) === currentValue)
+        if (!effectiveEnabled || !validValue(candidate) || String(candidate) === currentValue)
             return
-        currentValue = String(candidate)
-        valueSelected(currentValue)
+        valueSelected(String(candidate))
     }
 
     function selectNext(delta) {
@@ -40,8 +49,18 @@ Item {
         selectValue(model[(index + delta + model.length) % model.length].value)
     }
 
-    Keys.onLeftPressed: event => { selectNext(-1); event.accepted = true }
-    Keys.onRightPressed: event => { selectNext(1); event.accepted = true }
+    Keys.onPressed: event => {
+        if (!effectiveEnabled)
+            return
+        if (event.key === Qt.Key_Left) {
+            selectNext(-1)
+            event.accepted = true
+        } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Return
+                   || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+            selectNext(1)
+            event.accepted = true
+        }
+    }
 
     // Keep one highlighted choice label and indicator visible at all times.
     Rectangle {
@@ -58,16 +77,16 @@ Item {
             anchors.leftMargin: 12
             anchors.right: chevron.left
             anchors.verticalCenter: parent.verticalCenter
-            text: root.currentValue
+            text: root.displayLabel
             color: LazerTheme.textPrimary
             elide: Text.ElideRight
         }
         Text { id: chevron; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "›"; color: LazerTheme.textMuted; font.pixelSize: 18 }
     }
 
-    HoverHandler { id: choiceHover; enabled: root.enabled }
+    HoverHandler { id: choiceHover; enabled: root.effectiveEnabled }
     TapHandler {
-        enabled: root.enabled
+        enabled: root.effectiveEnabled
         onTapped: root.selectNext(1)
     }
 }

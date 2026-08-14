@@ -6,12 +6,26 @@ Item {
 
     property string labelText: ""
     property string descriptionText: ""
+    property bool enabled: true
     default property alias control: controlHost.data
     readonly property Item controlItem: controlHost.data.length > 0 ? controlHost.data[0] : null
 
     implicitWidth: 640
-    implicitHeight: Math.max(56, descriptionText.length > 0 ? 72 : 56)
+    readonly property real textRegionWidth: textColumn.width
+    readonly property real controlRegionLeft: controlHost.x
+    implicitHeight: Math.max(56, textColumn.implicitHeight + 24)
     height: implicitHeight
+    opacity: root.enabled ? 1 : MotionTokens.disabledOpacity
+
+    onEnabledChanged: {
+        if (controlItem && controlItem.hasOwnProperty("rowEnabled"))
+            controlItem.rowEnabled = root.enabled
+    }
+
+    Component.onCompleted: {
+        if (controlItem && controlItem.hasOwnProperty("rowEnabled"))
+            controlItem.rowEnabled = root.enabled
+    }
 
     // Paint the quiet grouped row surface.
     Rectangle {
@@ -25,8 +39,11 @@ Item {
 
     // Present the setting copy without coupling it to a service.
     Column {
+        id: textColumn
         anchors.left: parent.left
         anchors.leftMargin: 16
+        anchors.right: controlHost.left
+        anchors.rightMargin: 16
         anchors.verticalCenter: parent.verticalCenter
         spacing: 3
 
@@ -34,6 +51,7 @@ Item {
             text: root.labelText
             color: LazerTheme.textPrimary
             font.pixelSize: 14
+            elide: Text.ElideRight
         }
 
         Text {
@@ -41,6 +59,8 @@ Item {
             text: root.descriptionText
             color: LazerTheme.textMuted
             font.pixelSize: 11
+            elide: Text.ElideRight
+            wrapMode: Text.WordWrap
         }
     }
 
@@ -54,5 +74,5 @@ Item {
         implicitHeight: childrenRect.height
     }
 
-    HoverHandler { id: rowHover }
+    HoverHandler { id: rowHover; enabled: root.enabled }
 }
