@@ -67,6 +67,14 @@ Item {
         categoryChanged(category)
     }
 
+    // Move navigation focus with the newly selected category, not the old item.
+    function moveNavigation(direction) {
+        if (!root.interactive)
+            return
+        root.selectCategory(root.categoryAt(root.selectedIndex + Number(direction)))
+        Qt.callLater(function() { root.focusNavigation() })
+    }
+
     // Keep every persistent page synchronized through one state transition path.
     function syncPages(previousIndex, nextIndex) {
         var direction = Logic.categoryDirection(previousIndex, nextIndex)
@@ -129,6 +137,19 @@ Item {
     }
 
     onInteractiveChanged: syncPages(selectedIndex, selectedIndex)
+
+    // Reduced motion must cancel any in-flight translation immediately.
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (!MotionTokens.reducedMotion)
+                return
+            appearancePage.x = 0
+            barPage.x = 0
+            notificationPage.x = 0
+            indicator.y = root.contentTop + 10 + root.selectedIndex * 48
+        }
+    }
 
     // Draw the glass panel body behind the persistent rail and viewport.
     Rectangle {
@@ -208,7 +229,7 @@ Item {
             wallpaperService: root.wallpaperService
             opacity: 0
             Behavior on opacity { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-            Behavior on x { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
         }
 
         // Persist the bar page so its scroll position survives navigation.
@@ -220,7 +241,7 @@ Item {
             saveCallback: root.saveCallback
             opacity: 0
             Behavior on opacity { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-            Behavior on x { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
         }
 
         // Persist the notification page so its scroll position survives navigation.
@@ -232,7 +253,7 @@ Item {
             saveCallback: root.saveCallback
             opacity: 0
             Behavior on opacity { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-            Behavior on x { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
         }
     }
 
@@ -245,7 +266,7 @@ Item {
         height: 24
         radius: 2
         color: LazerTheme.osuPink
-        Behavior on y { NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+        Behavior on y { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
     }
 
     // Host the three persistent category controls in the navigation rail.
@@ -256,9 +277,9 @@ Item {
         width: Math.max(0, root.navigationWidth - 20)
         spacing: 4
 
-        LazerSettingsNavItem { id: appearanceNav; width: rail.width; label: "外观"; category: "appearance"; selected: root.selectedIndex === 0; interactive: root.interactive; onActivated: root.selectCategory(category); onMoveRequested: direction => root.selectCategory(root.categoryAt(root.selectedIndex + direction)) }
-        LazerSettingsNavItem { id: barNav; width: rail.width; label: "顶部栏"; category: "bar"; selected: root.selectedIndex === 1; interactive: root.interactive; onActivated: root.selectCategory(category); onMoveRequested: direction => root.selectCategory(root.categoryAt(root.selectedIndex + direction)) }
-        LazerSettingsNavItem { id: notificationNav; width: rail.width; label: "通知"; category: "notifications"; selected: root.selectedIndex === 2; interactive: root.interactive; onActivated: root.selectCategory(category); onMoveRequested: direction => root.selectCategory(root.categoryAt(root.selectedIndex + direction)) }
+        LazerSettingsNavItem { id: appearanceNav; width: rail.width; label: "外观"; category: "appearance"; selected: root.selectedIndex === 0; interactive: root.interactive; onActivated: root.selectCategory(category); onMoveRequested: direction => root.moveNavigation(direction) }
+        LazerSettingsNavItem { id: barNav; width: rail.width; label: "顶部栏"; category: "bar"; selected: root.selectedIndex === 1; interactive: root.interactive; onActivated: root.selectCategory(category); onMoveRequested: direction => root.moveNavigation(direction) }
+        LazerSettingsNavItem { id: notificationNav; width: rail.width; label: "通知"; category: "notifications"; selected: root.selectedIndex === 2; interactive: root.interactive; onActivated: root.selectCategory(category); onMoveRequested: direction => root.moveNavigation(direction) }
     }
 
     Keys.priority: Keys.AfterItem

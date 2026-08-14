@@ -30,14 +30,18 @@ Item {
         name: "LazerSettingsPanel"
 
         function init() {
+            Lazer.MotionTokens.reducedMotionOverride = true
             panel.interactive = true
             panel.selectedCategory = "appearance"
             panel.width = 840
             panel.height = 560
-            Lazer.MotionTokens.reducedMotionOverride = false
             panel.appearancePage.contentY = 0
             panel.barPage.contentY = 0
             panel.notificationPage.contentY = 0
+            closeSpy.clear()
+            categorySpy.clear()
+            Lazer.MotionTokens.reducedMotionOverride = false
+            wait(20)
         }
 
         function cleanup() { Lazer.MotionTokens.reducedMotionOverride = false }
