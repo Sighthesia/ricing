@@ -98,6 +98,8 @@ Item {
 
             overlay.openFrom(opener, 1)
             tryCompare(overlay, "phase", "open", 650)
+            overlay.panel.currentNav.forceActiveFocus()
+            verify(overlay.panel.currentNav.activeFocus)
             overlay.panel.requestClose()
             compare(requestSpy.count, 2)
             compare(overlay.phase, "closing")
@@ -106,6 +108,8 @@ Item {
             overlay.openFrom(opener, 1)
             tryCompare(overlay, "phase", "open", 650)
             requestSpy.clear()
+            overlay.panel.currentNav.forceActiveFocus()
+            verify(overlay.panel.currentNav.activeFocus)
             keyPress(Qt.Key_Escape)
             compare(requestSpy.count, 1)
             compare(overlay.phase, "closing")

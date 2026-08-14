@@ -29,14 +29,6 @@ Item {
     visible: blocksDesktop
     enabled: blocksDesktop
 
-    // Keep Escape modal even when focus belongs to a page control inside the panel.
-    Shortcut {
-        sequence: "Escape"
-        enabled: root.interactive
-        context: Qt.WindowShortcut
-        onActivated: root.requestClose()
-    }
-
     property int _motionToken: 0
 
     function openFrom(source, direction) {
@@ -59,8 +51,11 @@ Item {
         scrimMotion.to = 1
         scrimMotion.restart()
         Qt.callLater(function() {
-            if (root.interactive)
+            if (root.interactive) {
                 panel.focusFirstControl()
+                if (!panel.currentNav.activeFocus)
+                    panel.currentNav.forceActiveFocus()
+            }
         })
     }
 
@@ -148,6 +143,7 @@ Item {
         y: root.panelRestY + root.panelOffsetY
 
         // Close and navigation are the modal's tab boundary until page controls are extended.
+        focus: root.interactive
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: event => {
             if (!root.interactive)
@@ -158,6 +154,10 @@ Item {
                 root.cycleFocus(backward)
                 event.accepted = true
             }
+        }
+        Keys.onEscapePressed: event => {
+            root.requestClose()
+            event.accepted = true
         }
 
         // Shield empty panel clicks at the host boundary without intercepting child controls.
