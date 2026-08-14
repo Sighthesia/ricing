@@ -5,6 +5,10 @@ import "LazerBarLogic.js" as Logic
 Item {
     id: root
     property real availableWidth: 1000
+    property bool musicActive: false
+    property alias musicButtonItem: musicButton
+    signal musicOverlayRequested(bool open)
+    signal musicTooltipRequested(bool visible)
     readonly property var visibleIds: Logic.visibleUtilityIds(availableWidth, LazerTheme.targetSize, LazerTheme.groupGap)
     readonly property var entries: [
         { id: "news", name: "News", source: "icons/news.svg" },
@@ -13,8 +17,7 @@ Item {
         { id: "ranking", name: "Ranking", source: "icons/podium.svg" },
         { id: "library", name: "Beatmap library", source: "icons/library.svg" },
         { id: "chat", name: "Chat", source: "icons/chat.svg" },
-        { id: "community", name: "Community", source: "icons/globe.svg" },
-        { id: "music", name: "Music player", source: "icons/music.svg" }
+        { id: "community", name: "Community", source: "icons/globe.svg" }
     ]
     implicitWidth: row.implicitWidth
     implicitHeight: LazerTheme.barHeight
@@ -33,6 +36,17 @@ Item {
                 accessibleName: modelData.name
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
+        }
+        Rectangle { visible: root.visibleIds.indexOf("music") >= 0; width: visible ? 1 : 0; height: 22; anchors.verticalCenter: parent.verticalCenter; color: LazerTheme.divider }
+        OsuTopBarButton {
+            id: musicButton
+            visible: root.visibleIds.indexOf("music") >= 0
+            iconSource: "icons/music.svg"
+            titleText: "音乐播放器"
+            subtitleText: "播放控制"
+            isActive: root.musicActive
+            onClicked: root.musicOverlayRequested(!root.musicActive)
+            onTooltipRequestedChanged: root.musicTooltipRequested(tooltipRequested)
         }
     }
 }
