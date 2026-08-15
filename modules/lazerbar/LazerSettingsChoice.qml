@@ -71,7 +71,7 @@ Item {
         if (!root.menuOpen)
             return
         root.menuOpen = false
-        SettingsOverlayBridge.hideDropdown()
+        SettingsOverlayBridge.hideDropdown(root)
     }
 
     function focusHeader() {

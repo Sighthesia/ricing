@@ -27,6 +27,11 @@ Item {
         saveCallback: saveService.save
         wallpaperService: wallpaperService
     }
+    Lazer.LazerSettingsChoice {
+        id: externalChoice
+        model: [{ value: "outside", label: "Outside" }]
+        currentValue: "outside"
+    }
     SignalSpy { id: closeSpy; target: panel; signalName: "closeRequested" }
     SignalSpy { id: categorySpy; target: panel; signalName: "categoryChanged" }
 
@@ -277,6 +282,15 @@ Item {
             compare(barSettings.position, "bottom")
             verify(!panel.content.dropdownVisible)
             verify(!choice.menuOpen)
+            panel.contentReady = false
+        }
+
+        function test_dropdownIgnoresChoiceFromAnotherContentOwner() {
+            panel.contentReady = true
+            externalChoice.openMenu()
+            verify(externalChoice.menuOpen)
+            verify(!panel.content.dropdownVisible)
+            externalChoice.closeMenu()
             panel.contentReady = false
         }
 

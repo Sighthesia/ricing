@@ -455,7 +455,7 @@ Item {
     }
 
     function showTooltipAt(text, source) {
-        if (!root.interactive || !root.contentReady || !source || !text) {
+        if (!root.interactive || !root.contentReady || !root.ownsOverlaySource(source) || !text) {
             hideTooltip()
             return
         }
@@ -474,10 +474,21 @@ Item {
 
     function refreshTooltipFromBridge() {
         var current = SettingsOverlayBridge.currentTooltip()
-        if (current && current.text)
+        if (current && current.text && root.ownsOverlaySource(current.source))
             showTooltipAt(current.text, current.source)
         else
             hideTooltip()
+    }
+
+    // Accept overlay requests only from controls mounted under this screen's content.
+    function ownsOverlaySource(source) {
+        var cursor = source
+        while (cursor) {
+            if (cursor === root)
+                return true
+            cursor = cursor.parent
+        }
+        return false
     }
 
     function closeDropdownMenu() {
@@ -506,7 +517,7 @@ Item {
     }
 
     function showDropdownFor(choiceItem) {
-        if (!root.interactive || !root.contentReady || !choiceItem) {
+        if (!root.interactive || !root.contentReady || !root.ownsOverlaySource(choiceItem)) {
             hideTooltip()
             return
         }
@@ -547,8 +558,8 @@ Item {
         function onTooltipRequested(text, source, priority) { root.refreshTooltipFromBridge() }
         function onTooltipDismissed(source) { root.refreshTooltipFromBridge() }
         function onDropdownRequested(choiceItem) { root.showDropdownFor(choiceItem) }
-        function onDropdownDismissed() {
-            if (dropdownMenu.visible)
+        function onDropdownDismissed(choiceItem) {
+            if (dropdownMenu.visible && dropdownMenu.choiceItem === choiceItem)
                 dropdownMenu.close()
         }
     }

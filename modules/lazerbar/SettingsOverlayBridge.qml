@@ -8,7 +8,7 @@ QtObject {
     signal tooltipRequested(string text, var sourceItem, int priority)
     signal tooltipDismissed(var sourceItem)
     signal dropdownRequested(var choiceItem)
-    signal dropdownDismissed()
+    signal dropdownDismissed(var choiceItem)
 
     // Keep one active tooltip per source so hover/focus changes do not flicker.
     property var _tooltipRequests: []
@@ -54,7 +54,7 @@ QtObject {
         dropdownRequested(choiceItem)
     }
 
-    function hideDropdown() {
-        dropdownDismissed()
+    function hideDropdown(choiceItem) {
+        dropdownDismissed(choiceItem)
     }
 }

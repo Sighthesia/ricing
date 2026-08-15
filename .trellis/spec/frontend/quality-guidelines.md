@@ -205,3 +205,66 @@ Item {
     Behavior on x { NumberAnimation { easing.type: Easing.OutQuint } }
 }
 ```
+
+## Scenario: Local Control Overlays Through A Singleton Bridge
+
+### 1. Scope / Trigger
+
+- Apply when controls inside clipped Flickables request dropdowns or tooltips from an unclipped Content overlay.
+- Apply when one QML singleton carries those requests while multiple per-screen Content owners are alive.
+
+### 2. Signatures
+
+- Tooltip request: `(text, sourceItem, priority)`.
+- Dropdown request: `(choiceItem)`.
+- Dropdown dismiss: `(choiceItem)`; dismiss must retain source identity.
+- Content ownership predicate: walk `sourceItem.parent` until the receiving Content owner or `null`.
+
+### 3. Contracts
+
+- The singleton transports requests; it does not choose the visual owner.
+- Each Content instance handles only requests whose source is in its own visual ancestor chain.
+- Tooltip/dropdown Items live above the clipped page viewport but inside the existing fixed Settings surface.
+- Parent overlay visibility is owned by explicit state; it must not bind to a child's mutable `visible` property.
+
+### 4. Validation & Error Matrix
+
+- Request source is outside receiver tree -> ignore without closing local overlays.
+- Dismiss source differs from active dropdown source -> ignore.
+- `parent.visible: child.visible` while child `open()` writes `visible` -> reject as a circular ownership binding.
+- Category/search/owner close -> close only overlays owned by that Content instance.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a dropdown from screen A opens only in screen A's Settings Content.
+- Base: a row tooltip is repositioned into its owning Content overlay and does not take focus.
+- Bad: every per-screen Content reacts to one singleton dropdown signal.
+- Bad: opening a child menu is immediately undone by its parent's binding to child visibility.
+
+### 6. Tests Required
+
+- Instantiate an external Choice outside the tested Content and assert its request does not open the local dropdown.
+- Assert local dropdown open/select/Escape/outside-close and focus restoration.
+- Assert dropdown Escape is handled before Overlay Escape.
+- Repeat owner lifecycle tests to expose stale singleton requests.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+Item {
+    visible: menu.visible
+    SettingsDropdownMenu { id: menu }
+}
+```
+
+#### Correct
+
+```qml
+Item {
+    property bool dropdownOpen: false
+    visible: dropdownOpen
+    SettingsDropdownMenu { id: menu }
+}
+```
