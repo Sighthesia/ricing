@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/08-15-osu-settings-control-fidelity/prd.md","reason":"Authoritative control fidelity findings, product decisions, scope, and acceptance criteria."}
+{"file":".trellis/tasks/08-15-osu-settings-control-fidelity/design.md","reason":"Nub, slider, dropdown, SettingsRow, tooltip, reset, focus, and compatibility contracts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Fixed overlay surface, split settings layers, focus, testing, and token isolation contracts."}
+{"file":".agents/skills/comment-before-declarations/SKILL.md","reason":"Required QML declaration comments."}
+{"file":".agents/skills/visual-transition-rules/SKILL.md","reason":"Required transitions for control geometry, colour, opacity, glow, and filtered rows."}
