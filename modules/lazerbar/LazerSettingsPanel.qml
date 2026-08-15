@@ -180,9 +180,24 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: LazerTheme.settingsRadius
-        color: LazerTheme.settingsPanel
+        color: root.appearanceSettings
+               ? Qt.rgba(root.appearanceSettings.colorScheme === "light" ? 0.95 : 0.114,
+                         root.appearanceSettings.colorScheme === "light" ? 0.94 : 0.11,
+                         root.appearanceSettings.colorScheme === "light" ? 0.96 : 0.133,
+                         Math.max(0.35, Math.min(1, root.appearanceSettings.panelOpacity)))
+               : LazerTheme.settingsPanel
         border.width: 1
-        border.color: LazerTheme.settingsPanelBorder
+        border.color: root.appearanceSettings
+                ? Qt.rgba(root.appearanceSettings.colorScheme === "light" ? 0 : 1,
+                          root.appearanceSettings.colorScheme === "light" ? 0 : 1,
+                          root.appearanceSettings.colorScheme === "light" ? 0 : 1,
+                          Math.max(0.08, root.appearanceSettings.glassHighlightIntensity
+                                   * Math.max(1, root.appearanceSettings.glassHighlightWidth) * 0.125
+                                   + root.appearanceSettings.glassGlowIntensity * 0.05))
+                : LazerTheme.settingsPanelBorder
+
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
     // Provide a compact header with a keyboard-accessible close affordance.

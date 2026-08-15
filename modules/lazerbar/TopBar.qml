@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../../services" as Services
+import "LazerBarLogic.js" as Logic
 
 // Create one background and three focused interaction zones per screen.
 Variants {
@@ -16,12 +17,33 @@ Variants {
         required property var modelData
         readonly property int sidePadding: 12
         readonly property int safetyGap: 16
+        readonly property int floatingMargin: Services.SettingsService.bar.floating
+                ? Math.max(0, Math.min(24, Number(Services.SettingsService.bar.floatingMargin) || 0)) : 0
         readonly property int utilityBudget: Math.max(LazerTheme.targetSize,
             modelData.width - leftWindow.implicitWidth - statusWindow.implicitWidth
             - sidePadding * 2 - safetyGap * 2)
-        property bool musicOverlayOpen: false
+        property string activeOverlay: ""
         property bool musicTooltipOpen: false
         property bool shuffleActive: false
+
+        function requestOverlay(requested) {
+            const next = Logic.nextOverlay(activeOverlay, requested)
+            if (activeOverlay === "settings" && next !== "settings") {
+                if (next === "")
+                    settingsOverlay.closeAndRestoreFocus()
+                else
+                    settingsOverlay.closeWithoutFocusRestore()
+            }
+            if (activeOverlay === "music" && next !== "music")
+                musicOverlay.close()
+
+            activeOverlay = next
+            musicTooltipOpen = false
+            if (next === "settings")
+                settingsOverlay.openFrom(leftContent.settingsButtonItem, 1)
+            else if (next === "music")
+                musicOverlay.open()
+        }
 
         BarBackground { targetScreen: screenScope.modelData }
 
@@ -31,10 +53,16 @@ Variants {
             screen: screenScope.modelData
             color: "transparent"
             implicitWidth: leftContent.implicitWidth + screenScope.sidePadding * 2
-            implicitHeight: LazerTheme.barHeight
+            implicitHeight: Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
             exclusionMode: ExclusionMode.Ignore
-            anchors { top: true; left: true }
-            LeftZone { id: leftContent; anchors.centerIn: parent }
+            anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true }
+            margins { top: screenScope.floatingMargin; bottom: screenScope.floatingMargin; left: screenScope.floatingMargin }
+            LeftZone {
+                id: leftContent
+                anchors.centerIn: parent
+                settingsActive: screenScope.activeOverlay === "settings"
+                onSettingsRequested: screenScope.requestOverlay("settings")
+            }
         }
 
         // Host utilities against the status zone without a full-width hit area.
@@ -43,22 +71,43 @@ Variants {
             screen: screenScope.modelData
             color: "transparent"
             implicitWidth: utilityContent.implicitWidth + screenScope.sidePadding * 2
-            implicitHeight: LazerTheme.barHeight
+            implicitHeight: Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
             exclusionMode: ExclusionMode.Ignore
-            anchors { top: true; right: true }
-            margins { right: statusWindow.implicitWidth + screenScope.safetyGap }
+            anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; right: true }
+            margins { top: screenScope.floatingMargin; bottom: screenScope.floatingMargin; right: statusWindow.implicitWidth + screenScope.safetyGap + screenScope.floatingMargin }
             UtilityZone {
                 id: utilityContent
                 anchors.centerIn: parent
                 availableWidth: screenScope.utilityBudget - screenScope.sidePadding * 2
-                musicActive: screenScope.musicOverlayOpen
-                onMusicOverlayRequested: open => {
-                    screenScope.musicOverlayOpen = open
-                    screenScope.musicTooltipOpen = false
-                    if (open) musicOverlay.open()
-                    else musicOverlay.close()
+                musicActive: screenScope.activeOverlay === "music"
+                onMusicOverlayRequested: screenScope.requestOverlay("music")
+                onMusicTooltipRequested: visible => screenScope.musicTooltipOpen = visible
+                        && screenScope.activeOverlay !== "music"
+            }
+        }
+
+        // Keep the settings modal per-screen and independent from the bar geometry.
+        PanelWindow {
+            id: settingsWindow
+            screen: screenScope.modelData
+            color: "transparent"
+            implicitWidth: screenScope.modelData.width
+            implicitHeight: screenScope.modelData.height
+            exclusionMode: ExclusionMode.Ignore
+            anchors { top: true; left: true }
+            mask: Region { item: settingsOverlay.blocksDesktop ? settingsOverlay : null }
+            LazerSettingsOverlay {
+                id: settingsOverlay
+                anchors.fill: parent
+                panel.appearanceSettings: Services.SettingsService.appearance
+                panel.barSettings: Services.SettingsService.bar
+                panel.notificationSettings: Services.SettingsService.notifications
+                panel.saveCallback: Services.SettingsService.save
+                panel.wallpaperService: Services.WallpaperService
+                onClosed: {
+                    if (screenScope.activeOverlay === "settings")
+                        screenScope.activeOverlay = ""
                 }
-                onMusicTooltipRequested: visible => screenScope.musicTooltipOpen = visible && !screenScope.musicOverlayOpen
             }
         }
 
@@ -70,8 +119,8 @@ Variants {
             implicitWidth: 340
             implicitHeight: 134
             exclusionMode: ExclusionMode.Ignore
-            anchors { top: true; right: true }
-            margins { top: LazerTheme.barHeight + 4; right: statusWindow.implicitWidth + screenScope.safetyGap }
+            anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; right: true }
+            margins { top: Services.SettingsService.bar.position === "top" ? Services.SettingsService.bar.height + 4 : 4; bottom: Services.SettingsService.bar.position === "bottom" ? Services.SettingsService.bar.height + 4 : 4; right: statusWindow.implicitWidth + screenScope.safetyGap }
             mask: Region { item: musicOverlay.interactive ? musicHitArea : null }
             Item { id: musicHitArea; anchors.fill: musicOverlay }
             OsuMusicOverlay {
@@ -90,7 +139,7 @@ Variants {
                 onPlayPauseRequested: Services.MediaService.playPause()
                 onNextRequested: Services.MediaService.next()
                 onCloseRequested: {
-                    screenScope.musicOverlayOpen = false
+                    screenScope.activeOverlay = ""
                     close()
                     utilityContent.musicButtonItem.forceActiveFocus()
                 }
@@ -105,8 +154,8 @@ Variants {
             implicitWidth: 150
             implicitHeight: 48
             exclusionMode: ExclusionMode.Ignore
-            anchors { top: true; right: true }
-            margins { top: LazerTheme.barHeight + 4; right: statusWindow.implicitWidth + screenScope.safetyGap }
+            anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; right: true }
+            margins { top: Services.SettingsService.bar.position === "top" ? Services.SettingsService.bar.height + 4 : 4; bottom: Services.SettingsService.bar.position === "bottom" ? Services.SettingsService.bar.height + 4 : 4; right: statusWindow.implicitWidth + screenScope.safetyGap }
             mask: Region {}
             Rectangle {
                 anchors.fill: parent
@@ -130,9 +179,9 @@ Variants {
             screen: screenScope.modelData
             color: "transparent"
             implicitWidth: statusContent.implicitWidth + screenScope.sidePadding * 2
-            implicitHeight: LazerTheme.barHeight
+            implicitHeight: Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
             exclusionMode: ExclusionMode.Ignore
-            anchors { top: true; right: true }
+            anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; right: true }
             StatusZone {
                 id: statusContent
                 anchors.centerIn: parent

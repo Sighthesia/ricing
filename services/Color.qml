@@ -47,7 +47,8 @@ QtObject {
     // Use Qt.colorEqual guard: unset color properties default to transparent (#00000000),
     // so we fall back to defaults only when the adapter value is fully transparent.
     function applyColors() {
-        var d = adapter.dark
+        var d = Services.SettingsService.appearance.colorScheme === "light"
+                ? adapter.light : adapter.dark
         root.mPrimary = Qt.colorEqual(d.primary, "transparent") ? defaults.mPrimary : d.primary
         root.mOnPrimary = Qt.colorEqual(d.on_primary, "transparent") ? defaults.mOnPrimary : d.on_primary
         root.mSecondary = Qt.colorEqual(d.secondary, "transparent") ? defaults.mSecondary : d.secondary
@@ -62,6 +63,12 @@ QtObject {
         root.mOnSurfaceVariant = Qt.colorEqual(d.on_surface_variant, "transparent") ? defaults.mOnSurfaceVariant : d.on_surface_variant
         root.mOutline = Qt.colorEqual(d.outline, "transparent") ? defaults.mOutline : d.outline
         root.mShadow = Qt.colorEqual(d.shadow, "transparent") ? defaults.mShadow : d.shadow
+    }
+
+    // Apply an already-generated palette immediately while ColorService refreshes the cache.
+    property Connections _schemeConnection: Connections {
+        target: Services.SettingsService.appearance
+        function onColorSchemeChanged() { root.applyColors() }
     }
 
     // Debounce reload for atomic file replacements
@@ -116,6 +123,22 @@ QtObject {
             // Read the nested "dark" object from colors.json via JsonObject.
             // Property names must match JSON keys exactly (snake_case).
             property JsonObject dark: JsonObject {
+                property color primary
+                property color on_primary
+                property color secondary
+                property color on_secondary
+                property color tertiary
+                property color on_tertiary
+                property color error
+                property color on_error
+                property color surface
+                property color on_surface
+                property color surface_variant
+                property color on_surface_variant
+                property color outline
+                property color shadow
+            }
+            property JsonObject light: JsonObject {
                 property color primary
                 property color on_primary
                 property color secondary

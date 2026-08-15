@@ -7,4 +7,6 @@ ShellRoot {
     LazerBar.TopBar {
         username: "Sighthesia"
     }
+
+    LazerBar.NotificationHost {}
 }

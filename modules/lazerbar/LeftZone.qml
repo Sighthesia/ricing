@@ -4,6 +4,9 @@ import QtQuick
 Item {
     id: root
     property alias selectedMode: modes.selectedMode
+    property bool settingsActive: false
+    property alias settingsButtonItem: settingsButton
+    signal settingsRequested
     implicitWidth: row.implicitWidth
     implicitHeight: LazerTheme.barHeight
 
@@ -11,7 +14,14 @@ Item {
         id: row
         anchors.verticalCenter: parent.verticalCenter
         spacing: 8
-        IconButton { source: "icons/settings.svg"; accessibleName: "Settings" }
+        OsuTopBarButton {
+            id: settingsButton
+            iconSource: "icons/settings.svg"
+            titleText: "设置"
+            subtitleText: "个性化 Afloat"
+            isActive: root.settingsActive
+            onClicked: root.settingsRequested()
+        }
         IconButton { source: "icons/home.svg"; accessibleName: "Home" }
         Rectangle { width: 1; height: 22; anchors.verticalCenter: parent.verticalCenter; color: LazerTheme.divider }
         ModeSelector {

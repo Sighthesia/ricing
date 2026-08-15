@@ -28,3 +28,6 @@ LazerSettingsNotifications 1.0 LazerSettingsNotifications.qml
 LazerSettingsNavItem 1.0 LazerSettingsNavItem.qml
 LazerSettingsPanel 1.0 LazerSettingsPanel.qml
 LazerSettingsOverlay 1.0 LazerSettingsOverlay.qml
+LazerNotificationPopup 1.0 LazerNotificationPopup.qml
+LazerNotificationStack 1.0 LazerNotificationStack.qml
+NotificationHost 1.0 NotificationHost.qml

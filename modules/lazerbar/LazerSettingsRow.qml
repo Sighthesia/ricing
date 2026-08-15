@@ -8,8 +8,8 @@ Item {
     property string descriptionText: ""
     property bool enabled: true
     readonly property bool contentEnabled: enabled
-    default property alias control: controlHost.data
-    readonly property Item controlItem: controlHost.data.length > 0 ? controlHost.data[0] : null
+    default property alias control: controlHost.children
+    readonly property Item controlItem: controlHost.children.length > 0 ? controlHost.children[0] : null
     readonly property bool controlSupportsRowEnabled: controlItem !== null && controlItem.rowEnabled !== undefined
     readonly property bool controlSupportsAvailableWidth: controlItem !== null && controlItem.availableWidth !== undefined
     readonly property bool controlSupportsRequestedWidth: controlItem !== null && controlItem.requestedWidth !== undefined

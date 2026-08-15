@@ -81,7 +81,9 @@ Singleton {
 
     // Per-message dwell: notifications linger, OSD feedback is brief.
     property Timer hideTimer: Timer {
-        interval: root.current && root.current.kind === "notification" ? 5000 : 1800
+        interval: root.current && root.current.kind === "notification"
+            ? Math.max(0, Number(Services.SettingsService.notifications.timeout) || 0)
+            : 1800
         onTriggered: {
             if (root._queue.length === 0) {
                 root._advance()

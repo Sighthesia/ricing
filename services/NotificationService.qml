@@ -28,6 +28,32 @@ Singleton {
     readonly property int maxHistoryEntries: 120
     readonly property int messageCount: historyList.count
     readonly property int stickyCount: stickyList.count
+    // Export one normalized placement contract for notification hosts.
+    readonly property string notificationPosition: {
+        const value = String(SettingsService.notifications.position || "top-right")
+        return ["top-left", "top-right", "bottom-left", "bottom-right"].indexOf(value) >= 0
+                ? value : "top-right"
+    }
+    readonly property bool notificationTop: notificationPosition.indexOf("top-") === 0
+    readonly property bool notificationBottom: !notificationTop
+    readonly property bool notificationLeft: notificationPosition.indexOf("-left") >= 0
+    readonly property bool notificationRight: !notificationLeft
+
+    // Remove transient popups from one deterministic timer owned by the service.
+    property Timer popupExpiryTimer: Timer {
+        interval: 250
+        running: true
+        repeat: true
+        onTriggered: {
+            const now = Date.now()
+            const timeout = Math.max(0, Number(SettingsService.notifications.timeout) || 0)
+            for (let i = root.popupList.count - 1; i >= 0; --i) {
+                const entry = root.popupList.get(i)
+                if (timeout <= 0 || now - Number(entry.timestamp || 0) >= timeout)
+                    root.popupList.remove(i)
+            }
+        }
+    }
 
     function _normalizedSourceName(appName) {
         return (appName || "").toLowerCase()
@@ -209,6 +235,11 @@ Singleton {
                 return
             }
         }
+    }
+
+    // Expose the popup-specific dismissal contract used by notification hosts.
+    function dismissPopup(notifId) {
+        removeNotification(notifId)
     }
 
     function setSticky(notifId, sticky) {
