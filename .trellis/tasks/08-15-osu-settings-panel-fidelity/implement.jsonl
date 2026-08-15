@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/08-15-osu-settings-panel-fidelity/prd.md","reason":"Authoritative product scope, source anchors, search/collapse decisions, and acceptance criteria."}
+{"file":".trellis/tasks/08-15-osu-settings-panel-fidelity/design.md","reason":"Owner-layer architecture, motion/search/focus contracts, responsive behavior, and compatibility boundaries."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Existing fixed-surface overlay, focus, reduced-motion, token isolation, and QML validation contracts."}
+{"file":".agents/skills/comment-before-declarations/SKILL.md","reason":"Required declaration-comment convention for all modified and new QML modules."}
+{"file":".agents/skills/visual-transition-rules/SKILL.md","reason":"Project transition rules for geometry, opacity, colors, spacing, and visual token changes."}

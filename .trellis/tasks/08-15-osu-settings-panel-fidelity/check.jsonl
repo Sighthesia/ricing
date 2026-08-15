@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/08-15-osu-settings-panel-fidelity/prd.md","reason":"Check every observable requirement and out-of-scope boundary before completion."}
+{"file":".trellis/tasks/08-15-osu-settings-panel-fidelity/design.md","reason":"Verify implementation preserves the agreed owner, motion, search, focus, and responsive contracts."}
+{"file":".trellis/tasks/08-15-osu-settings-panel-fidelity/implement.md","reason":"Run the ordered component and full-regression validation checklist."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check fixed PanelWindow geometry, coordinator lifecycle, isolated tokens, focus races, WARN/ERROR output, and required tests."}
+{"file":".agents/skills/visual-transition-rules/SKILL.md","reason":"Review perceptible visual changes and reduced-motion behavior against project rules."}
