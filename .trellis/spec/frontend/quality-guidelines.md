@@ -84,3 +84,77 @@ PanelWindow {
     mask: Region { item: notificationStack.implicitHeight > 0 ? notificationStack : null }
 }
 ```
+
+## Scenario: Shared Fullscreen Route Owner
+
+### 1. Scope / Trigger
+
+- Apply when multiple persistent pages or existing overlays share one fullscreen shell.
+- Use one fixed per-screen `PanelWindow`; route changes replace inner content, not the compositor owner.
+
+### 2. Signatures
+
+- Route: `"" | "settings" | "music" | "wiki" | "news" | "beatmap"`.
+- Lifecycle: `"closed" | "opening" | "open" | "closing"`.
+- Host entry points: `openRoute(route, opener)`, `close()`, and `handleEscape()`.
+- Compatibility route components may expose `open()`; the host calls it after the route `Loader` completes.
+
+### 3. Contracts
+
+- The `PanelWindow` uses screen-sized `implicitWidth`/`implicitHeight`; only the inner surface animates.
+- One route value owns mutually exclusive page selection and is cleared only after close animation completion.
+- The inner focused `Item` owns `Keys.*`; the compositor-facing `PanelWindow` does not.
+- Escape precedence is input state, page return state, then host close.
+- Closing restores focus to the opener after route cleanup.
+- Existing settings content is mounted as `LazerSettingsPanel`, not as a nested closed `LazerSettingsOverlay` lifecycle.
+- Existing music content is activated after loading so `opacity`, `enabled`, and keyboard controls become interactive.
+
+### 4. Validation & Error Matrix
+
+- Unknown or empty route -> reject without opening.
+- Reopen while closing -> stop close animation and retarget the current owner.
+- Route component with `open()` -> invoke once when loaded.
+- Route component without `open()` -> display directly without error.
+- Narrow screen -> clamp surface dimensions inside the available screen bounds.
+- Close completion -> clear route, remove interactive mask, then restore opener focus.
+
+### 5. Good/Base/Bad Cases
+
+- Good: settings, music, wiki, news, and beatmap replace one loader inside one stable surface.
+- Base: a static page has no activation method and renders immediately.
+- Bad: settings is loaded as `LazerSettingsOverlay` but never receives `openFrom()`, leaving it invisible.
+- Bad: each route creates its own fullscreen `PanelWindow` or animates layer-shell dimensions per frame.
+
+### 6. Tests Required
+
+- Pure logic tests cover route normalization, geometry clamps, and Escape precedence.
+- Host tests cover open/close cleanup, rapid route replacement, static page creation, and optional route activation.
+- Existing settings and music component suites remain green.
+- Run all plugin-independent QML tests sequentially, Python backend tests, `qs -p .`, and `git diff --check`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+Loader {
+    sourceComponent: route === "settings" ? settingsOverlayComponent : musicOverlayComponent
+}
+```
+
+This mounts components whose own lifecycle defaults to closed without activating them.
+
+#### Correct
+
+```qml
+Loader {
+    id: routeLoader
+    sourceComponent: selectedRouteComponent
+    onLoaded: {
+        if (item && typeof item.open === "function")
+            item.open()
+    }
+}
+```
+
+Mount settings as the directly interactive panel and let the shared host own modal lifecycle.

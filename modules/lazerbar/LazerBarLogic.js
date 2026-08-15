@@ -65,9 +65,9 @@ function visualState(enabled, active, hovered, pressed) {
 
 function nextOverlay(current, requested) {
     var activeCandidate = current == null ? "" : String(current)
-    var active = activeCandidate === "settings" || activeCandidate === "music" ? activeCandidate : ""
+    var active = ["settings", "music", "wiki", "news", "beatmap"].indexOf(activeCandidate) >= 0 ? activeCandidate : ""
     var targetCandidate = requested == null ? "" : String(requested)
-    if (targetCandidate !== "settings" && targetCandidate !== "music")
+    if (["settings", "music", "wiki", "news", "beatmap"].indexOf(targetCandidate) < 0)
         return active
     return active === targetCandidate ? "" : targetCandidate
 }

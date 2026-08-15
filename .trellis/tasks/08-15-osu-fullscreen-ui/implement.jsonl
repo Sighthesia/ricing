@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"QML token purity, per-screen host, bounded masks, and sequential UI test requirements."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Keep route host, settings services, static page models, and input ownership at explicit boundaries."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse one fullscreen owner and shared header/sidebar/content contracts instead of duplicating page windows."}

@@ -9,6 +9,7 @@ Item {
     property alias musicButtonItem: musicButton
     signal musicOverlayRequested(bool open)
     signal musicTooltipRequested(bool visible)
+    signal routeRequested(string route)
     readonly property var visibleIds: Logic.visibleUtilityIds(availableWidth, LazerTheme.targetSize, LazerTheme.groupGap)
     readonly property var entries: [
         { id: "news", name: "News", source: "icons/news.svg" },
@@ -35,6 +36,7 @@ Item {
                 source: modelData.source
                 accessibleName: modelData.name
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                onClicked: root.routeRequested(modelData.id === "library" ? "beatmap" : modelData.id === "wiki" ? "wiki" : modelData.id === "news" ? "news" : "")
             }
         }
         Rectangle { visible: root.visibleIds.indexOf("music") >= 0; width: visible ? 1 : 0; height: 22; anchors.verticalCenter: parent.verticalCenter; color: LazerTheme.divider }

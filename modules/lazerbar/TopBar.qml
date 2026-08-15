@@ -28,21 +28,15 @@ Variants {
 
         function requestOverlay(requested) {
             const next = Logic.nextOverlay(activeOverlay, requested)
-            if (activeOverlay === "settings" && next !== "settings") {
-                if (next === "")
-                    settingsOverlay.closeAndRestoreFocus()
-                else
-                    settingsOverlay.closeWithoutFocusRestore()
-            }
-            if (activeOverlay === "music" && next !== "music")
-                musicOverlay.close()
-
             activeOverlay = next
             musicTooltipOpen = false
-            if (next === "settings")
-                settingsOverlay.openFrom(leftContent.settingsButtonItem, 1)
-            else if (next === "music")
-                musicOverlay.open()
+            if (next === "") {
+                fullscreenHost.close()
+            } else if (next === "settings" || next === "music") {
+                fullscreenHost.openRoute(next, next === "settings" ? leftContent.settingsButtonItem : utilityContent.musicButtonItem)
+            } else {
+                fullscreenHost.openRoute(next, null)
+            }
         }
 
         BarBackground { targetScreen: screenScope.modelData }
@@ -81,67 +75,76 @@ Variants {
                 availableWidth: screenScope.utilityBudget - screenScope.sidePadding * 2
                 musicActive: screenScope.activeOverlay === "music"
                 onMusicOverlayRequested: screenScope.requestOverlay("music")
+                onRouteRequested: route => {
+                    if (route)
+                        screenScope.requestOverlay(route)
+                }
                 onMusicTooltipRequested: visible => screenScope.musicTooltipOpen = visible
                         && screenScope.activeOverlay !== "music"
             }
         }
 
-        // Keep the settings modal per-screen and independent from the bar geometry.
+        // Keep one fixed fullscreen owner for every route on this screen.
         PanelWindow {
-            id: settingsWindow
+            id: fullscreenWindow
             screen: screenScope.modelData
             color: "transparent"
             implicitWidth: screenScope.modelData.width
             implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
             anchors { top: true; left: true }
-            mask: Region { item: settingsOverlay.blocksDesktop ? settingsOverlay : null }
-            LazerSettingsOverlay {
-                id: settingsOverlay
+            // The active modal includes its backdrop so click-away remains usable;
+            // the mask is removed as soon as close completes.
+            mask: Region { item: fullscreenHost.interactive ? fullscreenHost : null }
+            FullscreenOverlayHost {
+                id: fullscreenHost
                 anchors.fill: parent
-                panel.appearanceSettings: Services.SettingsService.appearance
-                panel.barSettings: Services.SettingsService.bar
-                panel.notificationSettings: Services.SettingsService.notifications
-                panel.saveCallback: Services.SettingsService.save
-                panel.wallpaperService: Services.WallpaperService
-                onClosed: {
-                    if (screenScope.activeOverlay === "settings")
-                        screenScope.activeOverlay = ""
+                settingsComponent: settingsRoute
+                musicComponent: musicRoute
+                onClosed: screenScope.activeOverlay = ""
+            }
+
+            // Adapt the existing settings surface into the shared route slot.
+            Component {
+                id: settingsRoute
+                LazerSettingsPanel {
+                    anchors.centerIn: parent
+                    width: panelWidth
+                    height: panelHeight
+                    availableWidth: parent ? parent.width : 0
+                    availableHeight: parent ? parent.height : 0
+                    appearanceSettings: Services.SettingsService.appearance
+                    barSettings: Services.SettingsService.bar
+                    notificationSettings: Services.SettingsService.notifications
+                    saveCallback: Services.SettingsService.save
+                    wallpaperService: Services.WallpaperService
+                    onCloseRequested: fullscreenHost.close()
+                    Component.onCompleted: Qt.callLater(focusFirstControl)
                 }
             }
-        }
 
-        // Host the fixed player card without reserving compositor workspace.
-        PanelWindow {
-            id: musicWindow
-            screen: screenScope.modelData
-            color: "transparent"
-            implicitWidth: 340
-            implicitHeight: 134
-            exclusionMode: ExclusionMode.Ignore
-            anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; right: true }
-            margins { top: Services.SettingsService.bar.position === "top" ? Services.SettingsService.bar.height + 4 : 4; bottom: Services.SettingsService.bar.position === "bottom" ? Services.SettingsService.bar.height + 4 : 4; right: statusWindow.implicitWidth + screenScope.safetyGap }
-            mask: Region { item: musicOverlay.interactive ? musicHitArea : null }
-            Item { id: musicHitArea; anchors.fill: musicOverlay }
-            OsuMusicOverlay {
-                id: musicOverlay
-                anchors.top: parent.top
-                titleText: Services.MediaControlService.hasMedia ? Services.MediaControlService.title : "暂无播放内容"
-                artistText: Services.MediaControlService.hasMedia ? Services.MediaControlService.artist : ""
-                playing: Services.MediaControlService.playbackState === "playing"
-                progress: Services.MediaControlService.progress
-                shuffleActive: screenScope.shuffleActive
-                canGoPrevious: Services.MediaControlService.canGoPrevious
-                canTogglePlayback: Services.MediaControlService.canTogglePlayback
-                canGoNext: Services.MediaControlService.canGoNext
-                onShuffleRequested: active => screenScope.shuffleActive = active
-                onPreviousRequested: Services.MediaService.previous()
-                onPlayPauseRequested: Services.MediaService.playPause()
-                onNextRequested: Services.MediaService.next()
-                onCloseRequested: {
-                    screenScope.activeOverlay = ""
-                    close()
-                    utilityContent.musicButtonItem.forceActiveFocus()
+            // Adapt the existing player surface without creating another window.
+            Component {
+                id: musicRoute
+                OsuMusicOverlay {
+                    anchors.top: parent.top
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.topMargin: 32
+                    width: Math.min(340, Math.max(1, parent ? parent.width - 48 : 340))
+                    height: implicitHeight
+                    titleText: Services.MediaControlService.hasMedia ? Services.MediaControlService.title : "暂无播放内容"
+                    artistText: Services.MediaControlService.hasMedia ? Services.MediaControlService.artist : ""
+                    playing: Services.MediaControlService.playbackState === "playing"
+                    progress: Services.MediaControlService.progress
+                    shuffleActive: screenScope.shuffleActive
+                    canGoPrevious: Services.MediaControlService.canGoPrevious
+                    canTogglePlayback: Services.MediaControlService.canTogglePlayback
+                    canGoNext: Services.MediaControlService.canGoNext
+                    onShuffleRequested: active => screenScope.shuffleActive = active
+                    onPreviousRequested: Services.MediaService.previous()
+                    onPlayPauseRequested: Services.MediaService.playPause()
+                    onNextRequested: Services.MediaService.next()
+                    onCloseRequested: fullscreenHost.close()
                 }
             }
         }
