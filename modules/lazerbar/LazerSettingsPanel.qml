@@ -1,7 +1,7 @@
 import QtQuick
 import "LazerSettingsLogic.js" as Logic
 
-// Keep the settings shell stable while category content cross-fades in place.
+// Compose the independent sidebar and content layers of the settings panel.
 Item {
     id: root
 
@@ -16,28 +16,48 @@ Item {
     property real availableWidth: 1040
     property real availableHeight: 760
     property bool sidePanel: false
+
+    // Session state: sidebar expansion, search, and the shared open progress.
+    property bool sidebarExpanded: true
+    property string searchQuery: ""
+    property real progress: 0
+    property bool contentReady: false
+    property real collapseProgress: sidebarExpanded ? 1 : 0
+
     readonly property int selectedIndex: categoryIndex(selectedCategory)
     readonly property int contentTransitionDirection: _transitionDirection
     readonly property real panelWidth: sidePanel ? Logic.sidePanelWidth(availableWidth) : Logic.panelWidth(availableWidth)
     readonly property real panelHeight: sidePanel ? Math.max(0, availableHeight) : Logic.panelHeight(availableHeight)
-    readonly property real navigationWidth: Logic.navigationWidth(width)
+    readonly property real navigationWidth: sidePanel ? sidebarWidth : Logic.navigationWidth(width)
     readonly property real railWidth: navigationWidth
     readonly property int categoryTransitionDuration: 160
     readonly property var contentTransitionEasing: MotionTokens.outSoft
-    readonly property int indicatorCount: 1
-    readonly property int contentTop: 64
+    readonly property int indicatorCount: 3
+    readonly property int contentTop: 56
     readonly property Item currentNav: [appearanceNav, barNav, notificationNav][selectedIndex]
+    readonly property Item currentPage: [appearancePage, barPage, notificationPage][selectedIndex]
+
+    // Animate the 70..170px sidebar width through one collapse transition.
+    readonly property real sidebarWidth: Math.max(0, Math.min(panelWidth,
+        Logic.sidebarContractedWidth + (Logic.sidebarExpandedWidth - Logic.sidebarContractedWidth) * collapseProgress))
+    readonly property real contentWidth: Logic.contentWidth(panelWidth, sidebarWidth)
+    readonly property real sidebarLayerX: MotionTokens.reducedMotion ? 0 : Logic.interpolate(Logic.sidebarStartX(), 0, progress)
+    readonly property real contentLayerX: MotionTokens.reducedMotion ? sidebarWidth : Logic.interpolate(Logic.contentStartX(panelWidth), sidebarWidth, progress)
+    readonly property real layerOpacity: progress
+
     signal escapeRequested
     signal closeRequested
     signal categoryChanged(string category)
     property alias appearancePage: appearancePage
     property alias barPage: barPage
     property alias notificationPage: notificationPage
-    property alias appearanceNav: appearanceNav
-    property alias barNav: barNav
-    property alias notificationNav: notificationNav
-    property alias closeButton: closeButton
-    property alias indicator: indicator
+    property alias appearanceNav: sidebarLayer.appearanceNav
+    property alias barNav: sidebarLayer.barNav
+    property alias notificationNav: sidebarLayer.notificationNav
+    property alias closeButton: contentLayer.closeButton
+    property alias searchField: contentLayer.searchEditor
+    property alias sidebar: sidebarLayer
+    property alias content: contentLayer
 
     implicitWidth: panelWidth
     implicitHeight: panelHeight
@@ -57,6 +77,23 @@ Item {
 
     function categoryAt(index) {
         return ["appearance", "bar", "notifications"][Math.max(0, Math.min(2, index))]
+    }
+
+    // Reset session-local state on every fresh open.
+    function beginSession() {
+        sidebarExpanded = true
+        searchQuery = ""
+        sidebarLayer.beginSession()
+    }
+
+    // Cancel session animations without touching persisted settings.
+    function endSession() {
+        sidebarLayer.endSession()
+    }
+
+    function toggleExpanded() {
+        if (root.interactive)
+            root.sidebarExpanded = !root.sidebarExpanded
     }
 
     function selectCategory(category) {
@@ -122,11 +159,16 @@ Item {
         currentNav.forceActiveFocus()
     }
 
+    function focusSearch() {
+        if (root.interactive && root.contentReady)
+            contentLayer.focusSearch()
+    }
+
     function focusFirstControl() {
         if (!root.interactive)
             return
-        if (currentNav)
-            currentNav.forceActiveFocus()
+        if (root.contentReady)
+            contentLayer.focusSearch()
         else
             root.forceActiveFocus()
     }
@@ -161,8 +203,8 @@ Item {
     Connections {
         target: MotionTokens
         function onReducedMotionChanged() {
-            transitionToken += 1
-            transitionsEnabled = false
+            root.transitionToken += 1
+            root.transitionsEnabled = false
             if (MotionTokens.reducedMotion) {
                 appearancePage.x = 0
                 barPage.x = 0
@@ -170,90 +212,64 @@ Item {
                 appearancePage.opacity = root.selectedIndex === 0 ? 1 : 0
                 barPage.opacity = root.selectedIndex === 1 ? 1 : 0
                 notificationPage.opacity = root.selectedIndex === 2 ? 1 : 0
-                transitionsEnabled = false
+                root.transitionsEnabled = false
             } else {
-                transitionsEnabled = true
+                root.transitionsEnabled = true
             }
         }
     }
 
-    // Draw one flat osu settings body behind the persistent rail and viewport.
-    Rectangle {
-        anchors.fill: parent
-        radius: root.sidePanel ? 0 : LazerTheme.settingsRadius
-        color: LazerTheme.settingsPanel
-        border.width: 0
-
-        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+    // Slide the sidebar rail as one independently animated owner layer.
+    // It must sit above the content layer (osu adds Sidebar last) so its rail
+    // and nav entries stay visible over the content background extension.
+    LazerSettingsSidebar {
+        id: sidebarLayer
+        z: 1
+        x: root.sidebarLayerX
+        y: 0
+        width: root.sidebarWidth
+        height: root.height
+        expanded: root.sidebarExpanded
+        interactive: root.interactive
+        selectedIndex: root.selectedIndex
+        opacity: root.layerOpacity
+        onCategorySelected: index => root.selectCategory(root.categoryAt(index))
+        onMoveRequested: direction => root.moveNavigation(direction)
+        onCollapseToggleRequested: root.toggleExpanded()
+        onCloseRequested: root.requestClose()
     }
 
-    // Provide a compact header with a keyboard-accessible close affordance.
-    Item {
-        id: header
-        x: root.navigationWidth
-        width: Math.max(0, root.width - root.navigationWidth)
-        height: root.contentTop
-
-        Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 20
-            anchors.verticalCenter: parent.verticalCenter
-            text: ["外观", "顶部栏", "通知"][root.selectedIndex]
-            color: LazerTheme.textPrimary
-            font.pixelSize: 20
-        }
-
-        // Keep the close affordance fixed-size and independent of page layout.
-        Item {
-            id: closeButton
-            anchors.right: parent.right
-            anchors.rightMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            width: 32
-            height: 32
-            enabled: root.interactive
-            activeFocusOnTab: root.interactive
-            Accessible.role: Accessible.Button
-            Accessible.name: "关闭"
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 16
-                color: closeHover.hovered ? LazerTheme.settingsRowHover : "transparent"
-            }
-            Text { anchors.centerIn: parent; text: "×"; color: LazerTheme.textPrimary; font.pixelSize: 22 }
-            HoverHandler { id: closeHover; enabled: closeButton.enabled }
-            TapHandler {
-                id: closeTap
-                enabled: closeButton.enabled
-                onTapped: { closeButton.forceActiveFocus(); root.requestClose() }
-            }
-            Keys.onPressed: event => {
-                if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) && closeButton.enabled) {
-                    root.requestClose()
-                    event.accepted = true
-                }
-            }
-        }
-    }
-
-    // Keep all category controls mounted under one visual viewport.
-    Item {
-        id: viewport
-        x: root.navigationWidth
-        y: root.contentTop
-        width: Math.max(0, root.width - root.navigationWidth)
-        height: Math.max(0, root.height - root.contentTop)
-        clip: true
+    // Slide the content viewport as a second independent owner layer.
+    LazerSettingsContent {
+        id: contentLayer
+        x: root.contentLayerX
+        y: 0
+        width: root.contentWidth
+        height: root.height
+        backgroundExtend: Math.max(0, root.panelWidth - root.contentWidth)
+        title: ["外观", "顶部栏", "通知"][root.selectedIndex]
+        searchQuery: root.searchQuery
+        interactive: root.interactive
+        contentReady: root.contentReady
+        expanded: root.sidebarExpanded
+        visibleResultCount: root.currentPage ? root.currentPage.visibleResultCount : 0
+        currentPage: root.currentPage
+        opacity: root.layerOpacity
+        onSearchQueryEdited: query => root.searchQuery = query
+        onExpandToggleRequested: root.toggleExpanded()
+        onCloseRequested: root.requestClose()
 
         // Persist the appearance page so its scroll position survives navigation.
+        // Positioned with explicit width/height (not anchors) so the transition owns x.
         LazerSettingsAppearance {
             id: appearancePage
-            width: viewport.width
-            height: viewport.height
+            y: 0
+            width: parent.width
+            height: parent.height
             settingsObject: root.appearanceSettings
             saveCallback: root.saveCallback
             wallpaperService: root.wallpaperService
+            searchQuery: root.searchQuery
             opacity: 0
             Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
             Behavior on x { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
@@ -262,10 +278,12 @@ Item {
         // Persist the bar page so its scroll position survives navigation.
         LazerSettingsBar {
             id: barPage
-            width: viewport.width
-            height: viewport.height
+            y: 0
+            width: parent.width
+            height: parent.height
             settingsObject: root.barSettings
             saveCallback: root.saveCallback
+            searchQuery: root.searchQuery
             opacity: 0
             Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
             Behavior on x { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
@@ -274,39 +292,22 @@ Item {
         // Persist the notification page so its scroll position survives navigation.
         LazerSettingsNotifications {
             id: notificationPage
-            width: viewport.width
-            height: viewport.height
+            y: 0
+            width: parent.width
+            height: parent.height
             settingsObject: root.notificationSettings
             saveCallback: root.saveCallback
+            searchQuery: root.searchQuery
             opacity: 0
             Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
             Behavior on x { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
         }
     }
 
-    // Present the single shared pink selection indicator beside the active item.
-    Rectangle {
-        id: indicator
-        x: 6
-        y: root.contentTop + 14 + root.selectedIndex * 48
-        width: 4
-        height: 24
-        radius: 2
-        color: LazerTheme.osuPink
-        Behavior on y { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-    }
-
-    // Host the three persistent category controls in the navigation rail.
-    Column {
-        id: rail
-        x: 10
-        y: root.contentTop + 4
-        width: Math.max(0, root.navigationWidth - 20)
-        spacing: 4
-
-        LazerSettingsNavItem { id: appearanceNav; width: rail.width; label: "外观"; category: "appearance"; selected: root.selectedIndex === 0; interactive: root.interactive; onActivated: root.selectCategory(category); onMoveRequested: direction => root.moveNavigation(direction) }
-        LazerSettingsNavItem { id: barNav; width: rail.width; label: "顶部栏"; category: "bar"; selected: root.selectedIndex === 1; interactive: root.interactive; onActivated: root.selectCategory(category); onMoveRequested: direction => root.moveNavigation(direction) }
-        LazerSettingsNavItem { id: notificationNav; width: rail.width; label: "通知"; category: "notifications"; selected: root.selectedIndex === 2; interactive: root.interactive; onActivated: root.selectCategory(category); onMoveRequested: direction => root.moveNavigation(direction) }
+    // Collapse the sidebar smoothly without resizing the fixed owner surface.
+    Behavior on collapseProgress {
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
     }
 
     Keys.priority: Keys.AfterItem

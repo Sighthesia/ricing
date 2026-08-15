@@ -189,5 +189,55 @@ Item {
             verify(!barPage.floatingMarginSlider.effectiveEnabled)
             compare(barSettings.floatingMargin, 17)
         }
+
+        function test_searchFiltersCurrentCategoryRows() {
+            appearancePage.searchQuery = "模糊"
+            compare(appearancePage.visibleResultCount, 2)
+            verify(appearancePage.blurSurfaceRow.searchVisible)
+            verify(!appearancePage.wallpaperRow.visible)
+            appearancePage.searchQuery = "壁纸"
+            compare(appearancePage.visibleResultCount, 1)
+            verify(appearancePage.wallpaperRow.visible)
+            appearancePage.searchQuery = ""
+            compare(appearancePage.visibleResultCount, 9)
+            verify(appearancePage.wallpaperRow.visible)
+        }
+
+        function test_searchMatchesDescriptionAndDisabledRows() {
+            appearancePage.searchQuery = "自动、深色或浅色"
+            verify(appearancePage.colorSchemeRow.visible)
+            compare(appearancePage.visibleResultCount, 1)
+            appearanceSettings.enableBlur = false
+            appearancePage.searchQuery = "模糊"
+            verify(appearancePage.blurSurfaceRow.searchVisible)
+            verify(appearancePage.blurSurfaceRow.visible)
+            verify(!appearancePage.blurSurfaceRow.enabled)
+            compare(appearancePage.visibleResultCount, 2)
+            appearancePage.searchQuery = "audio"
+            compare(appearancePage.visibleResultCount, 0)
+            appearancePage.searchQuery = ""
+            appearanceSettings.enableBlur = true
+        }
+
+        function test_searchDoesNotTriggerSave() {
+            appearancePage.searchQuery = "壁纸"
+            saveState.count = 0
+            appearancePage.searchQuery = "模糊"
+            appearancePage.searchQuery = ""
+            compare(saveState.count, 0)
+        }
+
+        function test_otherPagesFilterIndependently() {
+            barPage.searchQuery = "浮动"
+            compare(barPage.visibleResultCount, 2)
+            barPage.searchQuery = "位置"
+            compare(barPage.visibleResultCount, 1)
+            barPage.searchQuery = ""
+            compare(barPage.visibleResultCount, 5)
+            notificationsPage.searchQuery = "通知"
+            compare(notificationsPage.visibleResultCount, 3)
+            notificationsPage.searchQuery = ""
+            compare(notificationsPage.visibleResultCount, 4)
+        }
     }
 }

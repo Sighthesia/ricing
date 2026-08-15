@@ -1,7 +1,7 @@
 import QtQuick
 import "LazerSettingsLogic.js" as Logic
 
-// Own the fixed left settings surface while only its inner panel translates.
+// Own the fixed left settings surface; its sidebar and content layers move apart.
 Item {
     id: root
     property string phase: "closed"
@@ -12,60 +12,65 @@ Item {
     readonly property real requiredWidth: Logic.sidePanelWidth(width)
     readonly property int panelEnterDuration: MotionTokens.settingsSlide
     readonly property int panelExitDuration: MotionTokens.settingsSlide
-    readonly property real panelOffsetX: MotionTokens.reducedMotion ? 0 : -panelHost.width * (1 - progress)
-    readonly property real panelOpacity: progress
     property alias panel: panel
     property alias panelHost: panelHost
+    property alias sidebarLayer: panel.sidebar
+    property alias contentLayer: panel.content
     signal closed()
     signal closeRequested()
     property bool _restoreFocus: true
+    property int _contentToken: 0
+    property int readyToken: 0
 
     visible: blocksDesktop
     enabled: blocksDesktop
+    focus: root.interactive
+    Keys.onEscapePressed: event => { root.requestClose(); event.accepted = true }
 
     function openFrom(source) {
         opener = source || opener
+        panel.beginSession()
         panelMotion.stop()
         phase = "opening"
         panelMotion.duration = MotionTokens.reducedMotion ? MotionTokens.fast : panelEnterDuration
         panelMotion.easing.type = Easing.OutQuint
         panelMotion.to = 1
         panelMotion.restart()
-        Qt.callLater(function() { if (root.interactive) panel.focusFirstControl() })
+        scheduleContentReady()
     }
     function closeAndRestoreFocus() { close(true) }
     function closeWithoutFocusRestore() { close(false) }
     function requestClose() { if (interactive) { closeRequested(); closeAndRestoreFocus() } }
     function close(restoreFocus) {
         if (phase === "closed" || phase === "closing") return
+        _contentToken += 1
+        panel.endSession()
+        panel.contentReady = false
         panelMotion.stop(); phase = "closing"; _restoreFocus = restoreFocus
         panelMotion.duration = MotionTokens.reducedMotion ? MotionTokens.fast : panelExitDuration
         panelMotion.easing.type = Easing.InQuad; panelMotion.to = 0; panelMotion.restart()
     }
     function resetImmediately() {
+        _contentToken += 1
         panelMotion.stop(); phase = "closed"; progress = 0; opener = null; _restoreFocus = false
-    }
-    function cycleFocus(backward) {
-        if (!interactive) return
-        if (panel.closeButton.activeFocus) panel.currentNav.forceActiveFocus()
-        else panel.closeButton.forceActiveFocus()
+        panel.endSession()
+        panel.contentReady = false
     }
 
-    // Keep the panel host at fixed owner size and move only its scene-graph content.
+    // Defer content activation so the initial slide never competes for the first frames.
+    function scheduleContentReady() {
+        _contentToken += 1
+        panel.contentReady = false
+        readyToken = _contentToken
+        readyTimer.restart()
+    }
+
+    // Keep the panel host at fixed owner size; the two layers translate inside it.
     Item {
         id: panelHost
-        x: root.panelOffsetX
-        y: 0
         width: root.requiredWidth
         height: root.height
         focus: root.interactive
-        Keys.priority: Keys.BeforeItem
-        Keys.onPressed: event => {
-            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                root.cycleFocus(event.key === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier)); event.accepted = true
-            }
-        }
-        Keys.onEscapePressed: event => { root.requestClose(); event.accepted = true }
 
         LazerSettingsPanel {
             id: panel
@@ -74,15 +79,22 @@ Item {
             availableHeight: root.height
             sidePanel: true
             interactive: root.interactive
-            opacity: root.panelOpacity
+            progress: root.progress
             onCloseRequested: root.requestClose()
         }
     }
 
-    Binding { target: panel.appearanceNav; property: "KeyNavigation.tab"; value: panel.closeButton }
-    Binding { target: panel.barNav; property: "KeyNavigation.tab"; value: panel.closeButton }
-    Binding { target: panel.notificationNav; property: "KeyNavigation.tab"; value: panel.closeButton }
-    Binding { target: panel.closeButton; property: "KeyNavigation.tab"; value: panel.currentNav }
+    Timer {
+        id: readyTimer
+        interval: MotionTokens.settingsContentDelay
+        repeat: false
+        onTriggered: {
+            if (!root.interactive || root.readyToken !== root._contentToken)
+                return
+            panel.contentReady = true
+            panel.focusSearch()
+        }
+    }
 
     NumberAnimation {
         id: panelMotion; target: root; property: "progress"

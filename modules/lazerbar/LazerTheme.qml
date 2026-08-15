@@ -34,6 +34,10 @@ QtObject {
     readonly property color settingsSelected: "#40EB1C60"
     readonly property real settingsScrimOpacity: 0.6
     readonly property int settingsRadius: 16
+    readonly property int settingsSidebarContractedWidth: 70
+    readonly property int settingsSidebarExpandedWidth: 170
+    readonly property int settingsContentWidth: 400
+    readonly property int settingsPanelWidth: 570
 
     readonly property int barHeight: 46
     readonly property int bottomRadius: 14

@@ -1,20 +1,25 @@
 import QtQuick
+import QtQuick.Effects
 
-// Represent one keyboard-accessible settings category in the rail.
+// Represent one keyboard-accessible settings category in the sidebar rail.
 Item {
     id: root
 
     property string label: ""
+    property string iconSource: ""
     property bool selected: false
     property bool interactive: true
+    property bool expanded: true
+    property real appearOpacity: 1
     property string category: "appearance"
     signal activated
     signal moveRequested(int direction)
 
     implicitWidth: 184
-    implicitHeight: 44
+    implicitHeight: 46
     enabled: root.interactive
     activeFocusOnTab: root.interactive
+    opacity: root.appearOpacity
     Accessible.role: Accessible.ListItem
     Accessible.name: root.label
 
@@ -22,20 +27,71 @@ Item {
     Rectangle {
         anchors.fill: parent
         anchors.margins: 2
-        radius: 12
+        radius: 10
         color: root.selected ? LazerTheme.settingsSelected : (hoverHandler.hovered ? LazerTheme.settingsRowHover : "transparent")
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
-    // Keep category text aligned inside the rail capsule.
+    // Show the category icon at osu's left margin, centered when contracted.
+    Image {
+        id: iconImage
+        visible: root.iconSource.length > 0
+        x: root.expanded ? 25 : Math.max(0, (root.width - width) / 2)
+        anchors.verticalCenter: parent.verticalCenter
+        width: 20
+        height: 20
+        source: root.iconSource
+        fillMode: Image.PreserveAspectFit
+        Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
+    }
+
+    // Colorize the monochrome icon with the active or muted text tone.
+    MultiEffect {
+        anchors.fill: iconImage
+        source: iconImage
+        visible: iconImage.visible
+        colorization: 1
+        colorizationColor: root.selected ? LazerTheme.textPrimary : (hoverHandler.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted)
+
+        Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
+    }
+
+    // Keep category text visible only while the sidebar is expanded, fading
+    // with the collapse transition instead of hard-cutting.
     Text {
-        anchors.left: parent.left
-        anchors.leftMargin: 16
+        visible: root.expanded || opacity > 0
+        opacity: root.expanded ? 1 : 0
+        Behavior on opacity {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
+        }
+        x: 60
         anchors.verticalCenter: parent.verticalCenter
         text: root.label
         color: root.selected ? LazerTheme.textPrimary : LazerTheme.textMuted
         font.pixelSize: 14
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+    }
+
+    // Show the osu-style pink pill that grows when this category is active.
+    Rectangle {
+        id: selectionIndicator
+        x: 9
+        anchors.verticalCenter: parent.verticalCenter
+        width: 4
+        height: root.selected ? 18 : 4
+        radius: 2
+        color: LazerTheme.osuPink
+        opacity: root.selected ? 1 : 0.3
+
+        Behavior on height {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutElastic; easing.amplitude: 1; easing.period: 0.5 }
+        }
+        Behavior on opacity {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
+        }
     }
 
     // Capture pointer hover and activation without a competing visual parent.

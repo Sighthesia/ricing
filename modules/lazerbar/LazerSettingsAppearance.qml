@@ -7,6 +7,17 @@ Flickable {
     property var saveCallback: null
     property var wallpaperService: null
     property string title: "外观"
+    property string searchQuery: ""
+    readonly property int visibleResultCount:
+        (wallpaperRow.searchVisible ? 1 : 0)
+        + (colorSchemeRow.searchVisible ? 1 : 0)
+        + (panelOpacityRow.searchVisible ? 1 : 0)
+        + (enableBlurRow.searchVisible ? 1 : 0)
+        + (blurSurfaceRow.searchVisible ? 1 : 0)
+        + (glassHighlightRow.searchVisible ? 1 : 0)
+        + (glassGlowRow.searchVisible ? 1 : 0)
+        + (themeAdaptiveRow.searchVisible ? 1 : 0)
+        + (rippleRow.searchVisible ? 1 : 0)
     property alias wallpaperField: wallpaperFieldControl
     property alias colorSchemeChoice: colorSchemeChoiceControl
     property alias panelOpacitySlider: panelOpacitySliderControl
@@ -17,7 +28,9 @@ Flickable {
     property alias glassGlowIntensitySlider: glassGlowIntensitySliderControl
     property alias glassThemeAdaptiveToggle: glassThemeAdaptiveToggleControl
     property alias ripplePulseToggle: ripplePulseToggleControl
-    property alias blurSurfaceRow: blurSurfaceRowControl
+    property alias wallpaperRow: wallpaperRow
+    property alias colorSchemeRow: colorSchemeRow
+    property alias blurSurfaceRow: blurSurfaceRow
     contentWidth: width
     contentHeight: pageColumn.implicitHeight
     clip: true
@@ -41,7 +54,9 @@ Flickable {
         Text { text: root.title; color: LazerTheme.textPrimary; font.pixelSize: 22; leftPadding: 16; topPadding: 12 }
 
         LazerSettingsRow {
+            id: wallpaperRow
             width: pageColumn.width - 16; x: 8
+            searchQuery: root.searchQuery
             labelText: "壁纸路径"; descriptionText: "留空恢复默认壁纸"
             LazerSettingsTextField {
                 id: wallpaperFieldControl
@@ -69,7 +84,9 @@ Flickable {
         }
 
         LazerSettingsRow {
+            id: colorSchemeRow
             width: pageColumn.width - 16; x: 8
+            searchQuery: root.searchQuery
             labelText: "配色方案"; descriptionText: "自动、深色或浅色"
             LazerSettingsChoice {
                 id: colorSchemeChoiceControl
@@ -85,7 +102,9 @@ Flickable {
         }
 
         LazerSettingsRow {
+            id: panelOpacityRow
             width: pageColumn.width - 16; x: 8
+            searchQuery: root.searchQuery
             labelText: "面板不透明度"; descriptionText: "范围 0.35 到 1"
             LazerSettingsSlider {
                 id: panelOpacitySliderControl; from: 0.35; to: 1; stepSize: 0.05
@@ -95,7 +114,10 @@ Flickable {
         }
 
         LazerSettingsRow {
-            width: pageColumn.width - 16; x: 8; labelText: "启用模糊"
+            id: enableBlurRow
+            width: pageColumn.width - 16; x: 8
+            searchQuery: root.searchQuery
+            labelText: "启用模糊"
             LazerSettingsToggle {
                 id: enableBlurToggleControl; checked: root.settingsObject ? root.settingsObject.enableBlur : false
                 onToggled: function(value) { if (root.settingsObject) { root.settingsObject.enableBlur = value; root.save() } }
@@ -103,7 +125,9 @@ Flickable {
         }
 
         LazerSettingsRow {
-            id: blurSurfaceRowControl; width: pageColumn.width - 16; x: 8
+            id: blurSurfaceRow
+            width: pageColumn.width - 16; x: 8
+            searchQuery: root.searchQuery
             enabled: root.settingsObject ? root.settingsObject.enableBlur : false
             labelText: "模糊表面不透明度"; descriptionText: "范围 0 到 1"
             LazerSettingsSlider {
@@ -114,7 +138,10 @@ Flickable {
         }
 
         LazerSettingsRow {
-            width: pageColumn.width - 16; x: 8; labelText: "玻璃高光强度"; descriptionText: "范围 0 到 1"
+            id: glassHighlightRow
+            width: pageColumn.width - 16; x: 8
+            searchQuery: root.searchQuery
+            labelText: "玻璃高光强度"; descriptionText: "范围 0 到 1"
             LazerSettingsSlider {
                 id: glassHighlightIntensitySliderControl; from: 0; to: 1; stepSize: 0.05
                 value: root.settingsObject ? root.settingsObject.glassHighlightIntensity : 0.56
@@ -123,7 +150,10 @@ Flickable {
         }
 
         LazerSettingsRow {
-            width: pageColumn.width - 16; x: 8; labelText: "玻璃辉光强度"; descriptionText: "范围 0 到 1"
+            id: glassGlowRow
+            width: pageColumn.width - 16; x: 8
+            searchQuery: root.searchQuery
+            labelText: "玻璃辉光强度"; descriptionText: "范围 0 到 1"
             LazerSettingsSlider {
                 id: glassGlowIntensitySliderControl; from: 0; to: 1; stepSize: 0.05
                 value: root.settingsObject ? root.settingsObject.glassGlowIntensity : 0.22
@@ -131,7 +161,19 @@ Flickable {
             }
         }
 
-        LazerSettingsRow { width: pageColumn.width - 16; x: 8; labelText: "主题自适应"; LazerSettingsToggle { id: glassThemeAdaptiveToggleControl; checked: root.settingsObject ? root.settingsObject.glassThemeAdaptive : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.glassThemeAdaptive = value; root.save() } } } }
-        LazerSettingsRow { width: pageColumn.width - 16; x: 8; labelText: "涟漪脉冲"; LazerSettingsToggle { id: ripplePulseToggleControl; checked: root.settingsObject ? root.settingsObject.ripplePulseEnabled : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.ripplePulseEnabled = value; root.save() } } } }
+        LazerSettingsRow {
+            id: themeAdaptiveRow
+            width: pageColumn.width - 16; x: 8
+            searchQuery: root.searchQuery
+            labelText: "主题自适应"
+            LazerSettingsToggle { id: glassThemeAdaptiveToggleControl; checked: root.settingsObject ? root.settingsObject.glassThemeAdaptive : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.glassThemeAdaptive = value; root.save() } } }
+        }
+        LazerSettingsRow {
+            id: rippleRow
+            width: pageColumn.width - 16; x: 8
+            searchQuery: root.searchQuery
+            labelText: "涟漪脉冲"
+            LazerSettingsToggle { id: ripplePulseToggleControl; checked: root.settingsObject ? root.settingsObject.ripplePulseEnabled : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.ripplePulseEnabled = value; root.save() } } }
+        }
     }
 }

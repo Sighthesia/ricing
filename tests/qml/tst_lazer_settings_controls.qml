@@ -307,6 +307,35 @@ Item {
             compare(plainRow.controlSupportsRowEnabled, false)
         }
 
+        function test_rowSearchContractMatchesLabelOrDescription() {
+            row.searchQuery = ""
+            verify(row.matchesSearch)
+            verify(row.searchVisible)
+            verify(row.visible)
+            verify(row.height > 0)
+            row.searchQuery = "设置"
+            verify(row.matchesSearch)
+            verify(row.searchVisible)
+            row.searchQuery = "长"
+            verify(row.matchesSearch)
+            row.searchQuery = "audio"
+            verify(!row.matchesSearch)
+            verify(!row.searchVisible)
+            verify(!row.visible)
+            compare(row.height, 0)
+            row.searchQuery = ""
+            verify(row.visible)
+            verify(row.height > 0)
+            row.enabled = false
+            row.searchQuery = "设置"
+            verify(row.matchesSearch)
+            verify(row.searchVisible)
+            verify(row.visible)
+            verify(!row.contentEnabled)
+            row.enabled = true
+            row.searchQuery = ""
+        }
+
         function test_compactRowStacksTextAndControl() {
             compare(compactRow.compactLayout, true)
             verify(compactRow.textRegionWidth > 0)

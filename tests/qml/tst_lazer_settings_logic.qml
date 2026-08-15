@@ -61,6 +61,22 @@ Item {
             verify(!SettingsLogic.matchesSearch("Blur", "Background effect", "audio"))
         }
 
+        function test_layerStartAndInterpolation() {
+            compare(SettingsLogic.sidebarStartX(), -170)
+            compare(SettingsLogic.contentStartX(570), -570)
+            compare(SettingsLogic.contentStartX(-20), 0)
+            compare(SettingsLogic.contentStartX(NaN), -570)
+            compare(SettingsLogic.interpolate(-570, 170, 0), -570)
+            compare(SettingsLogic.interpolate(-570, 170, 1), 170)
+            compare(SettingsLogic.interpolate(-570, 170, 0.5), -200)
+            compare(SettingsLogic.interpolate(-170, 0, 0.25), -127.5)
+            compare(SettingsLogic.interpolate(-170, 0, 2), 0)
+            compare(SettingsLogic.interpolate(-170, 0, -1), -170)
+            compare(SettingsLogic.interpolate(NaN, 0, 0.5), 0)
+            compare(SettingsLogic.interpolate(0, NaN, 0.5), 0)
+            compare(SettingsLogic.interpolate(-170, 0, NaN), -170)
+        }
+
         function test_settingsConversions() {
             compare(SettingsLogic.timeoutSecondsToMs(1), 2000)
             compare(SettingsLogic.timeoutSecondsToMs(20), 15000)

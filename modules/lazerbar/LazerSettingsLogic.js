@@ -76,6 +76,29 @@ function categoryDirection(previousIndex, nextIndex) {
     return next > previous ? 1 : -1
 }
 
+function interpolate(start, end, progress) {
+    var p = Number(progress)
+    if (!isFinite(p))
+        p = 0
+    p = Math.max(0, Math.min(1, p))
+    var s = Number(start)
+    var e = Number(end)
+    if (!isFinite(s) || !isFinite(e))
+        return 0
+    return s + (e - s) * p
+}
+
+function sidebarStartX() {
+    return -sidebarExpandedWidth
+}
+
+function contentStartX(panelWidth) {
+    var width = Number(panelWidth)
+    if (!isFinite(width))
+        return -settingsPanelWidth
+    return -Math.max(0, width)
+}
+
 function normalizeSearchQuery(query) {
     return query == null ? "" : String(query).trim().toLowerCase()
 }

@@ -140,3 +140,68 @@ PanelWindow {
 #### Correct
 
 One coordinator dispatches to a wave owner, a left Settings owner, or a local Now Playing owner.
+
+## Scenario: Split Layers Inside A Fixed Settings Surface
+
+### 1. Scope / Trigger
+
+- Apply when a local overlay needs independently moving Sidebar and Content layers while retaining one fixed compositor surface.
+- Apply when persistent settings pages animate `x`, opacity, or filtered height without being destroyed.
+
+### 2. Signatures
+
+- Owner geometry: fixed `570px` maximum width.
+- Sidebar: `70px | 170px`, explicit `z` above Content.
+- Content: `400px` preferred width, final `x` equals Sidebar width.
+- Search row: `searchQuery`, `matchesSearch`, `searchVisible`.
+
+### 3. Contracts
+
+- Animate scene-graph Items only; never resize the `PanelWindow` per frame.
+- Sidebar and Content are sibling owner layers with independent X positions.
+- A persistent page that animates `x` uses explicit `width` and `height`; `anchors.fill` must not also own its position.
+- Content may over-extend left during transitions, so Sidebar must have a higher `z` value.
+- Search changes row visibility and layout participation without destroying controls or triggering settings persistence.
+
+### 4. Validation & Error Matrix
+
+- `anchors.fill` plus animated page `x` -> reject; anchors reset the translation.
+- Content `z >= Sidebar.z` -> reject; the over-extended content can cover Sidebar input and visuals.
+- Search hides a disabled-but-matching row -> reject; disabled state and search match are independent.
+- Closing then reopening -> retarget current progress and cancel stale readiness/stagger callbacks.
+
+### 5. Good/Base/Bad Cases
+
+- Good: Sidebar slides from `-170`, Content from `-570`, both inside one fixed owner.
+- Base: collapsed Sidebar uses `70px`; Content remains mounted and usable at `400px` where space permits.
+- Bad: one `panelHost` translates Sidebar and Content as a single rectangle.
+- Bad: filtering rebuilds the page model and loses control or scroll state.
+
+### 6. Tests Required
+
+- Assert `70/170/400/570` geometry and `Sidebar.z > Content.z`.
+- Assert search matches label or description, preserves disabled matches, and never calls save.
+- Assert open/close interruption, `200ms` readiness cancellation, item stagger, reduced motion, Escape, and final focus restore.
+- Run settings owner tests sequentially at least twice to expose focus and delayed-callback races.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+Item {
+    anchors.fill: parent
+    Behavior on x { NumberAnimation {} }
+}
+```
+
+#### Correct
+
+```qml
+Item {
+    width: parent.width
+    height: parent.height
+    x: targetX
+    Behavior on x { NumberAnimation { easing.type: Easing.OutQuint } }
+}
+```

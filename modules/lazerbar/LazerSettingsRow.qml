@@ -1,4 +1,5 @@
 import QtQuick
+import "LazerSettingsLogic.js" as Logic
 
 // Keep one settings label, description, and injected control aligned.
 Item {
@@ -7,6 +8,9 @@ Item {
     property string labelText: ""
     property string descriptionText: ""
     property bool enabled: true
+    property string searchQuery: ""
+    readonly property bool matchesSearch: Logic.matchesSearch(labelText, descriptionText, searchQuery)
+    readonly property bool searchVisible: matchesSearch
     readonly property bool contentEnabled: enabled
     default property alias control: controlHost.children
     readonly property Item controlItem: controlHost.children.length > 0 ? controlHost.children[0] : null
@@ -35,7 +39,8 @@ Item {
     implicitHeight: compactLayout
                    ? 16 + textColumn.implicitHeight + 12 + controlHost.height + 16
                    : Math.max(56, Math.max(textColumn.implicitHeight, controlHost.height) + 32)
-    height: implicitHeight
+    height: matchesSearch ? implicitHeight : 0
+    visible: matchesSearch
     opacity: root.enabled ? 1 : MotionTokens.disabledOpacity
 
     // Propagate availability to the single injected control.

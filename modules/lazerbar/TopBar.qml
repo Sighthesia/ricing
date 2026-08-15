@@ -98,7 +98,7 @@ Variants {
         PanelWindow {
             id: settingsWindow
             screen: screenScope.modelData; color: "transparent"
-            implicitWidth: Math.min(616, screenScope.modelData.width)
+            implicitWidth: Math.min(LazerTheme.settingsPanelWidth, screenScope.modelData.width)
             implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
             anchors { top: true; left: true }

@@ -26,6 +26,8 @@ LazerSettingsAppearance 1.0 LazerSettingsAppearance.qml
 LazerSettingsBar 1.0 LazerSettingsBar.qml
 LazerSettingsNotifications 1.0 LazerSettingsNotifications.qml
 LazerSettingsNavItem 1.0 LazerSettingsNavItem.qml
+LazerSettingsSidebar 1.0 LazerSettingsSidebar.qml
+LazerSettingsContent 1.0 LazerSettingsContent.qml
 LazerSettingsPanel 1.0 LazerSettingsPanel.qml
 LazerSettingsOverlay 1.0 LazerSettingsOverlay.qml
 LazerNotificationPopup 1.0 LazerNotificationPopup.qml
