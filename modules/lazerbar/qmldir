@@ -31,6 +31,7 @@ LazerSettingsOverlay 1.0 LazerSettingsOverlay.qml
 LazerNotificationPopup 1.0 LazerNotificationPopup.qml
 LazerNotificationStack 1.0 LazerNotificationStack.qml
 NotificationHost 1.0 NotificationHost.qml
+OverlayCoordinator 1.0 OverlayCoordinator.qml
 FullscreenOverlayHost 1.0 FullscreenOverlayHost.qml
 FullscreenHeader 1.0 FullscreenHeader.qml
 FullscreenSidebar 1.0 FullscreenSidebar.qml
