@@ -54,3 +54,13 @@ It is authoritative for task order, interfaces, TDD steps, validation commands, 
 - No new compatibility code preserves the rejected rounded-card/fullscreen-host architecture.
 - No unrelated user worktree changes are staged or modified.
 - Every task in the detailed plan has a dedicated passing test cycle and conventional commit.
+
+## Verification Results
+
+- All 23 QML test files loadable by plain `qmltestrunner` passed sequentially after the lifecycle timeout hardening.
+- `tst_media_lyrics.qml`, `tst_media_service.qml`, and `tst_workspace_hint_services.qml` require Quickshell/MPRIS plugins unavailable to plain `qmltestrunner`; their imports loaded successfully through the real `qs -p .` launch.
+- Wave host lifecycle passed three consecutive runs at 8 tests per run.
+- Settings side-panel lifecycle passed three consecutive runs at 7 tests per run.
+- Python backend suite passed: 4 tests.
+- `git diff --check` passed.
+- `timeout 12s qs -p .` reached `Configuration Loaded` with no new QML WARN/ERROR. The notification D-Bus ownership warning was environmental because another notification server was active.

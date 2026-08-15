@@ -3,7 +3,7 @@
   "name": "osu-fullscreen-visual-calibration",
   "title": "校准 osu 全屏界面设计",
   "description": "依据本地 osu!lazer 真实源码重新设计全屏页面的视觉语言、顶部栏衔接和底部滑入滑出动效，仅在设计获批后实施。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
