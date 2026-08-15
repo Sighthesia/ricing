@@ -13,6 +13,12 @@ QtObject {
     readonly property int page: 320
     readonly property int backdropEnter: 120
 
+    // Match osu!lazer's full-screen wave and side-panel timing contracts.
+    readonly property int waveEnter: 800
+    readonly property int waveExit: 500
+    readonly property int waveRoute: 160
+    readonly property int settingsSlide: 600
+
     // Settings overlay timings remain explicit so the host geometry never animates.
     readonly property int settingsEnter: 320
     readonly property int settingsExit: 240

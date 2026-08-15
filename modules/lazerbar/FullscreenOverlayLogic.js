@@ -1,6 +1,7 @@
 .pragma library
 
-var routes = ["settings", "music", "wiki", "news", "beatmap"]
+var routes = ["wiki", "news", "beatmap"]
+var waveAngles = [13, -7, 4, -2]
 
 function isRoute(route) {
     return routes.indexOf(route) >= 0
@@ -25,17 +26,23 @@ function clamp(value, minimum, maximum) {
 }
 
 function surfaceWidth(screenWidth) {
-    var width = Math.max(1, Number(screenWidth) || 1)
-    var maximum = Math.min(1440, Math.max(1, width - 32))
-    var minimum = Math.min(640, maximum)
-    return clamp(width - 96, minimum, maximum)
+    var width = Number(screenWidth)
+    if (!isFinite(width))
+        return 0
+    return Math.max(0, width) * 0.85
 }
 
-function surfaceHeight(screenHeight) {
-    var height = Math.max(1, Number(screenHeight) || 1)
-    var maximum = Math.min(900, Math.max(1, height - 32))
-    var minimum = Math.min(420, maximum)
-    return clamp(height - 96, minimum, maximum)
+function surfaceTop(barPosition, barHeight) {
+    var height = Number(barHeight)
+    if (!isFinite(height))
+        height = 0
+    return barPosition === "top" ? Math.max(0, height) : 0
+}
+
+function waveAngle(index) {
+    var candidate = Number(index)
+    return isFinite(candidate) && candidate >= 0 && candidate < waveAngles.length
+            ? waveAngles[Math.floor(candidate)] : 0
 }
 
 function sidebarWidth(value) {
