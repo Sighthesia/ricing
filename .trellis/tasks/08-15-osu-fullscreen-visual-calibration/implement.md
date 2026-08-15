@@ -1,5 +1,11 @@
 # Implementation Plan
 
+The executable step-by-step plan is committed at:
+
+`docs/superpowers/plans/2026-08-15-osu-fullscreen-visual-calibration-implementation.md`
+
+It is authoritative for task order, interfaces, TDD steps, validation commands, and commit boundaries. The checklist below is the phase-level summary.
+
 ## Preconditions
 
 - User has approved all four design sections.
@@ -47,3 +53,4 @@
 - No mixed fullscreen route remains for Settings or Music.
 - No new compatibility code preserves the rejected rounded-card/fullscreen-host architecture.
 - No unrelated user worktree changes are staged or modified.
+- Every task in the detailed plan has a dedicated passing test cycle and conventional commit.

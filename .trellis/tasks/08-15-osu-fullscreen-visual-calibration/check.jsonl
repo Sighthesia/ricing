@@ -1,1 +1,3 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":".trellis/tasks/08-15-osu-fullscreen-visual-calibration/prd.md","reason":"Acceptance criteria and explicit scope boundaries for final verification."}
+{"file":"docs/superpowers/specs/2026-08-15-osu-fullscreen-visual-calibration-design.md","reason":"Approved geometry, visual identity, lifecycle, and risk decisions."}
+{"file":"docs/superpowers/plans/2026-08-15-osu-fullscreen-visual-calibration-implementation.md","reason":"Exact targeted and full-suite verification matrix."}
