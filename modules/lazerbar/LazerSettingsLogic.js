@@ -2,6 +2,10 @@
 
 var narrowWidthBreakpoint = 792
 var narrowHeightBreakpoint = 552
+var sidebarContractedWidth = 70
+var sidebarExpandedWidth = 170
+var settingsContentWidth = 400
+var settingsPanelWidth = sidebarExpandedWidth + settingsContentWidth
 
 function clamp(value, minimum, maximum) {
     var candidate = Number(value)
@@ -28,7 +32,23 @@ function sidePanelWidth(availableWidth) {
     var width = Number(availableWidth)
     if (!isFinite(width))
         return 0
-    return Math.max(0, Math.min(616, width))
+    return Math.max(0, Math.min(settingsPanelWidth, width))
+}
+
+function sidebarWidth(expanded, availableWidth) {
+    var preferred = expanded ? sidebarExpandedWidth : sidebarContractedWidth
+    var width = Number(availableWidth)
+    if (!isFinite(width))
+        return preferred
+    return Math.max(0, Math.min(preferred, width))
+}
+
+function contentWidth(availableWidth, currentSidebarWidth) {
+    var width = Number(availableWidth)
+    var sidebar = Number(currentSidebarWidth)
+    if (!isFinite(width) || !isFinite(sidebar))
+        return 0
+    return Math.max(0, Math.min(settingsContentWidth, width - Math.max(0, sidebar)))
 }
 
 function panelHeight(availableHeight) {
@@ -54,6 +74,19 @@ function categoryDirection(previousIndex, nextIndex) {
     if (!isFinite(previous) || !isFinite(next) || previous === next)
         return 0
     return next > previous ? 1 : -1
+}
+
+function normalizeSearchQuery(query) {
+    return query == null ? "" : String(query).trim().toLowerCase()
+}
+
+function matchesSearch(label, description, query) {
+    var normalized = normalizeSearchQuery(query)
+    if (!normalized)
+        return true
+    var labelText = label == null ? "" : String(label).toLowerCase()
+    var descriptionText = description == null ? "" : String(description).toLowerCase()
+    return labelText.indexOf(normalized) !== -1 || descriptionText.indexOf(normalized) !== -1
 }
 
 function timeoutSecondsToMs(seconds) {

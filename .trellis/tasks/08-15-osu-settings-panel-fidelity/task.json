@@ -3,7 +3,7 @@
   "name": "osu-settings-panel-fidelity",
   "title": "还原 osu 设置面板结构与 stagger 动效",
   "description": "依据本地 osu!lazer SettingsPanel 源码，重新校准 Afloat 设置侧栏、内容分离布局、组件样式与 stagger 入退场动效，仅在设计获批后实施。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

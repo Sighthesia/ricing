@@ -39,10 +39,26 @@ Item {
         }
 
         function test_sidePanelWidth() {
-            compare(SettingsLogic.sidePanelWidth(1920), 616)
-            compare(SettingsLogic.sidePanelWidth(900), 616)
+            compare(SettingsLogic.sidePanelWidth(1920), 570)
+            compare(SettingsLogic.sidePanelWidth(900), 570)
             compare(SettingsLogic.sidePanelWidth(500), 500)
             compare(SettingsLogic.sidePanelWidth(-20), 0)
+            compare(SettingsLogic.sidebarWidth(true, 1920), 170)
+            compare(SettingsLogic.sidebarWidth(false, 1920), 70)
+            compare(SettingsLogic.sidebarWidth(true, 120), 120)
+            compare(SettingsLogic.contentWidth(570, 170), 400)
+            compare(SettingsLogic.contentWidth(470, 70), 400)
+            compare(SettingsLogic.contentWidth(320, 70), 250)
+            compare(SettingsLogic.contentWidth(-20, 70), 0)
+        }
+
+        function test_searchNormalizationAndMatching() {
+            compare(SettingsLogic.normalizeSearchQuery("  PANEL  "), "panel")
+            compare(SettingsLogic.normalizeSearchQuery(null), "")
+            verify(SettingsLogic.matchesSearch("Panel opacity", "Range 0 to 1", "PANEL"))
+            verify(SettingsLogic.matchesSearch("Blur", "Background effect", "effect"))
+            verify(SettingsLogic.matchesSearch("Blur", "", ""))
+            verify(!SettingsLogic.matchesSearch("Blur", "Background effect", "audio"))
         }
 
         function test_settingsConversions() {
@@ -124,6 +140,11 @@ Item {
             compare(Lazer.MotionTokens.settingsExit, 240)
             compare(Lazer.MotionTokens.settingsScrim, 180)
             compare(Lazer.MotionTokens.settingsCategory, 160)
+            compare(Lazer.MotionTokens.settingsSlide, 600)
+            compare(Lazer.MotionTokens.settingsContentDelay, 200)
+            compare(Lazer.MotionTokens.settingsSidebarFade, 500)
+            compare(Lazer.MotionTokens.settingsSidebarStagger, 40)
+            compare(Lazer.MotionTokens.settingsSidebarCollapse, 300)
         }
     }
 }

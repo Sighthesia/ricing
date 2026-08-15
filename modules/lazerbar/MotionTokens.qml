@@ -18,6 +18,10 @@ QtObject {
     readonly property int waveExit: 500
     readonly property int waveRoute: 160
     readonly property int settingsSlide: 600
+    readonly property int settingsContentDelay: 200
+    readonly property int settingsSidebarFade: 500
+    readonly property int settingsSidebarStagger: 40
+    readonly property int settingsSidebarCollapse: 300
 
     // Settings overlay timings remain explicit so the host geometry never animates.
     readonly property int settingsEnter: 320
