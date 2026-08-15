@@ -58,7 +58,18 @@ QtObject {
     }
 
     function ownerClosed(owner) {
-        if (!transitioning || owner !== _closingOwner)
+        if (!transitioning) {
+            if (owner !== activeOwner)
+                return
+            activeTarget = ""
+            activeOwner = ""
+            if (opener)
+                opener.forceActiveFocus()
+            opener = null
+            return
+        }
+
+        if (owner !== _closingOwner)
             return
 
         var nextTarget = pendingTarget

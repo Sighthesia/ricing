@@ -42,11 +42,5 @@ Item {
             ])
         }
 
-        function test_fullscreenRouteToggle() {
-            compare(Logic.nextOverlay("", "wiki"), "wiki")
-            compare(Logic.nextOverlay("wiki", "news"), "news")
-            compare(Logic.nextOverlay("news", "news"), "")
-            compare(Logic.nextOverlay("beatmap", "unknown"), "beatmap")
-        }
     }
 }

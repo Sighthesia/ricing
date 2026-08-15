@@ -92,5 +92,13 @@ Item {
             compare(openSpy.signalArguments[1][1], "music")
             compare(coordinator.opener, alternateOpener)
         }
+
+        function test_activeOwnerMayCloseItself() {
+            coordinator.request("wiki", opener)
+            coordinator.ownerClosed("wave")
+            compare(coordinator.activeTarget, "")
+            compare(coordinator.activeOwner, "")
+            verify(opener.activeFocus)
+        }
     }
 }

@@ -2,16 +2,15 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../../services" as Services
-import "LazerBarLogic.js" as Logic
 
-// Create one background and three focused interaction zones per screen.
+// Create the bar and three independently sized overlay owners per screen.
 Variants {
     id: root
     property string username: "Sighthesia"
     property url avatarSource
     model: Quickshell.screens
 
-    // Own the persistent surfaces for one compositor screen.
+    // Coordinate one screen's overlay state without mixing their visual containers.
     Scope {
         id: screenScope
         required property var modelData
@@ -22,21 +21,28 @@ Variants {
         readonly property int utilityBudget: Math.max(LazerTheme.targetSize,
             modelData.width - leftWindow.implicitWidth - statusWindow.implicitWidth
             - sidePadding * 2 - safetyGap * 2)
-        property string activeOverlay: ""
+        readonly property string activeOverlay: overlayCoordinator.activeTarget
         property bool musicTooltipOpen: false
         property bool shuffleActive: false
 
-        function requestOverlay(requested) {
-            const next = Logic.nextOverlay(activeOverlay, requested)
-            activeOverlay = next
+        function requestOverlay(target, opener) {
             musicTooltipOpen = false
-            if (next === "") {
-                fullscreenHost.close()
-            } else if (next === "settings" || next === "music") {
-                fullscreenHost.openRoute(next, next === "settings" ? leftContent.settingsButtonItem : utilityContent.musicButtonItem)
-            } else {
-                fullscreenHost.openRoute(next, null)
+            overlayCoordinator.request(target, opener)
+        }
+
+        OverlayCoordinator {
+            id: overlayCoordinator
+            onOpenRequested: (owner, target) => {
+                if (owner === "wave") fullscreenHost.openRoute(target, null)
+                else if (owner === "settings") settingsOverlay.openFrom(null)
+                else if (owner === "music") musicOverlay.open()
             }
+            onCloseRequested: owner => {
+                if (owner === "wave") fullscreenHost.close()
+                else if (owner === "settings") settingsOverlay.closeWithoutFocusRestore()
+                else if (owner === "music") musicOverlay.close()
+            }
+            onRouteRequested: target => fullscreenHost.openRoute(target, null)
         }
 
         BarBackground { targetScreen: screenScope.modelData }
@@ -44,108 +50,95 @@ Variants {
         // Host system and mode controls at the left edge.
         PanelWindow {
             id: leftWindow
-            screen: screenScope.modelData
-            color: "transparent"
+            screen: screenScope.modelData; color: "transparent"
             implicitWidth: leftContent.implicitWidth + screenScope.sidePadding * 2
             implicitHeight: Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
             exclusionMode: ExclusionMode.Ignore
             anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true }
             margins { top: screenScope.floatingMargin; bottom: screenScope.floatingMargin; left: screenScope.floatingMargin }
-            LeftZone {
-                id: leftContent
-                anchors.centerIn: parent
-                settingsActive: screenScope.activeOverlay === "settings"
-                onSettingsRequested: screenScope.requestOverlay("settings")
-            }
+            LeftZone { id: leftContent; anchors.centerIn: parent; settingsActive: screenScope.activeOverlay === "settings"; onSettingsRequested: screenScope.requestOverlay("settings", settingsButtonItem) }
         }
 
         // Host utilities against the status zone without a full-width hit area.
         PanelWindow {
             id: utilityWindow
-            screen: screenScope.modelData
-            color: "transparent"
+            screen: screenScope.modelData; color: "transparent"
             implicitWidth: utilityContent.implicitWidth + screenScope.sidePadding * 2
             implicitHeight: Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
             exclusionMode: ExclusionMode.Ignore
             anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; right: true }
             margins { top: screenScope.floatingMargin; bottom: screenScope.floatingMargin; right: statusWindow.implicitWidth + screenScope.safetyGap + screenScope.floatingMargin }
             UtilityZone {
-                id: utilityContent
-                anchors.centerIn: parent
+                id: utilityContent; anchors.centerIn: parent
                 availableWidth: screenScope.utilityBudget - screenScope.sidePadding * 2
                 musicActive: screenScope.activeOverlay === "music"
-                onMusicOverlayRequested: screenScope.requestOverlay("music")
-                onRouteRequested: route => {
-                    if (route)
-                        screenScope.requestOverlay(route)
-                }
-                onMusicTooltipRequested: visible => screenScope.musicTooltipOpen = visible
-                        && screenScope.activeOverlay !== "music"
+                onMusicOverlayRequested: screenScope.requestOverlay("music", musicButtonItem)
+                onRouteRequested: (route, opener) => { if (route) screenScope.requestOverlay(route, opener) }
+                onMusicTooltipRequested: visible => screenScope.musicTooltipOpen = visible && screenScope.activeOverlay !== "music"
             }
         }
 
-        // Keep one fixed fullscreen owner for every route on this screen.
+        // Keep the wave owner screen-sized while only its internal viewport moves.
         PanelWindow {
-            id: fullscreenWindow
-            screen: screenScope.modelData
-            color: "transparent"
-            implicitWidth: screenScope.modelData.width
+            id: waveWindow
+            screen: screenScope.modelData; color: "transparent"
+            implicitWidth: screenScope.modelData.width; implicitHeight: screenScope.modelData.height
+            exclusionMode: ExclusionMode.Ignore
+            anchors { top: true; left: true }
+            mask: Region { item: fullscreenHost.visible ? fullscreenHost : null }
+            FullscreenOverlayHost {
+                id: fullscreenHost; anchors.fill: parent
+                barPosition: Services.SettingsService.bar.position
+                barHeight: Services.SettingsService.bar.height
+                onClosed: overlayCoordinator.ownerClosed("wave")
+            }
+        }
+
+        // Keep Settings in a dedicated left-side owner with no full-screen mask.
+        PanelWindow {
+            id: settingsWindow
+            screen: screenScope.modelData; color: "transparent"
+            implicitWidth: Math.min(616, screenScope.modelData.width)
             implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
             anchors { top: true; left: true }
-            // The active modal includes its backdrop so click-away remains usable;
-            // the mask is removed as soon as close completes.
-            mask: Region { item: fullscreenHost.interactive ? fullscreenHost : null }
-            FullscreenOverlayHost {
-                id: fullscreenHost
-                anchors.fill: parent
-                settingsComponent: settingsRoute
-                musicComponent: musicRoute
-                onClosed: screenScope.activeOverlay = ""
+            mask: Region { item: settingsOverlay.blocksDesktop ? settingsOverlay : null }
+            LazerSettingsOverlay {
+                id: settingsOverlay; anchors.fill: parent
+                panel.appearanceSettings: Services.SettingsService.appearance
+                panel.barSettings: Services.SettingsService.bar
+                panel.notificationSettings: Services.SettingsService.notifications
+                panel.saveCallback: Services.SettingsService.save
+                panel.wallpaperService: Services.WallpaperService
+                onClosed: overlayCoordinator.ownerClosed("settings")
             }
+        }
 
-            // Adapt the existing settings surface into the shared route slot.
-            Component {
-                id: settingsRoute
-                LazerSettingsPanel {
-                    anchors.centerIn: parent
-                    width: panelWidth
-                    height: panelHeight
-                    availableWidth: parent ? parent.width : 0
-                    availableHeight: parent ? parent.height : 0
-                    appearanceSettings: Services.SettingsService.appearance
-                    barSettings: Services.SettingsService.bar
-                    notificationSettings: Services.SettingsService.notifications
-                    saveCallback: Services.SettingsService.save
-                    wallpaperService: Services.WallpaperService
-                    onCloseRequested: fullscreenHost.close()
-                    Component.onCompleted: Qt.callLater(focusFirstControl)
-                }
-            }
-
-            // Adapt the existing player surface without creating another window.
-            Component {
-                id: musicRoute
-                OsuMusicOverlay {
-                    anchors.top: parent.top
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.topMargin: 32
-                    width: Math.min(340, Math.max(1, parent ? parent.width - 48 : 340))
-                    height: implicitHeight
-                    titleText: Services.MediaControlService.hasMedia ? Services.MediaControlService.title : "暂无播放内容"
-                    artistText: Services.MediaControlService.hasMedia ? Services.MediaControlService.artist : ""
-                    playing: Services.MediaControlService.playbackState === "playing"
-                    progress: Services.MediaControlService.progress
-                    shuffleActive: screenScope.shuffleActive
-                    canGoPrevious: Services.MediaControlService.canGoPrevious
-                    canTogglePlayback: Services.MediaControlService.canTogglePlayback
-                    canGoNext: Services.MediaControlService.canGoNext
-                    onShuffleRequested: active => screenScope.shuffleActive = active
-                    onPreviousRequested: Services.MediaService.previous()
-                    onPlayPauseRequested: Services.MediaService.playPause()
-                    onNextRequested: Services.MediaService.next()
-                    onCloseRequested: fullscreenHost.close()
-                }
+        // Keep Now Playing local to the music entry instead of the wave viewport.
+        PanelWindow {
+            id: musicWindow
+            screen: screenScope.modelData; color: "transparent"
+            implicitWidth: 340; implicitHeight: 130
+            exclusionMode: ExclusionMode.Ignore
+            anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; right: true }
+            margins { top: Services.SettingsService.bar.position === "top" ? Services.SettingsService.bar.height + 4 : 4; bottom: Services.SettingsService.bar.position === "bottom" ? Services.SettingsService.bar.height + 4 : 4; right: statusWindow.implicitWidth + screenScope.safetyGap }
+            mask: Region { item: musicOverlay.openState || musicOverlay.openProgress > 0 ? musicOverlay : null }
+            OsuMusicOverlay {
+                id: musicOverlay; anchors.fill: parent
+                titleText: Services.MediaControlService.hasMedia ? Services.MediaControlService.title : "暂无播放内容"
+                artistText: Services.MediaControlService.hasMedia ? Services.MediaControlService.artist : ""
+                playing: Services.MediaControlService.playbackState === "playing"
+                progress: Services.MediaControlService.progress
+                shuffleActive: screenScope.shuffleActive
+                canGoPrevious: Services.MediaControlService.canGoPrevious
+                canTogglePlayback: Services.MediaControlService.canTogglePlayback
+                canGoNext: Services.MediaControlService.canGoNext
+                onShuffleRequested: active => screenScope.shuffleActive = active
+                onPreviousRequested: Services.MediaService.previous()
+                onPlayPauseRequested: Services.MediaService.playPause()
+                onNextRequested: Services.MediaService.next()
+                onCloseRequested: screenScope.requestOverlay("music", utilityContent.musicButtonItem)
+                onClosed: overlayCoordinator.ownerClosed("music")
             }
         }
 
@@ -179,18 +172,12 @@ Variants {
         // Host profile and system status at the right edge.
         PanelWindow {
             id: statusWindow
-            screen: screenScope.modelData
-            color: "transparent"
+            screen: screenScope.modelData; color: "transparent"
             implicitWidth: statusContent.implicitWidth + screenScope.sidePadding * 2
             implicitHeight: Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
             exclusionMode: ExclusionMode.Ignore
             anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; right: true }
-            StatusZone {
-                id: statusContent
-                anchors.centerIn: parent
-                username: root.username
-                avatarSource: root.avatarSource
-            }
+            StatusZone { id: statusContent; anchors.centerIn: parent; username: root.username; avatarSource: root.avatarSource }
         }
     }
 }

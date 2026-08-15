@@ -63,15 +63,6 @@ function visualState(enabled, active, hovered, pressed) {
     return "rest"
 }
 
-function nextOverlay(current, requested) {
-    var activeCandidate = current == null ? "" : String(current)
-    var active = ["settings", "music", "wiki", "news", "beatmap"].indexOf(activeCandidate) >= 0 ? activeCandidate : ""
-    var targetCandidate = requested == null ? "" : String(requested)
-    if (["settings", "music", "wiki", "news", "beatmap"].indexOf(targetCandidate) < 0)
-        return active
-    return active === targetCandidate ? "" : targetCandidate
-}
-
 function popupOrigin(anchorCenterX, popupWidth, screenWidth) {
     var center = Number(anchorCenterX) || 0
     var width = Math.max(0, Number(popupWidth) || 0)

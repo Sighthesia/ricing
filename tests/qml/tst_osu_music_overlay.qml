@@ -23,7 +23,7 @@ Item {
         function test_lifecycle() {
             compare(overlay.openDuration, 160); compare(overlay.closeDuration, 100)
             overlay.open(); compare(overlay.openState, true); compare(overlay.interactive, true); tryCompare(overlay, "openProgress", 1, 240)
-            overlay.close(); compare(overlay.openState, false); compare(overlay.interactive, false); tryCompare(overlay, "openProgress", 0, 180); compare(closedSpy.count, 1)
+            overlay.close(); compare(overlay.openState, false); compare(overlay.interactive, false); tryCompare(overlay, "openProgress", 0, 180); tryCompare(closedSpy, "count", 1, 100)
         }
         function test_reducedMotion() { Lazer.MotionTokens.reducedMotionOverride = true; overlay.openProgress = 0; compare(overlay.effectiveYOffset, 0) }
         function test_signals() {
