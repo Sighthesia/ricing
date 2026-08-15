@@ -26,3 +26,24 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 2: 研究 osu 全屏面板实现
+
+**Date**: 2026-08-15
+**Task**: 研究 osu 全屏面板实现
+**Branch**: `lazer`
+
+### Summary
+
+使用 osu 仓库 CodeGraph 和源码分析共享全屏 overlay、Wiki、News、Beatmap Listing，并输出 Afloat QML 架构映射与 P0/P1/P2 迁移建议。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `82a2ab1` | (see git log) |
+
+### Status
+
+[OK] **Completed**
