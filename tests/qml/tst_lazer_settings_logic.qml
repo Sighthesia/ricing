@@ -49,6 +49,13 @@ Item {
             compare(SettingsLogic.navigationWidth(760), 216)
         }
 
+        function test_sidePanelWidth() {
+            compare(SettingsLogic.sidePanelWidth(1920), 616)
+            compare(SettingsLogic.sidePanelWidth(900), 616)
+            compare(SettingsLogic.sidePanelWidth(500), 500)
+            compare(SettingsLogic.sidePanelWidth(-20), 0)
+        }
+
         function test_settingsConversions() {
             compare(SettingsLogic.timeoutSecondsToMs(1), 2000)
             compare(SettingsLogic.timeoutSecondsToMs(20), 15000)
@@ -113,11 +120,11 @@ Item {
         }
 
         function test_themeTokens() {
-            compare(Lazer.LazerTheme.settingsPanel, "#f21d1c22")
-            compare(Lazer.LazerTheme.settingsPanelBorder, "#38ffffff")
-            compare(Lazer.LazerTheme.settingsRail, "#2418171c")
-            compare(Lazer.LazerTheme.settingsRow, "#141d1c22")
-            compare(Lazer.LazerTheme.settingsRowHover, "#241f2028")
+            compare(Lazer.LazerTheme.settingsPanel, "#ee24252d")
+            compare(Lazer.LazerTheme.settingsPanelBorder, "#00000000")
+            compare(Lazer.LazerTheme.settingsRail, "#1b1c22")
+            compare(Lazer.LazerTheme.settingsRow, "#292a33")
+            compare(Lazer.LazerTheme.settingsRowHover, "#363842")
             compare(Lazer.LazerTheme.settingsSelected, "#40eb1c60")
             compare(Lazer.LazerTheme.settingsScrimOpacity, 0.6)
             compare(Lazer.LazerTheme.settingsRadius, 16)

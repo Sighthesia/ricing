@@ -25,12 +25,12 @@ QtObject {
     readonly property color musicGold: "#FFD000"
     readonly property color musicMuted: "#A0A0A0"
 
-    // Settings overlay surfaces use the same dark glass language as the bar.
-    readonly property color settingsPanel: "#F21D1C22"
-    readonly property color settingsPanelBorder: "#38FFFFFF"
-    readonly property color settingsRail: "#2418171C"
-    readonly property color settingsRow: "#141D1C22"
-    readonly property color settingsRowHover: "#241F2028"
+    // Settings surfaces use the fixed flat shades from osu's side-panel hierarchy.
+    readonly property color settingsPanel: "#EE24252D"
+    readonly property color settingsPanelBorder: "transparent"
+    readonly property color settingsRail: "#FF1B1C22"
+    readonly property color settingsRow: "#FF292A33"
+    readonly property color settingsRowHover: "#FF363842"
     readonly property color settingsSelected: "#40EB1C60"
     readonly property real settingsScrimOpacity: 0.6
     readonly property int settingsRadius: 16

@@ -15,10 +15,11 @@ Item {
     property string selectedCategory: "appearance"
     property real availableWidth: 1040
     property real availableHeight: 760
+    property bool sidePanel: false
     readonly property int selectedIndex: categoryIndex(selectedCategory)
     readonly property int contentTransitionDirection: _transitionDirection
-    readonly property real panelWidth: Logic.panelWidth(availableWidth)
-    readonly property real panelHeight: Logic.panelHeight(availableHeight)
+    readonly property real panelWidth: sidePanel ? Logic.sidePanelWidth(availableWidth) : Logic.panelWidth(availableWidth)
+    readonly property real panelHeight: sidePanel ? Math.max(0, availableHeight) : Logic.panelHeight(availableHeight)
     readonly property real navigationWidth: Logic.navigationWidth(width)
     readonly property real railWidth: navigationWidth
     readonly property int categoryTransitionDuration: 160
@@ -176,28 +177,14 @@ Item {
         }
     }
 
-    // Draw the glass panel body behind the persistent rail and viewport.
+    // Draw one flat osu settings body behind the persistent rail and viewport.
     Rectangle {
         anchors.fill: parent
-        radius: LazerTheme.settingsRadius
-        color: root.appearanceSettings
-               ? Qt.rgba(root.appearanceSettings.colorScheme === "light" ? 0.95 : 0.114,
-                         root.appearanceSettings.colorScheme === "light" ? 0.94 : 0.11,
-                         root.appearanceSettings.colorScheme === "light" ? 0.96 : 0.133,
-                         Math.max(0.35, Math.min(1, root.appearanceSettings.panelOpacity)))
-               : LazerTheme.settingsPanel
-        border.width: 1
-        border.color: root.appearanceSettings
-                ? Qt.rgba(root.appearanceSettings.colorScheme === "light" ? 0 : 1,
-                          root.appearanceSettings.colorScheme === "light" ? 0 : 1,
-                          root.appearanceSettings.colorScheme === "light" ? 0 : 1,
-                          Math.max(0.08, root.appearanceSettings.glassHighlightIntensity
-                                   * Math.max(1, root.appearanceSettings.glassHighlightWidth) * 0.125
-                                   + root.appearanceSettings.glassGlowIntensity * 0.05))
-                : LazerTheme.settingsPanelBorder
+        radius: root.sidePanel ? 0 : LazerTheme.settingsRadius
+        color: LazerTheme.settingsPanel
+        border.width: 0
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-        Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
     // Provide a compact header with a keyboard-accessible close affordance.

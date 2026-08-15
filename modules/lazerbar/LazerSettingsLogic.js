@@ -24,6 +24,13 @@ function panelWidth(availableWidth) {
     return Math.round(clamp(width * 0.8, 760, 1040))
 }
 
+function sidePanelWidth(availableWidth) {
+    var width = Number(availableWidth)
+    if (!isFinite(width))
+        return 0
+    return Math.max(0, Math.min(616, width))
+}
+
 function panelHeight(availableHeight) {
     var height = Number(availableHeight)
     if (!isFinite(height))
