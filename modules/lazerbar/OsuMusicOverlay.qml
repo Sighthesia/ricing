@@ -24,6 +24,14 @@ Item {
     signal nextRequested
     signal playlistRequested
     signal closeRequested
+    signal closed
+    property alias background: playerBackground
+    property alias metadataBlock: metadata
+    property alias controlsRow: controls
+    property alias progressBar: progressTrack
+    property alias shuffleControl: shuffleButton
+    property alias previousControl: previousButton
+    property alias playControl: playButton
 
     implicitWidth: 340
     implicitHeight: 130
@@ -33,35 +41,54 @@ Item {
 
     function open() { openState = true; interactive = true; reveal.duration = openDuration; reveal.to = 1; reveal.restart(); Qt.callLater(focusFirstControl) }
     function close() { interactive = false; openState = false; reveal.duration = closeDuration; reveal.to = 0; reveal.restart() }
-    function focusFirstControl() { shuffleButton.forceActiveFocus() }
+    function focusFirstControl() {
+        if (shuffleButton.enabled) shuffleButton.forceActiveFocus()
+        else if (previousButton.enabled) previousButton.forceActiveFocus()
+        else if (playButton.enabled) playButton.forceActiveFocus()
+        else playlistButton.forceActiveFocus()
+    }
     Keys.onEscapePressed: event => { closeRequested(); event.accepted = true }
 
-    NumberAnimation { id: reveal; target: root; property: "openProgress"; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft }
+    NumberAnimation {
+        id: reveal; target: root; property: "openProgress"; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft
+        onFinished: if (!root.openState && root.openProgress <= 0) root.closed()
+    }
 
     // Paint the fixed-size floating player card.
     Rectangle {
+        id: playerBackground
         anchors.fill: parent
-        radius: 10
-        color: LazerTheme.musicBackground
-        border.width: 1
-        border.color: "#24FFFFFF"
+        radius: 4
+        color: "#F0191A20"
+
+        // Anchor the metadata with an osu-like cover block rather than a generic centred card.
+        Rectangle {
+            id: cover
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: progressTrack.top
+            width: 92
+            color: LazerTheme.osuButtonActive
+            Text { anchors.centerIn: parent; text: "osu!"; color: "white"; font.pixelSize: 22; font.bold: true }
+        }
 
         Column {
+            id: metadata
             anchors.top: parent.top
-            anchors.left: parent.left
+            anchors.left: cover.right
             anchors.right: parent.right
-            anchors.topMargin: 14
+            anchors.topMargin: 13
             spacing: 2
-            Text { width: parent.width - 32; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; text: root.titleText || "暂无播放内容"; color: "white"; font.pixelSize: 16; font.bold: true; elide: Text.ElideRight }
-            Text { width: parent.width - 32; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; text: root.artistText; color: LazerTheme.musicMuted; font.pixelSize: 12; elide: Text.ElideRight }
+            Text { width: parent.width - 28; anchors.horizontalCenter: parent.horizontalCenter; text: root.titleText || "暂无播放内容"; color: "white"; font.pixelSize: 16; font.bold: true; elide: Text.ElideRight }
+            Text { width: parent.width - 28; anchors.horizontalCenter: parent.horizontalCenter; text: root.artistText; color: LazerTheme.musicMuted; font.pixelSize: 12; elide: Text.ElideRight }
         }
 
         Row {
             id: controls
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.horizontalCenter: metadata.horizontalCenter
             anchors.bottom: progressTrack.top
             anchors.bottomMargin: 13
-            spacing: 16
+            spacing: 12
             MusicControlButton { id: shuffleButton; iconSource: "icons/shuffle.svg"; accessibleName: "Shuffle"; active: root.shuffleActive; onClicked: { root.shuffleActive = !root.shuffleActive; root.shuffleRequested(root.shuffleActive) } KeyNavigation.right: previousButton }
             MusicControlButton { id: previousButton; iconSource: "icons/previous.svg"; accessibleName: "Previous"; enabled: root.canGoPrevious; onClicked: root.previousRequested(); KeyNavigation.left: shuffleButton; KeyNavigation.right: playButton }
             MusicControlButton { id: playButton; iconSource: root.playing ? "icons/pause.svg" : "icons/play.svg"; accessibleName: root.playing ? "Pause" : "Play"; outlined: true; enabled: root.canTogglePlayback; onClicked: root.playPauseRequested(); KeyNavigation.left: previousButton; KeyNavigation.right: nextButton }
