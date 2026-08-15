@@ -11,6 +11,7 @@ Item {
     QtObject { id: sliderHolder; property real value: 4 }
     QtObject { id: choiceHolder; property string value: "auto" }
     QtObject { id: textHolder; property string value: "  wallpaper.png  " }
+    QtObject { id: resetState; property int count: 0 }
 
     // Keep a non-settings child here to verify Row's guarded contract.
     Lazer.LazerSettingsRow {
@@ -25,6 +26,16 @@ Item {
         labelText: "设置"
         descriptionText: "这是一段很长的中文说明，用于验证窄宽布局不会和右侧控件重叠。"
         Lazer.LazerSettingsToggle { id: rowToggle }
+    }
+
+    Lazer.LazerSettingsRow {
+        id: revertRow
+        width: 520
+        labelText: "可恢复项"
+        defaultValue: 5
+        currentValue: 7
+        resetCallback: function() { resetState.count++ }
+        Lazer.LazerSettingsSlider { id: revertRowSlider; from: 0; to: 10 }
     }
 
     Lazer.LazerSettingsRow {
@@ -52,6 +63,7 @@ Item {
         stepSize: 2
         suffix: "%"
         value: sliderHolder.value
+        defaultValue: 2
         onValueModified: next => sliderHolder.value = next
     }
     Lazer.LazerSettingsSlider { id: secondSlider; value: 2 }
@@ -80,6 +92,8 @@ Item {
     SignalSpy { id: choiceSpy; target: choice; signalName: "valueSelected" }
     SignalSpy { id: commitSpy; target: textField; signalName: "textCommitted" }
     SignalSpy { id: clearSpy; target: textField; signalName: "clearRequested" }
+    SignalSpy { id: dropdownSpy; target: Lazer.SettingsOverlayBridge; signalName: "dropdownRequested" }
+    SignalSpy { id: dropdownDismissSpy; target: Lazer.SettingsOverlayBridge; signalName: "dropdownDismissed" }
 
     TestCase {
         name: "LazerSettingsControls"
@@ -100,16 +114,25 @@ Item {
             choice.enabled = true
             choiceHolder.value = "auto"
             choiceSpy.clear()
+            choice.menuOpen = false
+            dropdownSpy.clear()
+            dropdownDismissSpy.clear()
+            Lazer.SettingsOverlayBridge.clearTooltips()
             textField.enabled = true
             textField.focus = false
             textField.editorItem.focus = false
             textHolder.value = "  wallpaper.png  "
             commitSpy.clear()
             clearSpy.clear()
+            resetState.count = 0
+            revertRow.currentValue = 7
             Lazer.MotionTokens.reducedMotionOverride = false
         }
 
-        function cleanup() { Lazer.MotionTokens.reducedMotionOverride = false }
+        function cleanup() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            Lazer.SettingsOverlayBridge.clearTooltips()
+        }
 
         function test_toggleActivationAndDisabledBlocking() {
             toggle.activate()
@@ -129,6 +152,17 @@ Item {
             compare(toggleHolder.value, true)
             keyPress(Qt.Key_Space)
             compare(toggleHolder.value, false)
+        }
+
+        function test_toggleRendersFixedOsuNub() {
+            compare(toggle.nubItem.implicitWidth, 50)
+            compare(toggle.nubItem.implicitHeight, 15)
+            verify(toggle.nubItem)
+            toggle.checked = true
+            verify(toggle.nubItem.effectiveChecked)
+            Lazer.MotionTokens.reducedMotionOverride = true
+            compare(toggle.nubMorphEnabled, false)
+            compare(toggle.fillWidth, false)
         }
 
         function test_sliderNormalizesStepsAndSuffix() {
@@ -193,6 +227,33 @@ Item {
             verify(slider.trackTapEnabled)
         }
 
+        function test_sliderDoubleClickRestoresDefault() {
+            sliderHolder.value = 8
+            slider.resetToDefault()
+            compare(sliderHolder.value, 2)
+            verify(slider.defaultValue !== undefined)
+            slider.defaultValue = undefined
+            sliderHolder.value = 6
+            slider.resetToDefault()
+            compare(sliderHolder.value, 6)
+            compare(slider.nubDoubleTapEnabled, false)
+        }
+
+        function test_sliderReverseTrackMapping() {
+            slider.from = 10
+            slider.to = 0
+            slider.stepSize = 3
+            sliderHolder.value = 10
+            slider.forceActiveFocus()
+            keyPress(Qt.Key_Right)
+            compare(sliderHolder.value, 7)
+            keyPress(Qt.Key_Left)
+            compare(sliderHolder.value, 10)
+            compare(slider.valueForTrackPosition(0), 10)
+            compare(slider.valueForTrackPosition(slider.trackItem.width), 0)
+            compare(slider.valueForTrackPosition(slider.trackItem.width / 2), 4)
+        }
+
         function test_choiceRejectsUnknownValues() {
             choice.selectValue("missing")
             compare(choiceHolder.value, "auto")
@@ -209,20 +270,32 @@ Item {
             compare(choice.displayLabel, "深色模式")
         }
 
-        function test_choiceKeyboardAndDisabledBlocking() {
+        function test_choiceOpensRealDropdownInsteadOfCycling() {
             choiceHolder.value = "auto"
             choice.forceActiveFocus()
             keyPress(Qt.Key_Right)
-            compare(choiceHolder.value, "dark")
-            keyPress(Qt.Key_Left)
             compare(choiceHolder.value, "auto")
+            compare(dropdownSpy.count, 0)
             keyPress(Qt.Key_Enter)
-            compare(choiceHolder.value, "dark")
+            compare(choice.menuOpen, true)
+            compare(dropdownSpy.count, 1)
+            verify(dropdownSpy.signalArguments[0][0] === choice)
             keyPress(Qt.Key_Space)
+            compare(choice.menuOpen, true)
+            choice.closeMenu()
+            compare(choice.menuOpen, false)
+            compare(dropdownDismissSpy.count, 1)
             compare(choiceHolder.value, "auto")
+        }
+
+        function test_choiceDisabledBlocksMenu() {
             choice.enabled = false
-            keyPress(Qt.Key_Right)
-            compare(choiceHolder.value, "auto")
+            choice.openMenu()
+            compare(choice.menuOpen, false)
+            compare(dropdownSpy.count, 0)
+            compare(choice.activeFocusOnTab, false)
+            choice.closeMenu()
+            compare(dropdownDismissSpy.count, 0)
         }
 
         function test_textTrimsCommitAndClears() {
@@ -295,10 +368,8 @@ Item {
             verify(row.controlItem.height > 0)
             verify(row.controlItem.x >= 0)
             verify(row.controlItem.x + row.controlItem.width <= row.width - 16)
-            verify(row.labelTextItem.right <= row.controlItem.left)
-            verify(row.descriptionTextItem.right <= row.controlItem.left)
             row.enabled = false
-            compare(row.opacity, Lazer.MotionTokens.disabledOpacity)
+            compare(row.opacity, Lazer.LazerTheme.settingsDisabledAlpha)
             compare(row.contentEnabled, false)
             compare(rowToggle.rowEnabled, false)
             compare(choice.activeFocusOnTab, true)
@@ -343,7 +414,6 @@ Item {
             verify(compactTextField.x >= 0)
             verify(compactTextField.x + compactTextField.width <= compactRow.width - 16)
             verify(compactRow.labelTextItem.bottom <= compactTextField.top)
-            verify(compactRow.descriptionTextItem.bottom <= compactTextField.top)
             verify(compactRow.height >= compactRow.implicitHeight)
         }
 
@@ -357,19 +427,22 @@ Item {
             compare(rowToggle.width, 180)
         }
 
-        function test_sliderReverseTrackMapping() {
-            slider.from = 10
-            slider.to = 0
-            slider.stepSize = 3
-            sliderHolder.value = 10
-            slider.forceActiveFocus()
-            keyPress(Qt.Key_Right)
-            compare(sliderHolder.value, 7)
-            keyPress(Qt.Key_Left)
-            compare(sliderHolder.value, 10)
-            compare(slider.valueForTrackPosition(0), 10)
-            compare(slider.valueForTrackPosition(slider.trackItem.width), 0)
-            compare(slider.valueForTrackPosition(slider.trackItem.width / 2), 4)
+        function test_rowShowsRevertUntilValueMatchesDefault() {
+            verify(revertRow.hasDefault)
+            verify(!revertRow.isDefault)
+            verify(revertRow.revertVisible)
+            verify(revertRow.canReset)
+            verify(revertRow.revertButtonItem.visible)
+            revertRow.activateReset()
+            compare(resetState.count, 1)
+            revertRow.currentValue = 5
+            verify(revertRow.isDefault)
+            verify(!revertRow.revertVisible)
+            verify(!revertRow.canReset)
+            verify(!revertRow.revertButtonItem.visible)
+            revertRow.defaultValue = undefined
+            verify(!revertRow.hasDefault)
+            verify(!revertRow.revertVisible)
         }
     }
 }

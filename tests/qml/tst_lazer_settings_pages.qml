@@ -171,9 +171,8 @@ Item {
             barPage.positionChoice.selectNext(1)
             compare(barSettings.position, "bottom")
             compare(saveState.count, 2)
-            notificationsPage.positionChoice.forceActiveFocus()
-            keyPress(Qt.Key_Left)
-            compare(notificationSettings.position, "top-left")
+            notificationsPage.positionChoice.selectValue("bottom-left")
+            compare(notificationSettings.position, "bottom-left")
             compare(saveState.count, 3)
         }
 
@@ -238,6 +237,56 @@ Item {
             compare(notificationsPage.visibleResultCount, 3)
             notificationsPage.searchQuery = ""
             compare(notificationsPage.visibleResultCount, 4)
+        }
+
+        function test_rowsShowRevertOnlyWhenOffDefault() {
+            appearancePage.defaults = { "panelOpacity": 0.9, "colorScheme": "auto", "wallpaperPath": "" }
+            appearancePage.resetCallback = function(key, value) {
+                if (key === "panelOpacity") appearanceSettings.panelOpacity = value
+                else if (key === "colorScheme") appearanceSettings.colorScheme = value
+                else if (key === "wallpaperPath") appearanceSettings.wallpaperPath = value
+            }
+            verify(!appearancePage.panelOpacityRow.revertVisible)
+            appearanceSettings.panelOpacity = 0.55
+            verify(appearancePage.panelOpacityRow.revertVisible)
+            appearancePage.panelOpacityRow.activateReset()
+            compare(appearanceSettings.panelOpacity, 0.9)
+            verify(!appearancePage.panelOpacityRow.revertVisible)
+            verify(!appearancePage.colorSchemeRow.revertVisible)
+            appearanceSettings.colorScheme = "dark"
+            verify(appearancePage.colorSchemeRow.revertVisible)
+            appearancePage.colorSchemeRow.activateReset()
+            compare(appearanceSettings.colorScheme, "auto")
+            appearancePage.defaults = {}
+            verify(!appearancePage.panelOpacityRow.hasDefault)
+            verify(!appearancePage.panelOpacityRow.revertVisible)
+        }
+
+        function test_defaultAndResetFlowThroughPanelContract() {
+            appearancePage.defaults = { "enableBlur": true }
+            appearancePage.resetCallback = function(key, value) { appearanceSettings.enableBlur = value }
+            appearanceSettings.enableBlur = false
+            verify(appearancePage.enableBlurRow.revertVisible)
+            appearancePage.enableBlurRow.activateReset()
+            compare(appearanceSettings.enableBlur, true)
+            verify(!appearancePage.enableBlurRow.revertVisible)
+            barPage.defaults = { "floatingMargin": 4, "position": "top" }
+            barPage.resetCallback = function(key, value) {
+                if (key === "floatingMargin") barSettings.floatingMargin = value
+                else if (key === "position") barSettings.position = value
+            }
+            barSettings.floating = true
+            barSettings.floatingMargin = 20
+            verify(barPage.floatingMarginRow.revertVisible)
+            barPage.floatingMarginRow.activateReset()
+            compare(barSettings.floatingMargin, 4)
+            barSettings.floating = false
+            notificationsPage.defaults = { "maxVisible": 3 }
+            notificationsPage.resetCallback = function(key, value) { notificationSettings.maxVisible = value }
+            notificationSettings.maxVisible = 6
+            verify(notificationsPage.maxVisibleRow.revertVisible)
+            notificationsPage.maxVisibleRow.activateReset()
+            compare(notificationSettings.maxVisible, 3)
         }
     }
 }

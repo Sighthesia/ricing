@@ -1,7 +1,9 @@
 import QtQuick
+import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
-// Own the settings content chrome: header, search, viewport, footer, empty state.
+// Own the settings content chrome: header, outlined search, viewport, footer,
+// plus the top-level tooltip and dropdown overlay layers for row controls.
 Item {
     id: root
 
@@ -13,9 +15,11 @@ Item {
     property int visibleResultCount: 0
     property real backgroundExtend: 170
     property Item currentPage: null
+    property bool dropdownOpen: false
     readonly property bool emptyStateVisible:
         Logic.normalizeSearchQuery(searchQuery).length > 0 && visibleResultCount === 0
     readonly property bool canScrollDown: currentPage && currentPage.contentHeight - currentPage.contentY - viewport.height > 8
+    readonly property bool dropdownVisible: dropdownOpen
 
     signal searchQueryEdited(string query)
     signal expandToggleRequested()
@@ -30,6 +34,20 @@ Item {
     onSearchQueryChanged: {
         if (searchEditor.text !== root.searchQuery)
             searchEditor.text = root.searchQuery
+        root.closeDropdownMenu()
+        root.hideTooltip()
+    }
+
+    onCurrentPageChanged: {
+        root.closeDropdownMenu()
+        root.hideTooltip()
+    }
+
+    onInteractiveChanged: {
+        if (!root.interactive) {
+            root.closeDropdownMenu()
+            root.hideTooltip()
+        }
     }
 
     function focusSearch() {
@@ -78,16 +96,36 @@ Item {
             Accessible.role: Accessible.Button
             Accessible.name: "关闭"
 
+            scale: closePress.pressed ? MotionTokens.pressScale : 1
+            Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
+
             Rectangle {
                 anchors.fill: parent
                 radius: 16
                 color: closeHover.hovered || closeButton.activeFocus ? LazerTheme.settingsRowHover : "transparent"
                 border.width: closeButton.activeFocus ? 1 : 0
                 border.color: LazerTheme.focusRing
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }
-            Text { anchors.centerIn: parent; text: "×"; color: LazerTheme.textPrimary; font.pixelSize: 22 }
+            Image {
+                id: closeIcon
+                anchors.centerIn: parent
+                width: 16
+                height: 16
+                source: "icons/close.svg"
+                fillMode: Image.PreserveAspectFit
+            }
+            MultiEffect {
+                anchors.fill: closeIcon
+                source: closeIcon
+                visible: closeIcon.visible
+                colorization: 1
+                colorizationColor: closeHover.hovered || closeButton.activeFocus ? LazerTheme.textPrimary : LazerTheme.textMuted
+                Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
+            }
             HoverHandler { id: closeHover; enabled: closeButton.enabled }
             TapHandler {
+                id: closePress
                 enabled: closeButton.enabled
                 onTapped: { closeButton.forceActiveFocus(); root.closeRequested() }
             }
@@ -112,21 +150,36 @@ Item {
             Accessible.role: Accessible.Button
             Accessible.name: root.expanded ? "收起设置面板" : "展开设置面板"
 
+            scale: expandPress.pressed ? MotionTokens.pressScale : 1
+            Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
+
             Rectangle {
                 anchors.fill: parent
                 radius: 16
                 color: expandHover.hovered || expandToggle.activeFocus ? LazerTheme.settingsRowHover : "transparent"
                 border.width: expandToggle.activeFocus ? 1 : 0
                 border.color: LazerTheme.focusRing
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }
-            Text {
+            Image {
+                id: expandIcon
                 anchors.centerIn: parent
-                text: root.expanded ? "«" : "»"
-                color: LazerTheme.textMuted
-                font.pixelSize: 16
+                width: 16
+                height: 16
+                source: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
+                fillMode: Image.PreserveAspectFit
+            }
+            MultiEffect {
+                anchors.fill: expandIcon
+                source: expandIcon
+                visible: expandIcon.visible
+                colorization: 1
+                colorizationColor: expandHover.hovered || expandToggle.activeFocus ? LazerTheme.textPrimary : LazerTheme.textMuted
+                Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
             }
             HoverHandler { id: expandHover; enabled: expandToggle.enabled }
             TapHandler {
+                id: expandPress
                 enabled: expandToggle.enabled
                 onTapped: { expandToggle.forceActiveFocus(); root.expandToggleRequested() }
             }
@@ -139,7 +192,7 @@ Item {
         }
     }
 
-    // Keep the search field fixed between the header and the scrolling sections.
+    // Keep the outlined search field fixed between the header and the pages.
     Item {
         id: searchArea
         x: 0
@@ -154,21 +207,30 @@ Item {
             anchors.rightMargin: 12
             anchors.topMargin: 2
             anchors.bottomMargin: 2
-            radius: 10
-            color: searchHover.hovered || searchEditor.activeFocus ? LazerTheme.settingsRowHover : LazerTheme.settingsRow
+            radius: LazerTheme.settingsControlRadius
+            color: "transparent"
             border.width: searchEditor.activeFocus ? 2 : 1
-            border.color: searchEditor.activeFocus ? LazerTheme.focusRing : LazerTheme.settingsPanelBorder
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            border.color: searchEditor.activeFocus ? LazerTheme.focusRing : (searchHover.hovered ? "#66FFFFFF" : "#33FFFFFF")
             Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
+            Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
-        Text {
+        Image {
+            id: searchIcon
             anchors.left: searchSurface.left
             anchors.leftMargin: 14
             anchors.verticalCenter: searchSurface.verticalCenter
-            text: "⌕"
-            color: LazerTheme.textMuted
-            font.pixelSize: 18
+            width: 15
+            height: 15
+            source: "icons/search.svg"
+            fillMode: Image.PreserveAspectFit
+        }
+        MultiEffect {
+            anchors.fill: searchIcon
+            source: searchIcon
+            visible: searchIcon.visible
+            colorization: 1
+            colorizationColor: LazerTheme.textMuted
         }
 
         TextInput {
@@ -208,17 +270,39 @@ Item {
             enabled: root.interactive && root.contentReady
             activeFocusOnTab: false
 
-            Text {
-                anchors.centerIn: parent
-                text: "×"
-                color: LazerTheme.textMuted
-                font.pixelSize: 16
+            scale: clearPress.pressed ? MotionTokens.pressScale : 1
+            Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: 12
+                color: clearHover.hovered ? LazerTheme.settingsRowHover : "transparent"
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }
+            Image {
+                id: clearIcon
+                anchors.centerIn: parent
+                width: 12
+                height: 12
+                source: "icons/close.svg"
+                fillMode: Image.PreserveAspectFit
+            }
+            MultiEffect {
+                anchors.fill: clearIcon
+                source: clearIcon
+                visible: clearIcon.visible
+                colorization: 1
+                colorizationColor: clearHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
+                Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
+            }
+            HoverHandler { id: clearHover; enabled: searchClearButton.enabled && searchClearButton.visible }
             TapHandler {
+                id: clearPress
                 enabled: searchClearButton.enabled && searchClearButton.visible
                 onTapped: {
                     searchEditor.text = ""
                     root.searchQueryEdited("")
+                    searchEditor.forceActiveFocus()
                 }
             }
         }
@@ -306,6 +390,166 @@ Item {
             text: "v0.1.0 · Esc 关闭"
             color: LazerTheme.textMuted
             font.pixelSize: 11
+        }
+    }
+
+    // Present the hover/focus description or slider value above its source.
+    Item {
+        id: tooltip
+        z: 20
+        visible: false
+        property string tooltipText: ""
+        width: Math.min(LazerTheme.tooltipMaxWidth, Math.max(24, tooltipSurface.implicitWidth + 20))
+        height: tooltipSurface.implicitHeight + 12
+        opacity: visible ? 1 : 0
+
+        Rectangle {
+            id: tooltipSurface
+            anchors.fill: parent
+            radius: 6
+            color: LazerTheme.tooltipBackground
+            border.width: 1
+            border.color: LazerTheme.tooltipBorder
+
+            Text {
+                anchors.fill: parent
+                anchors.margins: 6
+                text: tooltip.tooltipText
+                color: LazerTheme.textPrimary
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+    }
+
+    // Own the real dropdown menu and its outside-click catcher on a top layer.
+    // The layer visibility follows the content state (not the child menu's
+    // visible, which would create a circular binding that resets the menu).
+    Item {
+        id: dropdownLayer
+        z: 30
+        anchors.fill: parent
+        visible: root.dropdownOpen
+
+        // Close the menu when the pointer lands outside it.
+        Item {
+            id: menuCatcher
+            anchors.fill: parent
+            TapHandler {
+                enabled: dropdownMenu.visible
+                onTapped: root.closeDropdownMenu()
+            }
+        }
+
+        SettingsDropdownMenu {
+            id: dropdownMenu
+            z: 1
+            onItemSelected: value => root.selectDropdownValue(value)
+            onClosed: root.onMenuClosed()
+        }
+    }
+
+    function hideTooltip() {
+        tooltip.visible = false
+    }
+
+    function showTooltipAt(text, source) {
+        if (!root.interactive || !root.contentReady || !source || !text) {
+            hideTooltip()
+            return
+        }
+        tooltip.tooltipText = text
+        var pos = source.mapToItem(root, 0, 0)
+        if (!isFinite(Number(pos.x)) || !isFinite(Number(pos.y)))
+            pos = { x: 0, y: 0 }
+        tooltip.x = Logic.clamp(pos.x, 0, Math.max(0, root.width - tooltip.width))
+        var aboveY = pos.y - tooltip.height - 6
+        if (aboveY >= viewport.y)
+            tooltip.y = aboveY
+        else
+            tooltip.y = Math.min(pos.y + (source.height > 0 ? source.height : 20) + 6, Math.max(viewport.y, root.height - tooltip.height))
+        tooltip.visible = true
+    }
+
+    function refreshTooltipFromBridge() {
+        var current = SettingsOverlayBridge.currentTooltip()
+        if (current && current.text)
+            showTooltipAt(current.text, current.source)
+        else
+            hideTooltip()
+    }
+
+    function closeDropdownMenu() {
+        root.dropdownOpen = false
+        if (dropdownMenu.choiceItem)
+            dropdownMenu.choiceItem.closeMenu()
+        else
+            dropdownMenu.close()
+    }
+
+    function selectDropdownValue(value) {
+        var choice = dropdownMenu.choiceItem
+        if (!choice)
+            return
+        choice.selectValue(value)
+        dropdownMenu.close()
+    }
+
+    function onMenuClosed() {
+        root.dropdownOpen = false
+        if (dropdownMenu.choiceItem) {
+            dropdownMenu.choiceItem.menuOpen = false
+            dropdownMenu.choiceItem.focusHeader()
+            dropdownMenu.choiceItem = null
+        }
+    }
+
+    function showDropdownFor(choiceItem) {
+        if (!root.interactive || !root.contentReady || !choiceItem) {
+            hideTooltip()
+            return
+        }
+        hideTooltip()
+        if (dropdownMenu.choiceItem && dropdownMenu.choiceItem !== choiceItem) {
+            dropdownMenu.choiceItem.menuOpen = false
+            dropdownMenu.choiceItem = null
+        }
+        dropdownMenu.choiceItem = choiceItem
+        dropdownMenu.model = choiceItem.model
+        dropdownMenu.currentValue = choiceItem.currentValue
+        var header = choiceItem.headerItem || choiceItem
+        var pos = header.mapToItem(root, 0, 0)
+        var menuHeight = Math.min(LazerTheme.dropdownMaxHeight, choiceItem.model.length * 30 + 8)
+        var placement = Logic.dropdownPlacement(pos.y, pos.y + header.height, menuHeight,
+                                                viewport.y, viewport.y + viewport.height,
+                                                LazerTheme.dropdownMaxHeight)
+        dropdownMenu.x = Logic.clamp(pos.x, 0, Math.max(0, root.width - header.width))
+        dropdownMenu.width = header.width
+        dropdownMenu.y = placement.y
+        dropdownMenu.height = placement.height
+        dropdownMenu.open()
+        root.dropdownOpen = true
+        dropdownMenu.forceActiveFocus()
+    }
+
+    // Close stale dropdowns and tooltips when the page scrolls out from under them.
+    Connections {
+        target: root.currentPage
+        function onContentYChanged() {
+            root.closeDropdownMenu()
+            root.hideTooltip()
+        }
+    }
+
+    Connections {
+        target: SettingsOverlayBridge
+        function onTooltipRequested(text, source, priority) { root.refreshTooltipFromBridge() }
+        function onTooltipDismissed(source) { root.refreshTooltipFromBridge() }
+        function onDropdownRequested(choiceItem) { root.showDropdownFor(choiceItem) }
+        function onDropdownDismissed() {
+            if (dropdownMenu.visible)
+                dropdownMenu.close()
         }
     }
 }

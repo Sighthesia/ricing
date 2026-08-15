@@ -1,6 +1,8 @@
 import QtQuick
 
 // Keep text editing isolated from persistence and own keyboard focus reliably.
+// Uses osu's outlined surface and commits on Enter or focus loss, deduplicated
+// against the last committed text so focus changes do not double-save.
 FocusScope {
     id: root
 
@@ -11,6 +13,7 @@ FocusScope {
     property real availableWidth: Infinity
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
+    property bool fillWidth: true
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property bool focusVisible: editor.activeFocus
@@ -18,6 +21,7 @@ FocusScope {
     property bool syncingEditor: false
     property bool pendingExternalText: false
     property bool committing: false
+    property string lastCommittedText: ""
     signal textCommitted(string text)
     signal clearRequested()
 
@@ -25,7 +29,7 @@ FocusScope {
     implicitHeight: 38
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
-    opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
+    opacity: effectiveEnabled ? 1 : LazerTheme.settingsDisabledAlpha
     activeFocusOnTab: effectiveEnabled
     Accessible.role: Accessible.EditableText
     Accessible.name: accessibleName
@@ -51,7 +55,10 @@ FocusScope {
         pendingExternalText = false
         syncEditorFromText()
     }
-    Component.onCompleted: syncEditorFromText()
+    Component.onCompleted: {
+        syncEditorFromText()
+        lastCommittedText = editor.text.trim()
+    }
 
     onActiveFocusChanged: {
         if (activeFocus && effectiveEnabled && !editor.activeFocus)
@@ -81,8 +88,12 @@ FocusScope {
     function commit() {
         if (!root.effectiveEnabled)
             return
+        var trimmed = editor.text.trim()
+        if (trimmed === root.lastCommittedText)
+            return
         committing = true
-        textCommitted(editor.text.trim())
+        root.lastCommittedText = trimmed
+        textCommitted(trimmed)
         committing = false
         pendingExternalText = false
         syncEditorFromText()
@@ -94,15 +105,17 @@ FocusScope {
         clearRequested()
     }
 
-    // Provide the persistent field surface and focus ring.
+    // Provide the outlined field surface and focus ring.
     Rectangle {
+        id: fieldSurface
         anchors.fill: parent
-        radius: 9
-        color: fieldHover.hovered ? LazerTheme.settingsRowHover : LazerTheme.settingsRow
+        radius: LazerTheme.settingsControlRadius
+        color: "transparent"
         border.width: editor.activeFocus ? 2 : 1
-        border.color: editor.activeFocus ? LazerTheme.focusRing : LazerTheme.settingsPanelBorder
-        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        border.color: editor.activeFocus ? LazerTheme.focusRing
+                    : (fieldHover.hovered ? "#66FFFFFF" : "#33FFFFFF")
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
+        Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
     TextInput {
@@ -119,9 +132,12 @@ FocusScope {
         font.pixelSize: 13
         onAccepted: root.commit()
         onActiveFocusChanged: {
-            if (!activeFocus && root.pendingExternalText) {
-                root.pendingExternalText = false
-                root.syncEditorFromText()
+            if (!activeFocus) {
+                if (root.pendingExternalText) {
+                    root.pendingExternalText = false
+                    root.syncEditorFromText()
+                }
+                root.commit()
             }
         }
     }

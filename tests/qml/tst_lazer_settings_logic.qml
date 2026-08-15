@@ -83,6 +83,73 @@ Item {
             compare(SettingsLogic.categoryDirection(2, 0), -1)
         }
 
+        function test_valuesEqual() {
+            verify(SettingsLogic.valuesEqual(0.1 + 0.2, 0.3))
+            verify(SettingsLogic.valuesEqual(5, 5))
+            verify(!SettingsLogic.valuesEqual(5, 6))
+            verify(SettingsLogic.valuesEqual("auto", "auto"))
+            verify(!SettingsLogic.valuesEqual("auto", "dark"))
+            verify(!SettingsLogic.valuesEqual(null, "auto"))
+            verify(SettingsLogic.valuesEqual(true, true))
+            verify(!SettingsLogic.valuesEqual(true, false))
+        }
+
+        function test_sliderFractionAndMapping() {
+            compare(SettingsLogic.sliderFraction(0, 10, 5), 0.5)
+            compare(SettingsLogic.sliderFraction(10, 0, 5), 0.5)
+            compare(SettingsLogic.sliderFraction(0, 10, 20), 1)
+            compare(SettingsLogic.sliderFraction(0, 10, -5), 0)
+            compare(SettingsLogic.sliderFraction(0, 10, NaN), 0)
+            compare(SettingsLogic.sliderFraction(4, 4, 4), 0)
+            compare(SettingsLogic.sliderValueFromFraction(0, 10, 0.5, 1), 5)
+            compare(SettingsLogic.sliderValueFromFraction(10, 0, 0.5, 1), 5)
+            compare(SettingsLogic.sliderValueFromFraction(0, 10, 0.5, 3), 6)
+            compare(SettingsLogic.sliderValueFromFraction(0, 10, 0.5, 0), 5)
+            compare(SettingsLogic.sliderValueFromFraction(0, 10, 2, 1), 10)
+            compare(SettingsLogic.sliderValueFromFraction(4, 4, 0.5, 1), 4)
+            compare(SettingsLogic.sliderFractionForPosition(50, 100, 25), 0.5)
+            compare(SettingsLogic.sliderFractionForPosition(0, 100, 25), 0)
+            compare(SettingsLogic.sliderFractionForPosition(100, 100, 25), 1)
+            compare(SettingsLogic.sliderFractionForPosition(50, 0, 25), 0)
+            compare(SettingsLogic.sliderFractionForPosition(50, 100, NaN), 0)
+        }
+
+        function test_dropdownPlacement() {
+            // Fits below -> place below at the header bottom, full height.
+            var p = SettingsLogic.dropdownPlacement(100, 140, 60, 0, 400, 200)
+            compare(p.y, 140)
+            compare(p.above, false)
+            compare(p.height, 60)
+            // Requested height is capped, and the capped menu still fits below.
+            p = SettingsLogic.dropdownPlacement(100, 140, 300, 0, 400, 200)
+            compare(p.y, 140)
+            compare(p.above, false)
+            compare(p.height, 200)
+            // Not enough room below, but above fits -> place above at full height.
+            p = SettingsLogic.dropdownPlacement(100, 140, 60, 0, 160, 200)
+            compare(p.y, 40)
+            compare(p.above, true)
+            compare(p.height, 60)
+            // Plenty of room below even when the header sits near the top.
+            p = SettingsLogic.dropdownPlacement(10, 50, 60, 0, 400, 200)
+            compare(p.y, 50)
+            compare(p.above, false)
+            compare(p.height, 60)
+            // Neither side fits -> clamp to the side with more space.
+            p = SettingsLogic.dropdownPlacement(30, 70, 100, 0, 100, 200)
+            compare(p.y, 0)
+            compare(p.above, true)
+            compare(p.height, 30)
+            p = SettingsLogic.dropdownPlacement(10, 40, 100, 0, 100, 200)
+            compare(p.y, 40)
+            compare(p.above, false)
+            compare(p.height, 60)
+            // Invalid header input -> empty menu.
+            p = SettingsLogic.dropdownPlacement(NaN, 140, 60, 0, 400, 200)
+            compare(p.y, 0)
+            compare(p.height, 0)
+        }
+
         function test_notificationAnchors() {
             var anchors = SettingsLogic.notificationAnchors("top-left")
             compare(anchors.top, true)

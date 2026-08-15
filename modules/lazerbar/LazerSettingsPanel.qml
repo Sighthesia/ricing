@@ -11,6 +11,10 @@ Item {
     property var notificationSettings: null
     property var saveCallback: null
     property var wallpaperService: null
+    property var appearanceDefaults: ({})
+    property var barDefaults: ({})
+    property var notificationDefaults: ({})
+    property var settingsReset: null
     property bool interactive: true
     property string selectedCategory: "appearance"
     property real availableWidth: 1040
@@ -269,6 +273,8 @@ Item {
             settingsObject: root.appearanceSettings
             saveCallback: root.saveCallback
             wallpaperService: root.wallpaperService
+            defaults: root.appearanceDefaults
+            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset(key, value) }
             searchQuery: root.searchQuery
             opacity: 0
             Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
@@ -283,6 +289,8 @@ Item {
             height: parent.height
             settingsObject: root.barSettings
             saveCallback: root.saveCallback
+            defaults: root.barDefaults
+            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset(key, value) }
             searchQuery: root.searchQuery
             opacity: 0
             Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
@@ -297,6 +305,8 @@ Item {
             height: parent.height
             settingsObject: root.notificationSettings
             saveCallback: root.saveCallback
+            defaults: root.notificationDefaults
+            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset(key, value) }
             searchQuery: root.searchQuery
             opacity: 0
             Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }

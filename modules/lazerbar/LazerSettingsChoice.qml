@@ -1,6 +1,8 @@
 import QtQuick
+import QtQuick.Effects
 
-// Offer documented enum values through a compact, persistent choice control.
+// Offer documented enum values through a real osu-style dropdown: a 40px
+// header with a downward chevron that opens a menu owned by the content layer.
 Item {
     id: root
 
@@ -11,18 +13,21 @@ Item {
     property real availableWidth: Infinity
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
+    property bool fillWidth: true
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property string displayLabel: labelFor(currentValue)
     readonly property bool focusVisible: activeFocus
+    property bool menuOpen: false
+    readonly property Item headerItem: headerSurface
     signal valueSelected(string value)
 
     implicitWidth: 190
-    implicitHeight: 36
+    implicitHeight: LazerTheme.settingsControlHeight
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     activeFocusOnTab: effectiveEnabled
-    opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
+    opacity: effectiveEnabled ? 1 : LazerTheme.settingsDisabledAlpha
     Accessible.role: Accessible.ComboBox
     Accessible.name: accessibleName
 
@@ -46,6 +51,7 @@ Item {
         valueSelected(String(candidate))
     }
 
+    // Programmatic cycling helper; keyboard and pointer no longer cycle values.
     function selectNext(delta) {
         var index = -1
         for (var i = 0; i < model.length; i++)
@@ -54,49 +60,90 @@ Item {
         selectValue(model[(index + delta + model.length) % model.length].value)
     }
 
-    Keys.onPressed: event => {
-        if (!effectiveEnabled)
+    function openMenu() {
+        if (!root.effectiveEnabled || root.menuOpen)
             return
-        if (event.key === Qt.Key_Left) {
-            selectNext(-1)
-            event.accepted = true
-        } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Return
-                   || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-            selectNext(1)
+        root.menuOpen = true
+        SettingsOverlayBridge.showDropdown(root)
+    }
+
+    function closeMenu() {
+        if (!root.menuOpen)
+            return
+        root.menuOpen = false
+        SettingsOverlayBridge.hideDropdown()
+    }
+
+    function focusHeader() {
+        if (root.effectiveEnabled)
+            root.forceActiveFocus()
+    }
+
+    Keys.onPressed: event => {
+        if (!root.effectiveEnabled)
+            return
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space
+                || (event.key === Qt.Key_Down && (event.modifiers & Qt.AltModifier))) {
+            root.openMenu()
             event.accepted = true
         }
     }
 
     onEffectiveEnabledChanged: {
-        if (!effectiveEnabled && activeFocus)
-            focus = false
+        if (!effectiveEnabled) {
+            if (activeFocus)
+                focus = false
+            if (menuOpen)
+                root.closeMenu()
+        }
     }
 
-    // Keep one highlighted choice label and indicator visible at all times.
+    // Keep one highlighted choice label and a downward chevron visible.
     Rectangle {
+        id: headerSurface
         anchors.fill: parent
-        radius: 9
-        color: choiceHover.hovered ? LazerTheme.settingsRowHover : LazerTheme.settingsRow
+        radius: LazerTheme.settingsControlRadius
+        color: (headerHover.hovered || root.menuOpen) && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsRow
         border.width: root.activeFocus ? 2 : 1
-        border.color: root.activeFocus ? LazerTheme.focusRing : LazerTheme.settingsPanelBorder
+        border.color: root.activeFocus ? LazerTheme.focusRing : (headerHover.hovered ? "#66FFFFFF" : "#33FFFFFF")
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
+        Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
 
         Text {
             anchors.left: parent.left
-            anchors.leftMargin: 12
+            anchors.leftMargin: LazerTheme.settingsControlPadding
             anchors.right: chevron.left
             anchors.verticalCenter: parent.verticalCenter
             text: root.displayLabel
             color: LazerTheme.textPrimary
             elide: Text.ElideRight
+            font.pixelSize: 14
         }
-        Text { id: chevron; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "›"; color: LazerTheme.textMuted; font.pixelSize: 18 }
+
+        // Show the downward chevron on the header's right edge.
+        Image {
+            id: chevron
+            anchors.right: parent.right
+            anchors.rightMargin: LazerTheme.settingsControlPadding
+            anchors.verticalCenter: parent.verticalCenter
+            width: 16
+            height: 16
+            source: "icons/chevron-down.svg"
+            fillMode: Image.PreserveAspectFit
+        }
+        MultiEffect {
+            anchors.fill: chevron
+            source: chevron
+            visible: chevron.visible
+            colorization: 1
+            colorizationColor: LazerTheme.textMuted
+        }
     }
 
-    HoverHandler { id: choiceHover; enabled: root.effectiveEnabled }
+    HoverHandler { id: headerHover; enabled: root.effectiveEnabled }
     TapHandler {
         enabled: root.effectiveEnabled
-        onTapped: root.selectNext(1)
+        onTapped: root.openMenu()
     }
 }

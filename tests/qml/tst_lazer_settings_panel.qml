@@ -265,6 +265,38 @@ Item {
             tryCompare(panel.barPage, "opacity", 1, 300)
         }
 
+        function test_dropdownOpensInContentAndSelects() {
+            panel.contentReady = true
+            panel.selectCategory("bar")
+            var choice = panel.barPage.positionChoice
+            choice.openMenu()
+            verify(panel.content.dropdownVisible)
+            verify(choice.menuOpen)
+            verify(choice.headerItem.width > 0)
+            panel.content.selectDropdownValue("bottom")
+            compare(barSettings.position, "bottom")
+            verify(!panel.content.dropdownVisible)
+            verify(!choice.menuOpen)
+            panel.contentReady = false
+        }
+
+        function test_searchAndCategoryChangeCloseDropdown() {
+            panel.contentReady = true
+            panel.selectCategory("bar")
+            var choice = panel.barPage.positionChoice
+            choice.openMenu()
+            verify(panel.content.dropdownVisible)
+            panel.selectCategory("appearance")
+            verify(!panel.content.dropdownVisible)
+            panel.selectCategory("bar")
+            choice.openMenu()
+            verify(panel.content.dropdownVisible)
+            panel.searchQuery = "位置"
+            verify(!panel.content.dropdownVisible)
+            panel.searchQuery = ""
+            panel.contentReady = false
+        }
+
         function test_closeButtonOwnsPanelCloseContract() {
             panel.focusNavigation()
             closeSpy.clear()

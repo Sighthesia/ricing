@@ -29,6 +29,17 @@ QtObject {
     readonly property int settingsScrim: 180
     readonly property int settingsCategory: 160
 
+    // Settings control timings follow osu!lazer's Nub/Slider/Outline contracts.
+    readonly property int nubMorph: 200
+    readonly property int nubHover: 40
+    readonly property int nubGlow: 800
+    readonly property int sliderNubMove: 250
+    readonly property int controlCommit: 120
+    readonly property int tooltipIn: 120
+    readonly property int tooltipOut: 160
+    readonly property int dropdownExpand: 140
+    readonly property int dropdownItem: 60
+
     readonly property var outSoft: [0.22, 1.0, 0.36, 1.0, 1.0, 1.0]
     readonly property var outStd: [0.2, 0.0, 0.0, 1.0, 1.0, 1.0]
     readonly property var inStd: [0.4, 0.0, 1.0, 1.0, 1.0, 1.0]

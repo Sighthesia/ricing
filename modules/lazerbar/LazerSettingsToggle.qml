@@ -1,6 +1,7 @@
 import QtQuick
 
-// Expose a service-independent, keyboard and pointer friendly boolean control.
+// Expose a service-independent, keyboard and pointer friendly boolean control
+// rendered as osu's fixed 50x15 Nub with fill/border morph, not a moving thumb.
 Item {
     id: root
 
@@ -10,6 +11,7 @@ Item {
     property real availableWidth: Infinity
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
+    property bool fillWidth: false
     signal toggled(bool checked)
 
     readonly property bool hovered: hoverHandler.hovered
@@ -18,10 +20,11 @@ Item {
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property bool hoverHandlerEnabled: hoverHandler.enabled
-    readonly property bool thumbBehaviorEnabled: thumbBehavior.enabled
+    readonly property Item nubItem: nub
+    readonly property bool nubMorphEnabled: nub.morphBehaviorEnabled
 
-    implicitWidth: 46
-    implicitHeight: 26
+    implicitWidth: 50
+    implicitHeight: 15
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
@@ -43,32 +46,15 @@ Item {
     Keys.onSpacePressed: event => { activate(); event.accepted = true }
     Keys.onReturnPressed: event => { activate(); event.accepted = true }
 
-    // Draw one persistent switch body and thumb across state changes.
-    Rectangle {
-        anchors.fill: parent
-        radius: height / 2
-        color: root.checked ? LazerTheme.osuPink : LazerTheme.settingsRowHover
-        border.width: root.activeFocus ? 2 : 1
-        border.color: root.activeFocus ? LazerTheme.focusRing : LazerTheme.settingsPanelBorder
-
-        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-        Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
-
-        Rectangle {
-            id: thumb
-            width: 20
-            height: 20
-            x: root.checked ? parent.width - width - 3 : 3
-            anchors.verticalCenter: parent.verticalCenter
-            radius: width / 2
-            color: LazerTheme.textPrimary
-
-            Behavior on x {
-                id: thumbBehavior
-                enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
-            }
-        }
+    // Delegate all checked/hover/focus/disabled visuals to the shared nub.
+    LazerSettingsNub {
+        id: nub
+        anchors.centerIn: parent
+        checked: root.checked
+        hovered: root.hovered
+        pressed: root.pressed
+        focused: root.focusVisible
+        enabled: root.effectiveEnabled
     }
 
     HoverHandler { id: hoverHandler; enabled: root.effectiveEnabled }

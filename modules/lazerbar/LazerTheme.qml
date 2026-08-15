@@ -45,4 +45,24 @@ QtObject {
     readonly property int targetSize: 32
     readonly property int groupGap: 12
     readonly property int inlineGap: 6
+
+    // osu Nub and outlined control tokens shared by settings controls.
+    readonly property real nubBorder: 3
+    readonly property real nubBorderChecked: 8.5
+    readonly property real nubGlowOpacity: 0.45
+    readonly property color nubGlowColor: "#66FF66AA"
+    readonly property int settingsControlRadius: 5
+    readonly property int settingsControlHeight: 40
+    readonly property int settingsControlPadding: 10
+    readonly property int settingsRangePadding: 25
+    readonly property color settingsTrack: "#3A3B45"
+    readonly property color settingsTrackFocus: "#4A4C59"
+    readonly property color settingsMenuBackground: "#F51D1C22"
+    readonly property color settingsMenuBorder: "#28FFFFFF"
+    readonly property color settingsMenuHover: "#24FFFFFF"
+    readonly property color tooltipBackground: "#F01B1C22"
+    readonly property color tooltipBorder: "#28FFFFFF"
+    readonly property real settingsDisabledAlpha: 0.3
+    readonly property int tooltipMaxWidth: 320
+    readonly property int dropdownMaxHeight: 200
 }

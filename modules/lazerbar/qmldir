@@ -1,6 +1,7 @@
 module Afloat.LazerBar
 singleton LazerTheme 1.0 LazerTheme.qml
 singleton MotionTokens 1.0 MotionTokens.qml
+singleton SettingsOverlayBridge 1.0 SettingsOverlayBridge.qml
 IconButton 1.0 IconButton.qml
 ModeSelector 1.0 ModeSelector.qml
 MenuItem 1.0 MenuItem.qml
@@ -18,10 +19,12 @@ OsuTopBarButton 1.0 OsuTopBarButton.qml
 MusicControlButton 1.0 MusicControlButton.qml
 OsuMusicOverlay 1.0 OsuMusicOverlay.qml
 LazerSettingsRow 1.0 LazerSettingsRow.qml
+LazerSettingsNub 1.0 LazerSettingsNub.qml
 LazerSettingsToggle 1.0 LazerSettingsToggle.qml
 LazerSettingsSlider 1.0 LazerSettingsSlider.qml
 LazerSettingsChoice 1.0 LazerSettingsChoice.qml
 LazerSettingsTextField 1.0 LazerSettingsTextField.qml
+SettingsDropdownMenu 1.0 SettingsDropdownMenu.qml
 LazerSettingsAppearance 1.0 LazerSettingsAppearance.qml
 LazerSettingsBar 1.0 LazerSettingsBar.qml
 LazerSettingsNotifications 1.0 LazerSettingsNotifications.qml

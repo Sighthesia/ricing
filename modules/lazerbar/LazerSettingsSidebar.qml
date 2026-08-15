@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
 // Own the settings sidebar rail: collapse toggle, staggered nav, back entry.
@@ -71,6 +72,9 @@ Item {
         Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
         Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
 
+        scale: collapsePress.pressed ? MotionTokens.pressScale : 1
+        Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
+
         Rectangle {
             anchors.fill: parent
             radius: 12
@@ -80,15 +84,26 @@ Item {
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
-        Text {
+        Image {
+            id: collapseIcon
             anchors.centerIn: parent
-            text: root.expanded ? "«" : "»"
-            color: LazerTheme.textMuted
-            font.pixelSize: 18
+            width: 16
+            height: 16
+            source: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
+            fillMode: Image.PreserveAspectFit
+        }
+        MultiEffect {
+            anchors.fill: collapseIcon
+            source: collapseIcon
+            visible: collapseIcon.visible
+            colorization: 1
+            colorizationColor: collapseHover.hovered || collapseButton.activeFocus ? LazerTheme.textPrimary : LazerTheme.textMuted
+            Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         HoverHandler { id: collapseHover; enabled: collapseButton.enabled }
         TapHandler {
+            id: collapsePress
             enabled: collapseButton.enabled
             onTapped: { collapseButton.forceActiveFocus(); root.collapseToggleRequested() }
         }
@@ -159,6 +174,9 @@ Item {
         Accessible.role: Accessible.Button
         Accessible.name: "返回"
 
+        scale: backPress.pressed ? MotionTokens.pressScale : 1
+        Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
+
         Rectangle {
             anchors.fill: parent
             anchors.margins: 2
@@ -169,19 +187,29 @@ Item {
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
-        Text {
+        Image {
+            id: backIcon
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            anchors.topMargin: 2
-            text: "‹"
-            color: LazerTheme.textMuted
-            font.pixelSize: 18
+            anchors.topMargin: 4
+            width: 16
+            height: 16
+            source: "icons/chevron-left.svg"
+            fillMode: Image.PreserveAspectFit
+        }
+        MultiEffect {
+            anchors.fill: backIcon
+            source: backIcon
+            visible: backIcon.visible
+            colorization: 1
+            colorizationColor: backHover.hovered || backButton.activeFocus ? LazerTheme.textPrimary : LazerTheme.textMuted
+            Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
         // Fade the back label with the collapse transition instead of hard-cutting.
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            anchors.topMargin: 20
+            anchors.topMargin: 21
             visible: root.showLabels || opacity > 0
             opacity: root.showLabels ? 1 : 0
             Behavior on opacity {
@@ -195,6 +223,7 @@ Item {
 
         HoverHandler { id: backHover; enabled: backButton.enabled }
         TapHandler {
+            id: backPress
             enabled: backButton.enabled
             onTapped: { backButton.forceActiveFocus(); root.closeRequested() }
         }

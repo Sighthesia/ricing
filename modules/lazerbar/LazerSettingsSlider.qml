@@ -1,6 +1,8 @@
 import QtQuick
+import "LazerSettingsLogic.js" as Logic
 
-// Provide a clamped numeric setting with consistent keyboard and pointer input.
+// Provide a clamped numeric setting with osu's 5px track and draggable 50x15
+// Nub; value changes animate at 250ms OutQuint unless the user is dragging.
 Item {
     id: root
 
@@ -9,24 +11,30 @@ Item {
     property real to: 100
     property real stepSize: 1
     property string suffix: ""
+    property var defaultValue: undefined
     property bool enabled: true
     property bool rowEnabled: true
     property real availableWidth: Infinity
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
+    property bool fillWidth: true
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property real displayValue: normalized(value)
     readonly property string displayText: Number(displayValue).toLocaleString(Qt.locale(), 'f', 0) + suffix
     readonly property bool focusVisible: activeFocus
+    readonly property bool dragging: dragHandler.active
+    readonly property bool hovered: hoverHandler.hovered
+    readonly property real normalizedFraction: Logic.sliderFraction(from, to, displayValue)
+    readonly property real targetFraction: Logic.sliderFraction(from, to, displayValue)
     signal valueModified(real value)
 
     implicitWidth: 180
-    implicitHeight: 36
+    implicitHeight: 15
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     activeFocusOnTab: effectiveEnabled
-    opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
+    opacity: effectiveEnabled ? 1 : LazerTheme.settingsDisabledAlpha
     Accessible.role: Accessible.Slider
     Accessible.name: accessibleName
 
@@ -67,10 +75,34 @@ Item {
     }
 
     function valueForTrackPosition(position) {
-        if (track.width <= 0 || from === to)
+        var trackWidth = Math.max(0, trackHost.width)
+        if (trackWidth <= 0 || from === to)
             return normalized(from)
-        var fraction = Math.max(0, Math.min(1, Number(position) / track.width))
-        return normalized(from + (to - from) * fraction)
+        var fraction = Math.max(0, Math.min(1, Number(position) / trackWidth))
+        return Logic.sliderValueFromFraction(from, to, fraction, stepSize)
+    }
+
+    function valueFromPointerX(pointerX) {
+        var fraction = Logic.sliderFractionForPosition(pointerX, root.width, LazerTheme.settingsRangePadding)
+        return Logic.sliderValueFromFraction(root.from, root.to, fraction, root.stepSize)
+    }
+
+    function resetToDefault() {
+        if (!root.effectiveEnabled || root.defaultValue === undefined)
+            return
+        root.forceActiveFocus()
+        root.setValue(root.defaultValue)
+    }
+
+    function refreshTooltip() {
+        if (!root.effectiveEnabled) {
+            SettingsOverlayBridge.hideTooltip(root)
+            return
+        }
+        if (root.hovered || root.dragging || root.focusVisible)
+            SettingsOverlayBridge.showTooltip(root.displayText, root, 2)
+        else
+            SettingsOverlayBridge.hideTooltip(root)
     }
 
     Keys.onPressed: event => {
@@ -88,64 +120,140 @@ Item {
     onEffectiveEnabledChanged: {
         if (!effectiveEnabled && activeFocus)
             focus = false
+        refreshTooltip()
     }
 
-    // Show the persistent track and thumb while animating only visual state.
+    onActiveFocusChanged: refreshTooltip()
+    onDisplayTextChanged: {
+        if (root.hovered || root.dragging || root.focusVisible)
+            refreshTooltip()
+    }
+
+    // Keep the 25px range padding on both sides of the interactive track area.
+    Item {
+        id: trackHost
+        x: LazerTheme.settingsRangePadding
+        y: 0
+        width: Math.max(0, root.width - 2 * LazerTheme.settingsRangePadding)
+        height: root.height
+    }
+
+    // Draw the hollow focus glow around the track while keyboard-focused.
     Rectangle {
-        id: track
-        anchors.left: parent.left
-        anchors.right: valueLabel.left
-        anchors.verticalCenter: parent.verticalCenter
-        height: 4
-        radius: 2
-        color: LazerTheme.settingsRowHover
-
-        Rectangle {
-            width: parent.width * root.normalizedFraction
-            height: parent.height
-            radius: 2
-            color: LazerTheme.osuPink
-            Behavior on width {
-                id: fillBehavior
-                enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.fast }
-            }
-        }
+        id: focusGlow
+        anchors.centerIn: trackHost
+        width: trackHost.width + 8
+        height: 19
+        radius: 9.5
+        color: "transparent"
+        border.width: 2
+        border.color: LazerTheme.osuPink
+        opacity: root.focusVisible && root.effectiveEnabled ? 0.55 : 0
+        Behavior on opacity { NumberAnimation { duration: MotionTokens.nubHover } }
     }
 
-        Text {
-        id: valueLabel
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(48, Math.max(0, root.width))
-        horizontalAlignment: Text.AlignRight
-        text: root.displayText
-        color: LazerTheme.textPrimary
-        font.pixelSize: 13
+    // Show the fixed 5px track surface beneath the moving nub.
+    Rectangle {
+        id: trackRect
+        anchors.centerIn: trackHost
+        width: trackHost.width
+        height: 5
+        radius: 2.5
+        color: LazerTheme.settingsTrack
     }
 
-    readonly property real normalizedFraction: {
-        var low = Math.min(Number(from), Number(to))
-        var high = Math.max(Number(from), Number(to))
-        if (high === low)
-            return 0
-        var fraction = (displayValue - low) / (high - low)
-        return to < from ? 1 - fraction : fraction
+    // Fill the travelled portion of the track from the left edge to the nub.
+    Rectangle {
+        id: fillRect
+        anchors.verticalCenter: trackRect.verticalCenter
+        x: trackHost.x
+        width: root.displayFraction * trackHost.width
+        height: 5
+        radius: 2.5
+        color: LazerTheme.osuPink
     }
 
-    HoverHandler { id: hoverHandler; enabled: root.effectiveEnabled }
-    // Map pointer positions in the track, excluding the value label.
+    // Animate the nub toward its value unless the user is actively dragging.
+    property real displayFraction: 0
+    Binding {
+        target: root
+        property: "displayFraction"
+        value: root.targetFraction
+        when: !root.dragging
+        restoreMode: Binding.RestoreNone
+    }
+    Behavior on displayFraction {
+        id: fractionBehavior
+        enabled: !root.dragging && !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.sliderNubMove; easing.type: Easing.OutQuint }
+    }
+
+    // Place the shared nub on the travelled fraction of the usable track.
+    LazerSettingsNub {
+        id: nub
+        x: root.displayFraction * trackHost.width
+        y: 0
+        sliderMode: true
+        hovered: root.hovered || root.dragging
+        pressed: root.dragging
+        focused: root.focusVisible
+        enabled: root.effectiveEnabled
+    }
+
+    HoverHandler {
+        id: hoverHandler
+        enabled: root.effectiveEnabled
+        onHoveredChanged: root.refreshTooltip()
+    }
+
+    // Map taps anywhere on the track to the value under the pointer.
     TapHandler {
         id: trackTapHandler
-        parent: track
         enabled: root.effectiveEnabled
-        onTapped: point => {
+        onTapped: eventPoint => {
             root.forceActiveFocus()
-            root.setValue(root.valueForTrackPosition(point.position.x))
+            root.setValue(root.valueFromPointerX(eventPoint.position.x))
         }
     }
 
-    readonly property Item trackItem: track
+    // Scrub toward a pointer x in slider coordinates, honoring the 25px padding.
+    function scrubToPointer(pointerX) {
+        var fraction = Logic.sliderFractionForPosition(pointerX, root.width, LazerTheme.settingsRangePadding)
+        root.displayFraction = fraction
+        root.setValue(Logic.sliderValueFromFraction(root.from, root.to, fraction, root.stepSize))
+    }
+
+    // Drag horizontally to scrub; the vertical axis stays owned by the page
+    // Flickable so rows keep scrolling.
+    DragHandler {
+        id: dragHandler
+        enabled: root.effectiveEnabled
+        target: null
+        xAxis.enabled: true
+        yAxis.enabled: false
+        onActiveChanged: {
+            if (dragHandler.active)
+                root.scrubToPointer(dragHandler.centroid.pressPosition.x + dragHandler.translation.x)
+            root.refreshTooltip()
+        }
+        onTranslationChanged: {
+            if (dragHandler.active)
+                root.scrubToPointer(dragHandler.centroid.pressPosition.x + dragHandler.translation.x)
+        }
+    }
+
+    // Double-click the nub to restore the explicitly provided default value.
+    TapHandler {
+        id: nubDoubleTapHandler
+        parent: nub
+        gesturePolicy: TapHandler.DoubleTap
+        enabled: root.effectiveEnabled && root.defaultValue !== undefined
+        onDoubleTapped: root.resetToDefault()
+    }
+
+    readonly property Item trackItem: trackRect
     readonly property bool trackTapEnabled: trackTapHandler.enabled
-    readonly property bool trackFillBehaviorEnabled: fillBehavior.enabled
+    readonly property bool trackFillBehaviorEnabled: fractionBehavior.enabled
+    readonly property Item nubItem: nub
+    readonly property bool nubDoubleTapEnabled: nubDoubleTapHandler.enabled
 }

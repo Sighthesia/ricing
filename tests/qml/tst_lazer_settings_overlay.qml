@@ -128,6 +128,27 @@ Item {
             compare(overlay.panel.appearanceNav.appearOpacity, 1)
         }
 
+        function test_escapeClosesDropdownBeforeOverlay() {
+            overlay.openFrom(opener)
+            tryCompare(overlay, "phase", "open", 1200)
+            overlay.panel.contentReady = true
+            overlay.panel.selectCategory("bar")
+            var choice = overlay.panel.barPage.positionChoice
+            choice.openMenu()
+            tryVerify(function() { return overlay.panel.content.dropdownVisible }, 200)
+            compare(requestSpy.count, 0)
+            // The menu owns focus, so the first Escape only closes the dropdown.
+            keyPress(Qt.Key_Escape)
+            verify(!overlay.panel.content.dropdownVisible)
+            verify(!choice.menuOpen)
+            compare(requestSpy.count, 0)
+            // Focus returns to the choice header; the next Escape closes the panel.
+            keyPress(Qt.Key_Escape)
+            compare(requestSpy.count, 1)
+            tryCompare(overlay, "phase", "closed", 1200)
+            overlay.panel.contentReady = false
+        }
+
         function test_settingsBindingsRemainAvailable() {
             verify(overlay.panel.appearancePage)
             verify(overlay.panel.barPage)

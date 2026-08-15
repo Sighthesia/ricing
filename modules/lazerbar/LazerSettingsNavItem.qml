@@ -43,6 +43,8 @@ Item {
         source: root.iconSource
         fillMode: Image.PreserveAspectFit
         Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
+        scale: tapHandler.pressed ? MotionTokens.pressScale : 1
+        Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
     }
 
     // Colorize the monochrome icon with the active or muted text tone.
