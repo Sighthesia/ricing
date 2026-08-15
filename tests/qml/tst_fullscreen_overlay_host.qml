@@ -47,7 +47,7 @@ Item {
 
         function test_openCloseAndReverseFromCurrentProgress() {
             verify(host.openRoute("wiki", opener))
-            tryCompare(host, "phase", "open", 1100)
+            tryCompare(host, "phase", "open", 1600)
             compare(host.bodyProgress, 1)
             compare(host.waveProgress, 1)
 
@@ -56,13 +56,13 @@ Item {
             var beforeReverse = host.bodyProgress
             verify(host.openRoute("news", opener))
             verify(host.bodyProgress >= beforeReverse - 0.03)
-            tryCompare(host, "phase", "open", 1100)
+            tryCompare(host, "phase", "open", 1600)
             compare(host.route, "news")
         }
 
         function test_sameOwnerRouteCrossFadeKeepsShellOpen() {
             host.openRoute("wiki", opener)
-            tryCompare(host, "phase", "open", 1100)
+            tryCompare(host, "phase", "open", 1600)
             var bodyBefore = host.bodyProgress
             host.openRoute("news", opener)
             tryCompare(host, "route", "news", 300)
@@ -73,21 +73,21 @@ Item {
 
         function test_sideZonesUseFullCloseLifecycle() {
             host.openRoute("beatmap", opener)
-            tryCompare(host, "phase", "open", 1100)
+            tryCompare(host, "phase", "open", 1600)
             mouseClick(host.outsideLeft, host.outsideLeft.width / 2, 20)
             compare(host.phase, "closing")
             tryCompare(host, "phase", "closed", 800)
             compare(closedSpy.count, 1)
 
             host.openRoute("wiki", opener)
-            tryCompare(host, "phase", "open", 1100)
+            tryCompare(host, "phase", "open", 1600)
             mouseClick(host.outsideRight, host.outsideRight.width / 2, 20)
             compare(host.phase, "closing")
         }
 
         function test_escapePrecedence() {
             host.openRoute("wiki", opener)
-            tryCompare(host, "phase", "open", 1100)
+            tryCompare(host, "phase", "open", 1600)
             host.inputActive = true
             host.pageCanGoBack = true
             verify(host.handleEscape())

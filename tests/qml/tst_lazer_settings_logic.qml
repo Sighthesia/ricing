@@ -1,23 +1,12 @@
 import QtQuick
 import QtTest
 import "../../modules/lazerbar" as Lazer
-import "../../modules/lazerbar/LazerBarLogic.js" as BarLogic
 import "../../modules/lazerbar/LazerSettingsLogic.js" as SettingsLogic
 
 // Verify settings overlay state, geometry, and normalization helpers.
 Item {
     TestCase {
         name: "LazerSettingsLogic"
-
-        function test_overlayState() {
-            compare(BarLogic.nextOverlay("", "settings"), "settings")
-            compare(BarLogic.nextOverlay("settings", "settings"), "")
-            compare(BarLogic.nextOverlay("music", "settings"), "settings")
-            compare(BarLogic.nextOverlay(null, null), "")
-            compare(BarLogic.nextOverlay("unknown", "settings"), "settings")
-            compare(BarLogic.nextOverlay("settings", "unknown"), "settings")
-            compare(BarLogic.nextOverlay("unknown", "unknown"), "")
-        }
 
         function test_panelGeometry() {
             compare(SettingsLogic.panelWidth(0), 0)

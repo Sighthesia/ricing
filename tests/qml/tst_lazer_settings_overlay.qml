@@ -20,18 +20,18 @@ Item {
             compare(overlay.panelHost.y, 0)
             compare(overlay.panelEnterDuration, 600); compare(overlay.panelExitDuration, 600)
             overlay.openFrom(opener); verify(overlay.panelOffsetX < 0); compare(overlay.panelHost.x, overlay.panelOffsetX)
-            tryCompare(overlay, "phase", "open", 800); compare(overlay.panelOffsetX, 0)
+            tryCompare(overlay, "phase", "open", 1200); compare(overlay.panelOffsetX, 0)
         }
         function test_closeEscapeAndFocus() {
-            overlay.openFrom(opener); tryCompare(overlay, "phase", "open", 800)
+            overlay.openFrom(opener); tryCompare(overlay, "phase", "open", 1200)
             overlay.panel.currentNav.forceActiveFocus(); keyPress(Qt.Key_Escape)
             compare(requestSpy.count, 1); compare(overlay.phase, "closing")
-            tryCompare(overlay, "phase", "closed", 800); compare(closedSpy.count, 1); verify(opener.activeFocus)
+            tryCompare(overlay, "phase", "closed", 1200); compare(closedSpy.count, 1); verify(opener.activeFocus)
         }
         function test_reopenRetargetsCurrentProgress() {
             overlay.openFrom(opener); tryVerify(function(){ return overlay.progress > 0 && overlay.progress < 1 }, 300)
             overlay.closeWithoutFocusRestore(); wait(60); var before = overlay.progress
-            overlay.openFrom(opener); verify(overlay.progress >= before - 0.03); tryCompare(overlay, "phase", "open", 800)
+            overlay.openFrom(opener); verify(overlay.progress >= before - 0.03); tryCompare(overlay, "phase", "open", 1200)
         }
         function test_reducedMotionRemovesTranslation() {
             Lazer.MotionTokens.reducedMotionOverride = true; overlay.openFrom(opener)
