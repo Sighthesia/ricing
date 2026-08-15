@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/08-16-settings-tooltip-layout-follow/prd.md","reason":"Check complete display, follow behavior, boundary clamp, and owner isolation acceptance."}
+{"file":".trellis/tasks/08-16-settings-tooltip-layout-follow/design.md","reason":"Verify exact measurement ownership, reactive triggers, source identity, and visibility lifecycle."}
+{"file":".trellis/tasks/08-16-settings-tooltip-layout-follow/implement.md","reason":"Execute ordered component and runtime checks."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check singleton bridge filtering, fixed surface, focus, QML tests, and runtime warnings."}
+{"file":".agents/skills/reactive-measurement-layout-debugging/SKILL.md","reason":"Review measured, target, actual, and clipped dimensions at the composed seam."}

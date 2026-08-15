@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/08-16-settings-tooltip-layout-follow/prd.md","reason":"Authoritative root causes, follow behavior decision, scope, and acceptance criteria."}
+{"file":".trellis/tasks/08-16-settings-tooltip-layout-follow/design.md","reason":"Measurement domains, active source lifecycle, placement, follow triggers, and Slider Nub anchor contract."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Settings fixed owner, singleton bridge owner isolation, focus, and required QML validation."}
+{"file":".agents/skills/reactive-measurement-layout-debugging/SKILL.md","reason":"Required measured/preferred/actual/clip domain debugging method."}
+{"file":".agents/skills/visual-transition-rules/SKILL.md","reason":"Tooltip opacity and geometry transition constraints."}
