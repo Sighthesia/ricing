@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check that each recommendation preserves data, state, layout and input contracts across frameworks."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that the report correctly separates reusable architecture from page-specific behavior."}

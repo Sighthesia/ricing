@@ -1,0 +1,2 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Structure the source-to-QML mapping across overlay state, data, layout and input boundaries."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Identify the shared osu overlay spine instead of treating concrete pages as independent implementations."}
