@@ -1,38 +1,37 @@
 import QtQuick
 
-// Keep the persistent page identity and navigation slot in one header.
+// Present osu-style page identity as a flat continuation of the overlay body.
 Rectangle {
     id: root
-    property string title: "Afloat"
-    property string breadcrumb: "Home"
-    property string iconText: "○"
-    property alias slot: headerSlot.data
+    property string title: ""
+    property string description: ""
+    property string breadcrumb: ""
+    property var palette: ({})
     signal closeRequested()
-    height: 72
-    color: "#E91D1D24"
-    border.color: "#25FFFFFF"
-    border.width: 1
 
-    Row {
-        anchors.fill: parent
-        anchors.margins: 18
-        spacing: 14
+    implicitHeight: 96
+    color: palette.header || "#7C4D9E"
 
-        Text { text: root.iconText; color: "#FF66AA"; font.pixelSize: 28; anchors.verticalCenter: parent.verticalCenter }
-        Column {
-            width: 220
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
-            Text { text: root.breadcrumb; color: "#A9A4AE"; font.pixelSize: 11 }
-            Text { text: root.title; color: "white"; font.pixelSize: 20; font.bold: true }
-        }
-        Item { id: headerSlot; width: Math.max(0, root.width - 380); height: parent.height }
-        Text {
-            text: "×"
-            color: "#D7D1DB"
-            font.pixelSize: 28
-            anchors.verticalCenter: parent.verticalCenter
-            MouseArea { anchors.fill: parent; onClicked: root.closeRequested() }
-        }
+    Column {
+        anchors.left: parent.left
+        anchors.leftMargin: 34
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 2
+        Text { text: root.breadcrumb; color: root.palette.muted || "#DDD"; font.pixelSize: 11 }
+        Text { text: root.title; color: root.palette.text || "white"; font.pixelSize: 27; font.bold: true }
+        Text { visible: text !== ""; text: root.description; color: root.palette.muted || "#DDD"; font.pixelSize: 12 }
+    }
+
+    Rectangle {
+        id: closeButton
+        width: 44; height: 44
+        anchors.right: parent.right; anchors.rightMargin: 24
+        anchors.verticalCenter: parent.verticalCenter
+        radius: 22
+        color: closeHover.hovered ? "#32FFFFFF" : "#18FFFFFF"
+        Text { anchors.centerIn: parent; text: "x"; color: root.palette.text || "white"; font.pixelSize: 18; font.bold: true }
+        HoverHandler { id: closeHover }
+        TapHandler { onTapped: root.closeRequested() }
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 }

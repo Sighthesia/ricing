@@ -1,31 +1,34 @@
 import QtQuick
+import "OsuOverlayPalette.js" as Palettes
 
-// Render a local wiki-shaped article with mixed full-width and split panels.
-Item {
+// Reproduce the osu Wiki silhouette with minimal representative article content.
+Rectangle {
     id: root
-    property int contentPadding: 28
+    readonly property string pageKind: "wiki"
+    readonly property string paletteKind: "orange"
+    readonly property var palette: Palettes.forRoute("wiki")
     readonly property var sidebarEntries: [
-        { id: "overview", label: "Overview" }, { id: "getting-started", label: "Getting started" },
-        { id: "shortcuts", label: "Keyboard shortcuts" }, { id: "appearance", label: "Appearance" }
+        { id: "overview", label: "Overview" }, { id: "guides", label: "Guides" },
+        { id: "gameplay", label: "Gameplay" }, { id: "community", label: "Community" }
     ]
-    signal sidebarSelected(string value)
-    implicitWidth: 900
-    implicitHeight: 700
+    readonly property int sidebarItemCount: sidebarEntries.length
+    readonly property int sampleItemCount: 3
+    property string selected: "overview"
+    color: palette.body
 
-    Item {
-        anchors.fill: parent
-        FullscreenSidebar { id: rail; anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.left: parent.left; entries: root.sidebarEntries; selected: "overview"; onSelectedChangedByUser: root.sidebarSelected(value) }
-        Flickable {
-            anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.right: parent.right; anchors.left: rail.right
-            width: parent.width - rail.width; contentWidth: width; contentHeight: article.implicitHeight + root.contentPadding * 2; clip: true
-            Column {
-                id: article; x: root.contentPadding; y: root.contentPadding; width: parent.width - root.contentPadding * 2; spacing: 18
-                Text { text: "Home / Wiki / Overview"; color: "#FF66AA"; font.pixelSize: 12 }
-                Text { text: "Afloat, in motion"; color: "white"; font.pixelSize: 30; font.bold: true }
-                Rectangle { width: parent.width; height: 94; radius: 10; color: "#181A22"; border.color: "#28FFFFFF"; Text { anchors.fill: parent; anchors.margins: 18; text: "A calm desktop shell for focused work. This local article demonstrates the long-form rhythm used by the fullscreen surface."; wrapMode: Text.WordWrap; color: "#D6D1DB"; font.pixelSize: 14 } }
-                Row { width: parent.width; spacing: 14; Repeater { model: ["Structure", "Motion"]; delegate: Rectangle { width: (article.width - 14) / 2; height: 120; radius: 10; color: "#15171F"; Text { anchors.fill: parent; anchors.margins: 16; text: modelData + "\n\nA focused panel with a clear hierarchy."; color: "#D6D1DB"; wrapMode: Text.WordWrap } } } }
-                Rectangle { width: parent.width; height: 150; radius: 10; color: "#20212B"; Text { anchors.fill: parent; anchors.margins: 20; text: "## Notes\n\nStatic content keeps this prototype deterministic while the shared host proves route, focus, and layout behavior."; color: "#E9E4ED"; font.pixelSize: 14; wrapMode: Text.WordWrap } }
-            }
+    FullscreenSidebar { id: rail; anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.left: parent.left; entries: root.sidebarEntries; selected: root.selected; palette: root.palette; railWidth: Math.max(176, Math.min(240, root.width * 0.22)); onSelectedChangedByUser: value => root.selected = value }
+    Flickable {
+        anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.left: rail.right; anchors.right: parent.right
+        contentWidth: width; contentHeight: article.implicitHeight + 72; clip: true
+        Column {
+            id: article; x: 42; y: 34; width: parent.width - 84; spacing: 18
+            Text { text: "Welcome to the osu! wiki"; color: root.palette.text; font.pixelSize: 28; font.bold: true }
+            Rectangle { width: parent.width; height: 3; color: root.palette.accent }
+            Text { width: parent.width; text: "A compact knowledge base for play, creation, and community. This local sample preserves the original reading rhythm without reproducing full articles."; color: root.palette.muted; font.pixelSize: 15; wrapMode: Text.WordWrap; lineHeight: 1.35 }
+            Text { text: "Getting started"; color: root.palette.accent; font.pixelSize: 21; font.bold: true }
+            Text { width: parent.width; text: "Choose a topic from the left navigation. Links, headings, and article measure follow the osu overlay hierarchy."; color: root.palette.text; font.pixelSize: 14; wrapMode: Text.WordWrap; lineHeight: 1.35 }
+            Text { text: "Gameplay and creation"; color: root.palette.accent; font.pixelSize: 21; font.bold: true }
+            Text { width: parent.width; text: "Representative text is intentionally brief; layout and interface identity are the deliverable."; color: root.palette.text; font.pixelSize: 14; wrapMode: Text.WordWrap }
         }
     }
 }

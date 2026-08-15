@@ -1,28 +1,39 @@
 import QtQuick
 
-// Give every route the same stable, independently scrollable navigation rail.
+// Keep page-local navigation in a flat palette-aware osu sidebar.
 Rectangle {
     id: root
     property var entries: []
     property string selected: ""
-    property int railWidth: 220
+    property var palette: ({})
+    property real railWidth: 220
     signal selectedChangedByUser(string value)
+
     width: railWidth
-    color: "#B914141A"
+    color: palette.sidebar || "#312541"
 
     ListView {
         anchors.fill: parent
-        anchors.margins: 14
-        spacing: 5
+        anchors.topMargin: 18
+        anchors.bottomMargin: 18
         model: root.entries
+        spacing: 2
+        clip: true
         delegate: Rectangle {
             required property var modelData
             width: ListView.view.width
             height: 42
-            radius: 8
-            color: root.selected === modelData.id ? "#40EB1C60" : "transparent"
-            Text { anchors.fill: parent; anchors.leftMargin: 14; verticalAlignment: Text.AlignVCenter; text: modelData.label; color: root.selected === modelData.id ? "white" : "#B8B4BC"; font.pixelSize: 13 }
-            MouseArea { anchors.fill: parent; onClicked: root.selectedChangedByUser(modelData.id) }
+            color: root.selected === modelData.id ? root.palette.accent || "#D8A8EF"
+                    : itemHover.hovered ? "#18FFFFFF" : "transparent"
+            Text {
+                anchors.left: parent.left; anchors.leftMargin: 24
+                anchors.verticalCenter: parent.verticalCenter
+                text: modelData.label
+                color: root.selected === modelData.id ? root.palette.body || "#222" : root.palette.text || "white"
+                font.pixelSize: 13; font.bold: root.selected === modelData.id
+            }
+            HoverHandler { id: itemHover }
+            TapHandler { onTapped: root.selectedChangedByUser(modelData.id) }
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
     }

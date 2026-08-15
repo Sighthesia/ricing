@@ -162,6 +162,8 @@ Item {
                 anchors.right: parent.right
                 title: root.route === "wiki" ? "Wiki" : root.route === "news" ? "News" : "Beatmaps"
                 breadcrumb: "osu! / " + title
+                description: root.route === "wiki" ? "knowledge base" : root.route === "news" ? "community happenings" : "browse for new beatmaps"
+                palette: root.palette
                 onCloseRequested: root.close()
             }
 
