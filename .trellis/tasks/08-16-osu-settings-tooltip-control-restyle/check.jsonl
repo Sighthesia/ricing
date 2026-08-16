@@ -1,0 +1,7 @@
+{"file":".trellis/tasks/08-16-osu-settings-tooltip-control-restyle/prd.md","reason":"Verify every observable tooltip, palette, layout, navigation, search, compatibility, and runtime acceptance criterion."}
+{"file":".trellis/tasks/08-16-osu-settings-tooltip-control-restyle/design.md","reason":"Review stable arbitration, row modes, compatibility, focus impact, and stated risks."}
+{"file":".trellis/tasks/08-16-osu-settings-tooltip-control-restyle/implement.md","reason":"Confirm all implementation and verification stages were completed."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check fixed owner, per-screen filtering, measured tooltip, motion, focus, and test contracts."}
+{"file":"tests/qml/tst_lazer_settings_controls.qml","reason":"Control geometry, palette, interaction, and Thumb source coverage."}
+{"file":"tests/qml/tst_lazer_settings_panel.qml","reason":"Composed row layout, search/sidebar/header chrome, tooltip arbitration, and fallback coverage."}
+{"file":"tests/qml/tst_lazer_settings_overlay.qml","reason":"Overlay lifecycle, keyboard close, focus restoration, and tooltip cleanup coverage."}

@@ -1,0 +1,10 @@
+{"file":".trellis/tasks/08-16-osu-settings-tooltip-control-restyle/prd.md","reason":"Authoritative product colors, control geometry, tooltip stability behavior, scope, and acceptance criteria."}
+{"file":".trellis/tasks/08-16-osu-settings-tooltip-control-restyle/design.md","reason":"Stable tooltip arbitration, generic row presentation contract, compatibility, risks, and validation design."}
+{"file":".trellis/tasks/08-16-osu-settings-tooltip-control-restyle/implement.md","reason":"Ordered implementation and verification checklist."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Existing fixed Settings surface, singleton overlay ownership, measured tooltip, and required QML quality contracts."}
+{"file":"modules/lazerbar/SettingsOverlayBridge.qml","reason":"Current tooltip registry uses newest same-priority request, causing owner competition."}
+{"file":"modules/lazerbar/LazerSettingsContent.qml","reason":"Visual tooltip owner, fallback arbitration, header chrome, and search field implementation."}
+{"file":"modules/lazerbar/LazerSettingsRow.qml","reason":"Shared label, tooltip, revert, and control layout owner."}
+{"file":"modules/lazerbar/LazerSettingsToggle.qml","reason":"Current outlined Nub Toggle to replace while preserving behavior API."}
+{"file":"modules/lazerbar/LazerSettingsSlider.qml","reason":"Current track/Nub Slider, value formatting, interactions, and tooltip source identity."}
+{"file":"modules/lazerbar/LazerTheme.qml","reason":"Settings-specific palette tokens must be introduced without replacing global osu pink."}
