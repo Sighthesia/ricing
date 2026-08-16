@@ -86,6 +86,17 @@ Item {
             verify(panel.appearanceNav.selected)
             verify(!panel.barNav.selected)
             verify(!panel.notificationNav.selected)
+            compare(panel.appearanceNav.selectionIndicatorItem.height, 24)
+            compare(panel.appearanceNav.selectionIndicatorItem.color, Lazer.LazerTheme.settingsAccent)
+            compare(panel.barNav.selectionIndicatorItem.height, 0)
+            compare(panel.barNav.labelItem.color, Lazer.LazerTheme.settingsNavInactive)
+        }
+
+        function test_contentChromeUsesSingleTitleAndBorderlessSearchSurface() {
+            compare(panel.content.searchField.text, "")
+            compare(panel.content.searchSurfaceItem.color, Lazer.LazerTheme.settingsSearchSurface)
+            compare(panel.content.searchSurfaceItem.border.width, 0)
+            compare(panel.content.searchSurfaceItem.radius, 6)
         }
 
         function test_midOpenLayersOccupyDifferentPositions() {

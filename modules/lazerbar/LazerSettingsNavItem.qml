@@ -28,9 +28,12 @@ Item {
         anchors.fill: parent
         anchors.margins: 2
         radius: 10
-        color: root.selected ? LazerTheme.settingsSelected : (hoverHandler.hovered ? LazerTheme.settingsRowHover : "transparent")
+        color: hoverHandler.hovered ? LazerTheme.settingsRowHover : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
+
+    readonly property alias selectionIndicatorItem: selectionIndicator
+    readonly property alias labelItem: labelText
 
     // Show the category icon at osu's left margin, centered when contracted.
     Image {
@@ -53,7 +56,7 @@ Item {
         source: iconImage
         visible: iconImage.visible
         colorization: 1
-        colorizationColor: root.selected ? LazerTheme.settingsAccent : (hoverHandler.hovered ? LazerTheme.textPrimary : LazerTheme.settingsNavInactive)
+        colorizationColor: root.selected ? LazerTheme.textPrimary : (hoverHandler.hovered ? LazerTheme.textPrimary : LazerTheme.settingsNavInactive)
 
         Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
     }
@@ -61,6 +64,7 @@ Item {
     // Keep category text visible only while the sidebar is expanded, fading
     // with the collapse transition instead of hard-cutting.
     Text {
+        id: labelText
         visible: root.expanded || opacity > 0
         opacity: root.expanded ? 1 : 0
         Behavior on opacity {
@@ -70,7 +74,7 @@ Item {
         x: 60
         anchors.verticalCenter: parent.verticalCenter
         text: root.label
-        color: root.selected ? LazerTheme.settingsAccent : (hoverHandler.hovered ? LazerTheme.textPrimary : LazerTheme.settingsNavInactive)
+        color: root.selected ? LazerTheme.textPrimary : (hoverHandler.hovered ? LazerTheme.textPrimary : LazerTheme.settingsNavInactive)
         font.pixelSize: 14
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
@@ -81,7 +85,7 @@ Item {
         x: 9
         anchors.verticalCenter: parent.verticalCenter
         width: 4
-        height: root.selected ? 18 : 0
+        height: root.selected ? 24 : 0
         radius: 2
         color: LazerTheme.settingsAccent
         opacity: root.selected ? 1 : 0

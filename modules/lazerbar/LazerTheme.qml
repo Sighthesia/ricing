@@ -27,12 +27,15 @@ QtObject {
 
     // Settings surfaces use a dedicated violet hierarchy without changing the
     // global osu pink used by the rest of the shell.
-    readonly property color settingsAccent: "#765BFF"
+    readonly property color accentColor: "#765BFF"
+    readonly property color settingsAccent: accentColor
     readonly property color settingsControlSurface: "#25222E"
     readonly property color settingsPanel: "#18161D"
     readonly property color settingsPanelBorder: "transparent"
     readonly property color settingsRail: "#131217"
     readonly property color settingsNavInactive: "#8A8795"
+    readonly property color settingsSearchSurface: "#201E27"
+    readonly property color settingsToggleOff: "#322E3F"
     readonly property color settingsRow: "transparent"
     readonly property color settingsRowHover: "#FF363842"
     readonly property color settingsSelected: "#40765BFF"
@@ -57,6 +60,8 @@ QtObject {
     readonly property color nubGlowColor: "#66FF66AA"
     readonly property int settingsControlRadius: 5
     readonly property int settingsControlHeight: 40
+    readonly property int settingsChoiceHeight: 52
+    readonly property int settingsChoiceRadius: 6
     readonly property int settingsControlPadding: 10
     readonly property int settingsRangePadding: 0
     readonly property color settingsTrack: settingsControlSurface

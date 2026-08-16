@@ -39,6 +39,17 @@ Item {
     }
 
     Lazer.LazerSettingsRow {
+        id: choiceRow
+        width: 520
+        labelText: "配色方案"
+        Lazer.LazerSettingsChoice {
+            id: rowChoice
+            model: [{ value: "auto", label: "自动" }]
+            currentValue: "auto"
+        }
+    }
+
+    Lazer.LazerSettingsRow {
         id: compactRow
         width: 220
         labelText: "窄屏设置"
@@ -289,6 +300,17 @@ Item {
             compare(choiceSpy.count, 1)
             compare(choiceSpy.signalArguments[0][0], "dark")
             compare(choice.displayLabel, "深色模式")
+        }
+
+        function test_choiceUsesEmbeddedLabelPresentation() {
+            compare(choice.implicitHeight, 52)
+            compare(choice.headerItem.radius, 6)
+            compare(choice.headerItem.color, Lazer.LazerTheme.settingsControlSurface)
+            compare(choice.rowPresentation, "choice")
+            compare(rowChoice.rowPresentation, "choice")
+            compare(rowChoice.labelTextItem.visible, false)
+            compare(rowChoice.controlItem.fieldLabel, "配色方案")
+            compare(rowChoice.height, rowChoice.implicitHeight)
         }
 
         function test_choiceOpensRealDropdownInsteadOfCycling() {

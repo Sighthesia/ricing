@@ -311,11 +311,18 @@ Item {
 
         function test_themeTokens() {
             compare(Lazer.LazerTheme.settingsAccent, "#765bff")
+            compare(Lazer.LazerTheme.accentColor, "#765bff")
             compare(Lazer.LazerTheme.settingsControlSurface, "#25222e")
             compare(Lazer.LazerTheme.settingsPanel, "#18161d")
             compare(Lazer.LazerTheme.settingsPanelBorder, "#00000000")
             compare(Lazer.LazerTheme.settingsRail, "#131217")
             compare(Lazer.LazerTheme.settingsNavInactive, "#8a8795")
+            compare(Lazer.LazerTheme.settingsAccent, "#765bff")
+            compare(Lazer.LazerTheme.settingsControlSurface, "#25222e")
+            compare(Lazer.LazerTheme.settingsSearchSurface, "#201e27")
+            compare(Lazer.LazerTheme.settingsToggleOff, "#322e3f")
+            compare(Lazer.LazerTheme.settingsChoiceHeight, 52)
+            compare(Lazer.LazerTheme.settingsChoiceRadius, 6)
             compare(Lazer.LazerTheme.settingsRow, "#00000000")
             compare(Lazer.LazerTheme.settingsRowHover, "#363842")
             compare(Lazer.LazerTheme.settingsSelected, "#40765bff")

@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
-// Own the settings content chrome: header, outlined search, viewport, footer,
+// Own the settings content chrome: search, category title, viewport, footer,
 // plus the top-level tooltip and dropdown overlay layers for row controls.
 Item {
     id: root
@@ -32,6 +32,7 @@ Item {
 
     signal searchQueryEdited(string query)
     property alias searchEditor: searchEditor
+    property alias searchSurfaceItem: searchSurface
     property alias tooltipItem: tooltip
     property alias tooltipTextItem: tooltipText
     property alias tooltipPlacementSide: tooltip.placementSide
@@ -84,13 +85,13 @@ Item {
         Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
     }
 
-    // Present the compact title header without competing close or collapse owners.
+    // Present the category title below the search field as the sole page heading.
     Item {
         id: header
         x: 0
-        y: 0
+        y: searchArea.height
         width: root.width
-        height: 56
+        height: 48
 
         Text {
             anchors.left: parent.left
@@ -98,19 +99,19 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: root.title
             color: LazerTheme.textPrimary
-            font.pixelSize: 22
+            font.pixelSize: 18
             font.weight: Font.DemiBold
         }
 
     }
 
-    // Keep the outlined search field fixed between the header and the pages.
+    // Keep the borderless search field at the top of the content surface.
     Item {
         id: searchArea
         x: 0
-        y: header.height
+        y: 0
         width: root.width
-        height: 44
+        height: 52
 
         Rectangle {
             id: searchSurface
@@ -119,12 +120,11 @@ Item {
             anchors.rightMargin: 12
             anchors.topMargin: 2
             anchors.bottomMargin: 2
-            radius: LazerTheme.settingsControlRadius
-            color: "transparent"
-            border.width: searchEditor.activeFocus ? 2 : 1
-            border.color: searchEditor.activeFocus ? LazerTheme.focusRing : (searchHover.hovered ? "#66FFFFFF" : "#33FFFFFF")
-            Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
-            Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
+            radius: 6
+            color: LazerTheme.settingsSearchSurface
+            border.width: 0
+            border.color: "transparent"
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         Image {
@@ -150,9 +150,9 @@ Item {
         TextInput {
             id: searchEditor
             anchors.left: searchSurface.left
-            anchors.leftMargin: 34
+            anchors.leftMargin: 12
             anchors.right: searchSurface.right
-            anchors.rightMargin: 34
+            anchors.rightMargin: 38
             anchors.verticalCenter: searchSurface.verticalCenter
             clip: true
             enabled: root.interactive && root.contentReady
@@ -229,9 +229,9 @@ Item {
     Item {
         id: viewport
         x: 0
-        y: header.height + searchArea.height
+        y: header.y + header.height
         width: root.width
-        height: Math.max(0, root.height - header.height - searchArea.height - footer.height)
+        height: Math.max(0, root.height - searchArea.height - header.height - footer.height)
         clip: true
     }
 

@@ -51,7 +51,7 @@ Item {
         id: capsule
         anchors.fill: parent
         radius: 10
-        color: root.checked ? LazerTheme.settingsAccent : LazerTheme.settingsControlSurface
+        color: root.checked ? LazerTheme.settingsAccent : LazerTheme.settingsToggleOff
         border.width: root.focusVisible ? 2 : 0
         border.color: LazerTheme.focusRing
         scale: root.pressed ? MotionTokens.pressScale : (root.hovered ? 1.03 : 1)

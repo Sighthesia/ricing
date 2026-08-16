@@ -44,7 +44,6 @@ Flickable {
     // Keep top-bar controls grouped in one vertically scrollable column.
     Column {
         id: pageColumn; width: root.width; spacing: 8
-        Text { text: root.title; color: LazerTheme.textPrimary; font.pixelSize: 22; leftPadding: 16; topPadding: 12 }
         LazerSettingsRow {
             id: heightRow
             width: pageColumn.width - 16; x: 8

@@ -31,10 +31,12 @@ Item {
     readonly property bool controlSupportsAvailableWidth: controlItem !== null && controlItem.availableWidth !== undefined
     readonly property bool controlSupportsRequestedWidth: controlItem !== null && controlItem.requestedWidth !== undefined
     readonly property bool controlSupportsFillWidth: controlItem !== null && controlItem.fillWidth !== undefined
+    readonly property bool controlOwnsLabel: controlItem !== null && controlItem.rowPresentation === "choice"
     readonly property string rowPresentation: controlItem && controlItem.rowPresentation !== undefined
                                            ? String(controlItem.rowPresentation) : "standard"
     readonly property bool inlinePresentation: rowPresentation === "inline"
     readonly property bool splitPresentation: rowPresentation === "split"
+    readonly property bool choicePresentation: rowPresentation === "choice"
     readonly property bool compactLayout: width < 480
     readonly property real safeRequestedWidth: controlSupportsRequestedWidth
                                           && isFinite(Number(controlItem.requestedWidth))
@@ -54,7 +56,9 @@ Item {
     implicitWidth: 640
     readonly property real textRegionWidth: contentHost.width
     readonly property real controlRegionLeft: contentHost.x
-    implicitHeight: inlinePresentation ? 44 : (10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10)
+    implicitHeight: inlinePresentation ? 44
+                    : (choicePresentation ? safeControlHeight
+                       : (10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10))
     height: matchesSearch ? implicitHeight : 0
     visible: matchesSearch
     opacity: root.enabled ? 1 : LazerTheme.settingsDisabledAlpha
@@ -82,6 +86,14 @@ Item {
         property: "requestedWidth"
         value: contentHost.width
         when: root.controlSupportsFillWidth && root.controlItem.fillWidth
+    }
+
+    // Let embedded-label controls reuse the row's existing setting label.
+    Binding {
+        target: root.controlItem
+        property: "fieldLabel"
+        value: root.labelText
+        when: root.controlOwnsLabel && root.controlItem.fieldLabel !== undefined
     }
 
     function activateReset() {
@@ -158,13 +170,15 @@ Item {
     Item {
         id: contentHost
         x: contentPadding
-        y: root.inlinePresentation ? 0 : 10
+        y: root.inlinePresentation || root.choicePresentation ? 0 : 10
         width: Math.max(0, root.width - 2 * contentPadding)
-        height: root.inlinePresentation ? 44 : labelItem.implicitHeight + labelControlGap + controlHost.height
+        height: root.inlinePresentation || root.choicePresentation
+                ? controlHost.height : labelItem.implicitHeight + labelControlGap + controlHost.height
 
         Text {
             id: labelItem
             width: root.inlinePresentation ? Math.max(0, parent.width - controlHost.width - 12) : parent.width
+            visible: !root.controlOwnsLabel
             anchors.verticalCenter: root.inlinePresentation ? parent.verticalCenter : undefined
             text: root.labelText
             color: LazerTheme.textPrimary
@@ -187,10 +201,10 @@ Item {
         Item {
             id: controlHost
             x: root.inlinePresentation ? Math.max(0, parent.width - width) : (root.splitPresentation ? parent.width * 0.5 : 0)
-            y: root.inlinePresentation || root.splitPresentation
+            y: root.inlinePresentation || root.splitPresentation || root.choicePresentation
                ? (parent.height - height) / 2
                : labelItem.implicitHeight + root.labelControlGap
-            width: root.inlinePresentation ? root.safeRequestedWidth
+            width: root.inlinePresentation || root.choicePresentation ? parent.width
                  : (root.splitPresentation ? Math.max(0, parent.width * 0.5) : parent.width)
             height: root.safeControlHeight
             Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }

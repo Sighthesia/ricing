@@ -397,6 +397,74 @@ if (request.priority >= activePriority)
     setActiveTooltip(request)
 ```
 
+## Scenario: Single Settings Heading And Embedded Choice Fields
+
+### 1. Scope / Trigger
+
+- Apply when the settings Content surface owns category navigation and search chrome.
+- Apply when a Choice control displays its setting label inside the control surface.
+
+### 2. Signatures
+
+- Content chrome: top search field, one category heading, then the clipped page viewport.
+- Choice presentation: `rowPresentation: "choice"`, `fieldLabel: string`, and `displayLabel: string`.
+- Navigation item: `selectionIndicatorItem` is the only selected-state surface.
+
+### 3. Contracts
+
+- Content renders the category heading exactly once below the search field; category pages do not repeat it.
+- Search uses `#201E27`, radius `6`, no default border, right-side search icon, and placeholder `输入以搜索`.
+- A Choice row injects the existing row label through `fieldLabel`; the outer Row label is hidden to prevent duplicate text.
+- Choice controls are `52px` high with `#25222E` surface, `#8A8795` 11px field label, white 14px demi-bold value, and a right-aligned downward chevron.
+- Selected navigation has no outer capsule: it uses a left `4x24` radius-2 accent indicator and white icon/text. Inactive navigation has no indicator and uses `#8A8795`.
+- Sidebar collapse/Back and Content Escape close behavior remain available; Content does not add a second close or collapse owner.
+
+### 4. Validation & Error Matrix
+
+- Category page declares its own title -> reject; Content is the single heading owner.
+- Choice row renders both outer and embedded labels -> reject; use the `rowPresentation` contract.
+- Search surface has a default white/focus border -> reject; focus must not restore the removed white outline.
+- Inactive navigation has a visible indicator -> reject; use zero height and zero opacity.
+- Sidebar Back/collapse is removed while cleaning Content chrome -> reject; these are separate ownership boundaries.
+
+### 5. Good/Base/Bad Cases
+
+- Good: Content displays search, one `18px` category title, and a page whose first visible row is a setting.
+- Base: an empty query shows the search icon; a non-empty query replaces it with the clear action.
+- Good: a Choice row shows one label/value pair inside its `52px` surface and preserves dropdown focus/menu behavior.
+- Bad: each category page adds a second large title above its first row.
+- Bad: selected navigation keeps a filled purple pill behind the entire item.
+
+### 6. Tests Required
+
+- Panel tests assert search ordering, exact placeholder/surface/radius, right-side icon, and one Content-owned heading.
+- Control tests assert Choice height, surface token, embedded label/value contract, and preserved menu APIs.
+- Panel tests assert selected indicator geometry/color, inactive indicator absence, and inactive label color.
+- Existing geometry, persistence, dropdown, tooltip, Escape, and Sidebar Back/collapse tests remain green.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+Column {
+    Text { text: root.title }
+    LazerSettingsChoice { }
+}
+```
+
+#### Correct
+
+```qml
+LazerSettingsRow {
+    labelText: "配色方案"
+    LazerSettingsChoice {
+        rowPresentation: "choice"
+        fieldLabel: parent.labelText
+    }
+}
+```
+
 #### Correct
 
 ```qml
