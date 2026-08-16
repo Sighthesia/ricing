@@ -361,7 +361,7 @@ Rectangle {
 - Repeated requests from the active source update text and priority in place without restarting the fade or moving the source.
 - Fallback selects the highest valid priority using original registration order for ties.
 - Toggle exposes `inline` and renders a `44x20` capsule without a moving or hollow Nub.
-- Slider exposes `split`, renders a `24px` trough with `4x20` embedded thumb, and exposes that thumb as `nubItem`.
+- Slider exposes `split`, renders a `26px` trough whose active thumb is exactly as tall as the trough and uses a brighter shade of the fill color, and exposes that thumb as `nubItem`.
 - Settings tokens are exact: `#765BFF`, `#25222E`, `#18161D`, `#131217`, and `#8A8795`; `settingsRow` is transparent and global `osuPink` is unchanged.
 - Search places the icon on the right and uses the exact placeholder `输入以搜索`; a visible clear action replaces the icon while a query is present.
 
@@ -370,21 +370,21 @@ Rectangle {
 - Equal-priority competing source while active owner is valid -> retain active owner.
 - Higher-priority source -> replace active owner and reposition immediately.
 - Active source hidden, destroyed, or fully offscreen -> dismiss and choose deterministic fallback.
-- Toggle or Slider imports shared Nub visuals -> reject; controls render their specified capsule or embedded thumb directly.
+- Toggle or Slider imports shared Nub visuals -> reject; controls render their specified capsule or full-height thumb directly.
 - Inactive navigation item -> no selection indicator and use `#8A8795`.
 - Content header close/collapse controls -> reject; close remains on Escape or Sidebar Back.
 
 ### 5. Good/Base/Bad Cases
 
 - Good: a row description remains visible while an adjacent equal-priority row briefly becomes hovered, then becomes deterministic fallback after dismiss.
-- Base: a Slider value tooltip follows the embedded thumb while its row owns the split layout.
+- Base: a Slider value tooltip follows the full-height thumb while its row owns the split layout.
 - Bad: every equal-priority hover request immediately replaces the current owner.
 - Bad: a visual token change modifies global `osuPink` or recreates a row card.
 
 ### 6. Tests Required
 
 - Bridge/Content tests assert equal-priority stability, higher-priority takeover, in-place text updates, and registration-order fallback.
-- Control tests assert Toggle `44x20`, Slider `24px` trough, `4x20` thumb, `rowPresentation`, and `nubItem` identity.
+- Control tests assert Toggle `44x20`, Slider `26px` trough, full-height brighter thumb, `rowPresentation`, and `nubItem` identity.
 - Theme tests assert settings-only tokens and transparent row surface.
 - Panel tests assert right-side search icon, exact placeholder, removed header actions, inactive navigation indicator absence, and preserved Escape/Back close.
 
@@ -407,32 +407,32 @@ Rectangle {
 ### 2. Signatures
 
 - `LazerSettingsRow`: `defaultValue`, `currentValue`, `resetCallback`, `revertButtonItem`, and `contentItem`.
-- `LazerSettingsSlider`: `defaultMarkerItem`, `thumbLightItem`, `nubItem`, `thumbColor`, and `defaultMarkerVisible`.
+- `LazerSettingsSlider`: `defaultMarkerItem`, `nubItem`, `thumbColor`, and `defaultMarkerVisible`.
 
 ### 3. Contracts
 
 - The reset affordance is a sibling above the card/content layers, remains inside the row bounds, and reserves its width from the control budget.
 - Reset visibility is `hasDefault && !isDefault`; activation delegates to `resetCallback` and does not mutate settings directly.
-- Slider layer order is trough, fill, default marker, active thumb; the active thumb uses the settings accent while its inner light bar uses the light thumb token.
+- Slider layer order is trough, fill, default marker, active thumb; the active thumb is exactly as tall as the trough and uses a brighter shade of the fill color.
 - The default marker is non-interactive, uses the normalized `sliderFraction`, and is hidden when current and default values are equal.
 
 ### 4. Validation & Error Matrix
 
 - Reset button behind content or card -> reject; assert explicit z-order and visible bounds.
-- Slider thumb uses only the light inner color -> reject; assert outer accent and inner light colors separately.
+- Slider thumb is shorter than the trough or uses the fill color unchanged -> reject; assert a full-height thumb with a brighter shade of the fill token.
 - Marker exists but is below fill/thumb or has no visible state transition -> reject; assert z-order and `defaultMarkerVisible` transitions.
 - Page omits one of the reset properties -> reject; verify representative page rows carry the complete reset contract.
 
 ### 5. Good/Base/Bad Cases
 
-- Good: a modified page Slider shows the right reset icon, accent outer thumb, and default marker simultaneously.
+- Good: a modified page Slider shows the right reset icon, brighter full-height thumb, and default marker simultaneously.
 - Base: current value equals default, so the reset icon and marker are hidden while the thumb remains visible.
 - Bad: properties and colors are correct in a component test, but sibling stacking covers the reset button or marker in the panel.
 
 ### 6. Tests Required
 
 - Row tests assert reset visibility, bounds, z-order above `contentItem`, callback activation, and hide-after-equality.
-- Slider tests assert outer thumb accent, inner light bar, marker dimensions/color, layer order, normalized position, and modified/default transitions.
+- Slider tests assert full-height brighter thumb, marker dimensions/color, layer order, normalized position, and modified/default transitions.
 - Page tests assert representative rows receive `defaultValue`, `currentValue`, and `resetCallback`.
 
 ### 7. Wrong vs Correct
@@ -598,8 +598,8 @@ width: root.inlinePresentation
 - Card content keeps approximately `12px` horizontal padding; Toggle remains
   an inline `44x20` control and is not wrapped in a second card.
 - Slider is a `26px` high, radius-4 trough using `#2E2A3A`, an accent
-  `#765BFF` fill. Its active outer thumb fills the trough height, while its
-  inner light bar is `4x20`, radius-2, and `#EBE5FF`.
+  `#765BFF` fill. Its active thumb is exactly as tall as the trough and uses a
+  brighter shade of the fill (`#9A86FF`); there is no separate inner light bar.
 - When a Slider has a non-default value, its default marker uses the existing
   normalized fraction, is `3x6`, radius-1.5, and `#D5CCFF`; it fades out at
   the default value.
@@ -616,8 +616,8 @@ width: root.inlinePresentation
   background.
 - Slider width below `200px` when the available content can provide it ->
   reject; use the 55% split budget and 240px cap.
-- Slider thumb is hollow, outside the trough, or uses the old Nub geometry ->
-  reject; use the full-height outer thumb and embedded light bar.
+- Slider thumb is hollow, outside the trough, shorter than the trough, or uses
+  the fill color unchanged -> reject; use the full-height brighter thumb.
 - Reset control is placed on the left or changes the setting content width when
   it appears -> reject; use the fixed right-side slot.
 - Toggle receives a second visual card -> reject; Row owns the card and the
@@ -665,4 +665,60 @@ Rectangle {
 }
 
 width: Math.min(240, parent.width * 0.55)
+```
+
+## Scenario: Runtime Settings Defaults And Category Reset
+
+### 1. Scope / Trigger
+
+- Apply when a settings host wires restore-default state from live services instead of page-local fixtures.
+- Apply when category pages forward canonical defaults to Rows and Sliders in display units.
+
+### 2. Signatures
+
+- `SettingsService`: `appearanceDefaults`, `barDefaults`, `notificationDefaults`, and `resetCategorySetting(category, key, value)`.
+- `LazerSettingsPanel` inputs: `appearanceDefaults`, `barDefaults`, `notificationDefaults`, `settingsReset`.
+- Slider input: `defaultValue` in display units (notification timeout uses seconds while the persisted value is milliseconds).
+
+### 3. Contracts
+
+- Default maps mirror the persisted `JsonAdapter` initial values field-for-field and are never mutated by controls.
+- `resetCategorySetting` validates the category, key, and canonical value before writing the default into the persisted object and scheduling the existing `save()` debounce; it ignores unknown categories, absent keys, or non-canonical values.
+- The host injects all three maps and the category-aware reset operation; panel page wrappers forward their category name.
+- Every numeric Slider receives the same `defaultOf(key)` display-unit value as its enclosing Row, including the ms->seconds conversion for the notification timeout.
+- Clicking a Row restore button writes the canonical default and must not activate the adjacent Slider or move its thumb.
+
+### 4. Validation & Error Matrix
+
+- Non-canonical value through the reset path -> reject without writing.
+- Timeout reset writes milliseconds (5000) while the Slider marker uses seconds (5) -> the persisted canonical default is unchanged.
+- Restore button overlapping the Slider geometrically or by input ownership -> reject; keep the split control right-aligned at the reserved reset slot.
+- Page omits `defaultValue` on a numeric Slider -> reject; the marker stays hidden until a real configured default is supplied.
+
+### 5. Good/Base/Bad Cases
+
+- Good: resetting a modified appearance Slider writes `0.9` panelOpacity, saves once, and hides the reset icon and marker.
+- Base: an empty defaults map leaves rows without `hasDefault` and Slider markers hidden.
+- Bad: a restore click also scrubs the adjacent Slider to its maximum.
+
+### 6. Tests Required
+
+- Service/host tests assert default maps match persisted schemas and category-aware reset routing.
+- Page tests assert Slider `defaultValue` propagation in display units and canonical reset values.
+- Control tests assert the restore button click does not emit Slider `valueModified`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+// The host writes an arbitrary value straight into the persisted object,
+// bypassing canonical validation, so a reset can inject non-defaults.
+panel.settingsReset: function(category, key, value) { SettingsService[category][key] = value }
+```
+
+#### Correct
+
+```qml
+panel.settingsReset: Services.SettingsService.resetCategorySetting
 ```

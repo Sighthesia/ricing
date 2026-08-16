@@ -52,7 +52,7 @@ Flickable {
             defaultValue: root.defaultOf("height")
             currentValue: root.settingsObject ? root.settingsObject.height : null
             resetCallback: function() { root.resetKey("height") }
-            LazerSettingsSlider { id: heightSliderControl; from: 40; to: 64; stepSize: 1; value: root.settingsObject ? root.settingsObject.height : 48; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.height = Math.round(Math.max(40, Math.min(64, value))); root.save() } } }
+            LazerSettingsSlider { id: heightSliderControl; from: 40; to: 64; stepSize: 1; defaultValue: root.defaultOf("height"); value: root.settingsObject ? root.settingsObject.height : 48; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.height = Math.round(Math.max(40, Math.min(64, value))); root.save() } } }
         }
         LazerSettingsRow {
             id: positionRow
@@ -82,7 +82,7 @@ Flickable {
             defaultValue: root.defaultOf("floatingMargin")
             currentValue: root.settingsObject ? root.settingsObject.floatingMargin : null
             resetCallback: function() { root.resetKey("floatingMargin") }
-            LazerSettingsSlider { id: floatingMarginSliderControl; from: 0; to: 24; stepSize: 1; value: root.settingsObject ? root.settingsObject.floatingMargin : 4; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.floatingMargin = Math.round(Math.max(0, Math.min(24, value))); root.save() } } }
+            LazerSettingsSlider { id: floatingMarginSliderControl; from: 0; to: 24; stepSize: 1; defaultValue: root.defaultOf("floatingMargin"); value: root.settingsObject ? root.settingsObject.floatingMargin : 4; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.floatingMargin = Math.round(Math.max(0, Math.min(24, value))); root.save() } } }
         }
         LazerSettingsRow {
             id: cornerRadiusRow
@@ -92,7 +92,7 @@ Flickable {
             defaultValue: root.defaultOf("cornerRadius")
             currentValue: root.settingsObject ? root.settingsObject.cornerRadius : null
             resetCallback: function() { root.resetKey("cornerRadius") }
-            LazerSettingsSlider { id: cornerRadiusSliderControl; from: 0; to: 24; stepSize: 1; value: root.settingsObject ? root.settingsObject.cornerRadius : 12; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.cornerRadius = Math.round(Math.max(0, Math.min(24, value))); root.save() } } }
+            LazerSettingsSlider { id: cornerRadiusSliderControl; from: 0; to: 24; stepSize: 1; defaultValue: root.defaultOf("cornerRadius"); value: root.settingsObject ? root.settingsObject.cornerRadius : 12; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.cornerRadius = Math.round(Math.max(0, Math.min(24, value))); root.save() } } }
         }
     }
 }

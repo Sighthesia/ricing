@@ -212,7 +212,7 @@ Item {
         NumberAnimation { duration: MotionTokens.sliderNubMove; easing.type: Easing.OutQuint }
     }
 
-    // Embed a bright full-height thumb with a shorter inner light bar.
+    // Keep the active thumb as a brighter full-height continuation of the fill.
     Rectangle {
         id: thumb
         z: 3
@@ -220,7 +220,7 @@ Item {
                                  root.displayFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
         width: 6
-        height: 20
+        height: trackHost.height
         radius: 3
         color: LazerTheme.settingsSliderThumb
         scale: root.dragging ? MotionTokens.pressScale : (root.hovered ? 1.06 : 1)
@@ -228,14 +228,6 @@ Item {
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
 
-        Rectangle {
-            id: thumbLight
-            anchors.centerIn: parent
-            width: 4
-            height: 20
-            radius: 2
-            color: LazerTheme.settingsSliderThumbLight
-        }
     }
 
     HoverHandler {
@@ -292,7 +284,7 @@ Item {
     readonly property Item trackItem: trackRect
     readonly property Item trackFillItem: fillRect
     readonly property Item defaultMarkerItem: defaultMarker
-    readonly property Item thumbLightItem: thumbLight
+    readonly property Item thumbLightItem: null
     readonly property bool trackTapEnabled: trackTapHandler.enabled
     readonly property bool trackFillBehaviorEnabled: fractionBehavior.enabled
     readonly property Item nubItem: thumb

@@ -63,7 +63,7 @@ Flickable {
             defaultValue: root.defaultOf("maxVisible")
             currentValue: root.settingsObject ? root.settingsObject.maxVisible : null
             resetCallback: function() { root.resetKey("maxVisible") }
-            LazerSettingsSlider { id: maxVisibleSliderControl; from: 1; to: 8; stepSize: 1; value: root.settingsObject ? root.settingsObject.maxVisible : 3; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.maxVisible = Math.round(Math.max(1, Math.min(8, value))); root.save() } } }
+            LazerSettingsSlider { id: maxVisibleSliderControl; from: 1; to: 8; stepSize: 1; defaultValue: root.defaultOf("maxVisible"); value: root.settingsObject ? root.settingsObject.maxVisible : 3; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.maxVisible = Math.round(Math.max(1, Math.min(8, value))); root.save() } } }
         }
         LazerSettingsRow {
             id: timeoutRow
@@ -73,7 +73,7 @@ Flickable {
             defaultValue: root.defaultOf("timeout")
             currentValue: root.settingsObject ? root.settingsObject.timeout : null
             resetCallback: function() { root.resetKey("timeout") }
-            LazerSettingsSlider { id: timeoutSliderControl; from: 2; to: 15; stepSize: 1; suffix: " 秒"; value: root.settingsObject ? root.settingsObject.timeout / 1000 : 5; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.timeout = Math.round(Math.max(2, Math.min(15, value))) * 1000; root.save() } } }
+            LazerSettingsSlider { id: timeoutSliderControl; from: 2; to: 15; stepSize: 1; suffix: " 秒"; defaultValue: root.defaultOf("timeout") === undefined ? undefined : root.defaultOf("timeout") / 1000; value: root.settingsObject ? root.settingsObject.timeout / 1000 : 5; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.timeout = Math.round(Math.max(2, Math.min(15, value))) * 1000; root.save() } } }
         }
         LazerSettingsRow {
             id: positionRow

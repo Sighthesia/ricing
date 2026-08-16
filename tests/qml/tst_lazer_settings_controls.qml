@@ -100,6 +100,7 @@ Item {
 
     SignalSpy { id: toggleSpy; target: toggle; signalName: "toggled" }
     SignalSpy { id: sliderSpy; target: slider; signalName: "valueModified" }
+    SignalSpy { id: revertRowSliderSpy; target: revertRowSlider; signalName: "valueModified" }
     SignalSpy { id: choiceSpy; target: choice; signalName: "valueSelected" }
     SignalSpy { id: commitSpy; target: textField; signalName: "textCommitted" }
     SignalSpy { id: clearSpy; target: textField; signalName: "clearRequested" }
@@ -124,6 +125,7 @@ Item {
             slider.focus = false
             secondSlider.focus = false
             sliderSpy.clear()
+            revertRowSliderSpy.clear()
             choice.enabled = true
             choiceHolder.value = "auto"
             choiceSpy.clear()
@@ -262,7 +264,7 @@ Item {
             compare(slider.nubDoubleTapEnabled, false)
         }
 
-        function test_sliderDefaultMarkerAndEmbeddedLightBar() {
+        function test_sliderDefaultMarkerAndFullHeightThumb() {
             slider.defaultValue = 2
             sliderHolder.value = 4
             wait(0)
@@ -271,13 +273,11 @@ Item {
             compare(slider.defaultMarkerItem.height, 6)
             compare(slider.defaultMarkerItem.radius, 1.5)
             compare(slider.defaultMarkerItem.color, "#d5ccff")
-            compare(slider.nubItem.height, 20)
+            compare(slider.nubItem.height, slider.trackItem.height)
             compare(slider.nubItem.width, 6)
-            compare(slider.thumbColor, Lazer.LazerTheme.settingsAccent)
-            compare(slider.thumbLightItem.width, 4)
-            compare(slider.thumbLightItem.height, 20)
-            compare(slider.thumbLightItem.radius, 2)
-            compare(slider.thumbLightItem.color, Lazer.LazerTheme.settingsSliderThumbLight)
+            compare(slider.thumbColor, Lazer.LazerTheme.settingsSliderThumb)
+            verify(slider.thumbColor !== Lazer.LazerTheme.settingsAccent)
+            verify(slider.thumbLightItem === null)
             verify(slider.defaultMarkerItem.z < slider.nubItem.z)
             verify(slider.nubItem.z > slider.trackItem.z)
             sliderHolder.value = 2
@@ -474,7 +474,7 @@ Item {
             compare(revertRowSlider.trackItem.color, Lazer.LazerTheme.settingsTrack)
             compare(revertRowSlider.trackFillItem.color, Lazer.LazerTheme.settingsAccent)
             compare(revertRowSlider.nubItem.width, 6)
-            compare(revertRowSlider.nubItem.height, 20)
+            compare(revertRowSlider.nubItem.height, revertRowSlider.trackItem.height)
             compare(revertRowSlider.nubItem.radius, 3)
             compare(revertRowSlider.nubItem.color, Lazer.LazerTheme.settingsSliderThumb)
             verify(revertRowSlider.nubItem !== null)
@@ -537,8 +537,17 @@ Item {
             verify(revertRow.revertButtonItem.visible)
             compare(revertRow.revertButtonItem.x + revertRow.revertButtonItem.width,
                     revertRow.width - revertRow.contentPadding)
-            revertRow.activateReset()
+            var sliderRight = revertRowSlider.mapToItem(revertRow, revertRowSlider.width, 0).x
+            verify(sliderRight <= revertRow.revertButtonItem.x)
+            var beforeSliderSignals = revertRowSliderSpy.count
+            mouseClick(revertRow.revertButtonItem,
+                       revertRow.revertButtonItem.width / 2,
+                       revertRow.revertButtonItem.height / 2,
+                       Qt.LeftButton)
             compare(resetState.count, 1)
+            compare(revertRowSliderSpy.count, beforeSliderSignals)
+            revertRow.activateReset()
+            compare(resetState.count, 2)
             revertRow.currentValue = 5
             verify(revertRow.isDefault)
             verify(!revertRow.revertVisible)

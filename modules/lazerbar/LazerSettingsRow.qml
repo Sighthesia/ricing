@@ -218,7 +218,7 @@ Item {
 
         Item {
             id: controlHost
-            x: root.inlinePresentation ? Math.max(0, parent.width - width) : (root.splitPresentation ? parent.width * 0.5 : 0)
+            x: root.inlinePresentation || root.splitPresentation ? Math.max(0, parent.width - width) : 0
             y: root.inlinePresentation || root.splitPresentation || root.choicePresentation
                ? (parent.height - height) / 2
                : labelItem.implicitHeight + root.labelControlGap

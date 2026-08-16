@@ -67,7 +67,7 @@ QtObject {
     readonly property int settingsControlPadding: 10
     readonly property int settingsRangePadding: 0
     readonly property color settingsTrack: "#2E2A3A"
-    readonly property color settingsSliderThumb: settingsAccent
+    readonly property color settingsSliderThumb: "#9A86FF"
     readonly property color settingsSliderThumbLight: "#EBE5FF"
     readonly property color settingsTrackFocus: "#4A4C59"
     readonly property color settingsMenuBackground: "#F51D1C22"

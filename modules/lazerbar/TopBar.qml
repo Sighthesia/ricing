@@ -109,6 +109,10 @@ Variants {
                 panel.barSettings: Services.SettingsService.bar
                 panel.notificationSettings: Services.SettingsService.notifications
                 panel.saveCallback: Services.SettingsService.save
+                panel.appearanceDefaults: Services.SettingsService.appearanceDefaults
+                panel.barDefaults: Services.SettingsService.barDefaults
+                panel.notificationDefaults: Services.SettingsService.notificationDefaults
+                panel.settingsReset: Services.SettingsService.resetCategorySetting
                 panel.wallpaperService: Services.WallpaperService
                 onClosed: overlayCoordinator.ownerClosed("settings")
             }

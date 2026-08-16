@@ -12,6 +12,21 @@ Item {
     QtObject { id: notificationSettings; property int maxVisible: 3; property int timeout: 5000; property string position: "top-right"; property bool dnd: false }
     QtObject { id: wallpaperService; function changeWallpaper(path) {} }
     QtObject { id: saveService; property int count: 0; function save() { count++ } }
+    QtObject {
+        id: resetService
+        property int count: 0
+        property string category: ""
+        property string key: ""
+        property var value: undefined
+        function reset(nextCategory, nextKey, nextValue) {
+            count++
+            category = nextCategory
+            key = nextKey
+            value = nextValue
+            if (nextCategory === "bar" && nextKey === "height")
+                barSettings.height = nextValue
+        }
+    }
 
     Lazer.LazerSettingsPanel {
         id: panel
@@ -26,6 +41,10 @@ Item {
         notificationSettings: notificationSettings
         saveCallback: saveService.save
         wallpaperService: wallpaperService
+        appearanceDefaults: ({ panelOpacity: 0.9 })
+        barDefaults: ({ height: 48 })
+        notificationDefaults: ({ timeout: 5000 })
+        settingsReset: resetService.reset
     }
     Lazer.LazerSettingsChoice {
         id: externalChoice
@@ -54,6 +73,11 @@ Item {
             panel.appearancePage.contentY = 0
             panel.barPage.contentY = 0
             panel.notificationPage.contentY = 0
+            barSettings.height = 48
+            resetService.count = 0
+            resetService.category = ""
+            resetService.key = ""
+            resetService.value = undefined
             closeSpy.clear()
             categorySpy.clear()
             wait(20)
@@ -70,6 +94,22 @@ Item {
             compare(panel.notificationPage.settingsObject, notificationSettings)
             compare(panel.appearancePage.wallpaperService, wallpaperService)
             compare(panel.appearancePage.saveCallback, saveService.save)
+            compare(panel.appearancePage.defaults.panelOpacity, 0.9)
+            compare(panel.barPage.defaults.height, 48)
+            compare(panel.notificationPage.defaults.timeout, 5000)
+            compare(panel.notificationPage.timeoutSlider.defaultValue, 5)
+        }
+
+        function test_resetWrapperPreservesCategoryAndCanonicalDefault() {
+            barSettings.height = 60
+            verify(panel.barPage.heightRow.revertVisible)
+            panel.barPage.heightRow.activateReset()
+            compare(resetService.count, 1)
+            compare(resetService.category, "bar")
+            compare(resetService.key, "height")
+            compare(resetService.value, 48)
+            compare(barSettings.height, 48)
+            verify(!panel.barPage.heightRow.revertVisible)
         }
 
         function test_layersAreIndependentAndMatchOsuGeometry() {

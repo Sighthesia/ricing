@@ -72,6 +72,12 @@ Item {
             notificationSettings.timeout = 5000
             notificationSettings.position = "top-right"
             notificationSettings.dnd = false
+            appearancePage.defaults = ({})
+            appearancePage.resetCallback = null
+            barPage.defaults = ({})
+            barPage.resetCallback = null
+            notificationsPage.defaults = ({})
+            notificationsPage.resetCallback = null
         }
 
         function cleanup() {
@@ -287,6 +293,41 @@ Item {
             verify(notificationsPage.maxVisibleRow.revertVisible)
             notificationsPage.maxVisibleRow.activateReset()
             compare(notificationSettings.maxVisible, 3)
+        }
+
+        function test_sliderDefaultsUseDisplayUnitsAndResetCanonicalValues() {
+            appearancePage.defaults = { "panelOpacity": 0.9 }
+            appearancePage.resetCallback = function(key, value) {
+                if (key === "panelOpacity") appearanceSettings.panelOpacity = value
+            }
+            appearanceSettings.panelOpacity = 0.55
+            compare(appearancePage.panelOpacitySlider.defaultValue, 0.9)
+            verify(appearancePage.panelOpacitySlider.defaultMarkerVisible)
+            appearancePage.panelOpacityRow.activateReset()
+            compare(appearanceSettings.panelOpacity, 0.9)
+
+            barPage.defaults = { "height": 48 }
+            barPage.resetCallback = function(key, value) {
+                if (key === "height") barSettings.height = value
+            }
+            barSettings.height = 60
+            compare(barPage.heightSlider.defaultValue, 48)
+            verify(barPage.heightSlider.defaultMarkerVisible)
+            barPage.heightRow.activateReset()
+            compare(barSettings.height, 48)
+
+            notificationsPage.defaults = { "timeout": 5000 }
+            notificationsPage.resetCallback = function(key, value) {
+                if (key === "timeout") notificationSettings.timeout = value
+            }
+            notificationSettings.timeout = 12000
+            compare(notificationsPage.timeoutSlider.defaultValue, 5)
+            compare(notificationsPage.timeoutSlider.displayValue, 12)
+            verify(notificationsPage.timeoutSlider.defaultMarkerVisible)
+            notificationsPage.timeoutRow.activateReset()
+            compare(notificationSettings.timeout, 5000)
+            compare(notificationsPage.timeoutSlider.displayValue, 5)
+            verify(!notificationsPage.timeoutSlider.defaultMarkerVisible)
         }
     }
 }

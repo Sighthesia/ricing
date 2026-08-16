@@ -130,6 +130,7 @@ Flickable {
             resetCallback: function() { root.resetKey("panelOpacity") }
             LazerSettingsSlider {
                 id: panelOpacitySliderControl; from: 0.35; to: 1; stepSize: 0.05
+                defaultValue: root.defaultOf("panelOpacity")
                 value: root.settingsObject ? root.settingsObject.panelOpacity : 0.9
                 onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.panelOpacity = Math.max(0.35, Math.min(1, value)); root.save() } }
             }
@@ -160,6 +161,7 @@ Flickable {
             resetCallback: function() { root.resetKey("blurSurfaceOpacity") }
             LazerSettingsSlider {
                 id: blurSurfaceOpacitySliderControl; from: 0; to: 1; stepSize: 0.05
+                defaultValue: root.defaultOf("blurSurfaceOpacity")
                 value: root.settingsObject ? root.settingsObject.blurSurfaceOpacity : 0.35
                 onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.blurSurfaceOpacity = Math.max(0, Math.min(1, value)); root.save() } }
             }
@@ -175,6 +177,7 @@ Flickable {
             resetCallback: function() { root.resetKey("glassHighlightIntensity") }
             LazerSettingsSlider {
                 id: glassHighlightIntensitySliderControl; from: 0; to: 1; stepSize: 0.05
+                defaultValue: root.defaultOf("glassHighlightIntensity")
                 value: root.settingsObject ? root.settingsObject.glassHighlightIntensity : 0.56
                 onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.glassHighlightIntensity = Math.max(0, Math.min(1, value)); root.save() } }
             }
@@ -190,6 +193,7 @@ Flickable {
             resetCallback: function() { root.resetKey("glassGlowIntensity") }
             LazerSettingsSlider {
                 id: glassGlowIntensitySliderControl; from: 0; to: 1; stepSize: 0.05
+                defaultValue: root.defaultOf("glassGlowIntensity")
                 value: root.settingsObject ? root.settingsObject.glassGlowIntensity : 0.22
                 onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.glassGlowIntensity = Math.max(0, Math.min(1, value)); root.save() } }
             }

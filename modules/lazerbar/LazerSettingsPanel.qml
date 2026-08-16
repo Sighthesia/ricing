@@ -271,7 +271,7 @@ Item {
             saveCallback: root.saveCallback
             wallpaperService: root.wallpaperService
             defaults: root.appearanceDefaults
-            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset(key, value) }
+            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("appearance", key, value) }
             searchQuery: root.searchQuery
             opacity: 0
             Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
@@ -287,7 +287,7 @@ Item {
             settingsObject: root.barSettings
             saveCallback: root.saveCallback
             defaults: root.barDefaults
-            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset(key, value) }
+            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("bar", key, value) }
             searchQuery: root.searchQuery
             opacity: 0
             Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
@@ -303,7 +303,7 @@ Item {
             settingsObject: root.notificationSettings
             saveCallback: root.saveCallback
             defaults: root.notificationDefaults
-            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset(key, value) }
+            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("notifications", key, value) }
             searchQuery: root.searchQuery
             opacity: 0
             Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
