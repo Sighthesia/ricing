@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Preserves fixed settings ownership, default visual layer, and regression-test contracts."}
+{"file":".trellis/tasks/archive/2026-08/08-16-settings-reset-slider-visuals/prd.md","reason":"Records the previous component-level visual contract that runtime wiring must activate."}
