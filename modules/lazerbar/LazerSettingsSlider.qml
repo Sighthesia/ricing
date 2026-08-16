@@ -1,7 +1,7 @@
 import QtQuick
 import "LazerSettingsLogic.js" as Logic
 
-// Provide a clamped numeric setting with a 24px trough and embedded thumb.
+// Provide a clamped numeric setting with a thick trough and embedded thumb.
 Item {
     id: root
 
@@ -29,8 +29,8 @@ Item {
     readonly property real targetFraction: Logic.sliderFraction(from, to, displayValue)
     signal valueModified(real value)
 
-    implicitWidth: 180
-    implicitHeight: 24
+    implicitWidth: 220
+    implicitHeight: 26
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     activeFocusOnTab: effectiveEnabled
@@ -155,7 +155,7 @@ Item {
         Behavior on opacity { NumberAnimation { duration: MotionTokens.nubHover } }
     }
 
-    // Show the fixed 24px control trough.
+    // Show the thick rounded control trough.
     Rectangle {
         id: trackRect
         anchors.fill: trackHost
@@ -196,10 +196,10 @@ Item {
         id: thumb
         x: root.displayFraction * Math.max(0, trackHost.width - width)
         anchors.verticalCenter: trackHost.verticalCenter
-        width: 4
+        width: 6
         height: 20
-        radius: 2
-        color: "#E9E5F2"
+        radius: 3
+        color: LazerTheme.settingsSliderThumb
         scale: root.dragging ? MotionTokens.pressScale : (root.hovered ? 1.06 : 1)
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -258,6 +258,7 @@ Item {
     }
 
     readonly property Item trackItem: trackRect
+    readonly property Item trackFillItem: fillRect
     readonly property bool trackTapEnabled: trackTapHandler.enabled
     readonly property bool trackFillBehaviorEnabled: fractionBehavior.enabled
     readonly property Item nubItem: thumb

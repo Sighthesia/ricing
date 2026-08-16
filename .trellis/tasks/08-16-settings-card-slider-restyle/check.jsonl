@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Quality checklist and executable contracts for QML visual changes, fixed surfaces, existing settings controls, and smoke-test expectations."}
+{"file":".trellis/tasks/08-16-settings-card-slider-restyle/prd.md","reason":"Acceptance criteria used to verify card ownership, Slider interaction fidelity, Toggle compatibility, and out-of-scope boundaries."}
+{"file":".trellis/tasks/08-16-settings-card-slider-restyle/implement.md","reason":"Ordered implementation, risk points, and validation commands for the quality pass."}

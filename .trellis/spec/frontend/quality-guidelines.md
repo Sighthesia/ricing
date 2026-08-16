@@ -520,3 +520,84 @@ width: root.inlinePresentation
         ? Math.min(parent.width, Math.max(0, root.safeRequestedWidth))
         : parent.width * 0.5
 ```
+
+## Scenario: Shared Settings Cards And Slider Fidelity
+
+### 1. Scope / Trigger
+
+- Apply when restoring the visual container for settings rows or tuning the
+  thick Slider presentation without changing settings behavior.
+
+### 2. Signatures
+
+- Row owns one `cardItem` surface for every presentation.
+- Slider exposes `trackItem`, `trackFillItem`, and `nubItem` for visual and
+  tooltip assertions.
+- Split controls receive a capped right-side width of
+  `Math.min(240, contentWidth * 0.55)`.
+
+### 3. Contracts
+
+- The shared card fills the Row width, uses `radius: 6`, `#221F2B`, and
+  transitions to `#2A2636` while the row is hovered.
+- Card content keeps approximately `12px` horizontal padding; Toggle remains
+  an inline `44x20` control and is not wrapped in a second card.
+- Slider is a `26px` high, radius-4 trough using `#2E2A3A`, an accent
+  `#765BFF` fill, and a `6x20` radius-3 embedded thumb using `#EBE5FF`.
+- Split Slider controls remain wide enough for the fixed settings content when
+  possible, but never exceed `240px`.
+- Track taps, continuous horizontal drags, step snapping, keyboard input,
+  default reset, and `nubItem` tooltip identity remain unchanged.
+
+### 4. Validation & Error Matrix
+
+- Transparent Row surface -> reject; the shared card must own the visible row
+  background.
+- Slider width below `200px` when the available content can provide it ->
+  reject; use the 55% split budget and 240px cap.
+- Slider thumb is hollow, outside the trough, or uses the old Nub geometry ->
+  reject; use the embedded 6x20 thumb.
+- Toggle receives a second visual card -> reject; Row owns the card and the
+  Toggle owns only its capsule.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a hovered Row changes only its shared card surface through a color
+  transition while its label and control remain mounted.
+- Base: a fixed 400px settings content column gives a Slider roughly 200px of
+  right-side track space.
+- Bad: each control creates a nested card, or the Slider shrinks to the old
+  narrow generic control width.
+
+### 6. Tests Required
+
+- Control tests assert card width, radius, base color, hover token, content
+  padding, Slider width range, trough/fill colors, and thumb geometry.
+- Existing Slider interaction tests assert track taps, drag updates, step
+  normalization, keyboard behavior, default reset, and tooltip anchoring.
+- Existing Toggle tests assert `44x20`, checked/off colors, accessibility, and
+  keyboard/focus behavior.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+// The Row has no visible shared surface and the Slider uses a narrow generic
+// control width.
+Rectangle { color: "transparent" }
+width: parent.width * 0.5
+```
+
+#### Correct
+
+```qml
+Rectangle {
+    anchors.fill: parent
+    radius: 6
+    color: rowHover.hovered ? LazerTheme.settingsCardHover
+                            : LazerTheme.settingsCard
+}
+
+width: Math.min(240, parent.width * 0.55)
+```

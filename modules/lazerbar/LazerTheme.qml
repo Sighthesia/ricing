@@ -38,6 +38,8 @@ QtObject {
     readonly property color settingsToggleOff: "#322E3F"
     readonly property color settingsRow: "transparent"
     readonly property color settingsRowHover: "#FF363842"
+    readonly property color settingsCard: "#221F2B"
+    readonly property color settingsCardHover: "#2A2636"
     readonly property color settingsSelected: "#40765BFF"
     readonly property real settingsScrimOpacity: 0.6
     readonly property int settingsRadius: 16
@@ -64,7 +66,8 @@ QtObject {
     readonly property int settingsChoiceRadius: 6
     readonly property int settingsControlPadding: 10
     readonly property int settingsRangePadding: 0
-    readonly property color settingsTrack: settingsControlSurface
+    readonly property color settingsTrack: "#2E2A3A"
+    readonly property color settingsSliderThumb: "#EBE5FF"
     readonly property color settingsTrackFocus: "#4A4C59"
     readonly property color settingsMenuBackground: "#F51D1C22"
     readonly property color settingsMenuBorder: "#28FFFFFF"

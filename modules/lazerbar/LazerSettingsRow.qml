@@ -2,8 +2,8 @@ import QtQuick
 import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
-// Present one settings entry as osu's full-width vertical flow: a 20px revert
-// zone, then label above control with 5px spacing, no per-row card surface.
+// Present one settings entry as osu's full-width card with a 20px revert zone,
+// then label above control with 5px spacing.
 // The description is delivered as a hover/focus tooltip but still searches.
 Item {
     id: root
@@ -22,7 +22,7 @@ Item {
     readonly property bool isDefault: hasDefault && Logic.valuesEqual(defaultValue, currentValue)
     readonly property bool revertVisible: hasDefault && !isDefault
     readonly property bool canReset: revertVisible && enabled
-    readonly property real contentPadding: 20
+    readonly property real contentPadding: 12
     readonly property real revertZoneWidth: 20
     readonly property real labelControlGap: 5
     default property alias control: controlHost.children
@@ -63,6 +63,15 @@ Item {
     visible: matchesSearch
     opacity: root.enabled ? 1 : LazerTheme.settingsDisabledAlpha
 
+    // Keep one shared card surface behind every setting presentation.
+    Rectangle {
+        id: cardSurface
+        anchors.fill: parent
+        radius: 6
+        color: rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+    }
+
     // Propagate availability to the single injected control.
     Binding {
         target: root.controlItem
@@ -76,7 +85,7 @@ Item {
         target: root.controlItem
         property: "availableWidth"
         value: root.inlinePresentation ? root.safeRequestedWidth
-             : (root.splitPresentation ? Math.max(0, contentHost.width * 0.5) : contentHost.width)
+              : (root.splitPresentation ? Math.min(240, Math.max(0, contentHost.width * 0.55)) : contentHost.width)
         when: root.controlSupportsAvailableWidth
     }
 
@@ -182,7 +191,7 @@ Item {
             anchors.verticalCenter: root.inlinePresentation ? parent.verticalCenter : undefined
             text: root.labelText
             color: LazerTheme.textPrimary
-            font.pixelSize: 14
+            font.pixelSize: root.splitPresentation ? 13 : 14
             elide: Text.ElideRight
         }
 
@@ -193,8 +202,9 @@ Item {
             anchors.top: labelItem.bottom
             text: root.splitPresentation && root.controlItem && root.controlItem.displayText !== undefined
                   ? String(root.controlItem.displayText) : ""
-            color: LazerTheme.textMuted
-            font.pixelSize: 12
+            color: LazerTheme.textPrimary
+            font.pixelSize: 14
+            font.weight: Font.Bold
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
@@ -206,7 +216,7 @@ Item {
                : labelItem.implicitHeight + root.labelControlGap
             width: root.inlinePresentation ? Math.min(parent.width, Math.max(0, root.safeRequestedWidth))
                  : (root.choicePresentation ? parent.width
-                    : (root.splitPresentation ? Math.max(0, parent.width * 0.5) : parent.width))
+                     : (root.splitPresentation ? Math.min(240, Math.max(0, parent.width * 0.55)) : parent.width))
             height: root.safeControlHeight
             Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
             Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
@@ -226,4 +236,5 @@ Item {
 
     readonly property Item labelTextItem: labelItem
     readonly property Item revertButtonItem: revertButton
+    readonly property Item cardItem: cardSurface
 }

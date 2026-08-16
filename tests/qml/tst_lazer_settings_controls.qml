@@ -173,6 +173,8 @@ Item {
             compare(toggle.implicitWidth, 44)
             compare(toggle.implicitHeight, 20)
             verify(toggle.nubItem)
+            toggle.checked = false
+            compare(toggle.nubItem.color, Lazer.LazerTheme.settingsToggleOff)
             toggle.checked = true
             compare(toggle.nubItem.color, Lazer.LazerTheme.settingsAccent)
             Lazer.MotionTokens.reducedMotionOverride = true
@@ -406,6 +408,9 @@ Item {
             verify(row.implicitHeight >= 56)
             compare(row.compactLayout, false)
             compare(row.controlItem, rowToggle)
+            compare(row.cardItem.color, Lazer.LazerTheme.settingsCard)
+            compare(row.cardItem.radius, 6)
+            compare(row.cardItem.width, row.width)
             verify(row.textRegionWidth > 0)
             verify(row.labelTextItem.visible)
             verify(row.labelTextItem.width > 0)
@@ -432,7 +437,17 @@ Item {
             compare(row.rowPresentation, "inline")
             compare(revertRow.rowPresentation, "split")
             verify(rowToggle.x >= row.width - rowToggle.width - 20)
-            verify(revertRowSlider.width <= revertRow.width * 0.6)
+            verify(revertRowSlider.width >= 200)
+            verify(revertRowSlider.width <= 240)
+            compare(revertRowSlider.trackItem.height, 26)
+            compare(revertRowSlider.trackItem.radius, 4)
+            compare(revertRowSlider.trackItem.color, Lazer.LazerTheme.settingsTrack)
+            compare(revertRowSlider.trackFillItem.color, Lazer.LazerTheme.settingsAccent)
+            compare(revertRowSlider.nubItem.width, 6)
+            compare(revertRowSlider.nubItem.height, 20)
+            compare(revertRowSlider.nubItem.radius, 3)
+            compare(revertRowSlider.nubItem.color, Lazer.LazerTheme.settingsSliderThumb)
+            verify(revertRowSlider.nubItem !== null)
         }
 
         function test_rowSearchContractMatchesLabelOrDescription() {
