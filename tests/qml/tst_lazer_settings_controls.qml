@@ -62,6 +62,19 @@ Item {
         }
     }
 
+    Lazer.LazerSettingsRow {
+        id: resetTextRow
+        width: 520
+        labelText: "壁纸路径"
+        defaultValue: "default.png"
+        currentValue: textHolder.value
+        resetCallback: function() { resetState.count++ }
+        Lazer.LazerSettingsTextField {
+            id: resetTextField
+            text: textHolder.value
+        }
+    }
+
     Lazer.LazerSettingsToggle {
         id: toggle
         checked: toggleHolder.value
@@ -190,6 +203,10 @@ Item {
             var contentCenter = row.contentItem.mapToItem(row, row.contentItem.width / 2,
                                                           row.contentItem.height / 2)
             verify(Math.abs(capsuleCenter.y - contentCenter.y) < 0.1)
+            var labelCenter = row.labelTextItem.mapToItem(row, row.labelTextItem.width / 2,
+                                                          row.labelTextItem.height / 2)
+            verify(Math.abs(labelCenter.y - capsuleCenter.y) < 0.1)
+            compare(row.labelTextItem.height, row.contentItem.height)
             verify(rowToggle.x + rowToggle.width <= row.width - row.contentPadding - row.revertZoneWidth)
             verify(!row.revertButtonItem.visible)
         }
@@ -584,6 +601,18 @@ Item {
             revertRow.defaultValue = undefined
             verify(!revertRow.hasDefault)
             verify(!revertRow.revertVisible)
+        }
+
+        function test_textFieldResetButtonCentersOnField() {
+            var fieldCenter = resetTextField.mapToItem(resetTextRow,
+                                                       resetTextField.width / 2,
+                                                       resetTextField.height / 2)
+            var buttonCenter = resetTextRow.revertButtonItem.mapToItem(resetTextRow,
+                                                                        resetTextRow.revertButtonItem.width / 2,
+                                                                        resetTextRow.revertButtonItem.height / 2)
+            verify(resetTextRow.revertButtonItem.visible)
+            verify(Math.abs(fieldCenter.y - buttonCenter.y) < 0.1)
+            compare(resetTextRow.revertButtonItem.children[0].radius, 6)
         }
     }
 }

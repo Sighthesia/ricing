@@ -282,29 +282,6 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         height: 44
-
-        Rectangle {
-            anchors.fill: parent
-            color: LazerTheme.settingsRail
-        }
-
-        Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 16
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Afloat 设置"
-            color: LazerTheme.textPrimary
-            font.pixelSize: 13
-            font.weight: Font.DemiBold
-        }
-        Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 96
-            anchors.verticalCenter: parent.verticalCenter
-            text: "v0.1.0 · Esc 关闭"
-            color: LazerTheme.textMuted
-            font.pixelSize: 11
-        }
     }
 
     // Present the hover/focus description or slider value near its source.

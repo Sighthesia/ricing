@@ -135,7 +135,8 @@ Item {
         x: Math.max(0, root.width - width - contentPadding)
         width: 28
         height: 28
-        anchors.verticalCenter: parent.verticalCenter
+        // Follow the actual control center, not the taller label-plus-control card.
+        y: contentHost.y + controlHost.y + (controlHost.height - height) / 2
         visible: root.revertVisible
         opacity: root.revertVisible ? 1 : 0
         enabled: root.canReset
@@ -201,6 +202,7 @@ Item {
             id: labelItem
             width: root.inlinePresentation ? Math.max(0, parent.width - controlHost.width - 12) : parent.width
             visible: !root.controlOwnsLabel
+            height: root.inlinePresentation ? parent.height : implicitHeight
             anchors.verticalCenter: root.inlinePresentation ? parent.verticalCenter : undefined
             anchors.top: root.splitPresentation ? undefined : parent.top
             anchors.bottom: root.splitPresentation ? valueItem.top : undefined
@@ -209,6 +211,7 @@ Item {
             color: LazerTheme.textPrimary
             font.pixelSize: root.splitPresentation ? 13 : 14
             elide: Text.ElideRight
+            verticalAlignment: root.inlinePresentation ? Text.AlignVCenter : Text.AlignTop
         }
 
         Text {
