@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Quality checks for QML visual transitions, coordinate ownership, popup lifecycle, and regression coverage."}
+{"file":".trellis/tasks/archive/2026-08/08-16-settings-default-indicator-alignment/implement.md","reason":"Validation command expectations and prior control geometry risks."}
+{"file":".trellis/tasks/archive/2026-08/08-16-settings-default-visuals-runtime/implement.md","reason":"Existing QML, smoke-test, and environment warning expectations."}

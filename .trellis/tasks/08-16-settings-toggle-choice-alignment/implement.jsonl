@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Frontend QML geometry ownership, transition, fixed-surface, and mapped-coordinate testing contracts."}
+{"file":".trellis/tasks/archive/2026-08/08-16-settings-default-indicator-alignment/design.md","reason":"Previous settings Row/Slider/Choice geometry and reset-slot contracts that this alignment fix must preserve."}
+{"file":".trellis/tasks/archive/2026-08/08-16-settings-default-visuals-runtime/design.md","reason":"Runtime settings panel ownership and per-screen wiring constraints."}
