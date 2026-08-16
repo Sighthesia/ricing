@@ -182,6 +182,12 @@ Item {
             compare(toggle.fillWidth, false)
         }
 
+        function test_toggleRowCentersControlAndReservesRightResetSlot() {
+            compare(rowToggle.y + rowToggle.height / 2, row.height / 2)
+            verify(rowToggle.x + rowToggle.width <= row.width - row.contentPadding - row.revertZoneWidth)
+            verify(!row.revertButtonItem.visible)
+        }
+
         function test_sliderNormalizesStepsAndSuffix() {
             sliderHolder.value = 99
             compare(slider.displayValue, 10)
@@ -254,6 +260,26 @@ Item {
             slider.resetToDefault()
             compare(sliderHolder.value, 6)
             compare(slider.nubDoubleTapEnabled, false)
+        }
+
+        function test_sliderDefaultMarkerAndEmbeddedLightBar() {
+            slider.defaultValue = 2
+            sliderHolder.value = 4
+            wait(0)
+            verify(slider.defaultMarkerVisible)
+            compare(slider.defaultMarkerItem.width, 3)
+            compare(slider.defaultMarkerItem.height, 6)
+            compare(slider.defaultMarkerItem.radius, 1.5)
+            compare(slider.defaultMarkerItem.color, "#d5ccff")
+            compare(slider.nubItem.height, slider.trackItem.height)
+            compare(slider.nubItem.width, 6)
+            compare(slider.thumbLightItem.width, 4)
+            compare(slider.thumbLightItem.height, 20)
+            compare(slider.thumbLightItem.radius, 2)
+            compare(slider.thumbLightItem.color, "#ebe5ff")
+            sliderHolder.value = 2
+            wait(0)
+            verify(!slider.defaultMarkerVisible)
         }
 
         function test_sliderReverseTrackMapping() {
@@ -505,6 +531,8 @@ Item {
             verify(revertRow.revertVisible)
             verify(revertRow.canReset)
             verify(revertRow.revertButtonItem.visible)
+            compare(revertRow.revertButtonItem.x + revertRow.revertButtonItem.width,
+                    revertRow.width - revertRow.contentPadding)
             revertRow.activateReset()
             compare(resetState.count, 1)
             revertRow.currentValue = 5

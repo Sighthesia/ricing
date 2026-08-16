@@ -27,6 +27,9 @@ Item {
     readonly property bool hovered: hoverHandler.hovered
     readonly property real normalizedFraction: Logic.sliderFraction(from, to, displayValue)
     readonly property real targetFraction: Logic.sliderFraction(from, to, displayValue)
+    readonly property real defaultFraction: defaultValue === undefined
+                                           ? 0 : Logic.sliderFraction(from, to, defaultValue)
+    readonly property bool defaultMarkerVisible: defaultValue !== undefined && displayValue !== normalized(defaultValue)
     signal valueModified(real value)
 
     implicitWidth: 220
@@ -176,6 +179,21 @@ Item {
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
+    // Mark the configured default without competing with the active thumb.
+    Rectangle {
+        id: defaultMarker
+        x: Math.max(0, Math.min(trackHost.width - width,
+                                 root.defaultFraction * trackHost.width - width / 2))
+        anchors.verticalCenter: trackHost.verticalCenter
+        width: 3
+        height: 6
+        radius: 1.5
+        color: "#D5CCFF"
+        opacity: root.defaultMarkerVisible ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+        Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+    }
+
     // Animate the nub toward its value unless the user is actively dragging.
     property real displayFraction: 0
     Binding {
@@ -191,19 +209,29 @@ Item {
         NumberAnimation { duration: MotionTokens.sliderNubMove; easing.type: Easing.OutQuint }
     }
 
-    // Embed a narrow vertical thumb inside the trough.
+    // Embed a bright full-height thumb with a shorter inner light bar.
     Rectangle {
         id: thumb
-        x: root.displayFraction * Math.max(0, trackHost.width - width)
+        x: Math.max(0, Math.min(trackHost.width - width,
+                                 root.displayFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
         width: 6
-        height: 20
+        height: trackHost.height
         radius: 3
         color: LazerTheme.settingsSliderThumb
         scale: root.dragging ? MotionTokens.pressScale : (root.hovered ? 1.06 : 1)
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+
+        Rectangle {
+            id: thumbLight
+            anchors.centerIn: parent
+            width: 4
+            height: 20
+            radius: 2
+            color: "#EBE5FF"
+        }
     }
 
     HoverHandler {
@@ -259,6 +287,8 @@ Item {
 
     readonly property Item trackItem: trackRect
     readonly property Item trackFillItem: fillRect
+    readonly property Item defaultMarkerItem: defaultMarker
+    readonly property Item thumbLightItem: thumbLight
     readonly property bool trackTapEnabled: trackTapHandler.enabled
     readonly property bool trackFillBehaviorEnabled: fractionBehavior.enabled
     readonly property Item nubItem: thumb

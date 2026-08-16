@@ -543,7 +543,13 @@ width: root.inlinePresentation
 - Card content keeps approximately `12px` horizontal padding; Toggle remains
   an inline `44x20` control and is not wrapped in a second card.
 - Slider is a `26px` high, radius-4 trough using `#2E2A3A`, an accent
-  `#765BFF` fill, and a `6x20` radius-3 embedded thumb using `#EBE5FF`.
+  `#765BFF` fill. Its active outer thumb fills the trough height, while its
+  inner light bar is `4x20`, radius-2, and `#EBE5FF`.
+- When a Slider has a non-default value, its default marker uses the existing
+  normalized fraction, is `3x6`, radius-1.5, and `#D5CCFF`; it fades out at
+  the default value.
+- A modified setting exposes a right-side restore button in the Row's fixed
+  reset slot; the slot remains reserved even when the button is hidden.
 - Split Slider controls remain wide enough for the fixed settings content when
   possible, but never exceed `240px`.
 - Track taps, continuous horizontal drags, step snapping, keyboard input,
@@ -556,7 +562,9 @@ width: root.inlinePresentation
 - Slider width below `200px` when the available content can provide it ->
   reject; use the 55% split budget and 240px cap.
 - Slider thumb is hollow, outside the trough, or uses the old Nub geometry ->
-  reject; use the embedded 6x20 thumb.
+  reject; use the full-height outer thumb and embedded light bar.
+- Reset control is placed on the left or changes the setting content width when
+  it appears -> reject; use the fixed right-side slot.
 - Toggle receives a second visual card -> reject; Row owns the card and the
   Toggle owns only its capsule.
 
@@ -577,6 +585,8 @@ width: root.inlinePresentation
   normalization, keyboard behavior, default reset, and tooltip anchoring.
 - Existing Toggle tests assert `44x20`, checked/off colors, accessibility, and
   keyboard/focus behavior.
+- Default marker tests assert normalized placement, `3x6` geometry, hidden
+  default state, and right-side reset visibility/activation.
 
 ### 7. Wrong vs Correct
 

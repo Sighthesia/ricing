@@ -69,7 +69,11 @@ Item {
         anchors.fill: parent
         radius: 6
         color: rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+        border.width: rowHover.hovered ? 1.5 : 0
+        border.color: rowHover.hovered ? LazerTheme.settingsAccent : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on border.width { NumberAnimation { duration: 100 } }
+        Behavior on border.color { ColorAnimation { duration: 100 } }
     }
 
     // Propagate availability to the single injected control.
@@ -122,10 +126,10 @@ Item {
             SettingsOverlayBridge.hideTooltip(root)
     }
 
-    // Show the osu revert-to-default affordance in the left 20px zone.
+    // Show the restore-default affordance in the fixed right-side slot.
     Item {
         id: revertButton
-        x: 0
+        x: Math.max(0, root.width - width - contentPadding)
         width: 20
         height: 20
         anchors.verticalCenter: parent.verticalCenter
@@ -135,6 +139,7 @@ Item {
         activeFocusOnTab: root.canReset
         Accessible.role: Accessible.Button
         Accessible.name: "恢复默认"
+        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
 
         Rectangle {
             anchors.fill: parent
@@ -180,9 +185,10 @@ Item {
         id: contentHost
         x: contentPadding
         y: root.inlinePresentation || root.choicePresentation ? 0 : 10
-        width: Math.max(0, root.width - 2 * contentPadding)
-        height: root.inlinePresentation || root.choicePresentation
-                ? controlHost.height : labelItem.implicitHeight + labelControlGap + controlHost.height
+        width: Math.max(0, root.width - 2 * contentPadding - revertZoneWidth)
+        height: root.inlinePresentation ? root.implicitHeight
+                : (root.choicePresentation ? controlHost.height
+                   : labelItem.implicitHeight + labelControlGap + controlHost.height)
 
         Text {
             id: labelItem

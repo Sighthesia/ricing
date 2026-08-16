@@ -39,7 +39,7 @@ QtObject {
     readonly property color settingsRow: "transparent"
     readonly property color settingsRowHover: "#FF363842"
     readonly property color settingsCard: "#221F2B"
-    readonly property color settingsCardHover: "#2A2636"
+    readonly property color settingsCardHover: "#272332"
     readonly property color settingsSelected: "#40765BFF"
     readonly property real settingsScrimOpacity: 0.6
     readonly property int settingsRadius: 16
