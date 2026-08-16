@@ -58,7 +58,6 @@ Item {
     property alias appearanceNav: sidebarLayer.appearanceNav
     property alias barNav: sidebarLayer.barNav
     property alias notificationNav: sidebarLayer.notificationNav
-    property alias closeButton: contentLayer.closeButton
     property alias searchField: contentLayer.searchEditor
     property alias sidebar: sidebarLayer
     property alias content: contentLayer
@@ -260,8 +259,6 @@ Item {
         currentPage: root.currentPage
         opacity: root.layerOpacity
         onSearchQueryEdited: query => root.searchQuery = query
-        onExpandToggleRequested: root.toggleExpanded()
-        onCloseRequested: root.requestClose()
 
         // Persist the appearance page so its scroll position survives navigation.
         // Positioned with explicit width/height (not anchors) so the transition owns x.

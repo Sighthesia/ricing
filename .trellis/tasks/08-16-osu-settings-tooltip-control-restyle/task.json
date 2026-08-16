@@ -3,7 +3,7 @@
   "name": "osu-settings-tooltip-control-restyle",
   "title": "Stabilize osu settings tooltips and restyle controls",
   "description": "Stabilize tooltip ownership between settings controls and refactor the osu settings palette, toggle, slider, sidebar, and search chrome to the requested visual contract.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

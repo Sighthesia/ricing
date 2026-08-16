@@ -36,7 +36,6 @@ Item {
             verify(panel.appearanceNav)
             verify(panel.barNav)
             verify(panel.notificationNav)
-            verify(panel.closeButton)
             verify(panel.searchField)
         }
         function test_geometry() {

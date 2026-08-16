@@ -25,13 +25,17 @@ QtObject {
     readonly property color musicGold: "#FFD000"
     readonly property color musicMuted: "#A0A0A0"
 
-    // Settings surfaces use the fixed flat shades from osu's side-panel hierarchy.
-    readonly property color settingsPanel: "#EE24252D"
+    // Settings surfaces use a dedicated violet hierarchy without changing the
+    // global osu pink used by the rest of the shell.
+    readonly property color settingsAccent: "#765BFF"
+    readonly property color settingsControlSurface: "#25222E"
+    readonly property color settingsPanel: "#18161D"
     readonly property color settingsPanelBorder: "transparent"
-    readonly property color settingsRail: "#FF1B1C22"
-    readonly property color settingsRow: "#FF292A33"
+    readonly property color settingsRail: "#131217"
+    readonly property color settingsNavInactive: "#8A8795"
+    readonly property color settingsRow: "transparent"
     readonly property color settingsRowHover: "#FF363842"
-    readonly property color settingsSelected: "#40EB1C60"
+    readonly property color settingsSelected: "#40765BFF"
     readonly property real settingsScrimOpacity: 0.6
     readonly property int settingsRadius: 16
     readonly property int settingsSidebarContractedWidth: 70
@@ -54,8 +58,8 @@ QtObject {
     readonly property int settingsControlRadius: 5
     readonly property int settingsControlHeight: 40
     readonly property int settingsControlPadding: 10
-    readonly property int settingsRangePadding: 25
-    readonly property color settingsTrack: "#3A3B45"
+    readonly property int settingsRangePadding: 0
+    readonly property color settingsTrack: settingsControlSurface
     readonly property color settingsTrackFocus: "#4A4C59"
     readonly property color settingsMenuBackground: "#F51D1C22"
     readonly property color settingsMenuBorder: "#28FFFFFF"

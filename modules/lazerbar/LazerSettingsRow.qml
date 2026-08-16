@@ -31,6 +31,10 @@ Item {
     readonly property bool controlSupportsAvailableWidth: controlItem !== null && controlItem.availableWidth !== undefined
     readonly property bool controlSupportsRequestedWidth: controlItem !== null && controlItem.requestedWidth !== undefined
     readonly property bool controlSupportsFillWidth: controlItem !== null && controlItem.fillWidth !== undefined
+    readonly property string rowPresentation: controlItem && controlItem.rowPresentation !== undefined
+                                           ? String(controlItem.rowPresentation) : "standard"
+    readonly property bool inlinePresentation: rowPresentation === "inline"
+    readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool compactLayout: width < 480
     readonly property real safeRequestedWidth: controlSupportsRequestedWidth
                                           && isFinite(Number(controlItem.requestedWidth))
@@ -50,7 +54,7 @@ Item {
     implicitWidth: 640
     readonly property real textRegionWidth: contentHost.width
     readonly property real controlRegionLeft: contentHost.x
-    implicitHeight: 10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10
+    implicitHeight: inlinePresentation ? 44 : (10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10)
     height: matchesSearch ? implicitHeight : 0
     visible: matchesSearch
     opacity: root.enabled ? 1 : LazerTheme.settingsDisabledAlpha
@@ -67,7 +71,8 @@ Item {
     Binding {
         target: root.controlItem
         property: "availableWidth"
-        value: contentHost.width
+        value: root.inlinePresentation ? root.safeRequestedWidth
+             : (root.splitPresentation ? Math.max(0, contentHost.width * 0.5) : contentHost.width)
         when: root.controlSupportsAvailableWidth
     }
 
@@ -132,7 +137,7 @@ Item {
             source: revertIcon
             visible: revertIcon.visible
             colorization: 1
-            colorizationColor: revertHover.hovered || revertButton.activeFocus ? LazerTheme.osuPink : LazerTheme.textMuted
+                colorizationColor: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsAccent : LazerTheme.textMuted
             Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
 
@@ -149,28 +154,47 @@ Item {
         }
     }
 
-    // Reserve the full-width vertical flow: label above the injected control.
+    // Arrange the injected control according to its small presentation contract.
     Item {
         id: contentHost
         x: contentPadding
-        y: 10
+        y: root.inlinePresentation ? 0 : 10
         width: Math.max(0, root.width - 2 * contentPadding)
-        height: labelItem.implicitHeight + labelControlGap + controlHost.height
+        height: root.inlinePresentation ? 44 : labelItem.implicitHeight + labelControlGap + controlHost.height
 
         Text {
             id: labelItem
-            width: parent.width
+            width: root.inlinePresentation ? Math.max(0, parent.width - controlHost.width - 12) : parent.width
+            anchors.verticalCenter: root.inlinePresentation ? parent.verticalCenter : undefined
             text: root.labelText
             color: LazerTheme.textPrimary
             font.pixelSize: 14
             elide: Text.ElideRight
         }
 
+        Text {
+            id: valueItem
+            visible: root.splitPresentation
+            anchors.left: labelItem.left
+            anchors.top: labelItem.bottom
+            text: root.splitPresentation && root.controlItem && root.controlItem.displayText !== undefined
+                  ? String(root.controlItem.displayText) : ""
+            color: LazerTheme.textMuted
+            font.pixelSize: 12
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+
         Item {
             id: controlHost
-            y: labelItem.implicitHeight + root.labelControlGap
-            width: parent.width
+            x: root.inlinePresentation ? Math.max(0, parent.width - width) : (root.splitPresentation ? parent.width * 0.5 : 0)
+            y: root.inlinePresentation || root.splitPresentation
+               ? (parent.height - height) / 2
+               : labelItem.implicitHeight + root.labelControlGap
+            width: root.inlinePresentation ? root.safeRequestedWidth
+                 : (root.splitPresentation ? Math.max(0, parent.width * 0.5) : parent.width)
             height: root.safeControlHeight
+            Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+            Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         }
     }
 

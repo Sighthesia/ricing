@@ -310,12 +310,15 @@ Item {
         }
 
         function test_themeTokens() {
-            compare(Lazer.LazerTheme.settingsPanel, "#ee24252d")
+            compare(Lazer.LazerTheme.settingsAccent, "#765bff")
+            compare(Lazer.LazerTheme.settingsControlSurface, "#25222e")
+            compare(Lazer.LazerTheme.settingsPanel, "#18161d")
             compare(Lazer.LazerTheme.settingsPanelBorder, "#00000000")
-            compare(Lazer.LazerTheme.settingsRail, "#1b1c22")
-            compare(Lazer.LazerTheme.settingsRow, "#292a33")
+            compare(Lazer.LazerTheme.settingsRail, "#131217")
+            compare(Lazer.LazerTheme.settingsNavInactive, "#8a8795")
+            compare(Lazer.LazerTheme.settingsRow, "#00000000")
             compare(Lazer.LazerTheme.settingsRowHover, "#363842")
-            compare(Lazer.LazerTheme.settingsSelected, "#40eb1c60")
+            compare(Lazer.LazerTheme.settingsSelected, "#40765bff")
             compare(Lazer.LazerTheme.settingsScrimOpacity, 0.6)
             compare(Lazer.LazerTheme.settingsRadius, 16)
         }

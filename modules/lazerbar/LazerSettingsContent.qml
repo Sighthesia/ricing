@@ -31,9 +31,6 @@ Item {
     property var _tooltipBoundsRect: ({ x: 0, y: 0, width: 0, height: 0 })
 
     signal searchQueryEdited(string query)
-    signal expandToggleRequested()
-    signal closeRequested()
-    property alias closeButton: closeButton
     property alias searchEditor: searchEditor
     property alias tooltipItem: tooltip
     property alias tooltipTextItem: tooltipText
@@ -87,7 +84,7 @@ Item {
         Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
     }
 
-    // Present the expandable header with title, collapse chevron, and close.
+    // Present the compact title header without competing close or collapse owners.
     Item {
         id: header
         x: 0
@@ -105,113 +102,6 @@ Item {
             font.weight: Font.DemiBold
         }
 
-        // Keep the close affordance fixed-size and independent of page layout.
-        Item {
-            id: closeButton
-            anchors.right: parent.right
-            anchors.rightMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
-            width: 32
-            height: 32
-            enabled: root.interactive
-            activeFocusOnTab: root.interactive
-            Accessible.role: Accessible.Button
-            Accessible.name: "关闭"
-
-            scale: closePress.pressed ? MotionTokens.pressScale : 1
-            Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 16
-                color: closeHover.hovered || closeButton.activeFocus ? LazerTheme.settingsRowHover : "transparent"
-                border.width: closeButton.activeFocus ? 1 : 0
-                border.color: LazerTheme.focusRing
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            }
-            Image {
-                id: closeIcon
-                anchors.centerIn: parent
-                width: 16
-                height: 16
-                source: "icons/close.svg"
-                fillMode: Image.PreserveAspectFit
-            }
-            MultiEffect {
-                anchors.fill: closeIcon
-                source: closeIcon
-                visible: closeIcon.visible
-                colorization: 1
-                colorizationColor: closeHover.hovered || closeButton.activeFocus ? LazerTheme.textPrimary : LazerTheme.textMuted
-                Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
-            }
-            HoverHandler { id: closeHover; enabled: closeButton.enabled }
-            TapHandler {
-                id: closePress
-                enabled: closeButton.enabled
-                onTapped: { closeButton.forceActiveFocus(); root.closeRequested() }
-            }
-            Keys.onPressed: event => {
-                if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) && closeButton.enabled) {
-                    root.closeRequested()
-                    event.accepted = true
-                }
-            }
-        }
-
-        // Let the header chevron toggle the same 70/170px sidebar expansion.
-        Item {
-            id: expandToggle
-            anchors.right: closeButton.left
-            anchors.rightMargin: 4
-            anchors.verticalCenter: parent.verticalCenter
-            width: 32
-            height: 32
-            enabled: root.interactive
-            activeFocusOnTab: root.interactive
-            Accessible.role: Accessible.Button
-            Accessible.name: root.expanded ? "收起设置面板" : "展开设置面板"
-
-            scale: expandPress.pressed ? MotionTokens.pressScale : 1
-            Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 16
-                color: expandHover.hovered || expandToggle.activeFocus ? LazerTheme.settingsRowHover : "transparent"
-                border.width: expandToggle.activeFocus ? 1 : 0
-                border.color: LazerTheme.focusRing
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            }
-            Image {
-                id: expandIcon
-                anchors.centerIn: parent
-                width: 16
-                height: 16
-                source: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
-                fillMode: Image.PreserveAspectFit
-            }
-            MultiEffect {
-                anchors.fill: expandIcon
-                source: expandIcon
-                visible: expandIcon.visible
-                colorization: 1
-                colorizationColor: expandHover.hovered || expandToggle.activeFocus ? LazerTheme.textPrimary : LazerTheme.textMuted
-                Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
-            }
-            HoverHandler { id: expandHover; enabled: expandToggle.enabled }
-            TapHandler {
-                id: expandPress
-                enabled: expandToggle.enabled
-                onTapped: { expandToggle.forceActiveFocus(); root.expandToggleRequested() }
-            }
-            Keys.onPressed: event => {
-                if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) && expandToggle.enabled) {
-                    root.expandToggleRequested()
-                    event.accepted = true
-                }
-            }
-        }
     }
 
     // Keep the outlined search field fixed between the header and the pages.
@@ -239,13 +129,15 @@ Item {
 
         Image {
             id: searchIcon
-            anchors.left: searchSurface.left
-            anchors.leftMargin: 14
+            anchors.right: searchSurface.right
+            anchors.rightMargin: 14
             anchors.verticalCenter: searchSurface.verticalCenter
             width: 15
             height: 15
             source: "icons/search.svg"
             fillMode: Image.PreserveAspectFit
+            visible: searchEditor.text.length === 0
+            Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
         }
         MultiEffect {
             anchors.fill: searchIcon
@@ -259,13 +151,13 @@ Item {
             id: searchEditor
             anchors.left: searchSurface.left
             anchors.leftMargin: 34
-            anchors.right: searchClearButton.left
-            anchors.rightMargin: 6
+            anchors.right: searchSurface.right
+            anchors.rightMargin: 34
             anchors.verticalCenter: searchSurface.verticalCenter
             clip: true
             enabled: root.interactive && root.contentReady
             color: LazerTheme.textPrimary
-            selectionColor: LazerTheme.osuPink
+            selectionColor: LazerTheme.settingsAccent
             font.pixelSize: 13
             activeFocusOnTab: root.interactive && root.contentReady
             onTextEdited: root.searchQueryEdited(searchEditor.text)
@@ -275,7 +167,7 @@ Item {
             anchors.left: searchEditor.left
             anchors.verticalCenter: searchEditor.verticalCenter
             visible: !searchEditor.text && !searchEditor.activeFocus
-            text: "搜索设置…"
+            text: "输入以搜索"
             color: LazerTheme.textMuted
             font.pixelSize: 13
         }
@@ -561,12 +453,13 @@ Item {
     }
 
     function setActiveTooltip(text, source, priority) {
+        var sameSource = root.tooltipVisible && root.activeTooltipSource === source
         root.activeTooltipSource = source
         root.activeTooltipText = text
         root.activeTooltipPriority = priority
         root.tooltipVisible = true
         root.repositionTooltip()
-        if (root.tooltipVisible)
+        if (root.tooltipVisible && !sameSource)
             root.showTooltipSurface()
     }
 
@@ -616,8 +509,10 @@ Item {
         var p = priority === undefined ? 1 : Number(priority)
         if (!isFinite(p) || p < 1)
             p = 1
-        if (root.activeTooltipSource && root.activeTooltipSource !== source && p < root.activeTooltipPriority) {
-            root.applyBridgeFallback()
+        // Keep the current owner stable. Equal-priority hover/focus requests
+        // remain registered for deterministic fallback instead of stealing it.
+        if (root.activeTooltipSource && root.activeTooltipSource !== source
+                && p <= root.activeTooltipPriority) {
             return
         }
         root.setActiveTooltip(text, source, p)
@@ -651,7 +546,7 @@ Item {
             var req = requests[i]
             if (!req.text || !req.source || !root.ownsOverlaySource(req.source))
                 continue
-            if (!best || req.priority >= best.priority)
+            if (!best || req.priority > best.priority)
                 best = req
         }
         return best

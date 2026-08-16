@@ -61,6 +61,7 @@ readonly property color panel: SettingsService.appearance.colorScheme === "light
         ? "white" : "black"
 ```
 
+
 ```qml
 PanelWindow {
     implicitWidth: screen.width
@@ -339,4 +340,66 @@ Rectangle {
     width: label.width + horizontalPadding
     height: label.implicitHeight + verticalPadding
 }
+```
+
+## Scenario: Stable Settings Tooltip Ownership And Control Tokens
+
+### 1. Scope / Trigger
+
+- Apply when multiple row or control hover/focus sources can request a tooltip during the same frame or while the previous source is still visible.
+- Apply when restyling settings controls without changing the shell-wide theme.
+
+### 2. Signatures
+
+- Tooltip arbitration keeps one request entry per source and preserves first-registration order.
+- Settings-only tokens: `settingsAccent`, `settingsControlSurface`, `settingsPanel`, `settingsRail`, and `settingsNavInactive`.
+- Control presentation contract: `standard | inline | split` via `rowPresentation`.
+
+### 3. Contracts
+
+- An active tooltip owner is not replaced by an equal-priority source; a strictly higher-priority request may replace it immediately.
+- Repeated requests from the active source update text and priority in place without restarting the fade or moving the source.
+- Fallback selects the highest valid priority using original registration order for ties.
+- Toggle exposes `inline` and renders a `44x20` capsule without a moving or hollow Nub.
+- Slider exposes `split`, renders a `24px` trough with `4x20` embedded thumb, and exposes that thumb as `nubItem`.
+- Settings tokens are exact: `#765BFF`, `#25222E`, `#18161D`, `#131217`, and `#8A8795`; `settingsRow` is transparent and global `osuPink` is unchanged.
+- Search places the icon on the right and uses the exact placeholder `输入以搜索`; a visible clear action replaces the icon while a query is present.
+
+### 4. Validation & Error Matrix
+
+- Equal-priority competing source while active owner is valid -> retain active owner.
+- Higher-priority source -> replace active owner and reposition immediately.
+- Active source hidden, destroyed, or fully offscreen -> dismiss and choose deterministic fallback.
+- Toggle or Slider imports shared Nub visuals -> reject; controls render their specified capsule or embedded thumb directly.
+- Inactive navigation item -> no selection indicator and use `#8A8795`.
+- Content header close/collapse controls -> reject; close remains on Escape or Sidebar Back.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a row description remains visible while an adjacent equal-priority row briefly becomes hovered, then becomes deterministic fallback after dismiss.
+- Base: a Slider value tooltip follows the embedded thumb while its row owns the split layout.
+- Bad: every equal-priority hover request immediately replaces the current owner.
+- Bad: a visual token change modifies global `osuPink` or recreates a row card.
+
+### 6. Tests Required
+
+- Bridge/Content tests assert equal-priority stability, higher-priority takeover, in-place text updates, and registration-order fallback.
+- Control tests assert Toggle `44x20`, Slider `24px` trough, `4x20` thumb, `rowPresentation`, and `nubItem` identity.
+- Theme tests assert settings-only tokens and transparent row surface.
+- Panel tests assert right-side search icon, exact placeholder, removed header actions, inactive navigation indicator absence, and preserved Escape/Back close.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+if (request.priority >= activePriority)
+    setActiveTooltip(request)
+```
+
+#### Correct
+
+```qml
+if (!activeSource || request.priority > activePriority)
+    setActiveTooltip(request)
 ```

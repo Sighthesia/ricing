@@ -1,7 +1,6 @@
 import QtQuick
 
-// Expose a service-independent, keyboard and pointer friendly boolean control
-// rendered as osu's fixed 50x15 Nub with fill/border morph, not a moving thumb.
+// Expose a keyboard and pointer friendly 44x20 settings capsule.
 Item {
     id: root
 
@@ -12,6 +11,7 @@ Item {
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
     property bool fillWidth: false
+    readonly property string rowPresentation: "inline"
     signal toggled(bool checked)
 
     readonly property bool hovered: hoverHandler.hovered
@@ -20,11 +20,11 @@ Item {
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property bool hoverHandlerEnabled: hoverHandler.enabled
-    readonly property Item nubItem: nub
-    readonly property bool nubMorphEnabled: nub.morphBehaviorEnabled
+    readonly property Item nubItem: capsule
+    readonly property bool nubMorphEnabled: false
 
-    implicitWidth: 50
-    implicitHeight: 15
+    implicitWidth: 44
+    implicitHeight: 20
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
@@ -46,15 +46,19 @@ Item {
     Keys.onSpacePressed: event => { activate(); event.accepted = true }
     Keys.onReturnPressed: event => { activate(); event.accepted = true }
 
-    // Delegate all checked/hover/focus/disabled visuals to the shared nub.
-    LazerSettingsNub {
-        id: nub
-        anchors.centerIn: parent
-        checked: root.checked
-        hovered: root.hovered
-        pressed: root.pressed
-        focused: root.focusVisible
-        enabled: root.effectiveEnabled
+    // Paint the full capsule as the state indicator without a moving thumb.
+    Rectangle {
+        id: capsule
+        anchors.fill: parent
+        radius: 10
+        color: root.checked ? LazerTheme.settingsAccent : LazerTheme.settingsControlSurface
+        border.width: root.focusVisible ? 2 : 0
+        border.color: LazerTheme.focusRing
+        scale: root.pressed ? MotionTokens.pressScale : (root.hovered ? 1.03 : 1)
+
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
+        Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
     }
 
     HoverHandler { id: hoverHandler; enabled: root.effectiveEnabled }

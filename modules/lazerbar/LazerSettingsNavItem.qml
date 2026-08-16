@@ -53,7 +53,7 @@ Item {
         source: iconImage
         visible: iconImage.visible
         colorization: 1
-        colorizationColor: root.selected ? LazerTheme.textPrimary : (hoverHandler.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted)
+        colorizationColor: root.selected ? LazerTheme.settingsAccent : (hoverHandler.hovered ? LazerTheme.textPrimary : LazerTheme.settingsNavInactive)
 
         Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
     }
@@ -70,21 +70,21 @@ Item {
         x: 60
         anchors.verticalCenter: parent.verticalCenter
         text: root.label
-        color: root.selected ? LazerTheme.textPrimary : LazerTheme.textMuted
+        color: root.selected ? LazerTheme.settingsAccent : (hoverHandler.hovered ? LazerTheme.textPrimary : LazerTheme.settingsNavInactive)
         font.pixelSize: 14
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
-    // Show the osu-style pink pill that grows when this category is active.
+    // Show an accent pill only for the selected category.
     Rectangle {
         id: selectionIndicator
         x: 9
         anchors.verticalCenter: parent.verticalCenter
         width: 4
-        height: root.selected ? 18 : 4
+        height: root.selected ? 18 : 0
         radius: 2
-        color: LazerTheme.osuPink
-        opacity: root.selected ? 1 : 0.3
+        color: LazerTheme.settingsAccent
+        opacity: root.selected ? 1 : 0
 
         Behavior on height {
             enabled: !MotionTokens.reducedMotion

@@ -226,15 +226,10 @@ Item {
             verify(panel.barNav.activeFocus)
             panel.focusFirstControl()
             verify(panel.activeFocus || panel.currentNav.activeFocus)
-            panel.closeButton.forceActiveFocus()
-            closeSpy.clear()
-            keyPress(Qt.Key_Space)
-            compare(closeSpy.count, 1)
-            panel.closeButton.forceActiveFocus()
-            keyPress(Qt.Key_Return)
-            compare(closeSpy.count, 2)
             panel.focusNavigation()
             verify(panel.currentNav.activeFocus)
+            panel.requestClose()
+            compare(closeSpy.count, 1)
         }
 
         function test_fastRetargetEndsAtLatestCategoryAndHiddenPagesAreInactive() {
@@ -311,16 +306,6 @@ Item {
             verify(!panel.content.dropdownVisible)
             panel.searchQuery = ""
             panel.contentReady = false
-        }
-
-        function test_closeButtonOwnsPanelCloseContract() {
-            panel.focusNavigation()
-            closeSpy.clear()
-            panel.closeButton.forceActiveFocus()
-            keyPress(Qt.Key_Space)
-            compare(closeSpy.count, 1)
-            panel.requestClose()
-            compare(closeSpy.count, 2)
         }
 
         function test_navSelectionFollowsCategoryWhenReducedMotionChanges() {
@@ -468,6 +453,32 @@ Item {
             compare(panel.content.activeTooltipText, row.descriptionText)
             Lazer.SettingsOverlayBridge.hideTooltip(row)
             tryVerify(function() { return !panel.content.tooltipVisible }, 300)
+            panel.contentReady = false
+        }
+
+        function test_equalPriorityTooltipKeepsActiveOwnerAndFallsBackInOrder() {
+            panel.contentReady = true
+            var first = panel.appearancePage.colorSchemeRow
+            var second = panel.appearancePage.wallpaperRow
+            Lazer.SettingsOverlayBridge.showTooltip(first.descriptionText, first, 1)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, first)
+
+            // A neighbouring row may become hovered before the first hover
+            // fully clears; equal priority must not make the surface jump.
+            Lazer.SettingsOverlayBridge.showTooltip(second.descriptionText, second, 1)
+            compare(panel.content.activeTooltipSource, first)
+            compare(panel.content.activeTooltipText, first.descriptionText)
+
+            // Updating the active request changes its text without ownership churn.
+            Lazer.SettingsOverlayBridge.showTooltip("更新后的说明", first, 1)
+            compare(panel.content.activeTooltipSource, first)
+            compare(panel.content.activeTooltipText, "更新后的说明")
+
+            Lazer.SettingsOverlayBridge.hideTooltip(first)
+            tryVerify(function() { return panel.content.activeTooltipSource === second }, 200)
+            compare(panel.content.activeTooltipText, second.descriptionText)
+            Lazer.SettingsOverlayBridge.hideTooltip(second)
             panel.contentReady = false
         }
 

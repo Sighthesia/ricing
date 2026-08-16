@@ -17,8 +17,13 @@ QtObject {
         var p = priority === undefined ? 1 : Number(priority)
         if (!isFinite(p) || p < 1)
             p = 1
-        removeTooltipSource(sourceItem)
-        _tooltipRequests.push({ text: text, source: sourceItem, priority: p })
+        var existing = tooltipRequestIndex(sourceItem)
+        if (existing >= 0) {
+            _tooltipRequests[existing].text = text
+            _tooltipRequests[existing].priority = p
+        } else {
+            _tooltipRequests.push({ text: text, source: sourceItem, priority: p })
+        }
         tooltipRequested(text, sourceItem, p)
     }
 
@@ -34,12 +39,20 @@ QtObject {
         }
     }
 
+    function tooltipRequestIndex(sourceItem) {
+        for (var i = 0; i < _tooltipRequests.length; i++) {
+            if (_tooltipRequests[i].source === sourceItem)
+                return i
+        }
+        return -1
+    }
+
     function currentTooltip() {
         if (_tooltipRequests.length === 0)
             return null
         var best = _tooltipRequests[0]
         for (var i = 1; i < _tooltipRequests.length; i++) {
-            if (_tooltipRequests[i].priority >= best.priority)
+            if (_tooltipRequests[i].priority > best.priority)
                 best = _tooltipRequests[i]
         }
         return best

@@ -1,8 +1,7 @@
 import QtQuick
 import "LazerSettingsLogic.js" as Logic
 
-// Provide a clamped numeric setting with osu's 5px track and draggable 50x15
-// Nub; value changes animate at 250ms OutQuint unless the user is dragging.
+// Provide a clamped numeric setting with a 24px trough and embedded thumb.
 Item {
     id: root
 
@@ -18,6 +17,7 @@ Item {
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
     property bool fillWidth: true
+    readonly property string rowPresentation: "split"
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property real displayValue: normalized(value)
@@ -30,7 +30,7 @@ Item {
     signal valueModified(real value)
 
     implicitWidth: 180
-    implicitHeight: 15
+    implicitHeight: 24
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     activeFocusOnTab: effectiveEnabled
@@ -134,48 +134,46 @@ Item {
             refreshTooltip()
     }
 
-    // Keep the 25px range padding on both sides of the interactive track area.
+    // Use the full right-hand row column as the interactive track area.
     Item {
         id: trackHost
-        x: LazerTheme.settingsRangePadding
+        x: 0
         y: 0
-        width: Math.max(0, root.width - 2 * LazerTheme.settingsRangePadding)
+        width: root.width
         height: root.height
     }
 
-    // Draw the hollow focus glow around the track while keyboard-focused.
+    // Draw a restrained focus outline around the trough.
     Rectangle {
         id: focusGlow
-        anchors.centerIn: trackHost
-        width: trackHost.width + 8
-        height: 19
-        radius: 9.5
+        anchors.fill: trackHost
+        radius: 4
         color: "transparent"
         border.width: 2
-        border.color: LazerTheme.osuPink
-        opacity: root.focusVisible && root.effectiveEnabled ? 0.55 : 0
+        border.color: LazerTheme.focusRing
+        opacity: root.focusVisible && root.effectiveEnabled ? 0.7 : 0
         Behavior on opacity { NumberAnimation { duration: MotionTokens.nubHover } }
     }
 
-    // Show the fixed 5px track surface beneath the moving nub.
+    // Show the fixed 24px control trough.
     Rectangle {
         id: trackRect
-        anchors.centerIn: trackHost
-        width: trackHost.width
-        height: 5
-        radius: 2.5
+        anchors.fill: trackHost
+        radius: 4
         color: LazerTheme.settingsTrack
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
-    // Fill the travelled portion of the track from the left edge to the nub.
+    // Fill the travelled portion of the trough.
     Rectangle {
         id: fillRect
-        anchors.verticalCenter: trackRect.verticalCenter
-        x: trackHost.x
+        anchors.left: trackRect.left
+        anchors.top: trackRect.top
+        anchors.bottom: trackRect.bottom
         width: root.displayFraction * trackHost.width
-        height: 5
-        radius: 2.5
-        color: LazerTheme.osuPink
+        radius: 4
+        color: LazerTheme.settingsAccent
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
     // Animate the nub toward its value unless the user is actively dragging.
@@ -193,16 +191,19 @@ Item {
         NumberAnimation { duration: MotionTokens.sliderNubMove; easing.type: Easing.OutQuint }
     }
 
-    // Place the shared nub on the travelled fraction of the usable track.
-    LazerSettingsNub {
-        id: nub
-        x: root.displayFraction * trackHost.width
-        y: 0
-        sliderMode: true
-        hovered: root.hovered || root.dragging
-        pressed: root.dragging
-        focused: root.focusVisible
-        enabled: root.effectiveEnabled
+    // Embed a narrow vertical thumb inside the trough.
+    Rectangle {
+        id: thumb
+        x: root.displayFraction * Math.max(0, trackHost.width - width)
+        anchors.verticalCenter: trackHost.verticalCenter
+        width: 4
+        height: 20
+        radius: 2
+        color: "#E9E5F2"
+        scale: root.dragging ? MotionTokens.pressScale : (root.hovered ? 1.06 : 1)
+
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
     }
 
     HoverHandler {
@@ -250,7 +251,7 @@ Item {
     // Double-click the nub to restore the explicitly provided default value.
     TapHandler {
         id: nubDoubleTapHandler
-        parent: nub
+        parent: thumb
         gesturePolicy: TapHandler.DoubleTap
         enabled: root.effectiveEnabled && root.defaultValue !== undefined
         onDoubleTapped: root.resetToDefault()
@@ -259,6 +260,6 @@ Item {
     readonly property Item trackItem: trackRect
     readonly property bool trackTapEnabled: trackTapHandler.enabled
     readonly property bool trackFillBehaviorEnabled: fractionBehavior.enabled
-    readonly property Item nubItem: nub
+    readonly property Item nubItem: thumb
     readonly property bool nubDoubleTapEnabled: nubDoubleTapHandler.enabled
 }

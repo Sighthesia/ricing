@@ -159,11 +159,11 @@ Item {
         }
 
         function test_toggleRendersFixedOsuNub() {
-            compare(toggle.nubItem.implicitWidth, 50)
-            compare(toggle.nubItem.implicitHeight, 15)
+            compare(toggle.implicitWidth, 44)
+            compare(toggle.implicitHeight, 20)
             verify(toggle.nubItem)
             toggle.checked = true
-            verify(toggle.nubItem.effectiveChecked)
+            compare(toggle.nubItem.color, Lazer.LazerTheme.settingsAccent)
             Lazer.MotionTokens.reducedMotionOverride = true
             compare(toggle.nubMorphEnabled, false)
             compare(toggle.fillWidth, false)
@@ -397,6 +397,15 @@ Item {
             choice.enabled = false
             compare(choice.activeFocusOnTab, false)
             compare(plainRow.controlSupportsRowEnabled, false)
+        }
+
+        function test_toggleAndSliderExposeRowPresentationContracts() {
+            compare(rowToggle.rowPresentation, "inline")
+            compare(slider.rowPresentation, "split")
+            compare(row.rowPresentation, "inline")
+            compare(revertRow.rowPresentation, "split")
+            verify(rowToggle.x >= row.width - rowToggle.width - 20)
+            verify(revertRowSlider.width <= revertRow.width * 0.6)
         }
 
         function test_rowSearchContractMatchesLabelOrDescription() {
