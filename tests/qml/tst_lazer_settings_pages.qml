@@ -327,7 +327,9 @@ Item {
             notificationsPage.timeoutRow.activateReset()
             compare(notificationSettings.timeout, 5000)
             compare(notificationsPage.timeoutSlider.displayValue, 5)
-            verify(!notificationsPage.timeoutSlider.defaultMarkerVisible)
+            verify(notificationsPage.timeoutSlider.defaultMarkerVisible)
+            compare(notificationsPage.timeoutSlider.defaultMarkerItem.height,
+                    notificationsPage.timeoutSlider.trackItem.height - 6)
         }
     }
 }

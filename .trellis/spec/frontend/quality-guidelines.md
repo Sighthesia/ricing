@@ -414,7 +414,7 @@ Rectangle {
 - The reset affordance is a sibling above the card/content layers, remains inside the row bounds, and reserves its width from the control budget.
 - Reset visibility is `hasDefault && !isDefault`; activation delegates to `resetCallback` and does not mutate settings directly.
 - Slider layer order is trough, fill, default marker, active thumb; the active thumb is exactly as tall as the trough and uses a brighter shade of the fill color.
-- The default marker is non-interactive, uses the normalized `sliderFraction`, and is hidden when current and default values are equal.
+- The default marker is non-interactive, uses the normalized `sliderFraction`, and stays visible above the active thumb. It is compact when modified and becomes a shorter-than-thumb vertical line when current and default values are equal.
 
 ### 4. Validation & Error Matrix
 
@@ -426,7 +426,7 @@ Rectangle {
 ### 5. Good/Base/Bad Cases
 
 - Good: a modified page Slider shows the right reset icon, brighter full-height thumb, and default marker simultaneously.
-- Base: current value equals default, so the reset icon and marker are hidden while the thumb remains visible.
+- Base: current value equals default, so the reset icon is hidden while the marker remains visible as a shorter vertical line above the thumb.
 - Bad: properties and colors are correct in a component test, but sibling stacking covers the reset button or marker in the panel.
 
 ### 6. Tests Required
@@ -600,11 +600,14 @@ width: root.inlinePresentation
 - Slider is a `26px` high, radius-4 trough using `#2E2A3A`, an accent
   `#765BFF` fill. Its active thumb is exactly as tall as the trough and uses a
   brighter shade of the fill (`#9A86FF`); there is no separate inner light bar.
-- When a Slider has a non-default value, its default marker uses the existing
-  normalized fraction, is `3x6`, radius-1.5, and `#D5CCFF`; it fades out at
-  the default value.
-- A modified setting exposes a right-side restore button in the Row's fixed
-  reset slot; the slot remains reserved even when the button is hidden.
+- The default marker always uses the normalized fraction, `3px` width, and
+  `#D5CCFF`, and renders above the active thumb. Away from the default it is
+  `6px` high with a `3px` radius; at the default it becomes a taller but
+  still shorter-than-thumb vertical line (`trackHeight - 6`).
+- A modified setting exposes a right-side `28x28`, radius-6 restore button in
+  the Row's fixed reset slot; the slot remains reserved when hidden.
+- Split Slider rows use a card-height track and bottom-inset value text;
+  Choice controls begin at the same content edge as other full-width rows.
 - Split Slider controls remain wide enough for the fixed settings content when
   possible, but never exceed `240px`.
 - Track taps, continuous horizontal drags, step snapping, keyboard input,
@@ -618,8 +621,9 @@ width: root.inlinePresentation
   reject; use the 55% split budget and 240px cap.
 - Slider thumb is hollow, outside the trough, shorter than the trough, or uses
   the fill color unchanged -> reject; use the full-height brighter thumb.
-- Reset control is placed on the left or changes the setting content width when
-  it appears -> reject; use the fixed right-side slot.
+- Reset control is placed on the left, lacks a visible rounded surface, or
+  changes the setting content width when it appears -> reject; use the fixed
+  right-side slot.
 - Toggle receives a second visual card -> reject; Row owns the card and the
   Toggle owns only its capsule.
 
@@ -640,8 +644,8 @@ width: root.inlinePresentation
   normalization, keyboard behavior, default reset, and tooltip anchoring.
 - Existing Toggle tests assert `44x20`, checked/off colors, accessibility, and
   keyboard/focus behavior.
-- Default marker tests assert normalized placement, `3x6` geometry, hidden
-  default state, and right-side reset visibility/activation.
+- Default marker tests assert normalized placement, marker-above-thumb layer
+  order, both marker heights, and right-side reset visibility/activation.
 
 ### 7. Wrong vs Correct
 

@@ -278,11 +278,18 @@ Item {
             compare(slider.thumbColor, Lazer.LazerTheme.settingsSliderThumb)
             verify(slider.thumbColor !== Lazer.LazerTheme.settingsAccent)
             verify(slider.thumbLightItem === null)
-            verify(slider.defaultMarkerItem.z < slider.nubItem.z)
+            verify(slider.defaultMarkerItem.z > slider.nubItem.z)
             verify(slider.nubItem.z > slider.trackItem.z)
+            compare(slider.defaultMarkerItem.height, 6)
+            compare(slider.defaultMarkerItem.radius, 3)
             sliderHolder.value = 2
             wait(0)
-            verify(!slider.defaultMarkerVisible)
+            verify(slider.defaultMarkerVisible)
+            compare(slider.defaultMarkerItem.height, slider.trackItem.height - 6)
+            compare(slider.defaultMarkerItem.radius, slider.defaultMarkerItem.height / 2)
+            sliderHolder.value = 4
+            wait(0)
+            compare(slider.defaultMarkerItem.height, 6)
         }
 
         function test_sliderReverseTrackMapping() {
@@ -342,6 +349,8 @@ Item {
             compare(rowChoice.labelTextItem.visible, false)
             compare(rowChoice.controlItem.fieldLabel, "配色方案")
             compare(rowChoice.height, rowChoice.implicitHeight)
+            verify(Math.abs(rowChoice.controlItem.mapToItem(rowChoice, 0, 0).x - rowChoice.contentItem.x) < 0.1)
+            compare(rowChoice.controlItem.width, rowChoice.contentItem.width)
         }
 
         function test_choiceOpensRealDropdownInsteadOfCycling() {
@@ -469,7 +478,8 @@ Item {
             verify(rowToggle.x >= row.width - rowToggle.width - 20)
             verify(revertRowSlider.width >= 200)
             verify(revertRowSlider.width <= 240)
-            compare(revertRowSlider.trackItem.height, 26)
+            compare(revertRowSlider.trackItem.height, revertRow.height)
+            verify(revertRowSlider.trackItem.height > 26)
             compare(revertRowSlider.trackItem.radius, 4)
             compare(revertRowSlider.trackItem.color, Lazer.LazerTheme.settingsTrack)
             compare(revertRowSlider.trackFillItem.color, Lazer.LazerTheme.settingsAccent)
@@ -478,6 +488,9 @@ Item {
             compare(revertRowSlider.nubItem.radius, 3)
             compare(revertRowSlider.nubItem.color, Lazer.LazerTheme.settingsSliderThumb)
             verify(revertRowSlider.nubItem !== null)
+            compare(revertRowSlider.height, revertRow.height)
+            verify(revertRow.valueTextItem.visible)
+            compare(revertRow.contentItem.height - revertRow.valueTextItem.bottom, 10)
         }
 
         function test_rowSearchContractMatchesLabelOrDescription() {
@@ -535,6 +548,10 @@ Item {
             verify(revertRow.revertVisible)
             verify(revertRow.canReset)
             verify(revertRow.revertButtonItem.visible)
+            compare(revertRow.revertButtonItem.width, 28)
+            compare(revertRow.revertButtonItem.height, 28)
+            compare(revertRow.revertButtonItem.children[0].radius, 6)
+            compare(revertRow.revertButtonItem.children[0].color, Lazer.LazerTheme.settingsResetSurface)
             compare(revertRow.revertButtonItem.x + revertRow.revertButtonItem.width,
                     revertRow.width - revertRow.contentPadding)
             var sliderRight = revertRowSlider.mapToItem(revertRow, revertRowSlider.width, 0).x

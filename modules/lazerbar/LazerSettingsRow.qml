@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
-// Present one settings entry as osu's full-width card with a 20px revert zone,
+// Present one settings entry as osu's full-width card with a reserved reset zone,
 // then label above control with 5px spacing.
 // The description is delivered as a hover/focus tooltip but still searches.
 Item {
@@ -23,7 +23,7 @@ Item {
     readonly property bool revertVisible: hasDefault && !isDefault
     readonly property bool canReset: revertVisible && enabled
     readonly property real contentPadding: 12
-    readonly property real revertZoneWidth: 20
+    readonly property real revertZoneWidth: 36
     readonly property real labelControlGap: 5
     default property alias control: controlHost.children
     readonly property Item controlItem: controlHost.children.length > 0 ? controlHost.children[0] : null
@@ -58,7 +58,8 @@ Item {
     readonly property real controlRegionLeft: contentHost.x
     implicitHeight: inlinePresentation ? 44
                     : (choicePresentation ? safeControlHeight
-                       : (10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10))
+                       : (splitPresentation ? 52
+                          : (10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10)))
     height: matchesSearch ? implicitHeight : 0
     visible: matchesSearch
     opacity: root.enabled ? 1 : LazerTheme.settingsDisabledAlpha
@@ -131,8 +132,8 @@ Item {
         id: revertButton
         z: 3
         x: Math.max(0, root.width - width - contentPadding)
-        width: 20
-        height: 20
+        width: 28
+        height: 28
         anchors.verticalCenter: parent.verticalCenter
         visible: root.revertVisible
         opacity: root.revertVisible ? 1 : 0
@@ -144,8 +145,8 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            radius: 10
-            color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsRowHover : "transparent"
+            radius: 6
+            color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsRowHover : LazerTheme.settingsResetSurface
             border.width: revertButton.activeFocus ? 1 : 0
             border.color: LazerTheme.focusRing
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -186,17 +187,21 @@ Item {
         id: contentHost
         z: 1
         x: contentPadding
-        y: root.inlinePresentation || root.choicePresentation ? 0 : 10
+        y: root.inlinePresentation || root.choicePresentation || root.splitPresentation ? 0 : 10
         width: Math.max(0, root.width - 2 * contentPadding - revertZoneWidth)
         height: root.inlinePresentation ? root.implicitHeight
                 : (root.choicePresentation ? controlHost.height
-                   : labelItem.implicitHeight + labelControlGap + controlHost.height)
+                   : (root.splitPresentation ? root.implicitHeight
+                      : labelItem.implicitHeight + labelControlGap + controlHost.height))
 
         Text {
             id: labelItem
             width: root.inlinePresentation ? Math.max(0, parent.width - controlHost.width - 12) : parent.width
             visible: !root.controlOwnsLabel
             anchors.verticalCenter: root.inlinePresentation ? parent.verticalCenter : undefined
+            anchors.top: root.splitPresentation ? undefined : parent.top
+            anchors.bottom: root.splitPresentation ? valueItem.top : undefined
+            anchors.bottomMargin: root.splitPresentation ? 2 : 0
             text: root.labelText
             color: LazerTheme.textPrimary
             font.pixelSize: root.splitPresentation ? 13 : 14
@@ -207,7 +212,9 @@ Item {
             id: valueItem
             visible: root.splitPresentation
             anchors.left: labelItem.left
-            anchors.top: labelItem.bottom
+            anchors.top: root.splitPresentation ? undefined : labelItem.bottom
+            anchors.bottom: root.splitPresentation ? parent.bottom : undefined
+            anchors.bottomMargin: root.splitPresentation ? 10 : 0
             text: root.splitPresentation && root.controlItem && root.controlItem.displayText !== undefined
                   ? String(root.controlItem.displayText) : ""
             color: LazerTheme.textPrimary
@@ -219,16 +226,25 @@ Item {
         Item {
             id: controlHost
             x: root.inlinePresentation || root.splitPresentation ? Math.max(0, parent.width - width) : 0
-            y: root.inlinePresentation || root.splitPresentation || root.choicePresentation
+            y: root.inlinePresentation || root.choicePresentation
                ? (parent.height - height) / 2
+               : root.splitPresentation ? 0
                : labelItem.implicitHeight + root.labelControlGap
             width: root.inlinePresentation ? Math.min(parent.width, Math.max(0, root.safeRequestedWidth))
                  : (root.choicePresentation ? parent.width
                      : (root.splitPresentation ? Math.min(240, Math.max(0, parent.width * 0.55)) : parent.width))
-            height: root.safeControlHeight
+            height: root.splitPresentation ? parent.height : root.safeControlHeight
             Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
             Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         }
+    }
+
+    // Match split controls to the full card height without changing their width contract.
+    Binding {
+        target: root.controlItem
+        property: "height"
+        value: root.implicitHeight
+        when: root.splitPresentation
     }
 
     HoverHandler {
@@ -243,6 +259,7 @@ Item {
     }
 
     readonly property Item labelTextItem: labelItem
+    readonly property Item valueTextItem: valueItem
     readonly property Item contentItem: contentHost
     readonly property Item revertButtonItem: revertButton
     readonly property Item cardItem: cardSurface

@@ -29,7 +29,8 @@ Item {
     readonly property real targetFraction: Logic.sliderFraction(from, to, displayValue)
     readonly property real defaultFraction: defaultValue === undefined
                                            ? 0 : Logic.sliderFraction(from, to, defaultValue)
-    readonly property bool defaultMarkerVisible: defaultValue !== undefined && displayValue !== normalized(defaultValue)
+    readonly property bool defaultMarkerVisible: defaultValue !== undefined
+    readonly property bool defaultMarkerAtValue: defaultValue !== undefined && displayValue === normalized(defaultValue)
     signal valueModified(real value)
 
     implicitWidth: 220
@@ -181,19 +182,20 @@ Item {
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
-    // Mark the configured default without competing with the active thumb.
+    // Keep the default marker above the active thumb so the default remains legible.
     Rectangle {
         id: defaultMarker
-        z: 2
+        z: 4
         x: Math.max(0, Math.min(trackHost.width - width,
                                  root.defaultFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
         width: 3
-        height: 6
-        radius: 1.5
+        height: root.defaultMarkerAtValue ? Math.max(0, trackHost.height - 6) : 6
+        radius: height / 2
         color: "#D5CCFF"
         opacity: root.defaultMarkerVisible ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+        Behavior on height { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
     }
 
