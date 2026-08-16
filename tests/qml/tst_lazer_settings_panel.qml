@@ -40,6 +40,8 @@ Item {
 
         function init() {
             Lazer.MotionTokens.reducedMotionOverride = false
+            Lazer.SettingsOverlayBridge.clearTooltips()
+            panel.content.hideTooltip()
             panel.interactive = true
             panel.selectedCategory = "appearance"
             panel.sidebarExpanded = true
@@ -329,6 +331,178 @@ Item {
             compare(panel.indicatorCount, 3)
             panel.selectCategory("appearance")
             verify(panel.appearanceNav.selected)
+        }
+
+        function test_tooltipShortTextShowsFullWidth() {
+            panel.contentReady = true
+            var row = panel.appearancePage.colorSchemeRow
+            Lazer.SettingsOverlayBridge.showTooltip(row.descriptionText, row, 1)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, row)
+            compare(panel.content.activeTooltipPriority, 1)
+            // The surface follows the text's natural width, never a 24px stub.
+            tryVerify(function() {
+                var item = panel.content.tooltipItem
+                var text = panel.content.tooltipTextItem
+                return item.width > 24
+                    && Math.abs(item.width - (text.implicitWidth + 12)) < 0.5
+                    && text.implicitHeight <= 20
+            }, 300)
+            Lazer.SettingsOverlayBridge.hideTooltip(row)
+            panel.contentReady = false
+        }
+
+        function test_tooltipLongTextWrapsAndExpandsHeight() {
+            panel.contentReady = true
+            var row = panel.appearancePage.colorSchemeRow
+            var longText = "这是一段特别长的设置说明文字，用来验证悬浮提示在可用宽度内正确换行，并且整个提示表面按照换行后的高度完整扩展，文本绝对不会被父级裁切或重叠。"
+            Lazer.SettingsOverlayBridge.showTooltip(longText, row, 1)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            tryVerify(function() {
+                var item = panel.content.tooltipItem
+                var text = panel.content.tooltipTextItem
+                return item.width > 24
+                    && item.width <= Lazer.LazerTheme.tooltipMaxWidth
+                    && text.implicitHeight > 20
+                    && Math.abs(item.height - (text.implicitHeight + 12)) < 0.5
+            }, 300)
+            verify(panel.content.tooltipItem.height > 40)
+            // The text stays fully inside the padded surface.
+            var text = panel.content.tooltipTextItem
+            verify(text.x >= 0)
+            verify(text.y >= 0)
+            verify(text.y + text.height <= panel.content.tooltipItem.height)
+            verify(text.x + text.width <= panel.content.tooltipItem.width)
+            Lazer.SettingsOverlayBridge.hideTooltip(row)
+            panel.contentReady = false
+        }
+
+        function test_tooltipClampsWithinContentBounds() {
+            panel.contentReady = true
+            var row = panel.appearancePage.colorSchemeRow
+            Lazer.SettingsOverlayBridge.showTooltip(row.descriptionText, row, 1)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            tryVerify(function() {
+                var item = panel.content.tooltipItem
+                var bounds = panel.content.tooltipBoundsRect()
+                return item.x >= bounds.x - 0.5
+                    && item.x + item.width <= bounds.x + bounds.width + 0.5
+                    && item.y >= bounds.y - 0.5
+            }, 300)
+            Lazer.SettingsOverlayBridge.hideTooltip(row)
+            panel.contentReady = false
+        }
+
+        function test_tooltipFollowsScrollAndClosesWhenSourceLeavesViewport() {
+            panel.contentReady = true
+            var page = panel.appearancePage
+            var row = panel.appearancePage.colorSchemeRow
+            page.contentY = 0
+            Lazer.SettingsOverlayBridge.showTooltip(row.descriptionText, row, 1)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            var y0 = panel.content.tooltipItem.y
+            // A modest scroll keeps the source visible and the tooltip follows.
+            page.contentY = 40
+            tryVerify(function() { return panel.content.tooltipItem.y < y0 - 20 }, 200)
+            verify(panel.content.tooltipVisible)
+            // Scrolling the source fully out of the viewport closes the tooltip.
+            page.contentY = page.contentHeight
+            tryVerify(function() { return !panel.content.tooltipVisible }, 300)
+            verify(!panel.content.tooltipVisible)
+            Lazer.SettingsOverlayBridge.hideTooltip(row)
+            page.contentY = 0
+            panel.contentReady = false
+        }
+
+        function test_tooltipFlipsAboveAtBottomAndBelowAtTop() {
+            panel.contentReady = true
+            var page = panel.appearancePage
+            var row = panel.appearancePage.glassGlowRow
+            page.contentY = 0
+            var topY = row.mapToItem(panel.content, 0, 0).y
+            // Bring the row near the bottom of the viewport -> above wins.
+            page.contentY = Math.max(0, topY - 430)
+            tryVerify(function() { return row.mapToItem(panel.content, 0, 0).y >= 390 }, 300)
+            Lazer.SettingsOverlayBridge.showTooltip(row.descriptionText, row, 1)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            tryVerify(function() { return panel.content.tooltipPlacementSide === "above" }, 300)
+            // Scroll it back near the top -> below wins.
+            page.contentY = Math.max(0, topY - 115)
+            tryVerify(function() { return panel.content.tooltipPlacementSide === "below" }, 300)
+            verify(panel.content.tooltipVisible)
+            Lazer.SettingsOverlayBridge.hideTooltip(row)
+            page.contentY = 0
+            panel.contentReady = false
+        }
+
+        function test_sliderTooltipAnchorsToNubAndFollows() {
+            panel.contentReady = true
+            var slider = panel.appearancePage.panelOpacitySlider
+            var nub = slider.nubItem
+            slider.forceActiveFocus()
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, nub)
+            compare(panel.content.activeTooltipPriority, 2)
+            var x0 = panel.content.tooltipItem.x
+            slider.setValue(0.35)
+            tryVerify(function() { return panel.content.tooltipItem.x !== x0 }, 400)
+            verify(panel.content.tooltipVisible)
+            Lazer.SettingsOverlayBridge.hideTooltip(nub)
+            panel.contentReady = false
+        }
+
+        function test_tooltipPrioritySliderOverridesRowAndFallsBack() {
+            panel.contentReady = true
+            var row = panel.appearancePage.panelOpacityRow
+            var slider = panel.appearancePage.panelOpacitySlider
+            Lazer.SettingsOverlayBridge.showTooltip(row.descriptionText, row, 1)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipText, row.descriptionText)
+            // The slider value tooltip (priority 2) replaces the row description.
+            Lazer.SettingsOverlayBridge.showTooltip("35%", slider.nubItem, 2)
+            tryVerify(function() { return panel.content.activeTooltipSource === slider.nubItem }, 200)
+            compare(panel.content.activeTooltipText, "35%")
+            // Dismissing the slider falls back to the still-registered row request.
+            Lazer.SettingsOverlayBridge.hideTooltip(slider.nubItem)
+            tryVerify(function() { return panel.content.activeTooltipSource === row }, 200)
+            compare(panel.content.activeTooltipText, row.descriptionText)
+            Lazer.SettingsOverlayBridge.hideTooltip(row)
+            tryVerify(function() { return !panel.content.tooltipVisible }, 300)
+            panel.contentReady = false
+        }
+
+        function test_tooltipIgnoresExternalOwner() {
+            panel.contentReady = true
+            // A request from a source outside this content never opens a tooltip.
+            Lazer.SettingsOverlayBridge.showTooltip("外部来源说明", externalChoice, 1)
+            verify(!panel.content.tooltipVisible)
+            verify(!panel.content.activeTooltipSource)
+            Lazer.SettingsOverlayBridge.hideTooltip(externalChoice)
+            // An external high-priority request must not disturb the local tooltip.
+            var row = panel.appearancePage.colorSchemeRow
+            Lazer.SettingsOverlayBridge.showTooltip(row.descriptionText, row, 1)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            Lazer.SettingsOverlayBridge.showTooltip("外部高优先级", externalChoice, 5)
+            verify(panel.content.tooltipVisible)
+            compare(panel.content.activeTooltipSource, row)
+            compare(panel.content.activeTooltipText, row.descriptionText)
+            Lazer.SettingsOverlayBridge.hideTooltip(externalChoice)
+            Lazer.SettingsOverlayBridge.hideTooltip(row)
+            panel.contentReady = false
+        }
+
+        function test_tooltipReducedMotionStillPositionsAccurately() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            panel.contentReady = true
+            var row = panel.appearancePage.colorSchemeRow
+            Lazer.SettingsOverlayBridge.showTooltip(row.descriptionText, row, 1)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.tooltipItem.opacity, 1)
+            verify(panel.content.tooltipItem.x >= 0)
+            Lazer.SettingsOverlayBridge.hideTooltip(row)
+            compare(panel.content.tooltipItem.visible, false)
+            panel.contentReady = false
+            Lazer.MotionTokens.reducedMotionOverride = false
         }
     }
 }

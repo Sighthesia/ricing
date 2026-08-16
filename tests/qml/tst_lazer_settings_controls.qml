@@ -94,6 +94,8 @@ Item {
     SignalSpy { id: clearSpy; target: textField; signalName: "clearRequested" }
     SignalSpy { id: dropdownSpy; target: Lazer.SettingsOverlayBridge; signalName: "dropdownRequested" }
     SignalSpy { id: dropdownDismissSpy; target: Lazer.SettingsOverlayBridge; signalName: "dropdownDismissed" }
+    SignalSpy { id: tooltipSpy; target: Lazer.SettingsOverlayBridge; signalName: "tooltipRequested" }
+    SignalSpy { id: tooltipDismissSpy; target: Lazer.SettingsOverlayBridge; signalName: "tooltipDismissed" }
 
     TestCase {
         name: "LazerSettingsControls"
@@ -118,6 +120,8 @@ Item {
             dropdownSpy.clear()
             dropdownDismissSpy.clear()
             Lazer.SettingsOverlayBridge.clearTooltips()
+            tooltipSpy.clear()
+            tooltipDismissSpy.clear()
             textField.enabled = true
             textField.focus = false
             textField.editorItem.focus = false
@@ -252,6 +256,23 @@ Item {
             compare(slider.valueForTrackPosition(0), 10)
             compare(slider.valueForTrackPosition(slider.trackItem.width), 0)
             compare(slider.valueForTrackPosition(slider.trackItem.width / 2), 4)
+        }
+
+        function test_sliderTooltipAnchorsToNubIdentity() {
+            slider.forceActiveFocus()
+            compare(tooltipSpy.count, 1)
+            verify(tooltipSpy.signalArguments[0][1] === slider.nubItem)
+            compare(tooltipSpy.signalArguments[0][2], 2)
+            compare(tooltipSpy.signalArguments[0][0], "4%")
+            // A value change re-requests with the same Nub source identity.
+            sliderHolder.value = 8
+            compare(tooltipSpy.count, 2)
+            verify(tooltipSpy.signalArguments[1][1] === slider.nubItem)
+            verify(tooltipSpy.signalArguments[1][0].indexOf("8") >= 0)
+            // Hiding uses the same Nub identity so the content can match it.
+            slider.focus = false
+            compare(tooltipDismissSpy.count, 1)
+            verify(tooltipDismissSpy.signalArguments[0][0] === slider.nubItem)
         }
 
         function test_choiceRejectsUnknownValues() {

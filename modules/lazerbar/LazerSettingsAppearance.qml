@@ -35,6 +35,7 @@ Flickable {
     property alias panelOpacityRow: panelOpacityRow
     property alias enableBlurRow: enableBlurRow
     property alias blurSurfaceRow: blurSurfaceRow
+    property alias glassGlowRow: glassGlowRow
     contentWidth: width
     contentHeight: pageColumn.implicitHeight
     clip: true

@@ -20,6 +20,7 @@ Item {
 
         function init() {
             Lazer.MotionTokens.reducedMotionOverride = false
+            Lazer.SettingsOverlayBridge.clearTooltips()
             if (overlay.phase !== "closed")
                 overlay.resetImmediately()
             closedSpy.clear()
@@ -155,6 +156,24 @@ Item {
             verify(overlay.panel.notificationPage)
             verify(overlay.panel.sidePanel)
             verify(overlay.panel.interactive === false)
+        }
+
+        function test_tooltipClosesOnOverlayCloseAndDoesNotTakeFocus() {
+            overlay.openFrom(opener)
+            tryCompare(overlay, "phase", "open", 1200)
+            overlay.panel.contentReady = true
+            var row = overlay.panel.appearancePage.colorSchemeRow
+            Lazer.SettingsOverlayBridge.showTooltip(row.descriptionText, row, 1)
+            tryVerify(function() { return overlay.panel.content.tooltipVisible }, 200)
+            // The tooltip surface never claims keyboard focus.
+            verify(!overlay.panel.content.tooltipItem.activeFocus)
+            verify(!overlay.panel.content.tooltipTextItem.activeFocus)
+            overlay.closeAndRestoreFocus()
+            tryCompare(overlay, "phase", "closed", 1200)
+            // Closing the overlay clears the tooltip without residue.
+            tryVerify(function() { return !overlay.panel.content.tooltipVisible }, 300)
+            Lazer.SettingsOverlayBridge.clearTooltips()
+            overlay.panel.contentReady = false
         }
     }
 }

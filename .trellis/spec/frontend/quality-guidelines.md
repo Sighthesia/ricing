@@ -268,3 +268,75 @@ Item {
     SettingsDropdownMenu { id: menu }
 }
 ```
+
+## Scenario: Measured Tooltips Following Local Sources
+
+### 1. Scope / Trigger
+
+- Apply when a tooltip is rendered by an unclipped Settings Content overlay for a source inside a clipped or scrolling viewport.
+- Apply when tooltip text can wrap or its source can move after the request is emitted.
+
+### 2. Signatures
+
+- Request: `SettingsOverlayBridge.showTooltip(text, sourceItem, priority)`.
+- Dismiss: `SettingsOverlayBridge.hideTooltip(sourceItem)`.
+- Geometry helpers: `tooltipTextWidth(...)`, `rectsIntersect(...)`, and `tooltipPlacement(sourceRect, tooltipSize, boundsRect, gap)`.
+- Slider source identity: `LazerSettingsSlider.nubItem`.
+
+### 3. Contracts
+
+- Text owns its natural `implicitWidth`; its constrained width then determines wrapped `implicitHeight`.
+- The tooltip surface adds padding after text measurement and never asks an unmeasured `Rectangle` for content size.
+- Available text width, placement bounds, source intersection, and final clamping all use the same local viewport coordinate domain.
+- The active source is mapped with `sourceItem.mapToItem(contentOwner, 0, 0)` and repositioned when source geometry, viewport geometry, page scroll, or measured tooltip size changes.
+- A partially visible source continues to own the tooltip; a fully non-intersecting, hidden, destroyed, or foreign-owner source closes it.
+- Slider value tooltips use `nubItem` for both show and hide identity. Position updates are immediate; reduced motion affects opacity only.
+
+### 4. Validation & Error Matrix
+
+- Natural text width exceeds available viewport width -> wrap at the constrained text width and grow height.
+- Source lacks the receiving Content in its ancestor chain -> ignore the request.
+- Source intersects the viewport only partially -> keep visible and reposition.
+- Source no longer intersects the viewport -> clear active tooltip state.
+- Above space is insufficient -> place below; neither side fits -> choose the larger side and clamp within viewport bounds.
+- Lower-priority request arrives while a higher-priority request is active -> retain the higher-priority tooltip.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a Slider tooltip tracks the moving Nub while the page scrolls and closes only after the Nub fully leaves the viewport.
+- Base: a short row description remains one line at its natural width plus padding.
+- Bad: text fills a parent `Rectangle` whose own implicit size is derived from that text.
+- Bad: width is measured against Content while placement is clamped against a narrower viewport.
+
+### 6. Tests Required
+
+- Logic tests assert natural-width clamping, wrapped width constraints, horizontal clamping, vertical flipping, and rectangle intersection.
+- Composed Content tests assert short and long text geometry, source movement, visible scroll following, offscreen close, and foreign-owner isolation.
+- Control tests assert Slider requests and dismisses with `nubItem` and that moving the Nub changes tooltip X.
+- Overlay lifecycle tests assert priority behavior, no keyboard focus capture, and no stale tooltip after close; repeat sequentially to expose singleton state leaks.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+Rectangle {
+    implicitWidth: label.implicitWidth + 20
+    Text { id: label; anchors.fill: parent; wrapMode: Text.WordWrap }
+}
+```
+
+#### Correct
+
+```qml
+Text {
+    id: label
+    width: constrainedTextWidth
+    wrapMode: Text.WordWrap
+}
+
+Rectangle {
+    width: label.width + horizontalPadding
+    height: label.implicitHeight + verticalPadding
+}
+```

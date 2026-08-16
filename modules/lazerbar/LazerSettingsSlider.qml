@@ -94,15 +94,20 @@ Item {
         root.setValue(root.defaultValue)
     }
 
+    // Request the value tooltip anchored to the moving Nub so the content can
+    // follow per-frame geometry instead of the static slider root.
     function refreshTooltip() {
         if (!root.effectiveEnabled) {
-            SettingsOverlayBridge.hideTooltip(root)
+            SettingsOverlayBridge.hideTooltip(root.nubItem)
             return
         }
-        if (root.hovered || root.dragging || root.focusVisible)
-            SettingsOverlayBridge.showTooltip(root.displayText, root, 2)
+        // Read the source properties directly: bound mirrors (hovered,
+        // dragging, focusVisible) are not re-evaluated until after the
+        // notify handler runs, so inside these handlers they are stale.
+        if (hoverHandler.hovered || dragHandler.active || root.activeFocus)
+            SettingsOverlayBridge.showTooltip(root.displayText, root.nubItem, 2)
         else
-            SettingsOverlayBridge.hideTooltip(root)
+            SettingsOverlayBridge.hideTooltip(root.nubItem)
     }
 
     Keys.onPressed: event => {
@@ -125,7 +130,7 @@ Item {
 
     onActiveFocusChanged: refreshTooltip()
     onDisplayTextChanged: {
-        if (root.hovered || root.dragging || root.focusVisible)
+        if (hoverHandler.hovered || dragHandler.active || root.activeFocus)
             refreshTooltip()
     }
 

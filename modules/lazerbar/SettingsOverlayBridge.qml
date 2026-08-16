@@ -45,6 +45,12 @@ QtObject {
         return best
     }
 
+    // Expose a snapshot so per-screen content owners can resolve their own
+    // best request without the singleton choosing a visual owner.
+    function allTooltipRequests() {
+        return _tooltipRequests.slice()
+    }
+
     function clearTooltips() {
         _tooltipRequests = []
         tooltipDismissed(null)

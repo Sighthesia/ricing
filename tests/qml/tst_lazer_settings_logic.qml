@@ -188,6 +188,108 @@ Item {
             compare(anchors.right, true)
         }
 
+        function test_tooltipMeasurementConstraints() {
+            // Short text keeps its natural width plus padding.
+            compare(SettingsLogic.tooltipSurfaceWidth(53, 320, 368, 6, 24), 65)
+            // The 24px minimum only guards empty text; short text is not stretched.
+            compare(SettingsLogic.tooltipSurfaceWidth(10, 320, 368, 6, 24), 22)
+            compare(SettingsLogic.tooltipSurfaceWidth(0, 320, 368, 6, 24), 24)
+            // Theme maximum width caps the surface.
+            compare(SettingsLogic.tooltipSurfaceWidth(600, 320, 368, 6, 24), 320)
+            // Available content width caps it harder than the theme maximum.
+            compare(SettingsLogic.tooltipSurfaceWidth(600, 320, 200, 6, 24), 200)
+            compare(SettingsLogic.tooltipSurfaceWidth(600, 320, 100, 6, 24), 100)
+            // Invalid inputs fall back to safe defaults.
+            compare(SettingsLogic.tooltipSurfaceWidth(NaN, 320, 368, 6, 24), 24)
+            compare(SettingsLogic.tooltipSurfaceWidth(53, NaN, 368, 6, 24), 65)
+            compare(SettingsLogic.tooltipSurfaceWidth(53, 320, -20, 6, 24), 12)
+            // Available surface width subtracts safe margins and padding.
+            compare(SettingsLogic.tooltipAvailableSurfaceWidth(400, 10, 6), 368)
+            compare(SettingsLogic.tooltipAvailableSurfaceWidth(100, 10, 6), 68)
+            compare(SettingsLogic.tooltipAvailableSurfaceWidth(100, 60, 6), 0)
+            compare(SettingsLogic.tooltipAvailableSurfaceWidth(-20, 10, 6), 0)
+            compare(SettingsLogic.tooltipAvailableSurfaceWidth(400, NaN, 6), 388)
+            compare(SettingsLogic.tooltipAvailableSurfaceWidth(400, 10, NaN), 380)
+        }
+
+        function test_rectsIntersect() {
+            verify(SettingsLogic.rectsIntersect({ x: 0, y: 0, width: 10, height: 10 }, { x: 5, y: 5, width: 10, height: 10 }))
+            verify(SettingsLogic.rectsIntersect({ x: 0, y: 0, width: 10, height: 10 }, { x: 9, y: 9, width: 10, height: 10 }))
+            // Corner contact alone is not an intersection (zero area overlap).
+            verify(!SettingsLogic.rectsIntersect({ x: 0, y: 0, width: 10, height: 10 }, { x: 10, y: 10, width: 10, height: 10 }))
+            // Touching an edge is not an intersection (source fully left).
+            verify(!SettingsLogic.rectsIntersect({ x: 0, y: 0, width: 10, height: 10 }, { x: 20, y: 0, width: 10, height: 10 }))
+            verify(!SettingsLogic.rectsIntersect({ x: 0, y: 0, width: 10, height: 10 }, { x: 0, y: 20, width: 10, height: 10 }))
+            // Zero-size and invalid rects never intersect.
+            verify(!SettingsLogic.rectsIntersect({ x: 0, y: 0, width: 0, height: 10 }, { x: 0, y: 0, width: 10, height: 10 }))
+            verify(!SettingsLogic.rectsIntersect({ x: 0, y: 0, width: 10, height: 0 }, { x: 0, y: 0, width: 10, height: 10 }))
+            verify(!SettingsLogic.rectsIntersect(null, { x: 0, y: 0, width: 10, height: 10 }))
+            verify(!SettingsLogic.rectsIntersect({ x: NaN, y: 0, width: 10, height: 10 }, { x: 0, y: 0, width: 10, height: 10 }))
+            // Partial visibility is still an intersection.
+            verify(SettingsLogic.rectsIntersect({ x: -5, y: 0, width: 10, height: 10 }, { x: 0, y: 0, width: 10, height: 10 }))
+            verify(SettingsLogic.rectsIntersect({ x: 0, y: -5, width: 10, height: 10 }, { x: 0, y: 0, width: 10, height: 10 }))
+        }
+
+        function test_tooltipPlacementAboveAndBelow() {
+            var p
+            // Plenty of room above -> above, centered on the source.
+            p = SettingsLogic.tooltipPlacement({ x: 100, y: 200, width: 100, height: 20 }, 100, 30, { x: 10, y: 10, width: 380, height: 500 }, 6)
+            compare(p.side, "above")
+            compare(p.y, 164)
+            compare(p.x, 100)
+            // Source near the top -> below.
+            p = SettingsLogic.tooltipPlacement({ x: 100, y: 40, width: 100, height: 20 }, 100, 30, { x: 10, y: 10, width: 380, height: 500 }, 6)
+            compare(p.side, "below")
+            compare(p.y, 66)
+            compare(p.x, 100)
+            // Exactly enough space above is still above.
+            p = SettingsLogic.tooltipPlacement({ x: 100, y: 46, width: 100, height: 20 }, 100, 30, { x: 10, y: 10, width: 380, height: 500 }, 6)
+            compare(p.side, "above")
+            compare(p.y, 10)
+            // No gap -> zero gap placement still respects the boundary.
+            p = SettingsLogic.tooltipPlacement({ x: 100, y: 20, width: 100, height: 20 }, 100, 30, { x: 10, y: 10, width: 380, height: 500 }, 0)
+            compare(p.side, "below")
+            compare(p.y, 40)
+        }
+
+        function test_tooltipPlacementClampsAndSideSelection() {
+            var p
+            // Wide tooltip on a left-edge source clamps to the safe margin.
+            p = SettingsLogic.tooltipPlacement({ x: 0, y: 200, width: 100, height: 20 }, 300, 30, { x: 10, y: 10, width: 380, height: 500 }, 6)
+            compare(p.x, 10)
+            compare(p.side, "above")
+            // Wide tooltip on a right-edge source clamps left.
+            p = SettingsLogic.tooltipPlacement({ x: 390, y: 200, width: 100, height: 20 }, 300, 30, { x: 10, y: 10, width: 380, height: 500 }, 6)
+            compare(p.x, 90)
+            // Neither side fits -> the side with more space wins, y clamps.
+            p = SettingsLogic.tooltipPlacement({ x: 100, y: 120, width: 100, height: 20 }, 100, 300, { x: 10, y: 10, width: 380, height: 200 }, 6)
+            // aboveSpace = 110, belowSpace = 200 - 140 = 60 -> above wins.
+            compare(p.side, "above")
+            compare(p.y, 10)
+            // Below has more space.
+            p = SettingsLogic.tooltipPlacement({ x: 100, y: 30, width: 100, height: 20 }, 100, 300, { x: 10, y: 10, width: 380, height: 160 }, 6)
+            // aboveSpace = 20, belowSpace = 160 - 50 = 110 -> below wins.
+            compare(p.side, "below")
+            compare(p.y, 10)
+            // Tooltip taller than the bounds stays inside the bounds top.
+            p = SettingsLogic.tooltipPlacement({ x: 100, y: 200, width: 100, height: 20 }, 100, 600, { x: 10, y: 10, width: 380, height: 300 }, 6)
+            compare(p.y, 10)
+            // Invalid source input -> safe fallback.
+            p = SettingsLogic.tooltipPlacement({ x: NaN, y: 0, width: 10, height: 10 }, 100, 30, { x: 0, y: 0, width: 100, height: 100 }, 6)
+            compare(p.side, "below")
+            compare(p.x, 0)
+            compare(p.y, 0)
+        }
+
+        function test_tooltipMeasurementUsesSurfacePaddingAndViewportWidth() {
+            // The available value is the surface cap after both safe margins
+            // and both text paddings have been reserved.
+            compare(SettingsLogic.tooltipAvailableSurfaceWidth(240, 10, 6), 208)
+            // A natural width equal to the text cap fills, but never exceeds,
+            // the viewport-safe surface width.
+            compare(SettingsLogic.tooltipSurfaceWidth(500, 320, 208, 6, 24), 208)
+        }
+
         function test_clampAndInvalidValues() {
             compare(SettingsLogic.clamp(12, 0, 10), 10)
             compare(SettingsLogic.clamp(-2, 0, 10), 0)

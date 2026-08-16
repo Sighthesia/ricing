@@ -205,6 +205,117 @@ function timeoutSecondsToMs(seconds) {
     return Math.round(clamp(Number(seconds), 2, 15) * 1000)
 }
 
+// Available width for the whole tooltip surface inside content safe margins.
+// The surface must keep its own horizontal padding clear of the content edges.
+function tooltipAvailableSurfaceWidth(contentWidth, sideMargin, hPadding) {
+    var width = Number(contentWidth)
+    var margin = Number(sideMargin)
+    var padding = Number(hPadding)
+    if (!isFinite(width) || width < 0)
+        width = 0
+    if (!isFinite(margin) || margin < 0)
+        margin = 0
+    if (!isFinite(padding) || padding < 0)
+        padding = 0
+    return Math.max(0, width - 2 * margin - 2 * padding)
+}
+
+// Derive the tooltip surface width from the text's natural width, capped by
+// the theme maximum and the current content availability. The minimum only
+// guards empty text; short text is never stretched to it.
+function tooltipSurfaceWidth(naturalTextWidth, maxTooltipWidth, availableSurfaceWidth, hPadding, minimumSurfaceWidth) {
+    var natural = Number(naturalTextWidth)
+    var maxTooltip = Number(maxTooltipWidth)
+    var available = Number(availableSurfaceWidth)
+    var padding = Number(hPadding)
+    if (!isFinite(natural) || natural < 0)
+        natural = 0
+    if (!isFinite(maxTooltip) || maxTooltip <= 0)
+        maxTooltip = 320
+    if (!isFinite(available) || available < 0)
+        available = 0
+    if (!isFinite(padding) || padding < 0)
+        padding = 0
+    var minimum = Number(minimumSurfaceWidth)
+    if (!isFinite(minimum) || minimum < 0)
+        minimum = 0
+    var cap = Math.min(maxTooltip, available)
+    var textCap = Math.max(0, cap - 2 * padding)
+    var targetText = Math.min(natural, textCap)
+    var surface = targetText + 2 * padding
+    if (natural <= 0 && surface < minimum)
+        surface = Math.min(minimum, cap)
+    return surface
+}
+
+// True when the two rects share any positive-area overlap.
+function rectsIntersect(a, b) {
+    if (!a || !b)
+        return false
+    var ax = Number(a.x), ay = Number(a.y), aw = Number(a.width), ah = Number(a.height)
+    var bx = Number(b.x), by = Number(b.y), bw = Number(b.width), bh = Number(b.height)
+    if (!isFinite(ax) || !isFinite(ay) || !isFinite(aw) || !isFinite(ah)
+            || !isFinite(bx) || !isFinite(by) || !isFinite(bw) || !isFinite(bh))
+        return false
+    if (aw <= 0 || ah <= 0 || bw <= 0 || bh <= 0)
+        return false
+    return ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah
+}
+
+// Place the tooltip beside its source inside a visible bounds rect. X centers
+// on the source then clamps; Y prefers above, flips below, and when neither
+// side fits clamps to the side with more space.
+function tooltipPlacement(sourceRect, tooltipWidth, tooltipHeight, boundsRect, gap) {
+    var sx = Number(sourceRect.x), sy = Number(sourceRect.y)
+    var sw = Number(sourceRect.width), sh = Number(sourceRect.height)
+    var tw = Number(tooltipWidth), th = Number(tooltipHeight)
+    var bx = Number(boundsRect.x), by = Number(boundsRect.y)
+    var bw = Number(boundsRect.width), bh = Number(boundsRect.height)
+    var g = Number(gap)
+    if (!isFinite(sx) || !isFinite(sy) || !isFinite(sw) || !isFinite(sh))
+        return { x: 0, y: 0, side: "below" }
+    if (!isFinite(tw) || tw < 0)
+        tw = 0
+    if (!isFinite(th) || th < 0)
+        th = 0
+    if (!isFinite(bx))
+        bx = 0
+    if (!isFinite(by))
+        by = 0
+    if (!isFinite(bw) || bw < 0)
+        bw = 0
+    if (!isFinite(bh) || bh < 0)
+        bh = 0
+    if (!isFinite(g) || g < 0)
+        g = 0
+    if (sw <= 0)
+        sw = 0
+    if (sh <= 0)
+        sh = 0
+
+    var minX = bx
+    var maxX = bx + bw - tw
+    if (maxX < minX)
+        maxX = minX
+    var x = Math.max(minX, Math.min(maxX, sx + sw / 2 - tw / 2))
+
+    var minY = by
+    var maxY = by + bh - th
+    if (maxY < minY)
+        maxY = minY
+    var aboveY = sy - g - th
+    var belowY = sy + sh + g
+    if (aboveY >= by)
+        return { x: x, y: aboveY, side: "above" }
+    if (belowY + th <= by + bh)
+        return { x: x, y: belowY, side: "below" }
+    var aboveSpace = sy - by
+    var belowSpace = by + bh - (sy + sh)
+    if (aboveSpace >= belowSpace)
+        return { x: x, y: Math.max(minY, Math.min(maxY, aboveY)), side: "above" }
+    return { x: x, y: Math.max(minY, Math.min(maxY, belowY)), side: "below" }
+}
+
 function notificationAnchors(position) {
     var normalized = position == null ? "top-right" : String(position)
     if (normalized !== "top-left" && normalized !== "top-right"
