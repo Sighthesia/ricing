@@ -1,0 +1,3 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Frontend QML contracts for fixed settings geometry, transitions, tooltip nub identity, and the new right-side reset/default-marker behavior."}
+{"file":".trellis/tasks/08-16-settings-toggle-slider-default-visuals/prd.md","reason":"Approved requirements and acceptance criteria for Toggle alignment, Slider markers, and restore affordances."}
+{"file":".trellis/tasks/08-16-settings-toggle-slider-default-visuals/design.md","reason":"Ownership boundaries, layout strategy, normalized Slider marker positioning, and compatibility risks."}
