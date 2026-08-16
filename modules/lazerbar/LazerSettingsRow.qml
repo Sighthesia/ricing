@@ -129,6 +129,7 @@ Item {
     // Show the restore-default affordance in the fixed right-side slot.
     Item {
         id: revertButton
+        z: 3
         x: Math.max(0, root.width - width - contentPadding)
         width: 20
         height: 20
@@ -183,6 +184,7 @@ Item {
     // Arrange the injected control according to its small presentation contract.
     Item {
         id: contentHost
+        z: 1
         x: contentPadding
         y: root.inlinePresentation || root.choicePresentation ? 0 : 10
         width: Math.max(0, root.width - 2 * contentPadding - revertZoneWidth)
@@ -241,6 +243,7 @@ Item {
     }
 
     readonly property Item labelTextItem: labelItem
+    readonly property Item contentItem: contentHost
     readonly property Item revertButtonItem: revertButton
     readonly property Item cardItem: cardSurface
 }

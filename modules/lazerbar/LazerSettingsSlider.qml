@@ -161,6 +161,7 @@ Item {
     // Show the thick rounded control trough.
     Rectangle {
         id: trackRect
+        z: 0
         anchors.fill: trackHost
         radius: 4
         color: LazerTheme.settingsTrack
@@ -170,6 +171,7 @@ Item {
     // Fill the travelled portion of the trough.
     Rectangle {
         id: fillRect
+        z: 1
         anchors.left: trackRect.left
         anchors.top: trackRect.top
         anchors.bottom: trackRect.bottom
@@ -182,6 +184,7 @@ Item {
     // Mark the configured default without competing with the active thumb.
     Rectangle {
         id: defaultMarker
+        z: 2
         x: Math.max(0, Math.min(trackHost.width - width,
                                  root.defaultFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
@@ -212,11 +215,12 @@ Item {
     // Embed a bright full-height thumb with a shorter inner light bar.
     Rectangle {
         id: thumb
+        z: 3
         x: Math.max(0, Math.min(trackHost.width - width,
                                  root.displayFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
         width: 6
-        height: trackHost.height
+        height: 20
         radius: 3
         color: LazerTheme.settingsSliderThumb
         scale: root.dragging ? MotionTokens.pressScale : (root.hovered ? 1.06 : 1)
@@ -230,7 +234,7 @@ Item {
             width: 4
             height: 20
             radius: 2
-            color: "#EBE5FF"
+            color: LazerTheme.settingsSliderThumbLight
         }
     }
 
@@ -292,5 +296,6 @@ Item {
     readonly property bool trackTapEnabled: trackTapHandler.enabled
     readonly property bool trackFillBehaviorEnabled: fractionBehavior.enabled
     readonly property Item nubItem: thumb
+    readonly property color thumbColor: thumb.color
     readonly property bool nubDoubleTapEnabled: nubDoubleTapHandler.enabled
 }

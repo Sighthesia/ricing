@@ -393,8 +393,63 @@ Rectangle {
 #### Wrong
 
 ```qml
-if (request.priority >= activePriority)
-    setActiveTooltip(request)
+    if (request.priority >= activePriority)
+        setActiveTooltip(request)
+    ```
+
+## Scenario: Visible Settings Reset And Slider Default Layers
+
+### 1. Scope / Trigger
+
+- Apply when a settings row exposes a restore-default action or a Slider displays both an active value and a configured default.
+- Apply after a visual implementation appears correct in isolated properties but disappears in the running panel.
+
+### 2. Signatures
+
+- `LazerSettingsRow`: `defaultValue`, `currentValue`, `resetCallback`, `revertButtonItem`, and `contentItem`.
+- `LazerSettingsSlider`: `defaultMarkerItem`, `thumbLightItem`, `nubItem`, `thumbColor`, and `defaultMarkerVisible`.
+
+### 3. Contracts
+
+- The reset affordance is a sibling above the card/content layers, remains inside the row bounds, and reserves its width from the control budget.
+- Reset visibility is `hasDefault && !isDefault`; activation delegates to `resetCallback` and does not mutate settings directly.
+- Slider layer order is trough, fill, default marker, active thumb; the active thumb uses the settings accent while its inner light bar uses the light thumb token.
+- The default marker is non-interactive, uses the normalized `sliderFraction`, and is hidden when current and default values are equal.
+
+### 4. Validation & Error Matrix
+
+- Reset button behind content or card -> reject; assert explicit z-order and visible bounds.
+- Slider thumb uses only the light inner color -> reject; assert outer accent and inner light colors separately.
+- Marker exists but is below fill/thumb or has no visible state transition -> reject; assert z-order and `defaultMarkerVisible` transitions.
+- Page omits one of the reset properties -> reject; verify representative page rows carry the complete reset contract.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a modified page Slider shows the right reset icon, accent outer thumb, and default marker simultaneously.
+- Base: current value equals default, so the reset icon and marker are hidden while the thumb remains visible.
+- Bad: properties and colors are correct in a component test, but sibling stacking covers the reset button or marker in the panel.
+
+### 6. Tests Required
+
+- Row tests assert reset visibility, bounds, z-order above `contentItem`, callback activation, and hide-after-equality.
+- Slider tests assert outer thumb accent, inner light bar, marker dimensions/color, layer order, normalized position, and modified/default transitions.
+- Page tests assert representative rows receive `defaultValue`, `currentValue`, and `resetCallback`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+Rectangle { id: cardSurface }
+Item { id: revertButton; visible: root.revertVisible }
+Item { id: contentHost }
+```
+
+#### Correct
+
+```qml
+Item { id: contentHost; z: 1 }
+Item { id: revertButton; z: 3; visible: root.revertVisible }
 ```
 
 ## Scenario: Single Settings Heading And Embedded Choice Fields
