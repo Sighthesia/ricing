@@ -204,8 +204,9 @@ Item {
             y: root.inlinePresentation || root.splitPresentation || root.choicePresentation
                ? (parent.height - height) / 2
                : labelItem.implicitHeight + root.labelControlGap
-            width: root.inlinePresentation || root.choicePresentation ? parent.width
-                 : (root.splitPresentation ? Math.max(0, parent.width * 0.5) : parent.width)
+            width: root.inlinePresentation ? Math.min(parent.width, Math.max(0, root.safeRequestedWidth))
+                 : (root.choicePresentation ? parent.width
+                    : (root.splitPresentation ? Math.max(0, parent.width * 0.5) : parent.width))
             height: root.safeControlHeight
             Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
             Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }

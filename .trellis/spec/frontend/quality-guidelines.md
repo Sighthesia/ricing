@@ -471,3 +471,52 @@ LazerSettingsRow {
 if (!activeSource || request.priority > activePriority)
     setActiveTooltip(request)
 ```
+
+## Scenario: Inline Settings Control Width Ownership
+
+### 1. Scope / Trigger
+
+- Apply when a settings Row places a compact control, such as a Toggle, inline with its label.
+
+### 2. Signatures
+
+- Row layout: `controlHost.width` is the compact control's measured/requested width for `rowPresentation: "inline"`.
+- Toggle dimensions: `implicitWidth: 44`, `implicitHeight: 20`.
+
+### 3. Contracts
+
+- The inline host is right-aligned and must not claim the entire row width.
+- The label width is the remaining content width after the compact control and gap are reserved.
+- The injected control remains mounted and owns its own fixed visual dimensions.
+
+### 4. Validation & Error Matrix
+
+- Inline host width equals full parent width -> reject; it collapses the label's available width.
+- Compact control requested width is invalid -> clamp host width to a non-negative finite value.
+- Choice or Slider presentation -> use their existing full or split width contracts instead.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a Toggle row shows its label and a `44x20` capsule at the right edge.
+- Bad: a full-width `controlHost` overlaps or consumes the label region while the Toggle remains only `44px` wide.
+
+### 6. Tests Required
+
+- Assert inline label visibility, positive label width, Toggle `44x20` size, and right-edge containment.
+- Keep Choice, Slider, search, and disabled-row tests unchanged and passing.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+width: root.inlinePresentation ? parent.width : parent.width * 0.5
+```
+
+#### Correct
+
+```qml
+width: root.inlinePresentation
+        ? Math.min(parent.width, Math.max(0, root.safeRequestedWidth))
+        : parent.width * 0.5
+```

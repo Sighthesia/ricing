@@ -407,8 +407,13 @@ Item {
             compare(row.compactLayout, false)
             compare(row.controlItem, rowToggle)
             verify(row.textRegionWidth > 0)
+            verify(row.labelTextItem.visible)
+            verify(row.labelTextItem.width > 0)
+            compare(row.labelTextItem.text, "设置")
             verify(row.controlItem.width > 0)
+            compare(row.controlItem.width, 44)
             verify(row.controlItem.height > 0)
+            compare(row.controlItem.height, 20)
             verify(row.controlItem.x >= 0)
             verify(row.controlItem.x + row.controlItem.width <= row.width - 16)
             row.enabled = false
