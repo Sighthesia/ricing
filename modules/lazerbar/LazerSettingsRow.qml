@@ -69,9 +69,10 @@ Item {
         id: cardSurface
         anchors.fill: parent
         radius: 6
-        color: rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-        border.width: rowHover.hovered ? 1.5 : 0
-        border.color: rowHover.hovered ? LazerTheme.settingsAccent : "transparent"
+        color: root.choicePresentation ? LazerTheme.settingsCard
+                                    : (rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard)
+        border.width: !root.choicePresentation && rowHover.hovered ? 1.5 : 0
+        border.color: !root.choicePresentation && rowHover.hovered ? LazerTheme.settingsAccent : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
@@ -186,9 +187,11 @@ Item {
     Item {
         id: contentHost
         z: 1
-        x: contentPadding
+        x: root.choicePresentation ? 0 : contentPadding
         y: root.inlinePresentation || root.choicePresentation || root.splitPresentation ? 0 : 10
-        width: Math.max(0, root.width - 2 * contentPadding - revertZoneWidth)
+        width: Math.max(0, root.choicePresentation
+                        ? root.width - contentPadding - revertZoneWidth
+                        : root.width - 2 * contentPadding - revertZoneWidth)
         height: root.inlinePresentation ? root.implicitHeight
                 : (root.choicePresentation ? controlHost.height
                    : (root.splitPresentation ? root.implicitHeight
@@ -226,14 +229,15 @@ Item {
         Item {
             id: controlHost
             x: root.inlinePresentation || root.splitPresentation ? Math.max(0, parent.width - width) : 0
-            y: root.inlinePresentation || root.choicePresentation
+            y: root.choicePresentation
                ? (parent.height - height) / 2
+               : root.inlinePresentation ? 0
                : root.splitPresentation ? 0
                : labelItem.implicitHeight + root.labelControlGap
             width: root.inlinePresentation ? Math.min(parent.width, Math.max(0, root.safeRequestedWidth))
                  : (root.choicePresentation ? parent.width
                      : (root.splitPresentation ? Math.min(240, Math.max(0, parent.width * 0.55)) : parent.width))
-            height: root.splitPresentation ? parent.height : root.safeControlHeight
+            height: root.inlinePresentation || root.splitPresentation ? parent.height : root.safeControlHeight
             Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
             Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         }
@@ -245,6 +249,14 @@ Item {
         property: "height"
         value: root.implicitHeight
         when: root.splitPresentation
+    }
+
+    // Center compact inline controls against the full visible card height.
+    Binding {
+        target: root.controlItem
+        property: "y"
+        value: Math.max(0, (contentHost.height - root.controlItem.height) / 2)
+        when: root.inlinePresentation
     }
 
     HoverHandler {

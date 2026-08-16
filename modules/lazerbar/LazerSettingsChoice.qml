@@ -21,6 +21,7 @@ Item {
     readonly property bool focusVisible: activeFocus
     property bool menuOpen: false
     readonly property Item headerItem: headerSurface
+    readonly property Item surfaceItem: headerSurface
     signal valueSelected(string value)
 
     implicitWidth: 190
@@ -112,6 +113,7 @@ Item {
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
 
         Column {
+            id: fieldColumn
             anchors.left: parent.left
             anchors.leftMargin: 12
             anchors.right: chevron.left
@@ -161,4 +163,6 @@ Item {
         enabled: root.effectiveEnabled
         onTapped: root.openMenu()
     }
+
+    readonly property Item fieldColumnItem: fieldColumn
 }

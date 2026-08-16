@@ -471,6 +471,8 @@ Item { id: revertButton; z: 3; visible: root.revertVisible }
 - Search uses `#201E27`, radius `6`, no default border, right-side search icon, and placeholder `输入以搜索`.
 - A Choice row injects the existing row label through `fieldLabel`; the outer Row label is hidden to prevent duplicate text.
 - Choice controls are `52px` high with `#25222E` surface, `#8A8795` 11px field label, white 14px demi-bold value, and a right-aligned downward chevron.
+- The Choice root and its visible `headerItem` share identical bounds. The Row gives this surface the card-left geometry while the embedded field column keeps the standard `12px` text inset.
+- `LazerSettingsContent.showDropdownFor()` maps that same `headerItem`; no Row or bridge layer may introduce another popup anchor or a competing hover/focus surface.
 - Selected navigation has no outer capsule: it uses a left `4x24` radius-2 accent indicator and white icon/text. Inactive navigation has no indicator and uses `#8A8795`.
 - Sidebar collapse/Back and Content Escape close behavior remain available; Content does not add a second close or collapse owner.
 
@@ -478,6 +480,7 @@ Item { id: revertButton; z: 3; visible: root.revertVisible }
 
 - Category page declares its own title -> reject; Content is the single heading owner.
 - Choice row renders both outer and embedded labels -> reject; use the `rowPresentation` contract.
+- Choice root, visible surface, and popup use different horizontal geometry sources -> reject; map `headerItem` as the single source of truth.
 - Search surface has a default white/focus border -> reject; focus must not restore the removed white outline.
 - Inactive navigation has a visible indicator -> reject; use zero height and zero opacity.
 - Sidebar Back/collapse is removed while cleaning Content chrome -> reject; these are separate ownership boundaries.
@@ -493,7 +496,7 @@ Item { id: revertButton; z: 3; visible: root.revertVisible }
 ### 6. Tests Required
 
 - Panel tests assert search ordering, exact placeholder/surface/radius, right-side icon, and one Content-owned heading.
-- Control tests assert Choice height, surface token, embedded label/value contract, and preserved menu APIs.
+- Control tests assert Choice height, surface token, embedded label/value contract, card/surface/text coordinate offsets, and preserved menu APIs.
 - Panel tests assert selected indicator geometry/color, inactive indicator absence, and inactive label color.
 - Existing geometry, persistence, dropdown, tooltip, Escape, and Sidebar Back/collapse tests remain green.
 
@@ -543,10 +546,12 @@ if (!activeSource || request.priority > activePriority)
 - The inline host is right-aligned and must not claim the entire row width.
 - The label width is the remaining content width after the compact control and gap are reserved.
 - The injected control remains mounted and owns its own fixed visual dimensions.
+- The inline host spans the Row content height, while the compact control itself is vertically centered within that host. Test the mapped capsule center against the mapped content center.
 
 ### 4. Validation & Error Matrix
 
 - Inline host width equals full parent width -> reject; it collapses the label's available width.
+- Toggle is only locally centered while its mapped capsule center differs from the Row content center -> reject; local coordinates do not prove visible alignment.
 - Compact control requested width is invalid -> clamp host width to a non-negative finite value.
 - Choice or Slider presentation -> use their existing full or split width contracts instead.
 
@@ -557,7 +562,7 @@ if (!activeSource || request.priority > activePriority)
 
 ### 6. Tests Required
 
-- Assert inline label visibility, positive label width, Toggle `44x20` size, and right-edge containment.
+- Assert inline label visibility, positive label width, Toggle `44x20` size, mapped center alignment, and right-edge containment.
 - Keep Choice, Slider, search, and disabled-row tests unchanged and passing.
 
 ### 7. Wrong vs Correct

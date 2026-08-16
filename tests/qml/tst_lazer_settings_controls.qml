@@ -185,7 +185,11 @@ Item {
         }
 
         function test_toggleRowCentersControlAndReservesRightResetSlot() {
-            compare(rowToggle.y + rowToggle.height / 2, row.height / 2)
+            var capsuleCenter = rowToggle.nubItem.mapToItem(row, rowToggle.nubItem.width / 2,
+                                                            rowToggle.nubItem.height / 2)
+            var contentCenter = row.contentItem.mapToItem(row, row.contentItem.width / 2,
+                                                          row.contentItem.height / 2)
+            verify(Math.abs(capsuleCenter.y - contentCenter.y) < 0.1)
             verify(rowToggle.x + rowToggle.width <= row.width - row.contentPadding - row.revertZoneWidth)
             verify(!row.revertButtonItem.visible)
         }
@@ -349,8 +353,15 @@ Item {
             compare(rowChoice.labelTextItem.visible, false)
             compare(rowChoice.controlItem.fieldLabel, "配色方案")
             compare(rowChoice.height, rowChoice.implicitHeight)
-            verify(Math.abs(rowChoice.controlItem.mapToItem(rowChoice, 0, 0).x - rowChoice.contentItem.x) < 0.1)
+            var choiceOrigin = rowChoice.controlItem.mapToItem(rowChoice, 0, 0)
+            var surfaceOrigin = rowChoice.controlItem.surfaceItem.mapToItem(rowChoice, 0, 0)
+            var labelOrigin = rowChoice.controlItem.fieldColumnItem.mapToItem(rowChoice, 0, 0)
+            verify(Math.abs(choiceOrigin.x - rowChoice.cardItem.x) < 0.1)
+            verify(Math.abs(surfaceOrigin.x - choiceOrigin.x) < 0.1)
+            verify(Math.abs(labelOrigin.x - rowChoice.contentPadding) < 0.1)
             compare(rowChoice.controlItem.width, rowChoice.contentItem.width)
+            compare(rowChoice.controlItem.headerItem.width, rowChoice.controlItem.width)
+            compare(rowChoice.cardItem.color, Lazer.LazerTheme.settingsCard)
         }
 
         function test_choiceOpensRealDropdownInsteadOfCycling() {
