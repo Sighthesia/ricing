@@ -44,7 +44,6 @@ Item {
     function close(restoreFocus) {
         if (phase === "closed" || phase === "closing") return
         _contentToken += 1
-        panel.endSession()
         panel.contentReady = false
         panelMotion.stop(); phase = "closing"; _restoreFocus = restoreFocus
         panelMotion.duration = MotionTokens.reducedMotion ? MotionTokens.fast : panelExitDuration
@@ -102,6 +101,7 @@ Item {
             if (root.phase === "opening" && root.progress >= 1) root.phase = "open"
             else if (root.phase === "closing" && root.progress <= 0) {
                 root.phase = "closed"
+                root.panel.endSession()
                 if (root._restoreFocus && root.opener) root.opener.forceActiveFocus()
                 root.closed()
             }

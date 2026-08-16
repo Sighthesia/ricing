@@ -47,7 +47,8 @@ Item {
     readonly property real contentWidth: Logic.contentWidth(panelWidth, sidebarWidth)
     readonly property real sidebarLayerX: MotionTokens.reducedMotion ? 0 : Logic.interpolate(Logic.sidebarStartX(), 0, progress)
     readonly property real contentLayerX: MotionTokens.reducedMotion ? sidebarWidth : Logic.interpolate(Logic.contentStartX(panelWidth), sidebarWidth, progress)
-    readonly property real layerOpacity: progress
+    // Keep the panel surfaces opaque while progress owns their translation.
+    readonly property real layerOpacity: 1
 
     signal escapeRequested
     signal closeRequested

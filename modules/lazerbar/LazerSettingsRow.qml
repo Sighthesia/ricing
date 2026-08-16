@@ -38,6 +38,9 @@ Item {
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
     readonly property bool compactLayout: width < 480
+    readonly property real choiceMenuReservedHeight: root.choicePresentation && root.controlItem
+                                                   && root.controlItem.menuReservedHeight !== undefined
+                                                   ? Math.max(0, Number(root.controlItem.menuReservedHeight)) : 0
     readonly property real safeRequestedWidth: controlSupportsRequestedWidth
                                           && isFinite(Number(controlItem.requestedWidth))
                                           ? Math.max(0, Number(controlItem.requestedWidth))
@@ -57,7 +60,7 @@ Item {
     readonly property real textRegionWidth: contentHost.width
     readonly property real controlRegionLeft: contentHost.x
     implicitHeight: inlinePresentation ? 44
-                    : (choicePresentation ? safeControlHeight
+                     : (choicePresentation ? safeControlHeight + choiceMenuReservedHeight
                        : (splitPresentation ? 52
                           : (10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10)))
     height: matchesSearch ? implicitHeight : 0
@@ -194,7 +197,7 @@ Item {
                         ? root.width - contentPadding - revertZoneWidth
                         : root.width - 2 * contentPadding - revertZoneWidth)
         height: root.inlinePresentation ? root.implicitHeight
-                : (root.choicePresentation ? controlHost.height
+                : (root.choicePresentation ? controlHost.height + root.choiceMenuReservedHeight
                    : (root.splitPresentation ? root.implicitHeight
                       : labelItem.implicitHeight + labelControlGap + controlHost.height))
 
@@ -233,7 +236,7 @@ Item {
             id: controlHost
             x: root.inlinePresentation || root.splitPresentation ? Math.max(0, parent.width - width) : 0
             y: root.choicePresentation
-               ? (parent.height - height) / 2
+               ? 0
                : root.inlinePresentation ? 0
                : root.splitPresentation ? 0
                : labelItem.implicitHeight + root.labelControlGap

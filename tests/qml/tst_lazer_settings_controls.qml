@@ -290,12 +290,12 @@ Item {
             sliderHolder.value = 4
             wait(0)
             verify(slider.defaultMarkerVisible)
-            compare(slider.defaultMarkerItem.width, 3)
+            compare(slider.defaultMarkerItem.width, 5)
             compare(slider.defaultMarkerItem.height, 6)
             compare(slider.defaultMarkerItem.radius, 1.5)
             compare(slider.defaultMarkerItem.color, "#d5ccff")
             compare(slider.nubItem.height, slider.trackItem.height)
-            compare(slider.nubItem.width, 6)
+            compare(slider.nubItem.width, 8)
             compare(slider.thumbColor, Lazer.LazerTheme.settingsSliderThumb)
             verify(slider.thumbColor !== Lazer.LazerTheme.settingsAccent)
             verify(slider.thumbLightItem === null)
@@ -311,6 +311,22 @@ Item {
             sliderHolder.value = 4
             wait(0)
             compare(slider.defaultMarkerItem.height, 6)
+        }
+
+        function test_choiceRowReservesMenuHeightAndTogglesClosed() {
+            choiceRow.y = 0
+            choiceRow.width = 520
+            choiceRow.height = choiceRow.implicitHeight
+            rowChoice.openMenu()
+            wait(0)
+            compare(rowChoice.menuReservedHeight, 38)
+            compare(choiceRow.height, choiceRow.implicitHeight)
+            compare(choiceRow.height, rowChoice.implicitHeight + rowChoice.menuReservedHeight)
+            compare(rowChoice.controlItem.y, 0)
+            rowChoice.openMenu()
+            compare(rowChoice.menuOpen, false)
+            compare(rowChoice.menuReservedHeight, 0)
+            compare(choiceRow.height, rowChoice.implicitHeight)
         }
 
         function test_sliderReverseTrackMapping() {
@@ -392,7 +408,7 @@ Item {
             compare(dropdownSpy.count, 1)
             verify(dropdownSpy.signalArguments[0][0] === choice)
             keyPress(Qt.Key_Space)
-            compare(choice.menuOpen, true)
+            compare(choice.menuOpen, false)
             choice.closeMenu()
             compare(choice.menuOpen, false)
             compare(dropdownDismissSpy.count, 1)
@@ -511,9 +527,9 @@ Item {
             compare(revertRowSlider.trackItem.radius, 4)
             compare(revertRowSlider.trackItem.color, Lazer.LazerTheme.settingsTrack)
             compare(revertRowSlider.trackFillItem.color, Lazer.LazerTheme.settingsAccent)
-            compare(revertRowSlider.nubItem.width, 6)
+            compare(revertRowSlider.nubItem.width, 8)
             compare(revertRowSlider.nubItem.height, revertRowSlider.trackItem.height)
-            compare(revertRowSlider.nubItem.radius, 3)
+            compare(revertRowSlider.nubItem.radius, 4)
             compare(revertRowSlider.nubItem.color, Lazer.LazerTheme.settingsSliderThumb)
             verify(revertRowSlider.nubItem !== null)
             compare(revertRowSlider.height, revertRow.height)

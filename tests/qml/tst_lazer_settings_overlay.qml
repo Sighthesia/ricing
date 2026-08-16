@@ -102,7 +102,18 @@ Item {
             overlay.panel.currentNav.forceActiveFocus()
             keyPress(Qt.Key_Escape)
             compare(requestSpy.count, 1)
+            verify(overlay.phase === "closing")
+            verify(overlay.panel.appearanceNav.appearOpacity > 0)
+            tryCompare(overlay, "phase", "closed", 1200)
             compare(overlay.panel.appearanceNav.appearOpacity, 0)
+        }
+
+        function test_panelLayersStayOpaqueDuringTranslation() {
+            overlay.openFrom(opener)
+            verify(overlay.panel.layerOpacity === 1)
+            tryCompare(overlay, "phase", "open", 1200)
+            overlay.closeWithoutFocusRestore()
+            verify(overlay.panel.layerOpacity === 1)
             tryCompare(overlay, "phase", "closed", 1200)
         }
 

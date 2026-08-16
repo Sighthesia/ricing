@@ -189,7 +189,7 @@ Item {
         x: Math.max(0, Math.min(trackHost.width - width,
                                  root.defaultFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
-        width: 3
+        width: 5
         height: root.defaultMarkerAtValue ? Math.max(0, trackHost.height - 6) : 6
         radius: height / 2
         color: "#D5CCFF"
@@ -221,9 +221,9 @@ Item {
         x: Math.max(0, Math.min(trackHost.width - width,
                                  root.displayFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
-        width: 6
+        width: 8
         height: trackHost.height
-        radius: 3
+        radius: 4
         color: LazerTheme.settingsSliderThumb
         scale: root.dragging ? MotionTokens.pressScale : (root.hovered ? 1.06 : 1)
 

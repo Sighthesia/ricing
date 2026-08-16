@@ -366,7 +366,7 @@ Item {
             anchors.fill: parent
             TapHandler {
                 enabled: dropdownMenu.visible
-                onTapped: root.closeDropdownMenu()
+                onTapped: eventPoint => root.handleDropdownTap(eventPoint.position)
             }
         }
 
@@ -548,6 +548,20 @@ Item {
             dropdownMenu.close()
     }
 
+    function handleDropdownTap(position) {
+        var choice = dropdownMenu.choiceItem
+        if (choice) {
+            var header = choice.headerItem || choice
+            var origin = header.mapToItem(root, 0, 0)
+            if (position.x >= origin.x && position.x <= origin.x + header.width
+                    && position.y >= origin.y && position.y <= origin.y + header.height) {
+                choice.closeMenu()
+                return
+            }
+        }
+        root.closeDropdownMenu()
+    }
+
     function selectDropdownValue(value) {
         var choice = dropdownMenu.choiceItem
         if (!choice)
@@ -581,13 +595,10 @@ Item {
         var header = choiceItem.headerItem || choiceItem
         var pos = header.mapToItem(root, 0, 0)
         var menuHeight = Math.min(LazerTheme.dropdownMaxHeight, choiceItem.model.length * 30 + 8)
-        var placement = Logic.dropdownPlacement(pos.y, pos.y + header.height, menuHeight,
-                                                viewport.y, viewport.y + viewport.height,
-                                                LazerTheme.dropdownMaxHeight)
         dropdownMenu.x = Logic.clamp(pos.x, 0, Math.max(0, root.width - header.width))
         dropdownMenu.width = header.width
-        dropdownMenu.y = placement.y
-        dropdownMenu.height = placement.height
+        dropdownMenu.y = pos.y + header.height
+        dropdownMenu.height = menuHeight
         dropdownMenu.open()
         root.dropdownOpen = true
         dropdownMenu.forceActiveFocus()

@@ -20,6 +20,8 @@ Item {
     readonly property string displayLabel: labelFor(currentValue)
     readonly property bool focusVisible: activeFocus
     property bool menuOpen: false
+    readonly property real menuReservedHeight: menuOpen
+        ? Math.min(LazerTheme.dropdownMaxHeight, model.length * 30 + 8) : 0
     readonly property Item headerItem: headerSurface
     readonly property Item surfaceItem: headerSurface
     signal valueSelected(string value)
@@ -63,8 +65,12 @@ Item {
     }
 
     function openMenu() {
-        if (!root.effectiveEnabled || root.menuOpen)
+        if (!root.effectiveEnabled)
             return
+        if (root.menuOpen) {
+            root.closeMenu()
+            return
+        }
         root.menuOpen = true
         SettingsOverlayBridge.showDropdown(root)
     }
