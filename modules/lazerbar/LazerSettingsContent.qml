@@ -487,6 +487,11 @@ Item {
         var p = priority === undefined ? 1 : Number(priority)
         if (!isFinite(p) || p < 1)
             p = 1
+        // Reject requests whose activity source already reports inactive; the
+        // source may have emitted a stale signal after losing hover/focus.
+        var actSource = SettingsOverlayBridge.activitySourceFor(source)
+        if (actSource && actSource.tooltipActive === false)
+            return
         // Keep the current owner stable. Equal-priority hover/focus requests
         // remain registered for deterministic fallback instead of stealing it.
         if (root.activeTooltipSource && root.activeTooltipSource !== source
@@ -523,6 +528,11 @@ Item {
         for (var i = 0; i < requests.length; i++) {
             var req = requests[i]
             if (!req.text || !req.source || !root.ownsOverlaySource(req.source))
+                continue
+            // Only callers that explicitly supplied an activity source opt into
+            // filtering. Existing three-argument requests remain valid.
+            var actSource = req.activitySource
+            if (actSource && actSource.tooltipActive === false)
                 continue
             if (!best || req.priority > best.priority)
                 best = req

@@ -12,6 +12,9 @@ Item {
     QtObject { id: notificationSettings; property int maxVisible: 3; property int timeout: 5000; property string position: "top-right"; property bool dnd: false }
     QtObject { id: wallpaperService; function changeWallpaper(path) {} }
     QtObject { id: saveService; property int count: 0; function save() { count++ } }
+    QtObject { id: firstActivity; property bool tooltipActive: false }
+    QtObject { id: secondActivity; property bool tooltipActive: false }
+    QtObject { id: sliderActivity; property bool tooltipActive: false }
     QtObject {
         id: resetService
         property int count: 0
@@ -78,6 +81,9 @@ Item {
             resetService.category = ""
             resetService.key = ""
             resetService.value = undefined
+            firstActivity.tooltipActive = false
+            secondActivity.tooltipActive = false
+            sliderActivity.tooltipActive = false
             closeSpy.clear()
             categorySpy.clear()
             wait(20)
@@ -573,6 +579,58 @@ Item {
             compare(panel.content.tooltipItem.visible, false)
             panel.contentReady = false
             Lazer.MotionTokens.reducedMotionOverride = false
+        }
+
+        function test_inactiveRowDoesNotReviveAfterSliderDismissal() {
+            panel.contentReady = true
+            var first = panel.appearancePage.colorSchemeRow
+            var second = panel.appearancePage.wallpaperRow
+            var slider = panel.appearancePage.panelOpacitySlider
+            firstActivity.tooltipActive = true
+            secondActivity.tooltipActive = true
+            sliderActivity.tooltipActive = true
+            Lazer.SettingsOverlayBridge.showTooltip(first.descriptionText, first, 1, firstActivity)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, first)
+            // The adjacent row registers without displacing the stable owner.
+            Lazer.SettingsOverlayBridge.showTooltip(second.descriptionText, second, 1, secondActivity)
+            compare(panel.content.activeTooltipSource, first)
+            // A higher-priority slider owns the surface while the old row goes stale.
+            Lazer.SettingsOverlayBridge.showTooltip("35%", slider.nubItem, 2, sliderActivity)
+            tryVerify(function() { return panel.content.activeTooltipSource === slider.nubItem }, 200)
+            firstActivity.tooltipActive = false
+            sliderActivity.tooltipActive = false
+            Lazer.SettingsOverlayBridge.hideTooltip(slider.nubItem)
+            // The stale first request remains registered but cannot reappear.
+            tryVerify(function() { return panel.content.activeTooltipSource === second }, 200)
+            compare(panel.content.activeTooltipText, second.descriptionText)
+            Lazer.SettingsOverlayBridge.hideTooltip(second)
+            Lazer.SettingsOverlayBridge.hideTooltip(first)
+            tryVerify(function() { return !panel.content.tooltipVisible }, 300)
+            panel.contentReady = false
+        }
+
+        function test_sliderActivitySourceFallsBackToActiveRow() {
+            panel.contentReady = true
+            var row = panel.appearancePage.panelOpacityRow
+            var slider = panel.appearancePage.panelOpacitySlider
+            var nub = slider.nubItem
+            firstActivity.tooltipActive = true
+            sliderActivity.tooltipActive = true
+            // Row description is active first.
+            Lazer.SettingsOverlayBridge.showTooltip(row.descriptionText, row, 1, firstActivity)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            // Slider takes over with priority 2.
+            Lazer.SettingsOverlayBridge.showTooltip("35%", nub, 2, sliderActivity)
+            tryVerify(function() { return panel.content.activeTooltipSource === nub }, 200)
+            compare(panel.content.activeTooltipPriority, 2)
+            // An inactive slider may not block the still-active row fallback.
+            sliderActivity.tooltipActive = false
+            Lazer.SettingsOverlayBridge.hideTooltip(nub)
+            tryVerify(function() { return panel.content.activeTooltipSource === row }, 200)
+            compare(panel.content.activeTooltipText, row.descriptionText)
+            Lazer.SettingsOverlayBridge.hideTooltip(row)
+            panel.contentReady = false
         }
     }
 }

@@ -40,6 +40,9 @@ Item {
     readonly property bool rowHovered: rowHover.hovered || revertHover.hovered
                                     || (controlItem && controlItem.hovered === true)
     readonly property bool rowHighlighted: rowHovered || (controlItem && controlItem.activeFocus)
+    // Expose whether this row is still actively hovered or focused so the
+    // content can skip stale tooltip fallback candidates.
+    readonly property bool tooltipActive: rowHighlighted
     readonly property bool compactLayout: width < 480
     readonly property real choiceMenuReservedHeight: root.choicePresentation && root.controlItem
                                                    && root.controlItem.menuReservedHeight !== undefined
@@ -128,7 +131,7 @@ Item {
             return
         }
         if (root.rowHighlighted)
-            SettingsOverlayBridge.showTooltip(root.descriptionText, root, 1)
+            SettingsOverlayBridge.showTooltip(root.descriptionText, root, 1, root)
         else
             SettingsOverlayBridge.hideTooltip(root)
     }

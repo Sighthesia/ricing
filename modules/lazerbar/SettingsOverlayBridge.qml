@@ -13,16 +13,20 @@ QtObject {
     // Keep one active tooltip per source so hover/focus changes do not flicker.
     property var _tooltipRequests: []
 
-    function showTooltip(text, sourceItem, priority) {
+    function showTooltip(text, sourceItem, priority, activitySource) {
         var p = priority === undefined ? 1 : Number(priority)
         if (!isFinite(p) || p < 1)
             p = 1
+        // Existing three-argument callers are programmatic requests without an
+        // interaction predicate. Only explicit sources participate in filtering.
+        var actSource = activitySource !== undefined ? activitySource : null
         var existing = tooltipRequestIndex(sourceItem)
         if (existing >= 0) {
             _tooltipRequests[existing].text = text
             _tooltipRequests[existing].priority = p
+            _tooltipRequests[existing].activitySource = actSource
         } else {
-            _tooltipRequests.push({ text: text, source: sourceItem, priority: p })
+            _tooltipRequests.push({ text: text, source: sourceItem, priority: p, activitySource: actSource })
         }
         tooltipRequested(text, sourceItem, p)
     }
@@ -45,6 +49,14 @@ QtObject {
                 return i
         }
         return -1
+    }
+
+    function activitySourceFor(sourceItem) {
+        var idx = tooltipRequestIndex(sourceItem)
+        if (idx < 0)
+            return null
+        var req = _tooltipRequests[idx]
+        return req.activitySource
     }
 
     function currentTooltip() {

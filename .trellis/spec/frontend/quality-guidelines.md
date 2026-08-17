@@ -352,6 +352,7 @@ Rectangle {
 ### 2. Signatures
 
 - Tooltip arbitration keeps one request entry per source and preserves first-registration order.
+- `SettingsOverlayBridge.showTooltip(text, sourceItem, priority, activitySource)` accepts an optional explicit activity source.
 - Settings-only tokens: `settingsAccent`, `settingsControlSurface`, `settingsPanel`, `settingsRail`, and `settingsNavInactive`.
 - Control presentation contract: `standard | inline | split` via `rowPresentation`.
 
@@ -360,6 +361,8 @@ Rectangle {
 - An active tooltip owner is not replaced by an equal-priority source; a strictly higher-priority request may replace it immediately.
 - Repeated requests from the active source update text and priority in place without restarting the fade or moving the source.
 - Fallback selects the highest valid priority using original registration order for ties.
+- Row descriptions pass the Row as `activitySource`; Slider value tooltips retain `nubItem` as their geometry source and pass the Slider root as `activitySource`.
+- A request with an explicit `activitySource.tooltipActive === false` cannot take ownership or reappear through fallback. Calls without the fourth argument retain their existing programmatic-request semantics.
 - Toggle exposes `inline` and renders a `44x20` capsule without a moving or hollow Nub.
 - Slider exposes `split`, renders a `26px` trough whose active thumb is exactly as tall as the trough and uses a brighter shade of the fill color, and exposes that thumb as `nubItem`.
 - Settings tokens are exact: `#765BFF`, `#25222E`, `#18161D`, `#131217`, and `#8A8795`; `settingsRow` is transparent and global `osuPink` is unchanged.
@@ -370,6 +373,7 @@ Rectangle {
 - Equal-priority competing source while active owner is valid -> retain active owner.
 - Higher-priority source -> replace active owner and reposition immediately.
 - Active source hidden, destroyed, or fully offscreen -> dismiss and choose deterministic fallback.
+- Explicit activity source reports `tooltipActive === false` -> skip the request during both initial ownership and fallback; do not revive its stale geometry.
 - Toggle or Slider imports shared Nub visuals -> reject; controls render their specified capsule or full-height thumb directly.
 - Inactive navigation item -> no selection indicator and use `#8A8795`.
 - Content header close/collapse controls -> reject; close remains on Escape or Sidebar Back.
@@ -384,6 +388,7 @@ Rectangle {
 ### 6. Tests Required
 
 - Bridge/Content tests assert equal-priority stability, higher-priority takeover, in-place text updates, and registration-order fallback.
+- Panel tests assert a stale Row request is skipped after a higher-priority Slider dismisses, and an inactive Slider falls back to a still-active Row.
 - Control tests assert Toggle `44x20`, Slider `26px` trough, full-height brighter thumb, `rowPresentation`, and `nubItem` identity.
 - Theme tests assert settings-only tokens and transparent row surface.
 - Panel tests assert right-side search icon, exact placeholder, removed header actions, inactive navigation indicator absence, and preserved Escape/Back close.

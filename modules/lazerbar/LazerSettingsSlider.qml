@@ -25,6 +25,9 @@ Item {
     readonly property bool focusVisible: activeFocus
     readonly property bool dragging: dragHandler.active
     readonly property bool hovered: hoverHandler.hovered
+    // Expose whether this slider is still actively hovered, dragged, or focused
+    // so the content can skip stale tooltip fallback candidates.
+    readonly property bool tooltipActive: hoverHandler.hovered || dragHandler.active || root.activeFocus
     readonly property real normalizedFraction: Logic.sliderFraction(from, to, displayValue)
     readonly property real targetFraction: Logic.sliderFraction(from, to, displayValue)
     readonly property real defaultFraction: defaultValue === undefined
@@ -109,7 +112,7 @@ Item {
         // dragging, focusVisible) are not re-evaluated until after the
         // notify handler runs, so inside these handlers they are stale.
         if (hoverHandler.hovered || dragHandler.active || root.activeFocus)
-            SettingsOverlayBridge.showTooltip(root.displayText, root.nubItem, 2)
+            SettingsOverlayBridge.showTooltip(root.displayText, root.nubItem, 2, root)
         else
             SettingsOverlayBridge.hideTooltip(root.nubItem)
     }
