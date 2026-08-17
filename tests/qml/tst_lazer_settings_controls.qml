@@ -126,6 +126,10 @@ Item {
         name: "LazerSettingsControls"
 
         function init() {
+            row.y = 20
+            compactRow.y = 150
+            choiceRow.y = 280
+            resetTextRow.y = 380
             toggle.enabled = true
             toggleHolder.value = false
             toggleSpy.clear()
@@ -564,6 +568,32 @@ Item {
             verify(!row.contentEnabled)
             row.enabled = true
             row.searchQuery = ""
+        }
+
+        function test_rowHoverCoversLabelAndControlRegions() {
+            row.searchQuery = ""
+            wait(0)
+
+            mouseMove(row, 24, 12)
+            verify(row.hovered)
+
+            mouseMove(row, row.controlRegionLeft + row.textRegionWidth - 24, row.height / 2)
+            verify(row.hovered)
+            compare(row.cardItem.border.width, 1.5)
+        }
+
+        function test_rowHoverCoversTextFieldAndChoiceControls() {
+            compactRow.searchQuery = ""
+            choiceRow.searchQuery = ""
+            wait(0)
+
+            mouseMove(compactRow, compactTextField.width / 2,
+                      compactTextField.mapToItem(compactRow, 0, compactTextField.height / 2).y)
+            verify(compactRow.hovered)
+
+            mouseMove(choiceRow, rowChoice.width / 2, rowChoice.height / 2)
+            verify(choiceRow.hovered)
+            compare(choiceRow.cardItem.border.width, 1.5)
         }
 
         function test_compactRowStacksTextAndControl() {

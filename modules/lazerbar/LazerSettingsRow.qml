@@ -72,10 +72,9 @@ Item {
         id: cardSurface
         anchors.fill: parent
         radius: 6
-        color: root.choicePresentation ? LazerTheme.settingsCard
-                                    : (rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard)
-        border.width: !root.choicePresentation && rowHover.hovered ? 1.5 : 0
-        border.color: !root.choicePresentation && rowHover.hovered ? LazerTheme.settingsAccent : "transparent"
+        color: rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+        border.width: rowHover.hovered ? 1.5 : 0
+        border.color: rowHover.hovered ? LazerTheme.settingsAccent : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
@@ -281,4 +280,5 @@ Item {
     readonly property Item contentItem: contentHost
     readonly property Item revertButtonItem: revertButton
     readonly property Item cardItem: cardSurface
+    readonly property bool hovered: rowHover.hovered
 }
