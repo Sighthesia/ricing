@@ -600,6 +600,10 @@ width: root.inlinePresentation
 
 - The shared card fills the Row width, uses `radius: 6`, `#221F2B`, and
   transitions to `#2A2636` while the row is hovered.
+- Row hover is owned by a `HoverHandler` targeted at that shared card surface.
+  Its highlighted state also includes an injected control's `hovered` and
+  `activeFocus` state plus the higher-z restore button's hover state; each
+  source refreshes the shared tooltip state when it changes.
 - Card content keeps approximately `12px` horizontal padding; Toggle remains
   an inline `44x20` control and is not wrapped in a second card.
 - Slider is a `26px` high, radius-4 trough using `#2E2A3A`, an accent
@@ -631,6 +635,8 @@ width: root.inlinePresentation
   right-side slot.
 - Toggle receives a second visual card -> reject; Row owns the card and the
   Toggle owns only its capsule.
+- Hovering a control, card edge, or visible restore button without highlighting
+  the shared card -> reject; those hit regions must use one row state.
 
 ### 5. Good/Base/Bad Cases
 
@@ -644,7 +650,8 @@ width: root.inlinePresentation
 ### 6. Tests Required
 
 - Control tests assert card width, radius, base color, hover token, content
-  padding, Slider width range, trough/fill colors, and thumb geometry.
+  padding, row-edge/control/reset hover coverage, Slider width range,
+  trough/fill colors, and thumb geometry.
 - Existing Slider interaction tests assert track taps, drag updates, step
   normalization, keyboard behavior, default reset, and tooltip anchoring.
 - Existing Toggle tests assert `44x20`, checked/off colors, accessibility, and
@@ -669,9 +676,11 @@ width: parent.width * 0.5
 Rectangle {
     anchors.fill: parent
     radius: 6
-    color: rowHover.hovered ? LazerTheme.settingsCardHover
-                            : LazerTheme.settingsCard
+    color: rowHighlighted ? LazerTheme.settingsCardHover
+                          : LazerTheme.settingsCard
 }
+
+HoverHandler { target: cardSurface }
 
 width: Math.min(240, parent.width * 0.55)
 ```
