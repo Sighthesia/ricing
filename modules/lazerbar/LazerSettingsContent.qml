@@ -294,6 +294,7 @@ Item {
         z: 20
         visible: false
         opacity: 0
+        enabled: false
         readonly property real hPadding: 6
         readonly property real vPadding: 6
         readonly property real sideMargin: 10
