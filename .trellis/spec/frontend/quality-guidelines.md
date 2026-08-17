@@ -605,11 +605,12 @@ width: root.inlinePresentation
 
 - The shared card fills the Row width, uses `radius: 6`, `#221F2B`, and
   transitions to `#2A2636` while the row is hovered.
-- Row hover is owned by a `HoverHandler` whose parent is the shared card
-  surface, so its monitored bounds exactly match the painted card. Its
-  highlighted state also includes an injected control's `hovered` and
-  `activeFocus` state plus the higher-z restore button's hover state; each
-  source refreshes the shared tooltip state when it changes.
+- Row hover is owned by a non-blocking `HoverHandler` on the Row root, so its
+  monitored bounds cover the complete painted card even where an embedded
+  control is stacked above the card surface. The embedded control keeps its
+  own hover/focus/tap/drag handler; the Row aggregates its public `hovered`
+  state and the higher-z restore button's hover state into one highlight and
+  tooltip state. The visual card surface must not become an input catcher.
 - If an embedded control can cover the card border, the Row may add a
   transparent, `enabled: false` focus ring above the content layer. This ring
   is visual-only and must never become an input catcher.

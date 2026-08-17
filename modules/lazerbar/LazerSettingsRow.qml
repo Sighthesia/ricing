@@ -37,7 +37,7 @@ Item {
     readonly property bool inlinePresentation: rowPresentation === "inline"
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
-    readonly property bool rowHovered: cardHover.hovered || revertHover.hovered
+    readonly property bool rowHovered: rowHover.hovered || revertHover.hovered
                                      || (controlItem && controlItem.hovered === true)
     readonly property bool rowHighlighted: rowHovered || (controlItem && controlItem.activeFocus)
     // Expose whether this row is still actively hovered or focused so the
@@ -73,6 +73,13 @@ Item {
     visible: matchesSearch
     opacity: root.enabled ? 1 : LazerTheme.settingsDisabledAlpha
 
+    // Observe the complete row, including areas covered by embedded controls.
+    HoverHandler {
+        id: rowHover
+        enabled: root.enabled
+        onHoveredChanged: root.refreshTooltip()
+    }
+
     // Keep one shared card surface behind every setting presentation.
     Rectangle {
         id: cardSurface
@@ -85,12 +92,6 @@ Item {
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
 
-        // Monitor the exact painted card bounds without covering controls.
-        HoverHandler {
-            id: cardHover
-            enabled: root.enabled
-            onHoveredChanged: root.refreshTooltip()
-        }
     }
 
     // Keep the row focus ring above embedded controls without owning input.
@@ -150,7 +151,7 @@ Item {
     // properties like rowHighlighted are not re-evaluated until after the
     // notify handler completes, so they are stale inside signal callbacks.
     function _isRowActiveForTooltip() {
-        if (cardHover.hovered || revertHover.hovered)
+        if (rowHover.hovered || revertHover.hovered)
             return true
         if (root.controlItem && root.controlItem.hovered === true)
             return true
