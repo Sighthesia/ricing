@@ -37,8 +37,8 @@ Item {
     readonly property bool inlinePresentation: rowPresentation === "inline"
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
-    readonly property bool rowHovered: rowHover.hovered || revertHover.hovered
-                                    || (controlItem && controlItem.hovered === true)
+    readonly property bool rowHovered: cardHover.hovered || revertHover.hovered
+                                     || (controlItem && controlItem.hovered === true)
     readonly property bool rowHighlighted: rowHovered || (controlItem && controlItem.activeFocus)
     // Expose whether this row is still actively hovered or focused so the
     // content can skip stale tooltip fallback candidates.
@@ -82,6 +82,28 @@ Item {
         border.width: root.rowHighlighted ? 1.5 : 0
         border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on border.width { NumberAnimation { duration: 100 } }
+        Behavior on border.color { ColorAnimation { duration: 100 } }
+
+        // Track the exact painted card bounds instead of relying on the Row
+        // parent while its content and injected control are stacked above it.
+        HoverHandler {
+            id: cardHover
+            enabled: root.enabled
+            onHoveredChanged: root.refreshTooltip()
+        }
+    }
+
+    // Keep the row focus ring above embedded controls without owning input.
+    Rectangle {
+        id: cardHighlight
+        z: 2
+        anchors.fill: parent
+        radius: cardSurface.radius
+        color: "transparent"
+        border.width: root.controlItem && root.controlItem.activeFocus ? 1.5 : 0
+        border.color: root.controlItem && root.controlItem.activeFocus ? LazerTheme.settingsAccent : "transparent"
+        enabled: false
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
     }
@@ -129,7 +151,7 @@ Item {
     // properties like rowHighlighted are not re-evaluated until after the
     // notify handler completes, so they are stale inside signal callbacks.
     function _isRowActiveForTooltip() {
-        if (rowHover.hovered || revertHover.hovered)
+        if (cardHover.hovered || revertHover.hovered)
             return true
         if (root.controlItem && root.controlItem.hovered === true)
             return true
@@ -285,13 +307,6 @@ Item {
         property: "y"
         value: Math.max(0, (contentHost.height - root.controlItem.height) / 2)
         when: root.inlinePresentation
-    }
-
-    HoverHandler {
-        id: rowHover
-        target: cardSurface
-        enabled: root.enabled
-        onHoveredChanged: root.refreshTooltip()
     }
 
     Connections {

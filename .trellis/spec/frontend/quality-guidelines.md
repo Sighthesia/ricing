@@ -605,10 +605,14 @@ width: root.inlinePresentation
 
 - The shared card fills the Row width, uses `radius: 6`, `#221F2B`, and
   transitions to `#2A2636` while the row is hovered.
-- Row hover is owned by a `HoverHandler` targeted at that shared card surface.
-  Its highlighted state also includes an injected control's `hovered` and
+- Row hover is owned by a `HoverHandler` whose parent is the shared card
+  surface, so its monitored bounds exactly match the painted card. Its
+  highlighted state also includes an injected control's `hovered` and
   `activeFocus` state plus the higher-z restore button's hover state; each
   source refreshes the shared tooltip state when it changes.
+- If an embedded control can cover the card border, the Row may add a
+  transparent, `enabled: false` focus ring above the content layer. This ring
+  is visual-only and must never become an input catcher.
 - Card content keeps approximately `12px` horizontal padding; Toggle remains
   an inline `44x20` control and is not wrapped in a second card.
 - Slider is a `26px` high, radius-4 trough using `#2E2A3A`, an accent
@@ -642,6 +646,8 @@ width: root.inlinePresentation
   Toggle owns only its capsule.
 - Hovering a control, card edge, or visible restore button without highlighting
   the shared card -> reject; those hit regions must use one row state.
+- A focus ring placed below an embedded Choice or TextField surface -> reject;
+  preserve the explicit non-interactive ring layer above content.
 
 ### 5. Good/Base/Bad Cases
 
@@ -685,7 +691,11 @@ Rectangle {
                           : LazerTheme.settingsCard
 }
 
-HoverHandler { target: cardSurface }
+// The handler monitors the exact painted card bounds.
+Rectangle {
+    anchors.fill: parent
+    HoverHandler { id: cardHover }
+}
 
 width: Math.min(240, parent.width * 0.55)
 ```
