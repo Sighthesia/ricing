@@ -125,12 +125,25 @@ Item {
         root.resetCallback()
     }
 
+    // Compute tooltip activity directly from raw input sources. Derived
+    // properties like rowHighlighted are not re-evaluated until after the
+    // notify handler completes, so they are stale inside signal callbacks.
+    function _isRowActiveForTooltip() {
+        if (rowHover.hovered || revertHover.hovered)
+            return true
+        if (root.controlItem && root.controlItem.hovered === true)
+            return true
+        if (root.controlItem && root.controlItem.activeFocus)
+            return true
+        return false
+    }
+
     function refreshTooltip() {
         if (!root.enabled || root.descriptionText.length === 0) {
             SettingsOverlayBridge.hideTooltip(root)
             return
         }
-        if (root.rowHighlighted)
+        if (_isRowActiveForTooltip())
             SettingsOverlayBridge.showTooltip(root.descriptionText, root, 1, root)
         else
             SettingsOverlayBridge.hideTooltip(root)

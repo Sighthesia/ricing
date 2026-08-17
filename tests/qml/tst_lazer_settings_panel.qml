@@ -91,6 +91,17 @@ Item {
 
         function cleanup() { Lazer.MotionTokens.reducedMotionOverride = false }
 
+        function movePointerTo(item) {
+            var point = item.mapToItem(panel.content, item.width / 2, item.height / 2)
+            mouseMove(panel.content, point.x, point.y)
+            wait(20)
+        }
+
+        function movePointerAway() {
+            mouseMove(panel.content, 2, panel.content.height - 2)
+            wait(20)
+        }
+
         function test_keepsAllPagesAliveAndInjectsDependencies() {
             verify(panel.appearancePage)
             verify(panel.barPage)
@@ -630,6 +641,85 @@ Item {
             tryVerify(function() { return panel.content.activeTooltipSource === row }, 200)
             compare(panel.content.activeTooltipText, row.descriptionText)
             Lazer.SettingsOverlayBridge.hideTooltip(row)
+            panel.contentReady = false
+        }
+
+        // ── Tooltip ownership regression: row departure/dismissal ──
+
+        function test_rowDepartureDismissesTooltipAndNewRowBecomesOwner() {
+            panel.contentReady = true
+            var first = panel.appearancePage.wallpaperRow
+            var second = panel.appearancePage.colorSchemeRow
+            movePointerTo(first)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, first)
+            movePointerAway()
+            tryCompare(panel.content, "tooltipVisible", false, 200)
+            movePointerTo(second)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, second)
+            compare(panel.content.activeTooltipText, second.descriptionText)
+            movePointerAway()
+            panel.contentReady = false
+        }
+
+        function test_controlFocusKeepsRowTooltipActive() {
+            panel.contentReady = true
+            var row = panel.appearancePage.panelOpacityRow
+            var slider = panel.appearancePage.panelOpacitySlider
+            movePointerAway()
+            slider.forceActiveFocus()
+            tryVerify(function() { return slider.activeFocus }, 200)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, row)
+            panel.forceActiveFocus()
+            wait(20)
+            tryCompare(panel.content, "tooltipVisible", false, 200)
+            panel.contentReady = false
+        }
+
+        function test_barCategoryRowDepartureDismissesAndNewRowOwns() {
+            panel.selectCategory("bar")
+            tryCompare(panel.barPage, "opacity", 1, 300)
+            panel.contentReady = true
+            var first = panel.barPage.heightRow
+            verify(first.descriptionText.length > 0)
+            movePointerTo(first)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, first)
+            movePointerAway()
+            tryCompare(panel.content, "tooltipVisible", false, 200)
+            panel.contentReady = false
+        }
+
+        function test_notificationCategoryRowDepartureDismissesAndNewRowOwns() {
+            panel.selectCategory("notifications")
+            tryCompare(panel.notificationPage, "opacity", 1, 300)
+            panel.contentReady = true
+            var first = panel.notificationPage.dndRow
+            var second = panel.notificationPage.maxVisibleRow
+            movePointerTo(first)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, first)
+            movePointerAway()
+            tryCompare(panel.content, "tooltipVisible", false, 200)
+            movePointerTo(second)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, second)
+            movePointerAway()
+            panel.contentReady = false
+        }
+
+        function test_controlRowHoverDrivesRowTooltip() {
+            panel.contentReady = true
+            var textRow = panel.appearancePage.wallpaperRow
+            verify(textRow.descriptionText.length > 0)
+            verify(textRow.controlItem !== null)
+            movePointerTo(textRow.controlItem)
+            tryCompare(panel.content, "tooltipVisible", true, 200)
+            compare(panel.content.activeTooltipSource, textRow)
+            movePointerAway()
+            tryCompare(panel.content, "tooltipVisible", false, 200)
             panel.contentReady = false
         }
     }
