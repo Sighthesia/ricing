@@ -249,11 +249,11 @@ Item {
         }
     }
 
-    // Match split controls to the full card height without changing their width contract.
+    // Center split controls vertically within the card without stretching.
     Binding {
         target: root.controlItem
-        property: "height"
-        value: root.implicitHeight
+        property: "y"
+        value: (root.height - root.controlItem.height) / 2
         when: root.splitPresentation
     }
 

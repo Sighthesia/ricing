@@ -522,7 +522,7 @@ Item {
             verify(rowToggle.x >= row.width - rowToggle.width - 20)
             verify(revertRowSlider.width >= 200)
             verify(revertRowSlider.width <= 240)
-            compare(revertRowSlider.trackItem.height, revertRow.height)
+            compare(revertRowSlider.trackItem.height, 30)
             verify(revertRowSlider.trackItem.height > 26)
             compare(revertRowSlider.trackItem.radius, 4)
             compare(revertRowSlider.trackItem.color, Lazer.LazerTheme.settingsTrack)
@@ -532,7 +532,7 @@ Item {
             compare(revertRowSlider.nubItem.radius, 5)
             compare(revertRowSlider.nubItem.color, Lazer.LazerTheme.settingsSliderThumb)
             verify(revertRowSlider.nubItem !== null)
-            compare(revertRowSlider.height, revertRow.height)
+            compare(revertRowSlider.height, 30)
             verify(revertRow.valueTextItem.visible)
             compare(revertRow.contentItem.height - revertRow.valueTextItem.bottom, 10)
         }
