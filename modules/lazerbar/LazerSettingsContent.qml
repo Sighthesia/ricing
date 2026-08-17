@@ -236,18 +236,20 @@ Item {
     }
 
     // Reveal a scroll shadow once the current page can scroll further down.
+    // Use visible (not opacity) so the item is fully removed from the scene
+    // graph when hidden, preventing it from intercepting hover events on the
+    // settings rows beneath it.
     Rectangle {
         id: scrollShadow
         anchors.left: viewport.left
         anchors.right: viewport.right
         anchors.bottom: viewport.bottom
         height: 22
-        opacity: root.canScrollDown ? 1 : 0
+        visible: root.canScrollDown
         gradient: Gradient {
             GradientStop { position: 0; color: "#00000000" }
             GradientStop { position: 1; color: "#55000000" }
         }
-        Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint } }
     }
 
     // Present a clear message when the current category has no matches.

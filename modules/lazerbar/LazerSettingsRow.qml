@@ -85,8 +85,7 @@ Item {
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
 
-        // Track the exact painted card bounds instead of relying on the Row
-        // parent while its content and injected control are stacked above it.
+        // Monitor the exact painted card bounds without covering controls.
         HoverHandler {
             id: cardHover
             enabled: root.enabled
