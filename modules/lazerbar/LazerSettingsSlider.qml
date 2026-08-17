@@ -190,7 +190,7 @@ Item {
                                  root.defaultFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
         width: 5
-        height: root.defaultMarkerAtValue ? Math.max(0, trackHost.height - 6) : 6
+        height: root.defaultMarkerAtValue ? Math.max(0, trackHost.height - 14) : 6
         radius: height / 2
         color: "#D5CCFF"
         opacity: root.defaultMarkerVisible ? 1 : 0
@@ -221,7 +221,7 @@ Item {
         x: Math.max(0, Math.min(trackHost.width - width,
                                  root.displayFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
-        width: 8
+        width: 12
         height: trackHost.height
         radius: 4
         color: LazerTheme.settingsSliderThumb
