@@ -37,7 +37,8 @@ Item {
     readonly property bool inlinePresentation: rowPresentation === "inline"
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
-    readonly property bool rowHovered: rowHover.hovered || (controlItem && controlItem.hovered === true)
+    readonly property bool rowHovered: rowHover.hovered || revertHover.hovered
+                                    || (controlItem && controlItem.hovered === true)
     readonly property bool rowHighlighted: rowHovered || (controlItem && controlItem.activeFocus)
     readonly property bool compactLayout: width < 480
     readonly property real choiceMenuReservedHeight: root.choicePresentation && root.controlItem
@@ -175,7 +176,11 @@ Item {
             Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
 
-        HoverHandler { id: revertHover; enabled: root.canReset }
+        HoverHandler {
+            id: revertHover
+            enabled: root.canReset
+            onHoveredChanged: root.refreshTooltip()
+        }
         TapHandler {
             enabled: root.canReset
             onTapped: root.activateReset()
@@ -268,6 +273,7 @@ Item {
 
     HoverHandler {
         id: rowHover
+        target: cardSurface
         enabled: root.enabled
         onHoveredChanged: root.refreshTooltip()
     }
