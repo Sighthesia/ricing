@@ -19,6 +19,7 @@ Item {
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property string displayLabel: labelFor(currentValue)
     readonly property bool focusVisible: activeFocus
+    readonly property bool hovered: headerHover.hovered
     property bool menuOpen: false
     readonly property real menuReservedHeight: menuOpen
         ? Math.min(LazerTheme.dropdownMaxHeight, model.length * 30 + 8) : 0

@@ -24,7 +24,6 @@ Item {
 
     visible: blocksDesktop
     enabled: blocksDesktop
-    focus: root.interactive
     Keys.onEscapePressed: event => { root.requestClose(); event.accepted = true }
 
     function openFrom(source) {
@@ -69,7 +68,6 @@ Item {
         id: panelHost
         width: root.requiredWidth
         height: root.height
-        focus: root.interactive
 
         LazerSettingsPanel {
             id: panel

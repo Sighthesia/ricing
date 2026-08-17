@@ -283,6 +283,14 @@ Item {
             compare(closeSpy.count, 1)
         }
 
+        function test_controlFocusHighlightsItsRow() {
+            var row = panel.appearancePage.panelOpacityRow
+            var slider = panel.appearancePage.panelOpacitySlider
+            slider.forceActiveFocus()
+            tryVerify(function() { return slider.activeFocus }, 200)
+            tryVerify(function() { return row.cardItem.border.width > 0 }, 200)
+        }
+
         function test_fastRetargetEndsAtLatestCategoryAndHiddenPagesAreInactive() {
             panel.selectCategory("bar")
             panel.selectCategory("notifications")

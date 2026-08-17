@@ -37,6 +37,8 @@ Item {
     readonly property bool inlinePresentation: rowPresentation === "inline"
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
+    readonly property bool rowHovered: rowHover.hovered || (controlItem && controlItem.hovered === true)
+    readonly property bool rowHighlighted: rowHovered || (controlItem && controlItem.activeFocus)
     readonly property bool compactLayout: width < 480
     readonly property real choiceMenuReservedHeight: root.choicePresentation && root.controlItem
                                                    && root.controlItem.menuReservedHeight !== undefined
@@ -72,9 +74,9 @@ Item {
         id: cardSurface
         anchors.fill: parent
         radius: 6
-        color: rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-        border.width: rowHover.hovered ? 1.5 : 0
-        border.color: rowHover.hovered ? LazerTheme.settingsAccent : "transparent"
+        color: root.rowHighlighted ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+        border.width: root.rowHighlighted ? 1.5 : 0
+        border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
@@ -124,7 +126,7 @@ Item {
             SettingsOverlayBridge.hideTooltip(root)
             return
         }
-        if (rowHover.hovered || (root.controlItem && root.controlItem.activeFocus))
+        if (root.rowHighlighted)
             SettingsOverlayBridge.showTooltip(root.descriptionText, root, 1)
         else
             SettingsOverlayBridge.hideTooltip(root)
@@ -272,6 +274,8 @@ Item {
 
     Connections {
         target: root.controlItem
+        ignoreUnknownSignals: true
+        function onHoveredChanged() { root.refreshTooltip() }
         function onActiveFocusChanged() { root.refreshTooltip() }
     }
 
@@ -280,5 +284,5 @@ Item {
     readonly property Item contentItem: contentHost
     readonly property Item revertButtonItem: revertButton
     readonly property Item cardItem: cardSurface
-    readonly property bool hovered: rowHover.hovered
+    readonly property bool hovered: rowHovered
 }
