@@ -40,6 +40,8 @@ Variants {
                 if (Services.SettingsService.hoverDebugEnabled
                         && screenScope.modelData.name === Services.SettingsService.hoverDebugOpenScreen) {
                     settingsOverlay.prepareDebugOpen()
+                    if (Services.SettingsService.hoverDebugCategory.length > 0)
+                        settingsOverlay.panel.selectedCategory = Services.SettingsService.hoverDebugCategory
                     overlayCoordinator.request("settings", null, true, true)
                 }
             }

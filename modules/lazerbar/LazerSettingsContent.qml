@@ -49,23 +49,46 @@ Item {
             "z": Number(row.z), "hover": row.rowHovered === true,
             "hoverScenePoint": row.rowHovered === true ? _point(row.debugHoverScenePoint) : null,
             "focus": row.activeFocus === true || (control && control.activeFocus === true),
+            "rowHighlighted": row.rowHighlighted === true,
+            "rowHoverBlocking": row.rowHoverBlocking === true,
+            "cardBorderWidth": Number(row.cardItem ? row.cardItem.border.width : 0),
             "control": control ? {
                 "role": String(row.rowPresentation || "standard"), "rect": _rect(control),
                 "sceneRect": _sceneRect(control),
                 "visible": control.visible, "enabled": control.enabled,
                 "opacity": Number(control.opacity), "z": Number(control.z),
                 "focus": control.activeFocus === true,
+                "effectiveEnabled": control.effectiveEnabled !== undefined
+                    ? control.effectiveEnabled === true : control.enabled === true,
+                "focusVisible": control.focusVisible !== undefined
+                    ? control.focusVisible === true : control.activeFocus === true,
+                "activeFocusOnTab": control.activeFocusOnTab === true,
+                "focusRing": control.headerItem && control.headerItem.border
+                    ? Number(control.headerItem.border.width)
+                    : (control.editorItem && control.editorItem.activeFocus
+                       ? 2 : (control.trackItem && control.focusVisible ? 2 : 0)),
             } : null,
         }
     }
 
+    function _pageSnapshot(page) {
+        if (!page)
+            return null
+        return {
+            "visible": page.visible, "enabled": page.enabled,
+            "opacity": Number(page.opacity), "z": Number(page.z),
+            "rect": _rect(page), "contentY": Number(page.contentY),
+            "contentHeight": Number(page.contentHeight),
+        }
+    }
+
     function _findRows(item, result) {
-        if (!item || result.length >= 4)
+        if (!item)
             return
         if (item.labelText !== undefined && item.controlItem !== undefined)
             result.push(item)
         var children = item.children || []
-        for (var i = 0; i < children.length && result.length < 4; i++)
+        for (var i = 0; i < children.length; i++)
             _findRows(children[i], result)
     }
 
@@ -78,6 +101,11 @@ Item {
         return {
             "rect": _rect(root), "viewport": { "rect": _rect(viewport), "clip": viewport.clip },
             "page": currentPage ? { "rect": _rect(currentPage), "contentY": Number(currentPage.contentY), "contentHeight": Number(currentPage.contentHeight), "visible": currentPage.visible, "enabled": currentPage.enabled, "opacity": Number(currentPage.opacity), "z": Number(currentPage.z) } : null,
+            "pages": {
+                "appearance": _pageSnapshot(root.parent && root.parent.appearancePage),
+                "bar": _pageSnapshot(root.parent && root.parent.barPage),
+                "notifications": _pageSnapshot(root.parent && root.parent.notificationPage),
+            },
             "selectedPageScroll": currentPage ? { "contentY": Number(currentPage.contentY), "contentHeight": Number(currentPage.contentHeight) } : null,
             "search": { "visible": searchArea.visible, "enabled": searchEditor.enabled, "focus": searchEditor.activeFocus },
             "dropdown": { "open": root.dropdownOpen }, "rows": rowSnapshots,

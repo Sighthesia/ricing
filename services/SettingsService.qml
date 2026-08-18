@@ -74,6 +74,7 @@ QtObject {
     property int hoverDebugToken: 0
     property int hoverDebugOpenToken: 0
     property string hoverDebugOpenScreen: ""
+    property string hoverDebugCategory: ""
     // Process-local diagnostic override; never persisted with settings.
     property string settingsMaskOverride: "auto"
     property int settingsMaskOverrideToken: 0
@@ -98,6 +99,7 @@ QtObject {
         function debugHover(enabled: string) { root.setHoverDebug(enabled) }
         function snapshotHover() { root.requestHoverSnapshot() }
         function openHoverDebug(screenName: string) { root.requestHoverDebugOpen(screenName) }
+        function debugCategory(category: string) { root.setHoverDebugCategory(category) }
         function maskOverride(mode: string) { root.setSettingsMaskOverride(mode) }
     }
 
@@ -133,6 +135,14 @@ QtObject {
             "screen": root.hoverDebugOpenScreen,
             "token": root.hoverDebugOpenToken,
         }))
+    }
+
+    function setHoverDebugCategory(category) {
+        var normalized = String(category).toLowerCase()
+        if (normalized !== "appearance" && normalized !== "bar" && normalized !== "notifications")
+            return
+        root.hoverDebugCategory = normalized
+        root.hoverDebugToken += 1
     }
 
     function setSettingsMaskOverride(mode) {
