@@ -1,0 +1,2 @@
+{"type":"spec","path":".trellis/spec/frontend","reason":"Check QML changes against frontend layer standards and required quality checks."}
+{"type":"research","path":".trellis/tasks/08-18-settings-category-hit-diagnosis","reason":"Compare post-change evidence with the previous category-level geometry and page-state diagnosis."}
