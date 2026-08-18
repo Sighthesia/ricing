@@ -16,6 +16,7 @@ Item {
 
     readonly property bool pressed: tapHandler.pressed
     readonly property bool focusVisible: activeFocus
+    readonly property bool hovered: hoverHandler.hovered
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property Item nubItem: capsule
@@ -38,6 +39,7 @@ Item {
     function activate() {
         if (!root.effectiveEnabled)
             return
+        root.forceActiveFocus()
         root.toggled(!root.checked)
     }
 
@@ -59,5 +61,8 @@ Item {
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
     }
 
+    // Keep hover state local to the capsule so the parent row can observe it
+    // without changing the toggle's input boundary.
+    HoverHandler { id: hoverHandler; enabled: root.effectiveEnabled }
     TapHandler { id: tapHandler; enabled: root.effectiveEnabled; onTapped: root.activate() }
 }

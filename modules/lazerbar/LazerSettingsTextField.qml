@@ -17,6 +17,7 @@ FocusScope {
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property bool focusVisible: editor.activeFocus
+    readonly property bool hovered: fieldHover.hovered
     readonly property Item editorItem: editor
     readonly property Item surfaceItem: fieldSurface
     property bool syncingEditor: false
@@ -151,5 +152,8 @@ FocusScope {
         font.pixelSize: 13
     }
 
+    // Keep hover state local to the editable surface so its parent row can
+    // observe it without changing the text field's input boundary.
+    HoverHandler { id: fieldHover; enabled: root.effectiveEnabled }
     TapHandler { enabled: root.effectiveEnabled; onTapped: editor.forceActiveFocus() }
 }

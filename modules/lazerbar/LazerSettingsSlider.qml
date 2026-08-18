@@ -23,6 +23,7 @@ Item {
     readonly property real displayValue: normalized(value)
     readonly property string displayText: Number(displayValue).toLocaleString(Qt.locale(), 'f', 0) + suffix
     readonly property bool focusVisible: activeFocus
+    readonly property bool hovered: trackHover.hovered
     readonly property bool dragging: dragHandler.active
     readonly property real normalizedFraction: Logic.sliderFraction(from, to, displayValue)
     readonly property real targetFraction: Logic.sliderFraction(from, to, displayValue)
@@ -207,6 +208,10 @@ Item {
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
 
     }
+
+    // Keep hover state local to the track so the parent row can observe it
+    // without changing the slider's input boundary.
+    HoverHandler { id: trackHover; enabled: root.effectiveEnabled }
 
     // Map taps anywhere on the track to the value under the pointer.
     TapHandler {

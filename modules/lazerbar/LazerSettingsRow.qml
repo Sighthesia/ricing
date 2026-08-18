@@ -37,7 +37,8 @@ Item {
     readonly property bool inlinePresentation: rowPresentation === "inline"
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
-    readonly property bool rowHovered: rowHover.hovered || revertHover.hovered
+    readonly property bool rowHovered: rowHover.hovered || rowHoverArea.containsMouse || revertHover.hovered
+                                     || (controlItem && controlItem.hovered === true)
     readonly property bool rowHoverBlocking: rowHover.blocking
     readonly property bool rowHighlighted: rowHovered || (controlItem && controlItem.activeFocus)
     readonly property point debugHoverScenePoint: rowHover.point.scenePosition
@@ -80,6 +81,16 @@ Item {
         enabled: root.enabled
         // Keep the row highlight observer from starving embedded controls.
         blocking: false
+    }
+
+    // Observe the complete card background without accepting control clicks.
+    MouseArea {
+        id: rowHoverArea
+        z: 0.5
+        anchors.fill: parent
+        enabled: root.enabled
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
     }
 
     // Keep one shared card surface behind every setting presentation.
