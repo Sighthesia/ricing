@@ -59,18 +59,21 @@ Item {
     readonly property real safeImplicitWidth: controlItem && isFinite(Number(controlItem.implicitWidth))
                                                ? Math.max(0, Number(controlItem.implicitWidth)) : 0
     readonly property real safeControlHeight: controlItem && isFinite(Number(controlItem.height))
-                                              && Number(controlItem.height) > 0
-                                              ? Number(controlItem.height)
-                                              : (controlItem && isFinite(Number(controlItem.implicitHeight))
-                                                 ? Math.max(0, Number(controlItem.implicitHeight)) : 0)
+                                               && Number(controlItem.height) > 0
+                                               ? Number(controlItem.height)
+                                               : (controlItem && isFinite(Number(controlItem.implicitHeight))
+                                                  ? Math.max(0, Number(controlItem.implicitHeight)) : 0)
+    readonly property real inlineControlWidth: Math.min(Math.max(0, contentHost.width), safeRequestedWidth)
+    readonly property real splitControlWidth: Math.min(240, Math.max(0, contentHost.width * 0.55))
+    readonly property real cardContentHeight: inlinePresentation ? 44
+                                         : (choicePresentation ? safeControlHeight + choiceMenuReservedHeight
+                                            : (splitPresentation ? 52
+                                               : 10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10))
 
     implicitWidth: 640
     readonly property real textRegionWidth: contentHost.width
     readonly property real controlRegionLeft: contentHost.x
-    implicitHeight: inlinePresentation ? 44
-                     : (choicePresentation ? safeControlHeight + choiceMenuReservedHeight
-                       : (splitPresentation ? 52
-                          : (10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10)))
+    implicitHeight: cardContentHeight
     height: matchesSearch ? implicitHeight : 0
     visible: matchesSearch
     opacity: root.enabled ? 1 : LazerTheme.settingsDisabledAlpha
@@ -235,19 +238,19 @@ Item {
         }
     }
 
-    // Arrange the injected control according to its small presentation contract.
+    // Own one stable content rectangle for every presentation mode.
     Item {
         id: contentHost
         z: 1
         x: root.choicePresentation ? 0 : contentPadding
-        y: root.inlinePresentation || root.choicePresentation || root.splitPresentation ? 0 : 10
+        y: root.choicePresentation || root.inlinePresentation || root.splitPresentation ? 0 : 10
         width: Math.max(0, root.choicePresentation
                         ? root.width - contentPadding - revertZoneWidth
                         : root.width - 2 * contentPadding - revertZoneWidth)
-        height: root.inlinePresentation ? root.implicitHeight
+        height: root.inlinePresentation ? 44
                 : (root.choicePresentation ? controlHost.height + root.choiceMenuReservedHeight
-                   : (root.splitPresentation ? root.implicitHeight
-                      : labelItem.implicitHeight + labelControlGap + controlHost.height))
+                   : (root.splitPresentation ? 52
+                      : root.implicitHeight - 20))
 
         Text {
             id: labelItem
@@ -282,35 +285,19 @@ Item {
 
         Item {
             id: controlHost
-            x: root.inlinePresentation || root.splitPresentation ? Math.max(0, parent.width - width) : 0
-            y: root.choicePresentation
-               ? 0
-               : root.inlinePresentation ? 0
-               : root.splitPresentation ? 0
+            x: root.inlinePresentation || root.splitPresentation
+               ? Math.max(0, parent.width - width) : 0
+            y: root.choicePresentation ? 0
+               : root.inlinePresentation ? Math.max(0, (parent.height - height) / 2)
+               : root.splitPresentation ? Math.max(0, (parent.height - height) / 2)
                : labelItem.implicitHeight + root.labelControlGap
-            width: root.inlinePresentation ? Math.min(parent.width, Math.max(0, root.safeRequestedWidth))
+            width: root.inlinePresentation ? root.inlineControlWidth
                  : (root.choicePresentation ? parent.width
-                     : (root.splitPresentation ? Math.min(240, Math.max(0, parent.width * 0.55)) : parent.width))
-            height: root.inlinePresentation || root.splitPresentation ? parent.height : root.safeControlHeight
+                     : (root.splitPresentation ? root.splitControlWidth : parent.width))
+            height: root.safeControlHeight
             Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
             Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         }
-    }
-
-    // Center split controls vertically within the card without stretching.
-    Binding {
-        target: root.controlItem
-        property: "y"
-        value: (root.height - root.controlItem.height) / 2
-        when: root.splitPresentation
-    }
-
-    // Center compact inline controls against the full visible card height.
-    Binding {
-        target: root.controlItem
-        property: "y"
-        value: Math.max(0, (contentHost.height - root.controlItem.height) / 2)
-        when: root.inlinePresentation
     }
 
     Connections {

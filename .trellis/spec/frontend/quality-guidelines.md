@@ -117,6 +117,68 @@ HoverHandler {
 }
 ```
 
+## Scenario: Single Settings Row Geometry Owner
+
+### 1. Scope / Trigger
+
+- Apply when a settings row embeds controls with different visual presentations and the page is inside a clipped Flickable.
+- This prevents parent height, child position bindings, and viewport clipping from deriving the same geometry through competing paths.
+
+### 2. Signatures
+
+- `LazerSettingsRow.cardContentHeight`: the single height calculation for `standard`, `inline`, `split`, and `choice` presentations.
+- `LazerSettingsRow.contentItem`: the stable row content rectangle.
+- `LazerSettingsRow.controlItem`: the injected control positioned by the row's `controlHost`.
+
+### 3. Contracts
+
+- The Row computes the card, content, and control rectangles once; the embedded control is not repositioned by a second external `y` Binding.
+- The card surface fills the Row exactly, and the control rectangle remains within the Row bounds for every presentation.
+- Search filtering may change Row height to zero, but must not recreate controls or change persistence behavior.
+- A clipped page remains inside the Content viewport; overlay geometry uses Content coordinates rather than screen coordinates.
+
+### 4. Validation & Error Matrix
+
+- Parent `implicitHeight`, child `y`, and host `height` mutually derive one another -> reject; this can produce stale or partial hit regions.
+- Card bounds differ from Row bounds -> reject; visual and hover ownership diverge.
+- Control rectangle exits Row bounds -> reject; pointer input can be clipped or routed to a neighboring row.
+- A decorative viewport layer remains enabled while visible over rows -> reject; it can intercept pointer delivery.
+
+### 5. Good/Base/Bad Cases
+
+- Good: standard rows stack label and control in one content rectangle, while inline and split controls are centered by the same host.
+- Good: Choice reserves menu height without changing the Choice header's own bounds.
+- Bad: a Row positions a split control through an external binding after the control has already been laid out by its host.
+
+### 6. Tests Required
+
+- Assert card bounds equal Row bounds.
+- Assert representative TextField, Choice, Slider, and Toggle rectangles stay inside their rows.
+- Assert viewport clipping and overlay enabled/visible state before and after opening a dropdown.
+- Preserve search, scroll position, category switching, focus, reset, and persistence tests.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+Binding {
+    target: root.controlItem
+    property: "y"
+    value: (root.height - root.controlItem.height) / 2
+}
+```
+
+#### Correct
+
+```qml
+Item {
+    id: controlHost
+    y: Math.max(0, (parent.height - height) / 2)
+    height: root.safeControlHeight
+}
+```
+
 #### Correct
 
 ```qml

@@ -126,6 +126,11 @@ Item {
     property alias tooltipItem: tooltip
     property alias tooltipTextItem: tooltipText
     property alias tooltipPlacementSide: tooltip.placementSide
+    property alias viewportItem: viewport
+    property alias scrollShadowItem: scrollShadow
+    property alias emptyStateItem: emptyState
+    property alias dropdownLayerItem: dropdownLayer
+    property alias menuCatcherItem: menuCatcher
 
     // Keep the persistent category pages mounted inside the clipped viewport.
     default property alias viewportChildren: viewport.data
@@ -311,7 +316,7 @@ Item {
             }
         }
 
-        HoverHandler { id: searchHover; enabled: root.interactive }
+        HoverHandler { id: searchHover; enabled: root.interactive; blocking: false }
         TapHandler { enabled: root.interactive; onTapped: searchEditor.forceActiveFocus() }
     }
 
@@ -331,6 +336,7 @@ Item {
     // settings rows beneath it.
     Rectangle {
         id: scrollShadow
+        enabled: false
         anchors.left: viewport.left
         anchors.right: viewport.right
         anchors.bottom: viewport.bottom
@@ -345,6 +351,7 @@ Item {
     // Present a clear message when the current category has no matches.
     Item {
         id: emptyState
+        enabled: false
         anchors.fill: viewport
         visible: root.emptyStateVisible
 
@@ -387,6 +394,7 @@ Item {
         visible: false
         opacity: 0
         enabled: false
+        activeFocusOnTab: false
         readonly property real hPadding: 6
         readonly property real vPadding: 6
         readonly property real sideMargin: 10
@@ -456,6 +464,7 @@ Item {
         // Close the menu when the pointer lands outside it.
         Item {
             id: menuCatcher
+            enabled: root.dropdownOpen
             anchors.fill: parent
             TapHandler {
                 enabled: dropdownMenu.visible

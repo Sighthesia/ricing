@@ -154,6 +154,36 @@ Item {
             compare(panel.content.searchSurfaceItem.color, Lazer.LazerTheme.settingsSearchSurface)
             compare(panel.content.searchSurfaceItem.border.width, 0)
             compare(panel.content.searchSurfaceItem.radius, 6)
+            verify(panel.content.tooltipItem.enabled === false)
+            verify(panel.content.scrollShadowItem.enabled === false)
+            verify(panel.content.emptyStateItem.enabled === false)
+            verify(panel.content.dropdownLayerItem.visible === false)
+            verify(panel.content.menuCatcherItem.enabled === false)
+        }
+
+        function test_visibleRowsOwnStableCardAndControlGeometry() {
+            var page = panel.appearancePage
+            var rows = [page.wallpaperRow, page.colorSchemeRow, page.panelOpacityRow,
+                        page.enableBlurRow, page.blurSurfaceRow]
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i]
+                var control = row.controlItem
+                verify(row.visible)
+                verify(row.height > 0)
+                compare(row.cardItem.width, row.width)
+                compare(row.cardItem.height, row.height)
+                verify(control.width > 0)
+                verify(control.height > 0)
+                var controlRect = control.mapToItem(row, 0, 0)
+                verify(controlRect.x >= -0.1)
+                verify(controlRect.y >= -0.1)
+                verify(controlRect.x + control.width <= row.width + 0.1)
+                verify(controlRect.y + control.height <= row.height + 0.1)
+            }
+            var viewport = panel.content.viewportItem
+            var firstRect = page.wallpaperRow.mapToItem(panel.content, 0, 0)
+            verify(firstRect.y >= viewport.y - page.contentY - 0.1)
+            verify(viewport.clip)
         }
 
         function test_midOpenLayersOccupyDifferentPositions() {
@@ -349,6 +379,8 @@ Item {
             var choice = panel.barPage.positionChoice
             choice.openMenu()
             verify(panel.content.dropdownVisible)
+            verify(panel.content.dropdownLayerItem.visible)
+            verify(panel.content.menuCatcherItem.enabled)
             verify(choice.menuOpen)
             verify(choice.headerItem.width > 0)
             panel.content.selectDropdownValue("bottom")
