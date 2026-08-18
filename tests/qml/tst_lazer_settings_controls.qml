@@ -574,6 +574,7 @@ Item {
             row.searchQuery = ""
             wait(0)
 
+            compare(row.rowHoverBlocking, false)
             mouseMove(row, 24, 12)
             verify(row.hovered)
 
@@ -590,9 +591,11 @@ Item {
             mouseMove(compactRow, compactTextField.width / 2,
                       compactTextField.mapToItem(compactRow, 0, compactTextField.height / 2).y)
             verify(compactRow.hovered)
+            verify(compactTextField.hovered)
 
             mouseMove(choiceRow, rowChoice.width / 2, rowChoice.height / 2)
             verify(choiceRow.hovered)
+            verify(rowChoice.hovered)
             compare(choiceRow.cardItem.border.width, 1.5)
         }
 

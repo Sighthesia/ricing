@@ -39,6 +39,7 @@ Item {
     readonly property bool choicePresentation: rowPresentation === "choice"
     readonly property bool rowHovered: rowHover.hovered || revertHover.hovered
                                      || (controlItem && controlItem.hovered === true)
+    readonly property bool rowHoverBlocking: rowHover.blocking
     readonly property bool rowHighlighted: rowHovered || (controlItem && controlItem.activeFocus)
     readonly property point debugHoverScenePoint: rowHover.point.scenePosition
     // Expose whether this row is still actively hovered or focused so the
@@ -78,6 +79,8 @@ Item {
     HoverHandler {
         id: rowHover
         enabled: root.enabled
+        // Keep the row highlight observer from starving embedded controls.
+        blocking: false
         onHoveredChanged: root.refreshTooltip()
     }
 

@@ -70,6 +70,62 @@ PanelWindow {
 }
 ```
 
+## Scenario: Non-Blocking Row Hover Observers
+
+### 1. Scope / Trigger
+
+- Apply when a settings Row aggregates hover state from a full-card observer and embeds controls with their own hover, tap, drag, or text-edit handlers.
+- This prevents the parent observer from starving child pointer handlers in the shared settings card.
+
+### 2. Signatures
+
+- `LazerSettingsRow.rowHover`: a `HoverHandler` monitoring the painted Row bounds.
+- `LazerSettingsRow.rowHoverBlocking`: read-only diagnostic contract exposing `rowHover.blocking`.
+
+### 3. Contracts
+
+- The Row hover observer must set `blocking: false`.
+- The Row may aggregate `rowHover.hovered` and child state for visual highlighting and tooltip ownership, but it must not become the exclusive pointer owner.
+- Embedded TextField, Choice, Slider, and Toggle handlers remain responsible for their own pointer and focus behavior.
+
+### 4. Validation & Error Matrix
+
+- Parent `HoverHandler.blocking === true` -> reject; child controls may lose hover, tap, drag, or text-edit delivery.
+- Parent `HoverHandler.blocking === false` -> accept; Row and child hover states can be true for the same pointer position.
+- Decorative card surfaces or focus rings used with this observer -> must remain non-interactive (`enabled: false` where applicable).
+
+### 5. Good/Base/Bad Cases
+
+- Good: a pointer over a TextField makes both the Row and TextField hover states true.
+- Good: a pointer over a Choice header makes both the Row and Choice hover states true while the Choice still opens its menu.
+- Bad: the Row highlights while the embedded TextField/Choice never reports hover because the parent observer blocks descendants.
+
+### 6. Tests Required
+
+- Assert `rowHoverBlocking === false`.
+- Move the pointer over a TextField and assert both Row and TextField hover states.
+- Move the pointer over a Choice and assert both Row and Choice hover states.
+- Preserve existing Slider/Toggle interaction, disabled-row, tooltip, dropdown, and reset tests.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```qml
+HoverHandler {
+    id: rowHover
+}
+```
+
+#### Correct
+
+```qml
+HoverHandler {
+    id: rowHover
+    blocking: false
+}
+```
+
 #### Correct
 
 ```qml
