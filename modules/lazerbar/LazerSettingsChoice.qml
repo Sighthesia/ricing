@@ -166,7 +166,10 @@ Item {
 
     TapHandler {
         enabled: root.effectiveEnabled
-        onTapped: root.openMenu()
+        onTapped: {
+            root.forceActiveFocus()
+            root.openMenu()
+        }
     }
 
     readonly property Item fieldColumnItem: fieldColumn

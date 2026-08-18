@@ -591,6 +591,15 @@ Item {
             verify(compactTextField.editorItem.activeFocus)
         }
 
+        function test_choiceHeaderFocusesBeforeOpeningMenu() {
+            rowChoice.focus = false
+            rowChoice.menuOpen = false
+            mouseClick(rowChoice, rowChoice.width / 2, rowChoice.height / 2, Qt.LeftButton)
+            verify(rowChoice.activeFocus)
+            verify(rowChoice.menuOpen)
+            rowChoice.closeMenu()
+        }
+
         function test_compactRowStacksTextAndControl() {
             compare(compactRow.compactLayout, true)
             verify(compactRow.textRegionWidth > 0)
