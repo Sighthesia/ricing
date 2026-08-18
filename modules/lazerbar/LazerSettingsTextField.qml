@@ -154,6 +154,14 @@ FocusScope {
 
     // Keep hover state local to the editable surface so its parent row can
     // observe it without changing the text field's input boundary.
-    HoverHandler { id: fieldHover; enabled: root.effectiveEnabled }
-    TapHandler { enabled: root.effectiveEnabled; onTapped: editor.forceActiveFocus() }
+    HoverHandler {
+        id: fieldHover
+        enabled: root.effectiveEnabled
+    }
+    TapHandler {
+        enabled: root.effectiveEnabled
+        onTapped: {
+            editor.forceActiveFocus()
+        }
+    }
 }

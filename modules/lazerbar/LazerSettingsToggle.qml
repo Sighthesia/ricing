@@ -63,6 +63,15 @@ Item {
 
     // Keep hover state local to the capsule so the parent row can observe it
     // without changing the toggle's input boundary.
-    HoverHandler { id: hoverHandler; enabled: root.effectiveEnabled }
-    TapHandler { id: tapHandler; enabled: root.effectiveEnabled; onTapped: root.activate() }
+    HoverHandler {
+        id: hoverHandler
+        enabled: root.effectiveEnabled
+    }
+    TapHandler {
+        id: tapHandler
+        enabled: root.effectiveEnabled
+        onTapped: {
+            root.activate()
+        }
+    }
 }

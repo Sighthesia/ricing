@@ -215,12 +215,17 @@ Item {
             panel.selectCategory("bar")
             compare(panel.appearancePage.contentY, 36)
             verify(!panel.appearancePage.enabled)
+            verify(!panel.appearancePage.visible)
             verify(panel.barPage.enabled)
+            verify(panel.barPage.visible)
             verify(!panel.notificationPage.enabled)
+            verify(!panel.notificationPage.visible)
             tryCompare(panel.barPage, "opacity", 1, 300)
             panel.selectCategory("notifications")
             verify(panel.notificationPage.enabled)
+            verify(panel.notificationPage.visible)
             verify(!panel.barPage.enabled)
+            verify(!panel.barPage.visible)
         }
 
         function test_searchFiltersCurrentPageAndShowsEmptyState() {

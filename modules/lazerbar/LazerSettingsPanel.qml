@@ -150,6 +150,7 @@ Item {
         transitionsEnabled = false
         for (var i = 0; i < pages.length; i++) {
             pages[i].enabled = i === nextIndex && root.interactive
+            pages[i].visible = i === nextIndex
             pages[i].activeFocusOnTab = pages[i].enabled
         }
         if (incoming.opacity <= 0) {
@@ -167,8 +168,10 @@ Item {
                 } else if (j === previousIndex && pages[j].opacity > 0) {
                     pages[j].x = MotionTokens.reducedMotion ? 0 : -direction * 8
                     pages[j].opacity = 0
+                    pages[j].visible = false
                 } else {
                     pages[j].opacity = 0
+                    pages[j].visible = false
                     if (MotionTokens.reducedMotion)
                         pages[j].x = 0
                 }

@@ -211,7 +211,10 @@ Item {
 
     // Keep hover state local to the track so the parent row can observe it
     // without changing the slider's input boundary.
-    HoverHandler { id: trackHover; enabled: root.effectiveEnabled }
+    HoverHandler {
+        id: trackHover
+        enabled: root.effectiveEnabled
+    }
 
     // Map taps anywhere on the track to the value under the pointer.
     TapHandler {

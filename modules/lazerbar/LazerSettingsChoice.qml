@@ -167,7 +167,10 @@ Item {
 
     // Keep hover state local to the dropdown header so the parent row can
     // observe it without changing the header's input boundary.
-    HoverHandler { id: headerHover; enabled: root.effectiveEnabled }
+    HoverHandler {
+        id: headerHover
+        enabled: root.effectiveEnabled
+    }
     TapHandler {
         enabled: root.effectiveEnabled
         onTapped: {
