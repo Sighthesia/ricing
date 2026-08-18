@@ -97,7 +97,7 @@ PanelWindow {
 
 - Target: `"" | "settings" | "music" | "wiki" | "news" | "beatmap"`.
 - Owners: `wave | settings | music`.
-- Coordinator entry points: `request(target, opener)` and `ownerClosed(owner)`.
+- Coordinator entry points: `request(target, opener, resetOpener, ensureOpen)` and `ownerClosed(owner)`; the final two flags are optional and reserved for source-less diagnostic opens.
 - Owner signals: `openRequested(owner, target)`, `closeRequested(owner)`, `routeRequested(target)`.
 
 ### 3. Contracts
@@ -587,6 +587,16 @@ width: root.inlinePresentation
 ```
 
 ## Scenario: Shared Settings Cards And Slider Fidelity
+
+> **Runtime diagnostic rule**: observe Row/control hover through their existing
+> `HoverHandler.point.scenePosition` properties and read-only geometry
+> snapshots. Do not add an ancestor or Overlay-wide `HoverHandler`, even with
+> `blocking: false`: runtime evidence showed that such an observer can change
+> descendant hover delivery and manufacture the failure being diagnosed.
+> Diagnostic IPC must remain default-off, omit setting values/text, reject null
+> Tooltip sources, and require an explicit screen name when opening a panel.
+> A source-less diagnostic open must be idempotent and clear stale
+> focus-restoration opener state in both the coordinator and the visual owner.
 
 ### 1. Scope / Trigger
 

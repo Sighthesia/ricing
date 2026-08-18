@@ -21,13 +21,17 @@ Item {
     property bool _restoreFocus: true
     property int _contentToken: 0
     property int readyToken: 0
+    property bool debugHoverEnabled: false
+    property int debugHoverToken: 0
+    property string debugScreenName: "unknown"
+    property string _lastDebugSignature: ""
 
     visible: blocksDesktop
     enabled: blocksDesktop
     Keys.onEscapePressed: event => { root.requestClose(); event.accepted = true }
 
-    function openFrom(source) {
-        opener = source || opener
+    function openFrom(source, resetOpener) {
+        opener = resetOpener === true ? (source || null) : (source || opener)
         panel.beginSession()
         panelMotion.stop()
         phase = "opening"
@@ -36,6 +40,10 @@ Item {
         panelMotion.to = 1
         panelMotion.restart()
         scheduleContentReady()
+    }
+    function prepareDebugOpen() {
+        opener = null
+        _restoreFocus = false
     }
     function closeAndRestoreFocus() { close(true) }
     function closeWithoutFocusRestore() { close(false) }
@@ -53,6 +61,74 @@ Item {
         panelMotion.stop(); phase = "closed"; progress = 0; opener = null; _restoreFocus = false
         panel.endSession()
         panel.contentReady = false
+    }
+
+    function _debugRect(item) {
+        if (!item)
+            return { "x": 0, "y": 0, "width": 0, "height": 0 }
+        var pos = item.mapToItem(root, 0, 0)
+        return {
+            "x": Number(pos.x), "y": Number(pos.y),
+            "width": Math.max(0, Number(item.width)),
+            "height": Math.max(0, Number(item.height)),
+        }
+    }
+
+    function debugSnapshot() {
+        return {
+            "event": "snapshot",
+            "screen": root.debugScreenName,
+            "overlay": {
+                "rect": root._debugRect(root), "phase": root.phase,
+                "progress": Number(root.progress), "visible": root.visible,
+                "enabled": root.enabled, "opacity": Number(root.opacity),
+                "z": Number(root.z), "blocksDesktop": root.blocksDesktop,
+                "requiredWidth": Number(root.requiredWidth),
+            },
+            "panel": panel.debugSnapshot(),
+            "mask": { "active": root.blocksDesktop, "owner": "settingsOverlay" },
+        }
+    }
+
+    function debugLog(eventName, payload) {
+        if (!root.debugHoverEnabled)
+            return
+        var entry = Object.assign({ "event": eventName, "screen": root.debugScreenName }, payload || ({}))
+        var signature = JSON.stringify(entry)
+        if (signature === root._lastDebugSignature)
+            return
+        root._lastDebugSignature = signature
+        console.log("[afloat:SettingsHoverDebug]", signature)
+    }
+
+    function emitDebugSnapshot() {
+        root.debugLog("snapshot", root.debugSnapshot())
+    }
+
+    onDebugHoverEnabledChanged: {
+        if (!debugHoverEnabled)
+            _lastDebugSignature = ""
+    }
+
+    onDebugHoverTokenChanged: {
+        if (debugHoverEnabled)
+            emitDebugSnapshot()
+    }
+
+    // Poll only while diagnostics are enabled so hover and scroll transitions
+    // are captured without installing another pointer or focus owner.
+    Timer {
+        interval: 120
+        repeat: true
+        running: root.debugHoverEnabled
+        onTriggered: root.emitDebugSnapshot()
+    }
+
+    // Sample state changes without adding an input or visual layer.
+    Connections {
+        target: root
+        function onPhaseChanged() { root.debugLog("overlay", { "phase": root.phase, "progress": Number(root.progress) }) }
+        function onProgressChanged() { root.debugLog("overlay", { "phase": root.phase, "progress": Number(root.progress) }) }
     }
 
     // Defer content activation so the initial slide never competes for the first frames.

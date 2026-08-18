@@ -15,6 +15,7 @@ Item {
     signal toggled(bool checked)
 
     readonly property bool hovered: hoverHandler.hovered
+    readonly property point debugHoverScenePoint: hoverHandler.point.scenePosition
     readonly property bool pressed: tapHandler.pressed
     readonly property bool focusVisible: activeFocus
     readonly property bool effectiveEnabled: enabled && rowEnabled

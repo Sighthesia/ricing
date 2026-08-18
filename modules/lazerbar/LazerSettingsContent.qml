@@ -30,6 +30,96 @@ Item {
     property var _tooltipSourceRect: ({ x: 0, y: 0, width: 0, height: 0 })
     property var _tooltipBoundsRect: ({ x: 0, y: 0, width: 0, height: 0 })
 
+    function _rect(item) {
+        if (!item)
+            return { "x": 0, "y": 0, "width": 0, "height": 0 }
+        var pos = item.mapToItem(root, 0, 0)
+        return { "x": Number(pos.x), "y": Number(pos.y),
+            "width": Math.max(0, Number(item.width)), "height": Math.max(0, Number(item.height)) }
+    }
+
+    function _sceneRect(item) {
+        if (!item)
+            return { "x": 0, "y": 0, "width": 0, "height": 0 }
+        var pos = item.mapToItem(null, 0, 0)
+        return { "x": Number(pos.x), "y": Number(pos.y),
+            "width": Math.max(0, Number(item.width)), "height": Math.max(0, Number(item.height)) }
+    }
+
+    function _point(point) {
+        return point ? { "x": Number(point.x), "y": Number(point.y) } : null
+    }
+
+    function _rowSnapshot(row, index) {
+        var control = row.controlItem
+        return {
+            "role": "row-" + index, "rect": _rect(row), "sceneRect": _sceneRect(row),
+            "visible": row.visible, "enabled": row.enabled, "opacity": Number(row.opacity),
+            "z": Number(row.z), "hover": row.rowHovered === true,
+            "hoverScenePoint": row.rowHovered === true ? _point(row.debugHoverScenePoint) : null,
+            "focus": row.activeFocus === true || (control && control.activeFocus === true),
+            "control": control ? {
+                "role": String(row.rowPresentation || "standard"), "rect": _rect(control),
+                "sceneRect": _sceneRect(control),
+                "visible": control.visible, "enabled": control.enabled,
+                "opacity": Number(control.opacity), "z": Number(control.z),
+                "hover": control.hovered === true, "focus": control.activeFocus === true,
+                "hoverScenePoint": control.hovered === true && control.debugHoverScenePoint !== undefined
+                    ? _point(control.debugHoverScenePoint) : null,
+            } : null,
+        }
+    }
+
+    function _tooltipRequestSnapshot() {
+        var requests = SettingsOverlayBridge.allTooltipRequests()
+        var owned = []
+        for (var i = 0; i < requests.length; i++) {
+            var request = requests[i]
+            if (!request || !request.source || !root.ownsOverlaySource(request.source))
+                continue
+            var activity = request.activitySource
+            owned.push({
+                "sourceRect": _sceneRect(request.source),
+                "priority": Number(request.priority),
+                "activeSource": request.source === root.activeTooltipSource,
+                "activityExplicit": activity !== null && activity !== undefined,
+                "activity": activity && activity.tooltipActive !== undefined
+                    ? activity.tooltipActive === true : null,
+            })
+        }
+        return owned
+    }
+
+    function _findRows(item, result) {
+        if (!item || result.length >= 4)
+            return
+        if (item.labelText !== undefined && item.controlItem !== undefined)
+            result.push(item)
+        var children = item.children || []
+        for (var i = 0; i < children.length && result.length < 4; i++)
+            _findRows(children[i], result)
+    }
+
+    function debugSnapshot() {
+        var rows = []
+        _findRows(currentPage, rows)
+        var rowSnapshots = []
+        for (var i = 0; i < rows.length; i++)
+            rowSnapshots.push(_rowSnapshot(rows[i], i))
+        return {
+            "rect": _rect(root), "viewport": { "rect": _rect(viewport), "clip": viewport.clip },
+            "page": currentPage ? { "rect": _rect(currentPage), "contentY": Number(currentPage.contentY), "contentHeight": Number(currentPage.contentHeight), "visible": currentPage.visible, "enabled": currentPage.enabled, "opacity": Number(currentPage.opacity), "z": Number(currentPage.z) } : null,
+            "selectedPageScroll": currentPage ? { "contentY": Number(currentPage.contentY), "contentHeight": Number(currentPage.contentHeight) } : null,
+            "search": { "visible": searchArea.visible, "enabled": searchEditor.enabled, "focus": searchEditor.activeFocus },
+            "tooltip": { "visible": root.tooltipVisible, "surfaceVisible": tooltip.visible,
+                "source": root.activeTooltipSource ? "local" : "none",
+                "sourceSceneRect": root.activeTooltipSource ? _sceneRect(root.activeTooltipSource) : null,
+                "priority": root.activeTooltipPriority, "rect": _rect(tooltip),
+                "requests": _tooltipRequestSnapshot() },
+            "dropdown": { "open": root.dropdownOpen }, "rows": rowSnapshots,
+        }
+    }
+
     signal searchQueryEdited(string query)
     property alias searchEditor: searchEditor
     property alias searchSurfaceItem: searchSurface

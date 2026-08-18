@@ -25,6 +25,7 @@ Item {
     readonly property bool focusVisible: activeFocus
     readonly property bool dragging: dragHandler.active
     readonly property bool hovered: hoverHandler.hovered
+    readonly property point debugHoverScenePoint: hoverHandler.point.scenePosition
     // Expose whether this slider is still actively hovered, dragged, or focused
     // so the content can skip stale tooltip fallback candidates.
     readonly property bool tooltipActive: hoverHandler.hovered || dragHandler.active || root.activeFocus

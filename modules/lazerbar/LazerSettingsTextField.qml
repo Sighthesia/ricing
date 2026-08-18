@@ -18,6 +18,7 @@ FocusScope {
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property bool focusVisible: editor.activeFocus
     readonly property bool hovered: fieldHover.hovered
+    readonly property point debugHoverScenePoint: fieldHover.point.scenePosition
     readonly property Item editorItem: editor
     property bool syncingEditor: false
     property bool pendingExternalText: false

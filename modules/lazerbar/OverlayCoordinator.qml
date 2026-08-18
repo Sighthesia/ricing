@@ -16,12 +16,14 @@ QtObject {
     signal closeRequested(string owner)
     signal routeRequested(string target)
 
-    function request(target, source) {
+    function request(target, source, resetOpener, ensureOpen) {
         var normalized = Logic.normalizeTarget(target)
         if (!normalized)
             return false
 
-        if (source)
+        if (resetOpener === true)
+            opener = source || null
+        else if (source)
             opener = source
 
         if (transitioning) {
@@ -37,6 +39,8 @@ QtObject {
         }
 
         if (normalized === activeTarget) {
+            if (ensureOpen === true)
+                return true
             pendingTarget = ""
             transitioning = true
             _closingOwner = activeOwner

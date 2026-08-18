@@ -30,11 +30,23 @@ Variants {
             overlayCoordinator.request(target, opener)
         }
 
+        // Route explicit diagnostics through the same coordinator as the bar button.
+        Connections {
+            target: Services.SettingsService
+            function onHoverDebugOpenTokenChanged() {
+                if (Services.SettingsService.hoverDebugEnabled
+                        && screenScope.modelData.name === Services.SettingsService.hoverDebugOpenScreen) {
+                    settingsOverlay.prepareDebugOpen()
+                    overlayCoordinator.request("settings", null, true, true)
+                }
+            }
+        }
+
         OverlayCoordinator {
             id: overlayCoordinator
             onOpenRequested: (owner, target) => {
                 if (owner === "wave") fullscreenHost.openRoute(target, null)
-                else if (owner === "settings") settingsOverlay.openFrom(null)
+                else if (owner === "settings") settingsOverlay.openFrom(null, true)
                 else if (owner === "music") musicOverlay.open()
             }
             onCloseRequested: owner => {
@@ -114,6 +126,10 @@ Variants {
                 panel.notificationDefaults: Services.SettingsService.notificationDefaults
                 panel.settingsReset: Services.SettingsService.resetCategorySetting
                 panel.wallpaperService: Services.WallpaperService
+                debugHoverEnabled: Services.SettingsService.hoverDebugEnabled
+                debugHoverToken: Services.SettingsService.hoverDebugToken
+                debugScreenName: screenScope.modelData && screenScope.modelData.name
+                        ? String(screenScope.modelData.name) : "unknown"
                 onClosed: overlayCoordinator.ownerClosed("settings")
             }
         }

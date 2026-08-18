@@ -14,6 +14,8 @@ QtObject {
     property var _tooltipRequests: []
 
     function showTooltip(text, sourceItem, priority, activitySource) {
+        if (!sourceItem)
+            return
         var p = priority === undefined ? 1 : Number(priority)
         if (!isFinite(p) || p < 1)
             p = 1

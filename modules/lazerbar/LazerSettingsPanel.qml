@@ -75,6 +75,25 @@ Item {
     property bool transitionsEnabled: true
     property int transitionToken: 0
 
+    function _rect(item) {
+        if (!item)
+            return { "x": 0, "y": 0, "width": 0, "height": 0 }
+        var pos = item.mapToItem(root, 0, 0)
+        return { "x": Number(pos.x), "y": Number(pos.y),
+            "width": Math.max(0, Number(item.width)), "height": Math.max(0, Number(item.height)) }
+    }
+
+    function debugSnapshot() {
+        return {
+            "rect": root._rect(root), "sidebar": { "rect": root._rect(sidebarLayer), "x": Number(sidebarLayer.x), "width": Number(sidebarLayer.width), "z": Number(sidebarLayer.z) },
+            "content": { "rect": root._rect(contentLayer), "x": Number(contentLayer.x), "width": Number(contentLayer.width), "z": Number(contentLayer.z) },
+            "selectedCategory": root.selectedCategory, "currentPage": root.selectedIndex,
+            "interactive": root.interactive, "visible": root.visible, "enabled": root.enabled,
+            "opacity": Number(root.opacity), "z": Number(root.z),
+            "contentSnapshot": contentLayer.debugSnapshot(),
+        }
+    }
+
     function categoryIndex(category) {
         return category === "appearance" ? 0 : category === "bar" ? 1 : category === "notifications" ? 2 : -1
     }

@@ -69,6 +69,11 @@ QtObject {
 
     // Panel visibility state (driven by bar widget, consumed by SettingsWindow)
     property bool panelVisible: false
+    // Keep hover diagnostics opt-in and independent from persisted settings.
+    property bool hoverDebugEnabled: false
+    property int hoverDebugToken: 0
+    property int hoverDebugOpenToken: 0
+    property string hoverDebugOpenScreen: ""
     function togglePanel() {
         if (Services.IslandService.expanded && Services.IslandService.panelPage === "settings-center")
             Services.IslandService.close()
@@ -87,6 +92,43 @@ QtObject {
         target: "settings"
 
         function toggle() { root.togglePanel() }
+        function debugHover(enabled: string) { root.setHoverDebug(enabled) }
+        function snapshotHover() { root.requestHoverSnapshot() }
+        function openHoverDebug(screenName: string) { root.requestHoverDebugOpen(screenName) }
+    }
+
+    function setHoverDebug(enabled) {
+        root.hoverDebugEnabled = enabled === true || String(enabled).toLowerCase() === "true" || String(enabled) === "1"
+        root.hoverDebugToken += 1
+        console.log("[afloat:SettingsHoverDebug]", JSON.stringify({
+            "event": "debug",
+            "enabled": root.hoverDebugEnabled,
+            "token": root.hoverDebugToken,
+        }))
+    }
+
+    function requestHoverSnapshot() {
+        root.hoverDebugToken += 1
+        if (!root.hoverDebugEnabled)
+            return
+        console.log("[afloat:SettingsHoverDebug]", JSON.stringify({
+            "event": "snapshot-request",
+            "token": root.hoverDebugToken,
+        }))
+    }
+
+    function requestHoverDebugOpen(screenName) {
+        if (!root.hoverDebugEnabled)
+            return
+        root.hoverDebugOpenScreen = String(screenName)
+        if (root.hoverDebugOpenScreen.length === 0)
+            return
+        root.hoverDebugOpenToken += 1
+        console.log("[afloat:SettingsHoverDebug]", JSON.stringify({
+            "event": "open-request",
+            "screen": root.hoverDebugOpenScreen,
+            "token": root.hoverDebugOpenToken,
+        }))
     }
 
     function save() {
