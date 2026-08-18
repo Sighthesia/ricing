@@ -14,13 +14,10 @@ Item {
     readonly property string rowPresentation: "inline"
     signal toggled(bool checked)
 
-    readonly property bool hovered: hoverHandler.hovered
-    readonly property point debugHoverScenePoint: hoverHandler.point.scenePosition
     readonly property bool pressed: tapHandler.pressed
     readonly property bool focusVisible: activeFocus
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
-    readonly property bool hoverHandlerEnabled: hoverHandler.enabled
     readonly property Item nubItem: capsule
     readonly property bool nubMorphEnabled: false
 
@@ -55,13 +52,12 @@ Item {
         color: root.checked ? LazerTheme.settingsAccent : LazerTheme.settingsToggleOff
         border.width: root.focusVisible ? 2 : 0
         border.color: LazerTheme.focusRing
-        scale: root.pressed ? MotionTokens.pressScale : (root.hovered ? 1.03 : 1)
+        scale: root.pressed ? MotionTokens.pressScale : 1
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
     }
 
-    HoverHandler { id: hoverHandler; enabled: root.effectiveEnabled }
     TapHandler { id: tapHandler; enabled: root.effectiveEnabled; onTapped: root.activate() }
 }

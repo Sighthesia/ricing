@@ -3,7 +3,7 @@ import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
 // Own the settings content chrome: search, category title, viewport, footer,
-// plus the top-level tooltip and dropdown overlay layers for row controls.
+// and the top-level dropdown overlay layer for choice controls.
 Item {
     id: root
 
@@ -20,15 +20,6 @@ Item {
         Logic.normalizeSearchQuery(searchQuery).length > 0 && visibleResultCount === 0
     readonly property bool canScrollDown: currentPage && currentPage.contentHeight - currentPage.contentY - viewport.height > 8
     readonly property bool dropdownVisible: dropdownOpen
-
-    // Active tooltip request state, owned by this content instance only. The
-    // bridge transports requests; per-screen ownership stays here.
-    property var activeTooltipSource: null
-    property string activeTooltipText: ""
-    property int activeTooltipPriority: 0
-    property bool tooltipVisible: false
-    property var _tooltipSourceRect: ({ x: 0, y: 0, width: 0, height: 0 })
-    property var _tooltipBoundsRect: ({ x: 0, y: 0, width: 0, height: 0 })
 
     function _rect(item) {
         if (!item)
@@ -63,31 +54,9 @@ Item {
                 "sceneRect": _sceneRect(control),
                 "visible": control.visible, "enabled": control.enabled,
                 "opacity": Number(control.opacity), "z": Number(control.z),
-                "hover": control.hovered === true, "focus": control.activeFocus === true,
-                "hoverScenePoint": control.hovered === true && control.debugHoverScenePoint !== undefined
-                    ? _point(control.debugHoverScenePoint) : null,
+                "focus": control.activeFocus === true,
             } : null,
         }
-    }
-
-    function _tooltipRequestSnapshot() {
-        var requests = SettingsOverlayBridge.allTooltipRequests()
-        var owned = []
-        for (var i = 0; i < requests.length; i++) {
-            var request = requests[i]
-            if (!request || !request.source || !root.ownsOverlaySource(request.source))
-                continue
-            var activity = request.activitySource
-            owned.push({
-                "sourceRect": _sceneRect(request.source),
-                "priority": Number(request.priority),
-                "activeSource": request.source === root.activeTooltipSource,
-                "activityExplicit": activity !== null && activity !== undefined,
-                "activity": activity && activity.tooltipActive !== undefined
-                    ? activity.tooltipActive === true : null,
-            })
-        }
-        return owned
     }
 
     function _findRows(item, result) {
@@ -111,11 +80,6 @@ Item {
             "page": currentPage ? { "rect": _rect(currentPage), "contentY": Number(currentPage.contentY), "contentHeight": Number(currentPage.contentHeight), "visible": currentPage.visible, "enabled": currentPage.enabled, "opacity": Number(currentPage.opacity), "z": Number(currentPage.z) } : null,
             "selectedPageScroll": currentPage ? { "contentY": Number(currentPage.contentY), "contentHeight": Number(currentPage.contentHeight) } : null,
             "search": { "visible": searchArea.visible, "enabled": searchEditor.enabled, "focus": searchEditor.activeFocus },
-            "tooltip": { "visible": root.tooltipVisible, "surfaceVisible": tooltip.visible,
-                "source": root.activeTooltipSource ? "local" : "none",
-                "sourceSceneRect": root.activeTooltipSource ? _sceneRect(root.activeTooltipSource) : null,
-                "priority": root.activeTooltipPriority, "rect": _rect(tooltip),
-                "requests": _tooltipRequestSnapshot() },
             "dropdown": { "open": root.dropdownOpen }, "rows": rowSnapshots,
         }
     }
@@ -123,9 +87,6 @@ Item {
     signal searchQueryEdited(string query)
     property alias searchEditor: searchEditor
     property alias searchSurfaceItem: searchSurface
-    property alias tooltipItem: tooltip
-    property alias tooltipTextItem: tooltipText
-    property alias tooltipPlacementSide: tooltip.placementSide
     property alias viewportItem: viewport
     property alias scrollShadowItem: scrollShadow
     property alias emptyStateItem: emptyState
@@ -140,30 +101,17 @@ Item {
         if (searchEditor.text !== root.searchQuery)
             searchEditor.text = root.searchQuery
         root.closeDropdownMenu()
-        root.hideTooltip()
     }
 
     onCurrentPageChanged: {
         root.closeDropdownMenu()
-        root.hideTooltip()
     }
 
     onInteractiveChanged: {
         if (!root.interactive) {
             root.closeDropdownMenu()
-            root.hideTooltip()
         }
     }
-
-    onContentReadyChanged: {
-        if (!root.contentReady)
-            root.closeActiveTooltip()
-    }
-
-    // Re-evaluate tooltip placement whenever the content viewport geometry
-    // changes (e.g. sidebar collapse on a narrow panel).
-    onWidthChanged: root.repositionTooltip()
-    onHeightChanged: root.repositionTooltip()
 
     function focusSearch() {
         if (root.interactive && root.contentReady)
@@ -383,75 +331,6 @@ Item {
         height: 44
     }
 
-    // Present the hover/focus description or slider value near its source.
-    // Size is driven by the Text's own measurement: the Text provides its
-    // natural width, is clamped to a target wrap width, then its wrapped
-    // implicit height decides the surface height. The Rectangle only paints
-    // the already-measured surface and never contributes an implicit size.
-    Item {
-        id: tooltip
-        z: 20
-        visible: false
-        opacity: 0
-        enabled: false
-        activeFocusOnTab: false
-        readonly property real hPadding: 6
-        readonly property real vPadding: 6
-        readonly property real sideMargin: 10
-        readonly property real minSurfaceWidth: 24
-        readonly property real gap: 6
-        readonly property real availableSurfaceWidth:
-            Logic.tooltipAvailableSurfaceWidth(viewport.width, sideMargin, hPadding)
-        readonly property real surfaceWidth:
-            Logic.tooltipSurfaceWidth(tooltipText.implicitWidth, LazerTheme.tooltipMaxWidth,
-                                      availableSurfaceWidth, hPadding, minSurfaceWidth)
-        readonly property real textWidth: Math.max(0, surfaceWidth - 2 * hPadding)
-        readonly property real surfaceHeight: tooltipText.implicitHeight + 2 * vPadding
-        readonly property var placement:
-            root.tooltipVisible
-                ? Logic.tooltipPlacement(root._tooltipSourceRect, width, height,
-                                         root._tooltipBoundsRect, gap)
-                : ({ x: 0, y: 0, side: "below" })
-        readonly property string placementSide: placement.side
-        readonly property real targetX: placement.x
-        readonly property real targetY: placement.y
-        width: surfaceWidth
-        height: surfaceHeight
-        x: targetX
-        y: targetY
-
-        Rectangle {
-            id: tooltipSurface
-            anchors.fill: parent
-            radius: 6
-            color: LazerTheme.tooltipBackground
-            border.width: 1
-            border.color: LazerTheme.tooltipBorder
-        }
-
-        Text {
-            id: tooltipText
-            x: tooltip.hPadding
-            y: tooltip.vPadding
-            width: tooltip.textWidth
-            text: root.activeTooltipText
-            color: LazerTheme.textPrimary
-            font.pixelSize: 12
-            wrapMode: Text.WordWrap
-        }
-
-        // Fade the surface in/out; geometry updates never lag behind opacity.
-        NumberAnimation {
-            id: tooltipOpacityAnimation
-            target: tooltip
-            property: "opacity"
-            onFinished: {
-                if (!root.tooltipVisible)
-                    tooltip.visible = false
-            }
-        }
-    }
-
     // Own the real dropdown menu and its outside-click catcher on a top layer.
     // The layer visibility follows the content state (not the child menu's
     // visible, which would create a circular binding that resets the menu).
@@ -478,167 +357,6 @@ Item {
             onItemSelected: value => root.selectDropdownValue(value)
             onClosed: root.onMenuClosed()
         }
-    }
-
-    function hideTooltip() {
-        root.closeActiveTooltip()
-    }
-
-    // Map the source rect into this content's local coordinate domain. Never
-    // mix screen coordinates with local ones.
-    function mappedSourceRect(source) {
-        var pos = source.mapToItem(root, 0, 0)
-        var x = isFinite(Number(pos.x)) ? Number(pos.x) : 0
-        var y = isFinite(Number(pos.y)) ? Number(pos.y) : 0
-        var w = isFinite(Number(source.width)) ? Math.max(0, Number(source.width)) : 0
-        var h = isFinite(Number(source.height)) ? Math.max(0, Number(source.height)) : 0
-        return { x: x, y: y, width: w, height: h }
-    }
-
-    // Keep every tooltip inside the page viewport so it never covers the
-    // header, search field, or footer.
-    function tooltipBoundsRect() {
-        return {
-            x: viewport.x + tooltip.sideMargin,
-            y: viewport.y,
-            width: Math.max(0, viewport.width - 2 * tooltip.sideMargin),
-            height: viewport.height,
-        }
-    }
-
-    function tooltipSourceVisible(source) {
-        var cursor = source
-        while (cursor) {
-            if (cursor.visible === false)
-                return false
-            cursor = cursor.parent
-        }
-        return true
-    }
-
-    // Recompute the cached source/bounds rects and enforce the visibility
-    // contract: a source that fully leaves the viewport closes the tooltip.
-    function repositionTooltip() {
-        if (!root.tooltipVisible || !root.activeTooltipSource)
-            return
-        root._tooltipSourceRect = root.mappedSourceRect(root.activeTooltipSource)
-        root._tooltipBoundsRect = root.tooltipBoundsRect()
-        if (!root.tooltipSourceVisible(root.activeTooltipSource)
-                || !Logic.rectsIntersect(root._tooltipSourceRect, root._tooltipBoundsRect)) {
-            root.closeActiveTooltip()
-            return
-        }
-        // Placement recomputes through the declarative binding on the new rects.
-    }
-
-    function setActiveTooltip(text, source, priority) {
-        var sameSource = root.tooltipVisible && root.activeTooltipSource === source
-        root.activeTooltipSource = source
-        root.activeTooltipText = text
-        root.activeTooltipPriority = priority
-        root.tooltipVisible = true
-        root.repositionTooltip()
-        if (root.tooltipVisible && !sameSource)
-            root.showTooltipSurface()
-    }
-
-    function showTooltipSurface() {
-        tooltipOpacityAnimation.stop()
-        if (!tooltip.visible) {
-            tooltip.opacity = 0
-            tooltip.visible = true
-        }
-        if (MotionTokens.reducedMotion) {
-            tooltip.opacity = 1
-        } else {
-            tooltipOpacityAnimation.duration = MotionTokens.tooltipIn
-            tooltipOpacityAnimation.to = 1
-            tooltipOpacityAnimation.start()
-        }
-    }
-
-    function closeActiveTooltip() {
-        if (!root.tooltipVisible)
-            return
-        root.tooltipVisible = false
-        tooltipOpacityAnimation.stop()
-        if (MotionTokens.reducedMotion || !tooltip.visible) {
-            tooltip.visible = false
-            tooltip.opacity = 0
-        } else {
-            tooltipOpacityAnimation.duration = MotionTokens.tooltipOut
-            tooltipOpacityAnimation.to = 0
-            tooltipOpacityAnimation.start()
-        }
-        root.activeTooltipSource = null
-        root.activeTooltipText = ""
-        root.activeTooltipPriority = 0
-    }
-
-    // Accept requests only for sources mounted under this content; external
-    // screen requests are ignored without disturbing the local tooltip.
-    function handleTooltipRequest(text, source, priority) {
-        if (!root.ownsOverlaySource(source))
-            return
-        if (!root.interactive || !root.contentReady) {
-            if (root.activeTooltipSource === source)
-                root.closeActiveTooltip()
-            return
-        }
-        var p = priority === undefined ? 1 : Number(priority)
-        if (!isFinite(p) || p < 1)
-            p = 1
-        // Reject requests whose activity source already reports inactive; the
-        // source may have emitted a stale signal after losing hover/focus.
-        var actSource = SettingsOverlayBridge.activitySourceFor(source)
-        if (actSource && actSource.tooltipActive === false)
-            return
-        // Keep the current owner stable. Equal-priority hover/focus requests
-        // remain registered for deterministic fallback instead of stealing it.
-        if (root.activeTooltipSource && root.activeTooltipSource !== source
-                && p <= root.activeTooltipPriority) {
-            return
-        }
-        root.setActiveTooltip(text, source, p)
-    }
-
-    function handleTooltipDismiss(source) {
-        if (source === null) {
-            root.closeActiveTooltip()
-            return
-        }
-        if (!root.ownsOverlaySource(source))
-            return
-        if (root.activeTooltipSource === source)
-            root.applyBridgeFallback()
-    }
-
-    // After a dismiss, fall back to the best request still owned by this
-    // content instead of leaving a stale or empty surface.
-    function applyBridgeFallback() {
-        var best = root.ownedBestTooltipRequest()
-        if (best && best.text && root.interactive && root.contentReady)
-            root.setActiveTooltip(best.text, best.source, best.priority)
-        else
-            root.closeActiveTooltip()
-    }
-
-    function ownedBestTooltipRequest() {
-        var requests = SettingsOverlayBridge.allTooltipRequests()
-        var best = null
-        for (var i = 0; i < requests.length; i++) {
-            var req = requests[i]
-            if (!req.text || !req.source || !root.ownsOverlaySource(req.source))
-                continue
-            // Only callers that explicitly supplied an activity source opt into
-            // filtering. Existing three-argument requests remain valid.
-            var actSource = req.activitySource
-            if (actSource && actSource.tooltipActive === false)
-                continue
-            if (!best || req.priority > best.priority)
-                best = req
-        }
-        return best
     }
 
     // Accept overlay requests only from controls mounted under this screen's content.
@@ -693,10 +411,8 @@ Item {
 
     function showDropdownFor(choiceItem) {
         if (!root.interactive || !root.contentReady || !root.ownsOverlaySource(choiceItem)) {
-            hideTooltip()
             return
         }
-        hideTooltip()
         if (dropdownMenu.choiceItem && dropdownMenu.choiceItem !== choiceItem) {
             dropdownMenu.choiceItem.menuOpen = false
             dropdownMenu.choiceItem = null
@@ -716,62 +432,16 @@ Item {
         dropdownMenu.forceActiveFocus()
     }
 
-    // Follow the active source's own geometry and visibility changes. The
-    // connection retargets automatically whenever the active source changes.
-    // The source is also revalidated on every parent/viewport geometry update,
-    // so detached or stale sources cannot keep a visible tooltip alive.
-    Connections {
-        id: tooltipSourceConnections
-        target: root.activeTooltipSource
-        function onXChanged() { root.repositionTooltip() }
-        function onYChanged() { root.repositionTooltip() }
-        function onWidthChanged() { root.repositionTooltip() }
-        function onHeightChanged() { root.repositionTooltip() }
-        function onVisibleChanged() { root.repositionTooltip() }
-        function onParentChanged() { root.repositionTooltip() }
-    }
-
-    // Removing a source from a dynamic page does not necessarily emit a
-    // geometry or visibility notification on the source itself. Its former
-    // parent does emit childrenChanged, which gives the active request a
-    // deterministic lifecycle check without relying on a stale QObject.
-    Connections {
-        target: root.activeTooltipSource ? root.activeTooltipSource.parent : null
-        function onChildrenChanged() { root.repositionTooltip() }
-    }
-
-    // A parent transform or layout change can move a source without changing
-    // the source's own x/y. Track the current page and the clipping viewport
-    // in the same local coordinate domain used by mappedSourceRect().
-    Connections {
-        target: viewport
-        function onXChanged() { root.repositionTooltip() }
-        function onYChanged() { root.repositionTooltip() }
-        function onWidthChanged() { root.repositionTooltip() }
-        function onHeightChanged() { root.repositionTooltip() }
-        function onVisibleChanged() { root.repositionTooltip() }
-    }
-
-    // Reposition (and possibly close) while the page scrolls; the source's own
-    // y does not change, so this connection owns scroll following.
+    // Close dropdowns when the active page scrolls.
     Connections {
         target: root.currentPage
-        function onXChanged() { root.repositionTooltip() }
-        function onYChanged() { root.repositionTooltip() }
-        function onWidthChanged() { root.repositionTooltip() }
-        function onHeightChanged() { root.repositionTooltip() }
-        function onVisibleChanged() { root.repositionTooltip() }
-        function onContentHeightChanged() { root.repositionTooltip() }
         function onContentYChanged() {
             root.closeDropdownMenu()
-            root.repositionTooltip()
         }
     }
 
     Connections {
         target: SettingsOverlayBridge
-        function onTooltipRequested(text, source, priority) { root.handleTooltipRequest(text, source, priority) }
-        function onTooltipDismissed(source) { root.handleTooltipDismiss(source) }
         function onDropdownRequested(choiceItem) { root.showDropdownFor(choiceItem) }
         function onDropdownDismissed(choiceItem) {
             if (dropdownMenu.visible && dropdownMenu.choiceItem === choiceItem)

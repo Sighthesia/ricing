@@ -17,8 +17,6 @@ FocusScope {
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property bool focusVisible: editor.activeFocus
-    readonly property bool hovered: fieldHover.hovered
-    readonly property point debugHoverScenePoint: fieldHover.point.scenePosition
     readonly property Item editorItem: editor
     property bool syncingEditor: false
     property bool pendingExternalText: false
@@ -114,8 +112,7 @@ FocusScope {
         radius: LazerTheme.settingsControlRadius
         color: "transparent"
         border.width: editor.activeFocus ? 2 : 1
-        border.color: editor.activeFocus ? LazerTheme.focusRing
-                    : (fieldHover.hovered ? "#66FFFFFF" : "#33FFFFFF")
+        border.color: editor.activeFocus ? LazerTheme.focusRing : "#33FFFFFF"
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
     }
@@ -153,6 +150,5 @@ FocusScope {
         font.pixelSize: 13
     }
 
-    HoverHandler { id: fieldHover; enabled: root.effectiveEnabled }
     TapHandler { enabled: root.effectiveEnabled; onTapped: editor.forceActiveFocus() }
 }

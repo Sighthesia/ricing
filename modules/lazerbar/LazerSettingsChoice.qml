@@ -19,8 +19,6 @@ Item {
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property string displayLabel: labelFor(currentValue)
     readonly property bool focusVisible: activeFocus
-    readonly property bool hovered: headerHover.hovered
-    readonly property point debugHoverScenePoint: headerHover.point.scenePosition
     property bool menuOpen: false
     readonly property real menuReservedHeight: menuOpen
         ? Math.min(LazerTheme.dropdownMaxHeight, model.length * 30 + 8) : 0
@@ -113,7 +111,7 @@ Item {
         id: headerSurface
         anchors.fill: parent
         radius: LazerTheme.settingsChoiceRadius
-        color: (headerHover.hovered || root.menuOpen) && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsControlSurface
+        color: root.menuOpen && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsControlSurface
         border.width: root.activeFocus ? 2 : 0
         border.color: LazerTheme.focusRing
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -166,7 +164,6 @@ Item {
         }
     }
 
-    HoverHandler { id: headerHover; enabled: root.effectiveEnabled }
     TapHandler {
         enabled: root.effectiveEnabled
         onTapped: root.openMenu()

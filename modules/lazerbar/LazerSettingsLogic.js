@@ -205,8 +205,8 @@ function timeoutSecondsToMs(seconds) {
     return Math.round(clamp(Number(seconds), 2, 15) * 1000)
 }
 
-// Available width for the whole tooltip surface inside content safe margins.
-// The surface must keep its own horizontal padding clear of the content edges.
+// Keep pure tooltip geometry helpers available for historical geometry tests;
+// settings controls no longer create or render tooltip surfaces.
 function tooltipAvailableSurfaceWidth(contentWidth, sideMargin, hPadding) {
     var width = Number(contentWidth)
     var margin = Number(sideMargin)
@@ -220,9 +220,6 @@ function tooltipAvailableSurfaceWidth(contentWidth, sideMargin, hPadding) {
     return Math.max(0, width - 2 * margin - 2 * padding)
 }
 
-// Derive the tooltip surface width from the text's natural width, capped by
-// the theme maximum and the current content availability. The minimum only
-// guards empty text; short text is never stretched to it.
 function tooltipSurfaceWidth(naturalTextWidth, maxTooltipWidth, availableSurfaceWidth, hPadding, minimumSurfaceWidth) {
     var natural = Number(naturalTextWidth)
     var maxTooltip = Number(maxTooltipWidth)
@@ -248,7 +245,6 @@ function tooltipSurfaceWidth(naturalTextWidth, maxTooltipWidth, availableSurface
     return surface
 }
 
-// True when the two rects share any positive-area overlap.
 function rectsIntersect(a, b) {
     if (!a || !b)
         return false
@@ -262,9 +258,6 @@ function rectsIntersect(a, b) {
     return ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah
 }
 
-// Place the tooltip beside its source inside a visible bounds rect. X centers
-// on the source then clamps; Y prefers above, flips below, and when neither
-// side fits clamps to the side with more space.
 function tooltipPlacement(sourceRect, tooltipWidth, tooltipHeight, boundsRect, gap) {
     var sx = Number(sourceRect.x), sy = Number(sourceRect.y)
     var sw = Number(sourceRect.width), sh = Number(sourceRect.height)
@@ -274,35 +267,18 @@ function tooltipPlacement(sourceRect, tooltipWidth, tooltipHeight, boundsRect, g
     var g = Number(gap)
     if (!isFinite(sx) || !isFinite(sy) || !isFinite(sw) || !isFinite(sh))
         return { x: 0, y: 0, side: "below" }
-    if (!isFinite(tw) || tw < 0)
-        tw = 0
-    if (!isFinite(th) || th < 0)
-        th = 0
-    if (!isFinite(bx))
-        bx = 0
-    if (!isFinite(by))
-        by = 0
-    if (!isFinite(bw) || bw < 0)
-        bw = 0
-    if (!isFinite(bh) || bh < 0)
-        bh = 0
-    if (!isFinite(g) || g < 0)
-        g = 0
-    if (sw <= 0)
-        sw = 0
-    if (sh <= 0)
-        sh = 0
-
+    if (!isFinite(tw) || tw < 0) tw = 0
+    if (!isFinite(th) || th < 0) th = 0
+    if (!isFinite(bx)) bx = 0
+    if (!isFinite(by)) by = 0
+    if (!isFinite(bw) || bw < 0) bw = 0
+    if (!isFinite(bh) || bh < 0) bh = 0
+    if (!isFinite(g) || g < 0) g = 0
     var minX = bx
-    var maxX = bx + bw - tw
-    if (maxX < minX)
-        maxX = minX
+    var maxX = Math.max(minX, bx + bw - tw)
     var x = Math.max(minX, Math.min(maxX, sx + sw / 2 - tw / 2))
-
     var minY = by
-    var maxY = by + bh - th
-    if (maxY < minY)
-        maxY = minY
+    var maxY = Math.max(minY, by + bh - th)
     var aboveY = sy - g - th
     var belowY = sy + sh + g
     if (aboveY >= by)

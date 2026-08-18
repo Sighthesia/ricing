@@ -119,8 +119,6 @@ Item {
     SignalSpy { id: clearSpy; target: textField; signalName: "clearRequested" }
     SignalSpy { id: dropdownSpy; target: Lazer.SettingsOverlayBridge; signalName: "dropdownRequested" }
     SignalSpy { id: dropdownDismissSpy; target: Lazer.SettingsOverlayBridge; signalName: "dropdownDismissed" }
-    SignalSpy { id: tooltipSpy; target: Lazer.SettingsOverlayBridge; signalName: "tooltipRequested" }
-    SignalSpy { id: tooltipDismissSpy; target: Lazer.SettingsOverlayBridge; signalName: "tooltipDismissed" }
 
     TestCase {
         name: "LazerSettingsControls"
@@ -149,9 +147,6 @@ Item {
             choice.menuOpen = false
             dropdownSpy.clear()
             dropdownDismissSpy.clear()
-            Lazer.SettingsOverlayBridge.clearTooltips()
-            tooltipSpy.clear()
-            tooltipDismissSpy.clear()
             textField.enabled = true
             textField.focus = false
             textField.editorItem.focus = false
@@ -165,7 +160,6 @@ Item {
 
         function cleanup() {
             Lazer.MotionTokens.reducedMotionOverride = false
-            Lazer.SettingsOverlayBridge.clearTooltips()
         }
 
         function test_toggleActivationAndDisabledBlocking() {
@@ -346,23 +340,6 @@ Item {
             compare(slider.valueForTrackPosition(0), 10)
             compare(slider.valueForTrackPosition(slider.trackItem.width), 0)
             compare(slider.valueForTrackPosition(slider.trackItem.width / 2), 4)
-        }
-
-        function test_sliderTooltipAnchorsToNubIdentity() {
-            slider.forceActiveFocus()
-            compare(tooltipSpy.count, 1)
-            verify(tooltipSpy.signalArguments[0][1] === slider.nubItem)
-            compare(tooltipSpy.signalArguments[0][2], 2)
-            compare(tooltipSpy.signalArguments[0][0], "4%")
-            // A value change re-requests with the same Nub source identity.
-            sliderHolder.value = 8
-            compare(tooltipSpy.count, 2)
-            verify(tooltipSpy.signalArguments[1][1] === slider.nubItem)
-            verify(tooltipSpy.signalArguments[1][0].indexOf("8") >= 0)
-            // Hiding uses the same Nub identity so the content can match it.
-            slider.focus = false
-            compare(tooltipDismissSpy.count, 1)
-            verify(tooltipDismissSpy.signalArguments[0][0] === slider.nubItem)
         }
 
         function test_choiceRejectsUnknownValues() {
@@ -591,12 +568,27 @@ Item {
             mouseMove(compactRow, compactTextField.width / 2,
                       compactTextField.mapToItem(compactRow, 0, compactTextField.height / 2).y)
             verify(compactRow.hovered)
-            verify(compactTextField.hovered)
 
             mouseMove(choiceRow, rowChoice.width / 2, rowChoice.height / 2)
             verify(choiceRow.hovered)
-            verify(rowChoice.hovered)
             compare(choiceRow.cardItem.border.width, 1.5)
+        }
+
+        function test_rowBlankAreaDoesNotActivateItsControl() {
+            var before = revertRowSliderSpy.count
+            mouseClick(revertRow, 20, 12, Qt.LeftButton)
+            compare(revertRowSliderSpy.count, before)
+        }
+
+        function test_textFieldOnlyFocusesFromItsOwnArea() {
+            compactTextField.focus = false
+            compactTextField.editorItem.focus = false
+            mouseClick(compactRow, 12, 8, Qt.LeftButton)
+            verify(!compactTextField.editorItem.activeFocus)
+
+            mouseClick(compactTextField, compactTextField.width / 2,
+                       compactTextField.height / 2, Qt.LeftButton)
+            verify(compactTextField.editorItem.activeFocus)
         }
 
         function test_compactRowStacksTextAndControl() {

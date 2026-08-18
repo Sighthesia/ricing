@@ -24,11 +24,6 @@ Item {
     readonly property string displayText: Number(displayValue).toLocaleString(Qt.locale(), 'f', 0) + suffix
     readonly property bool focusVisible: activeFocus
     readonly property bool dragging: dragHandler.active
-    readonly property bool hovered: hoverHandler.hovered
-    readonly property point debugHoverScenePoint: hoverHandler.point.scenePosition
-    // Expose whether this slider is still actively hovered, dragged, or focused
-    // so the content can skip stale tooltip fallback candidates.
-    readonly property bool tooltipActive: hoverHandler.hovered || dragHandler.active || root.activeFocus
     readonly property real normalizedFraction: Logic.sliderFraction(from, to, displayValue)
     readonly property real targetFraction: Logic.sliderFraction(from, to, displayValue)
     readonly property real defaultFraction: defaultValue === undefined
@@ -102,22 +97,6 @@ Item {
         root.setValue(root.defaultValue)
     }
 
-    // Request the value tooltip anchored to the moving Nub so the content can
-    // follow per-frame geometry instead of the static slider root.
-    function refreshTooltip() {
-        if (!root.effectiveEnabled) {
-            SettingsOverlayBridge.hideTooltip(root.nubItem)
-            return
-        }
-        // Read the source properties directly: bound mirrors (hovered,
-        // dragging, focusVisible) are not re-evaluated until after the
-        // notify handler runs, so inside these handlers they are stale.
-        if (hoverHandler.hovered || dragHandler.active || root.activeFocus)
-            SettingsOverlayBridge.showTooltip(root.displayText, root.nubItem, 2, root)
-        else
-            SettingsOverlayBridge.hideTooltip(root.nubItem)
-    }
-
     Keys.onPressed: event => {
         if (!root.effectiveEnabled)
             return
@@ -133,13 +112,6 @@ Item {
     onEffectiveEnabledChanged: {
         if (!effectiveEnabled && activeFocus)
             focus = false
-        refreshTooltip()
-    }
-
-    onActiveFocusChanged: refreshTooltip()
-    onDisplayTextChanged: {
-        if (hoverHandler.hovered || dragHandler.active || root.activeFocus)
-            refreshTooltip()
     }
 
     // Use the full right-hand row column as the interactive track area.
@@ -229,17 +201,11 @@ Item {
         height: trackHost.height
         radius: 5
         color: LazerTheme.settingsSliderThumb
-        scale: root.dragging ? MotionTokens.pressScale : (root.hovered ? 1.06 : 1)
+        scale: root.dragging ? MotionTokens.pressScale : 1
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
 
-    }
-
-    HoverHandler {
-        id: hoverHandler
-        enabled: root.effectiveEnabled
-        onHoveredChanged: root.refreshTooltip()
     }
 
     // Map taps anywhere on the track to the value under the pointer.
@@ -270,7 +236,6 @@ Item {
         onActiveChanged: {
             if (dragHandler.active)
                 root.scrubToPointer(dragHandler.centroid.pressPosition.x + dragHandler.translation.x)
-            root.refreshTooltip()
         }
         onTranslationChanged: {
             if (dragHandler.active)

@@ -3,8 +3,8 @@ import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
 // Present one settings entry as osu's full-width card with a reserved reset zone,
-// then label above control with 5px spacing.
-// The description is delivered as a hover/focus tooltip but still searches.
+// then label above control with 5px spacing. Description text remains searchable
+// but no longer creates a floating surface.
 Item {
     id: root
 
@@ -38,13 +38,9 @@ Item {
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
     readonly property bool rowHovered: rowHover.hovered || revertHover.hovered
-                                     || (controlItem && controlItem.hovered === true)
     readonly property bool rowHoverBlocking: rowHover.blocking
     readonly property bool rowHighlighted: rowHovered || (controlItem && controlItem.activeFocus)
     readonly property point debugHoverScenePoint: rowHover.point.scenePosition
-    // Expose whether this row is still actively hovered or focused so the
-    // content can skip stale tooltip fallback candidates.
-    readonly property bool tooltipActive: rowHighlighted
     readonly property bool compactLayout: width < 480
     readonly property real choiceMenuReservedHeight: root.choicePresentation && root.controlItem
                                                    && root.controlItem.menuReservedHeight !== undefined
@@ -84,7 +80,6 @@ Item {
         enabled: root.enabled
         // Keep the row highlight observer from starving embedded controls.
         blocking: false
-        onHoveredChanged: root.refreshTooltip()
     }
 
     // Keep one shared card surface behind every setting presentation.
@@ -154,30 +149,6 @@ Item {
         root.resetCallback()
     }
 
-    // Compute tooltip activity directly from raw input sources. Derived
-    // properties like rowHighlighted are not re-evaluated until after the
-    // notify handler completes, so they are stale inside signal callbacks.
-    function _isRowActiveForTooltip() {
-        if (rowHover.hovered || revertHover.hovered)
-            return true
-        if (root.controlItem && root.controlItem.hovered === true)
-            return true
-        if (root.controlItem && root.controlItem.activeFocus)
-            return true
-        return false
-    }
-
-    function refreshTooltip() {
-        if (!root.enabled || root.descriptionText.length === 0) {
-            SettingsOverlayBridge.hideTooltip(root)
-            return
-        }
-        if (_isRowActiveForTooltip())
-            SettingsOverlayBridge.showTooltip(root.descriptionText, root, 1, root)
-        else
-            SettingsOverlayBridge.hideTooltip(root)
-    }
-
     // Show the restore-default affordance in the fixed right-side slot.
     Item {
         id: revertButton
@@ -224,7 +195,6 @@ Item {
         HoverHandler {
             id: revertHover
             enabled: root.canReset
-            onHoveredChanged: root.refreshTooltip()
         }
         TapHandler {
             enabled: root.canReset
@@ -298,13 +268,6 @@ Item {
             Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
             Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         }
-    }
-
-    Connections {
-        target: root.controlItem
-        ignoreUnknownSignals: true
-        function onHoveredChanged() { root.refreshTooltip() }
-        function onActiveFocusChanged() { root.refreshTooltip() }
     }
 
     readonly property Item labelTextItem: labelItem
