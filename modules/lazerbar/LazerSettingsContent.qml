@@ -41,6 +41,34 @@ Item {
         return point ? { "x": Number(point.x), "y": Number(point.y) } : null
     }
 
+    function _surfaceSnapshot(item) {
+        if (!item)
+            return null
+        return {
+            "rect": _rect(item), "sceneRect": _sceneRect(item),
+            "visible": item.visible, "enabled": item.enabled,
+            "opacity": Number(item.opacity), "z": Number(item.z),
+            "borderWidth": item.border !== undefined && item.border
+                ? Number(item.border.width) : null,
+        }
+    }
+
+    function _controlSurface(control) {
+        if (!control)
+            return null
+        if (control.surfaceItem !== undefined)
+            return control.surfaceItem
+        if (control.headerItem !== undefined)
+            return control.headerItem
+        if (control.fieldSurfaceItem !== undefined)
+            return control.fieldSurfaceItem
+        if (control.trackItem !== undefined)
+            return control.trackItem
+        if (control.nubItem !== undefined)
+            return control.nubItem
+        return null
+    }
+
     function _rowSnapshot(row, index) {
         var control = row.controlItem
         return {
@@ -51,10 +79,13 @@ Item {
             "focus": row.activeFocus === true || (control && control.activeFocus === true),
             "rowHighlighted": row.rowHighlighted === true,
             "rowHoverBlocking": row.rowHoverBlocking === true,
+            "cardSurface": _surfaceSnapshot(row.cardItem),
+            "cardHighlight": _surfaceSnapshot(row.cardHighlightItem),
             "cardBorderWidth": Number(row.cardItem ? row.cardItem.border.width : 0),
             "control": control ? {
                 "role": String(row.rowPresentation || "standard"), "rect": _rect(control),
                 "sceneRect": _sceneRect(control),
+                "surface": _surfaceSnapshot(_controlSurface(control)),
                 "visible": control.visible, "enabled": control.enabled,
                 "opacity": Number(control.opacity), "z": Number(control.z),
                 "focus": control.activeFocus === true,
@@ -63,10 +94,15 @@ Item {
                 "focusVisible": control.focusVisible !== undefined
                     ? control.focusVisible === true : control.activeFocus === true,
                 "activeFocusOnTab": control.activeFocusOnTab === true,
-                "focusRing": control.headerItem && control.headerItem.border
-                    ? Number(control.headerItem.border.width)
-                    : (control.editorItem && control.editorItem.activeFocus
-                       ? 2 : (control.trackItem && control.focusVisible ? 2 : 0)),
+                "focusRing": {
+                    "activeFocus": control.activeFocus === true,
+                    "focusVisible": control.focusVisible !== undefined
+                        ? control.focusVisible === true : control.activeFocus === true,
+                    "surfaceBorderWidth": _controlSurface(control)
+                        && _controlSurface(control).border !== undefined
+                        && _controlSurface(control).border
+                        ? Number(_controlSurface(control).border.width) : null,
+                },
             } : null,
         }
     }
@@ -99,7 +135,12 @@ Item {
         for (var i = 0; i < rows.length; i++)
             rowSnapshots.push(_rowSnapshot(rows[i], i))
         return {
-            "rect": _rect(root), "viewport": { "rect": _rect(viewport), "clip": viewport.clip },
+            "rect": _rect(root), "viewport": {
+                "rect": _rect(viewport), "sceneRect": _sceneRect(viewport),
+                "visible": viewport.visible, "enabled": viewport.enabled,
+                "opacity": Number(viewport.opacity), "z": Number(viewport.z),
+                "clip": viewport.clip,
+            },
             "page": currentPage ? { "rect": _rect(currentPage), "contentY": Number(currentPage.contentY), "contentHeight": Number(currentPage.contentHeight), "visible": currentPage.visible, "enabled": currentPage.enabled, "opacity": Number(currentPage.opacity), "z": Number(currentPage.z) } : null,
             "pages": {
                 "appearance": _pageSnapshot(root.parent && root.parent.appearancePage),

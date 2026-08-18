@@ -275,5 +275,6 @@ Item {
     readonly property Item contentItem: contentHost
     readonly property Item revertButtonItem: revertButton
     readonly property Item cardItem: cardSurface
+    readonly property Item cardHighlightItem: cardHighlight
     readonly property bool hovered: rowHovered
 }

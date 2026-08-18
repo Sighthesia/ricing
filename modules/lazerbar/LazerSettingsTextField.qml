@@ -18,6 +18,7 @@ FocusScope {
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property bool focusVisible: editor.activeFocus
     readonly property Item editorItem: editor
+    readonly property Item surfaceItem: fieldSurface
     property bool syncingEditor: false
     property bool pendingExternalText: false
     property bool committing: false
