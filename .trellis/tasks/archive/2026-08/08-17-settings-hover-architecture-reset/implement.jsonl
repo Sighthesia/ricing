@@ -1,2 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Preserve established QML input ownership, settings card, Tooltip, warning, and validation contracts while deciding between local repair and component migration."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace mask, viewport, page, Row, control, and Tooltip ownership across layer boundaries before changing component structure."}

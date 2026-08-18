@@ -1,4 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Fixed settings surface, scene-graph animation, QML visual transitions, dropdown/tooltip ownership, and per-screen lifecycle contracts."}
-{"file":".trellis/tasks/08-16-osu-settings-panel-detail-tuning/prd.md","reason":"Final requirements and observable acceptance criteria for the settings panel detail tuning."}
-{"file":".trellis/tasks/08-16-osu-settings-panel-detail-tuning/design.md","reason":"Approved implementation boundaries and control presentation contracts for this task."}
-{"file":".trellis/tasks/08-16-osu-settings-panel-detail-tuning/implement.md","reason":"Ordered implementation and validation checklist for the QML changes."}

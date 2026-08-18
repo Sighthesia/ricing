@@ -1,3 +1,0 @@
-{"file":"docs/superpowers/specs/2026-08-15-osu-fullscreen-visual-calibration-design.md","reason":"Approved product and architecture contract for the implementation."}
-{"file":"docs/superpowers/plans/2026-08-15-osu-fullscreen-visual-calibration-implementation.md","reason":"Authoritative task order, interfaces, TDD steps, and commit boundaries."}
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Current QML window, mask, focus, and test constraints; Task 7 migrates its obsolete mixed-owner scenario."}

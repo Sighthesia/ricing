@@ -1,2 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Settings overlay, input ownership, fixed surface, and QML validation contracts."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace the PanelWindow, viewport, control, and tooltip state boundaries before changing code."}

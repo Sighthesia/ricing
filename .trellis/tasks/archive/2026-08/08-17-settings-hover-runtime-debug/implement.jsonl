@@ -1,2 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Settings fixed surfaces, overlay input ownership, QML validation, Row/control and Tooltip contracts"}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace IPC through service, per-screen owner, panel, content, row and control boundaries"}

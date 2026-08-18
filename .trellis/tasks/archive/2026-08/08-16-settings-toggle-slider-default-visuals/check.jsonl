@@ -1,3 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Quality checklist and executable contracts for QML visual changes, reset ownership, Slider marker geometry, and known smoke-test warnings."}
-{"file":".trellis/tasks/08-16-settings-toggle-slider-default-visuals/prd.md","reason":"Acceptance criteria used to verify Toggle centering, Slider marker/handle fidelity, and right-side restore behavior."}
-{"file":".trellis/tasks/08-16-settings-toggle-slider-default-visuals/implement.md","reason":"Ordered implementation, risk points, and required validation commands for the quality pass."}

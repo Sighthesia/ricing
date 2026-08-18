@@ -1,2 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review input-region, fixed-surface, focus, overlay, and QML test contracts."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review cross-layer event and geometry ownership during diagnosis."}

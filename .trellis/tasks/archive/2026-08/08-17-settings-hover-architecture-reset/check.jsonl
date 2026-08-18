@@ -1,2 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review component refactor and input-layer changes against the project’s QML contracts, forbidden interception patterns, and required validation."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review cross-layer geometry, event routing, focus ownership, and Tooltip lifecycle rather than only local component syntax."}

@@ -1,2 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review diagnostic input neutrality, public control contracts, validation and runtime ownership"}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review complete IPC-to-visual-instance data flow and avoid boundary assumptions"}

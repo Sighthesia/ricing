@@ -1,4 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Quality checks for fixed surfaces, visual transitions, singleton overlay ownership, and QML testability."}
-{"file":".trellis/tasks/08-16-osu-settings-panel-detail-tuning/prd.md","reason":"Acceptance criteria and out-of-scope constraints to verify after implementation."}
-{"file":".trellis/tasks/08-16-osu-settings-panel-detail-tuning/design.md","reason":"Design contracts and compatibility risks to review before validation."}
-{"file":".trellis/tasks/08-16-osu-settings-panel-detail-tuning/implement.md","reason":"Required test commands and final verification gates."}

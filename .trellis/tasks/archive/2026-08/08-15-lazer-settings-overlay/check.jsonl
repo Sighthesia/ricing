@@ -1,4 +1,0 @@
-{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check service-side warnings, singleton contracts, and deterministic notification behavior."}
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check QML structure, bindings, sizing, focus, and visible interaction behavior."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check that settings changes have live consumers and no broken cross-layer data flow."}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check for unnecessary duplicate helpers or service abstractions."}

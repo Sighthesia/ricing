@@ -1,3 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Existing fixed settings surface, Row presentation, visual transition, reset ownership, and Slider tooltip contracts to preserve while adding marker and alignment rules."}
-{"file":".trellis/tasks/archive/2026-08/08-16-settings-default-visuals-runtime/prd.md","reason":"Previous runtime-default task defines live default injection, canonical reset behavior, timeout unit conversion, and reset/Slider input isolation."}
-{"file":".trellis/tasks/archive/2026-08/08-16-settings-default-visuals-runtime/design.md","reason":"Previous design defines Row/Slider ownership boundaries and full-height brighter thumb behavior that this detail-tuning task must extend without breaking."}

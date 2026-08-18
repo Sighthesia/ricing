@@ -1,2 +1,0 @@
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check runtime default propagation against existing Row/Slider layer and persistence contracts."}
-{"file":".trellis/tasks/08-16-settings-default-visuals-runtime/prd.md","reason":"Validate all acceptance criteria, especially live host injection and Slider default forwarding."}

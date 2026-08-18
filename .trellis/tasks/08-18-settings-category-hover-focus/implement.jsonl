@@ -1,2 +1,0 @@
-{"type":"spec","path":".trellis/spec/frontend","reason":"Load frontend/QML conventions before editing settings components, including interaction ownership and validation rules."}
-{"type":"research","path":".trellis/tasks/08-18-settings-category-hit-diagnosis","reason":"Reuse prior settings hit-chain diagnosis, snapshot evidence, and known qrc:/qs-blackhole test limitation without repeating failed fixes."}

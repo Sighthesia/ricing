@@ -1,5 +1,0 @@
-{"file":".trellis/tasks/08-15-osu-settings-control-fidelity/prd.md","reason":"Verify every identified P0/P1 mismatch and observable acceptance criterion."}
-{"file":".trellis/tasks/08-15-osu-settings-control-fidelity/design.md","reason":"Check control structure, menu/tooltip ownership, defaults, focus, and compatibility."}
-{"file":".trellis/tasks/08-15-osu-settings-control-fidelity/implement.md","reason":"Run the ordered test and runtime verification checklist."}
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check fixed owner geometry, persistent controls, focus races, WARN/ERROR output, and QML tests."}
-{"file":".agents/skills/visual-transition-rules/SKILL.md","reason":"Review all perceptible state changes and reduced-motion behavior."}
