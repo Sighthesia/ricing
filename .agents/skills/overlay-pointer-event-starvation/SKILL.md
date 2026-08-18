@@ -34,6 +34,32 @@ A Quickshell top-bar system-tray menu (hover a tray icon -> glass menu slides do
 1. **Static starvation**: each bar widget was wrapped by a `BarWidgetWrapper` whose `MouseArea { anchors.fill: parent; hoverEnabled: true; acceptedButtons: RightButton }` (for a right-click context menu) sat above the tray icons. `hoverEnabled` made it consume hover-move, so the inner tray `HoverHandler` (and earlier a `MouseArea.containsMouse`) **never fired** -> "hovering does nothing". Swapping MouseArea->HoverHandler inside the icon did not help, because the event never reached that layer.
 2. **Self-inflicted flicker**: once opened, the menu lived in a **fullscreen overlay `PanelWindow`** (`anchors { top; left; right; bottom }`) layered above the bar. It covered the tray icon, so the icon lost hover -> close timer fired -> overlay vanished -> icon regained hover -> reopened -> **flicker**. Moving onto the menu card was stable only because that area set `pointerInMenu = true`.
 
+### Quickshell Persistent-Page Variant
+
+Settings panels commonly keep category pages mounted so each `Flickable` retains
+its scroll position. A page that is only hidden with `enabled: false` and
+`opacity: 0` can still remain in the scene graph and participate in hover
+routing. When several pages share the same viewport coordinates, the visible
+page and an inactive page may both report hover for one physical pointer
+position. Symptoms include controls responding only in a thin strip, an
+apparently dead control, or logs naming a different category than the one on
+screen.
+
+Use `visible: false` for every inactive page while keeping the page object
+mounted. This removes it from scene rendering and hit testing without losing
+its `contentY` or other persistent state:
+
+```qml
+for (var i = 0; i < pages.length; i++) {
+    pages[i].enabled = i === nextIndex && root.interactive
+    pages[i].visible = i === nextIndex
+}
+```
+
+Do not treat `enabled: false`, `opacity: 0`, or `z` alone as proof that a
+hidden QML page cannot interfere with pointer routing. Verify both `visible`
+and `enabled` in the runtime snapshot.
+
 ## The Anti-Pattern vs. Best Practice
 
 - ❌ **Anti-Pattern (static)**: using a full-area, hover/pointer-*consuming* element (e.g. `MouseArea { hoverEnabled: true }`, a DOM node with `pointer-events: auto` over its children, a transparent overlay `View`) merely to detect presence or catch one button. It silently eats every event for everything beneath it.
@@ -55,3 +81,17 @@ A Quickshell top-bar system-tray menu (hover a tray icon -> glass menu slides do
 - **Confirm with a controlled deactivation.** Temporarily disable the suspected upper layer's input consumption (e.g. `hoverEnabled: false`, `pointer-events: none`). If the inner layer's hover suddenly fires, the upper layer was the thief. Revert after confirming.
 - **Reproduce the flicker deterministically.** Hold the pointer still on the trigger; a correct fix shows the popup opening **once** and staying. Repeated open/close logs with a stationary pointer means the overlay is still covering the trigger.
 - **Verify pass-through.** After masking input to the popup content, confirm the area over the trigger still receives events (trigger hover stays true) and regions outside the card pass through to whatever is below.
+
+### Persistent-Page Verification
+
+- Add a unique temporary hover log at the Row and each control handler, then
+  reproduce the same screen coordinate in the active category.
+- Treat logs from multiple category pages at one coordinate as proof of
+  overlapping live hit trees, even when the inactive pages have opacity `0`.
+- Capture each page's `visible`, `enabled`, `opacity`, `contentY`, and scene
+  rect before changing control geometry or PointerHandlers.
+- After the fix, assert exactly one page is `visible=true` and
+  `enabled=true`; assert inactive pages remain mounted and retain their
+  scroll positions.
+- Remove all tagged diagnostic logs before committing and rerun the static
+  checks plus the persistent-shell snapshot.
