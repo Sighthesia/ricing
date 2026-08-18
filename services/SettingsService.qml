@@ -74,6 +74,9 @@ QtObject {
     property int hoverDebugToken: 0
     property int hoverDebugOpenToken: 0
     property string hoverDebugOpenScreen: ""
+    // Process-local diagnostic override; never persisted with settings.
+    property string settingsMaskOverride: "auto"
+    property int settingsMaskOverrideToken: 0
     function togglePanel() {
         if (Services.IslandService.expanded && Services.IslandService.panelPage === "settings-center")
             Services.IslandService.close()
@@ -95,6 +98,7 @@ QtObject {
         function debugHover(enabled: string) { root.setHoverDebug(enabled) }
         function snapshotHover() { root.requestHoverSnapshot() }
         function openHoverDebug(screenName: string) { root.requestHoverDebugOpen(screenName) }
+        function maskOverride(mode: string) { root.setSettingsMaskOverride(mode) }
     }
 
     function setHoverDebug(enabled) {
@@ -128,6 +132,19 @@ QtObject {
             "event": "open-request",
             "screen": root.hoverDebugOpenScreen,
             "token": root.hoverDebugOpenToken,
+        }))
+    }
+
+    function setSettingsMaskOverride(mode) {
+        var normalized = String(mode).toLowerCase()
+        if (normalized !== "auto" && normalized !== "on" && normalized !== "off")
+            normalized = "auto"
+        root.settingsMaskOverride = normalized
+        root.settingsMaskOverrideToken += 1
+        console.log("[afloat:SettingsHoverDebug]", JSON.stringify({
+            "event": "mask-override",
+            "override": normalized,
+            "token": root.settingsMaskOverrideToken,
         }))
     }
 

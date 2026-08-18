@@ -24,6 +24,8 @@ Item {
     property bool debugHoverEnabled: false
     property int debugHoverToken: 0
     property string debugScreenName: "unknown"
+    property string debugMaskOverride: "auto"
+    property bool debugMaskActive: false
     property string _lastDebugSignature: ""
 
     visible: blocksDesktop
@@ -86,7 +88,12 @@ Item {
                 "requiredWidth": Number(root.requiredWidth),
             },
             "panel": panel.debugSnapshot(),
-            "mask": { "active": root.blocksDesktop, "owner": "settingsOverlay" },
+            "mask": {
+                "active": root.debugMaskActive,
+                "overlayBlocksDesktop": root.blocksDesktop,
+                "override": root.debugMaskOverride,
+                "owner": "settingsOverlay",
+            },
         }
     }
 

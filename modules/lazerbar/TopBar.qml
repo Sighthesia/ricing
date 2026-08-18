@@ -21,6 +21,9 @@ Variants {
         readonly property int utilityBudget: Math.max(LazerTheme.targetSize,
             modelData.width - leftWindow.implicitWidth - statusWindow.implicitWidth
             - sidePadding * 2 - safetyGap * 2)
+        readonly property bool settingsMaskActive:
+            Services.SettingsService.settingsMaskOverride !== "off"
+            && settingsOverlay.blocksDesktop
         readonly property string activeOverlay: overlayCoordinator.activeTarget
         property bool musicTooltipOpen: false
         property bool shuffleActive: false
@@ -114,7 +117,7 @@ Variants {
             implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
             anchors { top: true; left: true }
-            mask: Region { item: settingsOverlay.blocksDesktop ? settingsOverlay : null }
+            mask: Region { item: screenScope.settingsMaskActive ? settingsOverlay : null }
             LazerSettingsOverlay {
                 id: settingsOverlay; anchors.fill: parent
                 panel.appearanceSettings: Services.SettingsService.appearance
@@ -128,6 +131,8 @@ Variants {
                 panel.wallpaperService: Services.WallpaperService
                 debugHoverEnabled: Services.SettingsService.hoverDebugEnabled
                 debugHoverToken: Services.SettingsService.hoverDebugToken
+                debugMaskOverride: Services.SettingsService.settingsMaskOverride
+                debugMaskActive: screenScope.settingsMaskActive
                 debugScreenName: screenScope.modelData && screenScope.modelData.name
                         ? String(screenScope.modelData.name) : "unknown"
                 onClosed: overlayCoordinator.ownerClosed("settings")
