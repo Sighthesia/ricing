@@ -82,13 +82,18 @@ Item {
     // Show an accent pill only for the selected category.
     Rectangle {
         id: selectionIndicator
-        x: 9
+        x: root.expanded ? 9 : 4
         anchors.verticalCenter: parent.verticalCenter
         width: 4
         height: root.selected ? 24 : 0
         radius: 2
         color: LazerTheme.settingsAccent
         opacity: root.selected ? 1 : 0
+
+        Behavior on x {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
+        }
 
         Behavior on height {
             enabled: !MotionTokens.reducedMotion

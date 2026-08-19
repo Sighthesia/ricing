@@ -128,7 +128,7 @@ Item {
             width: rail.width
             label: root.labels[0]
             iconSource: root.icons[0]
-            expanded: root.showLabels
+            expanded: root.expanded
             selected: root.selectedIndex === 0
             interactive: root.interactive
             appearOpacity: 0
@@ -140,7 +140,7 @@ Item {
             width: rail.width
             label: root.labels[1]
             iconSource: root.icons[1]
-            expanded: root.showLabels
+            expanded: root.expanded
             selected: root.selectedIndex === 1
             interactive: root.interactive
             appearOpacity: 0
@@ -152,7 +152,7 @@ Item {
             width: rail.width
             label: root.labels[2]
             iconSource: root.icons[2]
-            expanded: root.showLabels
+            expanded: root.expanded
             selected: root.selectedIndex === 2
             interactive: root.interactive
             appearOpacity: 0
@@ -173,6 +173,9 @@ Item {
         Accessible.role: Accessible.Button
         Accessible.name: "返回"
 
+        Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
+        Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
+
         scale: backPress.pressed ? MotionTokens.pressScale : 1
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
 
@@ -191,7 +194,7 @@ Item {
             anchors.centerIn: parent
             width: 16
             height: 16
-            source: "icons/chevron-left.svg"
+            source: "icons/sidebar-return.svg"
             fillMode: Image.PreserveAspectFit
         }
         MultiEffect {
@@ -202,22 +205,6 @@ Item {
             colorizationColor: backHover.hovered || backButton.activeFocus ? LazerTheme.textPrimary : LazerTheme.textMuted
             Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
-        // Fade the back label with the collapse transition instead of hard-cutting.
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 21
-            visible: root.showLabels || opacity > 0
-            opacity: root.showLabels ? 1 : 0
-            Behavior on opacity {
-                enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
-            }
-            text: "返回"
-            color: LazerTheme.textMuted
-            font.pixelSize: 12
-        }
-
         HoverHandler { id: backHover; enabled: backButton.enabled }
         TapHandler {
             id: backPress
