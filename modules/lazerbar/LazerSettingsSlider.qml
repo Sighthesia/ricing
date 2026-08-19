@@ -34,6 +34,8 @@ Item {
     readonly property bool defaultMarkerAtValue: defaultValue !== undefined
                                                  && Math.abs(displayValue - normalized(defaultValue)) < Math.max(1e-9, Math.abs(Number(stepSize)) * 0.001)
     readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
+    readonly property bool bumpActive: bumpAnimation.running || root.bumpScale > 1
+    property real bumpScale: 1
     signal valueModified(real value)
 
     readonly property real rangePadding: LazerTheme.settingsRangePadding
@@ -47,6 +49,14 @@ Item {
     opacity: effectiveEnabled ? 1 : LazerTheme.settingsDisabledAlpha
     Accessible.role: Accessible.Slider
     Accessible.name: accessibleName
+
+    transform: Scale {
+        id: bumpTransform
+        origin.x: root.width / 2
+        origin.y: root.height / 2
+        xScale: root.bumpScale
+        yScale: root.bumpScale
+    }
 
     function normalized(candidate) {
         var start = Number(from)
@@ -93,9 +103,14 @@ Item {
     function restartFlash() {
         if (!root.effectiveEnabled || MotionTokens.reducedMotion) {
             flashAnimation.stop()
+            bumpAnimation.stop()
             flashOverlay.opacity = 0
+            root.bumpScale = 1
             return
         }
+        bumpAnimation.stop()
+        root.bumpScale = MotionTokens.sliderTickBumpScale
+        bumpAnimation.restart()
         flashAnimation.restart()
     }
 
@@ -223,6 +238,18 @@ Item {
         running: false
     }
 
+    // Add a restrained center-anchored bump without changing layout geometry.
+    NumberAnimation {
+        id: bumpAnimation
+        target: root
+        property: "bumpScale"
+        from: MotionTokens.sliderTickBumpScale
+        to: 1
+        duration: MotionTokens.sliderTickBumpReturn
+        easing.type: Easing.OutQuint
+        running: false
+    }
+
     // Keep the default marker above the active thumb so the default remains legible.
     Rectangle {
         id: defaultMarker
@@ -329,6 +356,7 @@ Item {
     readonly property Item trackFillItem: fillRect
     readonly property Item flashOverlayItem: flashOverlay
     readonly property Animation flashAnimationItem: flashAnimation
+    readonly property Animation bumpAnimationItem: bumpAnimation
     readonly property Item defaultMarkerItem: defaultMarker
     readonly property Item thumbLightItem: defaultMarkerAtValue ? defaultMarker : null
     readonly property bool trackTapEnabled: trackTapHandler.enabled

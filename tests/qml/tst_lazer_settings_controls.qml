@@ -140,6 +140,8 @@ Item {
             slider.focus = false
             slider.flashAnimationItem.stop()
             slider.flashOverlayItem.opacity = 0
+            slider.bumpAnimationItem.stop()
+            slider.bumpScale = 1
             secondSlider.focus = false
             sliderSpy.clear()
             revertRowSliderSpy.clear()
@@ -282,13 +284,20 @@ Item {
 
             slider.setValue(6)
             verify(slider.flashActive)
+            verify(slider.bumpActive)
+            compare(slider.bumpScale, Lazer.MotionTokens.sliderTickBumpScale)
             compare(slider.flashAnimationItem.duration, 800)
             compare(slider.flashAnimationItem.easing.type, Easing.OutQuint)
+            compare(slider.bumpAnimationItem.duration, 220)
+            compare(slider.bumpAnimationItem.easing.type, Easing.OutQuint)
 
             slider.flashAnimationItem.stop()
             slider.flashOverlayItem.opacity = 0
+            slider.bumpAnimationItem.stop()
+            slider.bumpScale = 1
             slider.setValue(6)
             compare(slider.flashActive, false)
+            compare(slider.bumpActive, false)
         }
 
         function test_sliderTickFlashUsesResetPathAndReducedMotion() {
@@ -298,10 +307,14 @@ Item {
 
             slider.flashAnimationItem.stop()
             slider.flashOverlayItem.opacity = 0
+            slider.bumpAnimationItem.stop()
+            slider.bumpScale = 1
             sliderHolder.value = 8
             Lazer.MotionTokens.reducedMotionOverride = true
             slider.resetToDefault()
             compare(slider.flashActive, false)
+            compare(slider.bumpActive, false)
+            compare(slider.bumpScale, 1)
             compare(slider.flashOverlayItem.opacity, 0)
             compare(slider.flashAnimationItem.running, false)
         }

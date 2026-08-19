@@ -37,6 +37,8 @@ Add one non-interactive overlay above the filled progress portion and below the 
 
 The overlay is not a new hit target and must not intercept hover, tap, or drag events.
 
+When the flash starts, the complete slider visual receives a center-anchored scale bump to `1.015`, then returns to `1.0` over `220ms` with `Easing.OutQuint`. This uses a `Scale` transform only, so the slider's layout size and input boundary remain unchanged. Reduced motion keeps the scale at `1.0`.
+
 ## State And Triggering
 
 `LazerSettingsSlider` owns a private flash state. `setValue()` remains the single normalized mutation entry point. After confirming that the next value differs from the current value, it emits `valueModified(next)` and starts the flash. Existing callers continue to receive the same signal and value semantics.
