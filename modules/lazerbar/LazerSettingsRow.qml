@@ -63,9 +63,9 @@ Item {
     readonly property real inlineControlWidth: Math.min(Math.max(0, contentHost.width), safeRequestedWidth)
     readonly property real splitControlWidth: Math.min(240, Math.max(0, contentHost.width * 0.55))
     readonly property real cardContentHeight: inlinePresentation ? 44
-                                         : (choicePresentation ? safeControlHeight + choiceMenuReservedHeight
-                                            : (splitPresentation ? 52
-                                               : 10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10))
+                                          : (choicePresentation ? safeControlHeight
+                                             : (splitPresentation ? 52
+                                                : 10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10))
 
     implicitWidth: 640
     readonly property real textRegionWidth: contentHost.width
@@ -74,6 +74,11 @@ Item {
     height: matchesSearch ? implicitHeight : 0
     visible: matchesSearch
     opacity: root.enabled ? 1 : LazerTheme.settingsDisabledAlpha
+
+    Behavior on height {
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+    }
 
     // Observe the complete row, including areas covered by embedded controls.
     HoverHandler {
@@ -229,7 +234,7 @@ Item {
                         ? root.width - contentPadding - revertZoneWidth
                         : root.width - 2 * contentPadding - revertZoneWidth)
         height: root.inlinePresentation ? 44
-                : (root.choicePresentation ? controlHost.height + root.choiceMenuReservedHeight
+                : (root.choicePresentation ? controlHost.height
                    : (root.splitPresentation ? 52
                       : root.implicitHeight - 20))
 

@@ -21,14 +21,16 @@ Item {
     readonly property bool focusVisible: activeFocus
     readonly property bool hovered: headerHover.hovered
     property bool menuOpen: false
-    readonly property real menuReservedHeight: menuOpen
+    readonly property real optionListHeight: menuOpen && effectiveEnabled && model.length > 0
         ? Math.min(LazerTheme.dropdownMaxHeight, model.length * 30 + 8) : 0
+    readonly property real menuReservedHeight: optionListHeight
     readonly property Item headerItem: headerSurface
     readonly property Item surfaceItem: headerSurface
+    property int preselectIndex: -1
     signal valueSelected(string value)
 
     implicitWidth: 190
-    implicitHeight: LazerTheme.settingsChoiceHeight
+    implicitHeight: LazerTheme.settingsChoiceHeight + (optionListHeight > 0 ? 4 + optionListHeight : 0)
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     activeFocusOnTab: effectiveEnabled
@@ -51,9 +53,11 @@ Item {
     }
 
     function selectValue(candidate) {
-        if (!effectiveEnabled || !validValue(candidate) || String(candidate) === currentValue)
+        if (!effectiveEnabled || !validValue(candidate))
             return
-        valueSelected(String(candidate))
+        if (String(candidate) !== currentValue)
+            valueSelected(String(candidate))
+        root.closeMenu()
     }
 
     // Programmatic cycling helper; keyboard and pointer no longer cycle values.
@@ -66,21 +70,21 @@ Item {
     }
 
     function openMenu() {
-        if (!root.effectiveEnabled)
+        if (!root.effectiveEnabled || model.length === 0)
             return
         if (root.menuOpen) {
             root.closeMenu()
             return
         }
         root.menuOpen = true
-        SettingsOverlayBridge.showDropdown(root)
+        root.preselectIndex = Math.max(0, indexOfValue(root.currentValue))
     }
 
     function closeMenu() {
         if (!root.menuOpen)
             return
         root.menuOpen = false
-        SettingsOverlayBridge.hideDropdown(root)
+        root.preselectIndex = -1
     }
 
     function focusHeader() {
@@ -88,10 +92,41 @@ Item {
             root.forceActiveFocus()
     }
 
+    function indexOfValue(candidate) {
+        for (var i = 0; i < model.length; i++)
+            if (String(model[i].value) === String(candidate))
+                return i
+        return -1
+    }
+
+    function selectPreselected() {
+        if (preselectIndex >= 0 && preselectIndex < model.length)
+            selectValue(model[preselectIndex].value)
+    }
+
+    function movePreselect(delta) {
+        if (!menuOpen || model.length === 0)
+            return
+        preselectIndex = Math.max(0, Math.min(model.length - 1,
+            (preselectIndex < 0 ? 0 : preselectIndex) + delta))
+    }
+
     Keys.onPressed: event => {
         if (!root.effectiveEnabled)
             return
-        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space
+        if (root.menuOpen && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+            root.selectPreselected()
+            event.accepted = true
+        } else if (root.menuOpen && event.key === Qt.Key_Escape) {
+            root.closeMenu()
+            event.accepted = true
+        } else if (root.menuOpen && event.key === Qt.Key_Up) {
+            root.movePreselect(-1)
+            event.accepted = true
+        } else if (root.menuOpen && event.key === Qt.Key_Down) {
+            root.movePreselect(1)
+            event.accepted = true
+        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space
                 || (event.key === Qt.Key_Down && (event.modifiers & Qt.AltModifier))) {
             root.openMenu()
             event.accepted = true
@@ -107,10 +142,18 @@ Item {
         }
     }
 
+    onVisibleChanged: {
+        if (!visible && menuOpen)
+            root.closeMenu()
+    }
+
     // Keep the field label and selected value inside one compact surface.
     Rectangle {
         id: headerSurface
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: LazerTheme.settingsChoiceHeight
         radius: LazerTheme.settingsChoiceRadius
         color: root.menuOpen && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsControlSurface
         border.width: root.activeFocus ? 2 : 0
@@ -119,6 +162,7 @@ Item {
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
 
+        // Keep the field label and selected value inside the title surface.
         Column {
             id: fieldColumn
             anchors.left: parent.left
@@ -162,6 +206,66 @@ Item {
             visible: chevron.visible
             colorization: 1
             colorizationColor: LazerTheme.settingsNavInactive
+        }
+    }
+
+    // Keep the expanded options inside the Choice layout tree.
+    Rectangle {
+        id: optionSurface
+        anchors.left: parent.left
+        anchors.right: parent.right
+        y: LazerTheme.settingsChoiceHeight + 4
+        height: optionListHeight
+        radius: LazerTheme.settingsControlRadius
+        color: LazerTheme.settingsMenuBackground
+        border.width: optionListHeight > 0 ? 1 : 0
+        border.color: LazerTheme.settingsMenuBorder
+        visible: optionListHeight > 0
+        clip: true
+
+        // Scroll only the option list when the model exceeds the menu cap.
+        ListView {
+            id: optionList
+            anchors.fill: parent
+            anchors.margins: 4
+            clip: true
+            model: root.model
+            interactive: root.model.length > 6
+            boundsBehavior: Flickable.StopAtBounds
+
+            // Paint one selectable option inside the expanded Choice.
+            delegate: Rectangle {
+                width: optionList.width
+                height: 30
+                radius: 4
+                color: optionHover.hovered || index === root.preselectIndex
+                       ? LazerTheme.settingsMenuHover : "transparent"
+                Behavior on color { ColorAnimation { duration: MotionTokens.dropdownItem } }
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: LazerTheme.settingsControlPadding
+                    anchors.right: parent.right
+                    anchors.rightMargin: LazerTheme.settingsControlPadding
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: modelData.label
+                    color: String(modelData.value) === root.currentValue ? LazerTheme.osuPink : LazerTheme.textPrimary
+                    font.pixelSize: 14
+                    font.weight: String(modelData.value) === root.currentValue ? Font.DemiBold : Font.Normal
+                    elide: Text.ElideRight
+                }
+
+                HoverHandler {
+                    id: optionHover
+                    onHoveredChanged: {
+                        if (optionHover.hovered)
+                            root.preselectIndex = index
+                    }
+                }
+                TapHandler {
+                    onTapped: root.selectValue(String(modelData.value))
+                }
+            }
         }
     }
 

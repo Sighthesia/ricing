@@ -2,8 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
-// Own the settings content chrome: search, category title, viewport, footer,
-// and the top-level dropdown overlay layer for choice controls.
+// Own the settings content chrome: search, category title, viewport, and footer.
 Item {
     id: root
 
@@ -15,7 +14,8 @@ Item {
     property int visibleResultCount: 0
     property real backgroundExtend: 170
     property Item currentPage: null
-    property bool dropdownOpen: false
+    readonly property Item openChoice: findOpenChoice(currentPage)
+    readonly property bool dropdownOpen: openChoice !== null
     readonly property bool emptyStateVisible:
         Logic.normalizeSearchQuery(searchQuery).length > 0 && visibleResultCount === 0
     readonly property bool canScrollDown: currentPage && currentPage.contentHeight - currentPage.contentY - viewport.height > 8
@@ -128,6 +128,25 @@ Item {
             _findRows(children[i], result)
     }
 
+    function findOpenChoice(item) {
+        if (!item)
+            return null
+        if (item.menuOpen !== undefined && item.closeMenu !== undefined && item.menuOpen)
+            return item
+        var children = item.children || []
+        for (var i = 0; i < children.length; i++) {
+            var choice = findOpenChoice(children[i])
+            if (choice)
+                return choice
+        }
+        return null
+    }
+
+    function closeOpenChoice() {
+        if (root.openChoice)
+            root.openChoice.closeMenu()
+    }
+
     function debugSnapshot() {
         var rows = []
         _findRows(currentPage, rows)
@@ -169,16 +188,16 @@ Item {
     onSearchQueryChanged: {
         if (searchEditor.text !== root.searchQuery)
             searchEditor.text = root.searchQuery
-        root.closeDropdownMenu()
+        root.closeOpenChoice()
     }
 
     onCurrentPageChanged: {
-        root.closeDropdownMenu()
+        root.closeOpenChoice()
     }
 
     onInteractiveChanged: {
         if (!root.interactive) {
-            root.closeDropdownMenu()
+            root.closeOpenChoice()
         }
     }
 
@@ -400,121 +419,38 @@ Item {
         height: 44
     }
 
-    // Own the real dropdown menu and its outside-click catcher on a top layer.
-    // The layer visibility follows the content state (not the child menu's
-    // visible, which would create a circular binding that resets the menu).
+    // Keep compatibility items inert; Choice menus now live inside their Rows.
     Item {
         id: dropdownLayer
-        z: 30
-        anchors.fill: parent
-        visible: root.dropdownOpen
+        visible: false
 
-        // Close the menu when the pointer lands outside it.
         Item {
             id: menuCatcher
-            enabled: root.dropdownOpen
-            anchors.fill: parent
-            TapHandler {
-                enabled: dropdownMenu.visible
-                onTapped: eventPoint => root.handleDropdownTap(eventPoint.position)
-            }
-        }
-
-        SettingsDropdownMenu {
-            id: dropdownMenu
-            z: 1
-            onItemSelected: value => root.selectDropdownValue(value)
-            onClosed: root.onMenuClosed()
+            enabled: false
         }
     }
 
-    // Accept overlay requests only from controls mounted under this screen's content.
-    function ownsOverlaySource(source) {
-        var cursor = source
-        while (cursor) {
-            if (cursor === root)
-                return true
-            cursor = cursor.parent
-        }
-        return false
-    }
-
-    function closeDropdownMenu() {
-        root.dropdownOpen = false
-        if (dropdownMenu.choiceItem)
-            dropdownMenu.choiceItem.closeMenu()
-        else
-            dropdownMenu.close()
-    }
-
-    function handleDropdownTap(position) {
-        var choice = dropdownMenu.choiceItem
-        if (choice) {
-            var header = choice.headerItem || choice
-            var origin = header.mapToItem(root, 0, 0)
-            if (position.x >= origin.x && position.x <= origin.x + header.width
-                    && position.y >= origin.y && position.y <= origin.y + header.height) {
-                choice.closeMenu()
-                return
-            }
-        }
-        root.closeDropdownMenu()
-    }
-
-    function selectDropdownValue(value) {
-        var choice = dropdownMenu.choiceItem
-        if (!choice)
-            return
-        choice.selectValue(value)
-        dropdownMenu.close()
-    }
-
-    function onMenuClosed() {
-        root.dropdownOpen = false
-        if (dropdownMenu.choiceItem) {
-            dropdownMenu.choiceItem.menuOpen = false
-            dropdownMenu.choiceItem.focusHeader()
-            dropdownMenu.choiceItem = null
-        }
-    }
-
-    function showDropdownFor(choiceItem) {
-        if (!root.interactive || !root.contentReady || !root.ownsOverlaySource(choiceItem)) {
-            return
-        }
-        if (dropdownMenu.choiceItem && dropdownMenu.choiceItem !== choiceItem) {
-            dropdownMenu.choiceItem.menuOpen = false
-            dropdownMenu.choiceItem = null
-        }
-        dropdownMenu.choiceItem = choiceItem
-        dropdownMenu.model = choiceItem.model
-        dropdownMenu.currentValue = choiceItem.currentValue
-        var header = choiceItem.headerItem || choiceItem
-        var pos = header.mapToItem(root, 0, 0)
-        var menuHeight = Math.min(LazerTheme.dropdownMaxHeight, choiceItem.model.length * 30 + 8)
-        dropdownMenu.x = Logic.clamp(pos.x, 0, Math.max(0, root.width - header.width))
-        dropdownMenu.width = header.width
-        dropdownMenu.y = pos.y + header.height
-        dropdownMenu.height = menuHeight
-        dropdownMenu.open()
-        root.dropdownOpen = true
-        dropdownMenu.forceActiveFocus()
-    }
-
-    // Close dropdowns when the active page scrolls.
+    // Close the active inline menu when the page scrolls.
     Connections {
         target: root.currentPage
         function onContentYChanged() {
-            root.closeDropdownMenu()
+            root.closeOpenChoice()
         }
     }
 
-    Connections {
-        target: SettingsOverlayBridge
-        function onDropdownRequested(choiceItem) { root.showDropdownFor(choiceItem) }
-        function onDropdownDismissed(choiceItem) {
-            if (dropdownMenu.visible && dropdownMenu.choiceItem === choiceItem)
-                dropdownMenu.close()
+    // Observe taps outside the active inline Choice without blocking controls.
+    TapHandler {
+        enabled: root.interactive && root.openChoice !== null
+        blocking: false
+        onTapped: eventPoint => {
+            var choice = root.openChoice
+            if (!choice)
+                return
+            var point = eventPoint.position
+            var origin = choice.mapToItem(root, 0, 0)
+            if (point.x < origin.x || point.x > origin.x + choice.width
+                    || point.y < origin.y || point.y > origin.y + choice.height)
+                choice.closeMenu()
         }
     }
 }

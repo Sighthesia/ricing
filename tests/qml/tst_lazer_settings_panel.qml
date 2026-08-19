@@ -177,6 +177,58 @@ Item {
             verify(viewport.clip)
         }
 
+        function test_choiceMenuExpandsRowAndPushesFollowingRows() {
+            var row = panel.appearancePage.colorSchemeRow
+            var choice = row.controlItem
+            var following = panel.appearancePage.panelOpacityRow
+            var closedHeight = row.height
+            var closedY = following.y
+
+            verify(choice !== null)
+            compare(choice.menuOpen, false)
+            compare(choice.menuReservedHeight, 0)
+            choice.openMenu()
+            tryCompare(choice, "menuOpen", true)
+            tryCompare(row, "height", row.implicitHeight, 500)
+            verify(row.height > closedHeight)
+            verify(following.y > closedY)
+            verify(row.cardHighlightItem.height >= row.height - 1)
+            verify(choice.optionListHeight > 0)
+
+            choice.selectValue("dark")
+            tryCompare(choice, "menuOpen", false)
+            tryCompare(row, "height", closedHeight, 500)
+            tryCompare(following, "y", closedY, 500)
+        }
+
+        function test_choiceEscapeAndOutsideTapCloseWithoutChangingValue() {
+            var row = panel.appearancePage.colorSchemeRow
+            var choice = row.controlItem
+            var originalValue = choice.currentValue
+
+            choice.openMenu()
+            tryCompare(choice, "menuOpen", true)
+            keyPress(Qt.Key_Escape)
+            tryCompare(choice, "menuOpen", false)
+            compare(choice.currentValue, originalValue)
+
+            choice.openMenu()
+            tryCompare(choice, "menuOpen", true)
+            mouseClick(panel.content, 4, 4)
+            tryCompare(choice, "menuOpen", false)
+            compare(choice.currentValue, originalValue)
+        }
+
+        function test_choiceClosesWhenSwitchingCategory() {
+            var choice = panel.appearancePage.colorSchemeRow.controlItem
+            choice.openMenu()
+            tryCompare(choice, "menuOpen", true)
+            panel.selectCategory("bar")
+            tryCompare(choice, "menuOpen", false)
+            verify(!panel.appearancePage.visible)
+            verify(panel.barPage.visible)
+        }
+
         function test_midOpenLayersOccupyDifferentPositions() {
             panel.progress = 0.5
             compare(panel.sidebarLayerX, -85)
@@ -369,17 +421,21 @@ Item {
             tryCompare(panel.barPage, "opacity", 1, 300)
         }
 
-        function test_dropdownOpensInContentAndSelects() {
+        function test_dropdownExpandsInlineAndSelects() {
             panel.contentReady = true
             panel.selectCategory("bar")
             var choice = panel.barPage.positionChoice
+            var row = panel.barPage.positionRow
+            var closedHeight = row.height
             choice.openMenu()
             verify(panel.content.dropdownVisible)
-            verify(panel.content.dropdownLayerItem.visible)
-            verify(panel.content.menuCatcherItem.enabled)
+            verify(!panel.content.dropdownLayerItem.visible)
+            verify(!panel.content.menuCatcherItem.enabled)
             verify(choice.menuOpen)
             verify(choice.headerItem.width > 0)
-            panel.content.selectDropdownValue("bottom")
+            verify(choice.optionListHeight > 0)
+            verify(row.height > closedHeight)
+            choice.selectValue("bottom")
             compare(barSettings.position, "bottom")
             verify(!panel.content.dropdownVisible)
             verify(!choice.menuOpen)
