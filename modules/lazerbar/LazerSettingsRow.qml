@@ -149,7 +149,7 @@ Item {
     Binding {
         target: root.controlItem
         property: "requestedWidth"
-        value: contentHost.width
+        value: root.choicePresentation ? root.width : contentHost.width
         when: root.controlSupportsFillWidth && root.controlItem.fillWidth
     }
 

@@ -155,7 +155,7 @@ Item {
         anchors.right: parent.right
         height: LazerTheme.settingsChoiceHeight
         radius: LazerTheme.settingsChoiceRadius
-        color: root.menuOpen && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsControlSurface
+        color: LazerTheme.settingsControlSurface
         border.width: headerHover.hovered || root.menuOpen ? 2 : 0
         border.color: LazerTheme.settingsAccent
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
