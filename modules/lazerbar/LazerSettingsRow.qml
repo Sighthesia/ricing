@@ -172,10 +172,11 @@ Item {
     Item {
         id: revertButton
         z: 3
-        x: root.width - width - contentPadding
+        x: Math.max(0, root.width - width - contentPadding)
         width: 28
-        height: 28
-        anchors.verticalCenter: controlHost.verticalCenter
+        height: root.safeControlHeight > 0 ? root.safeControlHeight : 28
+        // Follow the actual control center, not the taller label-plus-control card.
+        y: contentHost.y + controlHost.y + (controlHost.height - height) / 2
         visible: root.revertVisible
         opacity: root.revertVisible ? 1 : 0
         enabled: root.canReset
@@ -187,7 +188,7 @@ Item {
         Rectangle {
             anchors.fill: parent
             radius: 5
-            color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsRowHover : "transparent"
+            color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsRowHover : LazerTheme.settingsResetSurface
             border.width: revertButton.activeFocus ? 1 : 0
             border.color: LazerTheme.focusRing
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
