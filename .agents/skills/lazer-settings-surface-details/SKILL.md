@@ -1,6 +1,6 @@
 ---
 name: lazer-settings-surface-details
-description: 修改 Afloat 的 lazer 设置面板、设置 row、恢复默认按钮、分类区块、搜索栏或控件反馈时使用。固化已验证的设置面板层级、尺寸、z-order、伪月牙默认按钮、hover/press 输入隔离和进入退出动效，避免破坏现有视觉与交互契约。
+description: 修改 Afloat 的 lazer 设置面板、设置 row、恢复默认按钮、分类区块、搜索栏、滑条或控件反馈时使用。固化已验证的设置面板层级、尺寸、z-order、伪月牙默认按钮、滑条刻度闪烁与轻微震动、hover/press 输入隔离和进入退出动效，避免破坏现有视觉与交互契约。
 ---
 
 # Lazer 设置面板细节规范
@@ -49,6 +49,18 @@ description: 修改 Afloat 的 lazer 设置面板、设置 row、恢复默认按
 - 默认按钮位于较低 z 层时，检查上方的 `MouseArea`、`HoverHandler` 和 `Rectangle` 是否会吞掉它的 pointer/hover 事件。
 - 使用独立按钮 handler 解决输入，不要通过把按钮重新提到 row 背景之上来绕过事件问题，否则会破坏伪月牙裁切。
 
+## 滑条刻度反馈
+
+- 滑条值经过新的离散刻度并真正改变 normalized value 时，才触发反馈；初始化、外部同步和重复设置当前刻度不触发。
+- 点击、拖动、键盘左右移动和恢复默认值必须进入同一个 `setValue()` 触发路径，避免不同输入方式产生不同反馈。
+- 闪烁层只覆盖已填充的进度本体，不覆盖空余轨道；它应与 `fillRect` 的位置、宽度和高度保持绑定。
+- 闪烁层必须是非交互的视觉层，不得改变 slider 的命中区域、布局尺寸、thumb、默认刻度或 row 高度。
+- 闪烁参数遵循 osu!lazer `OsuAnimatedButton` 的权威规则：白色等效叠加 `0.3` opacity、`800ms`、`Easing.OutQuint`。
+- 闪烁触发时，整个 slider 使用中心锚定的 `Scale` 变换轻微放大到 `1.015`，再用 `220ms`、`Easing.OutQuint` 回到 `1.0`；只能变换视觉，不得修改 `width`/`height`。
+- 连续经过刻度时重启反馈，但不允许 scale 累积；每次从 `1.015` 回落到 `1.0`。
+- `MotionTokens.reducedMotion` 开启时闪烁 opacity 必须保持 `0`，scale 必须保持 `1.0`，并停止相关动画。
+- 测试应覆盖：进度填充范围、非交互层、闪烁时长/曲线、重复刻度、恢复默认、连续触发、reduced-motion 和布局尺寸不变。
+
 ## 验证清单
 
 - 检查默认按钮最终宽度、右边缘、z-order 和 row 圆角半径的关系。
@@ -56,3 +68,4 @@ description: 修改 Afloat 的 lazer 设置面板、设置 row、恢复默认按
 - 检查 hover 时按钮背景和图标变色，按下时有 `pressScale` 反馈，并且点击只触发一次 reset callback。
 - 检查从非默认值恢复到默认值后，按钮向左滑回；移除 `defaultValue` 后才变为不可见。
 - 修改 QML 后运行相关 `qmllint`、`pytest` 和 `qs -p .`；QML 测试若被 `qrc:/qs-blackhole` 环境资源阻塞，要明确记录。
+- 修改滑条反馈后额外检查 `flashOverlay` 是否锚定 `trackFillItem`，以及 `Scale` 是否以 slider 中心为 origin；不要用 width/height 动画制造震动。
