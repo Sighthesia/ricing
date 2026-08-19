@@ -110,8 +110,8 @@ Item {
         radius: 6
         visible: !root.choicePresentation
         color: root.rowHighlighted ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-        border.width: root.rowHighlighted ? 1.5 : 0
-        border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
+        border.width: root.controlItem && root.controlItem.activeFocus ? 1.5 : 0
+        border.color: root.controlItem && root.controlItem.activeFocus ? LazerTheme.settingsAccent : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
