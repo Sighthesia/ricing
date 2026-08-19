@@ -156,8 +156,8 @@ Item {
         height: LazerTheme.settingsChoiceHeight
         radius: LazerTheme.settingsChoiceRadius
         color: root.menuOpen && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsControlSurface
-        border.width: root.activeFocus && headerHover.hovered ? 2 : 1
-        border.color: root.activeFocus && headerHover.hovered ? LazerTheme.focusRing : LazerTheme.settingsMenuBorder
+        border.width: (root.activeFocus && headerHover.hovered) || root.menuOpen ? 2 : 0
+        border.color: LazerTheme.focusRing
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
