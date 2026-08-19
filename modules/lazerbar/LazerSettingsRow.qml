@@ -28,6 +28,7 @@ Item {
     readonly property real cardRadius: 6
     readonly property real revertVisualWidth: root.revertZoneWidth + root.cardRadius
     readonly property real revertVisibleX: root.width - root.revertVisualWidth
+    readonly property real revertHiddenX: root.revertVisibleX - root.revertVisualWidth
     readonly property real reservedResetWidth: root.hasDefault ? root.revertZoneWidth : 0
     readonly property real reservedResetGap: root.hasDefault ? root.revertContentGap : 0
     readonly property real cardBodyWidth: Math.max(0, root.width - root.reservedResetWidth)
@@ -196,12 +197,11 @@ Item {
     Item {
         id: revertButton
         z: 0
-        x: Math.max(0, root.revertVisibleX
-                       - (root.revertVisible ? 0 : root.revertVisualWidth))
+        x: Math.max(0, root.revertVisible ? root.revertVisibleX : root.revertHiddenX)
         y: 0
         width: root.revertVisualWidth
         height: root.choicePresentation ? root.safeMainControlHeight : root.height
-        visible: root.hasDefault
+        visible: root.enabled && root.hasDefault && (root.revertVisible || x > root.revertHiddenX + 0.5)
         enabled: root.canReset
         activeFocusOnTab: root.canReset
         Accessible.role: Accessible.Button

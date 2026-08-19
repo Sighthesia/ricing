@@ -650,7 +650,7 @@ Item {
             verify(revertRow.isDefault)
             verify(!revertRow.revertVisible)
             verify(!revertRow.canReset)
-            verify(revertRow.revertButtonItem.visible)
+            verify(!revertRow.revertButtonItem.visible)
             verify(revertRow.revertButtonItem.x + revertRow.revertButtonItem.width
                    <= revertRow.cardItem.x + revertRow.cardItem.width)
             revertRow.defaultValue = undefined
