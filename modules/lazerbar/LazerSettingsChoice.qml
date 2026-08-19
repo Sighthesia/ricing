@@ -240,8 +240,9 @@ Item {
                 width: optionList.width
                 height: 30
                 radius: 4
-                color: optionHover.hovered || index === root.preselectIndex
-                       ? LazerTheme.settingsMenuHover : "transparent"
+                color: String(modelData.value) === root.currentValue ? LazerTheme.settingsAccent
+                       : (optionHover.hovered || index === root.preselectIndex
+                          ? LazerTheme.settingsMenuHover : "transparent")
                 Behavior on color { ColorAnimation { duration: MotionTokens.dropdownItem } }
 
                 Text {
@@ -251,7 +252,7 @@ Item {
                     anchors.rightMargin: LazerTheme.settingsControlPadding
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.label
-                    color: String(modelData.value) === root.currentValue ? LazerTheme.osuPink : LazerTheme.textPrimary
+                    color: LazerTheme.textPrimary
                     font.pixelSize: 14
                     font.weight: String(modelData.value) === root.currentValue ? Font.DemiBold : Font.Normal
                     elide: Text.ElideRight
