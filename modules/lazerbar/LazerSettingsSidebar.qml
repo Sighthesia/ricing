@@ -14,8 +14,14 @@ Item {
     property var labels: ["外观", "顶部栏", "通知"]
     property var icons: ["icons/settings.svg", "icons/podium.svg", "icons/bell.svg"]
     readonly property bool showLabels: root.expanded && root.width >= Logic.sidebarContractedWidth + 60
+    readonly property real actionSurfaceWidth: 40
+    readonly property real actionSurfaceX: (root.width - root.actionSurfaceWidth) / 2
     property alias collapseButton: collapseButton
     property alias backButton: backButton
+    property alias collapseSurfaceItem: collapseSurface
+    property alias collapseIconItem: collapseIcon
+    property alias backSurfaceItem: backSurface
+    property alias backIconItem: backIcon
     property alias appearanceNav: appearanceNav
     property alias barNav: barNav
     property alias notificationNav: notificationNav
@@ -74,9 +80,12 @@ Item {
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
 
         Rectangle {
-            anchors.fill: parent
-            radius: 12
-            color: collapseHover.hovered || collapseButton.activeFocus ? LazerTheme.settingsRowHover : "transparent"
+            id: collapseSurface
+            x: root.actionSurfaceX
+            width: root.actionSurfaceWidth
+            height: parent.height
+            anchors.verticalCenter: parent.verticalCenter
+            color: collapseHover.hovered ? LazerTheme.settingsRowHover : "transparent"
             border.width: 0
             border.color: "transparent"
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -84,10 +93,9 @@ Item {
 
         Image {
             id: collapseIcon
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
-            width: 16
-            height: 16
+            anchors.centerIn: collapseSurface
+            width: 20
+            height: 20
             source: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
             fillMode: Image.PreserveAspectFit
         }
@@ -96,7 +104,7 @@ Item {
             source: collapseIcon
             visible: collapseIcon.visible
             colorization: 1
-            colorizationColor: collapseHover.hovered || collapseButton.activeFocus ? LazerTheme.textPrimary : LazerTheme.textMuted
+            colorizationColor: collapseHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
             Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
 
@@ -179,21 +187,22 @@ Item {
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
 
         Rectangle {
-            anchors.fill: parent
-            anchors.margins: 2
-            radius: 12
-            color: backHover.hovered || backButton.activeFocus ? LazerTheme.settingsRowHover : "transparent"
-            border.width: backButton.activeFocus ? 1 : 0
-            border.color: LazerTheme.focusRing
+            id: backSurface
+            x: root.actionSurfaceX
+            width: root.actionSurfaceWidth
+            height: parent.height
+            anchors.verticalCenter: parent.verticalCenter
+            color: backHover.hovered ? LazerTheme.settingsRowHover : "transparent"
+            border.width: 0
+            border.color: "transparent"
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         Image {
             id: backIcon
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
-            width: 16
-            height: 16
+            anchors.centerIn: backSurface
+            width: 20
+            height: 20
             source: "icons/sidebar-return.svg"
             fillMode: Image.PreserveAspectFit
         }
@@ -202,7 +211,7 @@ Item {
             source: backIcon
             visible: backIcon.visible
             colorization: 1
-            colorizationColor: backHover.hovered || backButton.activeFocus ? LazerTheme.textPrimary : LazerTheme.textMuted
+            colorizationColor: backHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
             Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
         HoverHandler { id: backHover; enabled: backButton.enabled }

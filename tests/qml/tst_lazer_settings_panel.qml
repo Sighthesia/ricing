@@ -150,6 +150,29 @@ Item {
             verify(panel.content.menuCatcherItem.enabled === false)
         }
 
+        function test_sidebarActionsUseCompactFullWidthGeometry() {
+            var sidebar = panel.sidebar
+            compare(sidebar.collapseButton.x, 0)
+            compare(sidebar.backButton.x, 0)
+            compare(sidebar.collapseButton.width, sidebar.width)
+            compare(sidebar.backButton.width, sidebar.width)
+            compare(sidebar.collapseSurfaceItem.width, 40)
+            compare(sidebar.backSurfaceItem.width, 40)
+            compare(sidebar.collapseIconItem.width, 20)
+            compare(sidebar.backIconItem.width, 20)
+            compare(sidebar.collapseSurfaceItem.border.width, 0)
+            compare(sidebar.backSurfaceItem.border.width, 0)
+        }
+
+        function test_sidebarActionsDoNotUseFocusAsPersistentHighlight() {
+            var collapse = panel.sidebar.collapseButton
+            collapse.forceActiveFocus()
+            verify(collapse.activeFocus)
+            compare(panel.sidebar.collapseSurfaceItem.color, "transparent")
+            compare(panel.sidebar.collapseSurfaceItem.border.width, 0)
+            compare(panel.sidebar.backSurfaceItem.border.width, 0)
+        }
+
         function test_visibleRowsOwnStableCardAndControlGeometry() {
             var page = panel.appearancePage
             var rows = [page.wallpaperRow, page.colorSchemeRow, page.panelOpacityRow,
