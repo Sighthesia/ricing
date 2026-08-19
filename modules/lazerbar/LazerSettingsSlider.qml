@@ -21,7 +21,8 @@ Item {
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property real displayValue: normalized(value)
-    readonly property string displayText: Number(displayValue).toLocaleString(Qt.locale(), 'f', 0) + suffix
+    readonly property int displayDecimals: decimalPlaces(stepSize)
+    readonly property string displayText: Number(displayValue).toLocaleString(Qt.locale(), 'f', displayDecimals) + suffix
     readonly property bool focusVisible: activeFocus
     readonly property bool hovered: trackHover.hovered
     readonly property bool dragging: dragHandler.active
@@ -30,7 +31,8 @@ Item {
     readonly property real defaultFraction: defaultValue === undefined
                                            ? 0 : Logic.sliderFraction(from, to, defaultValue)
     readonly property bool defaultMarkerVisible: defaultValue !== undefined
-    readonly property bool defaultMarkerAtValue: defaultValue !== undefined && displayValue === normalized(defaultValue)
+    readonly property bool defaultMarkerAtValue: defaultValue !== undefined
+                                                 && Math.abs(displayValue - normalized(defaultValue)) < Math.max(1e-9, Math.abs(Number(stepSize)) * 0.001)
     signal valueModified(real value)
 
     implicitWidth: 220
@@ -60,7 +62,20 @@ Item {
             return clamped
         var direction = end >= start ? 1 : -1
         var steps = Math.round((clamped - start) / (step * direction))
-        return Math.max(low, Math.min(high, start + steps * step * direction))
+        var stepped = Math.max(low, Math.min(high, start + steps * step * direction))
+        var scale = Math.pow(10, decimalPlaces(step))
+        return Math.round(stepped * scale) / scale
+    }
+
+    function decimalPlaces(candidate) {
+        var number = Math.abs(Number(candidate))
+        if (!isFinite(number) || number <= 0)
+            return 0
+        var text = number.toString().toLowerCase()
+        if (text.indexOf("e-") >= 0)
+            return Number(text.split("e-")[1])
+        var dot = text.indexOf(".")
+        return dot < 0 ? 0 : text.length - dot - 1
     }
 
     function setValue(candidate) {
@@ -164,7 +179,7 @@ Item {
         id: defaultMarker
         z: 4
         x: Math.max(0, Math.min(trackHost.width - width,
-                                 root.defaultFraction * trackHost.width - width / 2))
+                                 root.rangePadding + root.defaultFraction * Math.max(0, trackHost.width - 2 * root.rangePadding) - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
         width: 4
         height: root.defaultMarkerAtValue ? Math.max(0, trackHost.height - 10) : 6
@@ -229,8 +244,9 @@ Item {
     // Scrub toward a pointer x in slider coordinates, honoring the 25px padding.
     function scrubToPointer(pointerX) {
         var fraction = Logic.sliderFractionForPosition(pointerX, root.width, LazerTheme.settingsRangePadding)
-        root.displayFraction = fraction
-        root.setValue(Logic.sliderValueFromFraction(root.from, root.to, fraction, root.stepSize))
+        var next = Logic.sliderValueFromFraction(root.from, root.to, fraction, root.stepSize)
+        root.displayFraction = Logic.sliderFraction(root.from, root.to, root.normalized(next))
+        root.setValue(next)
     }
 
     // Drag horizontally to scrub; the vertical axis stays owned by the page
@@ -263,7 +279,7 @@ Item {
     readonly property Item trackItem: trackRect
     readonly property Item trackFillItem: fillRect
     readonly property Item defaultMarkerItem: defaultMarker
-    readonly property Item thumbLightItem: null
+    readonly property Item thumbLightItem: defaultMarkerAtValue ? defaultMarker : null
     readonly property bool trackTapEnabled: trackTapHandler.enabled
     readonly property bool trackFillBehaviorEnabled: fractionBehavior.enabled
     readonly property Item nubItem: thumb

@@ -256,6 +256,7 @@ Item {
                 : (root.choicePresentation ? root.safeControlHeight
                    : (root.splitPresentation ? 52
                        : root.implicitHeight - 20))
+        Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
 
         Text {
             id: labelItem
@@ -267,8 +268,8 @@ Item {
             anchors.bottom: root.splitPresentation ? valueItem.top : undefined
             anchors.bottomMargin: root.splitPresentation ? 2 : 0
             text: root.labelText
-            color: LazerTheme.textPrimary
-            font.pixelSize: root.splitPresentation ? 13 : 14
+            color: root.splitPresentation ? LazerTheme.settingsNavInactive : LazerTheme.textPrimary
+            font.pixelSize: root.splitPresentation ? 11 : 14
             elide: Text.ElideRight
             verticalAlignment: root.inlinePresentation ? Text.AlignVCenter : Text.AlignTop
         }
@@ -284,7 +285,7 @@ Item {
                   ? String(root.controlItem.displayText) : ""
             color: LazerTheme.textPrimary
             font.pixelSize: 14
-            font.weight: Font.Bold
+            font.weight: Font.DemiBold
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
