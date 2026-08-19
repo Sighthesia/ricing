@@ -31,6 +31,7 @@ FocusScope {
     implicitHeight: 38
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
+    Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
     opacity: effectiveEnabled ? 1 : LazerTheme.settingsDisabledAlpha
     activeFocusOnTab: effectiveEnabled
     Accessible.role: Accessible.EditableText

@@ -26,6 +26,7 @@ Item {
     implicitHeight: 20
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
+    Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
     opacity: effectiveEnabled ? 1 : MotionTokens.disabledOpacity
     activeFocusOnTab: effectiveEnabled
     Accessible.role: Accessible.CheckBox

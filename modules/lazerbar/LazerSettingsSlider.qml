@@ -35,10 +35,13 @@ Item {
                                                  && Math.abs(displayValue - normalized(defaultValue)) < Math.max(1e-9, Math.abs(Number(stepSize)) * 0.001)
     signal valueModified(real value)
 
+    readonly property real rangePadding: LazerTheme.settingsRangePadding
+
     implicitWidth: 220
     implicitHeight: 30
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
+    Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
     activeFocusOnTab: effectiveEnabled
     opacity: effectiveEnabled ? 1 : LazerTheme.settingsDisabledAlpha
     Accessible.role: Accessible.Slider
@@ -202,8 +205,8 @@ Item {
     }
     Behavior on displayFraction {
         id: fractionBehavior
-        enabled: !root.dragging && !MotionTokens.reducedMotion
-        NumberAnimation { duration: MotionTokens.sliderNubMove; easing.type: Easing.OutQuint }
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: root.dragging ? 110 : MotionTokens.sliderNubMove; easing.type: Easing.OutQuint }
     }
 
     // Keep the active thumb as a brighter full-height continuation of the fill.
