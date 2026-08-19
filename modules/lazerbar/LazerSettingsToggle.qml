@@ -53,8 +53,8 @@ Item {
         anchors.fill: parent
         radius: 10
         color: root.checked ? LazerTheme.settingsAccent : LazerTheme.settingsToggleOff
-        border.width: root.focusVisible ? 2 : 0
-        border.color: LazerTheme.focusRing
+        border.width: 1.5
+        border.color: LazerTheme.settingsAccent
         scale: root.pressed ? MotionTokens.pressScale : 1
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }

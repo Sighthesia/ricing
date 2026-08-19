@@ -44,7 +44,7 @@ Item {
     readonly property bool rowHovered: rowHover.hovered || rowHoverArea.containsMouse || revertHover.hovered
                                      || (controlItem && controlItem.hovered === true)
     readonly property bool rowHoverBlocking: rowHover.blocking
-    readonly property bool rowHighlighted: rowHovered || (controlItem && controlItem.activeFocus)
+    readonly property bool rowHighlighted: rowHovered
     readonly property point debugHoverScenePoint: rowHover.point.scenePosition
     readonly property bool compactLayout: width < 480
     readonly property real choiceMenuReservedHeight: root.choicePresentation && root.controlItem
@@ -136,8 +136,8 @@ Item {
         radius: cardSurface.radius
         visible: !root.choicePresentation
         color: "transparent"
-        border.width: root.controlItem && root.controlItem.activeFocus ? 1.5 : 0
-        border.color: root.controlItem && root.controlItem.activeFocus ? LazerTheme.settingsAccent : "transparent"
+        border.width: root.rowHighlighted ? 1.5 : 0
+        border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
         enabled: false
         Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         Behavior on border.width { NumberAnimation { duration: 100 } }

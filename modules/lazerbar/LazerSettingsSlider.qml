@@ -150,7 +150,7 @@ Item {
         color: "transparent"
         border.width: 2
         border.color: LazerTheme.focusRing
-        opacity: root.focusVisible && root.effectiveEnabled ? 0.7 : 0
+        opacity: root.hovered && root.effectiveEnabled ? 0.7 : 0
         Behavior on opacity { NumberAnimation { duration: MotionTokens.nubHover } }
     }
 
