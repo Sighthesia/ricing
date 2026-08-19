@@ -251,7 +251,8 @@ Item {
         y: root.choicePresentation || root.inlinePresentation || root.splitPresentation ? 0 : 10
         width: Math.max(0, root.width - (root.choicePresentation
                                         ? (root.revertVisible ? revertZoneWidth : 0)
-                                        : contentPadding + root.revertContentGap + revertZoneWidth))
+                                        : contentPadding + root.revertContentGap
+                                          + (root.revertVisible ? revertZoneWidth : 0)))
         height: root.inlinePresentation ? 44
                 : (root.choicePresentation ? root.safeControlHeight
                    : (root.splitPresentation ? 52

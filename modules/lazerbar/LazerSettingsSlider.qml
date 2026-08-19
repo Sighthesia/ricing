@@ -29,7 +29,7 @@ Item {
     readonly property real normalizedFraction: Logic.sliderFraction(from, to, displayValue)
     readonly property real targetFraction: Logic.sliderFraction(from, to, displayValue)
     readonly property real defaultFraction: defaultValue === undefined
-                                           ? 0 : Logic.sliderFraction(from, to, defaultValue)
+                                           ? 0 : Logic.sliderFraction(from, to, normalized(defaultValue))
     readonly property bool defaultMarkerVisible: defaultValue !== undefined
     readonly property bool defaultMarkerAtValue: defaultValue !== undefined
                                                  && Math.abs(displayValue - normalized(defaultValue)) < Math.max(1e-9, Math.abs(Number(stepSize)) * 0.001)
@@ -171,7 +171,7 @@ Item {
         anchors.left: trackRect.left
         anchors.top: trackRect.top
         anchors.bottom: trackRect.bottom
-        width: root.displayFraction * trackHost.width
+        width: root.rangePadding + root.displayFraction * Math.max(0, trackHost.width - 2 * root.rangePadding)
         radius: 4
         color: LazerTheme.settingsAccent
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -214,7 +214,7 @@ Item {
         id: thumb
         z: 3
         x: Math.max(0, Math.min(trackHost.width - width,
-                                 root.displayFraction * trackHost.width - width / 2))
+                                 root.rangePadding + root.displayFraction * Math.max(0, trackHost.width - 2 * root.rangePadding) - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
         width: 10
         height: trackHost.height
@@ -246,7 +246,7 @@ Item {
 
     // Scrub toward a pointer x in slider coordinates, honoring the 25px padding.
     function scrubToPointer(pointerX) {
-        var fraction = Logic.sliderFractionForPosition(pointerX, root.width, LazerTheme.settingsRangePadding)
+        var fraction = Logic.sliderFractionForPosition(pointerX, root.width, root.rangePadding)
         var next = Logic.sliderValueFromFraction(root.from, root.to, fraction, root.stepSize)
         root.displayFraction = Logic.sliderFraction(root.from, root.to, root.normalized(next))
         root.setValue(next)
