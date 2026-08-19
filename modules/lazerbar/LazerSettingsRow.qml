@@ -25,6 +25,7 @@ Item {
     readonly property real contentPadding: 12
     readonly property real revertZoneWidth: 28
     readonly property real revertContentGap: 12
+    readonly property real cardBodyWidth: Math.max(0, root.width - (root.revertVisible ? root.revertZoneWidth : 0))
     readonly property real labelControlGap: 5
     default property alias control: controlHost.children
     readonly property Item controlItem: controlHost.children.length > 0 ? controlHost.children[0] : null
@@ -106,12 +107,15 @@ Item {
     // Keep one shared card surface behind every setting presentation.
     Rectangle {
         id: cardSurface
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: root.cardBodyWidth
         radius: 6
         visible: !root.choicePresentation
         color: root.rowHighlighted ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-        border.width: root.controlItem && root.controlItem.activeFocus ? 1.5 : 0
-        border.color: root.controlItem && root.controlItem.activeFocus ? LazerTheme.settingsAccent : "transparent"
+        border.width: root.rowHighlighted ? 1.5 : 0
+        border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
@@ -122,7 +126,10 @@ Item {
     Rectangle {
         id: cardHighlight
         z: 2
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: root.cardBodyWidth
         radius: cardSurface.radius
         visible: !root.choicePresentation
         color: "transparent"
