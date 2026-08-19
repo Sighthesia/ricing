@@ -141,7 +141,8 @@ Item {
         target: root.controlItem
         property: "availableWidth"
         value: root.inlinePresentation ? root.safeRequestedWidth
-              : (root.splitPresentation ? Math.min(240, Math.max(0, contentHost.width * 0.55)) : contentHost.width)
+              : (root.splitPresentation ? Math.min(240, Math.max(0, contentHost.width * 0.55))
+                 : (root.choicePresentation ? root.width : contentHost.width))
         when: root.controlSupportsAvailableWidth
     }
 
