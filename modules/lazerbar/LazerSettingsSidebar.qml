@@ -70,9 +70,6 @@ Item {
         Accessible.role: Accessible.Button
         Accessible.name: root.expanded ? "收起侧栏" : "展开侧栏"
 
-        Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
-        Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
-
         scale: collapsePress.pressed ? MotionTokens.pressScale : 1
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
 
@@ -80,14 +77,14 @@ Item {
             anchors.fill: parent
             radius: 12
             color: collapseHover.hovered || collapseButton.activeFocus ? LazerTheme.settingsRowHover : "transparent"
-            border.width: collapseButton.activeFocus ? 1 : 0
-            border.color: LazerTheme.focusRing
+            border.width: 0
+            border.color: "transparent"
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         Image {
             id: collapseIcon
-            x: 27 - 3 * root.expansionProgress
+            anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
             width: 16
             height: 16
@@ -178,9 +175,6 @@ Item {
         Accessible.role: Accessible.Button
         Accessible.name: "返回"
 
-        Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
-        Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
-
         scale: backPress.pressed ? MotionTokens.pressScale : 1
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
 
@@ -196,7 +190,7 @@ Item {
 
         Image {
             id: backIcon
-            x: 27 - 3 * root.expansionProgress
+            anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
             width: 16
             height: 16
