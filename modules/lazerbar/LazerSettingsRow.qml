@@ -20,7 +20,7 @@ Item {
     readonly property bool contentEnabled: enabled
     readonly property bool hasDefault: defaultValue !== undefined
     readonly property bool isDefault: hasDefault && Logic.valuesEqual(defaultValue, currentValue)
-    readonly property bool revertVisible: hasDefault && !isDefault
+    readonly property bool revertVisible: hasDefault && !isDefault && enabled
     readonly property bool canReset: revertVisible && enabled
     readonly property real contentPadding: 12
     readonly property real revertZoneWidth: 28

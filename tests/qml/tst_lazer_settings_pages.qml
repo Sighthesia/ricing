@@ -188,6 +188,8 @@ Item {
             barSettings.floating = false
             verify(!barPage.floatingMarginRow.enabled)
             verify(!barPage.floatingMarginSlider.effectiveEnabled)
+            verify(!barPage.floatingMarginRow.revertVisible)
+            verify(!barPage.floatingMarginRow.revertButtonItem.visible)
             compare(barSettings.floatingMargin, 17)
         }
 
