@@ -118,7 +118,8 @@ Variants {
             implicitWidth: Math.min(LazerTheme.settingsPanelWidth, screenScope.modelData.width)
             implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
-            anchors { top: true; left: true }
+            anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true }
+            margins { top: Services.SettingsService.bar.position === "top" ? screenScope.floatingMargin + Services.SettingsService.bar.height : 0; bottom: Services.SettingsService.bar.position === "bottom" ? screenScope.floatingMargin + Services.SettingsService.bar.height : 0 }
             mask: Region { item: screenScope.settingsMaskActive ? settingsOverlay : null }
             LazerSettingsOverlay {
                 id: settingsOverlay; anchors.fill: parent
