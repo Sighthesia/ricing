@@ -25,7 +25,9 @@ Item {
     readonly property real contentPadding: 12
     readonly property real revertZoneWidth: 28
     readonly property real revertContentGap: 12
-    readonly property real cardBodyWidth: Math.max(0, root.width - (root.revertVisible ? root.revertZoneWidth : 0))
+    readonly property real reservedResetWidth: root.hasDefault ? root.revertZoneWidth : 0
+    readonly property real reservedResetGap: root.hasDefault ? root.revertContentGap : 0
+    readonly property real cardBodyWidth: Math.max(0, root.width - root.reservedResetWidth)
     readonly property real labelControlGap: 5
     default property alias control: controlHost.children
     readonly property Item controlItem: controlHost.children.length > 0 ? controlHost.children[0] : null
@@ -250,9 +252,8 @@ Item {
         x: root.choicePresentation ? 0 : contentPadding
         y: root.choicePresentation || root.inlinePresentation || root.splitPresentation ? 0 : 10
         width: Math.max(0, root.width - (root.choicePresentation
-                                        ? (root.revertVisible ? revertZoneWidth : 0)
-                                        : contentPadding + root.revertContentGap
-                                          + (root.revertVisible ? revertZoneWidth : 0)))
+                                        ? root.reservedResetWidth
+                                        : contentPadding + root.reservedResetGap + root.reservedResetWidth))
         height: root.inlinePresentation ? 44
                 : (root.choicePresentation ? root.safeControlHeight
                    : (root.splitPresentation ? 52
