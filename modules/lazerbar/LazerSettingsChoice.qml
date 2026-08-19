@@ -156,7 +156,7 @@ Item {
         height: LazerTheme.settingsChoiceHeight
         radius: LazerTheme.settingsChoiceRadius
         color: "transparent"
-        border.width: root.activeFocus ? 2 : 0
+        border.width: root.activeFocus && headerHover.hovered ? 2 : 0
         border.color: LazerTheme.focusRing
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }

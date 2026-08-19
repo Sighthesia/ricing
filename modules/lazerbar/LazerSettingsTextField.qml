@@ -113,8 +113,8 @@ FocusScope {
         anchors.fill: parent
         radius: LazerTheme.settingsControlRadius
         color: "transparent"
-        border.width: editor.activeFocus ? 2 : 1
-        border.color: editor.activeFocus ? LazerTheme.focusRing : "#33FFFFFF"
+        border.width: editor.activeFocus && fieldHover.hovered ? 2 : 1
+        border.color: editor.activeFocus && fieldHover.hovered ? LazerTheme.focusRing : "#33FFFFFF"
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
     }
