@@ -24,6 +24,7 @@ Item {
     readonly property bool canReset: revertVisible && enabled
     readonly property real contentPadding: 12
     readonly property real revertZoneWidth: 28
+    readonly property real revertContentGap: 12
     readonly property real labelControlGap: 5
     default property alias control: controlHost.children
     readonly property Item controlItem: controlHost.children.length > 0 ? controlHost.children[0] : null
@@ -239,7 +240,9 @@ Item {
         z: 1
         x: root.choicePresentation ? 0 : contentPadding
         y: root.choicePresentation || root.inlinePresentation || root.splitPresentation ? 0 : 10
-        width: Math.max(0, root.width - (root.choicePresentation ? revertZoneWidth : contentPadding + revertZoneWidth))
+        width: Math.max(0, root.width - (root.choicePresentation
+                                        ? revertZoneWidth
+                                        : contentPadding + root.revertContentGap + revertZoneWidth))
         height: root.inlinePresentation ? 44
                 : (root.choicePresentation ? root.safeControlHeight
                    : (root.splitPresentation ? 52
