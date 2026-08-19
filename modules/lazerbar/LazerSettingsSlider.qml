@@ -202,7 +202,10 @@ Item {
     Rectangle {
         id: flashOverlay
         z: 2
-        anchors.fill: trackRect
+        anchors.left: fillRect.left
+        anchors.top: fillRect.top
+        anchors.bottom: fillRect.bottom
+        width: fillRect.width
         radius: trackRect.radius
         color: LazerTheme.textPrimary
         opacity: 0

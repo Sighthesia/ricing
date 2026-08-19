@@ -27,9 +27,9 @@ The hover animation and press-scale animation from `OsuAnimatedButton` are unrel
 
 ## Visual Structure
 
-Add one non-interactive overlay above the slider track and below the thumb/default marker. It must:
+Add one non-interactive overlay above the filled progress portion and below the thumb/default marker. It must:
 
-- Match the existing track geometry and preserve the current input boundary.
+- Match the existing filled-progress geometry and preserve the current input boundary.
 - Use the slider's existing radius and dimensions.
 - Use `LazerTheme.textPrimary` as the local equivalent of osu's white flash colour.
 - Render as an additive-style highlight where supported by the existing QML stack.

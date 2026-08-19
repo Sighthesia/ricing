@@ -276,8 +276,9 @@ Item {
         function test_sliderTickFlashStartsOnlyForChangedStep() {
             compare(slider.flashActive, false)
             compare(slider.flashOverlayItem.opacity, 0)
-            compare(slider.flashOverlayItem.width, slider.trackItem.width)
+            compare(slider.flashOverlayItem.width, slider.trackFillItem.width)
             compare(slider.flashOverlayItem.height, slider.trackItem.height)
+            compare(slider.flashOverlayItem.x, slider.trackFillItem.x)
 
             slider.setValue(6)
             verify(slider.flashActive)
