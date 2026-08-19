@@ -25,6 +25,9 @@ Item {
     readonly property real contentPadding: 12
     readonly property real revertZoneWidth: 28
     readonly property real revertContentGap: 12
+    readonly property real cardRadius: 6
+    readonly property real revertVisualWidth: root.revertZoneWidth + root.cardRadius
+    readonly property real revertVisibleX: root.width - root.revertVisualWidth
     readonly property real reservedResetWidth: root.hasDefault ? root.revertZoneWidth : 0
     readonly property real reservedResetGap: root.hasDefault ? root.revertContentGap : 0
     readonly property real cardBodyWidth: Math.max(0, root.width - root.reservedResetWidth)
@@ -109,11 +112,12 @@ Item {
     // Keep one shared card surface behind every setting presentation.
     Rectangle {
         id: cardSurface
+        z: 1
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: root.cardBodyWidth
-        radius: 6
+        radius: root.cardRadius
         visible: !root.choicePresentation
         color: root.rowHighlighted ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
         border.width: root.rowHighlighted ? 1.5 : 0
@@ -184,27 +188,30 @@ Item {
         root.resetCallback()
     }
 
-    // Reserve a full-height restore-default strip inside the row card.
+    // Slide the restore-default strip from behind the row card's rounded edge.
     Item {
         id: revertButton
-        z: 3
-        x: Math.max(0, root.width - root.revertZoneWidth)
+        z: 0
+        x: Math.max(0, root.revertVisibleX
+                       - (root.revertVisible ? 0 : root.revertVisualWidth))
         y: 0
-        width: root.revertZoneWidth
+        width: root.revertVisualWidth
         height: root.choicePresentation ? root.safeMainControlHeight : root.height
-        visible: root.revertVisible || opacity > 0
-        opacity: root.revertVisible ? 1 : 0
+        visible: root.hasDefault
         enabled: root.canReset
         activeFocusOnTab: root.canReset
         Accessible.role: Accessible.Button
         Accessible.name: "恢复默认"
-        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+        Behavior on x {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        }
 
         Rectangle {
             anchors.fill: parent
             topLeftRadius: 0
-            topRightRadius: cardSurface.radius
-            bottomRightRadius: cardSurface.radius
+            topRightRadius: root.cardRadius
+            bottomRightRadius: root.cardRadius
             bottomLeftRadius: 0
             color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsResetSurfaceHover : LazerTheme.settingsResetSurface
             border.width: revertButton.activeFocus ? 1 : 0
@@ -215,6 +222,7 @@ Item {
         Image {
             id: revertIcon
             anchors.centerIn: parent
+            anchors.horizontalCenterOffset: root.cardRadius / 2
             width: 14
             height: 14
             source: "icons/undo.svg"

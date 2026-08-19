@@ -626,14 +626,15 @@ Item {
             verify(revertRow.revertVisible)
             verify(revertRow.canReset)
             verify(revertRow.revertButtonItem.visible)
-            compare(revertRow.revertButtonItem.width, 28)
+            compare(revertRow.revertButtonItem.width, 34)
             compare(revertRow.revertButtonItem.height, 28)
             compare(revertRow.revertButtonItem.children[0].radius, 6)
             compare(revertRow.revertButtonItem.children[0].color, Lazer.LazerTheme.settingsResetSurface)
             compare(revertRow.revertButtonItem.x + revertRow.revertButtonItem.width,
-                    revertRow.width - revertRow.contentPadding)
+                    revertRow.width)
+            verify(revertRow.revertButtonItem.z < revertRow.cardItem.z)
             var sliderRight = revertRowSlider.mapToItem(revertRow, revertRowSlider.width, 0).x
-            verify(sliderRight <= revertRow.revertButtonItem.x)
+            verify(sliderRight <= revertRow.revertButtonItem.x + revertRow.cardRadius)
             var beforeSliderSignals = revertRowSliderSpy.count
             mouseClick(revertRow.revertButtonItem,
                        revertRow.revertButtonItem.width / 2,
@@ -644,13 +645,17 @@ Item {
             revertRow.activateReset()
             compare(resetState.count, 2)
             revertRow.currentValue = 5
+            wait(250)
             verify(revertRow.isDefault)
             verify(!revertRow.revertVisible)
             verify(!revertRow.canReset)
-            verify(!revertRow.revertButtonItem.visible)
+            verify(revertRow.revertButtonItem.visible)
+            verify(revertRow.revertButtonItem.x + revertRow.revertButtonItem.width
+                   <= revertRow.cardItem.x + revertRow.cardItem.width)
             revertRow.defaultValue = undefined
             verify(!revertRow.hasDefault)
             verify(!revertRow.revertVisible)
+            verify(!revertRow.revertButtonItem.visible)
         }
 
         function test_textFieldResetButtonCentersOnField() {
