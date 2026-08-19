@@ -31,6 +31,7 @@ QtObject {
     readonly property color settingsAccent: accentColor
     readonly property color settingsControlSurface: "#25222E"
     readonly property color settingsPanel: "#18161D"
+    readonly property color settingsSection: "#282532"
     readonly property color settingsPanelBorder: "transparent"
     readonly property color settingsRail: "#131217"
     readonly property color settingsNavInactive: "#8A8795"

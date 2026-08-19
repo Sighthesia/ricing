@@ -1,7 +1,8 @@
 import QtQuick
 import "LazerSettingsLogic.js" as Logic
 
-// Compose the independent sidebar and content layers of the settings panel.
+// Compose the sidebar rail and the flat, scrollable section stack of the
+// settings panel. The sidebar only navigates; browsing follows the scroll.
 Item {
     id: root
 
@@ -29,7 +30,6 @@ Item {
     property real collapseProgress: sidebarExpanded ? 1 : 0
 
     readonly property int selectedIndex: categoryIndex(selectedCategory)
-    readonly property int contentTransitionDirection: _transitionDirection
     readonly property real panelWidth: sidePanel ? Logic.sidePanelWidth(availableWidth) : Logic.panelWidth(availableWidth)
     readonly property real panelHeight: sidePanel ? Math.max(0, availableHeight) : Logic.panelHeight(availableHeight)
     readonly property real navigationWidth: sidePanel ? sidebarWidth : Logic.navigationWidth(width)
@@ -39,7 +39,7 @@ Item {
     readonly property int indicatorCount: 3
     readonly property int contentTop: 56
     readonly property Item currentNav: [appearanceNav, barNav, notificationNav][selectedIndex]
-    readonly property Item currentPage: [appearancePage, barPage, notificationPage][selectedIndex]
+    readonly property Item currentPage: sectionsItem
 
     // Animate the 70..170px sidebar width through one collapse transition.
     readonly property real sidebarWidth: Math.max(0, Math.min(panelWidth,
@@ -53,15 +53,16 @@ Item {
     signal escapeRequested
     signal closeRequested
     signal categoryChanged(string category)
-    property alias appearancePage: appearancePage
-    property alias barPage: barPage
-    property alias notificationPage: notificationPage
+    property alias appearancePage: appearanceSection
+    property alias barPage: barSection
+    property alias notificationPage: notificationSection
     property alias appearanceNav: sidebarLayer.appearanceNav
     property alias barNav: sidebarLayer.barNav
     property alias notificationNav: sidebarLayer.notificationNav
     property alias searchField: contentLayer.searchEditor
     property alias sidebar: sidebarLayer
     property alias content: contentLayer
+    property alias sections: sectionsItem
 
     implicitWidth: panelWidth
     implicitHeight: panelHeight
@@ -69,10 +70,7 @@ Item {
     focus: root.interactive
     activeFocusOnTab: root.interactive
 
-    property int _transitionDirection: 0
     property bool _syncingCategory: false
-    property int _lastSelectedIndex: 0
-    property bool transitionsEnabled: true
     property int transitionToken: 0
 
     function _rect(item) {
@@ -87,7 +85,7 @@ Item {
         return {
             "rect": root._rect(root), "sidebar": { "rect": root._rect(sidebarLayer), "x": Number(sidebarLayer.x), "width": Number(sidebarLayer.width), "z": Number(sidebarLayer.z) },
             "content": { "rect": root._rect(contentLayer), "x": Number(contentLayer.x), "width": Number(contentLayer.width), "z": Number(contentLayer.z) },
-            "selectedCategory": root.selectedCategory, "currentPage": root.selectedIndex,
+            "selectedCategory": root.selectedCategory, "currentIndex": root.selectedIndex,
             "interactive": root.interactive, "visible": root.visible, "enabled": root.enabled,
             "opacity": Number(root.opacity), "z": Number(root.z),
             "contentSnapshot": contentLayer.debugSnapshot(),
@@ -107,6 +105,7 @@ Item {
         sidebarExpanded = true
         searchQuery = ""
         sidebarLayer.beginSession()
+        sectionsItem.contentY = 0
     }
 
     // Cancel session animations without touching persisted settings.
@@ -119,14 +118,14 @@ Item {
             root.sidebarExpanded = !root.sidebarExpanded
     }
 
+    // Navigate by scrolling the target section into view.
     function selectCategory(category) {
         if (!root.interactive || categoryIndex(category) < 0)
             return
-        var nextIndex = categoryIndex(category)
-        if (nextIndex === root.selectedIndex)
+        if (category === root.selectedCategory) {
+            sectionsItem.scrollTo(root.selectedIndex)
             return
-        var previousIndex = root.selectedIndex
-        _transitionDirection = Logic.categoryDirection(previousIndex, nextIndex)
+        }
         root.selectedCategory = category
         categoryChanged(category)
     }
@@ -137,46 +136,6 @@ Item {
             return
         root.selectCategory(root.categoryAt(root.selectedIndex + Number(direction)))
         Qt.callLater(function() { root.focusNavigation() })
-    }
-
-    // Keep every persistent page synchronized through one state transition path.
-    function syncPages(previousIndex, nextIndex) {
-        var direction = Logic.categoryDirection(previousIndex, nextIndex)
-        _transitionDirection = direction
-        transitionToken += 1
-        var token = transitionToken
-        var pages = [appearancePage, barPage, notificationPage]
-        var incoming = pages[nextIndex]
-        transitionsEnabled = false
-        for (var i = 0; i < pages.length; i++) {
-            pages[i].enabled = i === nextIndex && root.interactive
-            pages[i].visible = i === nextIndex
-            pages[i].activeFocusOnTab = pages[i].enabled
-        }
-        if (incoming.opacity <= 0) {
-            incoming.x = MotionTokens.reducedMotion ? 0 : direction * 8
-            incoming.opacity = 0
-        }
-        Qt.callLater(function() {
-            if (token !== root.transitionToken)
-                return
-            transitionsEnabled = !MotionTokens.reducedMotion
-            for (var j = 0; j < pages.length; j++) {
-                if (j === nextIndex) {
-                    pages[j].x = 0
-                    pages[j].opacity = 1
-                } else if (j === previousIndex && pages[j].opacity > 0) {
-                    pages[j].x = MotionTokens.reducedMotion ? 0 : -direction * 8
-                    pages[j].opacity = 0
-                    pages[j].visible = false
-                } else {
-                    pages[j].opacity = 0
-                    pages[j].visible = false
-                    if (MotionTokens.reducedMotion)
-                        pages[j].x = 0
-                }
-            }
-        })
     }
 
     function focusNavigation() {
@@ -206,41 +165,28 @@ Item {
         escapeRequested()
     }
 
-    Component.onCompleted: syncPages(0, selectedIndex)
-
+    // Keep the selected category and the browsed section in sync both ways.
     onSelectedCategoryChanged: {
         if (_syncingCategory)
             return
-        var normalized = categoryIndex(selectedCategory) >= 0 ? selectedCategory : "appearance"
-        var previousIndex = _lastSelectedIndex
-        if (normalized !== selectedCategory) {
-            _syncingCategory = true
-            selectedCategory = normalized
-            _syncingCategory = false
+        var index = categoryIndex(selectedCategory)
+        if (index < 0) {
+            root.selectedCategory = "appearance"
+            return
         }
-        var nextIndex = categoryIndex(normalized)
-        syncPages(previousIndex, nextIndex)
-        _lastSelectedIndex = nextIndex
+        sectionsItem.scrollTo(index)
     }
 
-    onInteractiveChanged: syncPages(selectedIndex, selectedIndex)
-
-    // Reduced motion must cancel any in-flight translation immediately.
     Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            root.transitionToken += 1
-            root.transitionsEnabled = false
-            if (MotionTokens.reducedMotion) {
-                appearancePage.x = 0
-                barPage.x = 0
-                notificationPage.x = 0
-                appearancePage.opacity = root.selectedIndex === 0 ? 1 : 0
-                barPage.opacity = root.selectedIndex === 1 ? 1 : 0
-                notificationPage.opacity = root.selectedIndex === 2 ? 1 : 0
-                root.transitionsEnabled = false
-            } else {
-                root.transitionsEnabled = true
+        target: sectionsItem
+        function onCurrentIndexChanged() {
+            var index = sectionsItem.currentIndex
+            var category = root.categoryAt(index)
+            if (category !== root.selectedCategory) {
+                root._syncingCategory = true
+                root.selectedCategory = category
+                root._syncingCategory = false
+                root.categoryChanged(category)
             }
         }
     }
@@ -273,64 +219,50 @@ Item {
         width: root.contentWidth
         height: root.height
         backgroundExtend: Math.max(0, root.panelWidth - root.contentWidth)
-        title: ["外观", "顶部栏", "通知"][root.selectedIndex]
         searchQuery: root.searchQuery
         interactive: root.interactive
         contentReady: root.contentReady
         expanded: root.sidebarExpanded
-        visibleResultCount: root.currentPage ? root.currentPage.visibleResultCount : 0
-        currentPage: root.currentPage
+        currentSectionIndex: root.selectedIndex
+        sections: sectionsItem
         opacity: root.layerOpacity
         onSearchQueryEdited: query => root.searchQuery = query
 
-        // Persist the appearance page so its scroll position survives navigation.
-        // Positioned with explicit width/height (not anchors) so the transition owns x.
-        LazerSettingsAppearance {
-            id: appearancePage
-            y: 0
+        // Stack every category as one flat, scrollable section block.
+        LazerSettingsSections {
+            id: sectionsItem
             width: parent.width
             height: parent.height
-            settingsObject: root.appearanceSettings
-            saveCallback: root.saveCallback
-            wallpaperService: root.wallpaperService
-            defaults: root.appearanceDefaults
-            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("appearance", key, value) }
+            interactive: root.interactive
             searchQuery: root.searchQuery
-            opacity: 0
-            Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-            Behavior on x { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-        }
 
-        // Persist the bar page so its scroll position survives navigation.
-        LazerSettingsBar {
-            id: barPage
-            y: 0
-            width: parent.width
-            height: parent.height
-            settingsObject: root.barSettings
-            saveCallback: root.saveCallback
-            defaults: root.barDefaults
-            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("bar", key, value) }
-            searchQuery: root.searchQuery
-            opacity: 0
-            Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-            Behavior on x { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-        }
+            LazerSettingsAppearance {
+                id: appearanceSection
+                settingsObject: root.appearanceSettings
+                saveCallback: root.saveCallback
+                wallpaperService: root.wallpaperService
+                defaults: root.appearanceDefaults
+                resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("appearance", key, value) }
+                onActivated: root.selectCategory("appearance")
+            }
 
-        // Persist the notification page so its scroll position survives navigation.
-        LazerSettingsNotifications {
-            id: notificationPage
-            y: 0
-            width: parent.width
-            height: parent.height
-            settingsObject: root.notificationSettings
-            saveCallback: root.saveCallback
-            defaults: root.notificationDefaults
-            resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("notifications", key, value) }
-            searchQuery: root.searchQuery
-            opacity: 0
-            Behavior on opacity { enabled: root.transitionsEnabled; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
-            Behavior on x { enabled: root.transitionsEnabled && !MotionTokens.reducedMotion; NumberAnimation { duration: root.categoryTransitionDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: MotionTokens.outSoft } }
+            LazerSettingsBar {
+                id: barSection
+                settingsObject: root.barSettings
+                saveCallback: root.saveCallback
+                defaults: root.barDefaults
+                resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("bar", key, value) }
+                onActivated: root.selectCategory("bar")
+            }
+
+            LazerSettingsNotifications {
+                id: notificationSection
+                settingsObject: root.notificationSettings
+                saveCallback: root.saveCallback
+                defaults: root.notificationDefaults
+                resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("notifications", key, value) }
+                onActivated: root.selectCategory("notifications")
+            }
         }
     }
 

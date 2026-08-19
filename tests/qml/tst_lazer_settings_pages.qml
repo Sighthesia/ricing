@@ -81,23 +81,19 @@ Item {
         }
 
         function cleanup() {
-            appearancePage.height = 500
-            barPage.height = 500
-            notificationsPage.height = 500
+            appearancePage.searchQuery = ""
+            barPage.searchQuery = ""
+            notificationsPage.searchQuery = ""
         }
 
-        function test_pagesAreScrollableAndLocalized() {
-            appearancePage.height = 180
-            barPage.height = 180
-            notificationsPage.height = 180
-            verify(appearancePage.contentHeight > 0)
-            verify(barPage.contentHeight > 0)
-            verify(notificationsPage.contentHeight > notificationsPage.height)
+        function test_pagesAreSectionBlocksAndLocalized() {
+            verify(appearancePage.height > 100)
+            verify(barPage.height > 100)
+            verify(notificationsPage.height > 300)
             compare(appearancePage.title, "外观")
             compare(barPage.title, "顶部栏")
             compare(notificationsPage.title, "通知")
-            verify(notificationsPage.contentY >= 0)
-            verify(notificationsPage.contentHeight > 180)
+            verify(notificationsPage.hasVisibleContent)
         }
 
         function test_appearanceWritesAllSupportedValues() {

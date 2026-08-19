@@ -2,24 +2,23 @@ import QtQuick
 import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
-// Own the settings content chrome: search, category title, viewport, and footer.
+// Own the settings content chrome: search, flat section viewport, and footer.
 Item {
     id: root
 
-    property string title: ""
     property string searchQuery: ""
     property bool interactive: true
     property bool contentReady: false
     property bool expanded: true
-    property int visibleResultCount: 0
-    property real backgroundExtend: 170
-    property Item currentPage: null
-    readonly property Item openChoice: findOpenChoice(currentPage)
+    property int currentSectionIndex: 0
+    property real backgroundExtend: 0
+    property var sections: null
+    readonly property Item openChoice: findOpenChoice(sections)
     readonly property bool dropdownOpen: openChoice !== null
     readonly property bool emptyStateVisible:
-        Logic.normalizeSearchQuery(searchQuery).length > 0 && visibleResultCount === 0
-    readonly property bool canScrollDown: currentPage && currentPage.contentHeight - currentPage.contentY - viewport.height > 8
-    readonly property bool dropdownVisible: dropdownOpen
+        Logic.normalizeSearchQuery(searchQuery).length > 0 && totalResultCount === 0
+    readonly property int totalResultCount: sections ? sections.totalVisibleResultCount : 0
+    readonly property bool canScrollDown: sections && sections.contentHeight - sections.contentY - viewport.height > 8
 
     function _rect(item) {
         if (!item)
@@ -107,17 +106,6 @@ Item {
         }
     }
 
-    function _pageSnapshot(page) {
-        if (!page)
-            return null
-        return {
-            "visible": page.visible, "enabled": page.enabled,
-            "opacity": Number(page.opacity), "z": Number(page.z),
-            "rect": _rect(page), "contentY": Number(page.contentY),
-            "contentHeight": Number(page.contentHeight),
-        }
-    }
-
     function _findRows(item, result) {
         if (!item)
             return
@@ -149,7 +137,7 @@ Item {
 
     function debugSnapshot() {
         var rows = []
-        _findRows(currentPage, rows)
+        _findRows(sections, rows)
         var rowSnapshots = []
         for (var i = 0; i < rows.length; i++)
             rowSnapshots.push(_rowSnapshot(rows[i], i))
@@ -160,13 +148,11 @@ Item {
                 "opacity": Number(viewport.opacity), "z": Number(viewport.z),
                 "clip": viewport.clip,
             },
-            "page": currentPage ? { "rect": _rect(currentPage), "contentY": Number(currentPage.contentY), "contentHeight": Number(currentPage.contentHeight), "visible": currentPage.visible, "enabled": currentPage.enabled, "opacity": Number(currentPage.opacity), "z": Number(currentPage.z) } : null,
-            "pages": {
-                "appearance": _pageSnapshot(root.parent && root.parent.appearancePage),
-                "bar": _pageSnapshot(root.parent && root.parent.barPage),
-                "notifications": _pageSnapshot(root.parent && root.parent.notificationPage),
+            "sections": {
+                "currentIndex": sections ? sections.currentIndex : -1,
+                "contentY": sections ? Number(sections.contentY) : 0,
+                "contentHeight": sections ? Number(sections.contentHeight) : 0,
             },
-            "selectedPageScroll": currentPage ? { "contentY": Number(currentPage.contentY), "contentHeight": Number(currentPage.contentHeight) } : null,
             "search": { "visible": searchArea.visible, "enabled": searchEditor.enabled, "focus": searchEditor.activeFocus },
             "dropdown": { "open": root.dropdownOpen }, "rows": rowSnapshots,
         }
@@ -181,17 +167,13 @@ Item {
     property alias dropdownLayerItem: dropdownLayer
     property alias menuCatcherItem: menuCatcher
 
-    // Keep the persistent category pages mounted inside the clipped viewport.
+    // Keep the flat section container mounted inside the clipped viewport.
     default property alias viewportChildren: viewport.data
 
     // Mirror externally cleared queries without fighting the active editor.
     onSearchQueryChanged: {
         if (searchEditor.text !== root.searchQuery)
             searchEditor.text = root.searchQuery
-        root.closeOpenChoice()
-    }
-
-    onCurrentPageChanged: {
         root.closeOpenChoice()
     }
 
@@ -214,26 +196,6 @@ Item {
         color: LazerTheme.settingsPanel
         Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
         Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
-    }
-
-    // Present the category title below the search field as the sole page heading.
-    Item {
-        id: header
-        x: 0
-        y: searchArea.height
-        width: root.width
-        height: 48
-
-        Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 16
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.title
-            color: LazerTheme.textPrimary
-            font.pixelSize: 18
-            font.weight: Font.DemiBold
-        }
-
     }
 
     // Keep the borderless search field at the top of the content surface.
@@ -356,20 +318,17 @@ Item {
         TapHandler { enabled: root.interactive; onTapped: searchEditor.forceActiveFocus() }
     }
 
-    // Scroll the mounted category pages between the search field and footer.
+    // Scroll the flat section stack between the search field and footer.
     Item {
         id: viewport
         x: 0
-        y: header.y + header.height
+        y: searchArea.height
         width: root.width
-        height: Math.max(0, root.height - searchArea.height - header.height - footer.height)
+        height: Math.max(0, root.height - searchArea.height - footer.height)
         clip: true
     }
 
-    // Reveal a scroll shadow once the current page can scroll further down.
-    // Use visible (not opacity) so the item is fully removed from the scene
-    // graph when hidden, preventing it from intercepting hover events on the
-    // settings rows beneath it.
+    // Reveal a scroll shadow once the sections can scroll further down.
     Rectangle {
         id: scrollShadow
         enabled: false
@@ -384,7 +343,7 @@ Item {
         }
     }
 
-    // Present a clear message when the current category has no matches.
+    // Present a clear message when no category has matching rows.
     Item {
         id: emptyState
         enabled: false
@@ -430,9 +389,9 @@ Item {
         }
     }
 
-    // Close the active inline menu when the page scrolls.
+    // Close the active inline menu when the sections scroll.
     Connections {
-        target: root.currentPage
+        target: root.sections
         function onContentYChanged() {
             root.closeOpenChoice()
         }

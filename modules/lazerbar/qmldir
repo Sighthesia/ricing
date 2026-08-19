@@ -28,6 +28,8 @@ SettingsDropdownMenu 1.0 SettingsDropdownMenu.qml
 LazerSettingsAppearance 1.0 LazerSettingsAppearance.qml
 LazerSettingsBar 1.0 LazerSettingsBar.qml
 LazerSettingsNotifications 1.0 LazerSettingsNotifications.qml
+LazerSettingsSection 1.0 LazerSettingsSection.qml
+LazerSettingsSections 1.0 LazerSettingsSections.qml
 LazerSettingsNavItem 1.0 LazerSettingsNavItem.qml
 LazerSettingsSidebar 1.0 LazerSettingsSidebar.qml
 LazerSettingsContent 1.0 LazerSettingsContent.qml

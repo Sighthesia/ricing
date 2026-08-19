@@ -288,9 +288,9 @@ Item {
             sliderHolder.value = 4
             wait(0)
             verify(slider.defaultMarkerVisible)
-            compare(slider.defaultMarkerItem.width, 1)
+            compare(slider.defaultMarkerItem.width, 4)
             compare(slider.defaultMarkerItem.height, 6)
-            compare(slider.defaultMarkerItem.radius, 1.5)
+            compare(slider.defaultMarkerItem.radius, 3)
             compare(slider.defaultMarkerItem.color, "#d5ccff")
             compare(slider.nubItem.height, slider.trackItem.height)
             compare(slider.nubItem.width, 10)

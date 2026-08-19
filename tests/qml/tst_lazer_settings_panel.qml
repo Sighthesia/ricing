@@ -68,9 +68,7 @@ Item {
             panel.height = 560
             panel.availableWidth = 570
             panel.availableHeight = 560
-            panel.appearancePage.contentY = 0
-            panel.barPage.contentY = 0
-            panel.notificationPage.contentY = 0
+            panel.sections.contentY = 0
             barSettings.height = 48
             resetService.count = 0
             resetService.category = ""
@@ -161,7 +159,7 @@ Item {
                 var control = row.controlItem
                 verify(row.visible)
                 verify(row.height > 0)
-                compare(row.cardItem.width, row.width)
+                compare(row.cardItem.width, row.cardBodyWidth)
                 compare(row.cardItem.height, row.height)
                 verify(control.width > 0)
                 verify(control.height > 0)
@@ -173,7 +171,7 @@ Item {
             }
             var viewport = panel.content.viewportItem
             var firstRect = page.wallpaperRow.mapToItem(panel.content, 0, 0)
-            verify(firstRect.y >= viewport.y - page.contentY - 0.1)
+            verify(firstRect.y >= viewport.y - panel.sections.contentY - 0.1)
             verify(viewport.clip)
         }
 
@@ -225,8 +223,8 @@ Item {
             tryCompare(choice, "menuOpen", true)
             panel.selectCategory("bar")
             tryCompare(choice, "menuOpen", false)
-            verify(!panel.appearancePage.visible)
-            verify(panel.barPage.visible)
+            verify(!panel.appearancePage.sectionActive)
+            verify(panel.barPage.sectionActive)
         }
 
         function test_midOpenLayersOccupyDifferentPositions() {
@@ -262,27 +260,25 @@ Item {
             compare(panel.searchQuery, "")
         }
 
-        function test_switchKeepsScrollPositionAndDisablesHiddenPages() {
-            panel.appearancePage.contentY = 36
+        function test_switchActivatesSectionAndKeepsAllSectionsVisible() {
             panel.selectCategory("bar")
-            compare(panel.appearancePage.contentY, 36)
-            verify(!panel.appearancePage.enabled)
-            verify(!panel.appearancePage.visible)
-            verify(panel.barPage.enabled)
+            tryCompare(panel, "selectedCategory", "bar", 300)
+            verify(!panel.appearancePage.sectionActive)
+            verify(panel.barPage.sectionActive)
+            verify(!panel.notificationPage.sectionActive)
+            verify(panel.appearancePage.visible)
             verify(panel.barPage.visible)
-            verify(!panel.notificationPage.enabled)
-            verify(!panel.notificationPage.visible)
-            tryCompare(panel.barPage, "opacity", 1, 300)
-            panel.selectCategory("notifications")
-            verify(panel.notificationPage.enabled)
             verify(panel.notificationPage.visible)
-            verify(!panel.barPage.enabled)
-            verify(!panel.barPage.visible)
+            panel.selectCategory("notifications")
+            tryCompare(panel, "selectedCategory", "notifications", 300)
+            verify(panel.notificationPage.sectionActive)
+            verify(!panel.barPage.sectionActive)
         }
 
-        function test_searchFiltersCurrentPageAndShowsEmptyState() {
+        function test_searchFiltersAllSectionsAndShowsEmptyState() {
             panel.searchQuery = "模糊"
             compare(panel.appearancePage.visibleResultCount, 2)
+            compare(panel.barPage.visibleResultCount, 0)
             verify(!panel.appearancePage.wallpaperRow.visible)
             verify(panel.content.emptyStateVisible === false)
             panel.searchQuery = "zzz-no-match"
@@ -295,12 +291,12 @@ Item {
 
         function test_searchSurvivesCategorySwitch() {
             panel.searchQuery = "浮动"
-            panel.selectCategory("bar")
             compare(panel.barPage.visibleResultCount, 2)
             verify(!panel.barPage.heightRow.visible)
-            panel.selectCategory("appearance")
+            panel.selectCategory("bar")
+            tryCompare(panel, "selectedCategory", "bar", 300)
             compare(panel.appearancePage.visibleResultCount, 0)
-            verify(panel.content.emptyStateVisible)
+            verify(panel.content.emptyStateVisible === false)
             panel.searchQuery = ""
         }
 
@@ -323,19 +319,25 @@ Item {
             compare(closeSpy.count, 1)
         }
 
-        function test_crossfadeUsesReducedMotionOnlyForTranslation() {
-            panel.selectedCategory = "appearance"
-            panel.syncPages(0, 0)
+        function test_selectCategoryScrollsSectionIntoView() {
             panel.selectCategory("bar")
-            wait(80)
-            verify(panel.barPage.opacity > 0 && panel.appearancePage.opacity < 1)
-            verify(panel.barPage.x > 0 && panel.barPage.x < 8)
-            tryCompare(panel.appearancePage, "opacity", 0, 300)
+            tryCompare(panel, "selectedCategory", "bar", 300)
+            tryVerify(function() {
+                var bar = panel.barPage
+                var top = panel.sections.mapFromItem(bar, 0, 0).y
+                var center = panel.sections.contentY + panel.sections.height / 2
+                return center >= top && center <= top + bar.height
+            }, 500)
             Lazer.MotionTokens.reducedMotionOverride = true
             panel.selectCategory("notifications")
-            compare(panel.notificationPage.x, 0)
+            tryCompare(panel, "selectedCategory", "notifications", 300)
+            var notif = panel.notificationPage
+            var notifTop = panel.sections.mapFromItem(notif, 0, 0).y
+            var notifCenter = panel.sections.contentY + panel.sections.height / 2
+            verify(notifCenter >= notifTop && notifCenter <= notifTop + notif.height)
             compare(panel.categoryTransitionDuration, 160)
             compare(panel.contentTransitionEasing, Lazer.MotionTokens.outSoft)
+            Lazer.MotionTokens.reducedMotionOverride = false
         }
 
         function test_ownedStringContractAndInvalidDirectAssignmentRecovery() {
@@ -345,8 +347,8 @@ Item {
             panel.selectedCategory = "invalid"
             tryCompare(panel, "selectedCategory", "appearance", 300)
             compare(panel.selectedIndex, 0)
-            verify(panel.appearancePage.enabled)
-            verify(!panel.notificationPage.enabled)
+            verify(panel.appearancePage.sectionActive)
+            verify(!panel.notificationPage.sectionActive)
             panel.selectCategory("invalid")
             compare(panel.selectedCategory, "appearance")
         }
@@ -378,47 +380,54 @@ Item {
             compare(closeSpy.count, 1)
         }
 
-        function test_controlFocusHighlightsItsRow() {
+        function test_rowHighlightsOnHoverNotFocus() {
             var row = panel.appearancePage.panelOpacityRow
             var slider = panel.appearancePage.panelOpacitySlider
             slider.forceActiveFocus()
             tryVerify(function() { return slider.activeFocus }, 200)
-            tryVerify(function() { return row.cardItem.border.width > 0 }, 200)
+            verify(row.rowHighlighted === false)
+            verify(row.cardItem.border.width === 0)
+            movePointerTo(row)
+            tryVerify(function() { return row.rowHighlighted }, 200)
+            verify(row.cardItem.border.width > 0)
+            movePointerAway()
+            tryVerify(function() { return row.rowHighlighted === false }, 200)
         }
 
-        function test_fastRetargetEndsAtLatestCategoryAndHiddenPagesAreInactive() {
+        function test_fastRetargetEndsAtLatestCategoryAndOthersDim() {
             panel.selectCategory("bar")
             panel.selectCategory("notifications")
             tryCompare(panel, "selectedCategory", "notifications", 300)
-            tryCompare(panel.notificationPage, "opacity", 1, 300)
-            verify(!panel.appearancePage.enabled)
-            verify(!panel.barPage.enabled)
-            verify(panel.notificationPage.enabled)
+            tryVerify(function() { return panel.notificationPage.sectionActive }, 400)
+            verify(!panel.appearancePage.sectionActive)
+            verify(!panel.barPage.sectionActive)
+            verify(panel.notificationPage.sectionActive)
             verify(!panel.appearancePage.activeFocus)
             verify(!panel.barPage.activeFocus)
         }
 
-        function test_transitionTokenRejectsStaleCallLaterCallbacks() {
+        function test_scrollRetargetReplacesInFlightAnimation() {
             panel.selectCategory("appearance")
             panel.selectCategory("bar")
             panel.selectCategory("notifications")
             wait(1)
-            verify(panel.barPage.opacity < 1)
             compare(panel.selectedCategory, "notifications")
-            tryCompare(panel.notificationPage, "opacity", 1, 300)
-            compare(panel.barPage.opacity, 0)
+            tryVerify(function() { return panel.notificationPage.sectionActive }, 400)
+            tryVerify(function() {
+                var notif = panel.notificationPage
+                var top = panel.sections.mapFromItem(notif, 0, 0).y
+                return Math.abs(panel.sections.contentY + panel.sections.height / 2 - (top + notif.height / 2)) < 12
+            }, 500)
         }
 
-        function test_reducedMotionCanResumeCrossfade() {
+        function test_reducedMotionMakesScrollInstant() {
             Lazer.MotionTokens.reducedMotionOverride = true
             panel.selectCategory("appearance")
-            compare(panel.appearancePage.x, 0)
-            Lazer.MotionTokens.reducedMotionOverride = false
             panel.selectCategory("bar")
-            wait(80)
-            verify(panel.barPage.opacity > 0 && panel.barPage.opacity < 1)
-            verify(panel.appearancePage.opacity > 0 && panel.appearancePage.opacity < 1)
-            tryCompare(panel.barPage, "opacity", 1, 300)
+            compare(panel.selectedCategory, "bar")
+            verify(panel.barPage.sectionActive)
+            verify(!panel.appearancePage.sectionActive)
+            Lazer.MotionTokens.reducedMotionOverride = false
         }
 
         function test_dropdownExpandsInlineAndSelects() {
