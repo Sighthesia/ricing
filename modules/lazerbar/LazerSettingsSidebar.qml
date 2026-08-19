@@ -61,9 +61,9 @@ Item {
     // Provide the manual collapse toggle in the bottom action slot.
     Item {
         id: collapseButton
-        x: root.expanded ? 12 : 0
+        x: 0
         y: root.height - height - 12
-        width: root.expanded ? 40 : root.width
+        width: root.width
         height: 40
         enabled: root.interactive
         activeFocusOnTab: root.interactive
@@ -87,7 +87,8 @@ Item {
 
         Image {
             id: collapseIcon
-            anchors.centerIn: parent
+            x: 27 - 3 * root.expansionProgress
+            anchors.verticalCenter: parent.verticalCenter
             width: 16
             height: 16
             source: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
@@ -168,9 +169,9 @@ Item {
     // Provide the back affordance in the top action slot.
     Item {
         id: backButton
-        x: root.expanded ? 12 : 0
+        x: 0
         y: 10
-        width: root.expanded ? 40 : root.width
+        width: root.width
         height: 40
         enabled: root.interactive
         activeFocusOnTab: root.interactive
@@ -195,7 +196,8 @@ Item {
 
         Image {
             id: backIcon
-            anchors.centerIn: parent
+            x: 27 - 3 * root.expansionProgress
+            anchors.verticalCenter: parent.verticalCenter
             width: 16
             height: 16
             source: "icons/sidebar-return.svg"
