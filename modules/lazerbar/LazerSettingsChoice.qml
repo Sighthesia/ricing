@@ -155,10 +155,9 @@ Item {
         anchors.right: parent.right
         height: LazerTheme.settingsChoiceHeight
         radius: LazerTheme.settingsChoiceRadius
-        color: root.menuOpen && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsControlSurface
+        color: "transparent"
         border.width: root.activeFocus ? 2 : 0
         border.color: LazerTheme.focusRing
-        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -217,9 +216,8 @@ Item {
         y: LazerTheme.settingsChoiceHeight + 4
         height: optionListHeight
         radius: LazerTheme.settingsControlRadius
-        color: LazerTheme.settingsMenuBackground
-        border.width: optionListHeight > 0 ? 1 : 0
-        border.color: LazerTheme.settingsMenuBorder
+        color: "transparent"
+        border.width: 0
         visible: optionListHeight > 0
         clip: true
 
