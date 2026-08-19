@@ -5,7 +5,7 @@ description: 设计或修改任何可见 QML/Quickshell 表面、组件、图标
 
 # osu!lazer Sharp 设计语言
 
-主体锐利，细节圆润。大表面用直角矩形与几何拼接表达层次，圆角只属于组件内部细节与图标。
+主体锐利，细节圆润。大表面用直角矩形与几何拼接表达层次，圆角只属于组件内部细节与图标。设置面板的可复用实现细节见 [lazer-settings-surface-details](../lazer-settings-surface-details/SKILL.md)。
 
 ## 核心原则
 
@@ -44,3 +44,7 @@ description: 设计或修改任何可见 QML/Quickshell 表面、组件、图标
 
 - hover / focus / active / 禁用：用色块亮度、透明度、指示条切换，并遵守 `visual-transition-rules` 的过渡要求（color、opacity、border intensity 都需过渡）。
 - 新增视觉变量前自问：它属于哪一层？该层允许圆角吗？形态是否静态？
+
+## 设置面板实现入口
+
+涉及 `modules/lazerbar/LazerSettings*` 的布局、默认按钮、row hover 或交互反馈时，同时加载 `lazer-settings-surface-details`。总体规则决定形态层级，细节 skill 决定现有设置面板的尺寸、z-order、输入区域和动效契约。
