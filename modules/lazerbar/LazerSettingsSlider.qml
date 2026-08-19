@@ -167,7 +167,7 @@ Item {
                                  root.defaultFraction * trackHost.width - width / 2))
         anchors.verticalCenter: trackHost.verticalCenter
         width: 4
-        height: root.defaultMarkerAtValue ? Math.max(0, trackHost.height - 14) : 6
+        height: root.defaultMarkerAtValue ? Math.max(0, trackHost.height - 10) : 6
         radius: height / 2
         color: "#D5CCFF"
         opacity: root.defaultMarkerVisible ? 1 : 0
