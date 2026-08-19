@@ -138,6 +138,8 @@ Item {
             slider.requestedWidth = slider.implicitWidth
             sliderHolder.value = 4
             slider.focus = false
+            slider.flashAnimationItem.stop()
+            slider.flashOverlayItem.opacity = 0
             secondSlider.focus = false
             sliderSpy.clear()
             revertRowSliderSpy.clear()
@@ -269,6 +271,38 @@ Item {
             Lazer.MotionTokens.reducedMotionOverride = true
             compare(slider.trackFillBehaviorEnabled, false)
             verify(slider.trackTapEnabled)
+        }
+
+        function test_sliderTickFlashStartsOnlyForChangedStep() {
+            compare(slider.flashActive, false)
+            compare(slider.flashOverlayItem.opacity, 0)
+            compare(slider.flashOverlayItem.width, slider.trackItem.width)
+            compare(slider.flashOverlayItem.height, slider.trackItem.height)
+
+            slider.setValue(6)
+            verify(slider.flashActive)
+            compare(slider.flashAnimationItem.duration, 800)
+            compare(slider.flashAnimationItem.easing.type, Easing.OutQuint)
+
+            slider.flashAnimationItem.stop()
+            slider.flashOverlayItem.opacity = 0
+            slider.setValue(6)
+            compare(slider.flashActive, false)
+        }
+
+        function test_sliderTickFlashUsesResetPathAndReducedMotion() {
+            sliderHolder.value = 8
+            slider.resetToDefault()
+            verify(slider.flashActive)
+
+            slider.flashAnimationItem.stop()
+            slider.flashOverlayItem.opacity = 0
+            sliderHolder.value = 8
+            Lazer.MotionTokens.reducedMotionOverride = true
+            slider.resetToDefault()
+            compare(slider.flashActive, false)
+            compare(slider.flashOverlayItem.opacity, 0)
+            compare(slider.flashAnimationItem.running, false)
         }
 
         function test_sliderDoubleClickRestoresDefault() {

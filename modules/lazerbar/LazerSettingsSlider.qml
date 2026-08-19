@@ -33,6 +33,7 @@ Item {
     readonly property bool defaultMarkerVisible: defaultValue !== undefined
     readonly property bool defaultMarkerAtValue: defaultValue !== undefined
                                                  && Math.abs(displayValue - normalized(defaultValue)) < Math.max(1e-9, Math.abs(Number(stepSize)) * 0.001)
+    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
     signal valueModified(real value)
 
     readonly property real rangePadding: LazerTheme.settingsRangePadding
@@ -86,6 +87,16 @@ Item {
         if (next === Number(value))
             return
         valueModified(next)
+        restartFlash()
+    }
+
+    function restartFlash() {
+        if (!root.effectiveEnabled || MotionTokens.reducedMotion) {
+            flashAnimation.stop()
+            flashOverlay.opacity = 0
+            return
+        }
+        flashAnimation.restart()
     }
 
     function increase() { if (effectiveEnabled) setValue(displayValue + stepSize) }
@@ -131,6 +142,16 @@ Item {
     onEffectiveEnabledChanged: {
         if (!effectiveEnabled && activeFocus)
             focus = false
+        if (!effectiveEnabled)
+            restartFlash()
+    }
+
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (MotionTokens.reducedMotion)
+                root.restartFlash()
+        }
     }
 
     // Use the full right-hand row column as the interactive track area.
@@ -175,6 +196,28 @@ Item {
         radius: 4
         color: LazerTheme.settingsAccent
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+    }
+
+    // Flash the track once when a user action lands on a new discrete step.
+    Rectangle {
+        id: flashOverlay
+        z: 2
+        anchors.fill: trackRect
+        radius: trackRect.radius
+        color: LazerTheme.textPrimary
+        opacity: 0
+    }
+
+    // Match osu's click flash: a 0.3 white overlay fading for 800ms with OutQuint.
+    NumberAnimation {
+        id: flashAnimation
+        target: flashOverlay
+        property: "opacity"
+        from: 0.3
+        to: 0
+        duration: 800
+        easing.type: Easing.OutQuint
+        running: false
     }
 
     // Keep the default marker above the active thumb so the default remains legible.
@@ -281,6 +324,8 @@ Item {
 
     readonly property Item trackItem: trackRect
     readonly property Item trackFillItem: fillRect
+    readonly property Item flashOverlayItem: flashOverlay
+    readonly property Animation flashAnimationItem: flashAnimation
     readonly property Item defaultMarkerItem: defaultMarker
     readonly property Item thumbLightItem: defaultMarkerAtValue ? defaultMarker : null
     readonly property bool trackTapEnabled: trackTapHandler.enabled
