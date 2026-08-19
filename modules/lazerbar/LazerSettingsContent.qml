@@ -441,7 +441,6 @@ Item {
     // Observe taps outside the active inline Choice without blocking controls.
     TapHandler {
         enabled: root.interactive && root.openChoice !== null
-        blocking: false
         onTapped: eventPoint => {
             var choice = root.openChoice
             if (!choice)
