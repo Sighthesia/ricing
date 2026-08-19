@@ -10,6 +10,7 @@ Item {
     property bool selected: false
     property bool interactive: true
     property bool expanded: true
+    property real expansionProgress: expanded ? 1 : 0
     property real appearOpacity: 1
     property string category: "appearance"
     signal activated
@@ -39,13 +40,12 @@ Item {
     Image {
         id: iconImage
         visible: root.iconSource.length > 0
-        x: root.expanded ? 25 : Math.max(0, (root.width - width) / 2)
+        x: 15 + 10 * root.expansionProgress
         anchors.verticalCenter: parent.verticalCenter
         width: 20
         height: 20
         source: root.iconSource
         fillMode: Image.PreserveAspectFit
-        Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint } }
         scale: tapHandler.pressed ? MotionTokens.pressScale : 1
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
     }
@@ -65,12 +65,8 @@ Item {
     // with the collapse transition instead of hard-cutting.
     Text {
         id: labelText
-        visible: root.expanded || opacity > 0
-        opacity: root.expanded ? 1 : 0
-        Behavior on opacity {
-            enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
-        }
+        visible: root.expansionProgress > 0.01 || opacity > 0
+        opacity: root.expansionProgress
         x: 60
         anchors.verticalCenter: parent.verticalCenter
         text: root.label
@@ -82,18 +78,13 @@ Item {
     // Show an accent pill only for the selected category.
     Rectangle {
         id: selectionIndicator
-        x: root.expanded ? 9 : 4
+        x: 4 + 5 * root.expansionProgress
         anchors.verticalCenter: parent.verticalCenter
         width: 4
         height: root.selected ? 24 : 0
         radius: 2
         color: LazerTheme.settingsAccent
         opacity: root.selected ? 1 : 0
-
-        Behavior on x {
-            enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
-        }
 
         Behavior on height {
             enabled: !MotionTokens.reducedMotion

@@ -202,6 +202,7 @@ Item {
         width: root.sidebarWidth
         height: root.height
         expanded: root.sidebarExpanded
+        expansionProgress: root.collapseProgress
         interactive: root.interactive
         selectedIndex: root.selectedIndex
         opacity: root.layerOpacity

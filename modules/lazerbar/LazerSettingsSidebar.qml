@@ -7,6 +7,7 @@ Item {
     id: root
 
     property bool expanded: true
+    property real expansionProgress: expanded ? 1 : 0
     property bool interactive: true
     property bool sessionActive: false
     property int selectedIndex: 0
@@ -131,6 +132,7 @@ Item {
             expanded: root.expanded
             selected: root.selectedIndex === 0
             interactive: root.interactive
+            expansionProgress: root.expansionProgress
             appearOpacity: 0
             onActivated: root.categorySelected(0)
             onMoveRequested: direction => root.moveRequested(direction)
@@ -143,6 +145,7 @@ Item {
             expanded: root.expanded
             selected: root.selectedIndex === 1
             interactive: root.interactive
+            expansionProgress: root.expansionProgress
             appearOpacity: 0
             onActivated: root.categorySelected(1)
             onMoveRequested: direction => root.moveRequested(direction)
@@ -155,6 +158,7 @@ Item {
             expanded: root.expanded
             selected: root.selectedIndex === 2
             interactive: root.interactive
+            expansionProgress: root.expansionProgress
             appearOpacity: 0
             onActivated: root.categorySelected(2)
             onMoveRequested: direction => root.moveRequested(direction)
