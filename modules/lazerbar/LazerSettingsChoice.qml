@@ -27,6 +27,9 @@ Item {
     readonly property real mainControlHeight: LazerTheme.settingsChoiceHeight
     readonly property Item headerItem: headerSurface
     readonly property Item surfaceItem: headerSurface
+    readonly property bool flashActive: headerFlashAnimation.running || headerFlashOverlay.opacity > 0
+    readonly property Item flashOverlayItem: headerFlashOverlay
+    readonly property Animation flashAnimationItem: headerFlashAnimation
     property int preselectIndex: -1
     signal valueSelected(string value)
 
@@ -56,8 +59,14 @@ Item {
     function selectValue(candidate) {
         if (!effectiveEnabled || !validValue(candidate))
             return
-        if (String(candidate) !== currentValue)
+        var changed = String(candidate) !== currentValue
+        if (changed) {
             valueSelected(String(candidate))
+            root.restartHeaderFlash()
+            var option = optionList.itemAtIndex(root.indexOfValue(candidate))
+            if (option && option.restartFlash)
+                option.restartFlash()
+        }
         root.closeMenu()
     }
 
@@ -79,6 +88,16 @@ Item {
         }
         root.menuOpen = true
         root.preselectIndex = Math.max(0, indexOfValue(root.currentValue))
+        root.restartHeaderFlash()
+    }
+
+    function restartHeaderFlash() {
+        if (!root.effectiveEnabled || MotionTokens.reducedMotion) {
+            headerFlashAnimation.stop()
+            headerFlashOverlay.opacity = 0
+            return
+        }
+        headerFlashAnimation.restart()
     }
 
     function closeMenu() {
@@ -162,6 +181,17 @@ Item {
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
+
+        // Confirm opening or committing the choice without owning input.
+        Rectangle {
+            id: headerFlashOverlay
+            z: 1
+            anchors.fill: parent
+            radius: parent.radius
+            color: LazerTheme.textPrimary
+            opacity: 0
+            enabled: false
+        }
 
         // Keep the field label and selected value inside the title surface.
         Column {
@@ -269,7 +299,65 @@ Item {
                 TapHandler {
                     onTapped: root.selectValue(String(modelData.value))
                 }
+
+                Rectangle {
+                    id: optionFlashOverlay
+                    z: 1
+                    anchors.fill: parent
+                    radius: parent.radius
+                    color: LazerTheme.textPrimary
+                    opacity: 0
+                    enabled: false
+                }
+
+                NumberAnimation {
+                    id: optionFlashAnimation
+                    target: optionFlashOverlay
+                    property: "opacity"
+                    from: MotionTokens.clickFlashOpacity
+                    to: 0
+                    duration: MotionTokens.clickFlashDuration
+                    easing.type: MotionTokens.clickFlashEasing
+                    running: false
+                }
+
+                function restartFlash() {
+                    if (MotionTokens.reducedMotion) {
+                        optionFlashAnimation.stop()
+                        optionFlashOverlay.opacity = 0
+                        return
+                    }
+                    optionFlashAnimation.restart()
+                }
+
+                Connections {
+                    target: MotionTokens
+                    function onReducedMotionChanged() {
+                        if (MotionTokens.reducedMotion)
+                            restartFlash()
+                    }
+                }
             }
+        }
+    }
+
+    // Match the shared osu-style click flash timing for the choice header.
+    NumberAnimation {
+        id: headerFlashAnimation
+        target: headerFlashOverlay
+        property: "opacity"
+        from: MotionTokens.clickFlashOpacity
+        to: 0
+        duration: MotionTokens.clickFlashDuration
+        easing.type: MotionTokens.clickFlashEasing
+        running: false
+    }
+
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (MotionTokens.reducedMotion)
+                root.restartHeaderFlash()
         }
     }
 

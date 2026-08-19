@@ -21,6 +21,9 @@ Item {
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property Item nubItem: capsule
     readonly property bool nubMorphEnabled: false
+    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
+    readonly property Item flashOverlayItem: flashOverlay
+    readonly property Animation flashAnimationItem: flashAnimation
 
     implicitWidth: 44
     implicitHeight: 20
@@ -42,6 +45,16 @@ Item {
             return
         root.forceActiveFocus()
         root.toggled(!root.checked)
+        root.restartFlash()
+    }
+
+    function restartFlash() {
+        if (!root.effectiveEnabled || MotionTokens.reducedMotion) {
+            flashAnimation.stop()
+            flashOverlay.opacity = 0
+            return
+        }
+        flashAnimation.restart()
     }
 
     Keys.onSpacePressed: event => { activate(); event.accepted = true }
@@ -60,6 +73,37 @@ Item {
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+    }
+
+    // Confirm an accepted toggle without changing the capsule's input boundary.
+    Rectangle {
+        id: flashOverlay
+        z: 1
+        anchors.fill: capsule
+        radius: capsule.radius
+        color: LazerTheme.textPrimary
+        opacity: 0
+        enabled: false
+    }
+
+    // Match the shared osu-style click flash timing.
+    NumberAnimation {
+        id: flashAnimation
+        target: flashOverlay
+        property: "opacity"
+        from: MotionTokens.clickFlashOpacity
+        to: 0
+        duration: MotionTokens.clickFlashDuration
+        easing.type: MotionTokens.clickFlashEasing
+        running: false
+    }
+
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (MotionTokens.reducedMotion)
+                root.restartFlash()
+        }
     }
 
     // Keep hover state local to the capsule so the parent row can observe it

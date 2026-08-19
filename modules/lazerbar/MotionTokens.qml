@@ -35,6 +35,8 @@ QtObject {
     readonly property int nubGlow: 800
     readonly property int sliderNubMove: 250
     readonly property int sliderTickBumpReturn: 220
+    readonly property int clickFlashDuration: 800
+    readonly property int clickFlashEasing: Easing.OutQuint
     readonly property int controlCommit: 120
     readonly property int tooltipIn: 120
     readonly property int tooltipOut: 160
@@ -49,6 +51,7 @@ QtObject {
     readonly property real hoverScale: 1.015
     readonly property real pressScale: 0.985
     readonly property real sliderTickBumpScale: 1.015
+    readonly property real clickFlashOpacity: 0.3
     readonly property real popupFromScale: 0.98
     readonly property real popupFromY: -4
     readonly property real overlayFromY: 8

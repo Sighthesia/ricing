@@ -231,10 +231,10 @@ Item {
         id: flashAnimation
         target: flashOverlay
         property: "opacity"
-        from: 0.3
+        from: MotionTokens.clickFlashOpacity
         to: 0
-        duration: 800
-        easing.type: Easing.OutQuint
+        duration: MotionTokens.clickFlashDuration
+        easing.type: MotionTokens.clickFlashEasing
         running: false
     }
 

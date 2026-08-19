@@ -32,6 +32,9 @@ Item {
     readonly property real reservedResetWidth: root.hasDefault ? root.revertZoneWidth : 0
     readonly property real reservedResetGap: root.hasDefault ? root.revertContentGap : 0
     readonly property real cardBodyWidth: Math.max(0, root.width - root.reservedResetWidth)
+    readonly property bool flashActive: resetFlashAnimation.running || resetFlashOverlay.opacity > 0
+    readonly property Item flashOverlayItem: resetFlashOverlay
+    readonly property Animation flashAnimationItem: resetFlashAnimation
     readonly property real labelControlGap: 5
     default property alias control: controlHost.children
     readonly property Item controlItem: controlHost.children.length > 0 ? controlHost.children[0] : null
@@ -191,6 +194,24 @@ Item {
         if (!root.canReset || !root.resetCallback)
             return
         root.resetCallback()
+        restartResetFlash()
+    }
+
+    function restartResetFlash() {
+        if (MotionTokens.reducedMotion) {
+            resetFlashAnimation.stop()
+            resetFlashOverlay.opacity = 0
+            return
+        }
+        resetFlashAnimation.restart()
+    }
+
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (MotionTokens.reducedMotion)
+                root.restartResetFlash()
+        }
     }
 
     // Slide the restore-default strip from behind the row card's rounded edge.
@@ -229,8 +250,23 @@ Item {
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
+        // Confirm a reset while keeping the pseudo-crescent surface geometry.
+        Rectangle {
+            id: resetFlashOverlay
+            z: 1
+            anchors.fill: parent
+            topLeftRadius: 0
+            topRightRadius: root.cardRadius
+            bottomRightRadius: root.cardRadius
+            bottomLeftRadius: 0
+            color: LazerTheme.textPrimary
+            opacity: 0
+            enabled: false
+        }
+
         Image {
             id: revertIcon
+            z: 2
             anchors.centerIn: parent
             anchors.horizontalCenterOffset: root.cardRadius / 2
             width: 14
@@ -239,6 +275,7 @@ Item {
             fillMode: Image.PreserveAspectFit
         }
         MultiEffect {
+            z: 2
             anchors.fill: revertIcon
             source: revertIcon
             visible: revertIcon.visible
@@ -246,6 +283,18 @@ Item {
                 colorizationColor: revertHover.hovered || revertPress.pressed || revertButton.activeFocus
                                    ? LazerTheme.settingsAccent : LazerTheme.textMuted
             Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
+        }
+
+        // Match the shared osu-style click flash timing.
+        NumberAnimation {
+            id: resetFlashAnimation
+            target: resetFlashOverlay
+            property: "opacity"
+            from: MotionTokens.clickFlashOpacity
+            to: 0
+            duration: MotionTokens.clickFlashDuration
+            easing.type: MotionTokens.clickFlashEasing
+            running: false
         }
 
         HoverHandler {
