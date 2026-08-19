@@ -96,7 +96,7 @@ Item {
         anchors.fill: parent
         color: "#000000"
         visible: root.sectionActive ? opacity > 0.01 : true
-        opacity: root.sectionActive ? 0 : (root.sectionHovered ? 0.5 : 0.8)
+        opacity: root.sectionActive ? 0 : (root.sectionHovered ? 0.3 : 0.5)
         Behavior on opacity { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
     }
 
