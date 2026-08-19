@@ -118,9 +118,9 @@ Item {
     // Use the full right-hand row column as the interactive track area.
     Item {
         id: trackHost
-        x: LazerTheme.settingsRangePadding
+        x: 0
         y: 0
-        width: root.width - 2 * LazerTheme.settingsRangePadding
+        width: root.width
         height: root.height
     }
 
