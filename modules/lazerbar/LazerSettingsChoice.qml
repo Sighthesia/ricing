@@ -157,7 +157,7 @@ Item {
         radius: LazerTheme.settingsChoiceRadius
         color: root.menuOpen && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsControlSurface
         border.width: headerHover.hovered || root.menuOpen ? 2 : 0
-        border.color: LazerTheme.focusRing
+        border.color: LazerTheme.settingsAccent
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
@@ -218,8 +218,8 @@ Item {
         height: optionListHeight
         radius: LazerTheme.settingsControlRadius
         color: LazerTheme.settingsMenuBackground
-        border.width: optionSurfaceHover.hovered ? 2 : 0
-        border.color: LazerTheme.focusRing
+        border.width: root.menuOpen ? 2 : 0
+        border.color: LazerTheme.settingsAccent
         visible: optionListHeight > 0
         clip: true
 
