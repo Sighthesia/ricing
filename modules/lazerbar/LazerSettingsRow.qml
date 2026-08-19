@@ -174,7 +174,7 @@ Item {
         z: 3
         x: Math.max(0, root.width - width - contentPadding)
         width: 28
-        height: 28
+        height: root.safeControlHeight > 0 ? root.safeControlHeight : 28
         // Follow the actual control center, not the taller label-plus-control card.
         y: contentHost.y + controlHost.y + (controlHost.height - height) / 2
         visible: root.revertVisible
@@ -187,7 +187,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            radius: 6
+            radius: 5
             color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsRowHover : LazerTheme.settingsResetSurface
             border.width: revertButton.activeFocus ? 1 : 0
             border.color: LazerTheme.focusRing
@@ -197,8 +197,8 @@ Item {
         Image {
             id: revertIcon
             anchors.centerIn: parent
-            width: 14
-            height: 14
+            width: 10
+            height: 10
             source: "icons/undo.svg"
             fillMode: Image.PreserveAspectFit
         }
