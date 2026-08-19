@@ -141,9 +141,9 @@ Item {
 
         function test_contentChromeUsesSingleTitleAndBorderlessSearchSurface() {
             compare(panel.content.searchField.text, "")
-            compare(panel.content.searchSurfaceItem.color, Lazer.LazerTheme.settingsSearchSurface)
+            compare(panel.content.searchSurfaceItem.color, Lazer.LazerTheme.settingsRail)
             compare(panel.content.searchSurfaceItem.border.width, 0)
-            compare(panel.content.searchSurfaceItem.radius, 6)
+            compare(panel.content.searchSurfaceItem.radius, 0)
             verify(panel.content.scrollShadowItem.enabled === false)
             verify(panel.content.emptyStateItem.enabled === false)
             verify(panel.content.dropdownLayerItem.visible === false)

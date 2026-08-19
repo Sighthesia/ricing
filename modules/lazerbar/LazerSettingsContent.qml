@@ -206,15 +206,11 @@ Item {
         width: root.width
         height: 52
 
+        // Lay the search field as a flat full-width strip matching the sidebar surface.
         Rectangle {
             id: searchSurface
             anchors.fill: parent
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            anchors.topMargin: 2
-            anchors.bottomMargin: 2
-            radius: 6
-            color: LazerTheme.settingsSearchSurface
+            color: LazerTheme.settingsRail
             border.width: 0
             border.color: "transparent"
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
