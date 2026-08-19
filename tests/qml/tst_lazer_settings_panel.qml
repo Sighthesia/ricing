@@ -340,6 +340,18 @@ Item {
             Lazer.MotionTokens.reducedMotionOverride = false
         }
 
+        function test_bottomBoundaryActivatesFinalSection() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var maximumY = Math.max(0, panel.sections.contentHeight - panel.sections.height)
+            verify(maximumY > 0)
+            panel.sections.contentY = maximumY
+            wait(0)
+            compare(panel.selectedCategory, "notifications")
+            verify(panel.notificationPage.sectionActive)
+            verify(!panel.barPage.sectionActive)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
+
         function test_ownedStringContractAndInvalidDirectAssignmentRecovery() {
             panel.selectCategory("notifications")
             compare(panel.selectedIndex, 2)

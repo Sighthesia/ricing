@@ -63,9 +63,24 @@ Flickable {
         if (root._syncingScroll)
             return
         var children = column.children
+        var maximumY = Math.max(0, root.contentHeight - root.height)
         var center = root.contentY + root.height / 2
         var found = -1
+
+        // At the lower bound the viewport center may still be above a short
+        // final section. Treat the boundary as an explicit final-section cue.
+        if (maximumY > 0 && root.contentY >= maximumY - 0.5) {
+            for (var last = children.length - 1; last >= 0; last--) {
+                if (children[last].visible !== false && children[last].height > 0) {
+                    found = last
+                    break
+                }
+            }
+        }
+
         for (var i = 0; i < children.length; i++) {
+            if (found >= 0)
+                break
             var child = children[i]
             if (child.visible !== false && child.height > 0
                     && center >= child.y && center <= child.y + child.height) {
