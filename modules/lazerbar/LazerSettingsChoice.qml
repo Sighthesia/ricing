@@ -22,7 +22,7 @@ Item {
     readonly property bool hovered: headerHover.hovered
     property bool menuOpen: false
     readonly property real optionListHeight: menuOpen && effectiveEnabled && model.length > 0
-        ? Math.min(LazerTheme.dropdownMaxHeight, model.length * 30 + 8) : 0
+        ? Math.min(LazerTheme.dropdownMaxHeight, model.length * 30 + 18) : 0
     readonly property real menuReservedHeight: optionListHeight
     readonly property Item headerItem: headerSurface
     readonly property Item surfaceItem: headerSurface
@@ -30,7 +30,7 @@ Item {
     signal valueSelected(string value)
 
     implicitWidth: 190
-    implicitHeight: LazerTheme.settingsChoiceHeight + (optionListHeight > 0 ? 4 + optionListHeight : 0)
+    implicitHeight: LazerTheme.settingsChoiceHeight + (optionListHeight > 0 ? 5 + optionListHeight + 9 : 0)
     width: Math.min(Math.max(0, isFinite(Number(requestedWidth)) ? Number(requestedWidth) : implicitWidth), effectiveAvailableWidth)
     height: implicitHeight
     activeFocusOnTab: effectiveEnabled
@@ -154,7 +154,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         height: LazerTheme.settingsChoiceHeight
-        radius: LazerTheme.settingsChoiceRadius
+        radius: LazerTheme.settingsControlRadius
         color: LazerTheme.settingsControlSurface
         border.width: headerHover.hovered || root.menuOpen ? 2 : 0
         border.color: LazerTheme.settingsAccent
@@ -166,10 +166,10 @@ Item {
         Column {
             id: fieldColumn
             anchors.left: parent.left
-            anchors.leftMargin: 12
+            anchors.leftMargin: 9
             anchors.right: chevron.left
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
+            spacing: 4
 
             Text {
                 width: parent.width
@@ -193,7 +193,7 @@ Item {
         Image {
             id: chevron
             anchors.right: parent.right
-            anchors.rightMargin: LazerTheme.settingsControlPadding
+            anchors.rightMargin: 9
             anchors.verticalCenter: parent.verticalCenter
             width: 16
             height: 16
@@ -214,7 +214,7 @@ Item {
         id: optionSurface
         anchors.left: parent.left
         anchors.right: parent.right
-        y: LazerTheme.settingsChoiceHeight + 4
+        y: LazerTheme.settingsChoiceHeight + 5
         height: optionListHeight
         radius: LazerTheme.settingsControlRadius
         color: LazerTheme.settingsMenuBackground
@@ -229,7 +229,7 @@ Item {
         ListView {
             id: optionList
             anchors.fill: parent
-            anchors.margins: 4
+            anchors.margins: 9
             clip: true
             model: root.model
             interactive: root.model.length > 6
@@ -239,7 +239,7 @@ Item {
             delegate: Rectangle {
                 width: optionList.width
                 height: 30
-                radius: 4
+                radius: 5
                 color: String(modelData.value) === root.currentValue ? LazerTheme.settingsAccent
                        : (optionHover.hovered || index === root.preselectIndex
                           ? LazerTheme.settingsMenuHover : "transparent")
@@ -247,9 +247,9 @@ Item {
 
                 Text {
                     anchors.left: parent.left
-                    anchors.leftMargin: LazerTheme.settingsControlPadding
+                    anchors.leftMargin: 15
                     anchors.right: parent.right
-                    anchors.rightMargin: LazerTheme.settingsControlPadding
+                    anchors.rightMargin: 15
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.label
                     color: LazerTheme.textPrimary

@@ -64,7 +64,7 @@ QtObject {
     readonly property int settingsControlHeight: 40
     readonly property int settingsChoiceHeight: 52
     readonly property int settingsChoiceRadius: 6
-    readonly property int settingsControlPadding: 10
+    readonly property int settingsControlPadding: 9
     readonly property int settingsRangePadding: 0
     readonly property color settingsTrack: "#2E2A3A"
     readonly property color settingsSliderThumb: "#9A86FF"
