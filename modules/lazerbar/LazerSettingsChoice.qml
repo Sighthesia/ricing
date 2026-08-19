@@ -156,7 +156,7 @@ Item {
         height: LazerTheme.settingsChoiceHeight
         radius: LazerTheme.settingsChoiceRadius
         color: root.menuOpen && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsControlSurface
-        border.width: (root.activeFocus && headerHover.hovered) || root.menuOpen ? 2 : 0
+        border.width: headerHover.hovered || root.menuOpen ? 2 : 0
         border.color: LazerTheme.focusRing
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
