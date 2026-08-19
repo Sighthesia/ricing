@@ -633,6 +633,7 @@ Item {
             compare(revertRow.revertButtonItem.x + revertRow.revertButtonItem.width,
                     revertRow.width)
             verify(revertRow.revertButtonItem.z < revertRow.cardItem.z)
+            compare(revertRow.rowHovered, false)
             var sliderRight = revertRowSlider.mapToItem(revertRow, revertRowSlider.width, 0).x
             verify(sliderRight <= revertRow.revertButtonItem.x + revertRow.cardRadius)
             var beforeSliderSignals = revertRowSliderSpy.count

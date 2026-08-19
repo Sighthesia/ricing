@@ -44,8 +44,9 @@ Item {
     readonly property bool inlinePresentation: rowPresentation === "inline"
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
-    readonly property bool rowHovered: rowHover.hovered || rowHoverArea.containsMouse || revertHover.hovered
-                                     || (controlItem && controlItem.hovered === true)
+    readonly property bool rowHovered: ((rowHover.hovered && rowHover.point.position.x < root.revertVisibleX)
+                                        || rowHoverArea.containsMouse)
+                                      || (controlItem && controlItem.hovered === true)
     readonly property bool rowHoverBlocking: rowHover.blocking
     readonly property bool rowHighlighted: rowHovered
     readonly property point debugHoverScenePoint: rowHover.point.scenePosition
@@ -99,11 +100,14 @@ Item {
         blocking: false
     }
 
-    // Observe the complete card background without accepting control clicks.
+    // Observe only the row surface; leave the exposed reset button region to its own handlers.
     MouseArea {
         id: rowHoverArea
         z: 0.5
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: root.hasDefault ? Math.max(0, root.revertVisibleX) : root.width
         enabled: root.enabled
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
@@ -202,6 +206,11 @@ Item {
         activeFocusOnTab: root.canReset
         Accessible.role: Accessible.Button
         Accessible.name: "恢复默认"
+        scale: revertPress.pressed ? MotionTokens.pressScale : 1
+        Behavior on scale {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        }
         Behavior on x {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
@@ -213,7 +222,8 @@ Item {
             topRightRadius: root.cardRadius
             bottomRightRadius: root.cardRadius
             bottomLeftRadius: 0
-            color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsResetSurfaceHover : LazerTheme.settingsResetSurface
+            color: revertHover.hovered || revertPress.pressed || revertButton.activeFocus
+                   ? LazerTheme.settingsResetSurfaceHover : LazerTheme.settingsResetSurface
             border.width: revertButton.activeFocus ? 1 : 0
             border.color: LazerTheme.focusRing
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -233,7 +243,8 @@ Item {
             source: revertIcon
             visible: revertIcon.visible
             colorization: 1
-                colorizationColor: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsAccent : LazerTheme.textMuted
+                colorizationColor: revertHover.hovered || revertPress.pressed || revertButton.activeFocus
+                                   ? LazerTheme.settingsAccent : LazerTheme.textMuted
             Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
 
@@ -242,6 +253,7 @@ Item {
             enabled: root.canReset
         }
         TapHandler {
+            id: revertPress
             enabled: root.canReset
             onTapped: root.activateReset()
         }
