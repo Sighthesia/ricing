@@ -155,9 +155,10 @@ Item {
         anchors.right: parent.right
         height: LazerTheme.settingsChoiceHeight
         radius: LazerTheme.settingsChoiceRadius
-        color: "transparent"
-        border.width: root.activeFocus && headerHover.hovered ? 2 : 0
-        border.color: LazerTheme.focusRing
+        color: root.menuOpen && root.effectiveEnabled ? LazerTheme.settingsRowHover : LazerTheme.settingsControlSurface
+        border.width: root.activeFocus && headerHover.hovered ? 2 : 1
+        border.color: root.activeFocus && headerHover.hovered ? LazerTheme.focusRing : LazerTheme.settingsMenuBorder
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -216,8 +217,9 @@ Item {
         y: LazerTheme.settingsChoiceHeight + 4
         height: optionListHeight
         radius: LazerTheme.settingsControlRadius
-        color: "transparent"
-        border.width: 0
+        color: LazerTheme.settingsMenuBackground
+        border.width: optionListHeight > 0 ? 1 : 0
+        border.color: LazerTheme.settingsMenuBorder
         visible: optionListHeight > 0
         clip: true
 

@@ -103,6 +103,7 @@ Item {
         id: cardSurface
         anchors.fill: parent
         radius: 6
+        visible: !root.choicePresentation
         color: root.rowHighlighted ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
         border.width: root.rowHighlighted ? 1.5 : 0
         border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
@@ -118,6 +119,7 @@ Item {
         z: 2
         anchors.fill: parent
         radius: cardSurface.radius
+        visible: !root.choicePresentation
         color: "transparent"
         border.width: root.controlItem && root.controlItem.activeFocus ? 1.5 : 0
         border.color: root.controlItem && root.controlItem.activeFocus ? LazerTheme.settingsAccent : "transparent"
