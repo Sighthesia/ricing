@@ -218,10 +218,12 @@ Item {
         height: optionListHeight
         radius: LazerTheme.settingsControlRadius
         color: LazerTheme.settingsMenuBackground
-        border.width: optionListHeight > 0 ? 1 : 0
-        border.color: LazerTheme.settingsMenuBorder
+        border.width: optionSurfaceHover.hovered ? 2 : 0
+        border.color: LazerTheme.focusRing
         visible: optionListHeight > 0
         clip: true
+
+        HoverHandler { id: optionSurfaceHover; enabled: optionListHeight > 0 }
 
         // Scroll only the option list when the model exceeds the menu cap.
         ListView {
