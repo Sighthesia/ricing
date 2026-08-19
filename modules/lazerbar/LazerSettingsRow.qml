@@ -23,7 +23,7 @@ Item {
     readonly property bool revertVisible: hasDefault && !isDefault
     readonly property bool canReset: revertVisible && enabled
     readonly property real contentPadding: 12
-    readonly property real revertZoneWidth: 36
+    readonly property real revertZoneWidth: 28
     readonly property real labelControlGap: 5
     default property alias control: controlHost.children
     readonly property Item controlItem: controlHost.children.length > 0 ? controlHost.children[0] : null
@@ -168,15 +168,14 @@ Item {
         root.resetCallback()
     }
 
-    // Show the restore-default affordance in the fixed right-side slot.
+    // Reserve a full-height restore-default strip inside the row card.
     Item {
         id: revertButton
         z: 3
-        x: Math.max(0, root.width - width - contentPadding)
-        width: 28
-        height: 28
-        // Follow the actual control center, not the taller label-plus-control card.
-        y: contentHost.y + controlHost.y + (controlHost.height - height) / 2
+        x: Math.max(0, root.width - root.revertZoneWidth)
+        y: 0
+        width: root.revertZoneWidth
+        height: root.height
         visible: root.revertVisible
         opacity: root.revertVisible ? 1 : 0
         enabled: root.canReset
@@ -187,11 +186,20 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            radius: 6
-            color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsRowHover : LazerTheme.settingsResetSurface
+            radius: cardSurface.radius
+            color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsResetSurfaceHover : LazerTheme.settingsResetSurface
             border.width: revertButton.activeFocus ? 1 : 0
             border.color: LazerTheme.focusRing
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: 1
+            color: LazerTheme.settingsResetDivider
+            opacity: 0.8
         }
 
         Image {
