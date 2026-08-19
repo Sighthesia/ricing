@@ -29,6 +29,7 @@ This branch (`backend-only`) contains only the **backend** layer — services, s
 - **PanelWindow with WlrLayershell**: use `implicitWidth`/`implicitHeight`, not `width`/`height` (the latter triggers deprecation warnings).
 - JS helper files (`.js`) in services and modules contain pure logic extracted from QML for testability.
 - Comment before major QML element declarations (see skill below).
+- **Visual language is osu!lazer "sharp"**: major surfaces use right-angled rectangles and geometric joins (triangles/diamonds/rect strips); rounded corners belong only to component details and icons (see skill below).
 
 ## Skills
 
@@ -36,6 +37,7 @@ Load these for detailed context on specific topics:
 
 | Skill                                                                                                  | When to use                                                                                                                                                                                                                                                              |
 | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [osu-sharp-design-language](.agents/skills/osu-sharp-design-language/SKILL.md)                         | Creating or reshaping any visible QML element (surfaces, blocks, rows, controls, icons). Enforces the osu!lazer "sharp" visual language: sharp rectangles/geometry on major surfaces, rounded corners only on details. Load before adding any new UI shape.               |
 | [visual-transition-rules](.agents/skills/visual-transition-rules/SKILL.md)                             | Adjusting QML visual styles, colors, radii, opacity, blur, shadows, spacing, scale.                                                                                                                                                                                      |
 | [comment-before-declarations](.agents/skills/comment-before-declarations/SKILL.md)                     | Editing QML modules that should stay self-documenting.                                                                                                                                                                                                                   |
 | [reactive-measurement-layout-debugging](.agents/skills/reactive-measurement-layout-debugging/SKILL.md) | Diagnosing layout bugs where measured, preferred, target, actual, or clipped sizes diverge.                                                                                                                                                                              |
