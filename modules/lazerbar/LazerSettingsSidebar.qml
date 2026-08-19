@@ -73,6 +73,9 @@ Item {
         activeFocusOnTab: root.interactive
         Accessible.role: Accessible.Button
         Accessible.name: root.expanded ? "收起侧栏" : "展开侧栏"
+        readonly property bool flashActive: collapseFlashAnimation.running || collapseFlashOverlay.opacity > 0
+        readonly property Item flashOverlayItem: collapseFlashOverlay
+        readonly property Animation flashAnimationItem: collapseFlashAnimation
 
         scale: collapsePress.pressed ? MotionTokens.pressScale : 1
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
@@ -85,6 +88,17 @@ Item {
             border.width: 0
             border.color: "transparent"
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+
+        // Confirm the sidebar toggle without changing its input boundary.
+        Rectangle {
+            id: collapseFlashOverlay
+            z: 1
+            anchors.fill: collapseSurface
+            radius: collapseSurface.radius
+            color: LazerTheme.textPrimary
+            opacity: 0
+            enabled: false
         }
 
         Image {
@@ -108,12 +122,48 @@ Item {
         TapHandler {
             id: collapsePress
             enabled: collapseButton.enabled
-            onTapped: { collapseButton.forceActiveFocus(); root.collapseToggleRequested() }
+            onTapped: collapseButton.activate()
         }
         Keys.onPressed: event => {
             if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) && collapseButton.enabled) {
-                root.collapseToggleRequested()
+                collapseButton.activate()
                 event.accepted = true
+            }
+        }
+
+        function restartFlash() {
+            if (!collapseButton.enabled || MotionTokens.reducedMotion) {
+                collapseFlashAnimation.stop()
+                collapseFlashOverlay.opacity = 0
+                return
+            }
+            collapseFlashAnimation.restart()
+        }
+
+        function activate() {
+            if (!collapseButton.enabled)
+                return
+            collapseButton.forceActiveFocus()
+            collapseButton.restartFlash()
+            root.collapseToggleRequested()
+        }
+
+        NumberAnimation {
+            id: collapseFlashAnimation
+            target: collapseFlashOverlay
+            property: "opacity"
+            from: MotionTokens.clickFlashOpacity
+            to: 0
+            duration: MotionTokens.clickFlashDuration
+            easing.type: MotionTokens.clickFlashEasing
+            running: false
+        }
+
+        Connections {
+            target: MotionTokens
+            function onReducedMotionChanged() {
+                if (MotionTokens.reducedMotion)
+                    collapseButton.restartFlash()
             }
         }
     }
@@ -178,6 +228,9 @@ Item {
         activeFocusOnTab: root.interactive
         Accessible.role: Accessible.Button
         Accessible.name: "返回"
+        readonly property bool flashActive: backFlashAnimation.running || backFlashOverlay.opacity > 0
+        readonly property Item flashOverlayItem: backFlashOverlay
+        readonly property Animation flashAnimationItem: backFlashAnimation
 
         scale: backPress.pressed ? MotionTokens.pressScale : 1
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
@@ -191,6 +244,17 @@ Item {
             border.width: 0
             border.color: "transparent"
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+
+        // Confirm leaving the settings surface without changing its bounds.
+        Rectangle {
+            id: backFlashOverlay
+            z: 1
+            anchors.fill: backSurface
+            radius: backSurface.radius
+            color: LazerTheme.textPrimary
+            opacity: 0
+            enabled: false
         }
 
         Image {
@@ -213,12 +277,48 @@ Item {
         TapHandler {
             id: backPress
             enabled: backButton.enabled
-            onTapped: { backButton.forceActiveFocus(); root.closeRequested() }
+            onTapped: backButton.activate()
         }
         Keys.onPressed: event => {
             if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) && backButton.enabled) {
-                root.closeRequested()
+                backButton.activate()
                 event.accepted = true
+            }
+        }
+
+        function restartFlash() {
+            if (!backButton.enabled || MotionTokens.reducedMotion) {
+                backFlashAnimation.stop()
+                backFlashOverlay.opacity = 0
+                return
+            }
+            backFlashAnimation.restart()
+        }
+
+        function activate() {
+            if (!backButton.enabled)
+                return
+            backButton.forceActiveFocus()
+            backButton.restartFlash()
+            root.closeRequested()
+        }
+
+        NumberAnimation {
+            id: backFlashAnimation
+            target: backFlashOverlay
+            property: "opacity"
+            from: MotionTokens.clickFlashOpacity
+            to: 0
+            duration: MotionTokens.clickFlashDuration
+            easing.type: MotionTokens.clickFlashEasing
+            running: false
+        }
+
+        Connections {
+            target: MotionTokens
+            function onReducedMotionChanged() {
+                if (MotionTokens.reducedMotion)
+                    backButton.restartFlash()
             }
         }
     }

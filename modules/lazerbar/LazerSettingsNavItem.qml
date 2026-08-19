@@ -15,6 +15,9 @@ Item {
     property string category: "appearance"
     signal activated
     signal moveRequested(int direction)
+    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
+    readonly property Item flashOverlayItem: flashOverlay
+    readonly property Animation flashAnimationItem: flashAnimation
 
     implicitWidth: 184
     implicitHeight: 46
@@ -31,6 +34,18 @@ Item {
         radius: 10
         color: hoverHandler.hovered ? LazerTheme.settingsRowHover : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+    }
+
+    // Confirm category activation without changing the navigation item's bounds.
+    Rectangle {
+        id: flashOverlay
+        z: 1
+        anchors.fill: parent
+        anchors.margins: 2
+        radius: 10
+        color: LazerTheme.textPrimary
+        opacity: 0
+        enabled: false
     }
 
     readonly property alias selectionIndicatorItem: selectionIndicator
@@ -101,14 +116,50 @@ Item {
     TapHandler {
         id: tapHandler
         enabled: root.interactive
-        onTapped: { root.forceActiveFocus(); root.activated() }
+        onTapped: root.activate()
+    }
+
+    function restartFlash() {
+        if (!root.interactive || MotionTokens.reducedMotion) {
+            flashAnimation.stop()
+            flashOverlay.opacity = 0
+            return
+        }
+        flashAnimation.restart()
+    }
+
+    function activate() {
+        if (!root.interactive)
+            return
+        root.forceActiveFocus()
+        root.restartFlash()
+        root.activated()
+    }
+
+    NumberAnimation {
+        id: flashAnimation
+        target: flashOverlay
+        property: "opacity"
+        from: MotionTokens.clickFlashOpacity
+        to: 0
+        duration: MotionTokens.clickFlashDuration
+        easing.type: MotionTokens.clickFlashEasing
+        running: false
+    }
+
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (MotionTokens.reducedMotion)
+                root.restartFlash()
+        }
     }
 
     Keys.onPressed: event => {
         if (!root.interactive)
             return
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-            root.activated()
+            root.activate()
             event.accepted = true
         } else if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
             root.moveRequested(event.key === Qt.Key_Down ? 1 : -1)

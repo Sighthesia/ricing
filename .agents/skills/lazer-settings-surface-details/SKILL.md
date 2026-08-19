@@ -63,6 +63,7 @@ description: 修改 Afloat 的 lazer 设置面板、设置 row、恢复默认按
 - 文本框聚焦、搜索清除、设置导航、全屏导航和关闭动作不使用这套点击闪烁；这些动作保留各自的 focus、press 或空间过渡反馈。
 - 共享点击闪烁参数固定为 `MotionTokens.clickFlashOpacity: 0.3`、`clickFlashDuration: 800` 和 `clickFlashEasing: Easing.OutQuint`；滑条刻度闪烁也必须复用这些 tokens。
 - 点击闪烁层必须暴露为非交互视觉层，测试只通过只读 aliases 检查 `flashActive`、overlay geometry 和 animation timing，不新增生产环境控制入口。
+- 侧栏收起/展开、返回和分类项也复用点击闪烁 tokens；闪烁只覆盖各自侧栏表面，不改变侧栏宽度、分类指示器、展开进度或导航布局。
 - 测试应覆盖：进度填充范围、非交互层、闪烁时长/曲线、重复刻度、恢复默认、连续触发、reduced-motion 和布局尺寸不变。
 
 ## 验证清单

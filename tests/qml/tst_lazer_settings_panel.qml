@@ -173,6 +173,50 @@ Item {
             compare(panel.sidebar.backSurfaceItem.border.width, 0)
         }
 
+        function test_sidebarActionsUseClickFlashWithoutChangingGeometry() {
+            var sidebar = panel.sidebar
+            var collapse = sidebar.collapseButton
+            var back = sidebar.backButton
+            var nav = sidebar.appearanceNav
+
+            collapse.activate()
+            verify(collapse.flashActive)
+            compare(collapse.flashOverlayItem.enabled, false)
+            compare(collapse.flashAnimationItem.duration, Lazer.MotionTokens.clickFlashDuration)
+            collapse.flashAnimationItem.stop()
+            collapse.flashOverlayItem.opacity = 0
+
+            back.activate()
+            verify(back.flashActive)
+            compare(back.flashOverlayItem.enabled, false)
+            back.flashAnimationItem.stop()
+            back.flashOverlayItem.opacity = 0
+
+            nav.activate()
+            verify(nav.flashActive)
+            compare(nav.flashOverlayItem.enabled, false)
+            compare(nav.flashAnimationItem.duration, Lazer.MotionTokens.clickFlashDuration)
+
+            compare(collapse.width, sidebar.width)
+            compare(back.width, sidebar.width)
+        }
+
+        function test_sidebarActionsHideFlashInReducedMotion() {
+            var sidebar = panel.sidebar
+            Lazer.MotionTokens.reducedMotionOverride = true
+
+            sidebar.collapseButton.activate()
+            sidebar.backButton.activate()
+            sidebar.appearanceNav.activate()
+
+            compare(sidebar.collapseButton.flashActive, false)
+            compare(sidebar.backButton.flashActive, false)
+            compare(sidebar.appearanceNav.flashActive, false)
+            compare(sidebar.collapseButton.flashOverlayItem.opacity, 0)
+            compare(sidebar.backButton.flashOverlayItem.opacity, 0)
+            compare(sidebar.appearanceNav.flashOverlayItem.opacity, 0)
+        }
+
         function test_visibleRowsOwnStableCardAndControlGeometry() {
             var page = panel.appearancePage
             var rows = [page.wallpaperRow, page.colorSchemeRow, page.panelOpacityRow,
