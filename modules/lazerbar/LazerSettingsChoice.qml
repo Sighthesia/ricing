@@ -24,6 +24,7 @@ Item {
     readonly property real optionListHeight: menuOpen && effectiveEnabled && model.length > 0
         ? Math.min(LazerTheme.dropdownMaxHeight, model.length * 30 + 18) : 0
     readonly property real menuReservedHeight: optionListHeight
+    readonly property real mainControlHeight: LazerTheme.settingsChoiceHeight
     readonly property Item headerItem: headerSurface
     readonly property Item surfaceItem: headerSurface
     property int preselectIndex: -1

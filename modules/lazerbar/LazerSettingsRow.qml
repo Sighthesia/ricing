@@ -56,16 +56,20 @@ Item {
     readonly property real safeImplicitWidth: controlItem && isFinite(Number(controlItem.implicitWidth))
                                                ? Math.max(0, Number(controlItem.implicitWidth)) : 0
     readonly property real safeControlHeight: controlItem && isFinite(Number(controlItem.height))
-                                               && Number(controlItem.height) > 0
-                                               ? Number(controlItem.height)
-                                               : (controlItem && isFinite(Number(controlItem.implicitHeight))
-                                                  ? Math.max(0, Number(controlItem.implicitHeight)) : 0)
+                                                && Number(controlItem.height) > 0
+                                                ? Number(controlItem.height)
+                                                : (controlItem && isFinite(Number(controlItem.implicitHeight))
+                                                   ? Math.max(0, Number(controlItem.implicitHeight)) : 0)
+    readonly property real safeMainControlHeight: controlItem && controlItem.mainControlHeight !== undefined
+                                                   && isFinite(Number(controlItem.mainControlHeight))
+                                                   ? Math.max(0, Number(controlItem.mainControlHeight))
+                                                   : safeControlHeight
     readonly property real inlineControlWidth: Math.min(Math.max(0, contentHost.width), safeRequestedWidth)
     readonly property real splitControlWidth: Math.min(240, Math.max(0, contentHost.width * 0.55))
     readonly property real cardContentHeight: inlinePresentation ? 44
                                           : (choicePresentation ? safeControlHeight
                                              : (splitPresentation ? 52
-                                                : 10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10))
+                                                 : 10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10))
 
     implicitWidth: 640
     readonly property real textRegionWidth: contentHost.width
@@ -142,7 +146,7 @@ Item {
         property: "availableWidth"
         value: root.inlinePresentation ? root.safeRequestedWidth
               : (root.splitPresentation ? Math.min(240, Math.max(0, contentHost.width * 0.55))
-                 : (root.choicePresentation ? root.width : contentHost.width))
+                 : contentHost.width)
         when: root.controlSupportsAvailableWidth
     }
 
@@ -150,7 +154,7 @@ Item {
     Binding {
         target: root.controlItem
         property: "requestedWidth"
-        value: root.choicePresentation ? root.width : contentHost.width
+        value: contentHost.width
         when: root.controlSupportsFillWidth && root.controlItem.fillWidth
     }
 
@@ -175,7 +179,7 @@ Item {
         x: Math.max(0, root.width - root.revertZoneWidth)
         y: 0
         width: root.revertZoneWidth
-        height: root.height
+        height: root.safeMainControlHeight
         visible: root.revertVisible
         opacity: root.revertVisible ? 1 : 0
         enabled: root.canReset
@@ -186,20 +190,14 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            radius: cardSurface.radius
+            topLeftRadius: 0
+            topRightRadius: cardSurface.radius
+            bottomRightRadius: cardSurface.radius
+            bottomLeftRadius: 0
             color: revertHover.hovered || revertButton.activeFocus ? LazerTheme.settingsResetSurfaceHover : LazerTheme.settingsResetSurface
             border.width: revertButton.activeFocus ? 1 : 0
             border.color: LazerTheme.focusRing
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-        }
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: 1
-            color: LazerTheme.settingsResetDivider
-            opacity: 0.8
         }
 
         Image {
@@ -239,15 +237,13 @@ Item {
     Item {
         id: contentHost
         z: 1
-        x: root.choicePresentation ? 0 : contentPadding
+        x: contentPadding
         y: root.choicePresentation || root.inlinePresentation || root.splitPresentation ? 0 : 10
-        width: Math.max(0, root.choicePresentation
-                        ? root.width - contentPadding - revertZoneWidth
-                        : root.width - 2 * contentPadding - revertZoneWidth)
+        width: Math.max(0, root.width - contentPadding - revertZoneWidth)
         height: root.inlinePresentation ? 44
-                : (root.choicePresentation ? controlHost.height
+                : (root.choicePresentation ? root.safeControlHeight
                    : (root.splitPresentation ? 52
-                      : root.implicitHeight - 20))
+                       : root.implicitHeight - 20))
 
         Text {
             id: labelItem
