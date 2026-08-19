@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
 
-// Own the settings content chrome: search, flat section viewport, and footer.
+// Own the settings content chrome: search and the flat section viewport.
 Item {
     id: root
 
@@ -314,13 +314,13 @@ Item {
         TapHandler { enabled: root.interactive; onTapped: searchEditor.forceActiveFocus() }
     }
 
-    // Scroll the flat section stack between the search field and footer.
+    // Scroll the flat section stack below the search field.
     Item {
         id: viewport
         x: 0
         y: searchArea.height
         width: root.width
-        height: Math.max(0, root.height - searchArea.height - footer.height)
+        height: Math.max(0, root.height - searchArea.height)
         clip: true
     }
 
@@ -363,15 +363,6 @@ Item {
                 font.pixelSize: 12
             }
         }
-    }
-
-    // Close the content with static info and the keyboard hint.
-    Item {
-        id: footer
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: 44
     }
 
     // Keep compatibility items inert; Choice menus now live inside their Rows.

@@ -57,11 +57,11 @@ Item {
         color: LazerTheme.settingsRail
     }
 
-    // Provide the manual 70/170px collapse toggle above the nav entries.
+    // Provide the manual collapse toggle in the bottom action slot.
     Item {
         id: collapseButton
         x: root.expanded ? 12 : 0
-        y: 10
+        y: root.height - height - 12
         width: root.expanded ? 40 : root.width
         height: 40
         enabled: root.interactive
@@ -161,14 +161,13 @@ Item {
         }
     }
 
-    // Provide the osu back affordance anchored at the sidebar bottom.
+    // Provide the back affordance in the top action slot.
     Item {
         id: backButton
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 12
-        height: 44
+        x: root.expanded ? 12 : 0
+        y: 10
+        width: root.expanded ? 40 : root.width
+        height: 40
         enabled: root.interactive
         activeFocusOnTab: root.interactive
         Accessible.role: Accessible.Button
@@ -189,9 +188,7 @@ Item {
 
         Image {
             id: backIcon
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 4
+            anchors.centerIn: parent
             width: 16
             height: 16
             source: "icons/chevron-left.svg"
