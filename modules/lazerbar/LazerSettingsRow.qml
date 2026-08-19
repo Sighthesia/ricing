@@ -117,6 +117,7 @@ Item {
         border.width: root.rowHighlighted ? 1.5 : 0
         border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
 
@@ -136,6 +137,7 @@ Item {
         border.width: root.controlItem && root.controlItem.activeFocus ? 1.5 : 0
         border.color: root.controlItem && root.controlItem.activeFocus ? LazerTheme.settingsAccent : "transparent"
         enabled: false
+        Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         Behavior on border.width { NumberAnimation { duration: 100 } }
         Behavior on border.color { ColorAnimation { duration: 100 } }
     }
@@ -188,7 +190,7 @@ Item {
         y: 0
         width: root.revertZoneWidth
         height: root.choicePresentation ? root.safeMainControlHeight : root.height
-        visible: root.revertVisible
+        visible: root.revertVisible || opacity > 0
         opacity: root.revertVisible ? 1 : 0
         enabled: root.canReset
         activeFocusOnTab: root.canReset
@@ -248,7 +250,7 @@ Item {
         x: root.choicePresentation ? 0 : contentPadding
         y: root.choicePresentation || root.inlinePresentation || root.splitPresentation ? 0 : 10
         width: Math.max(0, root.width - (root.choicePresentation
-                                        ? revertZoneWidth
+                                        ? (root.revertVisible ? revertZoneWidth : 0)
                                         : contentPadding + root.revertContentGap + revertZoneWidth))
         height: root.inlinePresentation ? 44
                 : (root.choicePresentation ? root.safeControlHeight
