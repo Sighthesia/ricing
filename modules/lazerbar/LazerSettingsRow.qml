@@ -179,7 +179,7 @@ Item {
         x: Math.max(0, root.width - root.revertZoneWidth)
         y: 0
         width: root.revertZoneWidth
-        height: root.safeMainControlHeight
+        height: root.choicePresentation ? root.safeMainControlHeight : root.height
         visible: root.revertVisible
         opacity: root.revertVisible ? 1 : 0
         enabled: root.canReset
@@ -237,9 +237,9 @@ Item {
     Item {
         id: contentHost
         z: 1
-        x: contentPadding
+        x: root.choicePresentation ? 0 : contentPadding
         y: root.choicePresentation || root.inlinePresentation || root.splitPresentation ? 0 : 10
-        width: Math.max(0, root.width - contentPadding - revertZoneWidth)
+        width: Math.max(0, root.width - (root.choicePresentation ? revertZoneWidth : contentPadding + revertZoneWidth))
         height: root.inlinePresentation ? 44
                 : (root.choicePresentation ? root.safeControlHeight
                    : (root.splitPresentation ? 52
