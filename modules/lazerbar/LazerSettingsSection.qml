@@ -11,9 +11,11 @@ Item {
     property string searchQuery: ""
     property bool sectionActive: true
     property bool interactive: true
-    readonly property bool sectionHovered: dimArea.hovered === true
+    readonly property bool sectionHovered: dimArea.containsMouse === true
     readonly property int visibleResultCount: _countVisibleRows()
     readonly property bool hasVisibleContent: visibleResultCount > 0
+    readonly property Item dimItem: dim
+    readonly property Item dimAreaItem: dimArea
 
     // Rows are injected as the section content and laid out in one column.
     default property alias content: contentColumn.data

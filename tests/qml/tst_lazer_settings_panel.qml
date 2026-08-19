@@ -352,6 +352,21 @@ Item {
             Lazer.MotionTokens.reducedMotionOverride = false
         }
 
+        function test_dimmedSectionHoverUsesLighterOverlay() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            panel.selectCategory("bar")
+            var dimmed = panel.notificationPage
+            verify(!dimmed.sectionActive)
+            verify(dimmed.dimAreaItem !== undefined)
+            movePointerTo(dimmed)
+            tryVerify(function() { return dimmed.sectionHovered }, 200)
+            compare(dimmed.dimItem.opacity, 0.5)
+            movePointerAway()
+            tryVerify(function() { return !dimmed.sectionHovered }, 200)
+            compare(dimmed.dimItem.opacity, 0.8)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
+
         function test_ownedStringContractAndInvalidDirectAssignmentRecovery() {
             panel.selectCategory("notifications")
             compare(panel.selectedIndex, 2)
