@@ -14,8 +14,6 @@ Item {
     property var labels: ["外观", "顶部栏", "通知"]
     property var icons: ["icons/settings.svg", "icons/podium.svg", "icons/bell.svg"]
     readonly property bool showLabels: root.expanded && root.width >= Logic.sidebarContractedWidth + 60
-    readonly property real actionSurfaceWidth: 40
-    readonly property real actionSurfaceX: (root.width - root.actionSurfaceWidth) / 2
     property alias collapseButton: collapseButton
     property alias backButton: backButton
     property alias collapseSurfaceItem: collapseSurface
@@ -81,10 +79,8 @@ Item {
 
         Rectangle {
             id: collapseSurface
-            x: root.actionSurfaceX
-            width: root.actionSurfaceWidth
-            height: parent.height
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.fill: parent
+            radius: 12
             color: collapseHover.hovered ? LazerTheme.settingsRowHover : "transparent"
             border.width: 0
             border.color: "transparent"
@@ -188,10 +184,9 @@ Item {
 
         Rectangle {
             id: backSurface
-            x: root.actionSurfaceX
-            width: root.actionSurfaceWidth
-            height: parent.height
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.fill: parent
+            anchors.margins: 2
+            radius: 12
             color: backHover.hovered ? LazerTheme.settingsRowHover : "transparent"
             border.width: 0
             border.color: "transparent"
