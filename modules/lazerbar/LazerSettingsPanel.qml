@@ -126,6 +126,11 @@ Item {
             sectionsItem.scrollTo(root.selectedIndex)
             return
         }
+        var maximumY = Math.max(0, sectionsItem.contentHeight - sectionsItem.height)
+        if (maximumY > 0 && sectionsItem.contentY >= maximumY - 0.5 && category !== "notifications")
+            sectionsItem.bottomBoundarySuppressed = true
+        else if (category === "notifications")
+            sectionsItem.bottomBoundarySuppressed = false
         root.selectedCategory = category
         categoryChanged(category)
     }
@@ -174,15 +179,21 @@ Item {
             root.selectedCategory = "appearance"
             return
         }
+        if (selectedCategory === "notifications")
+            sectionsItem.bottomBoundarySuppressed = false
         sectionsItem.scrollTo(index)
     }
 
     Connections {
         target: sectionsItem
         function onCurrentIndexChanged() {
+            if (sectionsItem.dropdownOpen)
+                return
             var index = sectionsItem.currentIndex
             var category = root.categoryAt(index)
             if (category !== root.selectedCategory) {
+                if (category === "notifications")
+                    sectionsItem.bottomBoundarySuppressed = false
                 root._syncingCategory = true
                 root.selectedCategory = category
                 root._syncingCategory = false
@@ -236,6 +247,7 @@ Item {
             height: parent.height
             interactive: root.interactive
             searchQuery: root.searchQuery
+            dropdownOpen: contentLayer.dropdownOpen
 
             LazerSettingsAppearance {
                 id: appearanceSection

@@ -395,7 +395,7 @@ Item {
             var origin = choice.mapToItem(root, 0, 0)
             if (point.x < origin.x || point.x > origin.x + choice.width
                     || point.y < origin.y || point.y > origin.y + choice.height)
-                choice.closeMenu()
+                root.closeOpenChoice()
         }
     }
 }

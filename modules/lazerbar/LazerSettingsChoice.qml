@@ -30,6 +30,7 @@ Item {
     readonly property bool flashActive: headerFlashAnimation.running || headerFlashOverlay.opacity > 0
     readonly property Item flashOverlayItem: headerFlashOverlay
     readonly property Animation flashAnimationItem: headerFlashAnimation
+    readonly property alias chevronItem: chevron
     property int preselectIndex: -1
     signal valueSelected(string value)
 
@@ -229,7 +230,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: 16
             height: 16
-            source: "icons/chevron-down.svg"
+            source: root.menuOpen ? "icons/chevron-up.svg" : "icons/chevron-down.svg"
             fillMode: Image.PreserveAspectFit
         }
         MultiEffect {

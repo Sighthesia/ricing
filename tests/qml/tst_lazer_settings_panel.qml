@@ -474,6 +474,51 @@ Item {
             compare(closeSpy.count, 1)
         }
 
+        function test_bottomBoundaryAllowsPreviousCategoryUntilScrollingDownAgain() {
+            panel.selectCategory("notifications")
+            tryCompare(panel, "selectedCategory", "notifications", 300)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height)
+            wait(0)
+            mouseClick(panel.barNav, panel.barNav.width / 2, panel.barNav.height / 2)
+            tryCompare(panel, "selectedCategory", "bar", 300)
+            tryVerify(function() { return panel.barNav.activeFocus }, 200)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height - 1)
+            wait(0)
+            compare(panel.selectedCategory, "bar")
+            compare(panel.sections.currentIndex, 1)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height + 1)
+            wait(0)
+            compare(panel.selectedCategory, "notifications")
+            compare(panel.sections.currentIndex, 2)
+        }
+
+        function test_bottomNotificationClickDoesNotBounceBackToBar() {
+            panel.selectCategory("notifications")
+            tryCompare(panel, "selectedCategory", "notifications", 300)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height)
+            wait(0)
+            mouseClick(panel.notificationNav, panel.notificationNav.width / 2, panel.notificationNav.height / 2)
+            tryCompare(panel, "selectedCategory", "notifications", 300)
+            tryVerify(function() { return panel.notificationNav.activeFocus }, 200)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height + 1)
+            wait(0)
+            compare(panel.selectedCategory, "notifications")
+            compare(panel.sections.currentIndex, 2)
+        }
+
+        function test_bottomBarClickRestoresNotificationsOnDownwardScroll() {
+            panel.selectCategory("notifications")
+            tryCompare(panel, "selectedCategory", "notifications", 300)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height)
+            wait(0)
+            mouseClick(panel.barNav, panel.barNav.width / 2, panel.barNav.height / 2)
+            tryCompare(panel, "selectedCategory", "bar", 300)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height + 1)
+            wait(0)
+            compare(panel.selectedCategory, "notifications")
+            compare(panel.sections.currentIndex, 2)
+        }
+
         function test_rowHighlightsOnHoverNotFocus() {
             var row = panel.appearancePage.panelOpacityRow
             var slider = panel.appearancePage.panelOpacitySlider
@@ -542,6 +587,21 @@ Item {
             compare(barSettings.position, "bottom")
             verify(!panel.content.dropdownVisible)
             verify(!choice.menuOpen)
+            panel.contentReady = false
+        }
+
+        function test_bottomDropdownDoesNotBounceToPreviousCategoryWhileOpen() {
+            panel.contentReady = true
+            panel.selectCategory("notifications")
+            tryCompare(panel, "selectedCategory", "notifications", 300)
+            var choice = panel.notificationPage.positionChoice
+            choice.openMenu()
+            verify(panel.content.dropdownVisible)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height)
+            wait(0)
+            compare(panel.selectedCategory, "notifications")
+            verify(panel.notificationPage.sectionActive)
+            choice.closeMenu()
             panel.contentReady = false
         }
 

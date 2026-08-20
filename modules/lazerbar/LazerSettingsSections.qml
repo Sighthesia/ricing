@@ -8,6 +8,9 @@ Flickable {
     property bool interactive: true
     property string searchQuery: ""
     property int currentIndex: 0
+    property bool dropdownOpen: false
+    property bool bottomBoundarySuppressed: false
+    property real _lastContentY: 0
     readonly property int sectionCount: column.children.length
     readonly property int totalVisibleResultCount: _sumVisible()
 
@@ -62,14 +65,19 @@ Flickable {
     function recomputeCurrent() {
         if (root._syncingScroll)
             return
+        if (root.dropdownOpen)
+            return
         var children = column.children
         var maximumY = Math.max(0, root.contentHeight - root.height)
+        var movedDown = root.contentY > root._lastContentY + 0.5
+        if (root.bottomBoundarySuppressed && movedDown)
+            root.bottomBoundarySuppressed = false
         var center = root.contentY + root.height / 2
         var found = -1
 
         // At the lower bound the viewport center may still be above a short
         // final section. Treat the boundary as an explicit final-section cue.
-        if (maximumY > 0 && root.contentY >= maximumY - 0.5) {
+        if (maximumY > 0 && root.contentY >= maximumY - 0.5 && !root.bottomBoundarySuppressed) {
             for (var last = children.length - 1; last >= 0; last--) {
                 if (children[last].visible !== false && children[last].height > 0) {
                     found = last
@@ -90,6 +98,7 @@ Flickable {
         }
         if (found >= 0 && found !== root.currentIndex)
             root.currentIndex = found
+        root._lastContentY = root.contentY
     }
 
     // Scroll the target section near the viewport center with an eased motion.
