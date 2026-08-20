@@ -83,6 +83,7 @@ Item {
         if (!root.effectiveEnabled || model.length === 0)
             return
         if (root.menuOpen) {
+            root.restartHeaderFlash()
             root.closeMenu()
             return
         }

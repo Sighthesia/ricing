@@ -84,6 +84,16 @@ Item {
             compare(state.count, 1)
         }
 
+        function test_togglingOpenChoiceClosesWithFlash() {
+            choice.openMenu()
+            verify(choice.menuOpen)
+            choice.flashAnimationItem.stop()
+            choice.flashOverlayItem.opacity = 0
+            choice.openMenu()
+            compare(choice.menuOpen, false)
+            verify(choice.flashActive)
+        }
+
         function test_commonControlsFlashAfterAcceptedAction() {
             iconButton.activate()
             verify(iconButton.flashActive)
