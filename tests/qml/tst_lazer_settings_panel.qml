@@ -514,7 +514,7 @@ Item {
             compare(panel.selectedCategory, "bar")
             compare(panel.sections.currentIndex, 1)
             mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
-            wait(0)
+            tryVerify(function() { return !panel.sections.wheelAnimationActive }, 600)
             compare(panel.selectedCategory, "notifications")
             compare(panel.sections.currentIndex, 2)
         }
@@ -547,6 +547,28 @@ Item {
             wait(0)
             compare(panel.selectedCategory, "notifications")
             compare(panel.sections.currentIndex, 2)
+        }
+
+        function test_wheelOverscrollsAndReboundsAtTop() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            panel.sections.resetScrollState()
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, 120)
+            tryVerify(function() { return panel.sections.wheelOverscrolling }, 200)
+            tryVerify(function() { return !panel.sections.wheelAnimationActive }, 600)
+            compare(panel.sections.contentY, 0)
+            verify(!panel.sections.wheelOverscrolling)
+        }
+
+        function test_wheelOverscrollsAndReboundsAtBottom() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            var maximumY = Math.max(0, panel.sections.contentHeight - panel.sections.height)
+            panel.sections.contentY = maximumY
+            wait(0)
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+            tryVerify(function() { return panel.sections.wheelOverscrolling }, 200)
+            tryVerify(function() { return !panel.sections.wheelAnimationActive }, 600)
+            compare(panel.sections.contentY, maximumY)
+            verify(!panel.sections.wheelOverscrolling)
         }
 
         function test_rowHighlightsOnHoverNotFocus() {

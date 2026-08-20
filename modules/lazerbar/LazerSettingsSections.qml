@@ -13,6 +13,12 @@ Flickable {
     property real _lastContentY: 0
     property int _programmaticTargetIndex: -1
     property bool _ignoreScrollStopped: false
+    property bool _ignoreWheelStopped: false
+    property int _wheelAnimationPhase: 0
+    property real _wheelReturnTarget: 0
+    readonly property real overscrollDistance: 48
+    readonly property bool wheelAnimationActive: _wheelAnimationPhase !== 0
+    readonly property bool wheelOverscrolling: contentY < 0 || contentY > Math.max(0, contentHeight - height)
     readonly property int sectionCount: column.children.length
     readonly property int totalVisibleResultCount: _sumVisible()
 
@@ -22,7 +28,7 @@ Flickable {
     contentWidth: width
     contentHeight: _totalContentHeight()
     clip: true
-    boundsBehavior: Flickable.StopAtBounds
+    boundsBehavior: Flickable.DragAndOvershootBounds
     flickDeceleration: 2000
 
     property bool _syncingScroll: false
@@ -69,10 +75,31 @@ Flickable {
         root._programmaticTargetIndex = -1
     }
 
+    function _stopWheelAnimation() {
+        if (!wheelTravel.running && !wheelReturn.running && root._wheelAnimationPhase === 0)
+            return
+        root._ignoreWheelStopped = true
+        wheelTravel.stop()
+        wheelReturn.stop()
+        root._ignoreWheelStopped = false
+        root._wheelAnimationPhase = 0
+    }
+
+    function _animateWheelTo(target, returnTarget) {
+        root._stopWheelAnimation()
+        root._wheelReturnTarget = returnTarget
+        wheelTravel.from = root.contentY
+        wheelTravel.to = target
+        wheelTravel.duration = MotionTokens.reducedMotion ? 0 : 140
+        root._wheelAnimationPhase = 1
+        wheelTravel.start()
+    }
+
     function resetScrollState() {
         root._ignoreScrollStopped = true
         scrollAnim.stop()
         root._ignoreScrollStopped = false
+        root._stopWheelAnimation()
         root._syncingScroll = false
         root._programmaticTargetIndex = -1
         root.bottomBoundarySuppressed = false
@@ -97,6 +124,8 @@ Flickable {
 
     function recomputeCurrent() {
         if (root._syncingScroll)
+            return
+        if (root._wheelAnimationPhase !== 0)
             return
         if (root.dropdownOpen)
             return
@@ -153,16 +182,21 @@ Flickable {
             var delta = wheel.pixelDelta.y
             if (delta === 0)
                 delta = wheel.angleDelta.y / 120 * 40
-            var nextContentY = Math.max(0, Math.min(maximumY, root.contentY - delta))
-            if (nextContentY !== root.contentY)
-                root.contentY = nextContentY
+            if (delta === 0)
+                return
+            root._stopWheelAnimation()
+            var requestedY = root.contentY - delta
+            var nextContentY = Math.max(-root.overscrollDistance,
+                                        Math.min(maximumY + root.overscrollDistance, requestedY))
+            var returnTarget = Math.max(0, Math.min(maximumY, nextContentY))
             if (scrollingDown && root.bottomBoundarySuppressed
-                    && root.contentY >= maximumY - 0.5) {
+                    && (root.contentY >= maximumY - 0.5 || nextContentY > maximumY)) {
                 root.bottomBoundarySuppressed = false
                 var lastIndex = root._lastVisibleSectionIndex()
                 if (lastIndex >= 0)
                     root.currentIndex = lastIndex
             }
+            root._animateWheelTo(nextContentY, returnTarget)
         }
     }
 
@@ -174,6 +208,8 @@ Flickable {
         var child = children[index]
         if (!child || child.visible === false || child.height <= 0)
             return
+        root._stopWheelAnimation()
+        root.contentY = Math.max(0, Math.min(Math.max(0, root.contentHeight - root.height), root.contentY))
         var target = child.y - Math.max(0, (root.height - child.height) / 2)
         var maximumY = Math.max(0, root.contentHeight - root.height)
         target = Math.max(0, Math.min(maximumY, target))
@@ -216,6 +252,38 @@ Flickable {
             root.currentIndex = root._programmaticTargetIndex >= 0
                     ? root._programmaticTargetIndex : root.currentIndex
             root._programmaticTargetIndex = -1
+            root.recomputeCurrent()
+        }
+    }
+
+    // Animate wheel travel first, then settle any edge overshoot.
+    NumberAnimation {
+        id: wheelTravel
+        target: root
+        property: "contentY"
+        easing.type: Easing.OutQuint
+        onStopped: {
+            if (root._ignoreWheelStopped || root._wheelAnimationPhase !== 1)
+                return
+            wheelReturn.from = root.contentY
+            wheelReturn.to = root._wheelReturnTarget
+            wheelReturn.duration = MotionTokens.reducedMotion ? 0 : 220
+            root._wheelAnimationPhase = 2
+            wheelReturn.start()
+        }
+    }
+
+    NumberAnimation {
+        id: wheelReturn
+        target: root
+        property: "contentY"
+        easing.type: Easing.OutBack
+        onStopped: {
+            if (root._ignoreWheelStopped || root._wheelAnimationPhase !== 2)
+                return
+            root._wheelAnimationPhase = 0
+            root.contentY = root._wheelReturnTarget
+            root._lastContentY = root.contentY
             root.recomputeCurrent()
         }
     }
