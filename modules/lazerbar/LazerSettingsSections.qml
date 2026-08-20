@@ -48,6 +48,15 @@ Flickable {
         return total
     }
 
+    function _lastVisibleSectionIndex() {
+        var children = column.children
+        for (var i = children.length - 1; i >= 0; i--) {
+            if (children[i].visible !== false && children[i].height > 0)
+                return i
+        }
+        return -1
+    }
+
     // Forward the shared query and the browsed-section state to every section.
     function syncSections() {
         var children = column.children
@@ -99,6 +108,24 @@ Flickable {
         if (found >= 0 && found !== root.currentIndex)
             root.currentIndex = found
         root._lastContentY = root.contentY
+    }
+
+    WheelHandler {
+        orientation: Qt.Vertical
+        target: null
+        blocking: false
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: wheel => {
+            var scrollingDown = wheel.angleDelta.y < 0 || wheel.pixelDelta.y < 0
+            var maximumY = Math.max(0, root.contentHeight - root.height)
+            if (scrollingDown && root.bottomBoundarySuppressed
+                    && root.contentY >= maximumY - 0.5) {
+                root.bottomBoundarySuppressed = false
+                var lastIndex = root._lastVisibleSectionIndex()
+                if (lastIndex >= 0)
+                    root.currentIndex = lastIndex
+            }
+        }
     }
 
     // Scroll the target section near the viewport center with an eased motion.

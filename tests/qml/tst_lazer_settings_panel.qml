@@ -135,8 +135,22 @@ Item {
             verify(!panel.notificationNav.selected)
             compare(panel.appearanceNav.selectionIndicatorItem.height, 24)
             compare(panel.appearanceNav.selectionIndicatorItem.color, Lazer.LazerTheme.settingsAccent)
-            compare(panel.barNav.selectionIndicatorItem.height, 0)
+            compare(panel.appearanceNav.selectionIndicatorItem,
+                    panel.barNav.selectionIndicatorItem)
+            compare(panel.barNav.selectionIndicatorItem,
+                    panel.notificationNav.selectionIndicatorItem)
             compare(panel.barNav.labelItem.color, Lazer.LazerTheme.settingsNavInactive)
+        }
+
+        function test_sidebarIndicatorMovesAsOneContinuousSurface() {
+            var indicator = panel.sidebar.selectionIndicator
+            var appearanceY = indicator.y
+            panel.selectCategory("notifications")
+            tryCompare(panel, "selectedIndex", 2, 300)
+            tryVerify(function() { return indicator.y !== appearanceY }, 500)
+            verify(indicator.y > appearanceY)
+            compare(panel.appearanceNav.selectionIndicatorItem, indicator)
+            compare(panel.notificationNav.selectionIndicatorItem, indicator)
         }
 
         function test_contentChromeUsesSingleTitleAndBorderlessSearchSurface() {
@@ -513,7 +527,7 @@ Item {
             wait(0)
             mouseClick(panel.barNav, panel.barNav.width / 2, panel.barNav.height / 2)
             tryCompare(panel, "selectedCategory", "bar", 300)
-            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height + 1)
+            wheel(panel.sections, 0, -120)
             wait(0)
             compare(panel.selectedCategory, "notifications")
             compare(panel.sections.currentIndex, 2)

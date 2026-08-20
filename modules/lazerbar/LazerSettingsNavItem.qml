@@ -12,6 +12,7 @@ Item {
     property bool expanded: true
     property real expansionProgress: expanded ? 1 : 0
     property real appearOpacity: 1
+    property Item sharedSelectionIndicator: null
     property string category: "appearance"
     signal activated
     signal moveRequested(int direction)
@@ -48,7 +49,7 @@ Item {
         enabled: false
     }
 
-    readonly property alias selectionIndicatorItem: selectionIndicator
+    readonly property Item selectionIndicatorItem: root.sharedSelectionIndicator || selectionIndicator
     readonly property alias labelItem: labelText
 
     // Show the category icon at osu's left margin, centered when contracted.
@@ -93,6 +94,7 @@ Item {
     // Show an accent pill only for the selected category.
     Rectangle {
         id: selectionIndicator
+        visible: false
         x: 4 + 5 * root.expansionProgress
         anchors.verticalCenter: parent.verticalCenter
         width: 4

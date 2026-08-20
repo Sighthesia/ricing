@@ -14,6 +14,7 @@ Item {
     property var labels: ["外观", "顶部栏", "通知"]
     property var icons: ["icons/settings.svg", "icons/podium.svg", "icons/bell.svg"]
     readonly property bool showLabels: root.expanded && root.width >= Logic.sidebarContractedWidth + 60
+    readonly property real indicatorY: 62 + root.selectedIndex * (46 + 4) + 23
     property alias collapseButton: collapseButton
     property alias backButton: backButton
     property alias collapseSurfaceItem: collapseSurface
@@ -23,6 +24,7 @@ Item {
     property alias appearanceNav: appearanceNav
     property alias barNav: barNav
     property alias notificationNav: notificationNav
+    property alias selectionIndicator: selectionIndicator
 
     signal categorySelected(int index)
     signal moveRequested(int direction)
@@ -60,6 +62,31 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: LazerTheme.settingsRail
+    }
+
+    // Move one shared accent strip between category entries.
+    Rectangle {
+        id: selectionIndicator
+        x: 10 + 4 + 5 * root.expansionProgress
+        y: root.indicatorY - height / 2
+        width: 4
+        height: 24
+        radius: 2
+        color: LazerTheme.settingsAccent
+        opacity: root.sessionActive ? 1 : 0
+
+        Behavior on x {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
+        }
+        Behavior on y {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
+        }
+        Behavior on opacity {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
+        }
     }
 
     // Provide the manual collapse toggle in the bottom action slot.
@@ -185,6 +212,7 @@ Item {
             selected: root.selectedIndex === 0
             interactive: root.interactive
             expansionProgress: root.expansionProgress
+            sharedSelectionIndicator: root.selectionIndicator
             appearOpacity: 0
             onActivated: root.categorySelected(0)
             onMoveRequested: direction => root.moveRequested(direction)
@@ -198,6 +226,7 @@ Item {
             selected: root.selectedIndex === 1
             interactive: root.interactive
             expansionProgress: root.expansionProgress
+            sharedSelectionIndicator: root.selectionIndicator
             appearOpacity: 0
             onActivated: root.categorySelected(1)
             onMoveRequested: direction => root.moveRequested(direction)
@@ -211,6 +240,7 @@ Item {
             selected: root.selectedIndex === 2
             interactive: root.interactive
             expansionProgress: root.expansionProgress
+            sharedSelectionIndicator: root.selectionIndicator
             appearOpacity: 0
             onActivated: root.categorySelected(2)
             onMoveRequested: direction => root.moveRequested(direction)
