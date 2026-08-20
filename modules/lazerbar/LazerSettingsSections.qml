@@ -15,8 +15,9 @@ Flickable {
     property bool _ignoreScrollStopped: false
     property bool _ignoreWheelStopped: false
     property int _wheelAnimationPhase: 0
+    property real _wheelTargetY: 0
     property real _wheelReturnTarget: 0
-    readonly property real overscrollDistance: 48
+    readonly property real overscrollDistance: 88
     readonly property bool wheelAnimationActive: _wheelAnimationPhase !== 0
     readonly property bool wheelOverscrolling: contentY < 0 || contentY > Math.max(0, contentHeight - height)
     readonly property int sectionCount: column.children.length
@@ -28,8 +29,7 @@ Flickable {
     contentWidth: width
     contentHeight: _totalContentHeight()
     clip: true
-    boundsBehavior: Flickable.DragAndOvershootBounds
-    flickDeceleration: 2000
+    boundsBehavior: Flickable.StopAtBounds
 
     property bool _syncingScroll: false
 
@@ -76,23 +76,28 @@ Flickable {
     }
 
     function _stopWheelAnimation() {
-        if (!wheelTravel.running && !wheelReturn.running && root._wheelAnimationPhase === 0)
+        wheelSettleTimer.stop()
+        wheelFrameTimer.stop()
+        if (!wheelReturn.running && root._wheelAnimationPhase === 0)
             return
         root._ignoreWheelStopped = true
-        wheelTravel.stop()
         wheelReturn.stop()
-        root._ignoreWheelStopped = false
         root._wheelAnimationPhase = 0
+        root._ignoreWheelStopped = false
     }
 
     function _animateWheelTo(target, returnTarget) {
-        root._stopWheelAnimation()
-        root._wheelReturnTarget = returnTarget
-        wheelTravel.from = root.contentY
-        wheelTravel.to = target
-        wheelTravel.duration = MotionTokens.reducedMotion ? 0 : 140
+        var wasReturning = root._wheelAnimationPhase === 2
         root._wheelAnimationPhase = 1
-        wheelTravel.start()
+        root._wheelTargetY = target
+        root._wheelReturnTarget = returnTarget
+        wheelSettleTimer.restart()
+        if (wasReturning) {
+            root._ignoreWheelStopped = true
+            wheelReturn.stop()
+            root._ignoreWheelStopped = false
+        }
+        wheelFrameTimer.start()
     }
 
     function resetScrollState() {
@@ -184,8 +189,8 @@ Flickable {
                 delta = wheel.angleDelta.y / 120 * 40
             if (delta === 0)
                 return
-            root._stopWheelAnimation()
-            var requestedY = root.contentY - delta
+            var baseY = root._wheelAnimationPhase === 1 ? root._wheelTargetY : root.contentY
+            var requestedY = baseY - delta
             var nextContentY = Math.max(-root.overscrollDistance,
                                         Math.min(maximumY + root.overscrollDistance, requestedY))
             var returnTarget = Math.max(0, Math.min(maximumY, nextContentY))
@@ -244,7 +249,7 @@ Flickable {
         target: root
         property: "contentY"
         duration: 300
-        easing.type: Easing.OutQuint
+        easing.type: Easing.InOutCubic
         onStopped: {
             if (root._ignoreScrollStopped)
                 return
@@ -256,28 +261,11 @@ Flickable {
         }
     }
 
-    // Animate wheel travel first, then settle any edge overshoot.
-    NumberAnimation {
-        id: wheelTravel
-        target: root
-        property: "contentY"
-        easing.type: Easing.OutQuint
-        onStopped: {
-            if (root._ignoreWheelStopped || root._wheelAnimationPhase !== 1)
-                return
-            wheelReturn.from = root.contentY
-            wheelReturn.to = root._wheelReturnTarget
-            wheelReturn.duration = MotionTokens.reducedMotion ? 0 : 220
-            root._wheelAnimationPhase = 2
-            wheelReturn.start()
-        }
-    }
-
     NumberAnimation {
         id: wheelReturn
         target: root
         property: "contentY"
-        easing.type: Easing.OutBack
+        easing.type: Easing.InOutCubic
         onStopped: {
             if (root._ignoreWheelStopped || root._wheelAnimationPhase !== 2)
                 return
@@ -285,6 +273,45 @@ Flickable {
             root.contentY = root._wheelReturnTarget
             root._lastContentY = root.contentY
             root.recomputeCurrent()
+        }
+    }
+
+    // Retarget the current position every frame without restarting an animation.
+    Timer {
+        id: wheelFrameTimer
+        interval: 16
+        repeat: true
+        onTriggered: {
+            if (root._wheelAnimationPhase !== 1)
+                return
+            var distance = root._wheelTargetY - root.contentY
+            if (Math.abs(distance) < 0.5) {
+                root.contentY = root._wheelTargetY
+                stop()
+                wheelSettleTimer.restart()
+                return
+            }
+            var follow = MotionTokens.reducedMotion ? 1 : 0.32
+            root.contentY += distance * follow
+        }
+    }
+
+    // Hold the edge position briefly so closely spaced wheel ticks stay one motion.
+    Timer {
+        id: wheelSettleTimer
+        interval: MotionTokens.reducedMotion ? 0 : 120
+        repeat: false
+        onTriggered: {
+            if (root._wheelAnimationPhase !== 1)
+                return
+            root._ignoreWheelStopped = true
+            wheelFrameTimer.stop()
+            root._ignoreWheelStopped = false
+            root._wheelAnimationPhase = 2
+            wheelReturn.from = root.contentY
+            wheelReturn.to = root._wheelReturnTarget
+            wheelReturn.duration = MotionTokens.reducedMotion ? 0 : 340
+            wheelReturn.start()
         }
     }
 }

@@ -553,8 +553,8 @@ Item {
             Lazer.MotionTokens.reducedMotionOverride = false
             panel.sections.resetScrollState()
             mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, 120)
-            tryVerify(function() { return panel.sections.wheelOverscrolling }, 200)
-            tryVerify(function() { return !panel.sections.wheelAnimationActive }, 600)
+            tryVerify(function() { return panel.sections.wheelOverscrolling }, 350)
+            tryVerify(function() { return !panel.sections.wheelAnimationActive }, 700)
             compare(panel.sections.contentY, 0)
             verify(!panel.sections.wheelOverscrolling)
         }
@@ -565,10 +565,51 @@ Item {
             panel.sections.contentY = maximumY
             wait(0)
             mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
-            tryVerify(function() { return panel.sections.wheelOverscrolling }, 200)
-            tryVerify(function() { return !panel.sections.wheelAnimationActive }, 600)
+            tryVerify(function() { return panel.sections.wheelOverscrolling }, 350)
+            tryVerify(function() { return !panel.sections.wheelAnimationActive }, 700)
             compare(panel.sections.contentY, maximumY)
             verify(!panel.sections.wheelOverscrolling)
+        }
+
+        function test_continuousWheelInputAccumulatesWithoutRestartingMotion() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            panel.sections.resetScrollState()
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+            tryVerify(function() { return panel.sections.wheelAnimationActive }, 100)
+            var firstTarget = panel.sections._wheelTargetY
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+            verify(panel.sections._wheelTargetY > firstTarget)
+            tryVerify(function() { return !panel.sections.wheelAnimationActive }, 900)
+            verify(panel.sections.contentY > firstTarget)
+        }
+
+        function test_continuousWheelInputDoesNotEnterReboundBetweenTicks() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            panel.sections.resetScrollState()
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+            tryVerify(function() { return panel.sections.wheelAnimationActive }, 100)
+            wait(80)
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+            compare(panel.sections._wheelAnimationPhase, 1)
+            verify(panel.sections._wheelTargetY > panel.sections.contentY)
+        }
+
+        function test_rapidWheelBurstKeepsMovingWhileInputContinues() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            panel.sections.resetScrollState()
+            panel.sections.contentY = Math.max(0, (panel.sections.contentHeight - panel.sections.height) / 2)
+            wait(0)
+            var startY = panel.sections.contentY
+            for (var i = 0; i < 20; i++) {
+                mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+                wait(0)
+            }
+            var targetY = panel.sections._wheelTargetY
+            verify(targetY - startY >= 400)
+            verify(panel.sections._wheelAnimationPhase === 1)
+            wait(120)
+            verify(panel.sections.contentY - startY >= 250)
         }
 
         function test_rowHighlightsOnHoverNotFocus() {
