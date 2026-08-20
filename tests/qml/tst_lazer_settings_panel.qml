@@ -356,6 +356,19 @@ Item {
             verify(!panel.barPage.sectionActive)
         }
 
+        function test_switchToBarAtBottomDoesNotActivateNotifications() {
+            panel.selectCategory("appearance")
+            tryCompare(panel, "selectedCategory", "appearance", 300)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height)
+            wait(0)
+
+            panel.selectCategory("bar")
+            tryCompare(panel, "selectedCategory", "bar", 300)
+            tryCompare(panel.sections, "currentIndex", 1, 500)
+            verify(panel.barPage.sectionActive)
+            verify(!panel.notificationPage.sectionActive)
+        }
+
         function test_searchFiltersAllSectionsAndShowsEmptyState() {
             panel.searchQuery = "模糊"
             compare(panel.appearancePage.visibleResultCount, 2)

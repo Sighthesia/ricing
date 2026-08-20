@@ -11,6 +11,7 @@ Flickable {
     property bool dropdownOpen: false
     property bool bottomBoundarySuppressed: false
     property real _lastContentY: 0
+    property int _programmaticTargetIndex: -1
     readonly property int sectionCount: column.children.length
     readonly property int totalVisibleResultCount: _sumVisible()
 
@@ -76,6 +77,8 @@ Flickable {
             return
         if (root.dropdownOpen)
             return
+        if (root._programmaticTargetIndex >= 0)
+            return
         var children = column.children
         var maximumY = Math.max(0, root.contentHeight - root.height)
         var movedDown = root.contentY > root._lastContentY + 0.5
@@ -139,6 +142,7 @@ Flickable {
         var target = child.y - Math.max(0, (root.height - child.height) / 2)
         target = Math.max(0, Math.min(Math.max(0, root.contentHeight - root.height), target))
         root._syncingScroll = true
+        root._programmaticTargetIndex = index
         root.currentIndex = index
         scrollAnim.stop()
         scrollAnim.to = target
@@ -164,6 +168,9 @@ Flickable {
         easing.type: Easing.OutQuint
         onStopped: {
             root._syncingScroll = false
+            root.currentIndex = root._programmaticTargetIndex >= 0
+                    ? root._programmaticTargetIndex : root.currentIndex
+            root._programmaticTargetIndex = -1
             root.recomputeCurrent()
         }
     }
