@@ -12,6 +12,7 @@ Flickable {
     property bool bottomBoundarySuppressed: false
     property real _lastContentY: 0
     property int _programmaticTargetIndex: -1
+    property bool _ignoreScrollStopped: false
     readonly property int sectionCount: column.children.length
     readonly property int totalVisibleResultCount: _sumVisible()
 
@@ -58,6 +59,28 @@ Flickable {
         return -1
     }
 
+    function _interruptProgrammaticScroll() {
+        if (!scrollAnim.running && root._programmaticTargetIndex < 0)
+            return
+        root._ignoreScrollStopped = true
+        scrollAnim.stop()
+        root._ignoreScrollStopped = false
+        root._syncingScroll = false
+        root._programmaticTargetIndex = -1
+    }
+
+    function resetScrollState() {
+        root._ignoreScrollStopped = true
+        scrollAnim.stop()
+        root._ignoreScrollStopped = false
+        root._syncingScroll = false
+        root._programmaticTargetIndex = -1
+        root.bottomBoundarySuppressed = false
+        root.currentIndex = 0
+        root._lastContentY = 0
+        root.contentY = 0
+    }
+
     // Forward the shared query and the browsed-section state to every section.
     function syncSections() {
         var children = column.children
@@ -82,6 +105,8 @@ Flickable {
         var children = column.children
         var maximumY = Math.max(0, root.contentHeight - root.height)
         var movedDown = root.contentY > root._lastContentY + 0.5
+        if (root.bottomBoundarySuppressed && root.contentY < maximumY - 0.5)
+            root.bottomBoundarySuppressed = false
         if (root.bottomBoundarySuppressed && movedDown)
             root.bottomBoundarySuppressed = false
         var center = root.contentY + root.height / 2
@@ -102,6 +127,9 @@ Flickable {
             if (found >= 0)
                 break
             var child = children[i]
+            if (root.bottomBoundarySuppressed && root.contentY >= maximumY - 0.5
+                    && i === root._lastVisibleSectionIndex())
+                continue
             if (child.visible !== false && child.height > 0
                     && center >= child.y && center <= child.y + child.height) {
                 found = i
@@ -116,11 +144,18 @@ Flickable {
     WheelHandler {
         orientation: Qt.Vertical
         target: null
-        blocking: false
+        blocking: true
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: wheel => {
+            root._interruptProgrammaticScroll()
             var scrollingDown = wheel.angleDelta.y < 0 || wheel.pixelDelta.y < 0
             var maximumY = Math.max(0, root.contentHeight - root.height)
+            var delta = wheel.pixelDelta.y
+            if (delta === 0)
+                delta = wheel.angleDelta.y / 120 * 40
+            var nextContentY = Math.max(0, Math.min(maximumY, root.contentY - delta))
+            if (nextContentY !== root.contentY)
+                root.contentY = nextContentY
             if (scrollingDown && root.bottomBoundarySuppressed
                     && root.contentY >= maximumY - 0.5) {
                 root.bottomBoundarySuppressed = false
@@ -140,11 +175,19 @@ Flickable {
         if (!child || child.visible === false || child.height <= 0)
             return
         var target = child.y - Math.max(0, (root.height - child.height) / 2)
-        target = Math.max(0, Math.min(Math.max(0, root.contentHeight - root.height), target))
+        var maximumY = Math.max(0, root.contentHeight - root.height)
+        target = Math.max(0, Math.min(maximumY, target))
+        var lastIndex = root._lastVisibleSectionIndex()
+        if (target >= maximumY - 0.5 && index !== lastIndex)
+            root.bottomBoundarySuppressed = true
+        else if (index === lastIndex)
+            root.bottomBoundarySuppressed = false
+        root._ignoreScrollStopped = true
+        scrollAnim.stop()
+        root._ignoreScrollStopped = false
         root._syncingScroll = true
         root._programmaticTargetIndex = index
         root.currentIndex = index
-        scrollAnim.stop()
         scrollAnim.to = target
         scrollAnim.duration = MotionTokens.reducedMotion ? 0 : 300
         scrollAnim.start()
@@ -167,6 +210,8 @@ Flickable {
         duration: 300
         easing.type: Easing.OutQuint
         onStopped: {
+            if (root._ignoreScrollStopped)
+                return
             root._syncingScroll = false
             root.currentIndex = root._programmaticTargetIndex >= 0
                     ? root._programmaticTargetIndex : root.currentIndex

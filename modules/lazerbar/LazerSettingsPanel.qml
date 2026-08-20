@@ -105,7 +105,7 @@ Item {
         sidebarExpanded = true
         searchQuery = ""
         sidebarLayer.beginSession()
-        sectionsItem.contentY = 0
+        sectionsItem.resetScrollState()
     }
 
     // Cancel session animations without touching persisted settings.

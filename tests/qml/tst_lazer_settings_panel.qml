@@ -68,7 +68,7 @@ Item {
             panel.height = 560
             panel.availableWidth = 570
             panel.availableHeight = 560
-            panel.sections.contentY = 0
+            panel.sections.resetScrollState()
             barSettings.height = 48
             resetService.count = 0
             resetService.category = ""
@@ -513,7 +513,7 @@ Item {
             wait(0)
             compare(panel.selectedCategory, "bar")
             compare(panel.sections.currentIndex, 1)
-            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height + 1)
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
             wait(0)
             compare(panel.selectedCategory, "notifications")
             compare(panel.sections.currentIndex, 2)
@@ -540,7 +540,10 @@ Item {
             wait(0)
             mouseClick(panel.barNav, panel.barNav.width / 2, panel.barNav.height / 2)
             tryCompare(panel, "selectedCategory", "bar", 300)
-            wheel(panel.sections, 0, -120)
+            tryVerify(function() { return !panel.sections._syncingScroll }, 500)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height)
+            wait(0)
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
             wait(0)
             compare(panel.selectedCategory, "notifications")
             compare(panel.sections.currentIndex, 2)
