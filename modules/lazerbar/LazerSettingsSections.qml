@@ -13,13 +13,6 @@ Flickable {
     property real _lastContentY: 0
     property int _programmaticTargetIndex: -1
     property bool _ignoreScrollStopped: false
-    property bool _ignoreWheelStopped: false
-    property int _wheelAnimationPhase: 0
-    property real _wheelTargetY: 0
-    property real _wheelReturnTarget: 0
-    readonly property real overscrollDistance: 88
-    readonly property bool wheelAnimationActive: _wheelAnimationPhase !== 0
-    readonly property bool wheelOverscrolling: contentY < 0 || contentY > Math.max(0, contentHeight - height)
     readonly property int sectionCount: column.children.length
     readonly property int totalVisibleResultCount: _sumVisible()
 
@@ -30,6 +23,7 @@ Flickable {
     contentHeight: _totalContentHeight()
     clip: true
     boundsBehavior: Flickable.StopAtBounds
+    flickDeceleration: 2000
 
     property bool _syncingScroll: false
 
@@ -75,39 +69,10 @@ Flickable {
         root._programmaticTargetIndex = -1
     }
 
-    function _stopWheelAnimation() {
-        wheelSettleTimer.stop()
-        wheelFrameTimer.stop()
-        if (!wheelReturn.running && root._wheelAnimationPhase === 0)
-            return
-        root._ignoreWheelStopped = true
-        wheelReturn.stop()
-        root._wheelAnimationPhase = 0
-        root._ignoreWheelStopped = false
-    }
-
-    function _animateWheelTo(target, returnTarget) {
-        var wasReturning = root._wheelAnimationPhase === 2
-        root._wheelAnimationPhase = 1
-        root._wheelTargetY = target
-        root._wheelReturnTarget = returnTarget
-        if (Math.abs(target - returnTarget) > 0.5)
-            wheelSettleTimer.restart()
-        else
-            wheelSettleTimer.stop()
-        if (wasReturning) {
-            root._ignoreWheelStopped = true
-            wheelReturn.stop()
-            root._ignoreWheelStopped = false
-        }
-        wheelFrameTimer.start()
-    }
-
     function resetScrollState() {
         root._ignoreScrollStopped = true
         scrollAnim.stop()
         root._ignoreScrollStopped = false
-        root._stopWheelAnimation()
         root._syncingScroll = false
         root._programmaticTargetIndex = -1
         root.bottomBoundarySuppressed = false
@@ -132,8 +97,6 @@ Flickable {
 
     function recomputeCurrent() {
         if (root._syncingScroll)
-            return
-        if (root._wheelAnimationPhase !== 0)
             return
         if (root.dropdownOpen)
             return
@@ -190,21 +153,16 @@ Flickable {
             var delta = wheel.pixelDelta.y
             if (delta === 0)
                 delta = wheel.angleDelta.y / 120 * 40
-            if (delta === 0)
-                return
-            var baseY = root._wheelAnimationPhase === 1 ? root._wheelTargetY : root.contentY
-            var requestedY = baseY - delta
-            var nextContentY = Math.max(-root.overscrollDistance,
-                                        Math.min(maximumY + root.overscrollDistance, requestedY))
-            var returnTarget = Math.max(0, Math.min(maximumY, nextContentY))
+            var nextContentY = Math.max(0, Math.min(maximumY, root.contentY - delta))
+            if (nextContentY !== root.contentY)
+                root.contentY = nextContentY
             if (scrollingDown && root.bottomBoundarySuppressed
-                    && (root.contentY >= maximumY - 0.5 || nextContentY > maximumY)) {
+                    && root.contentY >= maximumY - 0.5) {
                 root.bottomBoundarySuppressed = false
                 var lastIndex = root._lastVisibleSectionIndex()
                 if (lastIndex >= 0)
                     root.currentIndex = lastIndex
             }
-            root._animateWheelTo(nextContentY, returnTarget)
         }
     }
 
@@ -216,8 +174,6 @@ Flickable {
         var child = children[index]
         if (!child || child.visible === false || child.height <= 0)
             return
-        root._stopWheelAnimation()
-        root.contentY = Math.max(0, Math.min(Math.max(0, root.contentHeight - root.height), root.contentY))
         var target = child.y - Math.max(0, (root.height - child.height) / 2)
         var maximumY = Math.max(0, root.contentHeight - root.height)
         target = Math.max(0, Math.min(maximumY, target))
@@ -252,7 +208,7 @@ Flickable {
         target: root
         property: "contentY"
         duration: 300
-        easing.type: Easing.InOutCubic
+        easing.type: Easing.OutQuint
         onStopped: {
             if (root._ignoreScrollStopped)
                 return
@@ -261,66 +217,6 @@ Flickable {
                     ? root._programmaticTargetIndex : root.currentIndex
             root._programmaticTargetIndex = -1
             root.recomputeCurrent()
-        }
-    }
-
-    NumberAnimation {
-        id: wheelReturn
-        target: root
-        property: "contentY"
-        easing.type: Easing.InOutCubic
-        onStopped: {
-            if (root._ignoreWheelStopped || root._wheelAnimationPhase !== 2)
-                return
-            root._wheelAnimationPhase = 0
-            root.contentY = root._wheelReturnTarget
-            root._lastContentY = root.contentY
-            root.recomputeCurrent()
-        }
-    }
-
-    // Retarget the current position every frame without restarting an animation.
-    Timer {
-        id: wheelFrameTimer
-        interval: 16
-        repeat: true
-        onTriggered: {
-            if (root._wheelAnimationPhase !== 1)
-                return
-            var distance = root._wheelTargetY - root.contentY
-            if (Math.abs(distance) < 0.5) {
-                root.contentY = root._wheelTargetY
-                stop()
-                if (Math.abs(root._wheelTargetY - root._wheelReturnTarget) > 0.5)
-                    wheelSettleTimer.restart()
-                else {
-                    root._wheelAnimationPhase = 0
-                    root._lastContentY = root.contentY
-                    root.recomputeCurrent()
-                }
-                return
-            }
-            var follow = MotionTokens.reducedMotion ? 1 : 0.32
-            root.contentY += distance * follow
-        }
-    }
-
-    // Hold the edge position briefly so closely spaced wheel ticks stay one motion.
-    Timer {
-        id: wheelSettleTimer
-        interval: MotionTokens.reducedMotion ? 0 : 120
-        repeat: false
-        onTriggered: {
-            if (root._wheelAnimationPhase !== 1)
-                return
-            root._ignoreWheelStopped = true
-            wheelFrameTimer.stop()
-            root._ignoreWheelStopped = false
-            root._wheelAnimationPhase = 2
-            wheelReturn.from = root.contentY
-            wheelReturn.to = root._wheelReturnTarget
-            wheelReturn.duration = MotionTokens.reducedMotion ? 0 : 340
-            wheelReturn.start()
         }
     }
 }
