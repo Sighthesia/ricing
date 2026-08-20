@@ -262,7 +262,7 @@ Item {
             anchors.centerIn: backSurface
             width: 20
             height: 20
-            source: "icons/sidebar-return.svg"
+            source: "icons/close.svg"
             fillMode: Image.PreserveAspectFit
         }
         MultiEffect {
