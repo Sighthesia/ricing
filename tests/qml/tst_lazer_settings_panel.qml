@@ -612,6 +612,23 @@ Item {
             verify(panel.sections.contentY - startY >= 250)
         }
 
+        function test_wheelStopsWithoutResidualMovement() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            panel.sections.resetScrollState()
+            panel.sections.contentY = Math.max(0, (panel.sections.contentHeight - panel.sections.height) / 3)
+            wait(0)
+            for (var i = 0; i < 8; i++) {
+                mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+                wait(20)
+            }
+            tryVerify(function() { return !panel.sections.wheelAnimationActive }, 900)
+            var settledY = panel.sections.contentY
+            wait(100)
+            compare(panel.sections.contentY, settledY)
+            wait(150)
+            compare(panel.sections.contentY, settledY)
+        }
+
         function test_rowHighlightsOnHoverNotFocus() {
             var row = panel.appearancePage.panelOpacityRow
             var slider = panel.appearancePage.panelOpacitySlider

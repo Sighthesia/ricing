@@ -91,7 +91,10 @@ Flickable {
         root._wheelAnimationPhase = 1
         root._wheelTargetY = target
         root._wheelReturnTarget = returnTarget
-        wheelSettleTimer.restart()
+        if (Math.abs(target - returnTarget) > 0.5)
+            wheelSettleTimer.restart()
+        else
+            wheelSettleTimer.stop()
         if (wasReturning) {
             root._ignoreWheelStopped = true
             wheelReturn.stop()
@@ -288,7 +291,13 @@ Flickable {
             if (Math.abs(distance) < 0.5) {
                 root.contentY = root._wheelTargetY
                 stop()
-                wheelSettleTimer.restart()
+                if (Math.abs(root._wheelTargetY - root._wheelReturnTarget) > 0.5)
+                    wheelSettleTimer.restart()
+                else {
+                    root._wheelAnimationPhase = 0
+                    root._lastContentY = root.contentY
+                    root.recomputeCurrent()
+                }
                 return
             }
             var follow = MotionTokens.reducedMotion ? 1 : 0.32
