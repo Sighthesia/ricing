@@ -67,6 +67,7 @@ Item {
     // Move one shared accent strip between category entries.
     Rectangle {
         id: selectionIndicator
+        z: 2
         x: 10 + 4 + 5 * root.expansionProgress
         y: root.indicatorY - height / 2
         width: 4
