@@ -19,6 +19,8 @@ Item {
     readonly property bool searchVisible: matchesSearch
     readonly property bool searchActive: Logic.normalizeSearchQuery(searchQuery).length > 0
     readonly property bool searchExiting: searchActive && !matchesSearch && !MotionTokens.reducedMotion
+    // Cascade the exit down the list so bulk filtering never pops at once.
+    readonly property real searchExitDelay: Math.round(Math.min(150, Math.max(0, root.y / 6)))
     property bool searchExitFinished: false
     readonly property bool contentEnabled: enabled
     readonly property bool hasDefault: defaultValue !== undefined
@@ -99,21 +101,30 @@ Item {
 
     Behavior on height {
         enabled: !MotionTokens.reducedMotion
-        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        SequentialAnimation {
+            PauseAnimation { duration: root.matchesSearch ? 0 : root.searchExitDelay }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
     }
     Behavior on opacity {
         enabled: !MotionTokens.reducedMotion
-        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        SequentialAnimation {
+            PauseAnimation { duration: root.matchesSearch ? 0 : root.searchExitDelay }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
     }
     Behavior on x {
         enabled: !MotionTokens.reducedMotion
-        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        SequentialAnimation {
+            PauseAnimation { duration: root.matchesSearch ? 0 : root.searchExitDelay }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
     }
 
     // Keep the row alive until its search exit animation has finished.
     Timer {
         id: searchExitTimer
-        interval: MotionTokens.fast
+        interval: root.searchExitDelay + MotionTokens.slow
         repeat: false
         running: root.searchExiting && !root.searchExitFinished
         onTriggered: root.searchExitFinished = true

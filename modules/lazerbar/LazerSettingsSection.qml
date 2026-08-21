@@ -16,6 +16,8 @@ Item {
     readonly property bool hasVisibleContent: visibleResultCount > 0
     readonly property bool searchActive: Logic.normalizeSearchQuery(searchQuery).length > 0
     readonly property bool searchExiting: searchActive && !hasVisibleContent && !MotionTokens.reducedMotion
+    // Stagger empty-category collapse behind the section's list position.
+    readonly property real searchExitDelay: Math.round(Math.min(100, Math.max(0, root.y / 10)))
     property bool searchExitFinished: false
     readonly property Item dimItem: dim
     readonly property Item dimAreaItem: dimArea
@@ -37,14 +39,32 @@ Item {
              : LazerTheme.settingsDisabledAlpha * (hasVisibleContent ? 1 : 0)
     x: hasVisibleContent ? 0 : -8
 
-    Behavior on height { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
-    Behavior on opacity { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
-    Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+    Behavior on height {
+        enabled: !MotionTokens.reducedMotion
+        SequentialAnimation {
+            PauseAnimation { duration: root.hasVisibleContent ? 0 : root.searchExitDelay }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
+    }
+    Behavior on opacity {
+        enabled: !MotionTokens.reducedMotion
+        SequentialAnimation {
+            PauseAnimation { duration: root.hasVisibleContent ? 0 : root.searchExitDelay }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
+    }
+    Behavior on x {
+        enabled: !MotionTokens.reducedMotion
+        SequentialAnimation {
+            PauseAnimation { duration: root.hasVisibleContent ? 0 : root.searchExitDelay }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
+    }
 
     // Keep an empty category alive until its search exit animation has finished.
     Timer {
         id: searchExitTimer
-        interval: MotionTokens.fast
+        interval: root.searchExitDelay + MotionTokens.slow
         repeat: false
         running: root.searchExiting && !root.searchExitFinished
         onTriggered: root.searchExitFinished = true
