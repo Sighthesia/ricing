@@ -116,9 +116,6 @@ Item {
         if (parentColumn && parentColumn.chainSync !== undefined)
             parentColumn.chainSync()
     }
-    // While revealing, clip at the row bounds so shifted rows never paint
-    // over the section header; restore overflow behavior once landed.
-    clip: revealHeld || snapTransitions || revealProgress < 1
 
     Behavior on height {
         enabled: !MotionTokens.reducedMotion
