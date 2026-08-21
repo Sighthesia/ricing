@@ -113,6 +113,7 @@ Flickable {
 
     // Reset scroll position and boundary state for a fresh session.
     function resetScrollState() {
+        root._cancelEdgeDrive()
         edgeBounce.stop()
         scrollAnim.stop()
         root._syncingScroll = false
@@ -256,6 +257,49 @@ Flickable {
         edgeBounce.start()
     }
 
+    // Manual edge driving: inside this distance from a bound, wheel deltas
+    // are applied directly so Flickable's queued smoothing cannot delay the
+    // feedback; once input idles, the view eases back into bounds.
+    readonly property real edgeTakeoverDistance: 80
+    property bool edgeDriving: false
+
+    Timer {
+        id: edgeSettleTimer
+        interval: 140
+        repeat: false
+        onTriggered: root._settleEdgeDrive()
+    }
+
+    NumberAnimation {
+        id: edgeSettleAnim
+        target: root
+        property: "contentY"
+        duration: MotionTokens.reducedMotion ? 0 : 260
+        easing.type: Easing.InOutCubic
+    }
+
+    function _cancelEdgeDrive() {
+        root.edgeDriving = false
+        edgeSettleTimer.stop()
+        edgeSettleAnim.stop()
+    }
+
+    // Ease back into bounds after an edge-driving burst ends.
+    function _settleEdgeDrive() {
+        if (!root.edgeDriving)
+            return
+        root.edgeDriving = false
+        var maximumY = Math.max(0, root.contentHeight - root.height)
+        var target = Math.max(0, Math.min(maximumY, root.contentY))
+        if (Math.abs(target - root.contentY) < 0.5) {
+            root.contentY = target
+            return
+        }
+        edgeBounce.stop()
+        edgeSettleAnim.to = target
+        edgeSettleAnim.start()
+    }
+
     WheelHandler {
         orientation: Qt.Vertical
         target: null
@@ -278,6 +322,23 @@ Flickable {
                 delta = wheel.angleDelta.y / 120 * 40
             if (delta === 0)
                 return
+            var nearBottom = scrollingDown && maximumY - root.contentY <= root.edgeTakeoverDistance
+            var nearTop = !scrollingDown && root.contentY <= root.edgeTakeoverDistance
+            if (root.edgeDriving && !nearBottom && !nearTop)
+                root._settleEdgeDrive()
+            if (!MotionTokens.reducedMotion && (nearBottom || nearTop)) {
+                // Take over before the bound: apply the raw delta so response
+                // is immediate, then ease back once input idles.
+                root.cancelFlick()
+                root.edgeDriving = true
+                edgeSettleTimer.restart()
+                edgeSettleAnim.stop()
+                root.contentY = Math.max(-root.overscrollDistance,
+                                         Math.min(maximumY + root.overscrollDistance,
+                                                  root.contentY - delta))
+                root._lastContentY = root.contentY
+                return
+            }
             if (!scrollingDown && root.contentY <= 0.5)
                 root._requestEdgeOvershoot(delta)
             else if (scrollingDown && root.contentY >= maximumY - 0.5)
@@ -300,6 +361,7 @@ Flickable {
         var child = column.children[index]
         if (!child || child.visible === false || child.height <= 0)
             return
+        root._cancelEdgeDrive()
         edgeBounce.stop()
         var target = child.y - Math.max(0, (root.height - child.height) / 2)
         target = Math.max(0, Math.min(Math.max(0, root.contentHeight - root.height), target))
