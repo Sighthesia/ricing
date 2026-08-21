@@ -89,8 +89,12 @@ Item {
     implicitWidth: 640
     readonly property real textRegionWidth: contentHost.width
     readonly property real controlRegionLeft: contentHost.x
+    // Own the list gap inside the height so a fully exited row frees exactly
+    // zero space; removing it from the Column then causes no layout jump.
+    readonly property real listGap: 8
+    readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
     implicitHeight: cardContentHeight
-    height: matchesSearch ? implicitHeight : 0
+    height: matchesSearch ? implicitHeight + listGap : 0
     // Stay rendered until the exit geometry and fade have fully landed.
     visible: !searchHidden || height > 0.5 || opacity > 0.01
     opacity: root.enabled
@@ -134,7 +138,7 @@ Item {
         z: 0.5
         anchors.left: parent.left
         anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        height: root.bodyHeight
         width: root.hasDefault ? Math.max(0, root.revertVisibleX) : root.width
         enabled: root.enabled && root.matchesSearch
         hoverEnabled: true
@@ -147,7 +151,7 @@ Item {
         z: 1
         anchors.left: parent.left
         anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        height: root.bodyHeight
         width: root.cardBodyWidth
         radius: root.cardRadius
         visible: !root.choicePresentation
@@ -167,7 +171,7 @@ Item {
         z: 2
         anchors.left: parent.left
         anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        height: root.bodyHeight
         width: root.cardBodyWidth
         radius: cardSurface.radius
         visible: !root.choicePresentation
@@ -245,7 +249,7 @@ Item {
         x: Math.max(0, root.revertVisible ? root.revertVisibleX : root.revertHiddenX)
         y: 0
         width: root.revertVisualWidth
-        height: root.choicePresentation ? root.safeMainControlHeight : root.height
+        height: root.choicePresentation ? root.safeMainControlHeight : root.bodyHeight
         visible: root.enabled && root.hasDefault && (root.revertVisible || x > root.revertHiddenX + 0.5)
         enabled: root.canReset && root.matchesSearch
         activeFocusOnTab: root.canReset

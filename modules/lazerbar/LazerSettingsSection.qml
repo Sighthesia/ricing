@@ -27,9 +27,13 @@ Item {
 
     implicitWidth: 400
     width: parent ? parent.width : implicitWidth
-    readonly property real contentImplicitHeight: contentColumn.implicitHeight
+    // Own the outer list gap inside the height so an exited section frees
+    // exactly zero space; removing it from the sections Column causes no jump.
+    readonly property real listGap: 4
+    readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
+    readonly property real contentImplicitHeight: Math.max(0, contentColumn.implicitHeight - 8)
     implicitHeight: header.height + contentImplicitHeight + 12
-    height: hasVisibleContent ? implicitHeight : 0
+    height: hasVisibleContent ? implicitHeight + listGap : 0
     // Stay rendered until the exit geometry and fade have fully landed.
     visible: !searchEmpty || height > 0.5 || opacity > 0.01
     clip: true
@@ -74,7 +78,10 @@ Item {
     // lighter than the row cards so the category block reads as one surface.
     Rectangle {
         id: background
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: parent.width
+        height: root.bodyHeight
         color: LazerTheme.settingsSection
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
@@ -107,20 +114,23 @@ Item {
         }
     }
 
-    // Lay out the injected rows below the header with one shared gap.
+    // Lay out the injected rows below the header; rows own their own gap.
     Column {
         id: contentColumn
         x: 0
         y: header.height
         width: root.width
-        spacing: 8
+        spacing: 0
     }
 
     // Dim the whole block while it is not the browsed section.
     Rectangle {
         id: dim
         z: 4
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: parent.width
+        height: root.bodyHeight
         color: "#000000"
         visible: root.sectionActive ? opacity > 0.01 : true
         opacity: root.sectionActive ? 0 : (root.sectionHovered ? 0.3 : 0.5)
@@ -131,7 +141,10 @@ Item {
     MouseArea {
         id: dimArea
         z: 5
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: parent.width
+        height: root.bodyHeight
         enabled: !root.sectionActive && root.hasVisibleContent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton

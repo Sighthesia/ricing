@@ -197,7 +197,7 @@ Flickable {
     Column {
         id: column
         width: root.width
-        spacing: 4
+        spacing: 0
     }
 
     onContentYChanged: root.recomputeCurrent()
