@@ -373,13 +373,30 @@ Item {
             panel.searchQuery = "模糊"
             compare(panel.appearancePage.visibleResultCount, 2)
             compare(panel.barPage.visibleResultCount, 0)
-            verify(!panel.appearancePage.wallpaperRow.visible)
+            tryCompare(panel.appearancePage.wallpaperRow, "visible", false, 500)
+            tryCompare(panel.barPage, "visible", false, 500)
             verify(panel.content.emptyStateVisible === false)
             panel.searchQuery = "zzz-no-match"
             compare(panel.appearancePage.visibleResultCount, 0)
+            tryCompare(panel.appearancePage, "visible", false, 500)
             verify(panel.content.emptyStateVisible)
             panel.searchQuery = ""
             compare(panel.appearancePage.visibleResultCount, 9)
+            tryVerify(function() { return panel.appearancePage.wallpaperRow.height > 0 }, 500)
+            tryVerify(function() { return panel.appearancePage.visible }, 500)
+            verify(!panel.content.emptyStateVisible)
+        }
+
+        function test_searchRapidChangesRestoreStableGeometry() {
+            panel.searchQuery = "模糊"
+            panel.searchQuery = "浮动"
+            panel.searchQuery = "zzz-no-match"
+            panel.searchQuery = ""
+
+            tryVerify(function() { return panel.appearancePage.height > 0 }, 500)
+            tryVerify(function() { return panel.barPage.height > 0 }, 500)
+            compare(panel.appearancePage.visibleResultCount, 9)
+            verify(panel.barPage.visibleResultCount > 0)
             verify(!panel.content.emptyStateVisible)
         }
 

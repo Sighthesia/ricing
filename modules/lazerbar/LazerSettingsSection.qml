@@ -14,6 +14,9 @@ Item {
     readonly property bool sectionHovered: dimArea.containsMouse === true
     readonly property int visibleResultCount: _countVisibleRows()
     readonly property bool hasVisibleContent: visibleResultCount > 0
+    readonly property bool searchActive: Logic.normalizeSearchQuery(searchQuery).length > 0
+    readonly property bool searchExiting: searchActive && !hasVisibleContent && !MotionTokens.reducedMotion
+    property bool searchExitFinished: false
     readonly property Item dimItem: dim
     readonly property Item dimAreaItem: dimArea
 
@@ -27,11 +30,28 @@ Item {
     readonly property real contentImplicitHeight: contentColumn.implicitHeight
     implicitHeight: header.height + contentImplicitHeight + 12
     height: hasVisibleContent ? implicitHeight : 0
-    visible: hasVisibleContent
+    visible: !searchActive || hasVisibleContent || searchExitTimer.running
     clip: true
-    opacity: root.interactive ? 1 : LazerTheme.settingsDisabledAlpha
+    opacity: root.interactive
+             ? (hasVisibleContent ? 1 : 0)
+             : LazerTheme.settingsDisabledAlpha * (hasVisibleContent ? 1 : 0)
+    x: hasVisibleContent ? 0 : -8
 
     Behavior on height { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+    Behavior on opacity { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+    Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+
+    // Keep an empty category alive until its search exit animation has finished.
+    Timer {
+        id: searchExitTimer
+        interval: MotionTokens.fast
+        repeat: false
+        running: root.searchExiting && !root.searchExitFinished
+        onTriggered: root.searchExitFinished = true
+    }
+
+    onHasVisibleContentChanged: root.searchExitFinished = root.hasVisibleContent || !root.searchActive
+    onSearchQueryChanged: root.searchExitFinished = false
 
     function _countVisibleRows() {
         var count = 0
@@ -105,7 +125,7 @@ Item {
         id: dimArea
         z: 5
         anchors.fill: parent
-        enabled: !root.sectionActive
+        enabled: !root.sectionActive && root.hasVisibleContent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton
         onClicked: root.activated()

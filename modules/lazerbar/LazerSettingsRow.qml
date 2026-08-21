@@ -17,6 +17,9 @@ Item {
     property var resetCallback: null
     readonly property bool matchesSearch: Logic.matchesSearch(labelText, descriptionText, searchQuery)
     readonly property bool searchVisible: matchesSearch
+    readonly property bool searchActive: Logic.normalizeSearchQuery(searchQuery).length > 0
+    readonly property bool searchExiting: searchActive && !matchesSearch && !MotionTokens.reducedMotion
+    property bool searchExitFinished: false
     readonly property bool contentEnabled: enabled
     readonly property bool hasDefault: defaultValue !== undefined
     readonly property bool isDefault: hasDefault && Logic.valuesEqual(defaultValue, currentValue)
@@ -88,18 +91,41 @@ Item {
     readonly property real controlRegionLeft: contentHost.x
     implicitHeight: cardContentHeight
     height: matchesSearch ? implicitHeight : 0
-    visible: matchesSearch
-    opacity: root.enabled ? 1 : LazerTheme.settingsDisabledAlpha
+    visible: !searchActive || matchesSearch || searchExitTimer.running
+    opacity: root.enabled
+             ? (matchesSearch ? 1 : 0)
+             : LazerTheme.settingsDisabledAlpha * (matchesSearch ? 1 : 0)
+    x: matchesSearch ? 0 : -8
 
     Behavior on height {
         enabled: !MotionTokens.reducedMotion
         NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
     }
+    Behavior on opacity {
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+    }
+    Behavior on x {
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+    }
+
+    // Keep the row alive until its search exit animation has finished.
+    Timer {
+        id: searchExitTimer
+        interval: MotionTokens.fast
+        repeat: false
+        running: root.searchExiting && !root.searchExitFinished
+        onTriggered: root.searchExitFinished = true
+    }
+
+    onMatchesSearchChanged: root.searchExitFinished = root.matchesSearch || !root.searchActive
+    onSearchQueryChanged: root.searchExitFinished = false
 
     // Observe the complete row, including areas covered by embedded controls.
     HoverHandler {
         id: rowHover
-        enabled: root.enabled
+        enabled: root.enabled && root.matchesSearch
         // Keep the row highlight observer from starving embedded controls.
         blocking: false
     }
@@ -112,7 +138,7 @@ Item {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: root.hasDefault ? Math.max(0, root.revertVisibleX) : root.width
-        enabled: root.enabled
+        enabled: root.enabled && root.matchesSearch
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
     }
@@ -223,7 +249,7 @@ Item {
         width: root.revertVisualWidth
         height: root.choicePresentation ? root.safeMainControlHeight : root.height
         visible: root.enabled && root.hasDefault && (root.revertVisible || x > root.revertHiddenX + 0.5)
-        enabled: root.canReset
+        enabled: root.canReset && root.matchesSearch
         activeFocusOnTab: root.canReset
         Accessible.role: Accessible.Button
         Accessible.name: "恢复默认"
@@ -299,11 +325,11 @@ Item {
 
         HoverHandler {
             id: revertHover
-            enabled: root.canReset
+            enabled: root.canReset && root.matchesSearch
         }
         TapHandler {
             id: revertPress
-            enabled: root.canReset
+            enabled: root.canReset && root.matchesSearch
             onTapped: root.activateReset()
         }
         Keys.onPressed: event => {
