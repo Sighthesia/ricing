@@ -114,7 +114,7 @@ Item {
         anchors.left: parent.left
         anchors.top: parent.top
         width: parent.width
-        height: root.revealBodyHeight
+        height: root.bodyHeight
         opacity: root.revealHeld ? 0 : 1
         color: LazerTheme.settingsSection
         Behavior on opacity { enabled: !MotionTokens.reducedMotion && !root.snapTransitions; NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint } }
@@ -166,37 +166,20 @@ Item {
     }
 
     // Reproduce the old compressed-layout motion: every row sits shifted up
-    // by however much unrevealed height remains above it (capped at the
-    // header line so the pile stacks beneath the title), then glides down.
-    // The revealed frontier also drives the section surface height so the
-    // block itself appears to grow with the wave.
-    property real revealedExtent: 100000
-
-    readonly property real revealBodyHeight: Math.min(bodyHeight, Math.max(header.height + 1, revealedExtent))
-
+    // by however much unrevealed height remains above it, then glides down.
     function _syncRevealOffsets() {
         var rows = contentColumn.children
         var shift = 0
-        var revealedBottom = header.height
         for (var i = 0; i < rows.length; i++) {
             var row = rows[i]
             if (row.revealShift === undefined)
                 continue
-            // Rows filtered out by search exit through the real layout;
-            // keep them out of the wave frontier math.
-            if (row.searchHidden === true)
-                continue
-            var capped = Math.min(shift, Number(row.y) || 0)
-            row.revealShift = capped
+            row.revealShift = shift
             var progress = Number(row.revealProgress)
-            progress = isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 1
-            var rowHeight = Math.max(0, Number(row.implicitHeight) || 0)
-                    + (Number(row.listGap) || 0)
-            shift += (1 - progress) * rowHeight
-            var visualBottom = header.height + (Number(row.y) || 0) - capped + progress * rowHeight
-            revealedBottom = Math.max(revealedBottom, visualBottom)
+            var remaining = 1 - (isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 1)
+            shift += remaining * (Math.max(0, Number(row.implicitHeight) || 0)
+                                  + (Number(row.listGap) || 0))
         }
-        root.revealedExtent = revealedBottom + 6
     }
 
     // Dim the whole block while it is not the browsed section.
@@ -206,7 +189,7 @@ Item {
         anchors.left: parent.left
         anchors.top: parent.top
         width: parent.width
-        height: root.revealBodyHeight
+        height: root.bodyHeight
         color: "#000000"
         visible: root.sectionActive ? opacity > 0.01 : true
         opacity: root.revealHeld ? 0
@@ -221,7 +204,7 @@ Item {
         anchors.left: parent.left
         anchors.top: parent.top
         width: parent.width
-        height: root.revealBodyHeight
+        height: root.bodyHeight
         enabled: !root.sectionActive && root.hasVisibleContent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton
