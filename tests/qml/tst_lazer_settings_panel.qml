@@ -445,6 +445,21 @@ Item {
             panel.searchQuery = ""
         }
 
+        function test_edgeOvershootStartsImmediately() {
+            panel.sections.contentY = 0
+            panel.sections._requestEdgeOvershoot(40)
+            tryVerify(function() { return panel.sections.contentY < 0 }, 300)
+        }
+
+        function test_edgeOvershootDuringProgrammaticScroll() {
+            panel.selectCategory("notifications")
+            panel.sections._requestEdgeOvershoot(-40)
+            tryVerify(function() {
+                var sections = panel.sections
+                return sections.contentY > sections.contentHeight - sections.height
+            }, 400)
+        }
+
         function test_keyboardNavigationAndEscapeAreInteractiveGated() {
             panel.focusNavigation()
             keyPress(Qt.Key_Down)

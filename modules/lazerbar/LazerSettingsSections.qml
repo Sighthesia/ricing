@@ -227,18 +227,26 @@ Flickable {
 
     // Push past the scroll edge on continued wheel input, then settle back.
     function _requestEdgeOvershoot(delta) {
-        if (MotionTokens.reducedMotion || scrollAnim.running || root._syncingScroll)
+        if (MotionTokens.reducedMotion)
             return
+        // Landing at an edge via programmatic scroll must not delay the
+        // edge feedback; take over immediately.
+        if (scrollAnim.running || root._syncingScroll) {
+            root._programmaticTargetIndex = -1
+            scrollAnim.stop()
+        }
         var maximumY = Math.max(0, root.contentHeight - root.height)
         var proposed = Math.max(-root.overscrollDistance,
                                 Math.min(maximumY + root.overscrollDistance,
                                          root.contentY - delta))
-        if (edgeBounce.running) {
+        // While pushing outward, ignore weaker same-direction nudges; a push
+        // during the return phase always relaunches from the current spot.
+        if (edgeBounce.running && edgeOut.running) {
             var furtherOut = delta > 0 ? proposed < edgeOut.to : proposed > edgeOut.to
             if (!furtherOut)
                 return
-            edgeBounce.stop()
         }
+        edgeBounce.stop()
         edgeOut.from = root.contentY
         edgeOut.to = proposed
         edgeBack.to = Math.max(0, Math.min(maximumY, proposed))
