@@ -76,6 +76,7 @@ Item {
             resetService.value = undefined
             closeSpy.clear()
             categorySpy.clear()
+            panel.endSession()
             wait(20)
         }
 
@@ -339,6 +340,39 @@ Item {
             panel.beginSession()
             compare(panel.sidebarExpanded, true)
             compare(panel.searchQuery, "")
+        }
+
+        function test_openSessionWaveRevealCompletes() {
+            panel.beginSession()
+            tryVerify(function() {
+                return panel.appearancePage.wallpaperRow.visible
+                       && panel.appearancePage.wallpaperRow.height >= panel.appearancePage.wallpaperRow.implicitHeight
+            }, 1500)
+            tryVerify(function() {
+                return panel.notificationPage.visible && panel.notificationPage.height > 0
+            }, 1500)
+            compare(panel.appearancePage.visibleResultCount, 9)
+        }
+
+        function test_openSessionReducedMotionSkipsWave() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            panel.beginSession()
+            verify(panel.appearancePage.wallpaperRow.visible)
+            tryCompare(panel.appearancePage.wallpaperRow, "height",
+                       panel.appearancePage.wallpaperRow.implicitHeight
+                       + panel.appearancePage.wallpaperRow.listGap, 300)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
+
+        function test_rapidReopenConvergesToFullGeometry() {
+            panel.beginSession()
+            panel.beginSession()
+            panel.beginSession()
+            tryVerify(function() {
+                return panel.barPage.visible && panel.barPage.height > 0
+                       && panel.notificationPage.visible && panel.notificationPage.height > 0
+            }, 2000)
+            verify(!panel.content.emptyStateVisible)
         }
 
         function test_switchActivatesSectionAndKeepsAllSectionsVisible() {

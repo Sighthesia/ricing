@@ -83,6 +83,51 @@ Flickable {
         }
     }
 
+    // Play the open-session wave: sections then rows appear top-to-bottom.
+    function playEntranceWave() {
+        if (MotionTokens.reducedMotion)
+            return
+        var baseDelay = 120
+        var slotInterval = 18
+        var slot = 0
+        var children = column.children
+        for (var i = 0; i < children.length; i++) {
+            var section = children[i]
+            if (section.holdInstantly === undefined)
+                continue
+            section.holdInstantly()
+            section.playReveal(baseDelay + slot * slotInterval)
+            slot++
+            var rows = section.contentRows || []
+            for (var r = 0; r < rows.length; r++) {
+                if (rows[r].holdInstantly === undefined)
+                    continue
+                rows[r].holdInstantly()
+                rows[r].playReveal(baseDelay + slot * slotInterval)
+                slot++
+            }
+        }
+    }
+
+    // Cancel an unfinished wave, restoring every holder instantly.
+    function cancelEntranceWave() {
+        var children = column.children
+        for (var i = 0; i < children.length; i++) {
+            var section = children[i]
+            if (section.releaseInstantly === undefined)
+                continue
+            if (section.revealHeld === true || section.snapTransitions === true)
+                section.releaseInstantly()
+            var rows = section.contentRows || []
+            for (var r = 0; r < rows.length; r++) {
+                if (rows[r].releaseInstantly === undefined)
+                    continue
+                if (rows[r].revealHeld === true || rows[r].snapTransitions === true)
+                    rows[r].releaseInstantly()
+            }
+        }
+    }
+
     onSearchQueryChanged: syncSections()
     onCurrentIndexChanged: syncSections()
 

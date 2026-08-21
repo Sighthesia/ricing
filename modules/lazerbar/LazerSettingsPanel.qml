@@ -106,11 +106,13 @@ Item {
         searchQuery = ""
         sidebarLayer.beginSession()
         sectionsItem.resetScrollState()
+        sectionsItem.playEntranceWave()
     }
 
     // Cancel session animations without touching persisted settings.
     function endSession() {
         sidebarLayer.endSession()
+        sectionsItem.cancelEntranceWave()
     }
 
     function toggleExpanded() {

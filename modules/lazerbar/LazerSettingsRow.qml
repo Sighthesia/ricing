@@ -20,6 +20,10 @@ Item {
     readonly property bool searchHidden: Logic.normalizeSearchQuery(searchQuery).length > 0 && !matchesSearch
     // Cascade the exit down the list so bulk filtering never pops at once.
     readonly property real searchExitDelay: Math.round(Math.min(150, Math.max(0, root.y / 6)))
+    // Open-session wave state: held rows share the search-hidden geometry.
+    property bool revealHeld: false
+    property bool snapTransitions: false
+    readonly property bool geometryHeld: searchHidden || revealHeld
     readonly property bool contentEnabled: enabled
     readonly property bool hasDefault: defaultValue !== undefined
     readonly property bool isDefault: hasDefault && Logic.valuesEqual(defaultValue, currentValue)
@@ -94,34 +98,65 @@ Item {
     readonly property real listGap: 8
     readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
     implicitHeight: cardContentHeight
-    height: matchesSearch ? implicitHeight + listGap : 0
+    height: geometryHeld ? 0 : implicitHeight + listGap
     // Stay rendered until the exit geometry and fade have fully landed.
-    visible: !searchHidden || height > 0.5 || opacity > 0.01
+    visible: !geometryHeld || height > 0.5 || opacity > 0.01
     opacity: root.enabled
-             ? (matchesSearch ? 1 : 0)
-             : LazerTheme.settingsDisabledAlpha * (matchesSearch ? 1 : 0)
-    x: matchesSearch ? 0 : -8
+             ? (geometryHeld ? 0 : 1)
+             : LazerTheme.settingsDisabledAlpha * (geometryHeld ? 0 : 1)
+    x: geometryHeld ? -8 : 0
 
     Behavior on height {
-        enabled: !MotionTokens.reducedMotion
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         SequentialAnimation {
-            PauseAnimation { duration: root.matchesSearch ? 0 : root.searchExitDelay }
+            PauseAnimation { duration: root.geometryHeld ? root.searchExitDelay : 0 }
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
     }
     Behavior on opacity {
-        enabled: !MotionTokens.reducedMotion
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         SequentialAnimation {
-            PauseAnimation { duration: root.matchesSearch ? 0 : root.searchExitDelay }
+            PauseAnimation { duration: root.geometryHeld ? root.searchExitDelay : 0 }
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
     }
     Behavior on x {
-        enabled: !MotionTokens.reducedMotion
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         SequentialAnimation {
-            PauseAnimation { duration: root.matchesSearch ? 0 : root.searchExitDelay }
+            PauseAnimation { duration: root.geometryHeld ? root.searchExitDelay : 0 }
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
+    }
+
+    Timer {
+        id: revealTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            root.snapTransitions = false
+            root.revealHeld = false
+        }
+    }
+
+    // Collapse instantly for the open-session wave, then release on schedule.
+    function holdInstantly() {
+        revealTimer.stop()
+        root.snapTransitions = true
+        root.revealHeld = true
+    }
+
+    // Leave the held state without animation (wave cancelled).
+    function releaseInstantly() {
+        revealTimer.stop()
+        root.snapTransitions = true
+        root.revealHeld = false
+        Qt.callLater(function () { root.snapTransitions = false })
+    }
+
+    // The timer owns the wave stagger so releases animate immediately.
+    function playReveal(delayMs) {
+        revealTimer.interval = Math.max(0, Math.round(Number(delayMs) || 0))
+        revealTimer.restart()
     }
 
     // Observe the complete row, including areas covered by embedded controls.
