@@ -27,57 +27,6 @@ Flickable {
     flickDeceleration: 2000
 
     property bool _syncingScroll: false
-    property int _deferredScrollIndex: -1
-
-    // True while any section or row is still armed or revealing from the
-    // open-session wave; layout keeps shifting so viewport tracking pauses.
-    readonly property bool entranceWaveActive: _anyHolderActive()
-
-    // Stay busy until the final reveal transitions have fully landed.
-    readonly property bool entranceBusy: entranceWaveActive || settleTimer.running
-
-    Timer {
-        id: settleTimer
-        // Cover the trailing reveal transitions plus the stagger tail.
-        interval: MotionTokens.slow + MotionTokens.slow / 2 + 100
-        repeat: false
-    }
-
-    function _anyHolderActive() {
-        var children = column.children
-        for (var i = 0; i < children.length; i++) {
-            var section = children[i]
-            if (section.revealHeld === true || section.snapTransitions === true)
-                return true
-            var rows = section.contentRows || []
-            for (var r = 0; r < rows.length; r++) {
-                if (rows[r].revealHeld === true || rows[r].snapTransitions === true)
-                    return true
-            }
-        }
-        return false
-    }
-
-    onEntranceWaveActiveChanged: {
-        if (root.entranceWaveActive)
-            settleTimer.stop()
-        else
-            settleTimer.restart()
-    }
-
-    // Once the wave settles, land any deferred navigation or re-sync the
-    // browsed section with wherever the user scrolled in the meantime.
-    onEntranceBusyChanged: {
-        if (root.entranceBusy)
-            return
-        if (root._deferredScrollIndex >= 0) {
-            var deferred = root._deferredScrollIndex
-            root._deferredScrollIndex = -1
-            root.scrollTo(deferred)
-        } else {
-            root.recomputeCurrent()
-        }
-    }
 
     // Sum the actual heights of the sections that remain on screen.
     function _totalContentHeight() {
@@ -187,8 +136,6 @@ Flickable {
             return
         if (root.dropdownOpen)
             return
-        if (root.entranceBusy)
-            return
         if (root._programmaticTargetIndex >= 0)
             return
         var children = column.children
@@ -251,8 +198,6 @@ Flickable {
         blocking: false
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: wheel => {
-            root._deferredScrollIndex = -1
-            root._programmaticTargetIndex = -1
             var scrollingDown = wheel.angleDelta.y < 0 || wheel.pixelDelta.y < 0
             var maximumY = Math.max(0, root.contentHeight - root.height)
             if (scrollingDown && root.bottomBoundarySuppressed
@@ -278,14 +223,6 @@ Flickable {
     function scrollTo(index) {
         if (index < 0 || index >= column.children.length)
             return
-        if (root.entranceBusy) {
-            // Layout is still expanding; land the motion once the wave ends,
-            // but lock the selection state immediately so nothing overrides it.
-            root._deferredScrollIndex = index
-            root._programmaticTargetIndex = index
-            root.currentIndex = index
-            return
-        }
         var child = column.children[index]
         if (!child || child.visible === false || child.height <= 0)
             return
@@ -310,12 +247,6 @@ Flickable {
     onContentYChanged: root.recomputeCurrent()
     onHeightChanged: root.recomputeCurrent()
     onContentHeightChanged: root.recomputeCurrent()
-
-    // Manual scrolling always wins over a pending wave-time navigation.
-    onMovementStarted: {
-        root._deferredScrollIndex = -1
-        root._programmaticTargetIndex = -1
-    }
 
     NumberAnimation {
         id: scrollAnim
