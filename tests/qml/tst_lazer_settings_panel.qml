@@ -68,7 +68,7 @@ Item {
             panel.height = 560
             panel.availableWidth = 570
             panel.availableHeight = 560
-            panel.sections.resetScrollState()
+            panel.sections.contentY = 0
             barSettings.height = 48
             resetService.count = 0
             resetService.category = ""
@@ -513,7 +513,7 @@ Item {
             wait(0)
             compare(panel.selectedCategory, "bar")
             compare(panel.sections.currentIndex, 1)
-            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+            panel.sections.contentY = Math.max(0, panel.sections.contentHeight - panel.sections.height + 1)
             wait(0)
             compare(panel.selectedCategory, "notifications")
             compare(panel.sections.currentIndex, 2)
