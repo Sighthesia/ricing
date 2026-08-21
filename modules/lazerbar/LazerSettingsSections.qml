@@ -14,6 +14,8 @@ Flickable {
     property int _programmaticTargetIndex: -1
     readonly property int sectionCount: column.children.length
     readonly property int totalVisibleResultCount: _sumVisible()
+    readonly property real overscrollDistance: 88
+    readonly property bool edgeBouncing: edgeBounce.running
 
     // Sections are injected and stacked vertically in one column.
     default property alias sections: column.data
@@ -60,6 +62,7 @@ Flickable {
 
     // Reset scroll position and boundary state for a fresh session.
     function resetScrollState() {
+        edgeBounce.stop()
         scrollAnim.stop()
         root._syncingScroll = false
         root._programmaticTargetIndex = -1
@@ -124,6 +127,26 @@ Flickable {
         root._lastContentY = root.contentY
     }
 
+    // Push past the scroll edge on continued wheel input, then settle back.
+    function _requestEdgeOvershoot(delta) {
+        if (MotionTokens.reducedMotion || scrollAnim.running || root._syncingScroll)
+            return
+        var maximumY = Math.max(0, root.contentHeight - root.height)
+        var proposed = Math.max(-root.overscrollDistance,
+                                Math.min(maximumY + root.overscrollDistance,
+                                         root.contentY - delta))
+        if (edgeBounce.running) {
+            var furtherOut = delta > 0 ? proposed < edgeOut.to : proposed > edgeOut.to
+            if (!furtherOut)
+                return
+            edgeBounce.stop()
+        }
+        edgeOut.from = root.contentY
+        edgeOut.to = proposed
+        edgeBack.to = Math.max(0, Math.min(maximumY, proposed))
+        edgeBounce.start()
+    }
+
     WheelHandler {
         orientation: Qt.Vertical
         target: null
@@ -139,6 +162,15 @@ Flickable {
                 if (lastIndex >= 0)
                     root.currentIndex = lastIndex
             }
+            var delta = wheel.pixelDelta.y
+            if (delta === 0)
+                delta = wheel.angleDelta.y / 120 * 40
+            if (delta === 0)
+                return
+            if (!scrollingDown && root.contentY <= 0.5)
+                root._requestEdgeOvershoot(delta)
+            else if (scrollingDown && root.contentY >= maximumY - 0.5)
+                root._requestEdgeOvershoot(delta)
         }
     }
 
@@ -150,6 +182,7 @@ Flickable {
         var child = children[index]
         if (!child || child.visible === false || child.height <= 0)
             return
+        edgeBounce.stop()
         var target = child.y - Math.max(0, (root.height - child.height) / 2)
         target = Math.max(0, Math.min(Math.max(0, root.contentHeight - root.height), target))
         root._syncingScroll = true
@@ -182,6 +215,29 @@ Flickable {
             root.currentIndex = root._programmaticTargetIndex >= 0
                     ? root._programmaticTargetIndex : root.currentIndex
             root._programmaticTargetIndex = -1
+            root.recomputeCurrent()
+        }
+    }
+
+    // Push past the edge, then spring back to the clamped position.
+    SequentialAnimation {
+        id: edgeBounce
+        NumberAnimation {
+            id: edgeOut
+            target: root
+            property: "contentY"
+            duration: MotionTokens.reducedMotion ? 0 : 160
+            easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            id: edgeBack
+            target: root
+            property: "contentY"
+            duration: MotionTokens.reducedMotion ? 0 : 260
+            easing.type: Easing.InOutCubic
+        }
+        onFinished: {
+            root._lastContentY = root.contentY
             root.recomputeCurrent()
         }
     }

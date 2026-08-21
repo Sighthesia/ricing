@@ -549,6 +549,33 @@ Item {
             compare(panel.sections.currentIndex, 2)
         }
 
+        function test_wheelOvershootsAndReboundsAtTop() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            panel.sections.resetScrollState()
+            compare(panel.sections.contentY, 0)
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, 120)
+            tryVerify(function() { return panel.sections.contentY < -1 }, 250)
+            tryVerify(function() { return !panel.sections.edgeBouncing }, 900)
+            compare(panel.sections.contentY, 0)
+            wait(120)
+            compare(panel.sections.contentY, 0)
+        }
+
+        function test_wheelOvershootsAndReboundsAtBottom() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            panel.sections.resetScrollState()
+            var maximumY = Math.max(0, panel.sections.contentHeight - panel.sections.height)
+            verify(maximumY > 0)
+            panel.sections.contentY = maximumY
+            wait(0)
+            mouseWheel(panel.sections, panel.sections.width / 2, panel.sections.height / 2, 0, -120)
+            tryVerify(function() { return panel.sections.contentY > maximumY + 1 }, 250)
+            tryVerify(function() { return !panel.sections.edgeBouncing }, 900)
+            compare(panel.sections.contentY, maximumY)
+            wait(120)
+            compare(panel.sections.contentY, maximumY)
+        }
+
         function test_rowHighlightsOnHoverNotFocus() {
             var row = panel.appearancePage.panelOpacityRow
             var slider = panel.appearancePage.panelOpacitySlider
