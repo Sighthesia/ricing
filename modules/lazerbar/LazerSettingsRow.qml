@@ -17,11 +17,9 @@ Item {
     property var resetCallback: null
     readonly property bool matchesSearch: Logic.matchesSearch(labelText, descriptionText, searchQuery)
     readonly property bool searchVisible: matchesSearch
-    readonly property bool searchActive: Logic.normalizeSearchQuery(searchQuery).length > 0
-    readonly property bool searchExiting: searchActive && !matchesSearch && !MotionTokens.reducedMotion
+    readonly property bool searchHidden: Logic.normalizeSearchQuery(searchQuery).length > 0 && !matchesSearch
     // Cascade the exit down the list so bulk filtering never pops at once.
     readonly property real searchExitDelay: Math.round(Math.min(150, Math.max(0, root.y / 6)))
-    property bool searchExitFinished: false
     readonly property bool contentEnabled: enabled
     readonly property bool hasDefault: defaultValue !== undefined
     readonly property bool isDefault: hasDefault && Logic.valuesEqual(defaultValue, currentValue)
@@ -93,7 +91,8 @@ Item {
     readonly property real controlRegionLeft: contentHost.x
     implicitHeight: cardContentHeight
     height: matchesSearch ? implicitHeight : 0
-    visible: !searchActive || matchesSearch || searchExitTimer.running
+    // Stay rendered until the exit geometry and fade have fully landed.
+    visible: !searchHidden || height > 0.5 || opacity > 0.01
     opacity: root.enabled
              ? (matchesSearch ? 1 : 0)
              : LazerTheme.settingsDisabledAlpha * (matchesSearch ? 1 : 0)
@@ -120,18 +119,6 @@ Item {
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
     }
-
-    // Keep the row alive until its search exit animation has finished.
-    Timer {
-        id: searchExitTimer
-        interval: root.searchExitDelay + MotionTokens.slow
-        repeat: false
-        running: root.searchExiting && !root.searchExitFinished
-        onTriggered: root.searchExitFinished = true
-    }
-
-    onMatchesSearchChanged: root.searchExitFinished = root.matchesSearch || !root.searchActive
-    onSearchQueryChanged: root.searchExitFinished = false
 
     // Observe the complete row, including areas covered by embedded controls.
     HoverHandler {

@@ -14,11 +14,9 @@ Item {
     readonly property bool sectionHovered: dimArea.containsMouse === true
     readonly property int visibleResultCount: _countVisibleRows()
     readonly property bool hasVisibleContent: visibleResultCount > 0
-    readonly property bool searchActive: Logic.normalizeSearchQuery(searchQuery).length > 0
-    readonly property bool searchExiting: searchActive && !hasVisibleContent && !MotionTokens.reducedMotion
+    readonly property bool searchEmpty: Logic.normalizeSearchQuery(searchQuery).length > 0 && !hasVisibleContent
     // Stagger empty-category collapse behind the section's list position.
     readonly property real searchExitDelay: Math.round(Math.min(100, Math.max(0, root.y / 10)))
-    property bool searchExitFinished: false
     readonly property Item dimItem: dim
     readonly property Item dimAreaItem: dimArea
 
@@ -32,7 +30,8 @@ Item {
     readonly property real contentImplicitHeight: contentColumn.implicitHeight
     implicitHeight: header.height + contentImplicitHeight + 12
     height: hasVisibleContent ? implicitHeight : 0
-    visible: !searchActive || hasVisibleContent || searchExitTimer.running
+    // Stay rendered until the exit geometry and fade have fully landed.
+    visible: !searchEmpty || height > 0.5 || opacity > 0.01
     clip: true
     opacity: root.interactive
              ? (hasVisibleContent ? 1 : 0)
@@ -60,18 +59,6 @@ Item {
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
     }
-
-    // Keep an empty category alive until its search exit animation has finished.
-    Timer {
-        id: searchExitTimer
-        interval: root.searchExitDelay + MotionTokens.slow
-        repeat: false
-        running: root.searchExiting && !root.searchExitFinished
-        onTriggered: root.searchExitFinished = true
-    }
-
-    onHasVisibleContentChanged: root.searchExitFinished = root.hasVisibleContent || !root.searchActive
-    onSearchQueryChanged: root.searchExitFinished = false
 
     function _countVisibleRows() {
         var count = 0
