@@ -20,7 +20,6 @@ Item {
     // Open-session wave state: held sections share the search-empty geometry.
     property bool revealHeld: false
     property bool snapTransitions: false
-    property bool dimSuppressed: false
     readonly property bool geometryHeld: searchEmpty || revealHeld
     // Rows injected as section content, exposed for the entrance wave walk.
     readonly property alias contentRows: contentColumn.children
@@ -161,8 +160,7 @@ Item {
         spacing: 0
     }
 
-    // Dim the whole block while it is not the browsed section, staying quiet
-    // during the open-session wave so activation never flickers.
+    // Dim the whole block while it is not the browsed section.
     Rectangle {
         id: dim
         z: 4
@@ -171,10 +169,8 @@ Item {
         width: parent.width
         height: root.bodyHeight
         color: "#000000"
-        visible: root.dimSuppressed ? false
-                 : (root.sectionActive ? opacity > 0.01 : true)
-        opacity: root.dimSuppressed ? 0
-                 : (root.sectionActive ? 0 : (root.sectionHovered ? 0.3 : 0.5))
+        visible: root.sectionActive ? opacity > 0.01 : true
+        opacity: root.sectionActive ? 0 : (root.sectionHovered ? 0.3 : 0.5)
         Behavior on opacity { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
     }
 

@@ -30,6 +30,12 @@ Item {
     property real collapseProgress: sidebarExpanded ? 1 : 0
 
     readonly property int selectedIndex: categoryIndex(selectedCategory)
+    // Categories emptied by search lose their sidebar highlight.
+    readonly property var categoryAvailable: [
+        appearanceSection.hasVisibleContent,
+        barSection.hasVisibleContent,
+        notificationSection.hasVisibleContent
+    ]
     readonly property real panelWidth: sidePanel ? Logic.sidePanelWidth(availableWidth) : Logic.panelWidth(availableWidth)
     readonly property real panelHeight: sidePanel ? Math.max(0, availableHeight) : Logic.panelHeight(availableHeight)
     readonly property real navigationWidth: sidePanel ? sidebarWidth : Logic.navigationWidth(width)
@@ -218,6 +224,7 @@ Item {
         expansionProgress: root.collapseProgress
         interactive: root.interactive
         selectedIndex: root.selectedIndex
+        categoryAvailable: root.categoryAvailable
         opacity: root.layerOpacity
         onCategorySelected: index => root.selectCategory(root.categoryAt(index))
         onMoveRequested: direction => root.moveNavigation(direction)

@@ -11,10 +11,18 @@ Item {
     property bool interactive: true
     property bool sessionActive: false
     property int selectedIndex: 0
+    // Per-category search availability; an emptied category never highlights.
+    property var categoryAvailable: [true, true, true]
     property var labels: ["外观", "顶部栏", "通知"]
     property var icons: ["icons/settings.svg", "icons/podium.svg", "icons/bell.svg"]
     readonly property bool showLabels: root.expanded && root.width >= Logic.sidebarContractedWidth + 60
+    readonly property bool selectedAvailable: root.indexAvailable(root.selectedIndex)
     readonly property real indicatorY: 62 + root.selectedIndex * (46 + 4) + 23
+
+    function indexAvailable(index) {
+        return index >= 0 && index < root.categoryAvailable.length
+                && root.categoryAvailable[index] !== false
+    }
     property alias collapseButton: collapseButton
     property alias backButton: backButton
     property alias collapseSurfaceItem: collapseSurface
@@ -74,7 +82,7 @@ Item {
         height: 24
         radius: 2
         color: LazerTheme.settingsAccent
-        opacity: root.sessionActive ? 1 : 0
+        opacity: root.sessionActive && root.selectedAvailable ? 1 : 0
 
         Behavior on x {
             enabled: !MotionTokens.reducedMotion
@@ -210,7 +218,7 @@ Item {
             label: root.labels[0]
             iconSource: root.icons[0]
             expanded: root.expanded
-            selected: root.selectedIndex === 0
+            selected: root.selectedIndex === 0 && root.indexAvailable(0)
             interactive: root.interactive
             expansionProgress: root.expansionProgress
             sharedSelectionIndicator: root.selectionIndicator
@@ -224,7 +232,7 @@ Item {
             label: root.labels[1]
             iconSource: root.icons[1]
             expanded: root.expanded
-            selected: root.selectedIndex === 1
+            selected: root.selectedIndex === 1 && root.indexAvailable(1)
             interactive: root.interactive
             expansionProgress: root.expansionProgress
             sharedSelectionIndicator: root.selectionIndicator
@@ -238,7 +246,7 @@ Item {
             label: root.labels[2]
             iconSource: root.icons[2]
             expanded: root.expanded
-            selected: root.selectedIndex === 2
+            selected: root.selectedIndex === 2 && root.indexAvailable(2)
             interactive: root.interactive
             expansionProgress: root.expansionProgress
             sharedSelectionIndicator: root.selectionIndicator

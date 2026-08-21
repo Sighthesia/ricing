@@ -65,22 +65,17 @@ Flickable {
             settleTimer.restart()
     }
 
-    // Keep the dim overlays quiet until the wave has fully landed, then
-    // complete any navigation that was requested mid-wave.
+    // Once the wave settles, land any deferred navigation or re-sync the
+    // browsed section with wherever the user scrolled in the meantime.
     onEntranceBusyChanged: {
-        propagateDimSuppression()
-        if (!root.entranceBusy && root._deferredScrollIndex >= 0) {
+        if (root.entranceBusy)
+            return
+        if (root._deferredScrollIndex >= 0) {
             var deferred = root._deferredScrollIndex
             root._deferredScrollIndex = -1
             root.scrollTo(deferred)
-        }
-    }
-
-    function propagateDimSuppression() {
-        var children = column.children
-        for (var i = 0; i < children.length; i++) {
-            if (children[i].dimSuppressed !== undefined)
-                children[i].dimSuppressed = root.entranceBusy
+        } else {
+            root.recomputeCurrent()
         }
     }
 
@@ -256,6 +251,8 @@ Flickable {
         blocking: false
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: wheel => {
+            root._deferredScrollIndex = -1
+            root._programmaticTargetIndex = -1
             var scrollingDown = wheel.angleDelta.y < 0 || wheel.pixelDelta.y < 0
             var maximumY = Math.max(0, root.contentHeight - root.height)
             if (scrollingDown && root.bottomBoundarySuppressed
@@ -313,6 +310,12 @@ Flickable {
     onContentYChanged: root.recomputeCurrent()
     onHeightChanged: root.recomputeCurrent()
     onContentHeightChanged: root.recomputeCurrent()
+
+    // Manual scrolling always wins over a pending wave-time navigation.
+    onMovementStarted: {
+        root._deferredScrollIndex = -1
+        root._programmaticTargetIndex = -1
+    }
 
     NumberAnimation {
         id: scrollAnim
