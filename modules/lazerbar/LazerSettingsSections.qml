@@ -27,6 +27,62 @@ Flickable {
     flickDeceleration: 2000
 
     property bool _syncingScroll: false
+    property int _deferredScrollIndex: -1
+
+    // True while any section or row is still armed or revealing from the
+    // open-session wave; layout keeps shifting so viewport tracking pauses.
+    readonly property bool entranceWaveActive: _anyHolderActive()
+
+    // Stay busy until the final reveal transitions have fully landed.
+    readonly property bool entranceBusy: entranceWaveActive || settleTimer.running
+
+    Timer {
+        id: settleTimer
+        // Cover the trailing reveal transitions plus the stagger tail.
+        interval: MotionTokens.slow + MotionTokens.slow / 2 + 100
+        repeat: false
+    }
+
+    function _anyHolderActive() {
+        var children = column.children
+        for (var i = 0; i < children.length; i++) {
+            var section = children[i]
+            if (section.revealHeld === true || section.snapTransitions === true)
+                return true
+            var rows = section.contentRows || []
+            for (var r = 0; r < rows.length; r++) {
+                if (rows[r].revealHeld === true || rows[r].snapTransitions === true)
+                    return true
+            }
+        }
+        return false
+    }
+
+    onEntranceWaveActiveChanged: {
+        if (root.entranceWaveActive)
+            settleTimer.stop()
+        else
+            settleTimer.restart()
+    }
+
+    // Keep the dim overlays quiet until the wave has fully landed, then
+    // complete any navigation that was requested mid-wave.
+    onEntranceBusyChanged: {
+        propagateDimSuppression()
+        if (!root.entranceBusy && root._deferredScrollIndex >= 0) {
+            var deferred = root._deferredScrollIndex
+            root._deferredScrollIndex = -1
+            root.scrollTo(deferred)
+        }
+    }
+
+    function propagateDimSuppression() {
+        var children = column.children
+        for (var i = 0; i < children.length; i++) {
+            if (children[i].dimSuppressed !== undefined)
+                children[i].dimSuppressed = root.entranceBusy
+        }
+    }
 
     // Sum the actual heights of the sections that remain on screen.
     function _totalContentHeight() {
@@ -136,6 +192,8 @@ Flickable {
             return
         if (root.dropdownOpen)
             return
+        if (root.entranceBusy)
+            return
         if (root._programmaticTargetIndex >= 0)
             return
         var children = column.children
@@ -221,10 +279,17 @@ Flickable {
 
     // Scroll the target section near the viewport center with an eased motion.
     function scrollTo(index) {
-        var children = column.children
-        if (index < 0 || index >= children.length)
+        if (index < 0 || index >= column.children.length)
             return
-        var child = children[index]
+        if (root.entranceBusy) {
+            // Layout is still expanding; land the motion once the wave ends,
+            // but lock the selection state immediately so nothing overrides it.
+            root._deferredScrollIndex = index
+            root._programmaticTargetIndex = index
+            root.currentIndex = index
+            return
+        }
+        var child = column.children[index]
         if (!child || child.visible === false || child.height <= 0)
             return
         edgeBounce.stop()
