@@ -96,29 +96,34 @@ Item {
     // Own the list gap inside the height so a fully exited row frees exactly
     // zero space; removing it from the Column then causes no layout jump.
     readonly property real listGap: 8
+    readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
     implicitHeight: cardContentHeight
-    // The wave never touches layout: rows keep their final slot and only the
-    // clipped visual host grows in, so scrolling works while items reveal.
-    height: matchesSearch ? implicitHeight + listGap : 0
-    visible: !searchHidden || height > 0.5 || opacity > 0.01
-    opacity: root.enabled ? 1 : LazerTheme.settingsDisabledAlpha
-    // Held (not yet revealed) rows keep their slot but take no input.
-    readonly property bool interactable: matchesSearch && !revealHeld
-    // Animated visual height driving the reveal grow inside the clip host.
-    property real revealHeight: geometryHeld ? 0 : implicitHeight
-    readonly property real revealProgress: implicitHeight > 0 ? Math.min(1, revealHeight / implicitHeight) : 1
+    height: geometryHeld ? 0 : implicitHeight + listGap
+    // Stay rendered until the exit geometry and fade have fully landed.
+    visible: !geometryHeld || height > 0.5 || opacity > 0.01
+    opacity: root.enabled
+             ? (geometryHeld ? 0 : 1)
+             : LazerTheme.settingsDisabledAlpha * (geometryHeld ? 0 : 1)
+    x: geometryHeld ? -8 : 0
 
     Behavior on height {
-        enabled: !MotionTokens.reducedMotion
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         SequentialAnimation {
-            PauseAnimation { duration: root.searchHidden ? root.searchExitDelay : 0 }
+            PauseAnimation { duration: root.geometryHeld ? root.searchExitDelay : 0 }
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
     }
-    Behavior on revealHeight {
+    Behavior on opacity {
         enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         SequentialAnimation {
-            PauseAnimation { duration: root.searchHidden ? root.searchExitDelay : 0 }
+            PauseAnimation { duration: root.geometryHeld ? root.searchExitDelay : 0 }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
+    }
+    Behavior on x {
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
+        SequentialAnimation {
+            PauseAnimation { duration: root.geometryHeld ? root.searchExitDelay : 0 }
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
     }
@@ -157,81 +162,62 @@ Item {
     // Observe the complete row, including areas covered by embedded controls.
     HoverHandler {
         id: rowHover
-        enabled: root.enabled && root.interactable
+        enabled: root.enabled && root.matchesSearch
         // Keep the row highlight observer from starving embedded controls.
         blocking: false
     }
 
-    // Clip the growing reveal so rows expand visually while the layout
-    // underneath stays at its final, scrollable geometry.
-    Item {
-        id: visualHost
+    // Observe only the row surface; leave the exposed reset button region to its own handlers.
+    MouseArea {
+        id: rowHoverArea
+        z: 0.5
         anchors.left: parent.left
         anchors.top: parent.top
-        width: root.width
-        height: root.revealHeight
-        clip: true
-        opacity: root.revealProgress
-        x: geometryHeld ? -8 : 0
+        height: root.bodyHeight
+        width: root.hasDefault ? Math.max(0, root.revertVisibleX) : root.width
+        enabled: root.enabled && root.matchesSearch
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+    }
 
-        Behavior on x {
-            enabled: !MotionTokens.reducedMotion && !root.snapTransitions
-            SequentialAnimation {
-                PauseAnimation { duration: root.searchHidden ? root.searchExitDelay : 0 }
-                NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
-            }
-        }
+    // Keep one shared card surface behind every setting presentation.
+    Rectangle {
+        id: cardSurface
+        z: 1
+        anchors.left: parent.left
+        anchors.top: parent.top
+        height: root.bodyHeight
+        width: root.cardBodyWidth
+        radius: root.cardRadius
+        visible: !root.choicePresentation
+        color: root.rowHighlighted ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+        border.width: root.rowHighlighted ? 1.5 : 0
+        border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+        Behavior on border.width { NumberAnimation { duration: 100 } }
+        Behavior on border.color { ColorAnimation { duration: 100 } }
 
-        // Observe only the row surface; leave the exposed reset button region to its own handlers.
-        MouseArea {
-            id: rowHoverArea
-            z: 0.5
-            anchors.left: parent.left
-            anchors.top: parent.top
-            height: root.revealHeight
-            width: root.hasDefault ? Math.max(0, root.revertVisibleX) : root.width
-            enabled: root.enabled && root.interactable
-            hoverEnabled: true
-            acceptedButtons: Qt.NoButton
-        }
+    }
 
-        // Keep one shared card surface behind every setting presentation.
-        Rectangle {
-            id: cardSurface
-            z: 1
-            anchors.left: parent.left
-            anchors.top: parent.top
-            height: root.revealHeight
-            width: root.cardBodyWidth
-            radius: root.cardRadius
-            visible: !root.choicePresentation
-            color: root.rowHighlighted ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-            border.width: root.rowHighlighted ? 1.5 : 0
-            border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
-            Behavior on border.width { NumberAnimation { duration: 100 } }
-            Behavior on border.color { ColorAnimation { duration: 100 } }
-        }
-
-        // Keep the row focus ring above embedded controls without owning input.
-        Rectangle {
-            id: cardHighlight
-            z: 2
-            anchors.left: parent.left
-            anchors.top: parent.top
-            height: root.revealHeight
-            width: root.cardBodyWidth
-            radius: cardSurface.radius
-            visible: !root.choicePresentation
-            color: "transparent"
-            border.width: root.rowHighlighted ? 1.5 : 0
-            border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
-            enabled: false
-            Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
-            Behavior on border.width { NumberAnimation { duration: 100 } }
-            Behavior on border.color { ColorAnimation { duration: 100 } }
-        }
+    // Keep the row focus ring above embedded controls without owning input.
+    Rectangle {
+        id: cardHighlight
+        z: 2
+        anchors.left: parent.left
+        anchors.top: parent.top
+        height: root.bodyHeight
+        width: root.cardBodyWidth
+        radius: cardSurface.radius
+        visible: !root.choicePresentation
+        color: "transparent"
+        border.width: root.rowHighlighted ? 1.5 : 0
+        border.color: root.rowHighlighted ? LazerTheme.settingsAccent : "transparent"
+        enabled: false
+        Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+        Behavior on border.width { NumberAnimation { duration: 100 } }
+        Behavior on border.color { ColorAnimation { duration: 100 } }
+    }
 
     // Propagate availability to the single injected control.
     Binding {
@@ -298,9 +284,9 @@ Item {
         x: Math.max(0, root.revertVisible ? root.revertVisibleX : root.revertHiddenX)
         y: 0
         width: root.revertVisualWidth
-        height: root.choicePresentation ? root.safeMainControlHeight : root.revealHeight
+        height: root.choicePresentation ? root.safeMainControlHeight : root.bodyHeight
         visible: root.enabled && root.hasDefault && (root.revertVisible || x > root.revertHiddenX + 0.5)
-        enabled: root.canReset && root.interactable
+        enabled: root.canReset && root.matchesSearch
         activeFocusOnTab: root.canReset
         Accessible.role: Accessible.Button
         Accessible.name: "恢复默认"
@@ -376,11 +362,11 @@ Item {
 
         HoverHandler {
             id: revertHover
-            enabled: root.canReset && root.interactable
+            enabled: root.canReset && root.matchesSearch
         }
         TapHandler {
             id: revertPress
-            enabled: root.canReset && root.interactable
+            enabled: root.canReset && root.matchesSearch
             onTapped: root.activateReset()
         }
         Keys.onPressed: event => {
@@ -452,7 +438,6 @@ Item {
             Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
             Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
         }
-    }
     }
 
     readonly property Item labelTextItem: labelItem
