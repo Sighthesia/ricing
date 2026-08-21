@@ -121,6 +121,10 @@ Variants {
             anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true }
             margins { top: Services.SettingsService.bar.position === "top" ? screenScope.floatingMargin + Services.SettingsService.bar.height : 0; bottom: Services.SettingsService.bar.position === "bottom" ? screenScope.floatingMargin + Services.SettingsService.bar.height : 0 }
             mask: Region { item: screenScope.settingsMaskActive ? settingsOverlay : null }
+            // Take keyboard only while settings is open so typing reaches its
+            // text fields and global keys stay free when closed.
+            WlrLayershell.keyboardFocus: settingsOverlay.interactive
+                    ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
             LazerSettingsOverlay {
                 id: settingsOverlay; anchors.fill: parent
                 panel.appearanceSettings: Services.SettingsService.appearance
