@@ -107,6 +107,18 @@ Item {
     // Animated visual height driving the reveal grow inside the clip host.
     property real revealHeight: geometryHeld ? 0 : implicitHeight
     readonly property real revealProgress: implicitHeight > 0 ? Math.min(1, revealHeight / implicitHeight) : 1
+    // Upward pre-offset set by the section: unrevealed rows sit where the old
+    // compressed layout would have placed them, gliding down as the wave lands.
+    property real revealShift: 0
+
+    onRevealProgressChanged: {
+        var parentColumn = root.parent
+        if (parentColumn && parentColumn.chainSync !== undefined)
+            parentColumn.chainSync()
+    }
+    // While revealing, clip at the row bounds so shifted rows never paint
+    // over the section header; restore overflow behavior once landed.
+    clip: revealHeld || snapTransitions || revealProgress < 1
 
     Behavior on height {
         enabled: !MotionTokens.reducedMotion
@@ -173,6 +185,7 @@ Item {
         clip: true
         opacity: root.revealProgress
         x: geometryHeld ? -8 : 0
+        y: -root.revealShift
 
         Behavior on x {
             enabled: !MotionTokens.reducedMotion && !root.snapTransitions

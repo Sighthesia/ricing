@@ -349,6 +349,7 @@ Item {
                     + panel.appearancePage.wallpaperRow.listGap)
             tryCompare(panel.appearancePage.wallpaperRow, "revealProgress", 1, 1500)
             tryCompare(panel.notificationPage.backgroundItem, "opacity", 1, 1500)
+            compare(panel.barPage.heightRow.revealShift, 0)
             compare(panel.appearancePage.visibleResultCount, 9)
         }
 
