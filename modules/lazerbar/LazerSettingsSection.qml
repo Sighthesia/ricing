@@ -80,7 +80,6 @@ Item {
         revealTimer.stop()
         root.snapTransitions = true
         root.revealHeld = true
-        Qt.callLater(root._syncRevealOffsets)
     }
 
     // Leave the held state without animation (wave cancelled).
@@ -158,28 +157,6 @@ Item {
         y: header.height
         width: root.width
         spacing: 0
-
-        // Rows bubble their reveal progress here to refresh chain offsets.
-        function chainSync() {
-            root._syncRevealOffsets()
-        }
-    }
-
-    // Reproduce the old compressed-layout motion: every row sits shifted up
-    // by however much unrevealed height remains above it, then glides down.
-    function _syncRevealOffsets() {
-        var rows = contentColumn.children
-        var shift = 0
-        for (var i = 0; i < rows.length; i++) {
-            var row = rows[i]
-            if (row.revealShift === undefined)
-                continue
-            row.revealShift = shift
-            var progress = Number(row.revealProgress)
-            var remaining = 1 - (isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 1)
-            shift += remaining * (Math.max(0, Number(row.implicitHeight) || 0)
-                                  + (Number(row.listGap) || 0))
-        }
     }
 
     // Dim the whole block while it is not the browsed section.
