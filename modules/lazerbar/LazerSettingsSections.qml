@@ -235,6 +235,9 @@ Flickable {
             root._programmaticTargetIndex = -1
             scrollAnim.stop()
         }
+        // Native wheel/flick momentum keeps clamping contentY at the bound
+        // and would fight the rebound animation; hand control over now.
+        root.cancelFlick()
         var maximumY = Math.max(0, root.contentHeight - root.height)
         var proposed = Math.max(-root.overscrollDistance,
                                 Math.min(maximumY + root.overscrollDistance,
