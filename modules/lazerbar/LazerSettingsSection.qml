@@ -39,13 +39,14 @@ Item {
     readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
     readonly property real contentImplicitHeight: Math.max(0, contentColumn.implicitHeight - 8)
     implicitHeight: header.height + contentImplicitHeight + 12
-    // The wave is purely visual; section layout is final from the start.
-    height: hasVisibleContent ? implicitHeight + listGap : 0
+    height: geometryHeld ? 0 : implicitHeight + listGap
     // Stay rendered until the exit geometry and fade have fully landed.
-    visible: !searchEmpty || height > 0.5 || opacity > 0.01
+    visible: !geometryHeld || height > 0.5 || opacity > 0.01
     clip: true
-    opacity: root.interactive ? 1 : LazerTheme.settingsDisabledAlpha
-    x: hasVisibleContent ? 0 : -8
+    opacity: root.interactive
+             ? (geometryHeld ? 0 : 1)
+             : LazerTheme.settingsDisabledAlpha * (geometryHeld ? 0 : 1)
+    x: geometryHeld ? -8 : 0
 
     Behavior on height {
         enabled: !MotionTokens.reducedMotion && !root.snapTransitions
@@ -110,17 +111,15 @@ Item {
         return count
     }
 
-    // Paint the square section background behind the title and rows; it fades
-    // in at the section's own wave slot while rows keep their final layout.
+    // Paint the square section background behind the title and rows, slightly
+    // lighter than the row cards so the category block reads as one surface.
     Rectangle {
         id: background
         anchors.left: parent.left
         anchors.top: parent.top
         width: parent.width
         height: root.bodyHeight
-        opacity: root.revealHeld ? 0 : 1
         color: LazerTheme.settingsSection
-        Behavior on opacity { enabled: !MotionTokens.reducedMotion && !root.snapTransitions; NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint } }
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
@@ -131,8 +130,6 @@ Item {
         y: 0
         width: root.width
         height: 48
-        opacity: root.revealHeld ? 0 : 1
-        Behavior on opacity { enabled: !MotionTokens.reducedMotion && !root.snapTransitions; NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint } }
 
         Text {
             anchors.left: parent.left
@@ -173,9 +170,8 @@ Item {
         height: root.bodyHeight
         color: "#000000"
         visible: root.sectionActive ? opacity > 0.01 : true
-        opacity: root.revealHeld ? 0
-                 : (root.sectionActive ? 0 : (root.sectionHovered ? 0.3 : 0.5))
-        Behavior on opacity { enabled: !MotionTokens.reducedMotion && !root.snapTransitions; NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+        opacity: root.sectionActive ? 0 : (root.sectionHovered ? 0.3 : 0.5)
+        Behavior on opacity { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
     }
 
     // Let the first click on a dimmed block scroll it into view (osu behavior).

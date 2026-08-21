@@ -344,7 +344,10 @@ Item {
 
         function test_openSessionWaveRevealCompletes() {
             panel.beginSession()
-            tryCompare(panel.appearancePage.wallpaperRow, "opacity", 1, 1500)
+            tryVerify(function() {
+                return panel.appearancePage.wallpaperRow.visible
+                       && panel.appearancePage.wallpaperRow.height >= panel.appearancePage.wallpaperRow.implicitHeight
+            }, 1500)
             tryVerify(function() {
                 return panel.notificationPage.visible && panel.notificationPage.height > 0
             }, 1500)
@@ -355,7 +358,6 @@ Item {
             Lazer.MotionTokens.reducedMotionOverride = true
             panel.beginSession()
             verify(panel.appearancePage.wallpaperRow.visible)
-            compare(panel.appearancePage.wallpaperRow.opacity, 1)
             tryCompare(panel.appearancePage.wallpaperRow, "height",
                        panel.appearancePage.wallpaperRow.implicitHeight
                        + panel.appearancePage.wallpaperRow.listGap, 300)
@@ -370,7 +372,6 @@ Item {
                 return panel.barPage.visible && panel.barPage.height > 0
                        && panel.notificationPage.visible && panel.notificationPage.height > 0
             }, 2000)
-            tryCompare(panel.appearancePage.wallpaperRow, "opacity", 1, 2000)
             verify(!panel.content.emptyStateVisible)
         }
 

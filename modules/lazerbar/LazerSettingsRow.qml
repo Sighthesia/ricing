@@ -24,8 +24,6 @@ Item {
     property bool revealHeld: false
     property bool snapTransitions: false
     readonly property bool geometryHeld: searchHidden || revealHeld
-    // Held (not yet revealed) rows keep their slot but take no input.
-    readonly property bool interactable: matchesSearch && !revealHeld
     readonly property bool contentEnabled: enabled
     readonly property bool hasDefault: defaultValue !== undefined
     readonly property bool isDefault: hasDefault && Logic.valuesEqual(defaultValue, currentValue)
@@ -100,33 +98,32 @@ Item {
     readonly property real listGap: 8
     readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
     implicitHeight: cardContentHeight
-    // The wave is purely visual: layout keeps its final geometry so the list
-    // can be scrolled normally while items are still fading in.
-    height: matchesSearch ? implicitHeight + listGap : 0
-    visible: !searchHidden || height > 0.5 || opacity > 0.01
+    height: geometryHeld ? 0 : implicitHeight + listGap
+    // Stay rendered until the exit geometry and fade have fully landed.
+    visible: !geometryHeld || height > 0.5 || opacity > 0.01
     opacity: root.enabled
              ? (geometryHeld ? 0 : 1)
              : LazerTheme.settingsDisabledAlpha * (geometryHeld ? 0 : 1)
     x: geometryHeld ? -8 : 0
 
     Behavior on height {
-        enabled: !MotionTokens.reducedMotion
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         SequentialAnimation {
-            PauseAnimation { duration: root.searchHidden ? root.searchExitDelay : 0 }
+            PauseAnimation { duration: root.geometryHeld ? root.searchExitDelay : 0 }
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
     }
     Behavior on opacity {
         enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         SequentialAnimation {
-            PauseAnimation { duration: root.searchHidden ? root.searchExitDelay : 0 }
+            PauseAnimation { duration: root.geometryHeld ? root.searchExitDelay : 0 }
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
     }
     Behavior on x {
         enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         SequentialAnimation {
-            PauseAnimation { duration: root.searchHidden ? root.searchExitDelay : 0 }
+            PauseAnimation { duration: root.geometryHeld ? root.searchExitDelay : 0 }
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
     }
@@ -165,7 +162,7 @@ Item {
     // Observe the complete row, including areas covered by embedded controls.
     HoverHandler {
         id: rowHover
-        enabled: root.enabled && root.interactable
+        enabled: root.enabled && root.matchesSearch
         // Keep the row highlight observer from starving embedded controls.
         blocking: false
     }
@@ -178,7 +175,7 @@ Item {
         anchors.top: parent.top
         height: root.bodyHeight
         width: root.hasDefault ? Math.max(0, root.revertVisibleX) : root.width
-        enabled: root.enabled && root.interactable
+        enabled: root.enabled && root.matchesSearch
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
     }
@@ -289,7 +286,7 @@ Item {
         width: root.revertVisualWidth
         height: root.choicePresentation ? root.safeMainControlHeight : root.bodyHeight
         visible: root.enabled && root.hasDefault && (root.revertVisible || x > root.revertHiddenX + 0.5)
-        enabled: root.canReset && root.interactable
+        enabled: root.canReset && root.matchesSearch
         activeFocusOnTab: root.canReset
         Accessible.role: Accessible.Button
         Accessible.name: "恢复默认"
@@ -365,11 +362,11 @@ Item {
 
         HoverHandler {
             id: revertHover
-            enabled: root.canReset && root.interactable
+            enabled: root.canReset && root.matchesSearch
         }
         TapHandler {
             id: revertPress
-            enabled: root.canReset && root.interactable
+            enabled: root.canReset && root.matchesSearch
             onTapped: root.activateReset()
         }
         Keys.onPressed: event => {
