@@ -30,6 +30,15 @@ description: 在 Afloat 中实现任何新的可见 QML 表面、交互反馈、
 - 焦点/强调环是独立 Rectangle 层（z 高于内容、`enabled: false` 不参与输入），边框 `1.5px` 的 accent 色，宽度过渡用 fast。
 - 点击闪烁配方（所有可点组件统一）：透明覆盖矩形填充 `LazerTheme.textPrimary`，激活时播放 `NumberAnimation { from: MotionTokens.clickFlashOpacity; to: 0; duration: MotionTokens.clickFlashDuration; easing.type: MotionTokens.clickFlashEasing }`；通过 `restartFlash()` 触发，reducedMotion 时直接归零。参考 `resetFlashAnimation` 与 `restartResetFlash()`。
 
+## 双层覆盖几何（矩形月牙）
+
+设置面板的标志性构成手法（权威实现：`LazerSettingsRow` 默认按钮），可复用于任何"角部附属控件嵌进主表面"的场景：
+
+- 下层是附属控件表面，上层是带圆角的主表面；主表面的圆角把下层露出的角裁成**矩形月牙**（一侧直角、一侧被圆角切掉的月牙形），不使用任何遮罩或 clip。
+- 逻辑宽度与视觉宽度分离：逻辑宽度是交互区（28px），视觉宽度 = 逻辑宽度 + 主表面圆角（34px）；多出的圆角宽度向主表面内侧延伸并被裁掉。
+- 图标以可见区域为居中基准，不以扩展后的视觉宽度为基准。
+- 状态表达仍走色块亮度/hover swap，月牙形态本身静态不变。
+
 ## 输入隔离
 
 - hover 观察（HoverHandler/MouseArea）不得吞掉内嵌控件的指针事件：全行 catcher 用 `blocking: false`，按钮区域留独立 handler。
