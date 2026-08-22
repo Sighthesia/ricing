@@ -7,7 +7,8 @@ import "textdiff.js" as TextDiff
 //    one text height while fading out, mirroring BasicTextBox's
 //    FallingDownContainer.Hide(): FadeOut(200) + MoveToY(200, Easing.InQuad).
 // All native behaviour (selection, clipboard, IME commit) is untouched; the
-// ghost glyphs are plain child items stacked above the live text.
+// ghost glyphs are spawned on the scene root so they can fall past every
+// enclosing surface.
 TextInput {
     id: root
 
@@ -49,13 +50,9 @@ TextInput {
     Component.onCompleted: {
         trackedText = text
         adoptRootGhostLayer()
-        syncGhostLayer()
     }
 
-    onParentChanged: {
-        adoptRootGhostLayer()
-        syncGhostLayer()
-    }
+    onParentChanged: adoptRootGhostLayer()
 
     // The field clips its own text, so ghosts parented here could never fall
     // past the surface. Hand the layer to the scene root with a dominant z:
@@ -69,26 +66,6 @@ TextInput {
         ghostLayer.parent = top
         ghostLayer.z = 1000000
     }
-
-    function syncGhostLayer() {
-        if (!ghostLayer.parent)
-            return
-        if (ghostLayer.parent !== root) {
-            var origin = mapToItem(ghostLayer.parent, 0, 0)
-            ghostLayer.x = origin.x
-            ghostLayer.y = origin.y
-        } else {
-            ghostLayer.x = 0
-            ghostLayer.y = 0
-        }
-        ghostLayer.width = width
-        ghostLayer.height = height
-    }
-
-    onXChanged: syncGhostLayer()
-    onYChanged: syncGhostLayer()
-    onWidthChanged: syncGhostLayer()
-    onHeightChanged: syncGhostLayer()
 
     // Reparented layers do not die with their original owner.
     Component.onDestruction: ghostLayer.destroy()
@@ -120,22 +97,30 @@ TextInput {
     }
 
     function createGhost(ch, x, anchorRect, delayMs) {
+        // Map fresh at spawn time: ancestor panels slide and scale between
+        // edits, so any cached layer geometry would drift away from the field.
+        var origin = root.mapToItem(ghostLayer, x, anchorRect.y)
+        var unitEnd = root.mapToItem(ghostLayer, x + 1, anchorRect.y)
+        var ancestorScale = Math.abs(unitEnd.x - origin.x) || 1
         return ghostComponent.createObject(ghostLayer, {
             text: ch,
             color: root.color,
             font: root.font,
-            x: x,
-            y: anchorRect.y,
+            x: origin.x,
+            y: origin.y,
             width: Math.max(2, anchorRect.height),
             height: anchorRect.height,
+            transformOrigin: Item.TopLeft,
+            scale: ancestorScale,
             verticalAlignment: Text.AlignVCenter,
-            fallDistance: Math.max(metrics.height * 0.8, 8),
+            fallDistance: Math.max(anchorRect.height, metrics.height) * ghostFallDistanceScale * ancestorScale,
             fallDelayMs: delayMs
         })
     }
 
-    // Ghost host; geometry mirrors this field (see syncGhostLayer) and clip
-    // stays off so falling glyphs may exit the surface like osu's removals.
+    // Ghost host on the scene root; clip stays off so falling glyphs may
+    // exit any enclosing surface like osu's removals. Ghost coordinates are
+    // mapped fresh at spawn time (see createGhost).
     Item {
         id: ghostLayer
     }
