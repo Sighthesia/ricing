@@ -39,6 +39,14 @@ Singleton {
     readonly property bool notificationLeft: notificationPosition.indexOf("-left") >= 0
     readonly property bool notificationRight: !notificationLeft
 
+    // Fired once per expiring popup so hosts can play the exit animation;
+    // the entry is removed only when the host reports back via dismissPopup.
+    signal popupCloseRequested(string notifId)
+
+    // Ids whose exit animation has been requested but not completed yet,
+    // mapped to the timestamp the request was issued.
+    property var _animatingOut: ({})
+
     // Remove transient popups from one deterministic timer owned by the service.
     property Timer popupExpiryTimer: Timer {
         interval: 250
@@ -49,8 +57,20 @@ Singleton {
             const timeout = Math.max(0, Number(SettingsService.notifications.timeout) || 0)
             for (let i = root.popupList.count - 1; i >= 0; --i) {
                 const entry = root.popupList.get(i)
-                if (timeout <= 0 || now - Number(entry.timestamp || 0) >= timeout)
-                    root.popupList.remove(i)
+                const id = String(entry.notifId)
+                if (root._animatingOut[id] !== undefined)
+                    continue
+                if (timeout <= 0 || now - Number(entry.timestamp || 0) >= timeout) {
+                    root._animatingOut[id] = now
+                    root.popupCloseRequested(id)
+                }
+            }
+            // Fallback: hosts without a live delegate must not leak entries.
+            for (const id in root._animatingOut) {
+                if (now - root._animatingOut[id] > 1500) {
+                    delete root._animatingOut[id]
+                    root.removeNotification(id)
+                }
             }
         }
     }
@@ -239,6 +259,7 @@ Singleton {
 
     // Expose the popup-specific dismissal contract used by notification hosts.
     function dismissPopup(notifId) {
+        delete root._animatingOut[String(notifId)]
         removeNotification(notifId)
     }
 

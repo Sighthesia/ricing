@@ -15,20 +15,20 @@ Variants {
         required property var modelData
 
         // Commit only the visible stack bounds to the input mask; keep the
-        // window a full screen column so flung cards can fall past the stack
-        // without being clipped by the layer surface edge.
+        // window a full screen column plus a left fly-out reserve so flung
+        // cards are not clipped by the layer surface edge mid-fall.
         PanelWindow {
             id: notificationWindow
             screen: screenScope.modelData
             color: "transparent"
-            implicitWidth: notificationStack.implicitWidth
+            implicitWidth: notificationStack.implicitWidth + 560
             implicitHeight: Math.max(1, screenScope.modelData.height)
             exclusionMode: ExclusionMode.Ignore
             anchors {
                 top: Services.NotificationService.notificationTop
                 bottom: Services.NotificationService.notificationBottom
-                left: Services.NotificationService.notificationLeft
                 right: Services.NotificationService.notificationRight
+                left: Services.NotificationService.notificationLeft
             }
             margins {
                 top: Services.NotificationService.notificationTop
@@ -43,16 +43,29 @@ Variants {
             mask: Region { item: notificationStack.implicitHeight > 0 ? notificationStack : null }
 
             // Stack only the cards; the stack keeps its content height so the
-            // input mask stays limited to visible notification cards.
+            // input mask stays limited to visible notification cards. It hugs
+            // whichever horizontal edge the host surface is pinned to, so the
+            // extra fly-out reserve stays transparent on the fling side.
             LazerNotificationStack {
                 id: notificationStack
                 anchors.top: Services.NotificationService.notificationTop ? parent.top : undefined
                 anchors.bottom: Services.NotificationService.notificationBottom ? parent.bottom : undefined
-                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.right: Services.NotificationService.notificationRight ? parent.right : undefined
+                anchors.left: Services.NotificationService.notificationLeft ? parent.left : undefined
                 stackAtTop: Services.NotificationService.notificationTop
                 popupModel: Services.NotificationService.popupList
                 onPopupDismissRequested: notifId => Services.NotificationService.dismissPopup(notifId)
-        }
+
+                // Expired popups leave with the same fling as a manual close;
+                // entries without a live delegate are dropped immediately.
+                Connections {
+                    target: Services.NotificationService
+                    function onPopupCloseRequested(notifId) {
+                        if (!notificationStack.closeAnimated(notifId))
+                            Services.NotificationService.dismissPopup(notifId)
+                    }
+                }
+            }
         }
     }
 }

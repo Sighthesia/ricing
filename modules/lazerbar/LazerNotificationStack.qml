@@ -11,6 +11,20 @@ Item {
     implicitWidth: 360
     implicitHeight: popupList.contentHeight
 
+    // Play the osu fling exit on one popup without touching the model.
+    // Returns false when no live delegate exists for the id.
+    function closeAnimated(notifId) {
+        for (let i = 0; i < popupList.count; ++i) {
+            if (String(popupModel.get(i).notifId) === String(notifId)) {
+                const item = popupList.itemAtIndex(i)
+                if (item)
+                    item.requestClose(true)
+                return item !== null
+            }
+        }
+        return false
+    }
+
     // Keep the stack's hit mask limited to visible notification cards.
     ListView {
         id: popupList
