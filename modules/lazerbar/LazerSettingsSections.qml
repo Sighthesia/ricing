@@ -229,6 +229,14 @@ Flickable {
         root._lastContentY = root.contentY
     }
 
+    // Rubber-band resistance: the further past the bound, the smaller each
+    // additional step becomes, like a spring approaching full tension.
+    function _resistedTarget(current, delta, bound) {
+        var past = Math.max(0, Math.abs(current - bound))
+        var tension = Math.min(1, past / root.overscrollDistance)
+        return current - delta * (1 - tension)
+    }
+
     // Push past the scroll edge on continued wheel input, then settle back.
     function _requestEdgeOvershoot(delta) {
         if (MotionTokens.reducedMotion)
@@ -345,16 +353,21 @@ Flickable {
             if (root.edgeDriving && !nearBottom && !nearTop)
                 root._settleEdgeDrive()
             if (!MotionTokens.reducedMotion && (nearBottom || nearTop)) {
-                // Take over before the bound: chase the raw delta with a
-                // short ease so response is immediate but motion stays
-                // continuous, then ease back once input idles.
+                // Take over before the bound: chase the delta with a short
+                // ease, damped deeper into the overscroll band so the pull
+                // tightens progressively toward the hard end.
                 root.cancelFlick()
                 root.edgeDriving = true
                 edgeSettleTimer.restart()
                 edgeSettleAnim.stop()
-                var proposed = Math.max(-root.overscrollDistance,
-                                        Math.min(maximumY + root.overscrollDistance,
-                                                 root.contentY - delta))
+                var proposed = root.contentY - delta
+                if (proposed < 0)
+                    proposed = root._resistedTarget(root.contentY, delta, 0)
+                else if (proposed > maximumY)
+                    proposed = root._resistedTarget(root.contentY, delta, maximumY)
+                proposed = Math.max(-root.overscrollDistance,
+                                    Math.min(maximumY + root.overscrollDistance,
+                                             proposed))
                 edgeDriveAnim.stop()
                 edgeDriveAnim.from = root.contentY
                 edgeDriveAnim.to = proposed
