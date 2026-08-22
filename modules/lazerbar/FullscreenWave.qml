@@ -14,7 +14,9 @@ Item {
     property alias paintedLayer: layer
 
     clip: true
-    opacity: Math.max(0, Math.min(1, progress))
+    // Ramp opacity ahead of position so the sweep reads as a reveal; reduced motion tracks progress exactly.
+    opacity: MotionTokens.reducedMotion ? Math.max(0, Math.min(1, progress))
+            : Math.max(0, Math.min(1, progress * 1.6))
 
     Rectangle {
         id: layer

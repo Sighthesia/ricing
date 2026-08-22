@@ -17,7 +17,7 @@ QtObject {
     readonly property int waveEnter: 800
     readonly property int waveExit: 500
     // Backdrop waves lead the body so they stay visible while content slides over them.
-    readonly property int waveBackdropEnter: 400
+    readonly property int waveBackdropEnter: 600
 
     // Wallpaper swaps are large-surface reveals; keep them calm but not slow.
     readonly property int wallpaperSwap: 480

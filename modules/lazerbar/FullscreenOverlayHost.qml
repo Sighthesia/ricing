@@ -201,7 +201,7 @@ Item {
         easing.type: Easing.OutQuint
         onFinished: if (root.phase === "opening") root.phase = "open"
     }
-    NumberAnimation { id: openWaves; target: root; property: "waveProgress"; to: 1; duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.waveBackdropEnter; easing.type: Easing.OutSine }
+    NumberAnimation { id: openWaves; target: root; property: "waveProgress"; to: 1; duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.waveBackdropEnter; easing.type: Easing.OutQuad }
     NumberAnimation {
         id: closeBody
         target: root
