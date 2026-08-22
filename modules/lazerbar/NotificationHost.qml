@@ -55,6 +55,8 @@ Variants {
                 stackAtTop: Services.NotificationService.notificationTop
                 popupModel: Services.NotificationService.popupList
                 onPopupDismissRequested: notifId => Services.NotificationService.dismissPopup(notifId)
+                onPopupActionRequested: (notifId, identifier) =>
+                    Services.NotificationService.invokePopupAction(notifId, identifier)
 
                 // Expired popups leave with the same fling as a manual close;
                 // entries without a live delegate are dropped immediately.

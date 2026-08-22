@@ -8,6 +8,7 @@ Item {
     // osu DragContainer pads 3px vertically per card, giving a 6px gap.
     readonly property int spacing: 6
     signal popupDismissRequested(var notifId)
+    signal popupActionRequested(var notifId, string identifier)
     implicitWidth: 360
     implicitHeight: popupList.contentHeight
 
@@ -56,7 +57,9 @@ Item {
             summary: model.summary ?? ""
             body: model.body ?? ""
             iconSource: model.icon ?? ""
+            actionsText: model.actionsJson ?? ""
             onDismissRequested: root.popupDismissRequested(model.notifId)
+            onActionRequested: identifier => root.popupActionRequested(model.notifId, identifier)
         }
     }
 }

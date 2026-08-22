@@ -47,6 +47,10 @@ Singleton {
     // mapped to the timestamp the request was issued.
     property var _animatingOut: ({})
 
+    // Live Notification objects kept alive (tracked) so popup action buttons
+    // can invoke them long after the D-Bus callback returned.
+    property var _trackedNotifications: ({})
+
     // Remove transient popups from one deterministic timer owned by the service.
     property Timer popupExpiryTimer: Timer {
         interval: 250
@@ -249,8 +253,20 @@ Singleton {
     }
 
     function removeNotification(notifId) {
+        const key = String(notifId)
+        const tracked = root._trackedNotifications[key]
+        if (tracked) {
+            delete root._trackedNotifications[key]
+            try {
+                if (typeof tracked.dismiss === "function")
+                    tracked.dismiss()
+            } catch (err) {
+                // The remote notification may already be gone; removal wins.
+            }
+        }
+
         for (let i = 0; i < popupList.count; i++) {
-            if (popupList.get(i).notifId === notifId) {
+            if (String(popupList.get(i).notifId) === key) {
                 popupList.remove(i)
                 return
             }
@@ -261,6 +277,22 @@ Singleton {
     function dismissPopup(notifId) {
         delete root._animatingOut[String(notifId)]
         removeNotification(notifId)
+    }
+
+    // Invoke a tracked popup's D-Bus action by identifier; no-op when the
+    // notification or the action is gone.
+    function invokePopupAction(notifId, identifier) {
+        const tracked = root._trackedNotifications[String(notifId)]
+        if (!tracked)
+            return
+
+        const actions = tracked.actions || []
+        for (let i = 0; i < actions.length; ++i) {
+            if (String(actions[i].identifier) === String(identifier)) {
+                actions[i].invoke()
+                return
+            }
+        }
     }
 
     function setSticky(notifId, sticky) {
@@ -339,6 +371,8 @@ Singleton {
     }
 
     property NotificationServer _server: NotificationServer {
+        actionsSupported: true
+
         onNotification: n => {
             root.recordNotification(n)
 
@@ -347,15 +381,31 @@ Singleton {
 
             // Cap at configured max visible popups
             if (root.popupList.count >= SettingsService.notifications.maxVisible)
-                root.popupList.remove(0)
+                root.removeNotification(root.popupList.get(0).notifId)
 
+            // Keep the Notification object alive so action buttons can invoke
+            // it later; collect the human-readable actions for the card.
+            n.tracked = true
+            const popupActions = []
+            for (let i = 0; i < n.actions.length; ++i) {
+                const action = n.actions[i]
+                if (String(action.text) !== "")
+                    popupActions.push({
+                        identifier: String(action.identifier),
+                        text: String(action.text)
+                    })
+            }
+
+            root._trackedNotifications[String(n.id)] = n
             root.popupList.append({
                 notifId: n.id,
                 appName: n.appName || "",
                 summary: n.summary || "",
                 body: n.body || "",
                 icon: n.appIcon || n.image || "",
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                // ListModel list roles read back unreliably; ship as JSON.
+                actionsJson: JSON.stringify(popupActions)
             })
         }
     }

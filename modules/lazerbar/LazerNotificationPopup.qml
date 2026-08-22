@@ -1,19 +1,40 @@
 import QtQuick
+import Quickshell
 
-// Present one transient notification as an osu-style toast. Layout, colors,
-// and motion follow osu!lazer's Notification.cs: Purple overlay palette
-// (hue 255), 6px radius, 40px icon strip, 28px close column, and the
-// DragContainer fling — fly left, rotate with X, fall under gravity.
+// Present one transient notification as a lazer-style toast. The surface is a
+// component-level 6px card over theme tokens: app-name header, summary title,
+// muted body, and D-Bus action buttons, with a 40px icon rail and 28px close
+// column. Motion and colors follow the settings-panel authority (MotionTokens,
+// hover swap, click flash); the exit keeps the osu DragContainer fling — fly
+// left, rotate with X, fall under gravity.
 Item {
     id: root
     property string appName: ""
     property string summary: ""
     property string body: ""
     property string iconSource: ""
+    property string actionsText: ""
+    // Actions arrive as JSON because ListModel list roles read back as null.
+    readonly property var actionList: {
+        try {
+            const parsed = JSON.parse(root.actionsText)
+            return Array.isArray(parsed) ? parsed : []
+        } catch (err) {
+            return []
+        }
+    }
+    // D-Bus icon entries may be theme names rather than paths.
+    readonly property string resolvedIcon: {
+        const src = root.iconSource
+        if (src === "" || src.indexOf("/") === 0 || src.indexOf(":") >= 0)
+            return src
+        return Quickshell.iconPath(src, "")
+    }
     property bool openState: false
     property bool closing: false
     readonly property bool reducedMotion: MotionTokens.reducedMotion
     signal dismissRequested
+    signal actionRequested(string identifier)
 
     // osu Notification.CORNER_RADIUS.
     readonly property int cardRadius: 6
@@ -119,13 +140,18 @@ Item {
         Rectangle {
             id: card
             width: parent.width
-            // osu grid row Dimension minSize 60 plus text padding 10 per side.
-            height: Math.max(60, textColumn.height + 20)
+            // Structured rows need more than osu's 60px minimum; padding is
+            // 12px top/bottom around the content column.
+            height: Math.max(72, contentColumn.height + 24)
             radius: root.cardRadius
-            // OverlayColourProvider.Purple Background3 / Background2 on hover.
-            color: gesture.containsMouse && !root.closing ? "#494554" : "#3D3946"
+            color: cardHover.hovered && !root.closing ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
 
-            Behavior on color { ColorAnimation { duration: root.reducedMotion ? 0 : 200; easing.type: Easing.OutQuint } }
+            Behavior on color { ColorAnimation { duration: root.reducedMotion ? 0 : MotionTokens.fast; easing.type: Easing.OutQuint } }
+
+            // Non-blocking tint observer so buttons keep their own hover.
+            HoverHandler {
+                id: cardHover
+            }
 
             NumberAnimation {
                 id: slideInAnim
@@ -137,7 +163,7 @@ Item {
                 easing.type: Easing.OutQuint
             }
 
-            // Icon column: app icon when available, otherwise the completion
+            // Icon rail: app icon when available, otherwise the completion
             // check with ProgressCompletionNotification's GreenDark→GreenLight
             // vertical gradient (approximated in two clipped bands).
             Rectangle {
@@ -147,11 +173,11 @@ Item {
                 anchors.bottom: parent.bottom
                 width: root.iconStripWidth
                 radius: root.cardRadius
-                color: "#24222A"
+                color: LazerTheme.settingsRail
 
                 Item {
                     anchors.centerIn: parent
-                    visible: root.iconSource === ""
+                    visible: root.resolvedIcon === ""
                     width: checkBottom.implicitWidth
                     height: checkBottom.implicitHeight
 
@@ -182,38 +208,22 @@ Item {
 
                 Image {
                     anchors.centerIn: parent
-                    visible: root.iconSource !== ""
-                    source: root.iconSource
-                    width: 20
-                    height: 20
+                    visible: root.resolvedIcon !== ""
+                    source: root.resolvedIcon
+                    width: 22
+                    height: 22
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
                 }
             }
 
-            // osu renders summary + body as one flowing 14px Medium paragraph.
-            Text {
-                id: textColumn
-                anchors.left: iconStrip.right
-                anchors.right: closeButton.left
-                anchors.top: parent.top
-                anchors.margins: 10
-                width: implicitWidth
-                text: root.summary + (root.body.length > 0 ? (root.summary.length > 0 ? "\u00A0" : "") + root.body : "")
-                color: "#FFFFFF"
-                font.pixelSize: 14
-                font.weight: Font.Medium
-                wrapMode: Text.WordWrap
-                maximumLineCount: 5
-                elide: Text.ElideRight
-            }
-
             // Rubber-band drag with velocity tracking; release thresholds
             // decide between fling dismiss, plain dismiss, and spring back.
+            // Declared under the interactive children so they receive input
+            // first; hover observation lives in cardHover instead.
             MouseArea {
                 id: gesture
                 anchors.fill: parent
-                hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
 
                 property real pressX: 0
@@ -265,8 +275,8 @@ Item {
                         springBack.restart()
                 }
 
-                // osu Notification.OnClick: left click activates then
-                // Close(false) — quick fade; right click runs the fling.
+                // osu Notification.OnClick parity: body left click activates
+                // then Close(false) — quick fade; right click runs the fling.
                 onClicked: mouse => {
                     if (mouse.button === Qt.RightButton)
                         root.requestClose(true)
@@ -275,8 +285,123 @@ Item {
                 }
             }
 
-            // osu CloseButton: 28px column, Gray(0)@0.15 hover background,
-            // Foreground1 icon turning Content1 white on hover.
+            // Content stack above the gesture catcher: header row, summary
+            // title, muted body, then the action button row when present.
+            Column {
+                id: contentColumn
+                anchors.left: iconStrip.right
+                anchors.right: closeButton.left
+                anchors.top: parent.top
+                anchors.margins: 12
+                spacing: 4
+
+                // App identity line above the payload.
+                Text {
+                    visible: root.appName.length > 0
+                    width: parent.width
+                    text: root.appName
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+                    elide: Text.ElideRight
+                }
+
+                // Summary as the card title.
+                Text {
+                    visible: root.summary.length > 0
+                    width: parent.width
+                    text: root.summary
+                    color: LazerTheme.textPrimary
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                }
+
+                // Body copy stays one step quieter than the title.
+                Text {
+                    visible: root.body.length > 0
+                    width: parent.width
+                    text: root.body
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 6
+                    elide: Text.ElideRight
+                }
+
+                // D-Bus action buttons as sharp detail-level chips.
+                Row {
+                    visible: root.actionList.length > 0
+                    spacing: 6
+                    topPadding: 4
+
+                    Repeater {
+                        model: root.actionList
+
+                        Rectangle {
+                            id: actionButton
+                            required property var modelData
+                            readonly property bool hovered: actionMouse.containsMouse
+
+                            height: 26
+                            // Size to the label plus symmetric chip padding.
+                            width: actionLabel.implicitWidth + 20
+                            radius: 4
+                            color: hovered ? LazerTheme.hoverFill : LazerTheme.pressedFill
+                            scale: actionMouse.pressed && !root.reducedMotion ? MotionTokens.pressScale : 1
+
+                            Behavior on scale { NumberAnimation { duration: root.reducedMotion ? 0 : MotionTokens.fast; easing.type: Easing.OutQuint } }
+
+                            Text {
+                                id: actionLabel
+                                anchors.centerIn: parent
+                                text: actionButton.modelData.text
+                                color: actionButton.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
+
+                                Behavior on color { ColorAnimation { duration: root.reducedMotion ? 0 : MotionTokens.fast } }
+                            }
+
+                            // Shared click-flash recipe from the settings authority.
+                            Rectangle {
+                                id: actionFlash
+                                anchors.fill: parent
+                                radius: parent.radius
+                                color: LazerTheme.textPrimary
+                                opacity: 0
+                            }
+
+                            NumberAnimation {
+                                id: actionFlashAnim
+                                target: actionFlash
+                                property: "opacity"
+                                from: MotionTokens.clickFlashOpacity
+                                to: 0
+                                duration: MotionTokens.clickFlashDuration
+                                easing.type: MotionTokens.clickFlashEasing
+                            }
+
+                            MouseArea {
+                                id: actionMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: {
+                                    if (!root.reducedMotion)
+                                        actionFlashAnim.restart()
+                                    root.actionRequested(actionButton.modelData.identifier)
+                                    root.requestClose(false)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Close button: 28px column, black@0.15 hover background,
+            // muted check turning white on hover.
             Item {
                 id: closeButton
                 anchors.right: parent.right
@@ -290,16 +415,16 @@ Item {
                     color: "#26000000"
                     opacity: closeButtonMouse.containsMouse ? 1 : 0
 
-                    Behavior on opacity { NumberAnimation { duration: root.reducedMotion ? 0 : 200; easing.type: Easing.OutQuint } }
+                    Behavior on opacity { NumberAnimation { duration: root.reducedMotion ? 0 : MotionTokens.fast; easing.type: Easing.OutQuint } }
                 }
 
                 Text {
                     anchors.centerIn: parent
                     text: "\u2713"
-                    color: closeButtonMouse.containsMouse ? "#FFFFFF" : "#948FA3"
+                    color: closeButtonMouse.containsMouse ? LazerTheme.textPrimary : LazerTheme.textMuted
                     font.pixelSize: 12
 
-                    Behavior on color { ColorAnimation { duration: root.reducedMotion ? 0 : 200; easing.type: Easing.OutQuint } }
+                    Behavior on color { ColorAnimation { duration: root.reducedMotion ? 0 : MotionTokens.fast } }
                 }
 
                 MouseArea {
