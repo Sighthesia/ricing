@@ -46,7 +46,9 @@ FocusScope {
         if (syncingEditor || editor.text === root.text)
             return
         syncingEditor = true
+        editor.suppressDeleteFx = true
         editor.text = root.text
+        editor.suppressDeleteFx = false
         syncingEditor = false
     }
 
@@ -120,7 +122,9 @@ FocusScope {
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
-    TextInput {
+    // OsuTextField keeps native editing behaviour and adds the smooth osu
+    // caret plus falling-ghost feedback for deleted characters.
+    OsuTextField {
         id: editor
         anchors.left: parent.left
         anchors.leftMargin: 12

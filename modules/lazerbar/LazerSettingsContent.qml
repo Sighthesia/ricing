@@ -236,7 +236,8 @@ Item {
             colorizationColor: LazerTheme.textMuted
         }
 
-        TextInput {
+        // OsuTextField adds the smooth osu caret and falling delete feedback.
+        OsuTextField {
             id: searchEditor
             anchors.left: searchSurface.left
             anchors.leftMargin: 12

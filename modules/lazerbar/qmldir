@@ -17,6 +17,8 @@ BarBackground 1.0 BarBackground.qml
 WallpaperBackground 1.0 WallpaperBackground.qml
 TopBar 1.0 TopBar.qml
 OsuTopBarButton 1.0 OsuTopBarButton.qml
+OsuTextCaret 1.0 OsuTextCaret.qml
+OsuTextField 1.0 OsuTextField.qml
 MusicControlButton 1.0 MusicControlButton.qml
 OsuMusicOverlay 1.0 OsuMusicOverlay.qml
 LazerSettingsRow 1.0 LazerSettingsRow.qml
