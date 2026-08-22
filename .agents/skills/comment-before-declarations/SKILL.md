@@ -8,7 +8,7 @@ description: "Require a brief descriptive comment immediately before major QML e
 Follow this rule when editing QML:
 
 - Place a short English comment immediately before each major element declaration.
-- Use the rule for `Variants`, `Item`, `PanelWindow`, and reusable visual components such as `ScreenCornerMask`.
+- Use the rule for `Variants`, `Item`, `PanelWindow`, and reusable visual components such as `IconButton`.
 - Keep comments brief and descriptive; explain intent, not mechanics.
 - Do not add comments that merely restate the line below.
 

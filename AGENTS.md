@@ -45,6 +45,7 @@ Load these for detailed context on specific topics:
 | Skill | When to use |
 | --- | --- |
 | [osu-sharp-design-language](.agents/skills/osu-sharp-design-language/SKILL.md) | Creating or reshaping any visible QML element. Load before adding any new UI shape. |
+| [osu-lazer-ui-reference](.agents/skills/osu-lazer-ui-reference/SKILL.md) | Needing lazer's exact colors, font sizes, durations, or easing values; styling buttons/sliders/text fields/menus to lazer spec. |
 | [settings-panel-style-authority](.agents/skills/settings-panel-style-authority/SKILL.md) | Any new visible surface, interaction feedback, scrolling, or motion. Reuse the settings panel's verified patterns first. |
 | [lazer-settings-surface-details](.agents/skills/lazer-settings-surface-details/SKILL.md) | Modifying the lazer settings panel, rows, controls, hover/press/motion behavior. Preserves geometry, z-order, input isolation, slide transition contracts. |
 | [visual-transition-rules](.agents/skills/visual-transition-rules/SKILL.md) | Adjusting colors, radii, opacity, blur, shadows, spacing, scale. |
