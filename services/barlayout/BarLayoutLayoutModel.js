@@ -4,18 +4,20 @@ var LEGACY_WIDGET_IDS = {
     "DynamicIslandDockZone": "clock",
     "placeholder": "clock",
     "widget-picker-button": "clock",
-    "settings": "clock",
 }
 
 var DEFAULT_WIDGET_SOURCE_BY_ID = {
     "clock": "../../modules/bar/widgets/Clock.qml",
     "tray": "../../modules/bar/widgets/Tray.qml",
     "active-window": "../../modules/bar/widgets/ActiveWindow.qml",
+    "workspaces": "../../modules/bar/widgets/Workspaces.qml",
     "battery": "../../modules/bar/widgets/Battery.qml",
     "brightness": "../../modules/bar/widgets/Brightness.qml",
     "system-monitor": "../../modules/bar/widgets/SystemMonitor.qml",
     "volume": "../../modules/bar/widgets/Volume.qml",
     "media": "../../modules/bar/widgets/Media.qml",
+    "notifications": "../../modules/bar/widgets/Notifications.qml",
+    "settings": "../../modules/bar/widgets/SettingsButton.qml",
 }
 
 function normalizeWidgetId(widgetId, widgetSource) {
@@ -86,6 +88,13 @@ var AVAILABLE_WIDGETS = [
         source: "../../modules/bar/widgets/ActiveWindow.qml",
     },
     {
+        id: "workspaces",
+        label: "Workspaces",
+        description: "Workspace overview with click to focus.",
+        section: "center",
+        source: "../../modules/bar/widgets/Workspaces.qml",
+    },
+    {
         id: "brightness",
         label: "Brightness",
         description: "Screen brightness with scroll control.",
@@ -134,19 +143,33 @@ var AVAILABLE_WIDGETS = [
         section: "left",
         source: "../../modules/bar/widgets/Media.qml",
     },
+    {
+        id: "notifications",
+        label: "Notifications",
+        description: "Unread badge with do-not-disturb toggle.",
+        section: "right",
+        source: "../../modules/bar/widgets/Notifications.qml",
+    },
+    {
+        id: "settings",
+        label: "Settings",
+        description: "Open the shell settings center.",
+        section: "right",
+        source: "../../modules/bar/widgets/SettingsButton.qml",
+    },
 ]
 
 var DEFAULT_LAYOUT_MODEL = {
     version: 1,
     widgets: [
-        {
-            id: "clock",
-            instanceKey: "clock:0",
-            section: "center",
-            order: 0,
-            enabled: true,
-            source: "../../modules/bar/widgets/Clock.qml",
-        },
+        { id: "active-window", instanceKey: "active-window:0", section: "left", order: 0, enabled: true, source: "../../modules/bar/widgets/ActiveWindow.qml" },
+        { id: "workspaces", instanceKey: "workspaces:0", section: "center", order: 0, enabled: true, source: "../../modules/bar/widgets/Workspaces.qml" },
+        { id: "tray", instanceKey: "tray:0", section: "right", order: 0, enabled: true, source: "../../modules/bar/widgets/Tray.qml" },
+        { id: "volume", instanceKey: "volume:0", section: "right", order: 1, enabled: true, source: "../../modules/bar/widgets/Volume.qml" },
+        { id: "brightness", instanceKey: "brightness:0", section: "right", order: 2, enabled: true, source: "../../modules/bar/widgets/Brightness.qml" },
+        { id: "notifications", instanceKey: "notifications:0", section: "right", order: 3, enabled: true, source: "../../modules/bar/widgets/Notifications.qml" },
+        { id: "settings", instanceKey: "settings:0", section: "right", order: 4, enabled: true, source: "../../modules/bar/widgets/SettingsButton.qml" },
+        { id: "clock", instanceKey: "clock:0", section: "right", order: 5, enabled: true, source: "../../modules/bar/widgets/Clock.qml" },
     ],
 }
 
