@@ -13,13 +13,15 @@ Variants {
         id: screenScope
         required property var modelData
 
-        // Commit only the visible stack bounds to the layer-shell surface.
+        // Commit only the visible stack bounds to the input mask; keep the
+        // window a full screen column so flung cards can fall past the stack
+        // without being clipped by the layer surface edge.
         PanelWindow {
             id: notificationWindow
             screen: screenScope.modelData
             color: "transparent"
             implicitWidth: notificationStack.implicitWidth
-            implicitHeight: Math.max(1, notificationStack.implicitHeight)
+            implicitHeight: Math.max(1, screenScope.modelData.height)
             exclusionMode: ExclusionMode.Ignore
             anchors {
                 top: Services.NotificationService.notificationTop
@@ -39,10 +41,13 @@ Variants {
             }
             mask: Region { item: notificationStack.implicitHeight > 0 ? notificationStack : null }
 
-            // Stack only the cards, leaving the rest of the screen pointer-transparent.
+            // Stack only the cards; the stack keeps its content height so the
+            // input mask stays limited to visible notification cards.
             LazerNotificationStack {
                 id: notificationStack
-                anchors.fill: parent
+                anchors.top: Services.NotificationService.notificationTop ? parent.top : undefined
+                anchors.bottom: Services.NotificationService.notificationBottom ? parent.bottom : undefined
+                anchors.horizontalCenter: parent.horizontalCenter
                 stackAtTop: Services.NotificationService.notificationTop
                 popupModel: Services.NotificationService.popupList
                 onPopupDismissRequested: Services.NotificationService.dismissPopup(notifId)
