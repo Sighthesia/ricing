@@ -1,0 +1,165 @@
+import QtQuick
+import QtTest
+import "../../services/LauncherLogic.js" as Logic
+
+// Lock the pure launcher contracts: prefix parsing, stable sorting,
+// selection clamping, and keyboard action precedence.
+TestCase {
+    name: "LauncherLogic"
+
+    // --- parseQuery ---
+
+    function test_parseQuery_blankDefaultsToApps() {
+        var blank = Logic.parseQuery("")
+        compare(blank.mode, "apps")
+        compare(blank.text, "")
+        compare(blank.prefix, "")
+
+        var whitespaceOnly = Logic.parseQuery("   ")
+        compare(whitespaceOnly.mode, "apps")
+        compare(whitespaceOnly.text, "")
+    }
+
+    function test_parseQuery_appText() {
+        var parsed = Logic.parseQuery("firefox")
+        compare(parsed.mode, "apps")
+        compare(parsed.text, "firefox")
+        compare(parsed.prefix, "")
+    }
+
+    function test_parseQuery_clipboardPrefix() {
+        var parsed = Logic.parseQuery(">clip passwords")
+        compare(parsed.mode, "clipboard")
+        compare(parsed.text, "passwords")
+        compare(parsed.prefix, ">clip ")
+    }
+
+    function test_parseQuery_shortcutPrefix() {
+        var parsed = Logic.parseQuery(">key spawn terminal")
+        compare(parsed.mode, "shortcuts")
+        compare(parsed.text, "spawn terminal")
+        compare(parsed.prefix, ">key ")
+    }
+
+    function test_parseQuery_prefixRequiresTrailingSpace() {
+        var pending = Logic.parseQuery(">clip")
+        compare(pending.mode, "apps")
+        compare(pending.text, ">clip")
+        compare(pending.prefix, "")
+    }
+
+    function test_parseQuery_whitespaceNormalization() {
+        var padded = Logic.parseQuery("  fire   fox  ")
+        compare(padded.mode, "apps")
+        compare(padded.text, "fire fox")
+
+        var prefixed = Logic.parseQuery("   >clip    token   ")
+        compare(prefixed.mode, "clipboard")
+        compare(prefixed.text, "token")
+
+        var emptyPrefixBody = Logic.parseQuery(">key    ")
+        compare(emptyPrefixBody.mode, "shortcuts")
+        compare(emptyPrefixBody.text, "")
+    }
+
+    function test_parseQuery_defensiveNonStringInput() {
+        var nullish = Logic.parseQuery(null)
+        compare(nullish.mode, "apps")
+        compare(nullish.text, "")
+    }
+
+    // --- sortResults ---
+
+    function test_sortResults_contractOrder() {
+        var input = [
+            { id: "c", name: "zeta", favoriteWeight: 0, lastUsedAt: 100 },
+            { id: "a", name: "beta", favoriteWeight: 10, lastUsedAt: 0 },
+            { id: "b", name: "alpha", favoriteWeight: 5, lastUsedAt: 200 },
+            { id: "d", name: "alpha", favoriteWeight: 5, lastUsedAt: 200 },
+            { id: "e", name: "alpha", favoriteWeight: 5, lastUsedAt: 100 },
+            { id: "f", name: "yonder", favoriteWeight: 5, lastUsedAt: 100 }
+        ]
+        var sorted = Logic.sortResults(input)
+        var ids = sorted.map(function (item) { return item.id })
+        compare(ids.join(","), "a,b,d,e,f,c")
+    }
+
+    function test_sortResults_stableIdentifierTiebreak() {
+        var input = [
+            { id: "z9", name: "same", favoriteWeight: 3, lastUsedAt: 50 },
+            { id: "a1", name: "same", favoriteWeight: 3, lastUsedAt: 50 },
+            { id: "m5", name: "same", favoriteWeight: 3, lastUsedAt: 50 }
+        ]
+        var ids = Logic.sortResults(input).map(function (item) { return item.id })
+        compare(ids.join(","), "a1,m5,z9")
+    }
+
+    function test_sortResults_doesNotMutateInput() {
+        var input = [
+            { id: "b", name: "beta", favoriteWeight: 1, lastUsedAt: 0 },
+            { id: "a", name: "alpha", favoriteWeight: 1, lastUsedAt: 0 }
+        ]
+        Logic.sortResults(input)
+        compare(input[0].id, "b")
+    }
+
+    function test_sortResults_missingFieldsSortLast() {
+        var sparse = [
+            { id: "full", name: "full", favoriteWeight: 2, lastUsedAt: 10 },
+            { id: "bare" }
+        ]
+        var ids = Logic.sortResults(sparse).map(function (item) { return item.id })
+        compare(ids.join(","), "full,bare")
+    }
+
+    function test_sortResults_emptyAndNullish() {
+        compare(Logic.sortResults([]).length, 0)
+        verify(Logic.sortResults(null) !== null)
+        compare(Logic.sortResults(null).length, 0)
+    }
+
+    // --- clampSelection ---
+
+    function test_clampSelection_emptyList() {
+        compare(Logic.clampSelection(0, 0), -1)
+        compare(Logic.clampSelection(3, -1), -1)
+    }
+
+    function test_clampSelection_outOfRange() {
+        compare(Logic.clampSelection(5, 3), 2)
+        compare(Logic.clampSelection(-4, 3), 0)
+        compare(Logic.clampSelection(2, 3), 2)
+    }
+
+    function test_clampSelection_defensiveIndex() {
+        compare(Logic.clampSelection(NaN, 3), 0)
+        compare(Logic.clampSelection("7", 10), 7)
+    }
+
+    // --- keyboardAction ---
+
+    function test_keyboardAction_escapePrecedence() {
+        compare(Logic.keyboardAction("escape", true, true, true), "clear")
+        compare(Logic.keyboardAction("escape", false, true, true), "close")
+        compare(Logic.keyboardAction("escape", true, false, false), "clear")
+    }
+
+    function test_keyboardAction_enterExecute() {
+        compare(Logic.keyboardAction("enter", true, true, true), "execute")
+        compare(Logic.keyboardAction("return", true, true, true), "execute")
+        compare(Logic.keyboardAction("enter", false, true, true), "execute")
+        compare(Logic.keyboardAction("enter", true, false, true), "none")
+        compare(Logic.keyboardAction("enter", true, true, false), "none")
+    }
+
+    function test_keyboardAction_upDownNavigation() {
+        compare(Logic.keyboardAction("up", true, false, true), "up")
+        compare(Logic.keyboardAction("down", false, false, true), "down")
+    }
+
+    function test_keyboardAction_unknownKeyIsNone() {
+        compare(Logic.keyboardAction("", true, true, true), "none")
+        compare(Logic.keyboardAction("a", true, true, true), "none")
+        compare(Logic.keyboardAction(null, true, true, true), "none")
+    }
+}
