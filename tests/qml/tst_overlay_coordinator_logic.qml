@@ -7,13 +7,26 @@ TestCase {
     name: "OverlayCoordinatorLogic"
 
     function test_targetClassification() {
-        compare(Logic.normalizeTarget("wiki"), "wiki")
+        compare(Logic.normalizeTarget("launcher"), "launcher")
         compare(Logic.normalizeTarget("remote"), "")
-        compare(Logic.ownerFor("wiki"), "wave")
+        compare(Logic.ownerFor("launcher"), "wave")
         compare(Logic.ownerFor("settings"), "settings")
         compare(Logic.ownerFor("music"), "music")
         compare(Logic.ownerFor("remote"), "")
-        verify(Logic.isSameOwner("wiki", "news"))
-        verify(!Logic.isSameOwner("wiki", "settings"))
+    }
+
+    function test_deprecatedWaveTargetsAreRejected() {
+        compare(Logic.normalizeTarget("wiki"), "")
+        compare(Logic.normalizeTarget("news"), "")
+        compare(Logic.normalizeTarget("beatmap"), "")
+        compare(Logic.ownerFor("wiki"), "")
+        compare(Logic.ownerFor("news"), "")
+        compare(Logic.ownerFor("beatmap"), "")
+    }
+
+    function test_ownerPairsAreDistinctOwners() {
+        verify(Logic.ownerFor("launcher") !== Logic.ownerFor("settings"))
+        verify(Logic.ownerFor("launcher") !== Logic.ownerFor("music"))
+        verify(Logic.ownerFor("settings") !== Logic.ownerFor("music"))
     }
 }

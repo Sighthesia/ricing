@@ -191,7 +191,13 @@ Item {
         readonly property string queryText: root.session && root.session.query != null ? String(root.session.query) : ""
         readonly property alias editorItem: editor
 
-        onQueryTextChanged: {
+        function focusEditor() {
+            editor.forceActiveFocus()
+        }
+
+        // Adopt external session query values into the editor exactly once per
+        // change so user typing remains the only other writer.
+        function adoptSessionQuery() {
             if (queryText === _lastPushedQuery)
                 return
             _lastPushedQuery = queryText
@@ -201,11 +207,9 @@ Item {
             editor.suppressDeleteFx = false
             _syncingEditor = false
         }
-        Component.onCompleted: onQueryTextChanged()
 
-        function focusEditor() {
-            editor.forceActiveFocus()
-        }
+        onQueryTextChanged: adoptSessionQuery()
+        Component.onCompleted: adoptSessionQuery()
 
         Rectangle {
             anchors.fill: parent

@@ -27,10 +27,78 @@ Variants {
         readonly property string activeOverlay: overlayCoordinator.activeTarget
         property bool musicTooltipOpen: false
         property bool shuffleActive: false
+        property Item pendingLauncherOpener: null
+
+        // Launcher palette bound explicitly at the mount site; independent of
+        // old Wiki/News/Beatmap palettes and anchored on the osu pink family.
+        readonly property var launcherPalette: ({
+            kind: "pink",
+            body: "#33202B",
+            header: "#B23A62",
+            sidebar: "#3A2531",
+            light4: "#F492B8",
+            light3: "#E56E97",
+            dark4: "#AC3F63",
+            dark3: "#75293F",
+            text: "#FFF2F6",
+            muted: "#D9BCC9",
+            accent: LazerTheme.osuPink
+        })
+        readonly property var launcherContent: waveHost.contentItem
+        readonly property string launcherTitle: launcherContent ? launcherContent.title : "Launcher"
+        readonly property string launcherDescription: launcherContent ? launcherContent.description : ""
 
         function requestOverlay(target, opener) {
             musicTooltipOpen = false
+            if (target === "launcher") {
+                requestLauncher(opener)
+                return
+            }
             overlayCoordinator.request(target, opener)
+        }
+
+        // Launcher activation goes through the standalone service open path so
+        // session visibility stays the single source of truth; the opener Item
+        // is recorded for focus restoration once the surface closes.
+        function requestLauncher(opener) {
+            if (Services.LauncherService.visible) {
+                if (overlayCoordinator.activeTarget === "launcher") {
+                    // Opening an already-open launcher refocuses its live search
+                    // session instead of creating a second surface instance.
+                    if (launcherContent)
+                        Qt.callLater(launcherContent.focusSearch)
+                    return
+                }
+                overlayCoordinator.request("launcher", opener, true, true)
+                return
+            }
+            pendingLauncherOpener = opener || null
+            Services.LauncherService.open()
+        }
+
+        function syncLauncherSurface() {
+            var service = Services.LauncherService
+            if (service.visible) {
+                overlayCoordinator.request("launcher", pendingLauncherOpener, true, true)
+                // Opening grabs surface focus; land typing in the live search session.
+                Qt.callLater(function() {
+                    if (screenScope.launcherContent)
+                        screenScope.launcherContent.focusSearch()
+                })
+            } else if (overlayCoordinator.activeTarget === "launcher") {
+                overlayCoordinator.request("launcher")
+            } else if (overlayCoordinator.transitioning && overlayCoordinator.pendingTarget === "launcher") {
+                // The queued open is stale now that the session closed again.
+                overlayCoordinator.pendingTarget = ""
+            }
+            pendingLauncherOpener = null
+        }
+
+        // Keyboard-shortcut IPC flips LauncherService visibility; mirror it onto
+        // the wave surface so shortcuts open and close the same single instance.
+        Connections {
+            target: Services.LauncherService
+            function onVisibleChanged() { screenScope.syncLauncherSurface() }
         }
 
         // Route explicit diagnostics through the same coordinator as the bar button.
@@ -50,16 +118,15 @@ Variants {
         OverlayCoordinator {
             id: overlayCoordinator
             onOpenRequested: (owner, target) => {
-                if (owner === "wave") fullscreenHost.openRoute(target, null)
+                if (owner === "wave") waveHost.openRoute(target, null)
                 else if (owner === "settings") settingsOverlay.openFrom(null, true)
                 else if (owner === "music") musicOverlay.open()
             }
             onCloseRequested: owner => {
-                if (owner === "wave") fullscreenHost.close()
+                if (owner === "wave") waveHost.close()
                 else if (owner === "settings") settingsOverlay.closeWithoutFocusRestore()
                 else if (owner === "music") musicOverlay.close()
             }
-            onRouteRequested: target => fullscreenHost.openRoute(target, null)
         }
 
         BarBackground { targetScreen: screenScope.modelData }
@@ -95,7 +162,7 @@ Variants {
             }
         }
 
-        // Keep the wave owner below the bar while only its internal viewport moves.
+        // Keep the launcher wave below the bar while only its internal viewport moves.
         PanelWindow {
             id: waveWindow
             screen: screenScope.modelData; color: "transparent"
@@ -103,11 +170,35 @@ Variants {
             exclusionMode: ExclusionMode.Ignore
             anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true }
             margins { top: Services.SettingsService.bar.position === "top" ? screenScope.floatingMargin + Services.SettingsService.bar.height : 0; bottom: Services.SettingsService.bar.position === "bottom" ? screenScope.floatingMargin + Services.SettingsService.bar.height : 0 }
-            mask: Region { item: fullscreenHost.visible ? fullscreenHost : null }
-            FullscreenOverlayHost {
-                id: fullscreenHost; anchors.fill: parent
-                onClosed: overlayCoordinator.ownerClosed("wave")
+            mask: Region { item: waveHost.visible ? waveHost : null }
+            // Take keyboard only while the launcher is up so typing reaches its
+            // search field and global keys stay free when closed.
+            WlrLayershell.keyboardFocus: waveHost.interactive
+                    ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+            WaveSurfaceHost {
+                id: waveHost; anchors.fill: parent
+                title: screenScope.launcherTitle
+                description: screenScope.launcherDescription
+                breadcrumb: "osu! / " + screenScope.launcherTitle
+                sidebarEntries: screenScope.launcherContent ? screenScope.launcherContent.sidebarEntries : []
+                activeSidebarId: screenScope.launcherContent ? screenScope.launcherContent.activeMode : ""
+                palette: screenScope.launcherPalette
+                contentComponent: launcherPageComponent
+                onSidebarSelected: id => {
+                    if (screenScope.launcherContent)
+                        screenScope.launcherContent.handleModeSelected(id)
+                }
+                onClosed: {
+                    overlayCoordinator.ownerClosed("wave")
+                    if (Services.LauncherService.visible)
+                        Services.LauncherService.close()
+                }
             }
+        }
+
+        Component {
+            id: launcherPageComponent
+            LauncherPage { session: Services.LauncherService }
         }
 
         // Keep Settings in a dedicated left-side owner with no full-screen mask.

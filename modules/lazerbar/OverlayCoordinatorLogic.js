@@ -1,7 +1,10 @@
 .pragma library
 
-var targets = ["settings", "music", "wiki", "news", "beatmap"]
-var waveTargets = ["wiki", "news", "beatmap"]
+// The wave owner serves the launcher; settings and music keep dedicated owners.
+// Deprecated Wiki/News/Beatmap content targets are no longer routable.
+
+var targets = ["settings", "music", "launcher"]
+var waveTargets = ["launcher"]
 
 function normalizeTarget(target) {
     var candidate = target == null ? "" : String(target)
@@ -13,9 +16,4 @@ function ownerFor(target) {
     if (waveTargets.indexOf(normalized) >= 0)
         return "wave"
     return normalized === "settings" || normalized === "music" ? normalized : ""
-}
-
-function isSameOwner(left, right) {
-    var owner = ownerFor(left)
-    return owner !== "" && owner === ownerFor(right)
 }

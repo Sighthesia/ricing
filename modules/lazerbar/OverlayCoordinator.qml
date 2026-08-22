@@ -1,7 +1,7 @@
 import QtQuick
 import "OverlayCoordinatorLogic.js" as Logic
 
-// Serialize route requests across the three independently animated overlay owners.
+// Serialize requests across the three overlay owners: settings, music, and the launcher wave.
 QtObject {
     id: root
 
@@ -14,7 +14,6 @@ QtObject {
 
     signal openRequested(string owner, string target)
     signal closeRequested(string owner)
-    signal routeRequested(string target)
 
     function request(target, source, resetOpener, ensureOpen) {
         var normalized = Logic.normalizeTarget(target)
@@ -45,12 +44,6 @@ QtObject {
             transitioning = true
             _closingOwner = activeOwner
             closeRequested(activeOwner)
-            return true
-        }
-
-        if (Logic.isSameOwner(activeTarget, normalized)) {
-            activeTarget = normalized
-            routeRequested(normalized)
             return true
         }
 
