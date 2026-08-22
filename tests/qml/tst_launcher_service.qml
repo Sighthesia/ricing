@@ -1,0 +1,331 @@
+import QtQuick
+import QtTest
+
+// Exercise the standalone launcher session state machine with deterministic
+// fixture adapters injected via the _adapters seam: open defaults, prefix
+// mode transitions, refresh sequencing, selection clamping, execution
+// outcomes, and the keyboard contract.
+//
+// The Quickshell-free LauncherSession component is loaded by file path so
+// the suite runs under plain qmltestrunner; the services directory module
+// itself pulls Quickshell-only singletons that cannot load without the
+// embedded plugin.
+Item {
+    Loader {
+        id: sessionLoader
+        source: "../../services/launcher/LauncherSession.qml"
+    }
+
+    TestCase {
+        name: "LauncherService"
+
+        // --- fixture helpers ---
+
+        function makeItem(id, name, weight, usedAt) {
+            return { id: id, displayName: name, favoriteWeight: weight, lastUsedAt: usedAt }
+        }
+
+        // Records every adapter call and keeps the completion callbacks so a
+        // test resolves them in any order; nothing shells out or runs timers.
+        function makeManualAdapter() {
+            var adapter = {
+                queries: [],
+                executions: [],
+                pendingRefreshes: [],
+                pendingExecutions: []
+            }
+            adapter.refresh = function(query, mode, done) {
+                adapter.queries.push({ query: query, mode: mode })
+                adapter.pendingRefreshes.push(done)
+            }
+            adapter.execute = function(item, done) {
+                adapter.executions.push(item)
+                adapter.pendingExecutions.push(done)
+            }
+            return adapter
+        }
+
+        function resolveRefresh(adapter, index, outcome) {
+            adapter.pendingRefreshes[index](outcome)
+        }
+
+        function resolveExecute(adapter, index, outcome) {
+            adapter.pendingExecutions[index](outcome)
+        }
+
+        function svc() {
+            return sessionLoader.item
+        }
+
+        function init() {
+            verify(sessionLoader.status === Loader.Ready,
+                   "LauncherSession failed to load: " + sessionLoader.source)
+            svc()._refreshToken++
+            svc().visible = false
+            svc().query = ""
+            svc().results = []
+            svc().loading = false
+            svc().error = ""
+            svc().selectedIndex = -1
+            svc()._adapters = ({})
+        }
+
+        // --- open / close defaults ---
+
+        function test_openDefaultsToAppsAndBeginsLoading() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+
+            compare(svc().visible, true)
+            compare(svc().mode, "apps")
+            compare(svc().loading, true)
+            compare(apps.queries.length, 1)
+            compare(apps.queries[0].query, "")
+            compare(apps.queries[0].mode, "apps")
+
+            // Favorite weight outranks recency per the LauncherLogic contract.
+            resolveRefresh(apps, 0, [makeItem("b", "Beta", 0, 99), makeItem("a", "Alpha", 5, 0)])
+
+            compare(svc().loading, false)
+            compare(svc().error, "")
+            compare(svc().results.length, 2)
+            compare(svc().results[0].id, "a")
+            compare(svc().results[1].id, "b")
+            compare(svc().selectedIndex, 0)
+        }
+
+        function test_toggleFlipsVisibility() {
+            svc().toggle()
+            compare(svc().visible, true)
+
+            svc().toggle()
+            compare(svc().visible, false)
+        }
+
+        // --- query-prefix mode transitions ---
+
+        function test_queryPrefixesTransitionModesWhileStayingOpen() {
+            var apps = makeManualAdapter()
+            var clips = makeManualAdapter()
+            var keys = makeManualAdapter()
+            svc()._adapters = ({ apps: apps, clipboard: clips, shortcuts: keys })
+
+            svc().open()
+            svc().query = ">clip secret"
+
+            compare(svc().mode, "clipboard")
+            compare(svc().visible, true)
+            compare(clips.queries.length, 1)
+            compare(clips.queries[0].query, "secret")
+            compare(clips.queries[0].mode, "clipboard")
+
+            resolveRefresh(clips, 0, [makeItem("c1", "Token", 0, 0)])
+            compare(svc().selectedIndex, 0)
+
+            svc().query = ">key spawn terminal"
+
+            compare(svc().mode, "shortcuts")
+            compare(keys.queries.length, 1)
+            compare(keys.queries[0].query, "spawn terminal")
+
+            resolveRefresh(keys, 0, [])
+            compare(svc().selectedIndex, -1)
+
+            svc().query = "firefox"
+            compare(svc().mode, "apps")
+            compare(svc().visible, true)
+            compare(apps.queries.length, 2)
+            compare(apps.queries[1].query, "firefox")
+        }
+
+        // --- selection clamping ---
+
+        function test_selectionClampsToResultBounds() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            resolveRefresh(apps, 0, [
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0),
+                makeItem("c", "Gamma", 0, 0)
+            ])
+
+            compare(svc().selectedIndex, 0)
+
+            svc().selectNext()
+            svc().selectNext()
+            compare(svc().selectedIndex, 2)
+
+            svc().selectNext()
+            compare(svc().selectedIndex, 2)
+
+            svc().selectPrevious()
+            svc().selectPrevious()
+            compare(svc().selectedIndex, 0)
+
+            svc().selectPrevious()
+            compare(svc().selectedIndex, 0)
+        }
+
+        // --- execution outcomes ---
+
+        function test_successfulExecutionClosesSurface() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("firefox", "Firefox", 0, 0)])
+
+            svc().executeSelected()
+            compare(apps.executions.length, 1)
+            compare(apps.executions[0].id, "firefox")
+
+            resolveExecute(apps, 0, { ok: true })
+
+            compare(svc().visible, false)
+            compare(svc().query, "")
+            compare(svc().results.length, 0)
+            compare(svc().loading, false)
+        }
+
+        function test_failedExecutionPreservesVisibilityAndReportsError() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("firefox", "Firefox", 0, 0)])
+
+            svc().executeSelected()
+            resolveExecute(apps, 0, { ok: false, error: "desktop entry missing" })
+
+            compare(svc().visible, true)
+            compare(svc().error, "desktop entry missing")
+            compare(svc().loading, false)
+            compare(svc().results.length, 1)
+        }
+
+        // --- explicit error state ---
+
+        function test_refreshFailureSetsExplicitErrorState() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            resolveRefresh(apps, 0, { error: "cache unavailable" })
+
+            compare(svc().visible, true)
+            compare(svc().loading, false)
+            compare(svc().error, "cache unavailable")
+        }
+
+        // --- refresh sequencing ---
+
+        function test_staleRefreshResultsAreDiscardedInFavorOfNewerQuery() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            svc().query = "fir"
+            compare(apps.pendingRefreshes.length, 2)
+            compare(svc().loading, true)
+
+            resolveRefresh(apps, 0, [makeItem("stale", "Stale", 9, 9)])
+
+            compare(svc().results.length, 0)
+            compare(svc().loading, true)
+            compare(svc().error, "")
+
+            resolveRefresh(apps, 1, [makeItem("fresh", "Fresh", 0, 0)])
+
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "fresh")
+            compare(svc().loading, false)
+            compare(svc().selectedIndex, 0)
+        }
+
+        function test_closeInvalidatesInFlightRefresh() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            svc().close()
+
+            resolveRefresh(apps, 0, [makeItem("late", "Late", 9, 9)])
+
+            compare(svc().visible, false)
+            compare(svc().loading, false)
+            compare(svc().results.length, 0)
+        }
+
+        // --- keyboard contract ---
+
+        function test_handleKeyFollowsKeyboardContract() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
+
+            compare(svc().handleKey("down"), "down")
+            compare(svc().selectedIndex, 1)
+
+            compare(svc().handleKey("up"), "up")
+            compare(svc().selectedIndex, 0)
+
+            compare(svc().handleKey("end"), "none")
+
+            svc().handleKey("escape")
+            compare(svc().visible, false)
+        }
+
+        function test_escapeClearsInputBeforeClosingSession() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            svc().query = "fir"
+
+            compare(svc().handleKey("escape"), "clear")
+            compare(svc().visible, true)
+            compare(svc().query, "")
+
+            compare(svc().handleKey("escape"), "close")
+            compare(svc().visible, false)
+        }
+
+        function test_enterBlockedWhileLoadingThenExecutesWhenReady() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            compare(svc().handleKey("enter"), "none")
+
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+            compare(svc().handleKey("enter"), "execute")
+            compare(apps.executions.length, 1)
+        }
+
+        // --- IPC entry helpers keep their prefix behavior ---
+
+        function test_openClipboardOpensWithClipboardPrefix() {
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+
+            compare(svc().visible, true)
+            compare(svc().query, ">clip ")
+            compare(svc().mode, "clipboard")
+            compare(clips.queries.length, 1)
+            compare(clips.queries[0].query, "")
+
+            svc().close()
+            svc().openShortcuts()
+            compare(svc().mode, "shortcuts")
+            compare(svc().query, ">key ")
+        }
+    }
+}
