@@ -20,8 +20,6 @@ TestCase {
         compare(Logic.surfaceWidth(1920), 1632)
         compare(Logic.surfaceWidth(800), 680)
         compare(Logic.surfaceWidth(-100), 0)
-        compare(Logic.surfaceTop("top", 46), 46)
-        compare(Logic.surfaceTop("bottom", 46), 0)
         compare(Logic.waveAngle(0), 13)
         compare(Logic.waveAngle(1), -7)
         compare(Logic.waveAngle(2), 4)

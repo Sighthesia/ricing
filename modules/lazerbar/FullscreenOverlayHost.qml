@@ -8,8 +8,6 @@ Item {
 
     property string route: ""
     property string phase: "closed"
-    property string barPosition: "top"
-    property real barHeight: 46
     property real bodyProgress: 0
     property real waveProgress: 0
     property bool loading: false
@@ -19,7 +17,6 @@ Item {
     property string _pendingRoute: ""
     readonly property bool interactive: phase === "opening" || phase === "open"
     readonly property real surfaceWidth: Logic.surfaceWidth(width)
-    readonly property real surfaceTop: Logic.surfaceTop(barPosition, barHeight)
     readonly property var palette: Palette.forRoute(route)
     readonly property int sidebarWidth: Logic.sidebarWidth(220)
     property alias surface: body
@@ -147,10 +144,9 @@ Item {
             id: body
             z: 5
             x: 0
-            y: MotionTokens.reducedMotion ? root.surfaceTop
-                    : root.height + (root.surfaceTop - root.height) * root.bodyProgress
+            y: MotionTokens.reducedMotion ? 0 : root.height * (1 - root.bodyProgress)
             width: parent.width
-            height: Math.max(0, root.height - root.surfaceTop)
+            height: root.height
             radius: 0
             color: root.palette.body || "#282036"
             opacity: root.bodyProgress

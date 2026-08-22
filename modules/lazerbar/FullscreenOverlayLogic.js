@@ -32,13 +32,6 @@ function surfaceWidth(screenWidth) {
     return Math.max(0, width) * 0.85
 }
 
-function surfaceTop(barPosition, barHeight) {
-    var height = Number(barHeight)
-    if (!isFinite(height))
-        height = 0
-    return barPosition === "top" ? Math.max(0, height) : 0
-}
-
 function waveAngle(index) {
     var candidate = Number(index)
     return isFinite(candidate) && candidate >= 0 && candidate < waveAngles.length

@@ -21,22 +21,17 @@ Item {
             host.route = ""
             host.bodyProgress = 0
             host.waveProgress = 0
-            host.barPosition = "top"
-            host.barHeight = 46
             closedSpy.clear()
         }
 
         function test_geometryAndWaveLayers() {
             compare(host.surfaceWidth, 680)
-            compare(host.surfaceTop, 46)
             compare(host.surface.radius, 0)
             compare(host.waveRepeater.count, 4)
             compare(host.waveRepeater.itemAt(0).angle, 13)
             compare(host.waveRepeater.itemAt(1).angle, -7)
             compare(host.waveRepeater.itemAt(2).angle, 4)
             compare(host.waveRepeater.itemAt(3).angle, -2)
-            host.barPosition = "bottom"
-            compare(host.surfaceTop, 0)
         }
 
         function test_invalidCompatibilityRoutesStayClosed() {

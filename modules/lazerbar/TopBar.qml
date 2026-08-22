@@ -95,18 +95,17 @@ Variants {
             }
         }
 
-        // Keep the wave owner screen-sized while only its internal viewport moves.
+        // Keep the wave owner below the bar while only its internal viewport moves.
         PanelWindow {
             id: waveWindow
             screen: screenScope.modelData; color: "transparent"
             implicitWidth: screenScope.modelData.width; implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
-            anchors { top: true; left: true }
+            anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true }
+            margins { top: Services.SettingsService.bar.position === "top" ? screenScope.floatingMargin + Services.SettingsService.bar.height : 0; bottom: Services.SettingsService.bar.position === "bottom" ? screenScope.floatingMargin + Services.SettingsService.bar.height : 0 }
             mask: Region { item: fullscreenHost.visible ? fullscreenHost : null }
             FullscreenOverlayHost {
                 id: fullscreenHost; anchors.fill: parent
-                barPosition: Services.SettingsService.bar.position
-                barHeight: Services.SettingsService.bar.height
                 onClosed: overlayCoordinator.ownerClosed("wave")
             }
         }
