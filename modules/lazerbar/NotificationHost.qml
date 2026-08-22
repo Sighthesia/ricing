@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import "../../services" as Services
 
@@ -50,8 +51,8 @@ Variants {
                 anchors.horizontalCenter: parent.horizontalCenter
                 stackAtTop: Services.NotificationService.notificationTop
                 popupModel: Services.NotificationService.popupList
-                onPopupDismissRequested: Services.NotificationService.dismissPopup(notifId)
-            }
+            onPopupDismissRequested: Services.NotificationService.dismissPopup(notifId)
+        }
         }
     }
 }

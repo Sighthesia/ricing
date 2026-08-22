@@ -263,9 +263,13 @@ Item {
                         springBack.restart()
                 }
 
+                // osu Notification.OnClick: left click activates then
+                // Close(false) — quick fade; right click runs the fling.
                 onClicked: mouse => {
                     if (mouse.button === Qt.RightButton)
                         root.requestClose(true)
+                    else if (mouse.button === Qt.LeftButton)
+                        root.requestClose(false)
                 }
             }
 
