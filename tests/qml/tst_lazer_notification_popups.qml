@@ -38,5 +38,19 @@ Item {
             verify(popup.implicitHeight > 0)
             compare(popup.height, popup.implicitHeight)
         }
+
+        // Regression: model roles must reach popup content via explicit
+        // `model.` bindings; required-property injection silently failed.
+        function test_stackPopupsReceiveModelData() {
+            var first = topStack.children[0].itemAtIndex(0)
+            var second = topStack.children[0].itemAtIndex(1)
+            verify(first !== null)
+            compare(first.appName, "A")
+            compare(first.summary, "First")
+            compare(first.body, "Body")
+            verify(second !== null)
+            compare(second.summary, "Second")
+            compare(second.body, "")
+        }
     }
 }

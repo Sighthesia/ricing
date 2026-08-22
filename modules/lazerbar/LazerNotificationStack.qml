@@ -32,15 +32,16 @@ Item {
         }
 
         // Render each service entry as an independently dismissible popup.
+        // Bind roles explicitly via `model.` — required properties on this
+        // delegate silently fail to inject because LazerNotificationPopup
+        // already declares appName/summary/body itself.
         delegate: LazerNotificationPopup {
-            required property var notifId
-            required property string appName
-            required property string summary
-            required property string body
-            required property string icon
             width: ListView.view.width
-            iconSource: icon
-            onDismissRequested: root.popupDismissRequested(notifId)
+            appName: model.appName ?? ""
+            summary: model.summary ?? ""
+            body: model.body ?? ""
+            iconSource: model.icon ?? ""
+            onDismissRequested: root.popupDismissRequested(model.notifId)
         }
     }
 }
