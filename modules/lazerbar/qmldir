@@ -47,6 +47,8 @@ FullscreenOverlayHost 1.0 FullscreenOverlayHost.qml
 WaveSurfaceHost 1.0 WaveSurfaceHost.qml
 FullscreenHeader 1.0 FullscreenHeader.qml
 FullscreenSidebar 1.0 FullscreenSidebar.qml
+LauncherPage 1.0 LauncherPage.qml
+LauncherResultRow 1.0 LauncherResultRow.qml
 WikiLikePage 1.0 WikiLikePage.qml
 NewsLikePage 1.0 NewsLikePage.qml
 BeatmapLikePage 1.0 BeatmapLikePage.qml

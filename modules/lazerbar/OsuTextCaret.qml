@@ -39,7 +39,7 @@ Rectangle {
 
     Behavior on x {
         enabled: !MotionTokens.reducedMotion
-        NumberAnimation { duration: caretRoot.moveTime; easing.type: Easing.Out }
+        NumberAnimation { duration: caretRoot.moveTime; easing.type: Easing.OutQuint }
     }
 
     Behavior on opacity {
