@@ -37,12 +37,12 @@ Item {
         Item {
             width: 24; height: 24
             Image { anchors.fill: parent; source: "icons/clock.svg"; opacity: 0.9 }
-            Rectangle { width: 2; height: 7; radius: 1; color: LazerTheme.osuPink; anchors.centerIn: parent; anchors.verticalCenterOffset: -3 }
+            Rectangle { width: 2; height: 7; radius: 0; color: LazerTheme.osuPink; anchors.centerIn: parent; anchors.verticalCenterOffset: -3 }
         }
         Column {
             spacing: 0
-            Text { text: root.currentTimeText; color: "#FFFFFF"; font.family: "monospace"; font.pixelSize: 13 }
-            Text { width: parent.width; horizontalAlignment: Text.AlignLeft; text: root.uptimeText; color: "#FF66AA"; font.family: "monospace"; font.pixelSize: 9 }
+            Text { text: root.currentTimeText; color: LazerTheme.textPrimary; font.family: "monospace"; font.pixelSize: 13 }
+            Text { width: parent.width; horizontalAlignment: Text.AlignLeft; text: root.uptimeText; color: LazerTheme.osuPink; font.family: "monospace"; font.pixelSize: 9 }
         }
     }
 }

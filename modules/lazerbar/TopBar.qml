@@ -187,16 +187,19 @@ Variants {
             mask: Region {}
             Rectangle {
                 anchors.fill: parent
-                radius: 7
-                color: "#EE202129"
+                radius: 0
+                color: Qt.alpha(LazerTheme.bgDark, 0.93)
                 opacity: screenScope.musicTooltipOpen ? 1 : 0
-                transform: Translate { y: MotionTokens.reducedMotion ? 0 : (screenScope.musicTooltipOpen ? 0 : 2) }
+                transform: Translate {
+                    y: MotionTokens.reducedMotion ? 0 : (screenScope.musicTooltipOpen ? 0 : 2)
+                    Behavior on y { NumberAnimation { duration: MotionTokens.fast } }
+                }
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
                 Column {
                     anchors.centerIn: parent
                     spacing: 1
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: "音乐播放器"; color: "white"; font.pixelSize: 12; font.bold: true }
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: "播放控制"; color: LazerTheme.musicMuted; font.pixelSize: 10 }
+                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: utilityContent.musicButtonItem.titleText; color: LazerTheme.textPrimary; font.pixelSize: 12; font.bold: true }
+                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: utilityContent.musicButtonItem.subtitleText; color: LazerTheme.musicMuted; font.pixelSize: 10 }
                 }
             }
         }

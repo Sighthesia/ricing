@@ -19,10 +19,9 @@ PanelWindow {
         anchors.fill: parent
         color: Services.SettingsService.appearance.colorScheme === "light" ? "#F2F0F5" : LazerTheme.bgDark
         opacity: Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity))
-        radius: Math.max(0, Math.min(24, Services.SettingsService.bar.cornerRadius))
+        radius: 0
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
-        Behavior on radius { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutCubic } }
     }
 }

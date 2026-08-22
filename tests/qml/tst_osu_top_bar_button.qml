@@ -22,11 +22,11 @@ Item {
             compare(button.iconOpacity, 0.45)
         }
         function test_flash() {
-            button.triggerFlash()
-            compare(button.flashOpacity, 0.6)
-            compare(button.isFlashing, true)
-            tryCompare(button, "isFlashing", false, 240)
-            compare(button.flashOpacity, 0)
+            button.restartFlash()
+            compare(button.flashOverlayItem.opacity, Lazer.MotionTokens.clickFlashOpacity)
+            compare(button.flashAnimationItem.running, true)
+            tryCompare(button, "flashActive", false, Lazer.MotionTokens.clickFlashDuration + 100)
+            compare(button.flashOverlayItem.opacity, 0)
         }
         function test_tooltipDelay() {
             button.forceHoverForTest = true

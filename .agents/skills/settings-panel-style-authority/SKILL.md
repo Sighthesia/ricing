@@ -53,6 +53,13 @@ description: 在 Afloat 中实现任何新的可见 QML 表面、交互反馈、
 - **间距折叠进高度**：列表 gap 折入子项 height（含完全退出时恰好归零），从布局移除子项时不产生跳变。
 - **声明式可见性**：过滤退场用 `!hidden || height > 0.5 || opacity > 0.01` 这类"动画落定后才隐藏"的绑定，配合 Timer 冻结隐藏时机，禁止多信号处理器竞写状态机。
 
+## 已批准的顶栏例外
+
+以下偏差经审视后确认为 lazer 原版忠实还原，仅限顶部栏使用，不得扩散到其他区域：
+
+- **图标按钮 hover 缩放**：`IconButton` / `OsuTopBarButton` 悬停 `hoverScale`、按压 `pressScale`（设置面板规则"悬停不缩放"不适用于栏上图标按钮）。
+- **ModeSelector 凹槽胶囊**：容器 `radius 9` + 底部锚定 xScale 0.97，是 lazer 模式选择器的标志性形态；选中指示仍为细条带。
+
 ## 禁止事项
 
 - 禁止引入 MotionTokens 之外的时长/缓动常量。

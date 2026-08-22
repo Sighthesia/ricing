@@ -15,8 +15,10 @@ Item {
     property bool testMode: false
     property bool forceHoverForTest: false
     property bool keyboardPressed: false
-    property real flashOpacity: 0
     property bool tooltipRequested: false
+    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
+    readonly property Item flashOverlayItem: flashOverlay
+    readonly property Animation flashAnimationItem: flashAnimation
 
     readonly property color backgroundColor: isActive ? LazerTheme.osuButtonActive
                                                       : hovered ? LazerTheme.osuButtonHover : "transparent"
@@ -35,16 +37,18 @@ Item {
     Accessible.role: Accessible.Button
     Accessible.name: titleText
 
-    function triggerFlash() {
-        flashAnimation.stop()
-        flashOpacity = 0.6
-        isFlashing = true
-        flashAnimation.duration = MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.medium
+    // Flash with the shared click-flash contract used across the project.
+    function restartFlash() {
+        if (!root.enabled || MotionTokens.reducedMotion) {
+            flashAnimation.stop()
+            flashOverlay.opacity = 0
+            return
+        }
         flashAnimation.restart()
     }
     function activate() {
         if (!enabled) return
-        triggerFlash()
+        restartFlash()
         clicked()
     }
 
@@ -109,19 +113,31 @@ Item {
 
     // Flash above all button content without replacing the button.
     Rectangle {
+        id: flashOverlay
         anchors.fill: parent
         z: 10
         radius: 6
         color: "white"
-        opacity: root.flashOpacity
+        opacity: 0
+        enabled: false
     }
     NumberAnimation {
         id: flashAnimation
-        target: root
-        property: "flashOpacity"
+        target: flashOverlay
+        property: "opacity"
+        from: MotionTokens.clickFlashOpacity
         to: 0
-        easing.type: Easing.OutQuad
-        onFinished: root.isFlashing = false
+        duration: MotionTokens.clickFlashDuration
+        easing.type: MotionTokens.clickFlashEasing
+        running: false
+    }
+
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (MotionTokens.reducedMotion)
+                root.restartFlash()
+        }
     }
     Timer { id: tooltipDelay; interval: 200; onTriggered: if (root.hovered && !root.isActive) root.tooltipRequested = true }
     HoverHandler { id: hoverHandler; enabled: root.enabled }
