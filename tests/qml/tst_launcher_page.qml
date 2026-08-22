@@ -130,6 +130,48 @@ Item {
             compare(svc().mode, "apps")
         }
 
+        // --- escape contract ---
+
+        function test_escapeWithInputClearsQueryAndKeepsSessionOpen() {
+            var apps = openWithResults([makeItem("a", "Alpha", 0, 0)])
+            verify(page.searchField.activeFocus)
+
+            keyClick(Qt.Key_F)
+            tryCompare(svc(), "query", "f")
+
+            keyClick(Qt.Key_Escape)
+
+            // Input was cleared and the session stays open and focused.
+            compare(svc().visible, true)
+            tryCompare(svc(), "query", "")
+            compare(svc().error, "")
+            resolveRefresh(apps, apps.pendingRefreshes.length - 1, [makeItem("a", "Alpha", 0, 0)])
+            tryVerify(function() { return page.searchField.activeFocus }, 300)
+            compare(page.loadingState.visible, false)
+
+            keyClick(Qt.Key_B)
+            tryCompare(svc(), "query", "b")
+        }
+
+        function test_escapeWithoutInputLeavesCloseOwnershipToTheHost() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            compare(svc().query, "")
+            verify(page.searchField.activeFocus)
+
+            keyClick(Qt.Key_Escape)
+
+            // With no input there is nothing to clear; the page must not
+            // close or tear down its own session — the wave shell owns that.
+            compare(svc().visible, true)
+            compare(svc().results.length, 1)
+            compare(page.title, "Launcher")
+            tryVerify(function() { return page.searchField.activeFocus }, 300)
+
+            // The page remains fully interactive afterwards.
+            keyClick(Qt.Key_A)
+            tryCompare(svc(), "query", "a")
+        }
+
         // --- mode switching without surface restart ---
 
         function test_modeSwitchRewritesPrefixAndKeepsSearchFocus() {

@@ -11,7 +11,7 @@ Item {
 
     // Session contract: any object exposing the observable LauncherService
     // state (visible, query, mode, results, loading, error, selectedIndex)
-    // plus refresh/selectNext/selectPrevious/executeSelected/handleKey, where
+    // plus refresh/selectNext/selectPrevious/executeSelected/execute, where
     // query edits re-request data while open. Production binds
     // Services.LauncherService; tests inject deterministic sessions. The
     // embedded default keeps the page self-contained without Quickshell.
@@ -72,12 +72,11 @@ Item {
             root.executeSelected()
             event.accepted = true
             break
-        case Qt.Key_Escape: {
-            var action = root.sessionEscapeAction()
-            // A close falls through so the owning wave shell closes itself.
-            event.accepted = action !== "close"
+        case Qt.Key_Escape:
+            // Single evaluation point: unaccepted keys bubble here from every
+            // inner item, so Escape is decided once per press.
+            event.accepted = root.handleEscape()
             break
-        }
         }
     }
 
@@ -134,11 +133,23 @@ Item {
         return false
     }
 
-    // Returns the action taken for Escape ("clear" or "close").
-    function sessionEscapeAction() {
-        if (root.session && typeof root.session.handleKey === "function")
-            return String(root.session.handleKey("escape"))
-        return ""
+    // Decides Escape through the shared pure keyboard contract: with input,
+    // clear the query and consume the key; otherwise report "close" to the
+    // owning wave shell by leaving the key unaccepted. The page never tears
+    // down its own session.
+    function handleEscape() {
+        if (!root.session)
+            return false
+        var query = root.session.query == null ? "" : String(root.session.query)
+        var action = LauncherLogic.keyboardAction(
+            "escape",
+            query.length > 0,
+            root.session.selectedIndex >= 0,
+            !root.session.loading && !root.session.error
+        )
+        if (action === "clear")
+            root.session.query = ""
+        return action === "clear"
     }
 
     function focusSearch() {
@@ -153,12 +164,16 @@ Item {
     }
 
     // Explicit result-area states; the search rail is never replaced so the
-    // editing session and keyboard focus survive every transition.
-    readonly property bool sessionLoading: root.session && root.session.loading && !root.session.error
-    readonly property bool sessionError: root.session && !root.session.loading && !!root.session.error
-    readonly property bool sessionEmpty: root.session && !root.session.loading
-                                          && !root.session.error
-                                          && (!root.session.results || root.session.results.length === 0)
+    // editing session and keyboard focus survive every transition. All states
+    // require a visible session so closed/closing sessions never render them.
+    readonly property bool sessionLoading: root.session && root.session.visible
+                                           && root.session.loading && !root.session.error
+    readonly property bool sessionError: root.session && root.session.visible
+                                         && !root.session.loading && !!root.session.error
+    readonly property bool sessionEmpty: root.session && root.session.visible
+                                         && !root.session.loading
+                                         && !root.session.error
+                                         && (!root.session.results || root.session.results.length === 0)
     readonly property bool stateVisible: sessionLoading || sessionError || sessionEmpty
 
     // Full-width sharp search rail carrying the osu caret text field.
@@ -215,10 +230,6 @@ Item {
                 searchSurface._lastPushedQuery = text
                 if (root.session)
                     root.session.query = text
-            }
-            Keys.onEscapePressed: event => {
-                var action = root.sessionEscapeAction()
-                event.accepted = action !== "close"
             }
             Keys.onUpPressed: event => { event.accepted = root.navigateSelection(-1) }
             Keys.onDownPressed: event => { event.accepted = root.navigateSelection(1) }
@@ -322,13 +333,15 @@ Item {
                 font.pixelSize: 14
             }
 
-            // Sharp retry strip following the reset-button hover contract.
+            // Sharp retry strip following the reset-button hover contract,
+            // keyboard-reachable and executable with Return or Space.
             Rectangle {
                 id: retryButton
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: 96
                 height: 32
                 radius: 0
+                activeFocusOnTab: true
                 color: retryHover.hovered || retryPress.pressed
                        ? LazerTheme.settingsResetSurfaceHover : LazerTheme.settingsResetSurface
                 scale: retryPress.pressed ? MotionTokens.pressScale : 1
@@ -346,6 +359,12 @@ Item {
 
                 HoverHandler { id: retryHover }
                 TapHandler { id: retryPress; onTapped: root.requestRetry() }
+                Keys.onPressed: event => {
+                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+                        root.requestRetry()
+                        event.accepted = true
+                    }
+                }
             }
         }
     }
