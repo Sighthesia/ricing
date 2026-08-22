@@ -14,6 +14,9 @@ TextInput {
 
     // osu! FallingDownContainer.Hide() timing contract.
     readonly property int ghostFallTime: 200
+    // Fall travel as a multiple of the line box so the drop clearly reads
+    // beyond osu's own-height baseline.
+    readonly property real ghostFallDistanceScale: 1.5
     // Cascade pacing when several characters are removed in one edit;
     // capped so a bulk delete never outlives the fall animation itself.
     readonly property int ghostStaggerStepMs: 24
