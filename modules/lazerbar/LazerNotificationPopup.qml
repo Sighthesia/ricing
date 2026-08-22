@@ -23,12 +23,13 @@ Item {
             return []
         }
     }
-    // D-Bus icon entries may be theme names rather than paths.
+    // D-Bus icon entries may be theme names rather than paths; unresolved
+    // names fall back to the generic executable icon like WindowHintService.
     readonly property string resolvedIcon: {
         const src = root.iconSource
         if (src === "" || src.indexOf("/") === 0 || src.indexOf(":") >= 0)
             return src
-        return Quickshell.iconPath(src, "")
+        return Quickshell.iconPath(src, "application-x-executable")
     }
     property bool openState: false
     property bool closing: false
