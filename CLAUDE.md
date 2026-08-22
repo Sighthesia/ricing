@@ -1,6 +1,6 @@
 Read [AGENTS.md](AGENTS.md) before starting any task.
 
-This branch (`backend-only`) keeps only the backend layer (`services/`, `scripts/`, `tests/qml/`). The frontend (`modules/`, `shell.qml`) was removed for a clean rewrite.
+This branch (`lazer`) contains the full shell: osu!lazer-styled frontend (`modules/`, `shell.qml`) plus the service/backend layer (`services/`, `scripts/`, `tests/qml/`).
 
 ## Skills
 

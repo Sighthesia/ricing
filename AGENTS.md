@@ -2,50 +2,57 @@
 
 ## Project
 
-Afloat is a Wayland desktop shell built with **Quickshell** (QML-based compositor shell framework).
-
-This branch (`backend-only`) contains only the **backend** layer — services, scripts, and backend tests. The **frontend** (`modules/`, `shell.qml`) was intentionally removed to enable a clean frontend rewrite. Rebuild the UI surface modules against the services below.
+Afloat is a Wayland desktop shell built with **Quickshell** (QML-based compositor shell framework), targeting the Niri compositor. The working branch (`lazer`) contains the full shell: an osu!lazer-styled frontend plus the service/backend layer.
 
 ## Architecture
 
-- `services/` — **singleton QML services** (registered in `services/qmldir`). All services are `singleton` types imported as `Services.*`. Key ones: `IslandService`, `BarLayoutService`, `SettingsService`, `ColorService`, `NiriService`, `VolumeService`, `MediaService`, `WindowHintService`.
-- `services/barlayout/` — bar layout JS modules (sections, persistence, drag, model)
-- `scripts/` — Python helpers: `afloat-ipc` (IPC via `qs ipc`), `netease_web_lyrics_bridge.py`, `theming/`, `window_hint_trigger.py`
-- `tests/qml/` — backend QML tests (`QtTest.TestCase`), run per test file
+- `shell.qml` — entrypoint. Mounts wallpaper background, top bar, and notification host via `Variants { model: Quickshell.screens }` per-screen instances.
+- `services/` — **singleton QML services** (registered in `services/qmldir`), imported as `Services.*`. Key ones: `IslandService`, `BarLayoutService`, `SettingsService`, `ColorService`, `NiriService`, `VolumeService`, `MediaService`, `LauncherService`, `NotificationService`, `WindowHintService`.
+  - Pure logic lives in sibling `.js` files (e.g. `barlayout/`, `launcher/`, `LauncherLogic.js`) for testability without instantiating QML.
+- `modules/bar/` — layout-driven top bar (`TopBar`, `BarContent`) and per-widget components in `widgets/`.
+- `modules/lazerbar/` — osu!lazer-styled surfaces: settings panel (`LazerSettings*`), launcher page, notifications, fullscreen overlay/music pages. Shared singletons here: `LazerTheme`, `MotionTokens`, `SettingsOverlayBridge` (see its `qmldir`).
+- `modules/shared/glsl/` — shader sources.
+- `scripts/` — Python/shell helpers: `afloat-ipc` (IPC via `qs ipc`), `netease_web_lyrics_bridge.py` (tested by `scripts/tests/test_netease_web_lyrics_bridge.py`), `theming/`, `window_hint_trigger.py`.
+- `tests/qml/` — QML tests (`TestCase` from QtTest), one file per unit, importing service `.js` logic directly via relative paths.
+- `docs/superpowers/` — implementation plans and specs (dated); consult for design intent of existing features.
 
 ## Running
 
-- Quickshell launches this config: `qs -p /path/to/afloat` (or symlink)
-- IPC calls: `scripts/afloat-ipc <target> <function> [args...]`
-- QML tests: run individual test files via `qs -p tests/qml/tst_*.qml`
-- **After every QML change**, run the relevant backend tests and fix any WARN/ERROR lines before considering the task done.
+- Launch config: `qs -p /path/to/afloat` (or symlink).
+- IPC: `scripts/afloat-ipc <target> <function> [args...]`
+- Tests run **per file** — there is no test runner aggregate:
+  `qs -p tests/qml/tst_bar_layout.qml`
+- **After every QML change**, run the relevant test files and fix any WARN/ERROR output before considering the task done.
 
 ## Conventions
 
-- Every service in `services/` is a **QML singleton** declared in `services/qmldir`. Do not instantiate them; import and reference directly.
+- Every service in `services/` is a **QML singleton** declared in `services/qmldir`. Do not instantiate them; import and reference directly. New services must be registered there.
 - Modules use `Variants { model: Quickshell.screens }` to create per-screen window instances.
 - Panel windows use `Quickshell.Wayland` (`WlrLayershell`, `WlrKeyboardFocus`) for layer-shell integration.
 - **PanelWindow is not a QML Item** — do not attach `Keys.*` handlers directly; put them on an inner `Item`/`Rectangle` with `focus: true`.
-- **PanelWindow with WlrLayershell**: use `implicitWidth`/`implicitHeight`, not `width`/`height` (the latter triggers deprecation warnings).
-- JS helper files (`.js`) in services and modules contain pure logic extracted from QML for testability.
+- **PanelWindow sizing**: use `implicitWidth`/`implicitHeight`, not `width`/`height` (the latter triggers deprecation warnings).
 - Comment before major QML element declarations (see skill below).
-- **Visual language is osu!lazer "sharp"**: major surfaces use right-angled rectangles and geometric joins (triangles/diamonds/rect strips); rounded corners belong only to component details and icons (see skill below).
+- Commit style: conventional commits (`feat(bar): ...`, `fix(notifications): ...`).
+
+## Visual language
+
+The visual language is osu!lazer "sharp": major surfaces use right-angled rectangles and geometric joins (triangles/diamonds/rect strips); rounded corners belong only to component details and icons. The **settings panel is the style authority** — reuse its verified highlight/click-flash/scroll patterns and `MotionTokens` values rather than inventing new motion or feedback styles.
 
 ## Skills
 
 Load these for detailed context on specific topics:
 
-| Skill                                                                                                  | When to use                                                                                                                                                                                                                                                              |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [osu-sharp-design-language](.agents/skills/osu-sharp-design-language/SKILL.md)                         | Creating or reshaping any visible QML element (surfaces, blocks, rows, controls, icons). Enforces the osu!lazer "sharp" visual language: sharp rectangles/geometry on major surfaces, rounded corners only on details. Load before adding any new UI shape.               |
-| [settings-panel-style-authority](.agents/skills/settings-panel-style-authority/SKILL.md)                | Implementing any new visible QML surface, interaction feedback, scrolling behavior, or motion in Afloat. The settings panel is the style authority: reuse its verified highlight/click-flash/scroll patterns and MotionTokens values before inventing new ones.           |
-| [lazer-settings-surface-details](.agents/skills/lazer-settings-surface-details/SKILL.md)                 | Modifying the lazer settings panel, settings rows, reset-default button, category blocks, search strip, or their hover/press/motion behavior. Preserves the verified geometry, z-order, input isolation, and slide transition contracts. |
-| [visual-transition-rules](.agents/skills/visual-transition-rules/SKILL.md)                             | Adjusting QML visual styles, colors, radii, opacity, blur, shadows, spacing, scale.                                                                                                                                                                                      |
-| [comment-before-declarations](.agents/skills/comment-before-declarations/SKILL.md)                     | Editing QML modules that should stay self-documenting.                                                                                                                                                                                                                   |
-| [reactive-measurement-layout-debugging](.agents/skills/reactive-measurement-layout-debugging/SKILL.md) | Diagnosing layout bugs where measured, preferred, target, actual, or clipped sizes diverge.                                                                                                                                                                              |
-| [surface-owner-split-debugging](.agents/skills/surface-owner-split-debugging/SKILL.md)                 | Debugging regressions after moving a UI surface's visible owner (hover, editing, content, geometry ownership).                                                                                                                                                           |
-| [async-layer-sync-lag-debugging](.agents/skills/async-layer-sync-lag-debugging/SKILL.md)               | A secondary layer on an async/coalesced commit path (compositor blur/mask region, cached copy) lags, stutters, overflows, or pops behind a per-frame main layer during fast animations.                                                                                  |
-| [overlay-pointer-event-starvation](.agents/skills/overlay-pointer-event-starvation/SKILL.md)           | An inner/lower element stops getting hover/pointer events (no hover, hover popup never opens, or popup flickers open/closed) because an overlapping upper element or fullscreen overlay consumes them.                                                                   |
-| [multi-instance-focus-ownership](.agents/skills/multi-instance-focus-ownership/SKILL.md)               | A text field or editable control works on first open but stops accepting keyboard input on reopen, page switch, or second mount because multiple live instances or wrapper/child hooks compete for focus ownership.                                                      |
-| [per-frame-surface-resize-jank](.agents/skills/per-frame-surface-resize-jank/SKILL.md)                 | An expand/collapse animation stutters because a per-frame size drives an expensive commit boundary (top-level/layer-shell window resize, compositor region, or per-frame model rebuild). Fix: fixed outer surface, animate clipped inner content.                        |
-| [reveal-before-clip](.agents/skills/reveal-before-clip/SKILL.md)                                       | When content inside an expanding/contracting surface (dockzone, island, drawer, menu) overflows or reads as harshly cut during the host's grow/shrink. Drive content reveal (opacity, slide, anchor edge) from the host's reveal progress before relying on a clip mask. |
+| Skill | When to use |
+| --- | --- |
+| [osu-sharp-design-language](.agents/skills/osu-sharp-design-language/SKILL.md) | Creating or reshaping any visible QML element. Load before adding any new UI shape. |
+| [settings-panel-style-authority](.agents/skills/settings-panel-style-authority/SKILL.md) | Any new visible surface, interaction feedback, scrolling, or motion. Reuse the settings panel's verified patterns first. |
+| [lazer-settings-surface-details](.agents/skills/lazer-settings-surface-details/SKILL.md) | Modifying the lazer settings panel, rows, controls, hover/press/motion behavior. Preserves geometry, z-order, input isolation, slide transition contracts. |
+| [visual-transition-rules](.agents/skills/visual-transition-rules/SKILL.md) | Adjusting colors, radii, opacity, blur, shadows, spacing, scale. |
+| [comment-before-declarations](.agents/skills/comment-before-declarations/SKILL.md) | Editing QML modules that should stay self-documenting. |
+| [reactive-measurement-layout-debugging](.agents/skills/reactive-measurement-layout-debugging/SKILL.md) | Layout bugs where measured/preferred/target/actual/clipped sizes diverge. |
+| [surface-owner-split-debugging](.agents/skills/surface-owner-split-debugging/SKILL.md) | Regressions after moving a surface's visible owner (hover, editing, content, geometry). |
+| [async-layer-sync-lag-debugging](.agents/skills/async-layer-sync-lag-debugging/SKILL.md) | Secondary async/coalesced layer lags behind per-frame main layer during fast animations. |
+| [overlay-pointer-event-starvation](.agents/skills/overlay-pointer-event-starvation/SKILL.md) | Inner/lower element stops getting hover/pointer events due to overlapping upper element. |
+| [multi-instance-focus-ownership](.agents/skills/multi-instance-focus-ownership/SKILL.md) | Text field works on first open but loses keyboard input on reopen/page switch. |
+| [per-frame-surface-resize-jank](.agents/skills/per-frame-surface-resize-jank/SKILL.md) | Expand/collapse stutters because per-frame size hits an expensive commit boundary. Fix: fixed outer surface, animate clipped inner content. |
+| [reveal-before-clip](.agents/skills/reveal-before-clip/SKILL.md) | Content inside an expanding surface overflows during grow/shrink. Drive reveal from host progress before clip masks. |
