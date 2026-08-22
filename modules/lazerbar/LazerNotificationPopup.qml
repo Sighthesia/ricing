@@ -37,6 +37,44 @@ Item {
     signal dismissRequested
     signal actionRequested(string identifier)
 
+    // Speech-bubble placeholder: rounded body plus an angled tail, tinted by
+    // bubbleColor so the top-band clip can reuse it with the darker green.
+    Component {
+        id: bubbleIcon
+
+        Item {
+            property color bubbleColor: "#B3D944"
+            width: 22
+            height: 20
+
+            Rectangle {
+                id: bubbleBody
+                width: parent.width
+                height: 15
+                radius: 4
+                color: bubbleColor
+            }
+
+            Canvas {
+                anchors.top: bubbleBody.bottom
+                x: 4
+                width: 8
+                height: 5
+                onPaint: {
+                    const ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.fillStyle = String(bubbleColor)
+                    ctx.beginPath()
+                    ctx.moveTo(0, 0)
+                    ctx.lineTo(width, 0)
+                    ctx.lineTo(1.5, height)
+                    ctx.closePath()
+                    ctx.fill()
+                }
+            }
+        }
+    }
+
     // osu Notification.CORNER_RADIUS.
     readonly property int cardRadius: 6
     // osu icon column Width = 40; CloseButton width = 28.
@@ -177,18 +215,19 @@ Item {
                 color: LazerTheme.settingsRail
 
                 Item {
+                    id: placeholderItem
                     anchors.centerIn: parent
                     visible: root.resolvedIcon === ""
-                    width: checkBottom.implicitWidth
-                    height: checkBottom.implicitHeight
+                    // Matches bubbleIcon so centering and the top-band clip
+                    // have real geometry to work with.
+                    width: 22
+                    height: 20
 
-                    Text {
-                        id: checkBottom
-                        anchors.centerIn: parent
-                        text: "\u2713"
-                        color: "#B3D944"
-                        font.pixelSize: 17
-                        font.bold: true
+                    // Message-bubble placeholder drawn from primitives so it
+                    // renders regardless of the installed icon theme.
+                    Loader {
+                        anchors.fill: parent
+                        sourceComponent: bubbleIcon
                     }
 
                     // Top band carries the gradient's darker green.
@@ -197,12 +236,10 @@ Item {
                         height: Math.ceil(parent.height / 2)
                         clip: true
 
-                        Text {
-                            anchors.centerIn: parent
-                            text: "\u2713"
-                            color: "#668800"
-                            font.pixelSize: 17
-                            font.bold: true
+                        Loader {
+                            anchors.fill: parent
+                            sourceComponent: bubbleIcon
+                            onLoaded: item.bubbleColor = "#668800"
                         }
                     }
                 }
@@ -421,9 +458,9 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: "\u2713"
+                    text: "\u2715"
                     color: closeButtonMouse.containsMouse ? LazerTheme.textPrimary : LazerTheme.textMuted
-                    font.pixelSize: 12
+                    font.pixelSize: 14
 
                     Behavior on color { ColorAnimation { duration: root.reducedMotion ? 0 : MotionTokens.fast } }
                 }
