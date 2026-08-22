@@ -16,6 +16,9 @@ QtObject {
     // Match osu!lazer's full-screen wave and side-panel timing contracts.
     readonly property int waveEnter: 800
     readonly property int waveExit: 500
+
+    // Wallpaper swaps are large-surface reveals; keep them calm but not slow.
+    readonly property int wallpaperSwap: 480
     readonly property int waveRoute: 160
     readonly property int settingsSlide: 600
     readonly property int settingsContentDelay: 200

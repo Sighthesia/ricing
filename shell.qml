@@ -2,8 +2,10 @@ import QtQuick
 import Quickshell
 import "modules/lazerbar" as LazerBar
 
-// Mount the lazer-inspired top bar as the shell's first visible surface.
+// Mount the desktop wallpaper behind the lazer top bar and notifications.
 ShellRoot {
+    LazerBar.WallpaperBackground {}
+
     LazerBar.TopBar {
         username: "Sighthesia"
     }
