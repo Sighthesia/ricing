@@ -5,7 +5,8 @@ Item {
     id: root
     property var popupModel: []
     property bool stackAtTop: true
-    readonly property int spacing: 8
+    // osu DragContainer pads 3px vertically per card, giving a 6px gap.
+    readonly property int spacing: 6
     signal popupDismissRequested(var notifId)
     implicitWidth: 360
     implicitHeight: popupList.contentHeight

@@ -1,8 +1,9 @@
 import QtQuick
 
-// Present one transient notification as an osu-style toast: icon strip,
-// text column, and a check close column. Closing plays the osu DragContainer
-// fling — the card flies left, rotates with X, and falls under gravity.
+// Present one transient notification as an osu-style toast. Layout, colors,
+// and motion follow osu!lazer's Notification.cs: Purple overlay palette
+// (hue 255), 6px radius, 40px icon strip, 28px close column, and the
+// DragContainer fling — fly left, rotate with X, fall under gravity.
 Item {
     id: root
     property string appName: ""
@@ -14,8 +15,9 @@ Item {
     readonly property bool reducedMotion: MotionTokens.reducedMotion
     signal dismissRequested
 
-    // Component-surface corner radius under the lazer sharp language.
+    // osu Notification.CORNER_RADIUS.
     readonly property int cardRadius: 6
+    // osu icon column Width = 40; CloseButton width = 28.
     readonly property int iconStripWidth: 40
     readonly property int closeButtonWidth: 28
     // osu gravity: velocity gain per millisecond of fall (px/ms^2).
@@ -34,7 +36,8 @@ Item {
         }
     }
 
-    Behavior on opacity { NumberAnimation { duration: root.reducedMotion ? 0 : MotionTokens.fast; easing.type: Easing.OutCubic } }
+    // osu LoadComplete FadeInFromZero(200).
+    Behavior on opacity { NumberAnimation { duration: root.reducedMotion ? 0 : 200 } }
 
     function _easeInOutQuart(t) {
         return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2
@@ -78,7 +81,7 @@ Item {
 
     SequentialAnimation {
         id: flingFade
-        NumberAnimation { target: root; property: "opacity"; to: 0; duration: 600; easing.type: Easing.In }
+        NumberAnimation { target: root; property: "opacity"; to: 0; duration: 600; easing.type: Easing.InQuad }
         ScriptAction { script: root.dismissRequested() }
     }
 
@@ -110,18 +113,17 @@ Item {
             NumberAnimation { target: dragContainer; property: "dragY"; to: 0; duration: 800; easing.type: Easing.OutElastic }
         }
 
-        // Pop-in slide from the screen edge, like osu LoadComplete.
+        // Pop-in slide from the screen edge, like osu LoadComplete MoveToX(500 OutQuint).
         Rectangle {
             id: card
             width: parent.width
+            // osu grid row Dimension minSize 60 plus text padding 10 per side.
             height: Math.max(60, textColumn.height + 20)
             radius: root.cardRadius
-            color: gesture.containsMouse && !root.closing ? "#F2252330" : LazerTheme.popupBackground
-            border.width: 1
-            border.color: LazerTheme.popupBorder
+            // OverlayColourProvider.Purple Background3 / Background2 on hover.
+            color: gesture.containsMouse && !root.closing ? "#494554" : "#3D3946"
 
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
+            Behavior on color { ColorAnimation { duration: root.reducedMotion ? 0 : 200; easing.type: Easing.OutQuint } }
 
             NumberAnimation {
                 id: slideInAnim
@@ -133,7 +135,9 @@ Item {
                 easing.type: Easing.OutQuint
             }
 
-            // Source strip: app icon when available, otherwise a green check.
+            // Icon column: app icon when available, otherwise the completion
+            // check with ProgressCompletionNotification's GreenDark→GreenLight
+            // vertical gradient (approximated in two clipped bands).
             Rectangle {
                 id: iconStrip
                 anchors.left: parent.left
@@ -141,65 +145,65 @@ Item {
                 anchors.bottom: parent.bottom
                 width: root.iconStripWidth
                 radius: root.cardRadius
-                color: "#14131A"
+                color: "#24222A"
 
-                Text {
+                Item {
                     anchors.centerIn: parent
                     visible: root.iconSource === ""
-                    text: "\u2713"
-                    color: "#84DB4B"
-                    font.pixelSize: 18
-                    font.bold: true
+                    width: checkBottom.implicitWidth
+                    height: checkBottom.implicitHeight
+
+                    Text {
+                        id: checkBottom
+                        anchors.centerIn: parent
+                        text: "\u2713"
+                        color: "#B3D944"
+                        font.pixelSize: 17
+                        font.bold: true
+                    }
+
+                    // Top band carries the gradient's darker green.
+                    Item {
+                        width: parent.width
+                        height: Math.ceil(parent.height / 2)
+                        clip: true
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "\u2713"
+                            color: "#668800"
+                            font.pixelSize: 17
+                            font.bold: true
+                        }
+                    }
                 }
 
                 Image {
                     anchors.centerIn: parent
                     visible: root.iconSource !== ""
                     source: root.iconSource
-                    width: 24
-                    height: 24
+                    width: 20
+                    height: 20
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
                 }
             }
 
-            Column {
+            // osu renders summary + body as one flowing 14px Medium paragraph.
+            Text {
                 id: textColumn
                 anchors.left: iconStrip.right
                 anchors.right: closeButton.left
                 anchors.top: parent.top
                 anchors.margins: 10
-                spacing: 2
-
-                Text {
-                    width: parent.width
-                    visible: root.appName.length > 0
-                    text: root.appName
-                    color: LazerTheme.textMuted
-                    font.pixelSize: 11
-                    elide: Text.ElideRight
-                }
-
-                Text {
-                    width: parent.width
-                    visible: root.summary.length > 0
-                    text: root.summary
-                    color: LazerTheme.textPrimary
-                    font.pixelSize: 14
-                    font.bold: true
-                    wrapMode: Text.Wrap
-                }
-
-                Text {
-                    width: parent.width
-                    visible: root.body.length > 0
-                    text: root.body
-                    color: LazerTheme.textMuted
-                    font.pixelSize: 12
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 4
-                    elide: Text.ElideRight
-                }
+                width: implicitWidth
+                text: root.summary + (root.body.length > 0 ? (root.summary.length > 0 ? "\u00A0" : "") + root.body : "")
+                color: "#FFFFFF"
+                font.pixelSize: 14
+                font.weight: Font.Medium
+                wrapMode: Text.WordWrap
+                maximumLineCount: 5
+                elide: Text.ElideRight
             }
 
             // Rubber-band drag with velocity tracking; release thresholds
@@ -265,7 +269,8 @@ Item {
                 }
             }
 
-            // Explicit keyboard- and pointer-friendly dismissal column.
+            // osu CloseButton: 28px column, Gray(0)@0.15 hover background,
+            // Foreground1 icon turning Content1 white on hover.
             Item {
                 id: closeButton
                 anchors.right: parent.right
@@ -279,16 +284,16 @@ Item {
                     color: "#26000000"
                     opacity: closeButtonMouse.containsMouse ? 1 : 0
 
-                    Behavior on opacity { NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+                    Behavior on opacity { NumberAnimation { duration: root.reducedMotion ? 0 : 200; easing.type: Easing.OutQuint } }
                 }
 
                 Text {
                     anchors.centerIn: parent
                     text: "\u2713"
-                    color: closeButtonMouse.containsMouse ? LazerTheme.hoverForeground : LazerTheme.textMuted
+                    color: closeButtonMouse.containsMouse ? "#FFFFFF" : "#948FA3"
                     font.pixelSize: 12
 
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                    Behavior on color { ColorAnimation { duration: root.reducedMotion ? 0 : 200; easing.type: Easing.OutQuint } }
                 }
 
                 MouseArea {
