@@ -1,0 +1,4 @@
+module Afloat.Bar
+BarPill 1.0 BarPill.qml
+BarContent 1.0 BarContent.qml
+TopBar 1.0 TopBar.qml

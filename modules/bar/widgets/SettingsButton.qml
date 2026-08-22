@@ -1,0 +1,29 @@
+import QtQuick
+import ".."
+import "../../lazerbar"
+import "../../../services" as Services
+
+// Gear button routed to the shell settings center.
+BarPill {
+    id: root
+
+    // Widget identity contract filled by the layout loader.
+    property string widgetId: ""
+    property string instanceKey: ""
+    property string section: ""
+    property string screenName: ""
+
+    onClicked: Services.IslandService.showSettingsCenter()
+
+    implicitWidth: 32
+
+    Image {
+        anchors.centerIn: parent
+        width: 16
+        height: 16
+        source: "../../lazerbar/icons/settings.svg"
+        opacity: root.hovered ? 1 : 0.85
+
+        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+    }
+}

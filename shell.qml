@@ -1,14 +1,13 @@
 import QtQuick
 import Quickshell
 import "modules/lazerbar" as LazerBar
+import "modules/bar" as Bar
 
-// Mount the desktop wallpaper behind the lazer top bar and notifications.
+// Mount the desktop wallpaper behind the layout-driven top bar and notifications.
 ShellRoot {
     LazerBar.WallpaperBackground {}
 
-    LazerBar.TopBar {
-        username: "Sighthesia"
-    }
+    Bar.TopBar {}
 
     LazerBar.NotificationHost {}
 }
