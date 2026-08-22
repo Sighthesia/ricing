@@ -5,7 +5,7 @@ import QtQuick
 Flickable {
     id: root
 
-    property bool interactive: true
+    property bool interactionEnabled: true
     property string searchQuery: ""
     property int currentIndex: 0
     property bool dropdownOpen: false
@@ -23,6 +23,8 @@ Flickable {
     contentWidth: width
     contentHeight: _totalContentHeight()
     clip: true
+    // Scrolling is suspended while the open-session wave is still playing.
+    interactive: root.interactionEnabled && !root.entranceBusy
     boundsBehavior: Flickable.StopAtBounds
     flickDeceleration: 2000
 
@@ -114,6 +116,7 @@ Flickable {
     // Reset scroll position and boundary state for a fresh session.
     function resetScrollState() {
         root._cancelEdgeDrive()
+        root.cancelFlick()
         edgeBounce.stop()
         scrollAnim.stop()
         root._syncingScroll = false
@@ -230,6 +233,8 @@ Flickable {
     function _requestEdgeOvershoot(delta) {
         if (MotionTokens.reducedMotion)
             return
+        if (!root.interactionEnabled || root.entranceBusy)
+            return
         // Landing at an edge via programmatic scroll must not delay the
         // edge feedback; take over immediately.
         if (scrollAnim.running || root._syncingScroll) {
@@ -317,6 +322,8 @@ Flickable {
         blocking: false
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: wheel => {
+            if (!root.interactionEnabled || root.entranceBusy)
+                return
             root._deferredScrollIndex = -1
             root._programmaticTargetIndex = -1
             var scrollingDown = wheel.angleDelta.y < 0 || wheel.pixelDelta.y < 0

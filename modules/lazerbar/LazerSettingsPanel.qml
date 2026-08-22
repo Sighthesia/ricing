@@ -254,7 +254,7 @@ Item {
             id: sectionsItem
             width: parent.width
             height: parent.height
-            interactive: root.interactive
+            interactionEnabled: root.interactive
             searchQuery: root.searchQuery
             dropdownOpen: contentLayer.dropdownOpen
 
