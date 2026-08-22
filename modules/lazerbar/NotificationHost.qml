@@ -51,7 +51,7 @@ Variants {
                 anchors.horizontalCenter: parent.horizontalCenter
                 stackAtTop: Services.NotificationService.notificationTop
                 popupModel: Services.NotificationService.popupList
-            onPopupDismissRequested: Services.NotificationService.dismissPopup(notifId)
+                onPopupDismissRequested: notifId => Services.NotificationService.dismissPopup(notifId)
         }
         }
     }

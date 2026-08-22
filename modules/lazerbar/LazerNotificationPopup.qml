@@ -69,13 +69,15 @@ Item {
         }
     }
 
-    // Integrate the free-fall physics on the render loop.
+    // Integrate the free-fall physics on the render loop. frameTime is in
+    // seconds; convert to ms to match the osu px/ms velocity/gravity units.
     FrameAnimation {
         id: fallAnim
         onTriggered: {
-            dragContainer.velocityY += frameTime * root.gravity
-            dragContainer.dragX += dragContainer.velocityX * frameTime
-            dragContainer.dragY += dragContainer.velocityY * frameTime
+            const dt = frameTime * 1000
+            dragContainer.velocityY += dt * root.gravity
+            dragContainer.dragX += dragContainer.velocityX * dt
+            dragContainer.dragY += dragContainer.velocityY * dt
         }
     }
 
