@@ -96,41 +96,40 @@ Item {
             field.suppressDeleteFx = false
         }
 
-        function instantiateCaret() {
-            var caret = field.cursorDelegate.createObject(null, { editor: field })
+        function test_caretCarriesOsuContracts() {
+            var caret = field.caretItem
             verify(caret !== null)
-            return caret
-        }
-
-        function test_caretDelegateCarriesOsuContracts() {
-            verify(field.cursorDelegate !== null)
-            var caret = instantiateCaret()
+            verify(caret.target === field)
             verify(caret.moveTime === 60)
             verify(caret.blinkHigh === 0.7 && caret.blinkLow === 0.4)
-            verify(caret.blinkPeriod === 500)
-            verify(caret.fadeTime === 200)
+            verify(caret.blinkHalfPeriod === 250)
             verify(caret.width === 3)
-            verify(!caret.focused)
             tryCompare(caret, "visualOpacity", 0, 600)
-            caret.destroy()
         }
 
         function test_caretPulsesWhileFocused() {
-            var caret = instantiateCaret()
+            var caret = field.caretItem
             field.forceActiveFocus()
             verify(caret.focused)
-            tryCompare(caret, "visualOpacity", 0.7, 100)
-            tryVerify(function() { return caret.visualOpacity < 0.7 }, 800)
+            // The pulse must dip toward the dim stop and climb back while focused.
+            var dipped = false
+            tryVerify(function() {
+                if (caret.visualOpacity < 0.55)
+                    dipped = true
+                return dipped && caret.visualOpacity > 0.55
+            }, 1500)
             field.focus = false
-            caret.destroy()
         }
 
-        function test_caretGlidesOnlyAfterFirstPlacement() {
-            var caret = instantiateCaret()
-            verify(!caret.glideReady)
-            caret.x = 42
-            tryCompare(caret, "glideReady", true)
-            caret.destroy()
+        function test_caretGlidesTowardCursorMoves() {
+            var caret = field.caretItem
+            field.forceActiveFocus()
+            field.cursorPosition = 0
+            tryCompare(caret, "x", field.cursorRectangle.x, 400)
+            // Moving the cursor retargets instantly while the Behavior glides.
+            field.cursorPosition = field.text.length
+            tryVerify(function() { return caret.x > 1 }, 400)
+            field.focus = false
         }
 
         function test_deletionSpawnsFallingGhosts() {

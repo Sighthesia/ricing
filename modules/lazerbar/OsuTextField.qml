@@ -13,9 +13,6 @@ TextInput {
 
     // osu! FallingDownContainer.Hide() timing contract.
     readonly property int ghostFallTime: 200
-    // Fall travel as a multiple of the line box so the drop clearly reads
-    // beyond osu's own-height baseline.
-    readonly property real ghostFallDistanceScale: 1.5
     // Cascade pacing when several characters are removed in one edit;
     // capped so a bulk delete never outlives the fall animation itself.
     readonly property int ghostStaggerStepMs: 24
@@ -28,8 +25,17 @@ TextInput {
     // Read-only views for tests: live ghost population and its container.
     readonly property int ghostCount: ghostLayer.children.length
     readonly property alias ghostLayerItem: ghostLayer
+    readonly property alias caretItem: caret
 
-    cursorDelegate: OsuTextCaret { editor: root }
+    // Empty delegate swallows the native cursor; the real bar is our own
+    // child bound to cursorRectangle so every move rides a Behavior.
+    cursorDelegate: Item { }
+
+    OsuTextCaret {
+        id: caret
+        target: root
+        z: 2
+    }
 
     TextMetrics {
         id: metrics
@@ -39,7 +45,53 @@ TextInput {
     // Snapshot of the previous string so onTextChanged can diff out exactly
     // which characters were removed and where they used to sit.
     property string trackedText: ""
-    Component.onCompleted: trackedText = text
+
+    Component.onCompleted: {
+        trackedText = text
+        adoptRootGhostLayer()
+        syncGhostLayer()
+    }
+
+    onParentChanged: {
+        adoptRootGhostLayer()
+        syncGhostLayer()
+    }
+
+    // The field clips its own text, so ghosts parented here could never fall
+    // past the surface. Hand the layer to the scene root with a dominant z:
+    // no intermediate clip and no later sibling subtree can cut the fall.
+    function adoptRootGhostLayer() {
+        var top = parent
+        while (top && top.parent)
+            top = top.parent
+        if (!top || top === root)
+            return
+        ghostLayer.parent = top
+        ghostLayer.z = 1000000
+    }
+
+    function syncGhostLayer() {
+        if (!ghostLayer.parent)
+            return
+        if (ghostLayer.parent !== root) {
+            var origin = mapToItem(ghostLayer.parent, 0, 0)
+            ghostLayer.x = origin.x
+            ghostLayer.y = origin.y
+        } else {
+            ghostLayer.x = 0
+            ghostLayer.y = 0
+        }
+        ghostLayer.width = width
+        ghostLayer.height = height
+    }
+
+    onXChanged: syncGhostLayer()
+    onYChanged: syncGhostLayer()
+    onWidthChanged: syncGhostLayer()
+    onHeightChanged: syncGhostLayer()
+
+    // Reparented layers do not die with their original owner.
+    Component.onDestruction: ghostLayer.destroy()
 
     onTextChanged: {
         if (!suppressDeleteFx)
@@ -77,16 +129,15 @@ TextInput {
             width: Math.max(2, anchorRect.height),
             height: anchorRect.height,
             verticalAlignment: Text.AlignVCenter,
-            fallDistance: Math.max(anchorRect.height, metrics.height) * ghostFallDistanceScale,
+            fallDistance: Math.max(metrics.height * 0.8, 8),
             fallDelayMs: delayMs
         })
     }
 
-    // Ghosts live inside the field so the host clip bounds them like osu's
-    // masked TextBox surface.
+    // Ghost host; geometry mirrors this field (see syncGhostLayer) and clip
+    // stays off so falling glyphs may exit the surface like osu's removals.
     Item {
         id: ghostLayer
-        anchors.fill: parent
     }
 
     Component {
