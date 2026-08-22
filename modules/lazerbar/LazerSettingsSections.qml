@@ -278,10 +278,20 @@ Flickable {
         easing.type: Easing.InOutCubic
     }
 
+    // Short chasing ease so manual edge driving glides instead of stepping.
+    NumberAnimation {
+        id: edgeDriveAnim
+        target: root
+        property: "contentY"
+        duration: MotionTokens.reducedMotion ? 0 : 80
+        easing.type: Easing.OutQuint
+    }
+
     function _cancelEdgeDrive() {
         root.edgeDriving = false
         edgeSettleTimer.stop()
         edgeSettleAnim.stop()
+        edgeDriveAnim.stop()
     }
 
     // Ease back into bounds after an edge-driving burst ends.
@@ -289,6 +299,7 @@ Flickable {
         if (!root.edgeDriving)
             return
         root.edgeDriving = false
+        edgeDriveAnim.stop()
         var maximumY = Math.max(0, root.contentHeight - root.height)
         var target = Math.max(0, Math.min(maximumY, root.contentY))
         if (Math.abs(target - root.contentY) < 0.5) {
@@ -327,15 +338,20 @@ Flickable {
             if (root.edgeDriving && !nearBottom && !nearTop)
                 root._settleEdgeDrive()
             if (!MotionTokens.reducedMotion && (nearBottom || nearTop)) {
-                // Take over before the bound: apply the raw delta so response
-                // is immediate, then ease back once input idles.
+                // Take over before the bound: chase the raw delta with a
+                // short ease so response is immediate but motion stays
+                // continuous, then ease back once input idles.
                 root.cancelFlick()
                 root.edgeDriving = true
                 edgeSettleTimer.restart()
                 edgeSettleAnim.stop()
-                root.contentY = Math.max(-root.overscrollDistance,
-                                         Math.min(maximumY + root.overscrollDistance,
-                                                  root.contentY - delta))
+                var proposed = Math.max(-root.overscrollDistance,
+                                        Math.min(maximumY + root.overscrollDistance,
+                                                 root.contentY - delta))
+                edgeDriveAnim.stop()
+                edgeDriveAnim.from = root.contentY
+                edgeDriveAnim.to = proposed
+                edgeDriveAnim.restart()
                 root._lastContentY = root.contentY
                 return
             }
