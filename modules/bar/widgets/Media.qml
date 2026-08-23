@@ -7,7 +7,9 @@ import "../../../services" as Services
 // grows with its content up to a cap, the translucent album cover sits in a
 // square region centered on the music glyph, and an over-long primary line
 // marquee-scrolls instead of being cut short. Lyric changes fade in while the
-// outgoing line falls away like OsuTextField's delete ghosts.
+// outgoing line falls away like OsuTextField's delete ghosts. An audio
+// spectrum (PipeWire via cava) renders as a sharp mirrored bar field behind
+// the content when the track is playing.
 BarPill {
     id: root
 
@@ -34,6 +36,12 @@ BarPill {
     readonly property int lyricGhostFallTime: 200
     readonly property real lyricGhostFallDistanceScale: 1.5
 
+    // Spectrum registration — mirrors the old bar spectrum integration.
+    readonly property string spectrumComponentId: "media:" + (root.instanceKey !== "" ? root.instanceKey : (root.widgetId !== "" ? root.widgetId : root.screenName))
+    readonly property var mediaSettings: Services.SettingsService.widgetSettingsObject("media", root.instanceKey)
+    readonly property bool needsSpectrum: root.hasMedia && root.playing && !MotionTokens.reducedMotion
+        && (root.mediaSettings ? root.mediaSettings.showAudioSpectrum !== false : true)
+
     property string trackedPrimaryText: ""
 
     visible: hasMedia
@@ -42,7 +50,22 @@ BarPill {
 
     onClicked: Services.MediaService.playPause()
 
-    Component.onCompleted: trackedPrimaryText = root.primaryText
+    function syncSpectrumRegistration() {
+        if (root.needsSpectrum)
+            Services.SpectrumService.registerComponent(root.spectrumComponentId)
+        else
+            Services.SpectrumService.unregisterComponent(root.spectrumComponentId)
+    }
+
+    Component.onCompleted: {
+        root.trackedPrimaryText = root.primaryText
+        // Ensure widget defaults exist so showAudioSpectrum can be toggled later.
+        if (root.instanceKey !== "")
+            Services.SettingsService.ensureWidgetSettings("media", root.instanceKey)
+        syncSpectrumRegistration()
+    }
+    Component.onDestruction: Services.SpectrumService.unregisterComponent(root.spectrumComponentId)
+    onNeedsSpectrumChanged: syncSpectrumRegistration()
 
     onPrimaryTextChanged: {
         if (root.trackedPrimaryText === "" || root.trackedPrimaryText === root.primaryText) {
@@ -87,6 +110,27 @@ BarPill {
             if (event.angleDelta.y > 0) Services.MediaService.next()
             else if (event.angleDelta.y < 0) Services.MediaService.previous()
             event.accepted = true
+        }
+    }
+
+    // Spectrum backdrop — sharp mirrored bars behind the pill content, faded
+    // when the audio is idle so the pill stays calm between tracks.
+    Item {
+        anchors.fill: parent
+        anchors.leftMargin: 4
+        anchors.rightMargin: 4
+        anchors.topMargin: 3
+        anchors.bottomMargin: 3
+        visible: root.needsSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
+        clip: true
+        opacity: Services.SpectrumService.isIdle ? 0 : 1
+
+        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+
+        DockzoneSpectrum {
+            anchors.fill: parent
+            values: Services.SpectrumService.values
+            barColor: Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.34)
         }
     }
 
