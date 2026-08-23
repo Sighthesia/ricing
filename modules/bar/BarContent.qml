@@ -1,5 +1,6 @@
 import QtQuick
 import "../lazerbar"
+import "./ShippedWidgets.js" as ShippedWidgets
 import "../../services" as Services
 import "../../services/barlayout/BarLayoutSections.js" as BarLayoutSections
 
@@ -10,26 +11,15 @@ Item {
     property string screenName: ""
     readonly property int sidePadding: 12
 
-    // Widget ids that ship a frontend implementation; registry entries
-    // without a file are skipped so persisted layouts never warn.
-    readonly property var shippedWidgetIds: [
-        "clock", "tray", "active-window", "workspaces", "brightness",
-        "volume", "media", "notifications", "settings",
-    ]
-
     // Widget loaders start one tick late so every service singleton is
     // fully registered before widget bindings evaluate.
     property bool widgetsReady: false
 
-    // Filter a section's entries down to implemented widgets.
+    // Filter a section's entries down to implemented widgets; the shipped
+    // set lives in the shared ShippedWidgets source so it cannot drift
+    // between production and tests.
     function loadableWidgets(sectionName) {
-        var entries = Services.BarLayoutService.sectionWidgets(sectionName)
-        var loadable = []
-        for (var index = 0; index < entries.length; index++) {
-            if (shippedWidgetIds.indexOf(entries[index].id) !== -1)
-                loadable.push(entries[index])
-        }
-        return loadable
+        return ShippedWidgets.loadable(Services.BarLayoutService.sectionWidgets(sectionName))
     }
 
     // Registry source paths are already relative to this file's directory.

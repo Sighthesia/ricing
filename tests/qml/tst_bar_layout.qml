@@ -89,6 +89,49 @@ Item {
             verify(ShippedWidgets.ids.indexOf("settings") !== -1)
         }
 
+        // Behavior-level guard for the exact render-filter regression: the
+        // launcher entry from a real section listing must survive the same
+        // filter BarContent applies before instantiating loaders.
+        function test_loadable_filter_keeps_launcher_mapped_to_button() {
+            var entries = [
+                { id: "clock", instanceKey: "clock:0", source: "../../modules/bar/widgets/Clock.qml" },
+                { id: "launcher", instanceKey: "launcher:0", source: "../../modules/bar/widgets/LauncherButton.qml" },
+                // Registry id without a shipped implementation must stay dropped.
+                { id: "widget-picker-button", instanceKey: "widget-picker-button:0", source: "" },
+            ]
+            var filtered = ShippedWidgets.loadable(entries)
+            compare(filtered.length, 2)
+            compare(filtered[1].id, "launcher")
+            compare(filtered[1].source, "../../modules/bar/widgets/LauncherButton.qml")
+            verify(BarLayoutModel.defaultWidgetSource(filtered[1].id)
+                   === filtered[1].source,
+                   "surviving launcher entry must remain mapped to LauncherButton")
+        }
+
+        // Every default-layout widget must survive the production filter;
+        // a silently dropped default (like launcher was) fails here.
+        function test_default_layout_widgets_all_survive_render_filter() {
+            var model = BarLayoutModel.defaultLayoutModel()
+            var filtered = ShippedWidgets.loadable(model.widgets)
+            compare(filtered.length, model.widgets.length)
+            var launcherSurvived = false
+            for (var i = 0; i < filtered.length; i++) {
+                if (filtered[i].id === "launcher")
+                    launcherSurvived = true
+            }
+            verify(launcherSurvived, "launcher must survive loadable filtering")
+        }
+
+        function test_bar_content_delegates_to_shared_shipped_source() {
+            var content = fileText("../../modules/bar/BarContent.qml")
+            if (content === "")
+                skip("local file reads disabled; run with QML_XHR_ALLOW_FILE_READ=1")
+            verify(content.indexOf("ShippedWidgets.loadable") !== -1,
+                   "BarContent must filter through the shared ShippedWidgets source")
+            verify(content.indexOf("shippedWidgetIds") === -1,
+                   "BarContent must not keep a private hardcoded widget list")
+        }
+
         function test_registry_maps_launcher_to_button_widget() {
             compare(BarLayoutModel.defaultWidgetSource("launcher"),
                     "../../modules/bar/widgets/LauncherButton.qml")
