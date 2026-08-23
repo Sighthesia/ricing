@@ -1,0 +1,468 @@
+.pragma library
+
+// Production launcher data-source adapters: builds the refresh/execute seam
+// consumed by LauncherSession from the standalone backend singletons
+// (desktop entries + launch counts, cliphist history, niri shortcut binds).
+// Pure JavaScript so tests instantiate this exact factory with fixture
+// backends; every unavailable source resolves to an explicit { error }
+// outcome instead of neutral results.
+
+function normalizeText(value) {
+    return value == null ? "" : String(value).replace(/\s+/g, " ").trim()
+}
+
+function toCount(value) {
+    var number = Number(value)
+    return isFinite(number) ? number : 0
+}
+
+function containsNormalized(value, needle) {
+    return value != null && String(value).toLowerCase().indexOf(needle) >= 0
+}
+
+function isSignal(target, name) {
+    return !!target && !!target[name] && typeof target[name].connect === "function"
+}
+
+// Formats a first-seen timestamp as a short HH:MM label for row metadata.
+function timeLabel(milliseconds) {
+    var stamp = new Date(toCount(milliseconds))
+    if (isNaN(stamp.getTime()))
+        return ""
+    return pad2(stamp.getHours()) + ":" + pad2(stamp.getMinutes())
+}
+
+function pad2(value) {
+    var text = String(Math.round(toCount(value)))
+    return text.length < 2 ? "0" + text : text
+}
+
+// ---- Applications ----
+
+function directIconPath(icon) {
+    var text = icon == null ? "" : String(icon)
+    if (text.indexOf("/") === 0 || text.indexOf("file:") === 0)
+        return text
+    return ""
+}
+
+function appMatches(entry, needle) {
+    if (!needle)
+        return true
+    return containsNormalized(entry.name, needle)
+        || containsNormalized(entry.comment, needle)
+        || containsNormalized(entry.id, needle)
+}
+
+function appItem(entry, launchCounts, iconResolver) {
+    var weight = launchCounts && typeof launchCounts.getLaunchCount === "function"
+                 ? toCount(launchCounts.getLaunchCount(String(entry.id == null ? "" : entry.id)))
+                 : 0
+    var rawIcon = entry.icon == null ? "" : String(entry.icon)
+    return {
+        id: entry.id == null ? "" : String(entry.id),
+        displayName: entry.name == null ? "" : String(entry.name),
+        description: entry.comment == null ? "" : String(entry.comment),
+        icon: iconResolver ? String(iconResolver(rawIcon)) : directIconPath(rawIcon),
+        favoriteWeight: weight,
+        lastUsedAt: 0
+    }
+}
+
+// Desktop-entry applications: favorites from launch counts drive ordering,
+// execution launches through the entry itself and records recent use.
+function createAppsAdapter(config) {
+    config = config || {}
+    var source = config.appsSource || null
+    var launchCounts = config.launchCounts || null
+    var iconResolver = typeof config.iconResolver === "function" ? config.iconResolver : null
+
+    // DesktopEntries.applications.values is a QML list object rather than a
+    // JavaScript array; accept anything indexable with a numeric length.
+    function entryValues() {
+        if (!source || !source.values)
+            return null
+        var values = source.values
+        return typeof values.length === "number" ? values : null
+    }
+
+    function findEntry(id) {
+        var values = entryValues()
+        if (!values)
+            return null
+        var wanted = String(id == null ? "" : id)
+        for (var index = 0; index < values.length; index++) {
+            var candidate = values[index]
+            if (candidate && String(candidate.id) === wanted)
+                return candidate
+        }
+        return null
+    }
+
+    return {
+        refresh: function(queryText, modeName, done) {
+            if (typeof done !== "function")
+                return
+            var values = entryValues()
+            if (!values) {
+                done({ error: "application source unavailable" })
+                return
+            }
+            var needle = normalizeText(queryText).toLowerCase()
+            var out = []
+            for (var index = 0; index < values.length; index++) {
+                var entry = values[index]
+                if (!entry || entry.noDisplay)
+                    continue
+                if (!appMatches(entry, needle))
+                    continue
+                out.push(appItem(entry, launchCounts, iconResolver))
+            }
+            done(out)
+        },
+
+        execute: function(item, done) {
+            if (typeof done !== "function")
+                return
+            if (!entryValues()) {
+                done({ ok: false, error: "application source unavailable" })
+                return
+            }
+            if (!item || !(item.id != null && String(item.id).length)) {
+                done({ ok: false, error: "no application selected" })
+                return
+            }
+            var entry = findEntry(item.id)
+            if (!entry) {
+                done({ ok: false, error: "application not found: " + String(item.displayName || item.id) })
+                return
+            }
+            if (typeof entry.execute !== "function") {
+                done({ ok: false, error: "application cannot be launched: " + String(entry.name || entry.id) })
+                return
+            }
+            entry.execute()
+            if (launchCounts && typeof launchCounts.recordLaunch === "function")
+                launchCounts.recordLaunch(String(entry.id))
+            done({ ok: true })
+        }
+    }
+}
+
+// ---- Clipboard ----
+
+function clipboardItem(raw) {
+    var preview = raw.preview == null ? "" : String(raw.preview)
+    var isImage = !!raw.isImage
+    var mime = raw.mime == null ? "text/plain" : String(raw.mime)
+    var seenMs = toCount(raw.firstSeenMs)
+    var title = isImage ? "[Image]" : (normalizeText(preview).length ? preview : "(empty)")
+    var description = mime
+    var seen = timeLabel(seenMs)
+    if (seen)
+        description += " · copied " + seen
+    return {
+        id: raw.id == null ? "" : String(raw.id),
+        displayName: title,
+        description: description,
+        icon: "",
+        previewText: preview,
+        mime: mime,
+        isImage: isImage,
+        time: seenMs,
+        favoriteWeight: 0,
+        lastUsedAt: seenMs
+    }
+}
+
+function mapClipboardItems(items, needle) {
+    var out = []
+    for (var index = 0; index < items.length; index++) {
+        var raw = items[index]
+        if (!raw)
+            continue
+        if (needle && !containsNormalized(raw.preview, needle))
+            continue
+        out.push(clipboardItem(raw))
+    }
+    return out
+}
+
+// Cliphist-backed clipboard history: write-back copies the selected entry;
+// the very first fetch may still be in flight, so the initial refresh waits
+// once for listCompletion instead of reporting an empty history.
+function createClipboardAdapter(config) {
+    config = config || {}
+    var backend = config.clipboardBackend || null
+    var waiting = null
+    var completionHandler = null
+
+    function settle() {
+        if (!completionHandler)
+            return
+        try { backend.listCompleted.disconnect(completionHandler) } catch (e) {}
+        completionHandler = null
+        var pending = waiting
+        waiting = null
+        if (pending)
+            pending.done(mapClipboardItems(Array.isArray(backend.items) ? backend.items : [], pending.needle))
+    }
+
+    return {
+        refresh: function(queryText, modeName, done) {
+            if (typeof done !== "function")
+                return
+            if (!backend) {
+                done({ error: "clipboard service unavailable" })
+                return
+            }
+            if (!backend.available) {
+                done({ error: "clipboard history unavailable" })
+                return
+            }
+            var needle = normalizeText(queryText).toLowerCase()
+            var items = Array.isArray(backend.items) ? backend.items : []
+            var canWait = toCount(backend.revision) <= 0
+                          && isSignal(backend, "listCompleted")
+                          && typeof backend.list === "function"
+            if (items.length > 0 || !canWait) {
+                done(mapClipboardItems(items, needle))
+                return
+            }
+            waiting = { needle: needle, done: done }
+            if (!completionHandler) {
+                completionHandler = settle
+                backend.listCompleted.connect(completionHandler)
+            }
+            backend.list()
+        },
+
+        execute: function(item, done) {
+            if (typeof done !== "function")
+                return
+            if (!backend) {
+                done({ ok: false, error: "clipboard service unavailable" })
+                return
+            }
+            if (!backend.available) {
+                done({ ok: false, error: "clipboard history unavailable" })
+                return
+            }
+            if (!item || !(item.id != null && String(item.id).length)) {
+                done({ ok: false, error: "no clipboard entry selected" })
+                return
+            }
+            if (typeof backend.copyItem === "function")
+                backend.copyItem(String(item.id))
+            done({ ok: true })
+        }
+    }
+}
+
+// ---- Shortcuts ----
+
+function modelRows(model) {
+    var count = model ? toCount(model.count) : 0
+    var rows = []
+    if (!count || typeof model.get !== "function")
+        return rows
+    for (var index = 0; index < count; index++) {
+        var row = model.get(index)
+        if (row)
+            rows.push(row)
+    }
+    return rows
+}
+
+function shortcutMatches(row, needle) {
+    if (!needle)
+        return true
+    return containsNormalized(row.label, needle)
+        || containsNormalized(row.sequence, needle)
+        || containsNormalized(row.detail, needle)
+        || containsNormalized(row.category, needle)
+}
+
+function shortcutItem(row, index) {
+    var sequence = row.sequence == null ? "" : String(row.sequence)
+    var detail = row.detail == null ? "" : String(row.detail)
+    return {
+        id: row.entryId == null ? "shortcut-" + index : String(row.entryId),
+        displayName: row.label == null ? "" : String(row.label),
+        description: detail ? sequence + " · " + detail : sequence,
+        keySequence: sequence,
+        detail: detail,
+        actionId: row.actionId == null ? "" : String(row.actionId),
+        category: row.category == null ? "" : String(row.category),
+        managedByShell: !!row.managedByShell,
+        favoriteWeight: 0,
+        lastUsedAt: 0
+    }
+}
+
+function mapShortcutItems(rows, needle) {
+    var out = []
+    for (var index = 0; index < rows.length; index++) {
+        if (!shortcutMatches(rows[index], needle))
+            continue
+        out.push(shortcutItem(rows[index], index))
+    }
+    return out
+}
+
+// Splits a kdl action body into argv tokens, honoring double-quoted strings
+// and backslash escapes so spawn arguments survive intact.
+function tokenizeActionBody(body) {
+    var text = body == null ? "" : String(body)
+    var tokens = []
+    var current = ""
+    var started = false
+    var quoted = false
+    for (var index = 0; index < text.length; index++) {
+        var character = text[index]
+        if (character === "\\" && index + 1 < text.length) {
+            current += text[index + 1]
+            started = true
+            index++
+            continue
+        }
+        if (character === "\"") {
+            quoted = !quoted
+            started = true
+            continue
+        }
+        if (!quoted && /\s/.test(character)) {
+            if (started) {
+                tokens.push(current)
+                current = ""
+                started = false
+            }
+            continue
+        }
+        current += character
+        started = true
+    }
+    if (started)
+        tokens.push(current)
+    return tokens
+}
+
+function shellIpcParts(actionId) {
+    var match = /^shell\.([a-z0-9_-]+)\.([a-z0-9_-]+)$/i.exec(actionId == null ? "" : String(actionId))
+    return match ? [match[1], match[2]] : null
+}
+
+// Builds the argv executing one shortcut result: shell-managed binds go
+// through the afloat IPC helper, everything else runs as a niri action.
+function actionArgv(item, ipcHelperPath) {
+    if (!item)
+        return []
+    if (item.managedByShell) {
+        var parts = shellIpcParts(item.actionId)
+        if (parts && ipcHelperPath)
+            return [String(ipcHelperPath), parts[0], parts[1]]
+    }
+    var tokens = tokenizeActionBody(item.detail != null ? item.detail : item.actionSummary)
+    if (!tokens.length)
+        return []
+    var head = tokens[0]
+    var argv = ["niri", "msg", "action", head]
+    if (head === "spawn" || head === "spawn-sh")
+        argv.push("--")
+    return argv.concat(tokens.slice(1))
+}
+
+// Niri shortcut bindings: entries come from the parsed binds model and
+// execution routes through niri msg (or the shell IPC helper).
+function createShortcutsAdapter(config) {
+    config = config || {}
+    var backend = config.shortcutsBackend || null
+    var actionRunner = typeof config.actionRunner === "function" ? config.actionRunner : null
+    var ipcHelperPath = config.ipcHelperPath == null ? "" : String(config.ipcHelperPath)
+
+    function evaluate(needle, done) {
+        var rows = modelRows(backend.shortcutsModel)
+        if (!rows.length && backend.errorText) {
+            done({ error: String(backend.errorText) })
+            return
+        }
+        done(mapShortcutItems(rows, needle))
+    }
+
+    return {
+        refresh: function(queryText, modeName, done) {
+            if (typeof done !== "function")
+                return
+            if (!backend) {
+                done({ error: "shortcut service unavailable" })
+                return
+            }
+            var needle = normalizeText(queryText).toLowerCase()
+            if (backend.isLoaded || !isSignal(backend, "shortcutsReloaded")) {
+                evaluate(needle, done)
+                return
+            }
+            // Binds file still loading: settle on either the successful
+            // reload or a surfaced load error before answering.
+            var settled = false
+            var handlers = []
+            var finish = function() {
+                if (settled)
+                    return
+                settled = true
+                for (var index = 0; index < handlers.length; index++) {
+                    try { handlers[index][0].disconnect(handlers[index][1]) } catch (e) {}
+                }
+                evaluate(needle, done)
+            }
+            handlers.push([backend.shortcutsReloaded, finish])
+            if (isSignal(backend, "errorTextChanged"))
+                handlers.push([backend.errorTextChanged, finish])
+            for (var index = 0; index < handlers.length; index++)
+                handlers[index][0].connect(handlers[index][1])
+        },
+
+        execute: function(item, done) {
+            if (typeof done !== "function")
+                return
+            if (!backend) {
+                done({ ok: false, error: "shortcut service unavailable" })
+                return
+            }
+            if (!actionRunner) {
+                done({ ok: false, error: "shortcut actions unavailable" })
+                return
+            }
+            if (!item) {
+                done({ ok: false, error: "no shortcut selected" })
+                return
+            }
+            var argv = actionArgv(item, ipcHelperPath)
+            if (!argv.length) {
+                done({ ok: false, error: "shortcut has no runnable action" })
+                return
+            }
+            actionRunner(argv, done)
+        }
+    }
+}
+
+// Assembles the full mode-keyed adapter set handed to LauncherSession.
+function createAdapters(config) {
+    config = config || {}
+    return {
+        apps: createAppsAdapter({
+            appsSource: config.appsSource || null,
+            launchCounts: config.launchCounts || null,
+            iconResolver: config.iconResolver || null
+        }),
+        clipboard: createClipboardAdapter({
+            clipboardBackend: config.clipboardBackend || null
+        }),
+        shortcuts: createShortcutsAdapter({
+            shortcutsBackend: config.shortcutsBackend || null,
+            actionRunner: config.actionRunner || null,
+            ipcHelperPath: config.ipcHelperPath || ""
+        })
+    }
+}

@@ -115,13 +115,17 @@ QtObject {
     }
 
     function executeSelected() {
+        // Non-interactive sessions (loading / error) must not execute the
+        // results still on screen; they are stale until a refresh commits.
+        if (!root.interactive)
+            return
         if (root.selectedIndex < 0 || root.selectedIndex >= root.results.length)
             return
         root.execute(root.results[root.selectedIndex])
     }
 
     function execute(item) {
-        if (!item || !root.visible)
+        if (!item || !root.visible || !root.interactive)
             return
         var adapter = _adapterFor(mode)
         var sessionToken = _refreshToken
