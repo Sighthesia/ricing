@@ -27,6 +27,17 @@
 - 文字 OsuSpriteText 默认字号；图标与文字水平 FillFlow 排布，间距紧凑（按钮 padding 3）
 - tooltip 显示在 toolbar 下方 30px 区域内（TOOLTIP_HEIGHT = 30）
 
+### 3.1 按钮几何与比例（逐文件核实）
+
+- **按钮是撑满栏高的正方形**：`ButtonContent.Width = Toolbar.HEIGHT`（40×40），`RelativeSizeAxes = Y`（ToolbarButton.cs:82-84）
+- PADDING=3 是 `ButtonContent` 的内边距 → **可见 hover/flash 表面为 34×34**，圆角 6（Exponent 3）
+- 标准图标 `ConstrainedIconContainer Size=(20)` 居中于 34 面内（每侧余白 7px）
+- **关键比例**：图标:栏高 = 50%；hover面:栏高 = 85%（40−2×3）；图标:hover面 ≈ 59%
+- 特例放大件：用户头像 **32×32**（80% 栏高，圆角 4 + 阴影）；模拟表盘 **22×22**（55%）
+- 带文字按钮的 Flow 左右各留 `HEIGHT/2`（20px）水平内边距
+- **按钮横向 Spacing = 0**：FillFlow 不设间隔，视觉 6px 间隙由相邻按钮各自的 3px 内边距拼出；左右按钮组直接贴屏幕边缘，无额外水平 padding
+- RulesetSelector 激活指示条高 3、宽 18（ToolbarRulesetSelector.cs:66）——细条带指示而非描边
+
 ## 4. 细节交互
 
 ### ToolbarUserButton
@@ -65,10 +76,29 @@
 | 点击 flash | 白 α100，50ms 入 + 800ms OutQuint 出 | ToolbarButton.cs:176 |
 | 激活态 | Carmine α180，200ms OutQuint | ToolbarOverlayToggleButton.cs:54-74 |
 | 按钮圆角 | 6（Exponent 3） | ToolbarButton.cs:83 |
-| 图标尺寸 | 20×20 | ToolbarButton.cs:117 |
+| 图标尺寸 | 20×20（=50% 栏高；hover 面的 ≈59%） | ToolbarButton.cs:117 |
+| 按钮形状 | 40×40 正方形撑满栏高，可见面 34×34 | ToolbarButton.cs:82-84 |
+| 按钮横向间距 | FillFlow Spacing=0，视觉间隙=相邻 padding 之和(6px) | Toolbar.cs:100-119 |
+| 特例图标 | 头像 32×32（80%）；模拟表盘 22×22 | ToolbarUserButton.cs:58 / AnalogClockDisplay.cs:28 |
 | 显隐动画 | MoveToY ±500ms，OutQuint 进 / InQuint 出 | Toolbar.cs:289-298 |
 | 主菜单按钮 | 140×100，WEDGE 20 切变 | ButtonSystem.cs:38-39 |
 | hover 扩宽 | ×1.5，500ms OutElastic | MainMenuButton.cs:229 |
 | logo hover | ×1.1，500ms OutElastic | OsuLogo.cs:419 |
 | logo 呼吸 | −2% 振幅缩放，beatLength×2 OutQuint 回弹 | OsuLogo.cs:321-323 |
 | 状态切换延迟 | 150ms（Initial 起始） | ButtonSystem.cs:441 |
+
+## 7. Afloat 移植映射（modules/bar，已实现）
+
+Afloat 顶栏组件（`modules/bar/widgets/`）按上述规格移植，全部数值收敛在 `LazerTheme` 令牌，绑定实时栏高设置（40–64 clamp），改栏高自动缩放：
+
+| LazerTheme 令牌 | 定义 | osu 对应 |
+|---|---|---|
+| `barWidgetGutter` = 3 | 组件上下留白 | ToolbarButton PADDING |
+| `barWidgetHeight` = 栏高−6 | 组件（pill/hover 面）高度 | 可见面 34 @40 |
+| `barGlyphSize` = round(栏高×0.5) | 标准图标尺寸 | 图标 20 @40 |
+
+- **纯图标按钮为正方形**：`implicitWidth = barWidgetHeight`（SettingsButton、Notifications、Workspaces 方块）
+- 带文字的 pill（媒体/音量/亮度/时钟）图标取 `barGlyphSize − 4` 平衡文字
+- 按钮横向间隔由 `BarContent` SectionRow 的 `BarLayoutSections.widgetSpacing`(6) 提供，等效 osu 的"0 Spacing + 相邻 padding"
+- hover 面用直角色块（sharp 语言），不用 osu 的圆角 6；三态反馈沿用 IconButton 的 hover swap + click flash
+- 教训：图标比例以**源码核实值为准**——曾按直觉放大到栏高 71%，osu 实际是"大方块小图标"（50%），空间给 hover 表面而非字形
