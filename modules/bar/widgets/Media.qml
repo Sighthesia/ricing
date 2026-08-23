@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import ".."
 import "../../lazerbar"
 import "../../../services" as Services
@@ -119,30 +120,53 @@ BarPill {
         anchors.centerIn: parent
         spacing: 8
 
-        // Cover region: translucent artwork behind the always-present music
-        // glyph; failed or missing art falls back to the bare glyph.
+        // Cover region: slightly rounded via OpacityMask, music glyph below cover.
         Item {
+            id: coverContainer
+
             anchors.verticalCenter: parent.verticalCenter
             width: root.coverSize
             height: root.coverSize
+            clip: true
+
+            Rectangle {
+                id: coverMask
+
+                anchors.fill: parent
+                radius: 6
+                visible: false
+            }
 
             Image {
-                anchors.fill: parent
-                source: Services.MediaControlService.artUrl
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                visible: root.hasCoverArt && status !== Image.Error
-                opacity: visible ? 0.55 : 0
+                id: musicGlyph
+
+                anchors.centerIn: parent
+                width: LazerTheme.barGlyphSize - 6
+                height: LazerTheme.barGlyphSize - 6
+                source: "../../lazerbar/icons/music.svg"
+                visible: !root.hasCoverArt
+                opacity: root.playing ? 0.95 : 0.5
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
 
             Image {
-                anchors.centerIn: parent
-                width: LazerTheme.barGlyphSize - 6
-                height: LazerTheme.barGlyphSize - 6
-                source: "../../lazerbar/icons/music.svg"
-                opacity: root.playing ? 0.95 : 0.5
+                id: coverImage
+
+                anchors.fill: parent
+                source: Services.MediaControlService.artUrl
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                visible: false
+            }
+
+            MultiEffect {
+                anchors.fill: coverImage
+                source: coverImage
+                maskEnabled: true
+                maskSource: coverMask
+                visible: root.hasCoverArt && coverImage.status !== Image.Error
+                opacity: visible ? 1 : 0
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
