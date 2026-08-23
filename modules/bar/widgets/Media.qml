@@ -6,7 +6,8 @@ import "../../../services" as Services
 // Compact now-playing pill; lyrics take priority over raw titles. The pill
 // grows with its content up to a cap, the translucent album cover sits in a
 // square region centered on the music glyph, and an over-long primary line
-// marquee-scrolls instead of being cut short.
+// marquee-scrolls instead of being cut short. Lyric changes fade in while the
+// outgoing line falls away like OsuTextField's delete ghosts.
 BarPill {
     id: root
 
@@ -29,11 +30,56 @@ BarPill {
     readonly property int coverSize: LazerTheme.barGlyphSize + 10
     readonly property bool hasCoverArt: Services.MediaControlService.artUrl !== ""
 
+    // Ghost exit reuses OsuTextField's FallingDownContainer contract.
+    readonly property int lyricGhostFallTime: 200
+    readonly property real lyricGhostFallDistanceScale: 1.5
+
+    property string trackedPrimaryText: ""
+
     visible: hasMedia
     implicitWidth: visible ? contentRow.implicitWidth + 12 : 0
     hoverable: hasMedia
 
     onClicked: Services.MediaService.playPause()
+
+    Component.onCompleted: trackedPrimaryText = root.primaryText
+
+    onPrimaryTextChanged: {
+        if (root.trackedPrimaryText === "" || root.trackedPrimaryText === root.primaryText) {
+            root.trackedPrimaryText = root.primaryText
+            return
+        }
+        const oldText = root.trackedPrimaryText
+        root.trackedPrimaryText = root.primaryText
+        if (MotionTokens.reducedMotion) {
+            titleScroll.stop()
+            titleLabel.x = 0
+            titleLabel.opacity = 1
+            return
+        }
+        // Reset marquee before spawning so ghosts start at the same origin
+        // the new line fades in from.
+        titleScroll.stop()
+        titleLabel.x = 0
+        spawnLyricGhost(oldText)
+        titleLabel.opacity = 0
+        lyricFadeIn.restart()
+    }
+
+    function spawnLyricGhost(oldText) {
+        if (oldText === "")
+            return
+        lyricGhostComponent.createObject(ghostLayer, {
+            text: oldText,
+            color: LazerTheme.textPrimary,
+            font: titleLabel.font,
+            x: 0,
+            y: 0,
+            opacity: 1,
+            // Travel one-and-a-half line heights, like the field's delete ghosts.
+            fallDistance: Math.max(1, titleLabel.height) * root.lyricGhostFallDistanceScale
+        })
+    }
 
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -84,46 +130,63 @@ BarPill {
             spacing: 1
 
             // Primary line grows with content; once past the cap it clips
-            // and marquee-scrolls (static elide under reduced motion).
+            // and marquee-scrolls (static elide under reduced motion). Ghosts
+            // overlay this slot without clipping so they can fall past the pill.
             Item {
-                id: titleSlot
+                id: titleContainer
                 width: Math.min(titleLabel.implicitWidth, root.maxTextWidth)
                 height: titleLabel.implicitHeight
-                clip: true
+                clip: false
 
-                Text {
-                    id: titleLabel
-                    text: root.primaryText
-                    color: LazerTheme.textPrimary
-                    font.pixelSize: 12
-                    font.bold: true
-                    width: titleScroll.running ? implicitWidth : Math.min(implicitWidth, root.maxTextWidth)
-                    elide: titleScroll.running ? Text.ElideNone : Text.ElideRight
+                Item {
+                    id: titleSlot
+                    anchors.fill: parent
+                    clip: true
+
+                    Text {
+                        id: titleLabel
+                        text: root.primaryText
+                        color: LazerTheme.textPrimary
+                        font.pixelSize: 12
+                        font.bold: true
+                        opacity: 1
+                        width: titleScroll.running ? implicitWidth : Math.min(implicitWidth, root.maxTextWidth)
+                        elide: titleScroll.running ? Text.ElideNone : Text.ElideRight
+                    }
+
+                    SequentialAnimation {
+                        id: titleScroll
+                        running: root.titleOverflows && !MotionTokens.reducedMotion
+                        loops: Animation.Infinite
+
+                        onRunningChanged: if (!running) titleLabel.x = 0
+
+                        PauseAnimation { duration: 1400 }
+                        NumberAnimation {
+                            target: titleLabel
+                            property: "x"
+                            to: -(titleLabel.implicitWidth - titleSlot.width)
+                            duration: Math.max(2000, (titleLabel.implicitWidth - titleSlot.width) * 18)
+                            easing.type: Easing.Linear
+                        }
+                        PauseAnimation { duration: 1400 }
+                        NumberAnimation {
+                            target: titleLabel
+                            property: "x"
+                            to: 0
+                            duration: Math.max(2000, (titleLabel.implicitWidth - titleSlot.width) * 18)
+                            easing.type: Easing.Linear
+                        }
+                    }
                 }
 
-                SequentialAnimation {
-                    id: titleScroll
-                    running: root.titleOverflows && !MotionTokens.reducedMotion
-                    loops: Animation.Infinite
-
-                    onRunningChanged: if (!running) titleLabel.x = 0
-
-                    PauseAnimation { duration: 1400 }
-                    NumberAnimation {
-                        target: titleLabel
-                        property: "x"
-                        to: -(titleLabel.implicitWidth - titleSlot.width)
-                        duration: Math.max(2000, (titleLabel.implicitWidth - titleSlot.width) * 18)
-                        easing.type: Easing.Linear
-                    }
-                    PauseAnimation { duration: 1400 }
-                    NumberAnimation {
-                        target: titleLabel
-                        property: "x"
-                        to: 0
-                        duration: Math.max(2000, (titleLabel.implicitWidth - titleSlot.width) * 18)
-                        easing.type: Easing.Linear
-                    }
+                // Ghosts share the slot's origin but live outside the clip so
+                // the fall remains visible as it exits the pill.
+                Item {
+                    id: ghostLayer
+                    anchors.fill: parent
+                    clip: false
+                    z: 10
                 }
             }
 
@@ -134,6 +197,53 @@ BarPill {
                 color: LazerTheme.textMuted
                 elide: Text.ElideRight
                 font.pixelSize: 10
+            }
+        }
+    }
+
+    // Incoming lyric fades in transparently; outgoing lyric is handled by
+    // the ghost layer above reusing the text-field fall contract.
+    NumberAnimation {
+        id: lyricFadeIn
+        target: titleLabel
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: root.lyricGhostFallTime
+        easing.type: Easing.OutQuad
+    }
+
+    Component {
+        id: lyricGhostComponent
+
+        Text {
+            id: ghost
+
+            property real fallDistance: 10
+
+            font.bold: true
+            font.pixelSize: 12
+            elide: Text.ElideNone
+
+            Behavior on y { NumberAnimation { duration: root.lyricGhostFallTime; easing.type: Easing.InQuad } }
+            Behavior on opacity { NumberAnimation { duration: root.lyricGhostFallTime; easing.type: Easing.InQuad } }
+
+            Timer {
+                id: fallTimer
+                interval: 1
+                onTriggered: {
+                    ghost.y += ghost.fallDistance
+                    ghost.opacity = 0
+                }
+            }
+            Timer {
+                id: retireTimer
+                interval: root.lyricGhostFallTime + 1
+                onTriggered: ghost.destroy()
+            }
+            Component.onCompleted: {
+                fallTimer.restart()
+                retireTimer.restart()
             }
         }
     }
