@@ -321,6 +321,12 @@ Item {
             svc().query = "gam"
             compare(svc().results.length, 1)
             compare(svc().results[svc().selectedIndex].id, "gamma")
+
+            // Broadening again must land back on the first row instead of
+            // staying anchored on the previously matched item.
+            svc().query = "a"
+            compare(svc().results.length, 3)
+            compare(svc().selectedIndex, 0)
         }
 
         function test_identicalPoolPullKeepsDisplayPoolIdentity() {

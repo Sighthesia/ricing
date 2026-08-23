@@ -124,6 +124,23 @@ function resultMatches(item, text) {
 // Keeps the same item selected across a refilter when it still matches;
 // otherwise falls back to clamping the old index into the new bounds so a
 // vanished selection lands somewhere sane instead of always jumping to top.
+// Selection across a query edit: keep the anchor only while the result set
+// shrinks (narrowing); broadening or replacement lands back on the first
+// row so growing lists never leave the highlight buried mid-list.
+function refilterSelection(items, index, nextItems) {
+    var count = nextItems ? nextItems.length : 0
+    var shrinking = items ? count > 0 && count <= items.length : false
+    if (shrinking) {
+        var wanted = index >= 0 && index < items.length ? identifierOf(items[index]) : ""
+        if (wanted !== "") {
+            for (var i = 0; i < count; i++)
+                if (identifierOf(nextItems[i]) === wanted)
+                    return i
+        }
+    }
+    return clampSelection(0, count)
+}
+
 function preservedSelection(items, index, nextItems) {
     var count = nextItems ? nextItems.length : 0
     var wanted = index >= 0 && items && index < items.length ? identifierOf(items[index]) : ""

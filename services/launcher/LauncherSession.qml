@@ -97,7 +97,7 @@ QtObject {
             // Clearing the query always lands back on the first row; only a
             // narrowing edit preserves the anchored selection.
             root.selectedIndex = parsed.text.length > 0
-                    ? LauncherLogic.preservedSelection(previous, root.selectedIndex, filtered)
+                    ? LauncherLogic.refilterSelection(previous, root.selectedIndex, filtered)
                     : LauncherLogic.clampSelection(0, filtered.length)
             root.results = filtered
             return
@@ -135,7 +135,7 @@ QtObject {
         }
         var filtered = LauncherLogic.filterResults(root.displayPool, requestText)
         root.selectedIndex = requestText.length > 0
-                ? LauncherLogic.preservedSelection(previous, root.selectedIndex, filtered)
+                ? LauncherLogic.refilterSelection(previous, root.selectedIndex, filtered)
                 : LauncherLogic.clampSelection(0, filtered.length)
         root.results = filtered
     }

@@ -163,6 +163,29 @@ TestCase {
         compare(Logic.keyboardAction(null, true, true, true), "none")
     }
 
+    function test_refilterSelectionResetsToFirstOnBroadening() {
+        var apple = { id: "apple", displayName: "Apple" }
+        var banana = { id: "banana", displayName: "Banana" }
+        var avocado = { id: "avocado", displayName: "Avocado" }
+        var full = [apple, banana, avocado]
+        var narrowed = [avocado]
+
+        // Narrowing keeps the anchored item.
+        compare(Logic.refilterSelection(full, 2, narrowed), 0)
+        compare(Logic.refilterSelection(narrowed, 0, narrowed), 0)
+
+        // Broadening after a hit lands back on the first row.
+        compare(Logic.refilterSelection(narrowed, 0, full), 0)
+        compare(Logic.refilterSelection([banana], 0, full), 0)
+
+        // Same-size sets keep the anchor only if the item survived.
+        compare(Logic.refilterSelection([banana, avocado], 1, [apple, avocado]), 1)
+        compare(Logic.refilterSelection([banana, avocado], 0, [apple, avocado]), 0)
+
+        // Empty results always clear the selection.
+        compare(Logic.refilterSelection(full, 1, []), -1)
+    }
+
     function test_filterResultsUsesSearchTextAndKeepsIdentity() {
         var alpha = { id: "a", displayName: "Alpha", searchText: "alpha editor" }
         var beta = { id: "b", displayName: "Beta", searchText: "beta browser" }
