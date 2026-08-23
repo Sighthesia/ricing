@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 import ".."
 import "../../lazerbar"
 import "../../../services" as Services
@@ -31,7 +31,23 @@ BarPill {
     readonly property bool titleOverflows: titleLabel.implicitWidth > maxTextWidth
     // Square cover region centered on the music glyph, translucent over text.
     readonly property int coverSize: LazerTheme.barGlyphSize + 10
-    readonly property bool hasCoverArt: Services.MediaControlService.artUrl !== ""
+    // Avoid inheriting previous cover when current track reports empty art.
+    readonly property bool hasCoverArt: {
+        if (Services.MediaControlService.artUrl === "")
+            return false
+        // If an MPRIS player is active, require its raw trackArtUrl to be non-empty;
+        // otherwise a cached fallback would keep showing previous track's art.
+        if (Services.MediaService.hasPlayer) {
+            var p = Services.MediaService.activePlayer
+            var raw = p ? String(p.trackArtUrl || "").trim() : ""
+            if (raw !== "")
+                return true
+            // No MPRIS art — only show Netease art when it belongs to current lyric session.
+            return Services.NeteaseWebLyricsService.artUrl !== ""
+                && Services.MediaControlService.artUrl === Services.NeteaseWebLyricsService.artUrl
+        }
+        return Services.NeteaseWebLyricsService.artUrl !== ""
+    }
 
     // Ghost exit reuses OsuTextField's FallingDownContainer contract.
     readonly property int lyricGhostFallTime: 200
@@ -120,34 +136,24 @@ BarPill {
         anchors.centerIn: parent
         spacing: 8
 
-        // Cover region: slightly rounded via OpacityMask, music glyph below cover.
-        Item {
+        // Cover region: rounded via OpacityMask (Rectangle clip is rectangular,
+        // not rounded), translucent artwork; the music glyph only shows when no
+        // cover art is available so it can never bleed through the artwork.
+        Rectangle {
             id: coverContainer
 
             anchors.verticalCenter: parent.verticalCenter
             width: root.coverSize
             height: root.coverSize
-            clip: true
-
-            Rectangle {
-                id: coverMask
-
-                anchors.fill: parent
-                radius: 6
-                visible: false
-            }
-
-            Image {
-                id: musicGlyph
-
-                anchors.centerIn: parent
-                width: LazerTheme.barGlyphSize - 6
-                height: LazerTheme.barGlyphSize - 6
-                source: "../../lazerbar/icons/music.svg"
-                visible: !root.hasCoverArt
-                opacity: root.playing ? 0.95 : 0.5
-
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+            radius: 4
+            color: "transparent"
+            layer.enabled: root.hasCoverArt && coverImage.status === Image.Ready
+            layer.effect: OpacityMask {
+                maskSource: Rectangle {
+                    width: coverContainer.width
+                    height: coverContainer.height
+                    radius: coverContainer.radius
+                }
             }
 
             Image {
@@ -157,16 +163,20 @@ BarPill {
                 source: Services.MediaControlService.artUrl
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
-                visible: false
+                visible: root.hasCoverArt && status !== Image.Error
+                opacity: visible ? 1 : 0
+
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
 
-            MultiEffect {
-                anchors.fill: coverImage
-                source: coverImage
-                maskEnabled: true
-                maskSource: coverMask
-                visible: root.hasCoverArt && coverImage.status !== Image.Error
-                opacity: visible ? 1 : 0
+            // Music glyph only appears when there is no usable cover art.
+            Image {
+                anchors.centerIn: parent
+                width: LazerTheme.barGlyphSize - 6
+                height: LazerTheme.barGlyphSize - 6
+                source: "../../lazerbar/icons/music.svg"
+                visible: !root.hasCoverArt || !coverImage.visible
+                opacity: visible ? (root.playing ? 0.95 : 0.5) : 0
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
