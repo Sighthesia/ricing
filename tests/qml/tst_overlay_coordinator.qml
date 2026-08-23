@@ -61,6 +61,8 @@ Item {
             openSpy.clear()
             closeSpy.clear()
             opener.forceActiveFocus()
+            s._pooledMode = ""
+            s.displayPool = []
         }
 
         function cleanup() {

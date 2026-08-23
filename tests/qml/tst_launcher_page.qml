@@ -68,6 +68,8 @@ Item {
             s.loading = false
             s.error = ""
             s.selectedIndex = -1
+            s._pooledMode = ""
+            s.displayPool = []
             s._adapters = ({})
         }
 

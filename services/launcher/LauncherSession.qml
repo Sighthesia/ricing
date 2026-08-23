@@ -91,10 +91,14 @@ QtObject {
 
         // Text-only edits inside a pooled mode never re-hit the data source;
         // the pool already holds the full sorted set for this open session.
-        if (parsed.mode === _pooledMode && parsed.text.length > 0 && displayPool.length > 0) {
+        if (parsed.mode === _pooledMode && displayPool.length > 0) {
             var previous = root.results
             var filtered = LauncherLogic.filterResults(displayPool, parsed.text)
-            root.selectedIndex = LauncherLogic.preservedSelection(previous, root.selectedIndex, filtered)
+            // Clearing the query always lands back on the first row; only a
+            // narrowing edit preserves the anchored selection.
+            root.selectedIndex = parsed.text.length > 0
+                    ? LauncherLogic.preservedSelection(previous, root.selectedIndex, filtered)
+                    : LauncherLogic.clampSelection(0, filtered.length)
             root.results = filtered
             return
         }
@@ -123,15 +127,16 @@ QtObject {
         // Keep the pooled array (and its live delegates) when a pull returns
         // the same ordered ids, so redundant refreshes never rebuild the list.
         var sorted = LauncherLogic.sortResults(outcome || [])
-        var poolStable = pooledMode === root._pooledMode
-                && LauncherLogic.poolMatches(sorted, root.displayPool)
+        var poolStable = LauncherLogic.poolMatches(sorted, root.displayPool)
         var previous = root.results
         if (!poolStable) {
             root.displayPool = sorted
             root._pooledMode = pooledMode
         }
         var filtered = LauncherLogic.filterResults(root.displayPool, requestText)
-        root.selectedIndex = LauncherLogic.preservedSelection(previous, root.selectedIndex, filtered)
+        root.selectedIndex = requestText.length > 0
+                ? LauncherLogic.preservedSelection(previous, root.selectedIndex, filtered)
+                : LauncherLogic.clampSelection(0, filtered.length)
         root.results = filtered
     }
 

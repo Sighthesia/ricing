@@ -68,6 +68,8 @@ Item {
             svc().error = ""
             svc().selectedIndex = -1
             svc()._adapters = ({})
+            svc()._pooledMode = ""
+            svc().displayPool = []
         }
 
         // --- open / close defaults ---
@@ -169,6 +171,32 @@ Item {
             compare(svc().selectedIndex, 0)
 
             svc().selectPrevious()
+            compare(svc().selectedIndex, 0)
+        }
+
+        function test_clearingQueryResetsSelectionToFirstItem() {
+            var apps = makeManualAdapter()
+            svc()._adapters = ({ apps: apps })
+
+            svc().open()
+            resolveRefresh(apps, 0, [
+                makeItem("alpha", "Alpha", 0, 0),
+                makeItem("beta", "Beta", 0, 0),
+                makeItem("gamma", "Gamma", 0, 2)
+            ])
+
+            svc().selectNext()
+            svc().selectNext()
+
+            // Narrow to gamma (anchor preserved), then clear the search:
+            // the selection must land back on the first row.
+            svc().query = "gam"
+            compare(svc().results.length, 1)
+            compare(svc().selectedIndex, 0)
+
+            svc().query = ""
+            compare(apps.queries.length, 1)
+            compare(svc().results.length, 3)
             compare(svc().selectedIndex, 0)
         }
 
@@ -303,15 +331,18 @@ Item {
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
             var stablePool = svc().displayPool
 
-            // Clearing text repulls the pool; identical contents must reuse
-            // the existing array so delegates never rebuild.
-            svc().query = "a"
-            svc().query = ""
-            resolveRefresh(apps, apps.pendingRefreshes.length - 1,
-                           [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
+            // Close and reopen: the invalidated mode re-pulls, and identical
+            // ordered contents must reuse the existing array so delegates
+            // never rebuild.
+            svc().close()
+            svc()._adapters = ({ apps: apps })
+            svc().open()
+            compare(apps.pendingRefreshes.length, 2)
+            resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
 
             verify(svc().displayPool === stablePool)
             compare(svc().results.length, 2)
+            compare(svc().selectedIndex, 0)
         }
 
         // --- keyboard contract ---
