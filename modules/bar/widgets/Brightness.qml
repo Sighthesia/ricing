@@ -15,7 +15,7 @@ Item {
     readonly property int percent: Math.round(Services.BrightnessService.brightness * 100)
 
     implicitWidth: contentRow.implicitWidth + 12
-    implicitHeight: LazerTheme.targetSize
+    implicitHeight: LazerTheme.barWidgetHeight
 
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -36,8 +36,8 @@ Item {
 
         Image {
             anchors.verticalCenter: parent.verticalCenter
-            width: 16
-            height: 16
+            width: LazerTheme.barGlyphSize - 6
+            height: LazerTheme.barGlyphSize - 6
             source: "../icons/brightness.svg"
             opacity: 0.9
         }
@@ -46,7 +46,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: root.percent + "%"
             color: LazerTheme.textPrimary
-            font.pixelSize: 11
+            font.pixelSize: 12
         }
     }
 }

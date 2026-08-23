@@ -29,7 +29,7 @@ Item {
     readonly property string dateText: Qt.formatDate(root.now, root.dateFormat)
 
     implicitWidth: Math.max(timeTextWidth, showDate ? dateTextWidth : 0) + 8
-    implicitHeight: LazerTheme.targetSize
+    implicitHeight: LazerTheme.barWidgetHeight
     readonly property real timeTextWidth: timeLabel.implicitWidth
     readonly property real dateTextWidth: dateLabel.implicitWidth
 
@@ -52,7 +52,7 @@ Item {
             text: root.timeText
             color: LazerTheme.textPrimary
             font.family: "monospace"
-            font.pixelSize: 13
+            font.pixelSize: 15
             font.bold: true
         }
 
@@ -64,7 +64,7 @@ Item {
             text: root.dateText
             color: LazerTheme.textMuted
             font.family: "monospace"
-            font.pixelSize: 9
+            font.pixelSize: 10
         }
     }
 }

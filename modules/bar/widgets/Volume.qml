@@ -39,8 +39,8 @@ BarPill {
 
         Image {
             anchors.verticalCenter: parent.verticalCenter
-            width: 16
-            height: 16
+            width: LazerTheme.barGlyphSize - 6
+            height: LazerTheme.barGlyphSize - 6
             source: "../icons/volume.svg"
             opacity: root.muted ? 0.4 : 0.9
 
@@ -51,7 +51,7 @@ BarPill {
             anchors.verticalCenter: parent.verticalCenter
             text: root.muted ? "静音" : root.percent + "%"
             color: root.muted ? LazerTheme.textMuted : LazerTheme.textPrimary
-            font.pixelSize: 11
+            font.pixelSize: 12
         }
     }
 }

@@ -12,7 +12,7 @@ Item {
     signal rightClicked
     signal middleClicked
 
-    implicitHeight: LazerTheme.targetSize
+    implicitHeight: LazerTheme.barWidgetHeight
 
     // Paint the sharp interactive surface without rounding the pill body.
     Rectangle {

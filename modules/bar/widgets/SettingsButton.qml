@@ -23,8 +23,8 @@ BarPill {
 
     Image {
         anchors.centerIn: parent
-        width: 16
-        height: 16
+        width: LazerTheme.barGlyphSize
+        height: LazerTheme.barGlyphSize
         source: "../../lazerbar/icons/settings.svg"
         opacity: root.hovered ? 1 : 0.85
 

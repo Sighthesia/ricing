@@ -37,8 +37,8 @@ Item {
                 readonly property string label:
                     modelData.title || modelData.tooltipTitle || modelData.id || "Tray item"
 
-                width: LazerTheme.targetSize
-                height: LazerTheme.targetSize
+                width: LazerTheme.barWidgetHeight
+                height: LazerTheme.barWidgetHeight
                 Accessible.role: Accessible.Button
                 Accessible.name: label
 
@@ -52,8 +52,8 @@ Item {
 
                 IconImage {
                     anchors.centerIn: parent
-                    width: 16
-                    height: 16
+                    width: LazerTheme.barGlyphSize - 4
+                    height: LazerTheme.barGlyphSize - 4
                     asynchronous: true
                     source: trayIcon.modelData.icon
                 }

@@ -24,13 +24,13 @@ BarPill {
         id: bellHost
 
         anchors.centerIn: parent
-        width: 20
-        height: 20
+        width: LazerTheme.barGlyphSize + 2
+        height: LazerTheme.barGlyphSize + 2
 
         Image {
             anchors.centerIn: parent
-            width: 16
-            height: 16
+            width: LazerTheme.barGlyphSize
+            height: LazerTheme.barGlyphSize
             source: "../../lazerbar/icons/bell.svg"
             opacity: root.dnd ? 0.4 : 0.9
 

@@ -16,7 +16,7 @@ Item {
         Services.NiriService.activeTitle.length > 0 ? Services.NiriService.activeTitle : "桌面"
 
     implicitWidth: Math.min(titleText.implicitWidth + 8, 240)
-    implicitHeight: LazerTheme.targetSize
+    implicitHeight: LazerTheme.barWidgetHeight
 
     Text {
         id: titleText
@@ -26,6 +26,6 @@ Item {
         text: root.displayTitle
         color: LazerTheme.textPrimary
         elide: Text.ElideRight
-        font.pixelSize: 12
+        font.pixelSize: 13
     }
 }

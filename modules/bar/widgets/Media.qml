@@ -43,8 +43,8 @@ BarPill {
 
         Image {
             anchors.verticalCenter: parent.verticalCenter
-            width: 16
-            height: 16
+            width: LazerTheme.barGlyphSize - 6
+            height: LazerTheme.barGlyphSize - 6
             source: "../../lazerbar/icons/music.svg"
             opacity: root.playing ? 0.95 : 0.5
 
@@ -60,7 +60,7 @@ BarPill {
                 text: root.primaryText
                 color: LazerTheme.textPrimary
                 elide: Text.ElideRight
-                font.pixelSize: 11
+                font.pixelSize: 12
                 font.bold: true
             }
 
@@ -70,7 +70,7 @@ BarPill {
                 visible: text.length > 0
                 color: LazerTheme.textMuted
                 elide: Text.ElideRight
-                font.pixelSize: 9
+                font.pixelSize: 10
             }
         }
     }

@@ -14,7 +14,7 @@ Item {
     property string screenName: ""
 
     implicitWidth: workspaceRow.implicitWidth
-    implicitHeight: LazerTheme.targetSize
+    implicitHeight: LazerTheme.barWidgetHeight
 
     Row {
         id: workspaceRow
@@ -35,8 +35,8 @@ Item {
 
                 readonly property bool hovered: hoverHandler.hovered
 
-                width: 24
-                height: 24
+                width: LazerTheme.barWidgetHeight - 8
+                height: LazerTheme.barWidgetHeight - 8
 
                 Rectangle {
                     anchors.fill: parent
@@ -65,7 +65,7 @@ Item {
                     color: workspaceSquare.isActive
                            ? LazerTheme.textPrimary
                            : workspaceSquare.hovered ? LazerTheme.hoverForeground : LazerTheme.iconInactive
-                    font.pixelSize: 11
+                    font.pixelSize: 13
                     font.bold: workspaceSquare.isActive
                 }
 

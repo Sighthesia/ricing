@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import "../../services" as Services
 
 // Centralize the lazer bar's dark visual language.
 QtObject {
@@ -55,6 +56,14 @@ QtObject {
     readonly property int targetSize: 32
     readonly property int groupGap: 12
     readonly property int inlineGap: 6
+
+    // osu toolbar widget metrics (ToolbarButton padding 3): hairline vertical
+    // gutters so glyphs dominate the live-configured bar height.
+    readonly property int barWidgetGutter: 3
+    readonly property int barLiveHeight:
+        Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
+    readonly property int barWidgetHeight: barLiveHeight - barWidgetGutter * 2
+    readonly property int barGlyphSize: Math.max(18, barWidgetHeight - 8)
 
     // osu Nub and outlined control tokens shared by settings controls.
     readonly property real nubBorder: 3
