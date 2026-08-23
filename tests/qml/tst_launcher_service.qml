@@ -117,18 +117,19 @@ Item {
 
             compare(svc().mode, "clipboard")
             compare(svc().visible, true)
+            // The pool pull requests the full set; text filtering is local.
             compare(clips.queries.length, 1)
-            compare(clips.queries[0].query, "secret")
+            compare(clips.queries[0].query, "")
             compare(clips.queries[0].mode, "clipboard")
 
-            resolveRefresh(clips, 0, [makeItem("c1", "Token", 0, 0)])
+            resolveRefresh(clips, 0, [makeItem("c1", "Secret token", 0, 5)])
             compare(svc().selectedIndex, 0)
 
             svc().query = ">key spawn terminal"
 
             compare(svc().mode, "shortcuts")
             compare(keys.queries.length, 1)
-            compare(keys.queries[0].query, "spawn terminal")
+            compare(keys.queries[0].query, "")
 
             resolveRefresh(keys, 0, [])
             compare(svc().selectedIndex, -1)
@@ -136,8 +137,9 @@ Item {
             svc().query = "firefox"
             compare(svc().mode, "apps")
             compare(svc().visible, true)
+            // Switching back to apps re-pulls its pool with empty text.
             compare(apps.queries.length, 2)
-            compare(apps.queries[1].query, "firefox")
+            compare(apps.queries[1].query, "")
         }
 
         // --- selection clamping ---
@@ -225,16 +227,24 @@ Item {
 
         function test_staleRefreshResultsAreDiscardedInFavorOfNewerQuery() {
             var apps = makeManualAdapter()
-            svc()._adapters = { apps: apps }
+            var clips = makeManualAdapter()
+            svc()._adapters = ({ apps: apps, clipboard: clips })
 
             svc().open()
-            svc().query = "fir"
+            compare(apps.pendingRefreshes.length, 1)
+
+            svc().query = ">clip x"
+            resolveRefresh(clips, 0, [makeItem("c1", "xray clip", 0, 5)])
+            compare(svc().results.length, 1)
+
+            // A newer apps pull invalidates the still-pending older apps pull.
+            svc().query = "fresh"
             compare(apps.pendingRefreshes.length, 2)
             compare(svc().loading, true)
 
             resolveRefresh(apps, 0, [makeItem("stale", "Stale", 9, 9)])
 
-            compare(svc().results.length, 0)
+            compare(svc().results.length, 1)
             compare(svc().loading, true)
             compare(svc().error, "")
 

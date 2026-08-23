@@ -30,6 +30,12 @@ QtObject {
     // modes without a registered adapter resolve to an empty result set.
     property var _adapters: ({})
 
+    // Stable per-mode pool of every sorted item; text filtering runs locally
+    // over this so result rows keep their identity across keystrokes and the
+    // surface can fold/reveal instead of reloading the whole list.
+    property var displayPool: []
+    property string _pooledMode: ""
+
     // Monotonic guard: only the newest dispatched refresh, or the session
     // alive when execution started, may commit state.
     property int _refreshToken: 0
@@ -81,19 +87,28 @@ QtObject {
         if (!root.visible)
             return
         var parsed = LauncherLogic.parseQuery(query)
+
+        // Text-only edits inside a pooled mode never re-hit the data source;
+        // the pool already holds the full sorted set for this open session.
+        if (parsed.mode === _pooledMode && parsed.text.length > 0 && displayPool.length > 0) {
+            root.results = LauncherLogic.filterResults(displayPool, parsed.text)
+            root.selectedIndex = LauncherLogic.clampSelection(0, root.results.length)
+            return
+        }
+
         var adapter = _adapterFor(parsed.mode)
         var token = ++_refreshToken
         root.loading = true
         root.error = ""
-        adapter.refresh(parsed.text, parsed.mode, function(outcome) {
-            root._completeRefresh(token, outcome)
+        adapter.refresh("", parsed.mode, function(outcome) {
+            root._completeRefresh(token, outcome, parsed.mode, parsed.text)
         })
     }
 
     // Commits a finished refresh only while it is still the newest request.
     // Stale completions are dropped so they cannot replace newer query or
     // mode state, leaving the newer attempt's loading/error display intact.
-    function _completeRefresh(token, outcome) {
+    function _completeRefresh(token, outcome, pooledMode, requestText) {
         if (token !== _refreshToken)
             return
         root.loading = false
@@ -102,7 +117,9 @@ QtObject {
             return
         }
         root.error = ""
-        root.results = LauncherLogic.sortResults(outcome || [])
+        root.displayPool = LauncherLogic.sortResults(outcome || [])
+        root._pooledMode = pooledMode
+        root.results = LauncherLogic.filterResults(root.displayPool, requestText)
         root.selectedIndex = LauncherLogic.clampSelection(0, root.results.length)
     }
 

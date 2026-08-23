@@ -82,3 +82,41 @@ function keyboardAction(key, hasInput, hasSelection, interactive) {
         return interactive ? "down" : "none"
     return "none"
 }
+
+// Client-side filtering over a pooled result set: keeps row identity stable
+// across keystrokes so the surface can fold/reveal instead of reloading.
+// Matching mirrors the adapter needles via each item's searchText.
+function filterResults(items, text) {
+    if (!items || !items.length)
+        return []
+    var needle = String(text == null ? "" : text).replace(/\s+/g, " ").trim().toLowerCase()
+    if (!needle)
+        return items.slice()
+    var out = []
+    for (var i = 0; i < items.length; i++) {
+        var item = items[i]
+        if (!item)
+            continue
+        var haystack = item.searchText != null && String(item.searchText).length > 0
+                ? String(item.searchText)
+                : String(item.displayName == null ? "" : item.displayName) + " "
+                  + String(item.description == null ? "" : item.description)
+        if (haystack.toLowerCase().indexOf(needle) >= 0)
+            out.push(item)
+    }
+    return out
+}
+
+// Single-item match used by rows deciding their own fold state.
+function resultMatches(item, text) {
+    var needle = String(text == null ? "" : text).replace(/\s+/g, " ").trim().toLowerCase()
+    if (!needle)
+        return true
+    if (!item)
+        return false
+    var haystack = item.searchText != null && String(item.searchText).length > 0
+            ? String(item.searchText)
+            : String(item.displayName == null ? "" : item.displayName) + " "
+              + String(item.description == null ? "" : item.description)
+    return haystack.toLowerCase().indexOf(needle) >= 0
+}

@@ -27,6 +27,14 @@ Item {
     ]
     readonly property string activeMode: root.session && root.session.mode != null ? String(root.session.mode) : ""
 
+    // Normalized free-text portion of the query; rows fold themselves against
+    // it exactly like settings rows do under a search filter.
+    readonly property string activeSearchText: {
+        if (!root.session || root.session.query == null)
+            return ""
+        return LauncherLogic.parseQuery(String(root.session.query)).text
+    }
+
     // Emitted when a sidebar-driven mode change is applied to the session.
     signal modeChangeRequested(string mode)
 
@@ -64,7 +72,7 @@ Item {
         function onSelectedIndexChanged() {
             resultsView.positionToSelection()
         }
-        function onResultsChanged() {
+        function onDisplayPoolChanged() {
             Qt.callLater(root._scheduleReleases)
         }
     }
@@ -396,9 +404,19 @@ Item {
         }
 
         function positionToSelection() {
-            if (!root.session || root.session.selectedIndex < 0)
+            var service = root.session
+            if (!service || service.selectedIndex < 0 || !service.results)
                 return
-            scrollTo(root.session.selectedIndex)
+            var current = service.results[service.selectedIndex]
+            if (!current)
+                return
+            for (var i = 0; i < resultsRepeater.count; i++) {
+                var row = resultsRepeater.itemAt(i)
+                if (row && row.result && row.result.id === current.id) {
+                    scrollTo(i)
+                    return
+                }
+            }
         }
 
         // Center the target row with the shared eased programmatic scroll;

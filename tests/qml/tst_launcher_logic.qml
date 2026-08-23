@@ -162,4 +162,22 @@ TestCase {
         compare(Logic.keyboardAction("a", true, true, true), "none")
         compare(Logic.keyboardAction(null, true, true, true), "none")
     }
+
+    function test_filterResultsUsesSearchTextAndKeepsIdentity() {
+        var alpha = { id: "a", displayName: "Alpha", searchText: "alpha editor" }
+        var beta = { id: "b", displayName: "Beta", searchText: "beta browser" }
+        var pooled = [alpha, beta]
+
+        var hit = Logic.filterResults(pooled, "edit")
+        compare(hit.length, 1)
+        compare(hit[0], alpha)
+
+        compare(Logic.filterResults(pooled, ""), pooled)
+        compare(Logic.filterResults(pooled, "   "), pooled)
+        compare(Logic.filterResults([], "x").length, 0)
+        verify(Logic.resultMatches(alpha, "ALPHA"))
+        verify(!Logic.resultMatches(beta, "alpha"))
+        verify(Logic.resultMatches(null, ""))
+        verify(!Logic.resultMatches(null, "x"))
+    }
 }

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import "../../services/LauncherLogic.js" as LauncherLogic
 
 // Present one launcher result as a fixed-height sharp osu!lazer row: accent
 // selection strip and tinted fill, settings-panel hover swap and focus ring,
@@ -12,6 +13,11 @@ Item {
     // { id, displayName, description, icon } with every field optional.
     property var result: null
     property bool selected: false
+    // Settings-style search folding: non-matching rows cascade their exit
+    // while survivors glide, all through the same height/opacity/x contract.
+    property string searchQuery: ""
+    readonly property bool matchesSearch: LauncherLogic.resultMatches(result, searchQuery)
+    readonly property bool searchHidden: !matchesSearch
 
     readonly property string displayName: result && result.displayName != null ? String(result.displayName) : ""
     readonly property string descriptionText: result && result.description != null ? String(result.description) : ""
@@ -43,8 +49,8 @@ Item {
     readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
     property bool revealHeld: false
     property bool snapTransitions: true
-    readonly property bool geometryHeld: revealHeld
-    readonly property real entryExitDelay: Math.round(Math.min(100, Math.max(0, root.y / 6)))
+    readonly property bool geometryHeld: revealHeld || searchHidden
+    readonly property real entryExitDelay: Math.round(Math.min(150, Math.max(0, root.y / 6)))
     height: geometryHeld ? 0 : rowHeight + listGap
     visible: !geometryHeld || height > 0.5 || opacity > 0.01
     opacity: geometryHeld ? 0 : 1

@@ -63,6 +63,7 @@ function appItem(entry, launchCounts, iconResolver) {
         id: entry.id == null ? "" : String(entry.id),
         displayName: entry.name == null ? "" : String(entry.name),
         description: entry.comment == null ? "" : String(entry.comment),
+        searchText: normalizeText(entry.name + " " + entry.comment + " " + entry.id).toLowerCase(),
         icon: iconResolver ? String(iconResolver(rawIcon)) : directIconPath(rawIcon),
         favoriteWeight: weight,
         lastUsedAt: 0
@@ -165,6 +166,7 @@ function clipboardItem(raw) {
         id: raw.id == null ? "" : String(raw.id),
         displayName: title,
         description: description,
+        searchText: normalizeText(title + " " + description).toLowerCase(),
         icon: "",
         previewText: preview,
         mime: mime,
@@ -290,6 +292,7 @@ function shortcutItem(row, index) {
         id: row.entryId == null ? "shortcut-" + index : String(row.entryId),
         displayName: row.label == null ? "" : String(row.label),
         description: detail ? sequence + " · " + detail : sequence,
+        searchText: normalizeText(row.label + " " + sequence + " " + detail + " " + row.category).toLowerCase(),
         keySequence: sequence,
         detail: detail,
         actionId: row.actionId == null ? "" : String(row.actionId),
