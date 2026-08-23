@@ -15,9 +15,11 @@ BarPill {
 
     // Route through the shared bridge so the overlay owner window opens the
     // panel on whichever screen owns this bar instance.
-    onClicked: Services.SettingsOverlayBridge.requestOpen()
+    onClicked: SettingsOverlayBridge.requestOpen()
+
 
     implicitWidth: 32
+
 
     Image {
         anchors.centerIn: parent
