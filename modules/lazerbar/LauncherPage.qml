@@ -31,7 +31,10 @@ Item {
     signal modeChangeRequested(string mode)
 
     readonly property alias searchField: searchSurface
-    readonly property alias resultsList: resultsListView
+    // Result access for tests and shell wiring.
+    readonly property alias resultsView: resultsView
+    readonly property int resultCount: resultsView.resultCount
+    function resultAt(index) { return resultsView.resultAt(index) }
     readonly property alias loadingState: loadingSurface
     readonly property alias emptyState: emptyStateHost
     readonly property alias errorState: errorStateHost
@@ -51,14 +54,18 @@ Item {
         function onVisibleChanged() {
             if (root.session.visible) {
                 root.focusSearch()
-                root.beginEntranceWave()
+                root._firstFillPending = true
             } else {
+                root.cancelEntranceWave()
                 entranceSettle.stop()
-                root.awaitingFirstFill = false
+                root._firstFillPending = false
             }
         }
         function onSelectedIndexChanged() {
-            resultsListView.positionToSelection()
+            resultsView.positionToSelection()
+        }
+        function onResultsChanged() {
+            Qt.callLater(root._scheduleReleases)
         }
     }
 
@@ -181,52 +188,110 @@ Item {
                                          && (!root.session.results || root.session.results.length === 0)
     readonly property bool stateVisible: sessionLoading || sessionError || sessionEmpty
 
-    // Entrance wave: the first result fill after an open reveals rows
-    // top-to-bottom with the settings stagger while scrolling stays held.
-    property bool awaitingFirstFill: false
-    readonly property bool entranceBusy: entranceSettle.running
+    // Entrance wave, mirroring LazerSettingsSections.playEntranceWave:
+    // hold every row instantly, release top-to-bottom on 18ms slots from a
+    // 120ms base, and hold scrolling until the reveal transitions land.
+    readonly property bool entranceBusy: _anyRowHeld() || entranceSettle.running
     readonly property int entranceBaseDelay: 120
     readonly property int entranceSlotInterval: 18
-    readonly property int entranceMaxSlots: 24
+
+    property int _deferredScrollIndex: -1
+    property bool _firstFillPending: false
 
     Timer {
         id: entranceSettle
-        // Cover the longest capped slot delay plus the reveal transition tail.
-        interval: root.entranceBaseDelay + root.entranceMaxSlots * root.entranceSlotInterval
-                  + MotionTokens.slow * 2 + 100
+        interval: MotionTokens.slow + MotionTokens.slow / 2 + 100
         repeat: false
+        onTriggered: {
+            if (root._deferredScrollIndex >= 0) {
+                var deferred = root._deferredScrollIndex
+                root._deferredScrollIndex = -1
+                resultsView.scrollTo(deferred)
+            }
+        }
     }
 
-    function beginEntranceWave() {
-        if (MotionTokens.reducedMotion)
+    function _anyRowHeld() {
+        var children = resultsColumn.children
+        for (var i = 0; i < children.length; i++) {
+            if (children[i].revealHeld === true || children[i].snapTransitions === true)
+                return true
+        }
+        return false
+    }
+
+    onEntranceBusyChanged: {
+        if (!root.entranceBusy && root._deferredScrollIndex >= 0) {
+            var deferred = root._deferredScrollIndex
+            root._deferredScrollIndex = -1
+            resultsView.scrollTo(deferred)
+        }
+    }
+
+    // Play the open-session wave over the current rows.
+    function playEntranceWave() {
+        var children = resultsColumn.children
+        if (MotionTokens.reducedMotion) {
+            for (var r = 0; r < children.length; r++)
+                if (children[r].releaseInstantly !== undefined)
+                    children[r].releaseInstantly()
             return
-        root.awaitingFirstFill = true
+        }
+        var baseDelay = root.entranceBaseDelay
+        var slotInterval = root.entranceSlotInterval
+        var slot = 0
+        for (var i = 0; i < children.length; i++) {
+            if (children[i].holdInstantly === undefined)
+                continue
+            children[i].holdInstantly()
+            children[i].playReveal(baseDelay + slot * slotInterval)
+            slot++
+        }
+        if (slot > 0)
+            entranceSettle.restart()
+    }
+
+    // Cancel an unfinished wave, restoring every row instantly.
+    function cancelEntranceWave() {
+        var children = resultsColumn.children
+        for (var i = 0; i < children.length; i++) {
+            if (children[i].releaseInstantly === undefined)
+                continue
+            if (children[i].revealHeld === true || children[i].snapTransitions === true)
+                children[i].releaseInstantly()
+        }
+    }
+
+    // Refills cascade like the settings search-exit delay: each new row set
+    // unfolds with a small position-based stagger instead of a full wave.
+    function playRefillCascade() {
+        var children = resultsColumn.children
+        if (MotionTokens.reducedMotion) {
+            for (var r = 0; r < children.length; r++)
+                if (children[r].releaseInstantly !== undefined)
+                    children[r].releaseInstantly()
+            return
+        }
+        for (var i = 0; i < children.length; i++) {
+            if (children[i].holdInstantly === undefined)
+                continue
+            children[i].holdInstantly()
+            children[i].playReveal(children[i].entryExitDelay)
+        }
         entranceSettle.restart()
     }
 
-    // Settings-panel scroll contract on the results list: edge takeover,
-    // rubber-band resistance, and a springed rebound past either bound.
-    function _resistedScrollTarget(current, delta, bound) {
-        var overscrollDistance = 88
-        var past = Math.max(0, Math.abs(current - bound))
-        var tension = Math.min(1, past / overscrollDistance)
-        return current - delta * (1 - tension)
-    }
-
-    function _settleScrollEdge() {
-        if (!resultsListView.edgeDriving)
+    // Route each fresh result set through the wave (first fill after open)
+    // or the lighter cascade (subsequent query refills).
+    function _scheduleReleases() {
+        if (resultsView.resultCount <= 0)
             return
-        resultsListView.edgeDriving = false
-        resultsListView.scrollDriveAnim.stop()
-        var maximumY = Math.max(0, resultsListView.contentHeight - resultsListView.height)
-        var target = Math.max(0, Math.min(maximumY, resultsListView.contentY))
-        if (Math.abs(target - resultsListView.contentY) < 0.5) {
-            resultsListView.contentY = target
-            return
+        if (root._firstFillPending) {
+            root._firstFillPending = false
+            root.playEntranceWave()
+        } else {
+            root.playRefillCascade()
         }
-        resultsListView.scrollBounce.stop()
-        resultsListView.scrollSettleAnim.to = target
-        resultsListView.scrollSettleAnim.start()
     }
 
     // Full-width sharp search rail carrying the osu caret text field.
@@ -304,11 +369,11 @@ Item {
         }
     }
 
-    // Result viewport: settings-panel scroll contract (edge takeover,
-    // rubber-band resistance, rebound) with wave-gated input and animated
-    // re-population when a query reshuffles the results.
-    ListView {
-        id: resultsListView
+    // Result viewport: settings-panel structure (Flickable + folding rows)
+    // so entrance wave, query reordering, and the scroll contract behave
+    // exactly like LazerSettingsSections.
+    Flickable {
+        id: resultsView
         anchors.top: searchSurface.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -316,32 +381,54 @@ Item {
         anchors.topMargin: 12
         anchors.leftMargin: 8
         anchors.rightMargin: 8
-        spacing: 2
         clip: true
         visible: !root.stateVisible
-        model: root.session && root.session.results ? root.session.results : []
-        boundsBehavior: ListView.StopAtBounds
+        contentWidth: width
+        contentHeight: resultsColumn.height
+        boundsBehavior: Flickable.StopAtBounds
         flickDeceleration: 2000
+        interactive: !root.entranceBusy
 
-        property bool edgeDriving: false
-        readonly property real edgeTakeoverDistance: 80
+        readonly property int resultCount: resultsRepeater.count
+
+        function resultAt(index) {
+            return resultsRepeater.itemAt(index)
+        }
 
         function positionToSelection() {
             if (!root.session || root.session.selectedIndex < 0)
                 return
-            if (root.session.selectedIndex >= count)
+            scrollTo(root.session.selectedIndex)
+        }
+
+        // Center the target row with the shared eased programmatic scroll;
+        // defer while the entrance wave is still reshaping the layout.
+        function scrollTo(index) {
+            var row = resultAt(index)
+            if (!row || row.height <= 0) {
+                root._deferredScrollIndex = index
                 return
-            positionViewAtIndex(root.session.selectedIndex, ListView.Contain)
+            }
+            var maximumY = Math.max(0, resultsView.contentHeight - resultsView.height)
+            var target = row.y - Math.max(0, (resultsView.height - row.height) / 2)
+            target = Math.max(0, Math.min(maximumY, target))
+            _cancelScrollEdge()
+            scrollBounce.stop()
+            scrollAnim.to = target
+            scrollAnim.duration = MotionTokens.reducedMotion ? 0 : 300
+            scrollAnim.restart()
         }
 
-        onModelChanged: {
-            if (root.awaitingFirstFill && count > 0)
-                root.awaitingFirstFill = false
+        function _cancelScrollEdge() {
+            edgeDriving = false
+            scrollEdgeSettleTimer.stop()
+            scrollSettleAnim.stop()
+            scrollDriveAnim.stop()
         }
 
-        // Manual edge driving mirrors LazerSettingsSections: inside the
-        // takeover band wheel deltas chase through a short ease with damped
-        // overscroll, then the view springs back once input idles.
+        property bool edgeDriving: false
+        readonly property real edgeTakeoverDistance: 80
+
         Timer {
             id: scrollEdgeSettleTimer
             interval: 140
@@ -351,7 +438,7 @@ Item {
 
         NumberAnimation {
             id: scrollSettleAnim
-            target: resultsListView
+            target: resultsView
             property: "contentY"
             duration: MotionTokens.reducedMotion ? 0 : 260
             easing.type: Easing.InOutCubic
@@ -359,7 +446,7 @@ Item {
 
         NumberAnimation {
             id: scrollDriveAnim
-            target: resultsListView
+            target: resultsView
             property: "contentY"
             duration: MotionTokens.reducedMotion ? 0 : 80
             easing.type: Easing.OutQuint
@@ -369,18 +456,26 @@ Item {
             id: scrollBounce
             NumberAnimation {
                 id: scrollBounceOut
-                target: resultsListView
+                target: resultsView
                 property: "contentY"
                 duration: MotionTokens.reducedMotion ? 0 : 160
                 easing.type: Easing.OutCubic
             }
             NumberAnimation {
                 id: scrollBounceBack
-                target: resultsListView
+                target: resultsView
                 property: "contentY"
                 duration: MotionTokens.reducedMotion ? 0 : 260
                 easing.type: Easing.InOutCubic
             }
+        }
+
+        NumberAnimation {
+            id: scrollAnim
+            target: resultsView
+            property: "contentY"
+            duration: 300
+            easing.type: Easing.OutQuint
         }
 
         WheelHandler {
@@ -397,61 +492,59 @@ Item {
                     delta = wheel.angleDelta.y / 120 * 40
                 if (delta === 0)
                     return
-                var maximumY = Math.max(0, resultsListView.contentHeight - resultsListView.height)
-                var nearBottom = scrollingDown && maximumY - resultsListView.contentY <= resultsListView.edgeTakeoverDistance
-                var nearTop = !scrollingDown && resultsListView.contentY <= resultsListView.edgeTakeoverDistance
-                if (resultsListView.edgeDriving && !nearBottom && !nearTop)
+                var maximumY = Math.max(0, resultsView.contentHeight - resultsView.height)
+                var nearBottom = scrollingDown && maximumY - resultsView.contentY <= resultsView.edgeTakeoverDistance
+                var nearTop = !scrollingDown && resultsView.contentY <= resultsView.edgeTakeoverDistance
+                if (resultsView.edgeDriving && !nearBottom && !nearTop)
                     root._settleScrollEdge()
                 if (!MotionTokens.reducedMotion && (nearBottom || nearTop)) {
-                    resultsListView.cancelFlick()
-                    resultsListView.edgeDriving = true
+                    resultsView.cancelFlick()
+                    resultsView.edgeDriving = true
                     scrollEdgeSettleTimer.restart()
                     scrollSettleAnim.stop()
-                    var proposed = resultsListView.contentY - delta
+                    var proposed = resultsView.contentY - delta
                     if (proposed < 0)
-                        proposed = root._resistedScrollTarget(resultsListView.contentY, delta, 0)
+                        proposed = root._resistedScrollTarget(resultsView.contentY, delta, 0)
                     else if (proposed > maximumY)
-                        proposed = root._resistedScrollTarget(resultsListView.contentY, delta, maximumY)
+                        proposed = root._resistedScrollTarget(resultsView.contentY, delta, maximumY)
                     proposed = Math.max(-88, Math.min(maximumY + 88, proposed))
-                    scrollDriveAnim.from = resultsListView.contentY
+                    scrollDriveAnim.from = resultsView.contentY
                     scrollDriveAnim.to = proposed
                     scrollDriveAnim.restart()
                     return
                 }
-                if ((!scrollingDown && resultsListView.contentY <= 0.5)
-                        || (scrollingDown && resultsListView.contentY >= maximumY - 0.5)) {
-                    resultsListView.cancelFlick()
-                    scrollBounceOut.from = resultsListView.contentY
-                    scrollBounceOut.to = Math.max(-88, Math.min(maximumY + 88, resultsListView.contentY - delta))
+                if ((!scrollingDown && resultsView.contentY <= 0.5)
+                        || (scrollingDown && resultsView.contentY >= maximumY - 0.5)) {
+                    resultsView.cancelFlick()
+                    scrollBounceOut.from = resultsView.contentY
+                    scrollBounceOut.to = Math.max(-88, Math.min(maximumY + 88, resultsView.contentY - delta))
                     scrollBounceBack.to = Math.max(0, Math.min(maximumY, scrollBounceOut.to))
                     scrollBounce.restart()
                 }
             }
         }
 
-        // Query-driven repopulation reads as a reorder: rows fade in and the
-        // survivors glide into their new positions.
-        populate: Transition {
-            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: MotionTokens.fast }
-        }
-        displaced: Transition {
-            NumberAnimation { property: "y"; duration: MotionTokens.medium; easing.type: Easing.OutQuint }
-        }
-        add: Transition {
-            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: MotionTokens.fast }
-        }
+        Column {
+            id: resultsColumn
+            width: parent.width
+            spacing: 0
 
-        delegate: LauncherResultRow {
-            required property var modelData
-            required property int index
-            width: ListView.view.width
-            result: modelData
-            selected: root.session && index === root.session.selectedIndex
-            entrySlot: index
-            entryStaggered: root.awaitingFirstFill
-            onActivated: {
-                if (root.session)
-                    root.session.execute(modelData)
+            Repeater {
+                id: resultsRepeater
+                model: root.session && root.session.results ? root.session.results : []
+
+                delegate: LauncherResultRow {
+                    required property var modelData
+                    required property int index
+                    width: resultsColumn.width
+                    result: modelData
+                    revealHeld: true
+                    selected: root.session && index === root.session.selectedIndex
+                    onActivated: {
+                        if (root.session)
+                            root.session.execute(modelData)
+                    }
+                }
             }
         }
     }
@@ -459,7 +552,7 @@ Item {
     // Loading surface keeps its own body color so stale rows never linger.
     Rectangle {
         id: loadingSurface
-        anchors.fill: resultsListView
+        anchors.fill: resultsView
         visible: root.sessionLoading
         radius: 0
         color: "transparent"
@@ -476,7 +569,7 @@ Item {
     // Empty state stays interactive so the next keystroke can repopulate.
     Item {
         id: emptyStateHost
-        anchors.fill: resultsListView
+        anchors.fill: resultsView
         visible: root.sessionEmpty
 
         Text {
@@ -491,7 +584,7 @@ Item {
     // Error state offers retry without closing or dropping search focus.
     Item {
         id: errorStateHost
-        anchors.fill: resultsListView
+        anchors.fill: resultsView
         visible: root.sessionError
 
         Column {

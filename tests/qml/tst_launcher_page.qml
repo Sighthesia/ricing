@@ -216,19 +216,19 @@ Item {
                 makeItem("c", "Gamma", 0, 0)
             ])
 
-            tryCompare(page.resultsList, "count", 3)
+            compare(page.resultCount, 3)
 
-            var firstRow = page.resultsList.itemAtIndex(0)
+            var firstRow = page.resultAt(0)
             verify(firstRow)
             compare(firstRow.selected, true)
             compare(firstRow.displayName, "Alpha")
 
-            var secondRow = page.resultsList.itemAtIndex(1)
+            var secondRow = page.resultAt(1)
             compare(secondRow.selected, false)
 
             svc().selectNext()
-            tryCompare(page.resultsList.itemAtIndex(1), "selected", true)
-            tryCompare(page.resultsList.itemAtIndex(0), "selected", false)
+            tryCompare(page.resultAt(1), "selected", true)
+            tryCompare(page.resultAt(0), "selected", false)
         }
 
         // --- keyboard navigation and execution ---
@@ -284,9 +284,9 @@ Item {
                 makeItem("a", "Alpha", 0, 0),
                 makeItem("b", "Beta", 0, 0)
             ])
-            tryCompare(page.resultsList, "count", 2)
+            compare(page.resultCount, 2)
 
-            var row = page.resultsList.itemAtIndex(1)
+            var row = page.resultAt(1)
             tryVerify(function() { return row.enabled && row.opacity === 1 }, 800)
             mouseClick(row, row.width / 2, row.height / 2)
 

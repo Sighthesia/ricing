@@ -12,10 +12,6 @@ Item {
     // { id, displayName, description, icon } with every field optional.
     property var result: null
     property bool selected: false
-    // Entry reveal: the first post-open fill staggers top-to-bottom like the
-    // settings entrance wave; later query refills use a quick fade-slide.
-    property int entrySlot: 0
-    property bool entryStaggered: false
 
     readonly property string displayName: result && result.displayName != null ? String(result.displayName) : ""
     readonly property string descriptionText: result && result.description != null ? String(result.description) : ""
@@ -23,7 +19,6 @@ Item {
 
     readonly property real rowHeight: 56
     implicitWidth: 480
-    height: rowHeight
     activeFocusOnTab: true
     Accessible.role: Accessible.ListItem
     Accessible.name: root.displayName
@@ -40,35 +35,82 @@ Item {
 
     signal activated()
 
-    // Entrance reveal: held transparent until the stagger slot fires, then
-    // fades in like the settings entrance wave. Opacity-only so ListView
-    // geometry and hit areas stay exact during the wave.
-    property bool _revealed: !entryStaggered || MotionTokens.reducedMotion
-    opacity: _revealed ? 1 : 0
-    // Held rows are invisible and must not intercept clicks mid-wave.
-    enabled: _revealed
+    // Settings-panel reveal contract (mirrors LazerSettingsRow verbatim):
+    // held rows fold to zero height with opacity and a leftward slide, then
+    // release through the shared slow OutQuint behaviors. The outer list gap
+    // lives inside the height so an exited row frees exactly zero space.
+    readonly property real listGap: 8
+    readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
+    property bool revealHeld: false
+    property bool snapTransitions: true
+    readonly property bool geometryHeld: revealHeld
+    readonly property real entryExitDelay: Math.round(Math.min(100, Math.max(0, root.y / 6)))
+    height: geometryHeld ? 0 : rowHeight + listGap
+    visible: !geometryHeld || height > 0.5 || opacity > 0.01
+    opacity: geometryHeld ? 0 : 1
+    x: geometryHeld ? -8 : 0
+    enabled: !geometryHeld
 
+    Behavior on height {
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
+        SequentialAnimation {
+            PauseAnimation { duration: root.geometryHeld ? root.entryExitDelay : 0 }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
+    }
     Behavior on opacity {
-        enabled: !MotionTokens.reducedMotion
-        NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
+        SequentialAnimation {
+            PauseAnimation { duration: root.geometryHeld ? root.entryExitDelay : 0 }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
+    }
+    Behavior on x {
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
+        SequentialAnimation {
+            PauseAnimation { duration: root.geometryHeld ? root.entryExitDelay : 0 }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
     }
 
     Timer {
-        id: entryRevealTimer
-        interval: entryStaggered ? 120 + Math.min(entrySlot, 24) * 18 : 0
+        id: revealTimer
+        interval: 0
         repeat: false
-        onTriggered: root._revealed = true
+        onTriggered: {
+            root.snapTransitions = false
+            root.revealHeld = false
+        }
     }
 
-    Component.onCompleted: {
-        if (!root._revealed)
-            entryRevealTimer.restart()
+    // Collapse instantly for the open-session wave, then release on schedule.
+    function holdInstantly() {
+        revealTimer.stop()
+        root.snapTransitions = true
+        root.revealHeld = true
+    }
+
+    // Leave the held state without animation (wave cancelled).
+    function releaseInstantly() {
+        revealTimer.stop()
+        root.snapTransitions = true
+        root.revealHeld = false
+        Qt.callLater(function () { root.snapTransitions = false })
+    }
+
+    // The timer owns the wave stagger so releases animate immediately.
+    function playReveal(delayMs) {
+        revealTimer.interval = Math.max(0, Math.round(Number(delayMs) || 0))
+        revealTimer.restart()
     }
 
     // Sharp full-row surface: selected tint outranks the plain hover swap.
     Rectangle {
         id: rowSurface
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: parent.width
+        height: root.bodyHeight
         radius: 0
         color: root.selected ? LazerTheme.settingsSelected
                 : rowHover.hovered ? LazerTheme.hoverFill : "transparent"
@@ -147,7 +189,10 @@ Item {
     Rectangle {
         id: flashOverlay
         z: 2
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: parent.width
+        height: root.bodyHeight
         radius: 0
         color: LazerTheme.textPrimary
         opacity: 0
@@ -169,7 +214,10 @@ Item {
     Rectangle {
         id: focusRing
         z: 3
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: parent.width
+        height: root.bodyHeight
         radius: 0
         color: "transparent"
         border.width: root.activeFocus ? 1.5 : 0
