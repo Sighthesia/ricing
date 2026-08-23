@@ -1,95 +1,147 @@
 import QtQuick
+import QtQuick.Effects
 
-// Keep page-local navigation as a settings-panel rail: darker rail surface,
-// rounded hover swap, accent pill for the active entry, and the shared
-// click-flash contract on activation.
+// Own the launcher navigation rail using the settings-sidebar contract:
+// collapsible width, icon nav items with staggered appear, one shared accent
+// indicator moved between entries, and a bottom collapse toggle.
 Rectangle {
     id: root
+
     property var entries: []
     property string selected: ""
-    property real railWidth: 220
+    property bool expanded: true
+    readonly property real expansionProgress: expanded ? 1 : 0
     signal selectedChangedByUser(string value)
+    signal collapseToggled()
 
-    width: railWidth
+    // Rail geometry mirrors the settings sidebar: padded column of 46px items.
+    readonly property int itemSpacing: 4
+    readonly property int railTop: 12
+    readonly property int itemHeight: 46
+    readonly property bool showLabels: expanded && width >= 130
+    property alias selectionIndicatorItem: selectionIndicator
+
+    function selectedIndex() {
+        for (var i = 0; i < entries.length; i++)
+            if (entries[i].id === selected)
+                return i
+        return -1
+    }
+
     color: LazerTheme.settingsRail
 
-    ListView {
-        anchors.fill: parent
-        anchors.topMargin: 12
-        anchors.bottomMargin: 12
-        model: root.entries
-        spacing: 2
-        clip: true
+    // Move one shared accent strip between category entries exactly like the
+    // settings sidebar does; NavItems render transparently under it.
+    Rectangle {
+        id: selectionIndicator
+        z: 2
+        x: 10 + 4 + 5 * root.expansionProgress
+        y: root.railTop + root.selectedIndex() * (root.itemHeight + root.itemSpacing) + root.itemHeight / 2 - height / 2
+        visible: root.selectedIndex() >= 0
+        width: 4
+        height: 24
+        radius: 2
+        color: LazerTheme.settingsAccent
 
-        delegate: Item {
-            id: navItem
-            required property var modelData
-            width: ListView.view.width
-            height: 46
+        Behavior on x {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
+        }
+        Behavior on y {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
+        }
+    }
 
-            // Hover highlight uses the settings row surface with detail rounding.
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 2
-                radius: 10
-                color: itemHover.hovered ? LazerTheme.settingsRowHover : "transparent"
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+    Column {
+        id: rail
+        x: 10
+        y: root.railTop
+        width: Math.max(0, root.width - 20)
+        spacing: root.itemSpacing
+
+        Repeater {
+            model: root.entries
+
+            delegate: LazerSettingsNavItem {
+                required property var modelData
+                required property int index
+                width: rail.width
+                label: modelData.label
+                iconSource: modelData.icon || ""
+                expanded: root.expanded
+                expansionProgress: root.expansionProgress
+                selected: root.selected === modelData.id
+                sharedSelectionIndicator: root.selectionIndicatorItem
+                onActivated: root.selectedChangedByUser(modelData.id)
             }
+        }
+    }
 
-            // Confirm activation with the shared click-flash contract.
-            Rectangle {
-                id: flashOverlay
-                z: 1
-                anchors.fill: parent
-                anchors.margins: 2
-                radius: 10
-                color: LazerTheme.textPrimary
-                opacity: 0
-                enabled: false
-            }
+    // Bottom collapse toggle carrying the settings sidebar's flash contract.
+    Item {
+        id: collapseButton
+        x: 0
+        y: root.height - height - 8
+        width: root.width
+        height: 40
+        Accessible.role: Accessible.Button
+        Accessible.name: root.expanded ? "收起侧栏" : "展开侧栏"
 
-            Text {
-                anchors.left: parent.left; anchors.leftMargin: 24
-                anchors.verticalCenter: parent.verticalCenter
-                text: navItem.modelData.label
-                color: root.selected === navItem.modelData.id
-                       ? LazerTheme.textPrimary : LazerTheme.settingsNavInactive
-                font.pixelSize: 14
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            }
+        scale: collapsePress.pressed ? MotionTokens.pressScale : 1
+        Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
 
-            // Accent pill marks the selected entry, matching settings navigation.
-            Rectangle {
-                x: 6
-                anchors.verticalCenter: parent.verticalCenter
-                width: 4
-                height: root.selected === navItem.modelData.id ? 24 : 0
-                radius: 2
-                color: LazerTheme.settingsAccent
-                Behavior on height {
-                    enabled: !MotionTokens.reducedMotion
-                    NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
-                }
-            }
+        Rectangle {
+            anchors.fill: parent
+            radius: 12
+            color: collapseHover.hovered ? LazerTheme.settingsRowHover : "transparent"
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
 
-            HoverHandler { id: itemHover }
-            TapHandler { id: itemTap; onTapped: navItem.activate() }
+        Rectangle {
+            id: collapseFlashOverlay
+            z: 1
+            anchors.fill: parent
+            radius: 12
+            color: LazerTheme.textPrimary
+            opacity: 0
+            enabled: false
+        }
 
-            function activate() {
-                root.selectedChangedByUser(navItem.modelData.id)
-                if (!MotionTokens.reducedMotion)
-                    flashAnimation.restart()
-            }
+        Image {
+            id: collapseIcon
+            anchors.centerIn: parent
+            width: 20
+            height: 20
+            source: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
+            fillMode: Image.PreserveAspectFit
+        }
+        MultiEffect {
+            anchors.fill: collapseIcon
+            source: collapseIcon
+            colorization: 1
+            colorizationColor: collapseHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
+            Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
+        }
 
-            NumberAnimation {
-                id: flashAnimation
-                target: flashOverlay
-                property: "opacity"
-                from: MotionTokens.clickFlashOpacity
-                to: 0
-                duration: MotionTokens.clickFlashDuration
-                easing.type: MotionTokens.clickFlashEasing
-            }
+        HoverHandler { id: collapseHover }
+        TapHandler { id: collapsePress; onTapped: collapseButton.activate() }
+
+        function activate() {
+            collapseButton.forceActiveFocus()
+            if (!MotionTokens.reducedMotion)
+                collapseFlashAnimation.restart()
+            root.collapseToggled()
+        }
+
+        NumberAnimation {
+            id: collapseFlashAnimation
+            target: collapseFlashOverlay
+            property: "opacity"
+            from: MotionTokens.clickFlashOpacity
+            to: 0
+            duration: MotionTokens.clickFlashDuration
+            easing.type: MotionTokens.clickFlashEasing
         }
     }
 }

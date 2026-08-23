@@ -21,9 +21,9 @@ Item {
     readonly property string title: "Launcher"
     readonly property string description: root.modeDescription(activeMode)
     readonly property var sidebarEntries: [
-        { id: "apps", label: "Apps" },
-        { id: "clipboard", label: "Clipboard" },
-        { id: "shortcuts", label: "Shortcuts" }
+        { id: "apps", label: "Apps", icon: "icons/apps.svg" },
+        { id: "clipboard", label: "Clipboard", icon: "icons/clipboard.svg" },
+        { id: "shortcuts", label: "Shortcuts", icon: "icons/keyboard.svg" }
     ]
     readonly property string activeMode: root.session && root.session.mode != null ? String(root.session.mode) : ""
 
@@ -49,8 +49,13 @@ Item {
     Connections {
         target: root.session
         function onVisibleChanged() {
-            if (root.session.visible)
+            if (root.session.visible) {
                 root.focusSearch()
+                root.beginEntranceWave()
+            } else {
+                entranceSettle.stop()
+                root.awaitingFirstFill = false
+            }
         }
         function onSelectedIndexChanged() {
             resultsListView.positionToSelection()
@@ -176,6 +181,54 @@ Item {
                                          && (!root.session.results || root.session.results.length === 0)
     readonly property bool stateVisible: sessionLoading || sessionError || sessionEmpty
 
+    // Entrance wave: the first result fill after an open reveals rows
+    // top-to-bottom with the settings stagger while scrolling stays held.
+    property bool awaitingFirstFill: false
+    readonly property bool entranceBusy: entranceSettle.running
+    readonly property int entranceBaseDelay: 120
+    readonly property int entranceSlotInterval: 18
+    readonly property int entranceMaxSlots: 24
+
+    Timer {
+        id: entranceSettle
+        // Cover the longest capped slot delay plus the reveal transition tail.
+        interval: root.entranceBaseDelay + root.entranceMaxSlots * root.entranceSlotInterval
+                  + MotionTokens.slow * 2 + 100
+        repeat: false
+    }
+
+    function beginEntranceWave() {
+        if (MotionTokens.reducedMotion)
+            return
+        root.awaitingFirstFill = true
+        entranceSettle.restart()
+    }
+
+    // Settings-panel scroll contract on the results list: edge takeover,
+    // rubber-band resistance, and a springed rebound past either bound.
+    function _resistedScrollTarget(current, delta, bound) {
+        var overscrollDistance = 88
+        var past = Math.max(0, Math.abs(current - bound))
+        var tension = Math.min(1, past / overscrollDistance)
+        return current - delta * (1 - tension)
+    }
+
+    function _settleScrollEdge() {
+        if (!resultsListView.edgeDriving)
+            return
+        resultsListView.edgeDriving = false
+        resultsListView.scrollDriveAnim.stop()
+        var maximumY = Math.max(0, resultsListView.contentHeight - resultsListView.height)
+        var target = Math.max(0, Math.min(maximumY, resultsListView.contentY))
+        if (Math.abs(target - resultsListView.contentY) < 0.5) {
+            resultsListView.contentY = target
+            return
+        }
+        resultsListView.scrollBounce.stop()
+        resultsListView.scrollSettleAnim.to = target
+        resultsListView.scrollSettleAnim.start()
+    }
+
     // Full-width sharp search rail carrying the osu caret text field.
     FocusScope {
         id: searchSurface
@@ -251,7 +304,9 @@ Item {
         }
     }
 
-    // Result viewport: fixed sharp rows bound to the service selection.
+    // Result viewport: settings-panel scroll contract (edge takeover,
+    // rubber-band resistance, rebound) with wave-gated input and animated
+    // re-population when a query reshuffles the results.
     ListView {
         id: resultsListView
         anchors.top: searchSurface.bottom
@@ -265,6 +320,11 @@ Item {
         clip: true
         visible: !root.stateVisible
         model: root.session && root.session.results ? root.session.results : []
+        boundsBehavior: ListView.StopAtBounds
+        flickDeceleration: 2000
+
+        property bool edgeDriving: false
+        readonly property real edgeTakeoverDistance: 80
 
         function positionToSelection() {
             if (!root.session || root.session.selectedIndex < 0)
@@ -274,12 +334,121 @@ Item {
             positionViewAtIndex(root.session.selectedIndex, ListView.Contain)
         }
 
+        onModelChanged: {
+            if (root.awaitingFirstFill && count > 0)
+                root.awaitingFirstFill = false
+        }
+
+        // Manual edge driving mirrors LazerSettingsSections: inside the
+        // takeover band wheel deltas chase through a short ease with damped
+        // overscroll, then the view springs back once input idles.
+        Timer {
+            id: scrollEdgeSettleTimer
+            interval: 140
+            repeat: false
+            onTriggered: root._settleScrollEdge()
+        }
+
+        NumberAnimation {
+            id: scrollSettleAnim
+            target: resultsListView
+            property: "contentY"
+            duration: MotionTokens.reducedMotion ? 0 : 260
+            easing.type: Easing.InOutCubic
+        }
+
+        NumberAnimation {
+            id: scrollDriveAnim
+            target: resultsListView
+            property: "contentY"
+            duration: MotionTokens.reducedMotion ? 0 : 80
+            easing.type: Easing.OutQuint
+        }
+
+        SequentialAnimation {
+            id: scrollBounce
+            NumberAnimation {
+                id: scrollBounceOut
+                target: resultsListView
+                property: "contentY"
+                duration: MotionTokens.reducedMotion ? 0 : 160
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                id: scrollBounceBack
+                target: resultsListView
+                property: "contentY"
+                duration: MotionTokens.reducedMotion ? 0 : 260
+                easing.type: Easing.InOutCubic
+            }
+        }
+
+        WheelHandler {
+            orientation: Qt.Vertical
+            target: null
+            blocking: false
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: wheel => {
+                if (root.entranceBusy)
+                    return
+                var scrollingDown = wheel.angleDelta.y < 0 || wheel.pixelDelta.y < 0
+                var delta = wheel.pixelDelta.y
+                if (delta === 0)
+                    delta = wheel.angleDelta.y / 120 * 40
+                if (delta === 0)
+                    return
+                var maximumY = Math.max(0, resultsListView.contentHeight - resultsListView.height)
+                var nearBottom = scrollingDown && maximumY - resultsListView.contentY <= resultsListView.edgeTakeoverDistance
+                var nearTop = !scrollingDown && resultsListView.contentY <= resultsListView.edgeTakeoverDistance
+                if (resultsListView.edgeDriving && !nearBottom && !nearTop)
+                    root._settleScrollEdge()
+                if (!MotionTokens.reducedMotion && (nearBottom || nearTop)) {
+                    resultsListView.cancelFlick()
+                    resultsListView.edgeDriving = true
+                    scrollEdgeSettleTimer.restart()
+                    scrollSettleAnim.stop()
+                    var proposed = resultsListView.contentY - delta
+                    if (proposed < 0)
+                        proposed = root._resistedScrollTarget(resultsListView.contentY, delta, 0)
+                    else if (proposed > maximumY)
+                        proposed = root._resistedScrollTarget(resultsListView.contentY, delta, maximumY)
+                    proposed = Math.max(-88, Math.min(maximumY + 88, proposed))
+                    scrollDriveAnim.from = resultsListView.contentY
+                    scrollDriveAnim.to = proposed
+                    scrollDriveAnim.restart()
+                    return
+                }
+                if ((!scrollingDown && resultsListView.contentY <= 0.5)
+                        || (scrollingDown && resultsListView.contentY >= maximumY - 0.5)) {
+                    resultsListView.cancelFlick()
+                    scrollBounceOut.from = resultsListView.contentY
+                    scrollBounceOut.to = Math.max(-88, Math.min(maximumY + 88, resultsListView.contentY - delta))
+                    scrollBounceBack.to = Math.max(0, Math.min(maximumY, scrollBounceOut.to))
+                    scrollBounce.restart()
+                }
+            }
+        }
+
+        // Query-driven repopulation reads as a reorder: rows fade in and the
+        // survivors glide into their new positions.
+        populate: Transition {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: MotionTokens.fast }
+        }
+        displaced: Transition {
+            NumberAnimation { property: "y"; duration: MotionTokens.medium; easing.type: Easing.OutQuint }
+        }
+        add: Transition {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: MotionTokens.fast }
+        }
+
         delegate: LauncherResultRow {
             required property var modelData
             required property int index
             width: ListView.view.width
             result: modelData
             selected: root.session && index === root.session.selectedIndex
+            entrySlot: index
+            entryStaggered: root.awaitingFirstFill
             onActivated: {
                 if (root.session)
                     root.session.execute(modelData)

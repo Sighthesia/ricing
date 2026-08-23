@@ -287,6 +287,7 @@ Item {
             tryCompare(page.resultsList, "count", 2)
 
             var row = page.resultsList.itemAtIndex(1)
+            tryVerify(function() { return row.enabled && row.opacity === 1 }, 800)
             mouseClick(row, row.width / 2, row.height / 2)
 
             compare(apps.executions.length, 1)

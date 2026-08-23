@@ -169,17 +169,28 @@ Item {
         }
 
         function test_sidebarRendersEntriesAndEmitsSelection() {
-            compare(host.sidebar.width, 220)
+            compare(host.sidebar.width, LazerTheme.settingsSidebarExpandedWidth)
             verify(host.openRoute("launcher", opener))
             tryCompare(host, "phase", "open", 1600)
             compare(host.sidebar.visible, true)
-            mouseClick(host.sidebar, host.sidebar.width / 2, 12 + 46 + 2 + 23)
+            mouseClick(host.sidebar, host.sidebar.width / 2, 12 + 46 + 4 + 23)
             tryCompare(sidebarSpy, "count", 1)
             compare(sidebarSpy.signalArguments[0][0], "clipboard")
             compare(host.activeSidebarId, "apps")
 
             host.sidebarEntries = []
             compare(host.sidebar.visible, false)
+        }
+
+        function test_sidebarCollapsesAndExpands() {
+            verify(host.openRoute("launcher", opener))
+            tryCompare(host, "phase", "open", 1600)
+            var expandedWidth = host.sidebar.width
+            host.sidebar.collapseToggled()
+            tryCompare(host.sidebar, "width", LazerTheme.settingsSidebarContractedWidth, 800)
+            compare(host.sidebarExpanded, false)
+            host.sidebar.collapseToggled()
+            tryCompare(host.sidebar, "width", expandedWidth, 800)
         }
 
         function test_normalMotionSlidesBodyFromBelow() {

@@ -12,6 +12,10 @@ Item {
     // { id, displayName, description, icon } with every field optional.
     property var result: null
     property bool selected: false
+    // Entry reveal: the first post-open fill staggers top-to-bottom like the
+    // settings entrance wave; later query refills use a quick fade-slide.
+    property int entrySlot: 0
+    property bool entryStaggered: false
 
     readonly property string displayName: result && result.displayName != null ? String(result.displayName) : ""
     readonly property string descriptionText: result && result.description != null ? String(result.description) : ""
@@ -35,6 +39,31 @@ Item {
     readonly property Animation flashAnimationItem: flashAnimation
 
     signal activated()
+
+    // Entrance reveal: held transparent until the stagger slot fires, then
+    // fades in like the settings entrance wave. Opacity-only so ListView
+    // geometry and hit areas stay exact during the wave.
+    property bool _revealed: !entryStaggered || MotionTokens.reducedMotion
+    opacity: _revealed ? 1 : 0
+    // Held rows are invisible and must not intercept clicks mid-wave.
+    enabled: _revealed
+
+    Behavior on opacity {
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+    }
+
+    Timer {
+        id: entryRevealTimer
+        interval: entryStaggered ? 120 + Math.min(entrySlot, 24) * 18 : 0
+        repeat: false
+        onTriggered: root._revealed = true
+    }
+
+    Component.onCompleted: {
+        if (!root._revealed)
+            entryRevealTimer.restart()
+    }
 
     // Sharp full-row surface: selected tint outranks the plain hover swap.
     Rectangle {

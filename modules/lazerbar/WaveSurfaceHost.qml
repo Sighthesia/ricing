@@ -17,12 +17,16 @@ Item {
     property string description: ""
     property var sidebarEntries: []
     property string activeSidebarId: ""
+    // Collapsible settings-style rail; the width eases between the two
+    // canonical settings sidebar sizes.
+    property bool sidebarExpanded: true
+    readonly property int sidebarWidth: root.sidebarExpanded
+            ? LazerTheme.settingsSidebarExpandedWidth : LazerTheme.settingsSidebarContractedWidth
     property var palette: ({})
     property Component contentComponent: null
     property string _pendingRoute: ""
     readonly property bool interactive: phase === "opening" || phase === "open"
     readonly property real surfaceWidth: Logic.surfaceWidth(width)
-    readonly property int sidebarWidth: Logic.sidebarWidth(220)
     property alias surface: body
     property alias outsideLeft: outsideLeft
     property alias outsideRight: outsideRight
@@ -188,9 +192,15 @@ Item {
                 anchors.left: parent.left
                 entries: root.sidebarEntries
                 selected: root.activeSidebarId
-                railWidth: root.sidebarWidth
+                expanded: root.sidebarExpanded
+                width: root.sidebarWidth
                 visible: root.sidebarEntries.length > 0
+                Behavior on width {
+                    enabled: !MotionTokens.reducedMotion
+                    NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
+                }
                 onSelectedChangedByUser: id => root.sidebarSelected(id)
+                onCollapseToggled: root.sidebarExpanded = !root.sidebarExpanded
             }
 
             // Hairline divider between the navigation rail and the content column.
