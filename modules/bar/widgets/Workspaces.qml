@@ -29,7 +29,9 @@ Item {
             delegate: Item {
                 id: workspaceSquare
 
-                required property var modelData
+                required property int idx
+                required property bool isActive
+                required property string name
 
                 readonly property bool hovered: hoverHandler.hovered
 
@@ -39,7 +41,7 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     radius: 0
-                    color: workspaceSquare.modelData.isActive
+                    color: workspaceSquare.isActive
                            ? LazerTheme.activeFill
                            : workspaceSquare.hovered ? LazerTheme.hoverFill : "transparent"
 
@@ -50,7 +52,7 @@ Item {
                 Rectangle {
                     anchors.bottom: parent.bottom
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: workspaceSquare.modelData.isActive ? parent.width - 8 : 0
+                    width: workspaceSquare.isActive ? parent.width - 8 : 0
                     height: 2
                     color: LazerTheme.osuGreen
 
@@ -59,12 +61,12 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: workspaceSquare.modelData.idx
-                    color: workspaceSquare.modelData.isActive
+                    text: workspaceSquare.idx
+                    color: workspaceSquare.isActive
                            ? LazerTheme.textPrimary
                            : workspaceSquare.hovered ? LazerTheme.hoverForeground : LazerTheme.iconInactive
                     font.pixelSize: 11
-                    font.bold: workspaceSquare.modelData.isActive
+                    font.bold: workspaceSquare.isActive
                 }
 
                 HoverHandler {
@@ -75,7 +77,7 @@ Item {
                     gesturePolicy: TapHandler.ReleaseWithinBounds
                     onTapped: Quickshell.execDetached([
                         "niri", "msg", "action", "focus-workspace",
-                        String(workspaceSquare.modelData.idx)
+                        String(workspaceSquare.idx)
                     ])
                 }
             }

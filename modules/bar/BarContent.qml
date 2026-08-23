@@ -34,9 +34,7 @@ Item {
 
     // Registry source paths are already relative to this file's directory.
     function widgetSourceUrl(source) {
-        var url = Qt.resolvedUrl(String(source || ""))
-        console.info("URLDBG", source, "->", url)
-        return url
+        return Qt.resolvedUrl(String(source || ""))
     }
 
     // Publish section bounds and widget centers for the layout service.
