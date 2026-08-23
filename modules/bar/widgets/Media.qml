@@ -113,27 +113,6 @@ BarPill {
         }
     }
 
-    // Spectrum backdrop — sharp mirrored bars behind the pill content, faded
-    // when the audio is idle so the pill stays calm between tracks.
-    Item {
-        anchors.fill: parent
-        anchors.leftMargin: 4
-        anchors.rightMargin: 4
-        anchors.topMargin: 3
-        anchors.bottomMargin: 3
-        visible: root.needsSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
-        clip: true
-        opacity: Services.SpectrumService.isIdle ? 0 : 1
-
-        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
-
-        DockzoneSpectrum {
-            anchors.fill: parent
-            values: Services.SpectrumService.values
-            barColor: Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.34)
-        }
-    }
-
     Row {
         id: contentRow
 
@@ -196,6 +175,8 @@ BarPill {
         }
 
         Column {
+            id: textColumn
+
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
 
@@ -268,6 +249,32 @@ BarPill {
                 elide: Text.ElideRight
                 font.pixelSize: 10
             }
+        }
+    }
+
+    // Spectrum backdrop — X strictly inside textColumn, Y fills the pill.
+    // No left bleed: left edge aligns exactly with text, right bleeds slightly for breathing.
+    Item {
+        id: spectrumBg
+
+        // Left aligns exactly with textColumn to avoid exceeding text X range.
+        x: contentRow.x + textColumn.x
+        width: textColumn.width
+        anchors.top: parent.top
+        anchors.topMargin: 3
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 3
+        z: -1
+        visible: root.needsSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
+        clip: true
+        opacity: Services.SpectrumService.isIdle ? 0 : 1
+
+        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+
+        DockzoneSpectrum {
+            anchors.fill: parent
+            values: Services.SpectrumService.values
+            barColor: Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.58)
         }
     }
 
