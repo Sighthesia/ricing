@@ -556,8 +556,14 @@ Item {
                     required property int index
                     width: resultsColumn.width
                     result: modelData
+                    searchQuery: root.activeSearchText
                     revealHeld: true
-                    selected: root.session && index === root.session.selectedIndex
+                    selected: {
+                        if (!root.session || !root.session.results || root.session.selectedIndex < 0)
+                            return false
+                        var sel = root.session.results[root.session.selectedIndex]
+                        return !!sel && !!modelData && String(sel.id) === String(modelData.id)
+                    }
                     onActivated: {
                         if (root.session)
                             root.session.execute(modelData)
