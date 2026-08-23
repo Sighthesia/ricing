@@ -30,10 +30,12 @@ var defaultOptions = {
     // Tempi outside the band report their nearest in-band metrical relative.
     minBpmSearch: 80,
     maxBpmSearch: 170,
-    // Recompute tempo every N frames (~0.5s at 30fps) to bound CPU cost.
-    analyzeEveryFrames: 15,
-    // Need at least this many envelope frames before trusting an estimate.
-    minEnvelopeFrames: 90,
+    // Recompute tempo every N frames (~0.33s at 30fps) to bound CPU cost
+    // while keeping tempo-change response snappy.
+    analyzeEveryFrames: 10,
+    // Need at least this many envelope frames before trusting an estimate
+    // (2s at 30fps — the pending-switch guard absorbs early instability).
+    minEnvelopeFrames: 60,
     // Readout clamp (mirrors the search band).
     minBpm: 80,
     maxBpm: 170
@@ -179,7 +181,7 @@ function feedFrame(tracker, values) {
     // Periodic tempo re-analysis over the accumulated envelope. A candidate
     // that disagrees with the current readout must persist for several
     // analyses before it takes over, so one noisy window cannot flip the
-    // tempo, but a real track change still wins within ~2 seconds.
+    // tempo, but a real track change still wins within ~1 second.
     if (tracker.frameCounter % tracker.analyzeEveryFrames === 0) {
         var raw = estimateTempo(tracker)
         if (raw > 0) {
@@ -196,7 +198,7 @@ function feedFrame(tracker, values) {
                     else
                         tracker.pendingCount = 1
                     tracker.pendingBpm = folded
-                    if (tracker.pendingCount >= 4) {
+                    if (tracker.pendingCount >= 3) {
                         tracker.bpm = folded
                         tracker.pendingBpm = 0
                         tracker.pendingCount = 0

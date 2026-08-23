@@ -15,11 +15,16 @@ Singleton {
     property bool isIdle: true
 
     // Bass-onset BPM estimate derived from the same cava frames (0 when unknown).
-    readonly property real bpm: _beatTracker.bpm
+    // The tracker is a plain JS object, so its fields carry no change
+    // notifications — these mirrors are assigned per frame to make the
+    // values reactive for QML consumers.
+    readonly property real bpm: _reportedBpm
     // Decaying 0..1 beat pulse for visual accents; spikes to 1 on each onset.
-    readonly property real beatPulse: _beatTracker.pulse
+    readonly property real beatPulse: _reportedPulse
     signal beat()
 
+    property real _reportedBpm: 0
+    property real _reportedPulse: 0
     property var _beatTracker: BeatDetect.createTracker({})
     // Debug logging for beat tracking, gated by AFLOAT_SPECTRUM_DEBUG=1.
     readonly property bool _debugBeat: (Quickshell.env("AFLOAT_SPECTRUM_DEBUG") || "").trim() === "1"
@@ -144,7 +149,10 @@ Singleton {
         root.values = buffer
 
         // Bass-onset BPM tracking rides the same frames as the visualizers.
-        if (BeatDetect.feedFrame(root._beatTracker, buffer))
+        const fired = BeatDetect.feedFrame(root._beatTracker, buffer)
+        root._reportedBpm = root._beatTracker.bpm
+        root._reportedPulse = root._beatTracker.pulse
+        if (fired)
             root.beat()
     }
 
@@ -154,12 +162,12 @@ Singleton {
         if (!root._debugBeat)
             return
 
-        const bpm = root._beatTracker.bpm
+        const bpm = root._reportedBpm
         const rounded = Math.round(bpm)
         console.log("[afloat:SpectrumBeat]", JSON.stringify({
             event: "beat",
             bpm: Math.round(bpm * 10) / 10,
-            pulse: Math.round(root._beatTracker.pulse * 100) / 100,
+            pulse: Math.round(root._reportedPulse * 100) / 100,
             bassAverage: Math.round(root._beatTracker.average * 1000) / 1000
         }))
         if (rounded !== root._lastLoggedBpm) {
@@ -167,7 +175,7 @@ Singleton {
             console.log("[afloat:SpectrumBeat]", JSON.stringify({
                 event: "bpm-settle",
                 bpm: rounded,
-                intervals: root._beatTracker.intervals.length
+                pendingSwitches: root._beatTracker.pendingCount
             }))
         }
     }
