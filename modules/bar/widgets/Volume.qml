@@ -3,7 +3,7 @@ import ".."
 import "../../lazerbar"
 import "../../../services" as Services
 
-// Output volume pill: click mutes, wheel steps by the configured amount.
+// Square output volume: click mutes, wheel steps, level shown as rounded horizontal bar below icon.
 BarPill {
     id: root
 
@@ -14,11 +14,12 @@ BarPill {
     property string screenName: ""
 
     readonly property bool muted: Services.VolumeService.sinkMuted
-    readonly property int percent: Math.round(Services.VolumeService.sinkVolume * 100)
+    readonly property real level: root.muted ? 0 : Math.max(0, Math.min(1, Services.VolumeService.sinkVolume))
 
     onClicked: Services.VolumeService.toggleSinkMute()
 
-    implicitWidth: contentRow.implicitWidth + 12
+    implicitWidth: LazerTheme.barWidgetHeight
+    implicitHeight: LazerTheme.barWidgetHeight
 
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -31,27 +32,45 @@ BarPill {
         }
     }
 
-    Row {
-        id: contentRow
+    // Icon stays vertically centered; progress sits directly below it.
+    Image {
+        id: volumeIcon
 
         anchors.centerIn: parent
-        spacing: 6
+        width: LazerTheme.barGlyphSize - 4
+        height: LazerTheme.barGlyphSize - 4
+        source: "../icons/volume.svg"
+        opacity: root.muted ? 0.4 : 0.9
 
-        Image {
-            anchors.verticalCenter: parent.verticalCenter
-            width: LazerTheme.barGlyphSize - 4
-            height: LazerTheme.barGlyphSize - 4
-            source: "../icons/volume.svg"
-            opacity: root.muted ? 0.4 : 0.9
+        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+    }
 
-            Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
-        }
+    // Rounded horizontal level bar below the icon, replacing the percentage text.
+    Rectangle {
+        id: volumeTrack
 
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.muted ? "静音" : root.percent + "%"
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: volumeIcon.bottom
+        anchors.topMargin: 4
+        width: LazerTheme.barWidgetHeight - 16
+        height: 3
+        radius: 1.5
+        color: Qt.rgba(1, 1, 1, 0.14)
+        clip: true
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: parent.width * root.level
+            radius: 1.5
             color: root.muted ? LazerTheme.textMuted : LazerTheme.textPrimary
-            font.pixelSize: 12
+
+            Behavior on width {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+            }
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
     }
 }

@@ -169,6 +169,32 @@ BarPill {
             }
         }
 
+        // Rounded vertical playback progress to the right of the cover glyph.
+        Rectangle {
+            id: mediaProgressTrack
+
+            anchors.verticalCenter: parent.verticalCenter
+            width: 3
+            height: root.coverSize
+            radius: 1.5
+            color: Qt.rgba(1, 1, 1, 0.14)
+            clip: true
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: parent.height * Services.MediaControlService.progress
+                radius: 1.5
+                color: LazerTheme.textPrimary
+
+                Behavior on height {
+                    enabled: !MotionTokens.reducedMotion
+                    NumberAnimation { duration: 220; easing.type: Easing.OutQuad }
+                }
+            }
+        }
+
         Column {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
