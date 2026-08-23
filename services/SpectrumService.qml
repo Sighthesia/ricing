@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "spectrum/BeatDetect.js" as BeatDetect
 
 // Provide shared PipeWire spectrum data for lightweight background visualizers.
 Singleton {
@@ -12,6 +13,14 @@ Singleton {
     property int _crashCount: 0
     property var values: []
     property bool isIdle: true
+
+    // Bass-onset BPM estimate derived from the same cava frames (0 when unknown).
+    readonly property real bpm: _beatTracker.bpm
+    // Decaying 0..1 beat pulse for visual accents; spikes to 1 on each onset.
+    readonly property real beatPulse: _beatTracker.pulse
+    signal beat()
+
+    property var _beatTracker: BeatDetect.createTracker({})
     // Dockzone spectrum override — set by the active media widget.
     property real dockzoneHeightScale: 1.0
     property real dockzoneMaxHeightRatio: 1.0
@@ -74,6 +83,7 @@ Singleton {
         root.values = new Array(root.barsCount).fill(0)
         root.isIdle = true
         root._idleFrameCount = 0
+        BeatDetect.resetTracker(root._beatTracker)
     }
 
     function _parseFrame(data) {
@@ -129,6 +139,10 @@ Singleton {
 
         root._bufToggle = !root._bufToggle
         root.values = buffer
+
+        // Bass-onset BPM tracking rides the same frames as the visualizers.
+        if (BeatDetect.feedFrame(root._beatTracker, buffer))
+            root.beat()
     }
 
     on_ShouldRunChanged: {
