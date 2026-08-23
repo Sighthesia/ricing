@@ -13,6 +13,14 @@ Variants {
 
         required property var modelData
 
+        // Keep the theme's bar metrics tracking settings; the singleton itself
+        // stays service-free so component suites run without Quickshell.
+        Binding {
+            target: LazerTheme
+            property: "barHeightSetting"
+            value: Services.SettingsService.bar.height
+        }
+
         readonly property bool floating: Services.SettingsService.bar.floating
         readonly property int floatingMargin: floating
                 ? Math.max(0, Math.min(24, Number(Services.SettingsService.bar.floatingMargin) || 0)) : 0

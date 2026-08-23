@@ -1,6 +1,5 @@
 pragma Singleton
 import QtQuick
-import "../../services" as Services
 
 // Centralize the lazer bar's dark visual language.
 QtObject {
@@ -59,9 +58,12 @@ QtObject {
 
     // osu toolbar widget metrics (ToolbarButton PADDING 3, icon 20 in HEIGHT 40):
     // hairline vertical gutters, square buttons, glyphs at half the live bar height.
+    // The theme singleton stays service-free so component suites run without the
+    // Quickshell plugin; the production bar binds barHeightSetting to settings.
+    property int barHeightSetting: 48
     readonly property int barWidgetGutter: 3
     readonly property int barLiveHeight:
-        Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
+        Math.max(40, Math.min(64, barHeightSetting))
     readonly property int barWidgetHeight: barLiveHeight - barWidgetGutter * 2
     readonly property int barGlyphSize: Math.max(16, Math.round(barLiveHeight * 0.5))
 
