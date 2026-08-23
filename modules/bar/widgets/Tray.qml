@@ -15,7 +15,7 @@ Item {
     property string screenName: ""
 
     implicitWidth: trayRow.implicitWidth
-    implicitHeight: LazerTheme.targetSize
+    implicitHeight: LazerTheme.barWidgetHeight
 
     Row {
         id: trayRow
@@ -36,6 +36,17 @@ Item {
                 readonly property bool hovered: iconHover.hovered
                 readonly property string label:
                     modelData.title || modelData.tooltipTitle || modelData.id || "Tray item"
+                readonly property string iconSource: {
+                    var icon = modelData ? (modelData.icon || "") : ""
+                    // SNI icons may carry a non-theme path suffix that the
+                    // image provider cannot resolve without conversion.
+                    var pathSplit = icon.indexOf("?path=")
+                    if (pathSplit < 0)
+                        return icon
+                    var name = icon.substring(0, pathSplit)
+                    var dir = icon.substring(pathSplit + 6)
+                    return "file://" + dir + "/" + name.substring(name.lastIndexOf("/") + 1)
+                }
 
                 width: LazerTheme.barWidgetHeight
                 height: LazerTheme.barWidgetHeight
@@ -55,7 +66,10 @@ Item {
                     width: LazerTheme.barGlyphSize
                     height: LazerTheme.barGlyphSize
                     asynchronous: true
-                    source: trayIcon.modelData.icon
+                    backer.fillMode: Image.PreserveAspectFit
+                    source: trayIcon.iconSource
+                    // Failed loads stay invisible instead of rendering blank.
+                    opacity: status === Image.Ready ? 1 : 0
                 }
 
                 HoverHandler {
