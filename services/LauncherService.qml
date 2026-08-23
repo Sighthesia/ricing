@@ -48,6 +48,8 @@ Singleton {
     property alias query: session.query
     readonly property alias mode: session.mode
     property alias results: session.results
+    // Stable per-mode pool the surface renders; text filtering is local.
+    property alias displayPool: session.displayPool
     readonly property alias loading: session.loading
     readonly property alias error: session.error
     readonly property alias selectedIndex: session.selectedIndex
