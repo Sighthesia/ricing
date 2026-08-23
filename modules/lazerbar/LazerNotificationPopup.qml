@@ -117,6 +117,9 @@ Item {
         root.closing = true
         gesture.enabled = false
         closeButtonMouse.enabled = false
+        // A plain click releases into springBack before onClicked fires; stop
+        // it so the fling integrates from rest exactly like the close button.
+        springBack.stop()
 
         if (runFling && !root.reducedMotion) {
             if (dragContainer.velocityX > -0.3)
@@ -313,13 +316,9 @@ Item {
                         springBack.restart()
                 }
 
-                // osu Notification.OnClick parity: body left click activates
-                // then Close(false) — quick fade; right click runs the fling.
-                onClicked: mouse => {
-                    if (mouse.button === Qt.RightButton)
-                        root.requestClose(true)
-                    else if (mouse.button === Qt.LeftButton)
-                        root.requestClose(false)
+                // Body click triggers the parabolic fling exit effect.
+                onClicked: _ => {
+                    root.requestClose(true)
                 }
             }
 
@@ -430,7 +429,7 @@ Item {
                                     if (!root.reducedMotion)
                                         actionFlashAnim.restart()
                                     root.actionRequested(actionButton.modelData.identifier)
-                                    root.requestClose(false)
+                                    root.requestClose(true)
                                 }
                             }
                         }
