@@ -9,7 +9,7 @@ Singleton {
     id: root
 
     readonly property bool preferLyrics: true
-    readonly property bool preferTranslatedLyrics: false
+    readonly property bool preferTranslatedLyrics: true
     readonly property string _lyricsMetadataKey: root._normalizedTrackKey(
         Services.NeteaseWebLyricsService.title,
         Services.NeteaseWebLyricsService.artist
@@ -135,8 +135,12 @@ Singleton {
     readonly property string compactOriginalLyricKey: root._compactOriginalIsInstrumental ? "" : root._compactDisplayedLyricKey
     readonly property string compactTranslatedLyric: root._compactOriginalIsInstrumental || root._isInstrumentalLyric(root._compactDisplayedTranslatedLyric) ? "" : root._compactDisplayedTranslatedLyric
     readonly property string compactTranslatedLyricKey: root._compactOriginalIsInstrumental || root._isInstrumentalLyric(root._compactDisplayedTranslatedLyric) ? "" : root._compactDisplayedTranslatedLyricKey
-    readonly property string compactPrimaryLyric: root.compactOriginalLyric
-    readonly property string compactPrimaryLyricKey: root.compactOriginalLyricKey
+    // Primary compact line follows the translation preference and falls
+    // back to the original line when no translated text is available.
+    readonly property string compactPrimaryLyric: root.compactTranslatedLyric !== ""
+        ? root.compactTranslatedLyric : root.compactOriginalLyric
+    readonly property string compactPrimaryLyricKey: root.compactTranslatedLyric !== ""
+        ? root.compactTranslatedLyricKey : root.compactOriginalLyricKey
     readonly property bool showCompactLyric:
         root.preferLyrics && (root.compactOriginalLyric !== "" || root.compactTranslatedLyric !== "")
     readonly property real progress:
