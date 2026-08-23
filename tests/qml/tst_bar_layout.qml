@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import "../../services/barlayout/BarLayoutSections.js" as BarLayoutSections
 import "../../services/barlayout/BarLayoutLayoutModel.js" as BarLayoutModel
+import "../../modules/bar/ShippedWidgets.js" as ShippedWidgets
 
 Item {
     TestCase {
@@ -63,6 +64,65 @@ Item {
                 sections[entry.section] = true
             }
             verify(sections.left && sections.center && sections.right)
+        }
+    }
+
+    TestCase {
+        name: "BarLauncherEntry"
+
+        // Reads a repo file synchronously so mount contracts stay checkable
+        // without instantiating Quickshell windows under qmltestrunner.
+        // Returns "" when local file reads are disabled in this environment.
+        function fileText(relativePath) {
+            var xhr = new XMLHttpRequest
+            try {
+                xhr.open("GET", Qt.resolvedUrl(relativePath), false)
+                xhr.send()
+            } catch (error) {
+                return ""
+            }
+            return String(xhr.responseText || "")
+        }
+
+        function test_shipped_widgets_include_launcher() {
+            verify(ShippedWidgets.ships("launcher"))
+            verify(ShippedWidgets.ids.indexOf("settings") !== -1)
+        }
+
+        function test_registry_maps_launcher_to_button_widget() {
+            compare(BarLayoutModel.defaultWidgetSource("launcher"),
+                    "../../modules/bar/widgets/LauncherButton.qml")
+            var definition = BarLayoutModel.availableWidget("launcher")
+            verify(definition !== null)
+            compare(definition.section, "left")
+        }
+
+        function test_default_layout_installs_enabled_launcher_entry() {
+            var model = BarLayoutModel.defaultLayoutModel()
+            var found = false
+            for (var i = 0; i < model.widgets.length; i++) {
+                if (model.widgets[i].id === "launcher") {
+                    found = true
+                    compare(model.widgets[i].section, "left")
+                    compare(model.widgets[i].enabled, true)
+                }
+            }
+            verify(found, "default layout must ship the launcher entry")
+        }
+
+        function test_production_bar_mounts_launcher_stack_and_service() {
+            var barTopBar = fileText("../../modules/bar/TopBar.qml")
+            if (barTopBar === "")
+                skip("local file reads disabled; run with QML_XHR_ALLOW_FILE_READ=1")
+            verify(barTopBar.indexOf("LauncherSurface") !== -1,
+                   "production bar must mount the launcher surface stack")
+            verify(barTopBar.indexOf("Services.LauncherService") !== -1,
+                   "mounted launcher surface must reference LauncherService so its IPC target registers")
+
+            verify(fileText("../../modules/lazerbar/TopBar.qml").indexOf("LauncherSurface") !== -1,
+                   "legacy top bar must route through the shared launcher surface stack")
+            verify(fileText("../../modules/bar/widgets/LauncherButton.qml").indexOf("LauncherService") !== -1,
+                   "launcher bar entry must drive the launcher session")
         }
     }
 }

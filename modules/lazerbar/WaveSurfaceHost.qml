@@ -32,6 +32,7 @@ Item {
     property alias waveRepeater: waveRepeater
 
     signal closed()
+    signal opened()
     signal sidebarSelected(string id)
 
     function openRoute(nextRoute, source) {
@@ -59,6 +60,9 @@ Item {
         openBody.restart()
         openWaves.restart()
         forceActiveFocus()
+        // Announce after the surface focus grab so listeners can land
+        // content focus (search) without losing it back to the shell.
+        opened()
         return true
     }
 

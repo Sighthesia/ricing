@@ -54,6 +54,17 @@ QtObject {
         return true
     }
 
+    // Drop a queued hand-off while keeping the active owner open; used when
+    // the newest request recalls a surface that was mid-hand-off to another
+    // owner, so the recalled surface never fires a stale completion.
+    function cancelPending() {
+        if (!transitioning)
+            return
+        pendingTarget = ""
+        transitioning = false
+        _closingOwner = ""
+    }
+
     function ownerClosed(owner) {
         if (!transitioning) {
             if (owner !== activeOwner)

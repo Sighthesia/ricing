@@ -45,6 +45,7 @@ OverlayCoordinator 1.0 OverlayCoordinator.qml
 FullscreenWave 1.0 FullscreenWave.qml
 FullscreenOverlayHost 1.0 FullscreenOverlayHost.qml
 WaveSurfaceHost 1.0 WaveSurfaceHost.qml
+LauncherSurface 1.0 LauncherSurface.qml
 FullscreenHeader 1.0 FullscreenHeader.qml
 FullscreenSidebar 1.0 FullscreenSidebar.qml
 LauncherPage 1.0 LauncherPage.qml

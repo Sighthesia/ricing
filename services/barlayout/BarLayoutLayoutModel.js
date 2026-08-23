@@ -18,6 +18,7 @@ var DEFAULT_WIDGET_SOURCE_BY_ID = {
     "media": "../../modules/bar/widgets/Media.qml",
     "notifications": "../../modules/bar/widgets/Notifications.qml",
     "settings": "../../modules/bar/widgets/SettingsButton.qml",
+    "launcher": "../../modules/bar/widgets/LauncherButton.qml",
 }
 
 function normalizeWidgetId(widgetId, widgetSource) {
@@ -157,12 +158,20 @@ var AVAILABLE_WIDGETS = [
         section: "right",
         source: "../../modules/bar/widgets/SettingsButton.qml",
     },
+    {
+        id: "launcher",
+        label: "Launcher",
+        description: "Toggle the app launcher search.",
+        section: "left",
+        source: "../../modules/bar/widgets/LauncherButton.qml",
+    },
 ]
 
 var DEFAULT_LAYOUT_MODEL = {
     version: 1,
     widgets: [
-        { id: "active-window", instanceKey: "active-window:0", section: "left", order: 0, enabled: true, source: "../../modules/bar/widgets/ActiveWindow.qml" },
+        { id: "launcher", instanceKey: "launcher:0", section: "left", order: 0, enabled: true, source: "../../modules/bar/widgets/LauncherButton.qml" },
+        { id: "active-window", instanceKey: "active-window:0", section: "left", order: 1, enabled: true, source: "../../modules/bar/widgets/ActiveWindow.qml" },
         { id: "workspaces", instanceKey: "workspaces:0", section: "center", order: 0, enabled: true, source: "../../modules/bar/widgets/Workspaces.qml" },
         { id: "tray", instanceKey: "tray:0", section: "right", order: 0, enabled: true, source: "../../modules/bar/widgets/Tray.qml" },
         { id: "volume", instanceKey: "volume:0", section: "right", order: 1, enabled: true, source: "../../modules/bar/widgets/Volume.qml" },

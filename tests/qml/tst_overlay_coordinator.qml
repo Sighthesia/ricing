@@ -3,7 +3,9 @@ import QtTest
 import "../../modules/lazerbar" as Lazer
 
 // Exercise mutual exclusion, pending transitions, final focus restoration,
-// and the direct launcher opener path through the generic wave shell.
+// and the direct launcher opener path by instantiating the real production
+// stack: OverlayCoordinator plus LauncherSurface (wave shell + launcher page
+// + session mirror), so the harness cannot drift from the mounted wiring.
 Item {
     id: host
     width: 1000
@@ -14,80 +16,23 @@ Item {
 
     Lazer.OverlayCoordinator {
         id: coordinator
-        onOpenRequested: (owner, target) => { if (owner === "wave") launcherHost.openRoute(target, null) }
-        onCloseRequested: owner => { if (owner === "wave") launcherHost.close() }
+        onOpenRequested: (owner, target) => { if (owner === "wave") launcherSurface.host.openRoute(target, null) }
+        onCloseRequested: owner => { if (owner === "wave") launcherSurface.host.close() }
     }
 
     SignalSpy { id: openSpy; target: coordinator; signalName: "openRequested" }
     SignalSpy { id: closeSpy; target: coordinator; signalName: "closeRequested" }
 
-    // Production-shaped launcher wiring: the standalone session owns visibility,
-    // the coordinator serializes ownership, and the generic shell renders it.
-    Lazer.WaveSurfaceHost {
-        id: launcherHost
+    // Production-shaped launcher wiring with the embedded Quickshell-free
+    // session; every open intent funnels through requestOpen / syncVisibility.
+    Lazer.LauncherSurface {
+        id: launcherSurface
         anchors.fill: parent
-        title: page() ? page().title : "Launcher"
-        description: page() ? page().description : ""
-        breadcrumb: "osu! / " + (page() ? page().title : "Launcher")
-        sidebarEntries: page() ? page().sidebarEntries : []
-        activeSidebarId: page() ? page().activeMode : "apps"
-        contentComponent: launcherPageComponent
-
-        onSidebarSelected: id => { if (page()) page().handleModeSelected(id) }
-        onClosed: {
-            coordinator.ownerClosed("wave")
-            if (session() && session().visible)
-                session().close()
-        }
+        coordinator: coordinator
     }
 
-    Component {
-        id: launcherPageComponent
-        Lazer.LauncherPage { }
-    }
-
-    // Mirror of the top-bar service sync: session visibility drives the surface.
-    Connections {
-        target: session()
-        function onVisibleChanged() { host.syncLauncherSurface() }
-    }
-
-    function page() { return launcherHost.contentItem }
-    function session() { return launcherHost.contentItem ? launcherHost.contentItem.session : null }
-
-    // Launcher activation goes through the standalone open path and records its
-    // opener Item so focus can be restored after close.
-    function requestLauncher(openerItem) {
-        if (!session())
-            return false
-        if (session().visible) {
-            if (coordinator.activeTarget === "launcher") {
-                page().focusSearch()
-                return true
-            }
-            return coordinator.request("launcher", openerItem, true, true)
-        }
-        pendingOpener = openerItem || null
-        session().open()
-        return true
-    }
-
-    function syncLauncherSurface() {
-        if (!session())
-            return
-        if (session().visible) {
-            coordinator.request("launcher", pendingOpener, true, true)
-            // Opening grabs surface focus; land typing in the live search session.
-            Qt.callLater(function() { if (host.page()) host.page().focusSearch() })
-        } else if (coordinator.activeTarget === "launcher") {
-            coordinator.request("launcher")
-        } else if (coordinator.transitioning && coordinator.pendingTarget === "launcher") {
-            coordinator.pendingTarget = ""
-        }
-        pendingOpener = null
-    }
-
-    property var pendingOpener: null
+    function page() { return launcherSurface.page() }
+    function session() { return launcherSurface.session }
 
     TestCase {
         name: "OverlayCoordinator"
@@ -101,8 +46,8 @@ Item {
             coordinator.transitioning = false
             coordinator.opener = null
             coordinator._closingOwner = ""
-            if (launcherHost.phase !== "closed")
-                launcherHost.finishClose()
+            if (launcherSurface.host.phase !== "closed")
+                launcherSurface.host.finishClose()
             var s = host.session()
             s._refreshToken++
             s.visible = false
@@ -112,7 +57,7 @@ Item {
             s.error = ""
             s.selectedIndex = -1
             s._adapters = ({})
-            host.pendingOpener = null
+            launcherSurface.pendingOpener = null
             openSpy.clear()
             closeSpy.clear()
             opener.forceActiveFocus()
@@ -123,7 +68,7 @@ Item {
         }
 
         function test_launcherActivationOpensThroughWaveOwnerAndFocusesSearch() {
-            verify(host.requestLauncher(opener))
+            launcherSurface.requestOpen(opener)
             compare(openSpy.count, 1)
             compare(openSpy.signalArguments[0][0], "wave")
             compare(openSpy.signalArguments[0][1], "launcher")
@@ -131,7 +76,7 @@ Item {
             compare(coordinator.activeOwner, "wave")
             verify(host.session().visible)
 
-            tryCompare(launcherHost, "phase", "open", 1600)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
             tryVerify(function() { return host.page().searchField.activeFocus }, 300)
         }
 
@@ -145,8 +90,8 @@ Item {
         }
 
         function test_crossOwnerSwitchFromLauncherToSettingsPreservesOwnership() {
-            verify(host.requestLauncher(opener))
-            tryCompare(launcherHost, "phase", "open", 1600)
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
 
             verify(coordinator.request("settings", alternateOpener))
             compare(closeSpy.count, 1)
@@ -181,8 +126,8 @@ Item {
         }
 
         function test_pendingTargetCanBeReplacedWhileClosing() {
-            verify(host.requestLauncher(opener))
-            tryCompare(launcherHost, "phase", "open", 1600)
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
 
             coordinator.request("settings", opener)
             verify(coordinator.transitioning)
@@ -202,8 +147,8 @@ Item {
         }
 
         function test_activeOwnerMayCloseItselfAndRestoresOpener() {
-            verify(host.requestLauncher(opener))
-            tryCompare(launcherHost, "phase", "open", 1600)
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
 
             coordinator.ownerClosed("wave")
             compare(coordinator.activeTarget, "")
@@ -212,7 +157,7 @@ Item {
         }
 
         function test_alreadyOpenActivationRefocusesCurrentSearchSession() {
-            verify(host.requestLauncher(opener))
+            launcherSurface.requestOpen(opener)
             tryVerify(function() { return host.page().searchField.activeFocus }, 300)
 
             keyClick(Qt.Key_F)
@@ -220,7 +165,7 @@ Item {
             host.forceActiveFocus()
             verify(!host.page().searchField.activeFocus)
 
-            verify(host.requestLauncher(alternateOpener))
+            launcherSurface.requestOpen(alternateOpener)
 
             // Same live instance: no second open, query preserved, search refocused.
             compare(openSpy.count, 1)
@@ -230,29 +175,136 @@ Item {
         }
 
         function test_serviceToggleClosesSurfaceThroughCoordinatorAndRestoresOpener() {
-            verify(host.requestLauncher(opener))
-            tryCompare(launcherHost, "phase", "open", 1600)
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
 
             host.session().toggle()
 
             compare(closeSpy.count, 1)
             compare(closeSpy.signalArguments[0][0], "wave")
-            tryCompare(launcherHost, "phase", "closed", 800)
+            tryCompare(launcherSurface.host, "phase", "closed", 800)
             compare(host.session().visible, false)
             compare(coordinator.activeTarget, "")
             verify(opener.activeFocus)
         }
 
         function test_escapeClosesThroughTheShellHandOffAndRestoresOpener() {
-            verify(host.requestLauncher(opener))
+            launcherSurface.requestOpen(opener)
             tryVerify(function() { return host.page().searchField.activeFocus }, 300)
 
             keyClick(Qt.Key_Escape)
 
-            tryCompare(launcherHost, "phase", "closed", 800)
+            tryCompare(launcherSurface.host, "phase", "closed", 800)
             compare(host.session().visible, false)
             compare(coordinator.activeTarget, "")
             verify(opener.activeFocus)
+        }
+
+        function test_queuedLauncherAfterSettingsFocusesOnlyOnceActuallyOpen() {
+            // Settings owns the coordinator first.
+            verify(coordinator.request("settings", alternateOpener))
+            compare(openSpy.signalArguments[0][0], "settings")
+
+            // An IPC-style open while settings is active queues behind its close.
+            host.session().open()
+
+            compare(coordinator.transitioning, true)
+            compare(coordinator.pendingTarget, "launcher")
+            // Yield so any premature focus attempt would have run by now;
+            // focus must stay out of the not-yet-opened surface.
+            wait(60)
+            verify(!host.page().searchField.activeFocus)
+
+            coordinator.ownerClosed("settings")
+
+            compare(openSpy.signalArguments[1][0], "wave")
+            compare(openSpy.signalArguments[1][1], "launcher")
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            // Search lands only after the wave actually opened.
+            tryVerify(function() { return host.page().searchField.activeFocus }, 300)
+        }
+
+        function test_reopenDuringCloseRecallsSameInstanceAndRefocuses() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+
+            keyClick(Qt.Key_Escape)
+            compare(launcherSurface.host.phase, "closing")
+            compare(coordinator.activeTarget, "launcher")
+
+            // Newest open intent arrives while the close animation still runs.
+            launcherSurface.requestOpen(alternateOpener)
+
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            compare(coordinator.activeTarget, "launcher")
+            verify(host.session().visible)
+            compare(closeSpy.count, 0)
+            tryVerify(function() { return host.page().searchField.activeFocus }, 300)
+
+            // The recalled request owns focus restoration from here on.
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "phase", "closed", 800)
+            tryVerify(function() { return alternateOpener.activeFocus })
+        }
+
+        function test_rapidToggleDuringCloseRestoresLauncher() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+
+            keyClick(Qt.Key_Escape)
+            compare(launcherSurface.host.phase, "closing")
+
+            // Hide intent mid-close: no animation restart, close keeps running.
+            host.session().toggle()
+            compare(host.session().visible, false)
+            compare(launcherSurface.host.phase, "closing")
+
+            // The newest toggle wins: the very same instance is recalled.
+            host.session().toggle()
+            compare(host.session().visible, true)
+
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            verify(host.session().visible)
+            tryVerify(function() { return host.page().searchField.activeFocus }, 300)
+        }
+
+        function test_launcherRecallCancelsQueuedHandOffToSettings() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+
+            // Start a serialized switch away to settings...
+            verify(coordinator.request("settings", alternateOpener))
+            verify(coordinator.transitioning)
+            compare(coordinator.pendingTarget, "settings")
+            compare(launcherSurface.host.phase, "closing")
+
+            // ...then recall the launcher before the close finishes: latest wins.
+            launcherSurface.requestOpen(alternateOpener)
+
+            verify(!coordinator.transitioning)
+            compare(coordinator.pendingTarget, "")
+            compare(coordinator.activeTarget, "launcher")
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            verify(host.session().visible)
+
+            for (var i = 0; i < openSpy.count; i++)
+                verify(openSpy.signalArguments[i][0] !== "settings",
+                       "superseded settings hand-off must never dispatch")
+        }
+
+        function test_staleQueuedLauncherIsCancelledWhenSessionHides() {
+            verify(coordinator.request("settings", alternateOpener))
+
+            host.session().open()
+            compare(coordinator.pendingTarget, "launcher")
+
+            host.session().close()
+
+            compare(coordinator.pendingTarget, "")
+            verify(coordinator.transitioning)
+            coordinator.ownerClosed("settings")
+            compare(coordinator.activeTarget, "")
+            compare(openSpy.count, 1)
         }
     }
 }
