@@ -1,10 +1,13 @@
-// Pure bass-onset BPM estimation over cava spectrum frames.
+// Bass-onset pulse + autocorrelation BPM estimation over cava spectrum frames.
 // No QML dependencies — operates on plain arrays and numbers.
 //
-// Feed one frame per cava frame (values 0..1, lowest bar first). The tracker
-// watches the low-frequency bars, fires an onset when energy spikes above an
-// adaptive threshold, and derives BPM from the median of recent inter-beat
-// intervals with half/double tempo folding into a musical range.
+// Two signals come out of the same frame stream:
+// - beat pulse: adaptive-threshold bass onset, drives `pulse` and the beat
+//   return value (visual accents).
+// - bpm: an onset-strength envelope is accumulated over ~8 seconds and a
+//   normalized autocorrelation over musically relevant lags picks the dominant
+//   tempo. Integrating over time makes the readout far more stable than
+//   per-beat interval medians, which break on a single missed/false onset.
 
 var defaultOptions = {
     // Bars counted as "bass" (cava log-spaces 50..12000Hz over 24 bars,
@@ -16,14 +19,24 @@ var defaultOptions = {
     minEnergy: 0.08,
     // Frames between accepted onsets (~267ms at 30fps -> caps ~225 BPM).
     minGapFrames: 8,
-    // Inter-beat intervals kept for median BPM estimation.
-    intervalHistory: 12,
-    // Intervals outside this window (seconds) are discarded as spurious.
-    minIntervalSeconds: 0.25,
-    maxIntervalSeconds: 2.0,
-    // Folded BPM is clamped into this range.
-    minBpm: 70,
-    maxBpm: 180
+
+    // --- autocorrelation tempo estimation ---
+    // Envelope history kept for analysis (frames). At 30fps this is ~8s,
+    // which gives several periods of support across the whole band.
+    envelopeLength: 240,
+    // Perceived tapping tempo lives mostly in 80..170 BPM; searching only
+    // that band sidesteps octave ambiguity (a true 180 would otherwise fight
+    // its own 90 subharmonic whenever kick/snare alternate in strength).
+    // Tempi outside the band report their nearest in-band metrical relative.
+    minBpmSearch: 80,
+    maxBpmSearch: 170,
+    // Recompute tempo every N frames (~0.5s at 30fps) to bound CPU cost.
+    analyzeEveryFrames: 15,
+    // Need at least this many envelope frames before trusting an estimate.
+    minEnvelopeFrames: 90,
+    // Readout clamp (mirrors the search band).
+    minBpm: 80,
+    maxBpm: 170
 }
 
 function createTracker(options) {
@@ -34,18 +47,25 @@ function createTracker(options) {
         onsetRatio: typeof opts.onsetRatio === "number" ? opts.onsetRatio : defaultOptions.onsetRatio,
         minEnergy: typeof opts.minEnergy === "number" ? opts.minEnergy : defaultOptions.minEnergy,
         minGapFrames: typeof opts.minGapFrames === "number" ? opts.minGapFrames : defaultOptions.minGapFrames,
-        intervalHistory: typeof opts.intervalHistory === "number" ? opts.intervalHistory : defaultOptions.intervalHistory,
-        minIntervalSeconds: typeof opts.minIntervalSeconds === "number" ? opts.minIntervalSeconds : defaultOptions.minIntervalSeconds,
-        maxIntervalSeconds: typeof opts.maxIntervalSeconds === "number" ? opts.maxIntervalSeconds : defaultOptions.maxIntervalSeconds,
+        envelopeLength: typeof opts.envelopeLength === "number" ? opts.envelopeLength : defaultOptions.envelopeLength,
+        minBpmSearch: typeof opts.minBpmSearch === "number" ? opts.minBpmSearch : defaultOptions.minBpmSearch,
+        maxBpmSearch: typeof opts.maxBpmSearch === "number" ? opts.maxBpmSearch : defaultOptions.maxBpmSearch,
+        analyzeEveryFrames: typeof opts.analyzeEveryFrames === "number" ? opts.analyzeEveryFrames : defaultOptions.analyzeEveryFrames,
+        minEnvelopeFrames: typeof opts.minEnvelopeFrames === "number" ? opts.minEnvelopeFrames : defaultOptions.minEnvelopeFrames,
         minBpm: typeof opts.minBpm === "number" ? opts.minBpm : defaultOptions.minBpm,
         maxBpm: typeof opts.maxBpm === "number" ? opts.maxBpm : defaultOptions.maxBpm,
 
         average: 0.0,
         variance: 0.0,
         framesSinceBeat: 0,
-        intervals: [],
+        pulse: 0,
+
+        envelope: [],
+        previousBass: 0,
+        frameCounter: 0,
         bpm: 0,
-        pulse: 0
+        pendingBpm: 0,
+        pendingCount: 0
     }
 }
 
@@ -64,29 +84,85 @@ function bassEnergy(tracker, values) {
     return weightSum > 0 ? sum / weightSum : 0
 }
 
-function foldBpm(bpm) {
-    var folded = bpm
-    var guard = 0
-    while (folded < defaultOptions.minBpm && guard < 8) {
-        folded *= 2
-        guard += 1
-    }
-    guard = 0
-    while (folded > defaultOptions.maxBpm && guard < 8) {
-        folded /= 2
-        guard += 1
-    }
-    if (folded < defaultOptions.minBpm || folded > defaultOptions.maxBpm)
+// Accept a raw estimate when it lands on the search band (parabolic
+// interpolation may overshoot the edge slightly); otherwise reject.
+function clampBpm(tracker, bpm) {
+    if (!(bpm > 0))
         return 0
-    return folded
+    if (bpm < tracker.minBpm * 0.97 || bpm > tracker.maxBpm * 1.03)
+        return 0
+    return Math.min(Math.max(bpm, tracker.minBpm), tracker.maxBpm)
 }
 
-function median(values) {
-    var sorted = values.slice().sort(function (a, b) { return a - b })
-    var mid = Math.floor(sorted.length / 2)
-    if (sorted.length % 2 === 1)
-        return sorted[mid]
-    return (sorted[mid - 1] + sorted[mid]) / 2
+// Half-wave rectified difference of bass energy — a classic onset envelope:
+// only rises count, so sustained bass does not smear the periodicity peak.
+function appendEnvelope(tracker, bass) {
+    var rise = bass - tracker.previousBass
+    tracker.previousBass = bass
+    tracker.envelope.push(rise > 0 ? rise : 0)
+    if (tracker.envelope.length > tracker.envelopeLength)
+        tracker.envelope.shift()
+}
+
+function autocorrAt(env, n, lag) {
+    var sum = 0
+    for (var t = lag; t < n; t++)
+        sum += env[t] * env[t - lag]
+    return sum
+}
+
+// Normalized autocorrelation of the onset envelope over the BPM search band.
+// Plain correlation: the band-limited search already removes octave fights,
+// and a harmonic boost only amplifies the fast side of every ambiguity.
+function estimateTempo(tracker) {
+    var env = tracker.envelope
+    var n = env.length
+    if (n < tracker.minEnvelopeFrames)
+        return 0
+
+    var minLag = Math.max(2, Math.floor(1800 / tracker.maxBpmSearch))
+    var maxLag = Math.min(n >> 1, Math.ceil(1800 / tracker.minBpmSearch))
+
+    var energy = 0
+    for (var e = 0; e < n; e++)
+        energy += env[e] * env[e]
+    if (energy <= 1e-9)
+        return 0
+
+    // Reject near-silent envelopes: without enough recent onset activity a
+    // lone stale rise must not produce a spurious peak from an empty window.
+    var activeRises = 0
+    for (var a = 0; a < n; a++)
+        if (env[a] > 0.02)
+            activeRises += 1
+    if (activeRises < 8)
+        return 0
+
+    var bestLag = -1
+    var bestScore = 0
+    for (var lag = minLag; lag <= maxLag; lag++) {
+        var score = autocorrAt(env, n, lag) / energy
+        if (score > bestScore) {
+            bestScore = score
+            bestLag = lag
+        }
+    }
+
+    if (bestLag < 0 || bestScore < 0.05)
+        return 0
+
+    // Parabolic interpolation around the peak for sub-lag resolution.
+    var refined = bestLag
+    if (bestLag > minLag && bestLag < maxLag) {
+        var rPrev = autocorrAt(env, n, bestLag - 1)
+        var rHere = autocorrAt(env, n, bestLag)
+        var rNext = autocorrAt(env, n, bestLag + 1)
+        var denom = rPrev - 2 * rHere + rNext
+        if (Math.abs(denom) > 1e-12)
+            refined = bestLag + 0.5 * (rPrev - rNext) / denom
+    }
+
+    return refined > 0 ? 1800.0 / refined : 0
 }
 
 // Consume one spectrum frame; returns true when an onset (beat) registered.
@@ -95,10 +171,42 @@ function feedFrame(tracker, values) {
     if (tracker.pulse < 0.01)
         tracker.pulse = 0
     tracker.framesSinceBeat += 1
+    tracker.frameCounter += 1
 
     var bass = bassEnergy(tracker, values)
+    appendEnvelope(tracker, bass)
 
-    // Adaptive baseline via exponential moving statistics.
+    // Periodic tempo re-analysis over the accumulated envelope. A candidate
+    // that disagrees with the current readout must persist for several
+    // analyses before it takes over, so one noisy window cannot flip the
+    // tempo, but a real track change still wins within ~2 seconds.
+    if (tracker.frameCounter % tracker.analyzeEveryFrames === 0) {
+        var raw = estimateTempo(tracker)
+        if (raw > 0) {
+            var folded = clampBpm(tracker, raw)
+            if (folded > 0) {
+                var agrees = tracker.bpm <= 0 || Math.abs(folded - tracker.bpm) / tracker.bpm < 0.08
+                if (agrees) {
+                    tracker.pendingBpm = 0
+                    tracker.pendingCount = 0
+                    tracker.bpm = tracker.bpm > 0 ? tracker.bpm * 0.6 + folded * 0.4 : folded
+                } else {
+                    if (Math.abs(folded - tracker.pendingBpm) / folded < 0.08)
+                        tracker.pendingCount += 1
+                    else
+                        tracker.pendingCount = 1
+                    tracker.pendingBpm = folded
+                    if (tracker.pendingCount >= 4) {
+                        tracker.bpm = folded
+                        tracker.pendingBpm = 0
+                        tracker.pendingCount = 0
+                    }
+                }
+            }
+        }
+    }
+
+    // Adaptive baseline via exponential moving statistics (onset gate only).
     var delta = bass - tracker.average
     tracker.average += delta * 0.12
     tracker.variance += (delta * delta - tracker.variance) * 0.12
@@ -110,45 +218,21 @@ function feedFrame(tracker, values) {
     if (!aboveThreshold || !gapOk)
         return false
 
-    var fired = false
-    if (tracker.framesSinceBeat > tracker.minGapFrames) {
-        // Fold the raw interval into the musical window (half/double tempo)
-        // so very fast or slow pulses still land inside the sane BPM band.
-        var seconds = tracker.framesSinceBeat * tracker.frameDuration
-        var guard = 0
-        while (seconds < tracker.minIntervalSeconds && guard < 8) {
-            seconds *= 2
-            guard += 1
-        }
-        guard = 0
-        while (seconds > tracker.maxIntervalSeconds && guard < 8) {
-            seconds /= 2
-            guard += 1
-        }
-        if (seconds >= tracker.minIntervalSeconds && seconds <= tracker.maxIntervalSeconds) {
-            tracker.intervals.push(seconds)
-            if (tracker.intervals.length > tracker.intervalHistory)
-                tracker.intervals.shift()
-            var estimated = foldBpm(60 / median(tracker.intervals))
-            if (estimated > 0) {
-                // Light smoothing keeps the readout stable between beats.
-                tracker.bpm = tracker.bpm > 0 ? tracker.bpm * 0.7 + estimated * 0.3 : estimated
-            }
-            fired = true
-        }
-    }
-
     tracker.framesSinceBeat = 0
     tracker.pulse = 1
-    return fired
+    return true
 }
 
-// Reset all adaptive state (track change / stream idle).
+// Reset all state (track change / stream idle).
 function resetTracker(tracker) {
     tracker.average = 0
     tracker.variance = 0
     tracker.framesSinceBeat = 0
-    tracker.intervals = []
-    tracker.bpm = 0
     tracker.pulse = 0
+    tracker.envelope = []
+    tracker.previousBass = 0
+    tracker.frameCounter = 0
+    tracker.bpm = 0
+    tracker.pendingBpm = 0
+    tracker.pendingCount = 0
 }
