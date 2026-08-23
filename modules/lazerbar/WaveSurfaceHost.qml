@@ -15,7 +15,6 @@ Item {
     property Item opener: null
     property string title: ""
     property string description: ""
-    property string breadcrumb: root.title !== "" ? "osu! / " + root.title : ""
     property var sidebarEntries: []
     property string activeSidebarId: ""
     property var palette: ({})
@@ -151,6 +150,8 @@ Item {
         }
 
         // Move the continuous body inside the fixed compositor-facing owner.
+        // The body uses the settings-panel surface hierarchy; the palette
+        // drives only the wave backdrop behind it.
         Rectangle {
             id: body
             z: 5
@@ -159,7 +160,7 @@ Item {
             width: parent.width
             height: root.height
             radius: 0
-            color: root.palette.body || "#282036"
+            color: LazerTheme.settingsPanel
             opacity: root.bodyProgress
 
             FullscreenHeader {
@@ -168,10 +169,16 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 title: root.title
-                breadcrumb: root.breadcrumb
                 description: root.description
-                palette: root.palette
                 onCloseRequested: root.close()
+            }
+
+            Rectangle {
+                anchors.top: header.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: LazerTheme.divider
             }
 
             FullscreenSidebar {
@@ -181,10 +188,18 @@ Item {
                 anchors.left: parent.left
                 entries: root.sidebarEntries
                 selected: root.activeSidebarId
-                palette: root.palette
                 railWidth: root.sidebarWidth
                 visible: root.sidebarEntries.length > 0
                 onSelectedChangedByUser: id => root.sidebarSelected(id)
+            }
+
+            // Hairline divider between the navigation rail and the content column.
+            Rectangle {
+                anchors.top: header.bottom
+                anchors.bottom: parent.bottom
+                anchors.left: sidebar.visible ? sidebar.right : parent.left
+                width: 1
+                color: LazerTheme.divider
             }
 
             Item {
@@ -204,8 +219,8 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     visible: root.loading
-                    color: root.palette.body || "#282036"
-                    Text { anchors.centerIn: parent; text: "Loading..."; color: root.palette.text || "white" }
+                    color: LazerTheme.settingsPanel
+                    Text { anchors.centerIn: parent; text: "Loading..."; color: LazerTheme.textMuted }
                 }
             }
         }

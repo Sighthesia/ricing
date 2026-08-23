@@ -142,7 +142,6 @@ Item {
         anchors.fill: parent
         title: root.page() ? root.page().title : "Launcher"
         description: root.page() ? root.page().description : ""
-        breadcrumb: "osu! / " + (root.page() ? root.page().title : "Launcher")
         sidebarEntries: root.page() ? root.page().sidebarEntries : []
         activeSidebarId: root.page() ? root.page().activeMode : "apps"
         palette: root.launcherPalette

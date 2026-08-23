@@ -1,37 +1,56 @@
 import QtQuick
 
-// Present osu-style page identity as a flat continuation of the overlay body.
+// Present page identity as a slim settings-panel title strip instead of an
+// osu hero header: rail surface, compact title, muted description, and a
+// sharp token-driven close affordance.
 Rectangle {
     id: root
     property string title: ""
     property string description: ""
-    property string breadcrumb: ""
-    property var palette: ({})
     signal closeRequested()
 
-    implicitHeight: 96
-    color: palette.header || "#7C4D9E"
+    implicitHeight: 48
+    color: LazerTheme.settingsRail
 
-    Column {
+    Row {
         anchors.left: parent.left
-        anchors.leftMargin: 34
+        anchors.leftMargin: 20
+        anchors.right: parent.right
+        anchors.rightMargin: 64
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
-        Text { text: root.breadcrumb; color: root.palette.muted || "#DDD"; font.pixelSize: 11 }
-        Text { text: root.title; color: root.palette.text || "white"; font.pixelSize: 27; font.bold: true }
-        Text { visible: text !== ""; text: root.description; color: root.palette.muted || "#DDD"; font.pixelSize: 12 }
+        spacing: 10
+
+        Text {
+            anchors.baseline: parent.children[1].baseline
+            text: root.title
+            color: LazerTheme.textPrimary
+            font.pixelSize: 14
+            font.bold: true
+        }
+
+        Text {
+            visible: text !== ""
+            text: root.description
+            color: LazerTheme.settingsNavInactive
+            font.pixelSize: 12
+        }
     }
 
     Rectangle {
         id: closeButton
-        width: 44; height: 44
-        anchors.right: parent.right; anchors.rightMargin: 24
+        width: 32; height: 32
+        anchors.right: parent.right; anchors.rightMargin: 16
         anchors.verticalCenter: parent.verticalCenter
-        radius: 22
-        color: closeHover.hovered ? "#32FFFFFF" : "#18FFFFFF"
-        Text { anchors.centerIn: parent; text: "x"; color: root.palette.text || "white"; font.pixelSize: 18; font.bold: true }
+        radius: 0
+        color: closeHover.hovered ? LazerTheme.hoverFill : "transparent"
+        scale: closePress.pressed ? MotionTokens.pressScale : 1
+        Behavior on scale {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        }
+        Text { anchors.centerIn: parent; text: "x"; color: LazerTheme.textMuted; font.pixelSize: 14 }
         HoverHandler { id: closeHover }
-        TapHandler { onTapped: root.closeRequested() }
+        TapHandler { id: closePress; onTapped: root.closeRequested() }
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 }

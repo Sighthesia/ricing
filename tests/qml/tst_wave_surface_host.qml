@@ -173,7 +173,7 @@ Item {
             verify(host.openRoute("launcher", opener))
             tryCompare(host, "phase", "open", 1600)
             compare(host.sidebar.visible, true)
-            mouseClick(host.sidebar, host.sidebar.width / 2, 18 + 42 + 2 + 21)
+            mouseClick(host.sidebar, host.sidebar.width / 2, 12 + 46 + 2 + 23)
             tryCompare(sidebarSpy, "count", 1)
             compare(sidebarSpy.signalArguments[0][0], "clipboard")
             compare(host.activeSidebarId, "apps")
