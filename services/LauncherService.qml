@@ -31,11 +31,19 @@ Singleton {
     readonly property int _desktopEntryCount: DesktopEntries.applications.values.length
 
     // Re-query apps when entries arrive while the launcher is already open,
-    // so an early open cannot strand the user on an empty result set.
-    on_DesktopEntryCountChanged: {
-        if (session.visible && session.mode === "apps" && !session.loading)
-            session.refresh()
+    // so an early open cannot strand the user on an empty result set. The
+    // scan reports every entry individually; coalesce the storm into one
+    // refresh instead of committing a growing pool per entry.
+    Timer {
+        id: entryScanRefreshTimer
+        interval: 400
+        repeat: false
+        onTriggered: {
+            if (session.visible && session.mode === "apps" && !session.loading)
+                session.refresh()
+        }
     }
+    on_DesktopEntryCountChanged: entryScanRefreshTimer.restart()
 
     // Quickshell-free session core (unit tested directly under qmltestrunner).
     LauncherSession {

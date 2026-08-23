@@ -60,6 +60,7 @@ QtObject {
         _refreshToken++
         root.visible = false
         root.query = ""
+        root._pooledMode = ""
         root.results = []
         root.loading = false
         root.error = ""
@@ -91,8 +92,10 @@ QtObject {
         // Text-only edits inside a pooled mode never re-hit the data source;
         // the pool already holds the full sorted set for this open session.
         if (parsed.mode === _pooledMode && parsed.text.length > 0 && displayPool.length > 0) {
-            root.results = LauncherLogic.filterResults(displayPool, parsed.text)
-            root.selectedIndex = LauncherLogic.clampSelection(0, root.results.length)
+            var previous = root.results
+            var filtered = LauncherLogic.filterResults(displayPool, parsed.text)
+            root.selectedIndex = LauncherLogic.preservedSelection(previous, root.selectedIndex, filtered)
+            root.results = filtered
             return
         }
 
@@ -117,10 +120,19 @@ QtObject {
             return
         }
         root.error = ""
-        root.displayPool = LauncherLogic.sortResults(outcome || [])
-        root._pooledMode = pooledMode
-        root.results = LauncherLogic.filterResults(root.displayPool, requestText)
-        root.selectedIndex = LauncherLogic.clampSelection(0, root.results.length)
+        // Keep the pooled array (and its live delegates) when a pull returns
+        // the same ordered ids, so redundant refreshes never rebuild the list.
+        var sorted = LauncherLogic.sortResults(outcome || [])
+        var poolStable = pooledMode === root._pooledMode
+                && LauncherLogic.poolMatches(sorted, root.displayPool)
+        var previous = root.results
+        if (!poolStable) {
+            root.displayPool = sorted
+            root._pooledMode = pooledMode
+        }
+        var filtered = LauncherLogic.filterResults(root.displayPool, requestText)
+        root.selectedIndex = LauncherLogic.preservedSelection(previous, root.selectedIndex, filtered)
+        root.results = filtered
     }
 
     function selectNext() {

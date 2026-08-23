@@ -294,6 +294,10 @@ Item {
     function _scheduleReleases() {
         if (resultsView.resultCount <= 0)
             return
+        // Incremental pool updates recreate nothing; only genuinely held
+        // rows (fresh sets) need a release schedule.
+        if (!root.entranceBusy && !root._anyRowHeld())
+            return
         if (root._firstFillPending) {
             root._firstFillPending = false
             root.playEntranceWave()
