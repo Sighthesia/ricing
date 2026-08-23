@@ -21,6 +21,9 @@ Singleton {
     signal beat()
 
     property var _beatTracker: BeatDetect.createTracker({})
+    // Debug logging for beat tracking, gated by AFLOAT_SPECTRUM_DEBUG=1.
+    readonly property bool _debugBeat: (Quickshell.env("AFLOAT_SPECTRUM_DEBUG") || "").trim() === "1"
+    property int _lastLoggedBpm: 0
     // Dockzone spectrum override — set by the active media widget.
     property real dockzoneHeightScale: 1.0
     property real dockzoneMaxHeightRatio: 1.0
@@ -143,6 +146,30 @@ Singleton {
         // Bass-onset BPM tracking rides the same frames as the visualizers.
         if (BeatDetect.feedFrame(root._beatTracker, buffer))
             root.beat()
+    }
+
+    // Debug beat log: one line per onset plus a line when the settled BPM
+    // readout moves by a whole BPM, so tempo drift stays visible.
+    onBeat: {
+        if (!root._debugBeat)
+            return
+
+        const bpm = root._beatTracker.bpm
+        const rounded = Math.round(bpm)
+        console.log("[afloat:SpectrumBeat]", JSON.stringify({
+            event: "beat",
+            bpm: Math.round(bpm * 10) / 10,
+            pulse: Math.round(root._beatTracker.pulse * 100) / 100,
+            bassAverage: Math.round(root._beatTracker.average * 1000) / 1000
+        }))
+        if (rounded !== root._lastLoggedBpm) {
+            root._lastLoggedBpm = rounded
+            console.log("[afloat:SpectrumBeat]", JSON.stringify({
+                event: "bpm-settle",
+                bpm: rounded,
+                intervals: root._beatTracker.intervals.length
+            }))
+        }
     }
 
     on_ShouldRunChanged: {
