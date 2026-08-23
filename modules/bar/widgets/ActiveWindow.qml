@@ -1,8 +1,10 @@
 import QtQuick
+import Quickshell
+import Quickshell.Widgets
 import "../../lazerbar"
 import "../../../services" as Services
 
-// Focused window title read straight from the compositor state.
+// Focused window title with app icon resolved from the compositor's active appId.
 Item {
     id: root
 
@@ -12,20 +14,51 @@ Item {
     property string section: ""
     property string screenName: ""
 
+    readonly property var widgetSettings: Services.SettingsService.widgetSettingsObject("active-window", root.instanceKey)
+    readonly property bool showIcon: widgetSettings ? widgetSettings.showIcon !== false : true
+    readonly property int maxTitleWidth: widgetSettings && widgetSettings.maxTitleWidth ? widgetSettings.maxTitleWidth : 200
+    readonly property int maxWidth: widgetSettings && widgetSettings.maxWidth ? widgetSettings.maxWidth : 240
+    readonly property string desktopLabel: widgetSettings && widgetSettings.desktopLabel && String(widgetSettings.desktopLabel).length > 0 ? String(widgetSettings.desktopLabel) : "桌面"
     readonly property string displayTitle:
-        Services.NiriService.activeTitle.length > 0 ? Services.NiriService.activeTitle : "桌面"
+        Services.NiriService.activeTitle.length > 0 ? Services.NiriService.activeTitle : root.desktopLabel
+    readonly property string activeAppId: Services.NiriService.activeAppId
+    readonly property bool hasWindow: Services.NiriService.activeTitle.length > 0 && root.activeAppId.length > 0
+    readonly property string iconSource: root.activeAppId.length > 0 ? Quickshell.iconPath(root.activeAppId, true) : ""
+    readonly property bool hasIcon: root.showIcon && root.hasWindow && root.iconSource !== ""
 
-    implicitWidth: Math.min(titleText.implicitWidth + 8, 240)
+    implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
 
-    Text {
-        id: titleText
+    Row {
+        id: contentRow
 
         anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(implicitWidth, parent.width)
-        text: root.displayTitle
-        color: LazerTheme.textPrimary
-        elide: Text.ElideRight
-        font.pixelSize: 13
+        anchors.left: parent.left
+        spacing: root.hasIcon ? 6 : 0
+
+        IconImage {
+            id: appIcon
+
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.hasIcon ? 16 : 0
+            height: 16
+            visible: root.hasIcon
+            source: root.iconSource
+            asynchronous: true
+            opacity: visible && status === Image.Ready ? 1 : 0
+
+            Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+        }
+
+        Text {
+            id: titleText
+
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(implicitWidth, root.maxTitleWidth)
+            text: root.displayTitle
+            color: LazerTheme.textPrimary
+            elide: Text.ElideRight
+            font.pixelSize: 13
+        }
     }
 }

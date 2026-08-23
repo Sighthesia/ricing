@@ -172,6 +172,7 @@ var DEFAULT_LAYOUT_MODEL = {
     widgets: [
         { id: "launcher", instanceKey: "launcher:0", section: "left", order: 0, enabled: true, source: "../../modules/bar/widgets/LauncherButton.qml" },
         { id: "active-window", instanceKey: "active-window:0", section: "left", order: 1, enabled: true, source: "../../modules/bar/widgets/ActiveWindow.qml" },
+        { id: "media", instanceKey: "media:0", section: "left", order: 2, enabled: true, source: "../../modules/bar/widgets/Media.qml" },
         { id: "workspaces", instanceKey: "workspaces:0", section: "center", order: 0, enabled: true, source: "../../modules/bar/widgets/Workspaces.qml" },
         { id: "tray", instanceKey: "tray:0", section: "right", order: 0, enabled: true, source: "../../modules/bar/widgets/Tray.qml" },
         { id: "volume", instanceKey: "volume:0", section: "right", order: 1, enabled: true, source: "../../modules/bar/widgets/Volume.qml" },
