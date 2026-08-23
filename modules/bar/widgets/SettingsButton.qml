@@ -18,7 +18,7 @@ BarPill {
     onClicked: SettingsOverlayBridge.requestOpen()
 
 
-    implicitWidth: 32
+    implicitWidth: LazerTheme.barWidgetHeight
 
 
     Image {

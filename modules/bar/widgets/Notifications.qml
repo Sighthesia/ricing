@@ -18,14 +18,14 @@ BarPill {
 
     onClicked: Services.NotificationService.dndEnabled = !root.dnd
 
-    implicitWidth: bellHost.width + 12
+    implicitWidth: LazerTheme.barWidgetHeight
 
     Item {
         id: bellHost
 
         anchors.centerIn: parent
-        width: LazerTheme.barGlyphSize + 2
-        height: LazerTheme.barGlyphSize + 2
+        width: LazerTheme.barWidgetHeight - 6
+        height: LazerTheme.barWidgetHeight - 6
 
         Image {
             anchors.centerIn: parent

@@ -35,8 +35,8 @@ Item {
 
                 readonly property bool hovered: hoverHandler.hovered
 
-                width: LazerTheme.barWidgetHeight - 8
-                height: LazerTheme.barWidgetHeight - 8
+                width: LazerTheme.barWidgetHeight
+                height: LazerTheme.barWidgetHeight
 
                 Rectangle {
                     anchors.fill: parent

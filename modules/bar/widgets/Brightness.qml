@@ -36,8 +36,8 @@ Item {
 
         Image {
             anchors.verticalCenter: parent.verticalCenter
-            width: LazerTheme.barGlyphSize - 6
-            height: LazerTheme.barGlyphSize - 6
+            width: LazerTheme.barGlyphSize - 4
+            height: LazerTheme.barGlyphSize - 4
             source: "../icons/brightness.svg"
             opacity: 0.9
         }

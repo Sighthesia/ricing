@@ -52,8 +52,8 @@ Item {
 
                 IconImage {
                     anchors.centerIn: parent
-                    width: LazerTheme.barGlyphSize - 4
-                    height: LazerTheme.barGlyphSize - 4
+                    width: LazerTheme.barGlyphSize
+                    height: LazerTheme.barGlyphSize
                     asynchronous: true
                     source: trayIcon.modelData.icon
                 }

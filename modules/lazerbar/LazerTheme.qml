@@ -57,13 +57,13 @@ QtObject {
     readonly property int groupGap: 12
     readonly property int inlineGap: 6
 
-    // osu toolbar widget metrics (ToolbarButton padding 3): hairline vertical
-    // gutters so glyphs dominate the live-configured bar height.
+    // osu toolbar widget metrics (ToolbarButton PADDING 3, icon 20 in HEIGHT 40):
+    // hairline vertical gutters, square buttons, glyphs at half the live bar height.
     readonly property int barWidgetGutter: 3
     readonly property int barLiveHeight:
         Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
     readonly property int barWidgetHeight: barLiveHeight - barWidgetGutter * 2
-    readonly property int barGlyphSize: Math.max(18, barWidgetHeight - 8)
+    readonly property int barGlyphSize: Math.max(16, Math.round(barLiveHeight * 0.5))
 
     // osu Nub and outlined control tokens shared by settings controls.
     readonly property real nubBorder: 3
