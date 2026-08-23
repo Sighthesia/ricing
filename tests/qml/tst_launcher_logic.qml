@@ -180,4 +180,27 @@ TestCase {
         verify(Logic.resultMatches(null, ""))
         verify(!Logic.resultMatches(null, "x"))
     }
+
+    function test_preservedSelectionKeepsSurvivorAndClampsOtherwise() {
+        var alpha = { id: "a", displayName: "Alpha" }
+        var beta = { id: "b", displayName: "Beta" }
+        var gamma = { id: "c", displayName: "Gamma" }
+
+        // Selected item still matches after the refilter.
+        compare(Logic.preservedSelection([alpha, beta], 1, [gamma, beta]), 1)
+        // Selected item vanished: old index clamps into the new bounds.
+        compare(Logic.preservedSelection([alpha, beta], 1, [gamma]), 0)
+        // No previous selection lands on the first row when results exist.
+        compare(Logic.preservedSelection([], -1, [alpha, beta]), 0)
+        compare(Logic.preservedSelection([alpha], 0, []), -1)
+    }
+
+    function test_poolMatchesComparesOrderedIds() {
+        var first = [{ id: "a" }, { id: "b" }]
+        verify(Logic.poolMatches(first, [{ id: "a" }, { id: "b" }]))
+        verify(!Logic.poolMatches(first, [{ id: "a" }, { id: "c" }]))
+        verify(!Logic.poolMatches(first, [{ id: "b" }, { id: "a" }]))
+        verify(!Logic.poolMatches(first, [{ id: "a" }]))
+        verify(!Logic.poolMatches(first, null))
+    }
 }

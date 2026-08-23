@@ -270,6 +270,50 @@ Item {
             compare(svc().results.length, 0)
         }
 
+        // --- pooled typing stability ---
+
+        function test_refilterKeepsSurvivingSelection() {
+            var apps = makeManualAdapter()
+            svc()._adapters = ({ apps: apps })
+
+            svc().open()
+            resolveRefresh(apps, 0, [
+                makeItem("alpha", "Alpha", 0, 0),
+                makeItem("beta", "Beta", 0, 0),
+                makeItem("gamma", "Gamma", 0, 0)
+            ])
+            compare(svc().selectedIndex, 0)
+
+            // Pick the third row, then narrow the query; the same item must
+            // stay selected instead of the highlight jumping back to top.
+            svc().selectNext()
+            svc().selectNext()
+            compare(svc().selectedIndex, 2)
+
+            svc().query = "gam"
+            compare(svc().results.length, 1)
+            compare(svc().results[svc().selectedIndex].id, "gamma")
+        }
+
+        function test_identicalPoolPullKeepsDisplayPoolIdentity() {
+            var apps = makeManualAdapter()
+            svc()._adapters = ({ apps: apps })
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
+            var stablePool = svc().displayPool
+
+            // Clearing text repulls the pool; identical contents must reuse
+            // the existing array so delegates never rebuild.
+            svc().query = "a"
+            svc().query = ""
+            resolveRefresh(apps, apps.pendingRefreshes.length - 1,
+                           [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
+
+            verify(svc().displayPool === stablePool)
+            compare(svc().results.length, 2)
+        }
+
         // --- keyboard contract ---
 
         function test_handleKeyFollowsKeyboardContract() {

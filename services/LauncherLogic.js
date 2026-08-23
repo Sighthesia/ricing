@@ -120,3 +120,31 @@ function resultMatches(item, text) {
               + String(item.description == null ? "" : item.description)
     return haystack.toLowerCase().indexOf(needle) >= 0
 }
+
+// Keeps the same item selected across a refilter when it still matches;
+// otherwise falls back to clamping the old index into the new bounds so a
+// vanished selection lands somewhere sane instead of always jumping to top.
+function preservedSelection(items, index, nextItems) {
+    var count = nextItems ? nextItems.length : 0
+    var wanted = index >= 0 && items && index < items.length ? identifierOf(items[index]) : ""
+    if (wanted !== "") {
+        for (var i = 0; i < count; i++)
+            if (identifierOf(nextItems[i]) === wanted)
+                return i
+    }
+    return clampSelection(index, count)
+}
+
+// Content equality by ordered ids: lets the session keep the same pooled
+// array (and therefore the same live delegates) when a pull returns data
+// identical to what is already rendered.
+function poolMatches(left, right) {
+    if (left === right)
+        return true
+    if (!left || !right || left.length !== right.length)
+        return false
+    for (var i = 0; i < left.length; i++)
+        if (identifierOf(left[i]) !== identifierOf(right[i]))
+            return false
+    return true
+}

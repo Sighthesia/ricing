@@ -50,6 +50,7 @@ Item {
     property bool revealHeld: false
     property bool snapTransitions: true
     readonly property bool geometryHeld: revealHeld || searchHidden
+    // Position-based reveal slot used by the page's entrance/refill waves.
     readonly property real entryExitDelay: Math.round(Math.min(150, Math.max(0, root.y / 6)))
     height: geometryHeld ? 0 : rowHeight + listGap
     visible: !geometryHeld || height > 0.5 || opacity > 0.01
@@ -57,26 +58,20 @@ Item {
     x: geometryHeld ? -8 : 0
     enabled: !geometryHeld
 
+    // Search-driven folds animate immediately and together; staggering here
+    // made every keystroke ripple the entire list (entrance stagger lives in
+    // the wave scheduler, not in these behaviors).
     Behavior on height {
         enabled: !MotionTokens.reducedMotion && !root.snapTransitions
-        SequentialAnimation {
-            PauseAnimation { duration: root.geometryHeld ? root.entryExitDelay : 0 }
-            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
-        }
+        NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
     }
     Behavior on opacity {
         enabled: !MotionTokens.reducedMotion && !root.snapTransitions
-        SequentialAnimation {
-            PauseAnimation { duration: root.geometryHeld ? root.entryExitDelay : 0 }
-            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
-        }
+        NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
     }
     Behavior on x {
         enabled: !MotionTokens.reducedMotion && !root.snapTransitions
-        SequentialAnimation {
-            PauseAnimation { duration: root.geometryHeld ? root.entryExitDelay : 0 }
-            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
-        }
+        NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
     }
 
     Timer {
