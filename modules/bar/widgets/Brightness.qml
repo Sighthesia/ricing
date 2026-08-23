@@ -58,7 +58,7 @@ Item {
             anchors.bottom: parent.bottom
             width: parent.width * root.level
             radius: 1.5
-            color: LazerTheme.textPrimary
+            color: LazerTheme.accentColor
 
             Behavior on width {
                 enabled: !MotionTokens.reducedMotion

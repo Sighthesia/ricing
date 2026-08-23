@@ -165,7 +165,7 @@ BarPill {
                 anchors.bottom: parent.bottom
                 height: parent.height * Services.MediaControlService.progress
                 radius: 1.5
-                color: LazerTheme.textPrimary
+                color: LazerTheme.accentColor
 
                 Behavior on height {
                     enabled: !MotionTokens.reducedMotion

@@ -64,7 +64,7 @@ BarPill {
             anchors.bottom: parent.bottom
             width: parent.width * root.level
             radius: 1.5
-            color: root.muted ? LazerTheme.textMuted : LazerTheme.textPrimary
+            color: root.muted ? Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.35) : LazerTheme.accentColor
 
             Behavior on width {
                 enabled: !MotionTokens.reducedMotion
