@@ -42,6 +42,8 @@ QtObject {
     readonly property int sliderTickBumpReturn: 220
     readonly property int clickFlashDuration: 800
     readonly property int clickFlashEasing: Easing.OutQuint
+    // Spectrum beat-wave sweep across its host surface.
+    readonly property int beatWave: 400
     readonly property int controlCommit: 120
     readonly property int tooltipIn: 120
     readonly property int tooltipOut: 160

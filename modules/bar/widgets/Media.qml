@@ -201,6 +201,20 @@ BarPill {
                 radius: 1.5
                 color: LazerTheme.accentColor
 
+                // Beat flash: brightness pulse riding the shared beatPulse
+                // decay, so the bar blinks once per detected beat.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 1.5
+                    color: LazerTheme.textPrimary
+                    opacity: MotionTokens.reducedMotion
+                        ? 0
+                        : Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity
+                    visible: opacity > 0.01
+
+                    Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                }
+
                 Behavior on height {
                     enabled: !MotionTokens.reducedMotion
                     NumberAnimation { duration: 220; easing.type: Easing.OutQuad }
@@ -305,10 +319,26 @@ BarPill {
 
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
 
+        function triggerWave() {
+            spectrumBars.triggerWave()
+        }
+
         DockzoneSpectrum {
+            id: spectrumBars
+
             anchors.fill: parent
             values: Services.SpectrumService.values
             barColor: Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.58)
+        }
+    }
+
+    // Each detected beat launches a highlight front sweeping the spectrum
+    // from its left edge, like a sound wave travelling through the bars.
+    Connections {
+        target: Services.SpectrumService
+
+        function onBeat() {
+            spectrumBg.triggerWave()
         }
     }
 
