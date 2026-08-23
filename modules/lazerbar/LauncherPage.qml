@@ -549,7 +549,7 @@ Item {
 
             Repeater {
                 id: resultsRepeater
-                model: root.session && root.session.results ? root.session.results : []
+                model: root.session && root.session.displayPool ? root.session.displayPool : []
 
                 delegate: LauncherResultRow {
                     required property var modelData
