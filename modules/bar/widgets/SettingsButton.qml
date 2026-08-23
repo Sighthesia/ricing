@@ -13,7 +13,9 @@ BarPill {
     property string section: ""
     property string screenName: ""
 
-    onClicked: Services.IslandService.showSettingsCenter()
+    // Route through the shared bridge so the overlay owner window opens the
+    // panel on whichever screen owns this bar instance.
+    onClicked: Services.SettingsOverlayBridge.requestOpen()
 
     implicitWidth: 32
 

@@ -7,11 +7,19 @@ QtObject {
     signal dropdownRequested(var choiceItem)
     signal dropdownDismissed(var choiceItem)
 
+    // Open intent from anywhere outside the overlay owner (bar gear button,
+    // IPC); the owning window listens and routes through its coordinator.
+    signal openRequested()
+
     function showDropdown(choiceItem) {
         dropdownRequested(choiceItem)
     }
 
     function hideDropdown(choiceItem) {
         dropdownDismissed(choiceItem)
+    }
+
+    function requestOpen() {
+        openRequested()
     }
 }
