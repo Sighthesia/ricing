@@ -3,7 +3,6 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "spectrum/BeatClock.js" as BeatClock
 
 // Provide shared PipeWire spectrum data for lightweight background visualizers.
 Singleton {
@@ -14,9 +13,8 @@ Singleton {
     property var values: []
     property bool isIdle: true
 
-    // Beat tracking (aubio bridge over the default monitor). The clock is a
-    // plain JS object, so its fields carry no change notifications — these
-    // mirrors are assigned explicitly to make the values reactive for QML.
+    // Beat tracking (aubio bridge over the default monitor), mirroring
+    // caelestia's approach: pass aubio's own get_bpm straight through.
     readonly property real bpm: _reportedBpm
     // Decaying 0..1 beat pulse for visual accents; spikes to 1 on each beat.
     readonly property real beatPulse: _reportedPulse
@@ -24,10 +22,6 @@ Singleton {
 
     property real _reportedBpm: 0
     property real _reportedPulse: 0
-    property var _beatClock: BeatClock.createClock({})
-    // Debug logging for beat tracking, gated by AFLOAT_SPECTRUM_DEBUG=1.
-    readonly property bool _debugBeat: (Quickshell.env("AFLOAT_SPECTRUM_DEBUG") || "").trim() === "1"
-    property int _lastLoggedBpm: 0
     // Dockzone spectrum override — set by the active media widget.
     property real dockzoneHeightScale: 1.0
     property real dockzoneMaxHeightRatio: 1.0
@@ -169,29 +163,11 @@ Singleton {
         if (!isFinite(timestamp) || timestamp < 0)
             return
 
-        const bpm = BeatClock.feedBeat(root._beatClock, timestamp)
+        // Caelestia-style passthrough: trust aubio's own tempo estimate.
+        const bpm = Number(payload.bpm)
+        root._reportedBpm = isFinite(bpm) && bpm > 0 ? bpm : root._reportedBpm
         root._reportedPulse = 1
         root.beat()
-
-        if (!root._debugBeat)
-            return
-
-        const confidence = Number(payload.conf)
-        const rounded = Math.round(bpm)
-        console.log("[afloat:SpectrumBeat]", JSON.stringify({
-            event: "beat",
-            t: Math.round(timestamp * 1000) / 1000,
-            bpm: Math.round(bpm * 10) / 10,
-            conf: isFinite(confidence) ? confidence : -1,
-            intervals: root._beatClock.intervals.length
-        }))
-        if (rounded !== root._lastLoggedBpm) {
-            root._lastLoggedBpm = rounded
-            console.log("[afloat:SpectrumBeat]", JSON.stringify({
-                event: "bpm-settle",
-                bpm: rounded
-            }))
-        }
     }
 
     on_ShouldRunChanged: {
@@ -202,9 +178,7 @@ Singleton {
         }
 
         if (root._shouldRun && !beatProcess.running) {
-            BeatClock.resetClock(root._beatClock)
             root._reportedBpm = 0
-            root._lastLoggedBpm = 0
             beatProcess.running = true
         } else if (!root._shouldRun && beatProcess.running) {
             beatProcess.running = false
@@ -283,7 +257,6 @@ Singleton {
 
         onExited: {
             root._reportedPulse = 0
-            BeatClock.resetClock(root._beatClock)
             root._reportedBpm = 0
         }
     }
