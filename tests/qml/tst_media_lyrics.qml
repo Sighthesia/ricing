@@ -334,4 +334,42 @@ TestCase {
         }, 1000)
         compare(Services.MediaControlService.showCompactLyric, true)
     }
+
+    function test_track_switch_clears_previous_song_lyrics_when_player_lags() {
+        resetState()
+
+        // Old song latched with original + translated lines displayed.
+        Services.MediaService._activePlayerRef = makePlayer(0)
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.NeteaseWebLyricsService.songId = "1"
+        Services.NeteaseWebLyricsService.title = "Song"
+        Services.NeteaseWebLyricsService.artist = "Artist"
+        Services.NeteaseWebLyricsService.currentLyric = "Old line"
+        Services.NeteaseWebLyricsService.currentTranslatedLyric = "旧歌词"
+        Services.NeteaseWebLyricsService.hasLyrics = true
+        Services.MediaControlService._refreshLyricsSession()
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactPrimaryLyric === "旧歌词"
+        }, 1000)
+
+        // Web source switches songs first; MPRIS metadata still reports the
+        // old track, which used to mask the session change and inherit the
+        // previous song's lyric lines into the new one.
+        Services.NeteaseWebLyricsService._applyPayload({
+            songId: "2",
+            title: "New Song",
+            artist: "New Artist",
+            playbackState: "playing",
+            positionMs: 0,
+            durationMs: 5000
+        })
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactPrimaryLyric !== "旧歌词"
+                && Services.MediaControlService.compactTranslatedLyric === ""
+                && Services.MediaControlService.compactOriginalLyric !== "Old line"
+        }, 1000)
+        compare(Services.MediaControlService.showCompactLyric, true)
+    }
 }

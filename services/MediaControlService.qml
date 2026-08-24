@@ -34,6 +34,7 @@ Singleton {
     property bool _lyricsSourceLatched: false
     property string _latchedLyricsSessionKey: ""
     property string _latchedPlayerTrackKey: ""
+    property string _latchedSourceTrackKey: ""
     property string _stableCurrentLyric: ""
     property string _stableNextLyric: ""
     property string _stableCurrentTranslatedLyric: ""
@@ -266,6 +267,7 @@ Singleton {
         root._lyricsSourceLatched = false
         root._latchedLyricsSessionKey = ""
         root._latchedPlayerTrackKey = ""
+        root._latchedSourceTrackKey = ""
         root._clearStableLyrics()
     }
 
@@ -320,22 +322,36 @@ Singleton {
     function _refreshLyricsSession() {
         const sessionKey = root._lyricsSessionKey
         const playerTrackKey = root._playerTrackKey
+        const sourceTrackKey = root._lyricsMetadataKey
         const currentTrackMatchesLatched = root._trackKeysMatch(playerTrackKey, root._latchedPlayerTrackKey)
         const hasStableLyrics = root.hasLyrics || root._hasStableLyricsCache()
         const lyricsSessionChanged = sessionKey !== "" && root._latchedLyricsSessionKey !== ""
             && sessionKey !== root._latchedLyricsSessionKey
         const playerTrackChanged = playerTrackKey !== "" && root._latchedPlayerTrackKey !== ""
             && !root._trackKeysMatch(playerTrackKey, root._latchedPlayerTrackKey)
-        const shouldIgnoreSessionKeyChurn = lyricsSessionChanged && currentTrackMatchesLatched
+        // The lyric source's own track identity is authoritative: when it
+        // changes, the song switched even if the player's metadata key lags
+        // behind and would otherwise mask the session churn.
+        const sourceTrackChanged = sourceTrackKey !== "" && root._latchedSourceTrackKey !== ""
+            && !root._trackKeysMatch(sourceTrackKey, root._latchedSourceTrackKey)
+        // An id-keyed session change is an authoritative track switch even
+        // if the player's metadata key lags behind the web source.
+        const sessionIdChanged = lyricsSessionChanged
+            && sessionKey.indexOf("id:") === 0
+            && root._latchedLyricsSessionKey.indexOf("id:") === 0
+        const shouldIgnoreSessionKeyChurn = lyricsSessionChanged && !sessionIdChanged
+            && currentTrackMatchesLatched
             && hasStableLyrics && root._lyricsSignalActive
 
-        if ((lyricsSessionChanged && !shouldIgnoreSessionKeyChurn) || playerTrackChanged)
+        if ((lyricsSessionChanged && !shouldIgnoreSessionKeyChurn) || playerTrackChanged || sourceTrackChanged)
             root._resetLyricsLatch()
 
         if (sessionKey !== "")
             root._latchedLyricsSessionKey = sessionKey
         if (playerTrackKey !== "")
             root._latchedPlayerTrackKey = playerTrackKey
+        if (sourceTrackKey !== "")
+            root._latchedSourceTrackKey = sourceTrackKey
 
         // No-lyric fallback is the bare title: never join the artist with
         // " · " on the primary row.
@@ -392,11 +408,27 @@ Singleton {
         root._updateCompactDisplayedLyric()
     }
 
-    onCurrentLyricChanged: root._updateCompactDisplayedLyric()
-    onNextLyricChanged: root._updateCompactDisplayedLyric()
-    onCurrentTranslatedLyricChanged: root._updateCompactDisplayedLyric()
-    onNextTranslatedLyricChanged: root._updateCompactDisplayedLyric()
-    onHasLyricsChanged: root._updateCompactDisplayedLyric()
+    // Coalesce refreshes onto the next event-loop turn: a track switch
+    // arrives as a burst of property writes (songId, title, artist, lyric
+    // window), and evaluating mid-batch would refill the stable caches from
+    // half-updated values and resurrect the previous song's lines.
+    function _scheduleLyricsRefresh() {
+        lyricsRefreshCoalescer.restart()
+    }
+
+    Timer {
+        id: lyricsRefreshCoalescer
+
+        interval: 0
+        repeat: false
+        onTriggered: root._refreshLyricsSession()
+    }
+
+    onCurrentLyricChanged: root._scheduleLyricsRefresh()
+    onNextLyricChanged: root._scheduleLyricsRefresh()
+    onCurrentTranslatedLyricChanged: root._scheduleLyricsRefresh()
+    onNextTranslatedLyricChanged: root._scheduleLyricsRefresh()
+    onHasLyricsChanged: root._scheduleLyricsRefresh()
 
     Timer {
         id: lyricsSourceTimer
@@ -419,26 +451,26 @@ Singleton {
     Connections {
         target: Services.MediaService
 
-        function onTitleChanged() { root._refreshLyricsSession() }
-        function onArtistChanged() { root._refreshLyricsSession() }
-        function onPlaybackStateChanged() { root._refreshLyricsSession() }
-        function onHasPlayerChanged() { root._refreshLyricsSession() }
+        function onTitleChanged() { root._scheduleLyricsRefresh() }
+        function onArtistChanged() { root._scheduleLyricsRefresh() }
+        function onPlaybackStateChanged() { root._scheduleLyricsRefresh() }
+        function onHasPlayerChanged() { root._scheduleLyricsRefresh() }
     }
 
     Connections {
         target: Services.NeteaseWebLyricsService
 
-        function onSongIdChanged() { root._refreshLyricsSession() }
-        function onTitleChanged() { root._refreshLyricsSession() }
-        function onArtistChanged() { root._refreshLyricsSession() }
-        function onActiveChanged() { root._refreshLyricsSession() }
-        function onHasLyricsChanged() { root._refreshLyricsSession() }
-        function onRawLyricChanged() { root._refreshLyricsSession() }
-        function onTranslatedLyricChanged() { root._refreshLyricsSession() }
-        function onCurrentLyricChanged() { root._refreshLyricsSession() }
-        function onNextLyricChanged() { root._refreshLyricsSession() }
-        function onCurrentTranslatedLyricChanged() { root._refreshLyricsSession() }
-        function onNextTranslatedLyricChanged() { root._refreshLyricsSession() }
-        function onPlaybackStateChanged() { root._refreshLyricsSession() }
+        function onSongIdChanged() { root._scheduleLyricsRefresh() }
+        function onTitleChanged() { root._scheduleLyricsRefresh() }
+        function onArtistChanged() { root._scheduleLyricsRefresh() }
+        function onActiveChanged() { root._scheduleLyricsRefresh() }
+        function onHasLyricsChanged() { root._scheduleLyricsRefresh() }
+        function onRawLyricChanged() { root._scheduleLyricsRefresh() }
+        function onTranslatedLyricChanged() { root._scheduleLyricsRefresh() }
+        function onCurrentLyricChanged() { root._scheduleLyricsRefresh() }
+        function onNextLyricChanged() { root._scheduleLyricsRefresh() }
+        function onCurrentTranslatedLyricChanged() { root._scheduleLyricsRefresh() }
+        function onNextTranslatedLyricChanged() { root._scheduleLyricsRefresh() }
+        function onPlaybackStateChanged() { root._scheduleLyricsRefresh() }
     }
 }
