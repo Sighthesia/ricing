@@ -510,6 +510,12 @@ Singleton {
         if (Date.now() - root._lastUpdateMs <= root._staleTimeoutMs)
             return
 
+        // A paused session legitimately stops emitting payloads (the page
+        // script dedupes unchanged state), so silence alone must not wipe a
+        // loaded song. Only a stopped/stale-while-playing session expires.
+        if (root.playbackState === "paused")
+            return
+
         root._resetState()
     }
 

@@ -287,12 +287,15 @@ Singleton {
         const isTranslatedTrack = trackPrefix === "translated"
         const currentServiceValue = isTranslatedTrack ? Services.NeteaseWebLyricsService.currentTranslatedLyric : Services.NeteaseWebLyricsService.currentLyric
         const displayedState = root._compactDisplayedState(trackPrefix)
+        // Both tracks share the stable-cache fallback: a transiently empty
+        // service value (e.g. mid-refresh) must not drop the displayed line.
+        const stableFallback = isTranslatedTrack ? root._stableCurrentTranslatedLyric : root._stableCurrentLyric
 
         let desiredState = root._compactTrackDisplayState(
             trackPrefix,
             "current",
             isTranslatedTrack ? Services.NeteaseWebLyricsService.currentTranslatedLyricIndex : Services.NeteaseWebLyricsService.currentLyricIndex,
-            currentServiceValue === "" && !isTranslatedTrack && root._stableCurrentLyric !== "" ? root._stableCurrentLyric : currentServiceValue
+            currentServiceValue === "" && stableFallback !== "" ? stableFallback : currentServiceValue
         )
 
         if (desiredState.text === "") {
@@ -355,13 +358,8 @@ Singleton {
         // (don't use fallback, so secondary line stays blank)
         if (Services.NeteaseWebLyricsService.currentTranslatedLyric !== "")
             root._stableCurrentTranslatedLyric = Services.NeteaseWebLyricsService.currentTranslatedLyric
-        else
-            root._stableCurrentTranslatedLyric = ""
-            
         if (Services.NeteaseWebLyricsService.nextTranslatedLyric !== "")
             root._stableNextTranslatedLyric = Services.NeteaseWebLyricsService.nextTranslatedLyric
-        else
-            root._stableNextTranslatedLyric = ""
 
         if (!root._lyricsSignalActive && !(currentTrackMatchesLatched && hasStableLyrics)) {
             root._updateCompactDisplayedLyric()

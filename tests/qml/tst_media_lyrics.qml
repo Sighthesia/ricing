@@ -261,4 +261,77 @@ TestCase {
 
         compare(Services.MediaControlService.showCompactLyric, false)
     }
+
+    function test_paused_session_survives_stale_payload_silence() {
+        resetState()
+
+        Services.NeteaseWebLyricsService._applyPayload({
+            songId: "9",
+            title: "Song",
+            artist: "Artist",
+            playbackState: "paused",
+            positionMs: 1200,
+            durationMs: 5000,
+            rawLyric: "[00:00.00]Line one\n[00:01.00]Line two",
+            translatedLyric: "[00:01.00]第二行"
+        })
+        compare(Services.NeteaseWebLyricsService.playbackState, "paused")
+
+        // A paused page stops emitting payloads (signature dedupe); the
+        // loaded session must not be wiped by stale-silence detection.
+        Services.NeteaseWebLyricsService._lastUpdateMs = Date.now() - 60000
+        Services.NeteaseWebLyricsService._clearIfStale()
+
+        compare(Services.NeteaseWebLyricsService.songId, "9")
+        compare(Services.NeteaseWebLyricsService.currentLyric, "Line two")
+        compare(Services.NeteaseWebLyricsService.currentTranslatedLyric, "第二行")
+    }
+
+    function test_stale_silence_still_clears_stopped_session() {
+        resetState()
+
+        Services.NeteaseWebLyricsService._applyPayload({
+            songId: "8",
+            title: "Song",
+            artist: "Artist",
+            playbackState: "stopped",
+            positionMs: 1200,
+            durationMs: 5000,
+            rawLyric: "[00:00.00]Line one"
+        })
+
+        Services.NeteaseWebLyricsService._lastUpdateMs = Date.now() - 60000
+        Services.NeteaseWebLyricsService._clearIfStale()
+
+        compare(Services.NeteaseWebLyricsService.songId, "")
+        compare(Services.NeteaseWebLyricsService.currentLyric, "")
+    }
+
+    function test_compact_translated_line_survives_transient_service_gap() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.title = "Song"
+        Services.NeteaseWebLyricsService.artist = "Artist"
+        Services.NeteaseWebLyricsService.currentLyric = "Line one"
+        Services.NeteaseWebLyricsService.currentTranslatedLyric = "第一行"
+        Services.NeteaseWebLyricsService.nextLyric = "Line two"
+        Services.NeteaseWebLyricsService.nextTranslatedLyric = "第二行"
+        Services.NeteaseWebLyricsService.hasLyrics = true
+        Services.MediaControlService._refreshLyricsSession()
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactPrimaryLyric === "第一行"
+                && Services.MediaControlService.compactTranslatedLyric === "第一行"
+        }, 1000)
+
+        // Transient gap in the service's translated value must not drop the
+        // displayed translation back to the original line.
+        Services.NeteaseWebLyricsService.currentTranslatedLyric = ""
+
+        tryVerify(function() {
+            return Services.MediaControlService.compactTranslatedLyric === "第一行"
+                && Services.MediaControlService.compactOriginalLyric === "Line one"
+        }, 1000)
+        compare(Services.MediaControlService.showCompactLyric, true)
+    }
 }
