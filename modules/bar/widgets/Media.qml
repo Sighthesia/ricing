@@ -329,6 +329,11 @@ BarPill {
             anchors.fill: parent
             values: Services.SpectrumService.values
             barColor: Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.58)
+            // One sweep per beat interval: the front hits the far edge just
+            // as the next beat fires the next wave.
+            waveDuration: Services.SpectrumService.bpm > 0
+                ? Math.round(Math.max(240, Math.min(1200, 60000 / Services.SpectrumService.bpm)))
+                : MotionTokens.beatWave
         }
     }
 

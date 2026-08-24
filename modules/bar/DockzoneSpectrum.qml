@@ -12,6 +12,9 @@ Item {
     property var values: []
     // lazer accent (#765BFF) at 34% — caller may override for theming.
     property color barColor: Qt.rgba(0.462, 0.356, 1.0, 0.34)
+    // Sweep duration; callers derive it from the current BPM so a new wave
+    // launches right as the previous one reaches the far edge.
+    property int waveDuration: MotionTokens.beatWave
     // How far ahead of the front the brightness bump reaches.
     readonly property real waveWidth: Math.max(20, root.width * 0.16)
 
@@ -43,7 +46,7 @@ Item {
         property: "waveX"
         from: -root.waveWidth
         to: root.width + root.waveWidth
-        duration: MotionTokens.beatWave
+        duration: root.waveDuration > 0 ? root.waveDuration : MotionTokens.beatWave
         easing.type: Easing.OutQuad
     }
 
