@@ -55,7 +55,7 @@ Item {
         root.trackedTitle = root.displayTitle
         // Per-char fade-in entrance plus staggered falling ghost exit,
         // reusing the media pill's main-line contract via MarqueeLabel.
-        titleText.transitionFrom(previous)
+        titleText.transitionFrom(previous, root.displayTitle)
     }
 
     // Smooth width morph: title changes ease instead of snapping, so the

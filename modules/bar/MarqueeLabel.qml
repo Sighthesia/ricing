@@ -140,15 +140,14 @@ Item {
     property var _enterRow: null
 
     // Play the exit/enter choreography for a just-applied text change.
-    // Callers pass the previously displayed text because a live `text:`
-    // binding has already updated by the time any change handler runs.
-    function transitionFrom(oldText) {
-        if (oldText === "" || oldText === root.text)
-            return
-        if (MotionTokens.reducedMotion)
+    // Both texts are passed explicitly: a live `text:` binding may not have
+    // re-evaluated yet when the host's change handler runs, so root.text
+    // cannot be trusted as either value here.
+    function transitionFrom(oldText, newText) {
+        if (MotionTokens.reducedMotion || oldText === "" || oldText === newText)
             return
         spawnGhosts(oldText)
-        startCharEnter(root.text)
+        startCharEnter(newText)
     }
 
     // Ghost exit reuses OsuTextField's FallingDownContainer contract,
