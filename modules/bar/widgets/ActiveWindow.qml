@@ -5,7 +5,8 @@ import ".."
 import "../../lazerbar"
 import "../../../services" as Services
 
-// Focused window title with app icon resolved from the compositor's active appId.
+// Focused window icon with a two-line readout: window title on top,
+// application name underneath, mirroring the Media pill's text column.
 Item {
     id: root
 
@@ -24,6 +25,15 @@ Item {
         Services.NiriService.activeTitle.length > 0 ? Services.NiriService.activeTitle : root.desktopLabel
     readonly property string activeAppId: Services.NiriService.activeAppId
     readonly property bool hasWindow: Services.NiriService.activeTitle.length > 0 && root.activeAppId.length > 0
+    // Friendly app label: collapse reverse-DNS ids ("org.mozilla.firefox")
+    // down to their final segment so the sub-line reads like Media's artist.
+    readonly property string displayAppName: {
+        if (!root.hasWindow)
+            return ""
+        var id = root.activeAppId
+        var dot = id.lastIndexOf(".")
+        return dot >= 0 && dot < id.length - 1 ? id.substring(dot + 1) : id
+    }
     readonly property string iconSource: root.activeAppId.length > 0 ? Quickshell.iconPath(root.activeAppId, true) : ""
     readonly property bool hasIcon: root.showIcon && root.hasWindow && root.iconSource !== ""
 
@@ -44,30 +54,48 @@ Item {
         anchors.left: parent.left
         spacing: root.hasIcon ? 6 : 0
 
+        // Tray-sized app icon so both identity glyphs share one visual weight.
         IconImage {
             id: appIcon
 
             anchors.verticalCenter: parent.verticalCenter
-            width: root.hasIcon ? 16 : 0
-            height: 16
+            width: root.hasIcon ? LazerTheme.barGlyphSize : 0
+            height: LazerTheme.barGlyphSize
             visible: root.hasIcon
             source: root.iconSource
             asynchronous: true
+            backer.fillMode: Image.PreserveAspectFit
             opacity: visible && status === Image.Ready ? 1 : 0
 
             Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
         }
 
-        // Long titles marquee-scroll instead of being elided short.
-        MarqueeLabel {
-            id: titleText
+        Column {
+            id: textColumn
 
             anchors.verticalCenter: parent.verticalCenter
-            width: implicitWidth
-            text: root.displayTitle
-            textColor: LazerTheme.textPrimary
-            maxWidth: root.maxTitleWidth
-            pixelSize: 13
+            spacing: 1
+
+            // Primary line grows with content; once past the cap it clips
+            // and marquee-scrolls instead of being elided short.
+            MarqueeLabel {
+                id: titleText
+
+                text: root.displayTitle
+                textColor: LazerTheme.textPrimary
+                maxWidth: root.maxTitleWidth
+                pixelSize: 12
+                bold: true
+            }
+
+            // Sub-line shows the application name like Media's artist line.
+            MarqueeLabel {
+                text: root.displayAppName
+                visible: text.length > 0
+                maxWidth: root.maxTitleWidth
+                textColor: LazerTheme.textMuted
+                pixelSize: 10
+            }
         }
     }
 }
