@@ -207,20 +207,6 @@ Item {
             opacity: 0
             enabled: false
         }
-
-        // Keyboard-focus ring above everything, non-input.
-        Rectangle {
-            id: focusRing
-            z: 3
-            anchors.fill: parent
-            radius: 6
-            color: "transparent"
-            border.width: root.activeFocus ? 1.5 : 0
-            border.color: LazerTheme.settingsAccent
-            enabled: false
-            Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
-            Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
-        }
     }
 
     NumberAnimation {
