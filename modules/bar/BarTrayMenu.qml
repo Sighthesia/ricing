@@ -78,7 +78,6 @@ Rectangle {
                 model: root.entries
 
                 delegate: MenuEntryRow {
-                    entry: modelData
                     onOpenSubmenu: (entry, row) => {
                         root.submenuEntry = entry
                         root.submenuAnchorRow = row
@@ -136,7 +135,6 @@ Rectangle {
                        ? [...root.submenuEntry.children.values] : []
 
                 delegate: MenuEntryRow {
-                    entry: modelData
                     onTriggered: {
                         root.closeSubmenu()
                         Services.BarPopupService.close()
@@ -152,10 +150,13 @@ Rectangle {
     }
 
     // One DBus menu entry: separator hairline or an actionable lazer row.
+    // Required modelData keeps the Repeater's strict delegate mode happy;
+    // entry aliases it so rows read naturally.
     component MenuEntryRow: Item {
         id: entryRow
 
-        required property var entry
+        required property var modelData
+        readonly property var entry: modelData
         signal openSubmenu(var entry, Item row)
         signal closeSubmenu()
         signal triggered()
