@@ -63,14 +63,47 @@ Item {
         text: root.text
     }
 
-    // Marquee is fully state-driven: it runs only once the label is revealed
-    // (external choreography may hide it), and every cycle pins explicit
-    // from/to so x can never start stale.
+    // Marquee is sync-driven: every input change (text, reveal opacity, slot
+    // width) resets x to 0 and restarts against current geometry, so a shorter
+    // title can never leave the label parked outside the clip window and a
+    // mid-morph slot width can never leave stale from/to offsets.
+    function syncScroll() {
+        var shouldRun = root.overflowing && !MotionTokens.reducedMotion
+            && label.opacity >= 0.99 && clipSlot.width > 0
+        scroll.stop()
+        label.x = 0
+        if (shouldRun)
+            scroll.restart()
+    }
+
+    Component.onCompleted: syncScroll()
+    onTextChanged: syncScroll()
+
+    Connections {
+        target: label
+        function onOpacityChanged() { root.syncScroll() }
+    }
+
+    // Slot width changes per frame during the host pill's width morph; only
+    // resync once it settles so the scroll is not perpetually restarted.
+    Timer {
+        id: slotWidthSettle
+
+        interval: 240
+        onTriggered: root.syncScroll()
+    }
+
+    Connections {
+        target: clipSlot
+        function onWidthChanged() {
+            if (root.overflowing && !MotionTokens.reducedMotion)
+                slotWidthSettle.restart()
+        }
+    }
+
     SequentialAnimation {
         id: scroll
 
-        running: root.overflowing && !MotionTokens.reducedMotion
-            && label.opacity >= 0.99 && clipSlot.width > 0
         loops: Animation.Infinite
 
         PauseAnimation { duration: 1400 }
