@@ -29,7 +29,6 @@ BarPill {
                 : Services.MediaControlService.title
     // Width cap where dynamic growth stops and the title starts scrolling.
     readonly property int maxTextWidth: 300
-    readonly property bool titleOverflows: titleLabel.implicitWidth > maxTextWidth
     // Square cover region centered on the music glyph, translucent over text.
     readonly property int coverSize: LazerTheme.barGlyphSize + 10
     // Avoid inheriting previous cover when current track reports empty art.
@@ -59,46 +58,6 @@ BarPill {
     readonly property int lyricCharFadeTime: 140
     readonly property int lyricMaxChars: 48
     property var _enterRow: null
-    // [DEBUG-mce6] temporary probe, remove after diagnosis.
-    readonly property bool _mceDebug: (Quickshell.env("AFLOAT_MEDIA_DEBUG") || "") === "1"
-    property string _mceLast: ""
-    Timer {
-        id: _mceProbe
-        running: root._mceDebug
-        interval: 50
-        repeat: true
-        onTriggered: {
-            var texts = []
-            root._mceScan(root, texts)
-            var sig = texts.join("|")
-            if (sig !== root._mceLast) {
-                root._mceLast = sig
-                for (var i = 0; i < texts.length; i++)
-                    console.log("[DEBUG-mce6]", i, texts[i])
-                if (texts.length === 0)
-                    console.log("[DEBUG-mce6] no-texts n=" + root.children.length)
-            }
-        }
-    }
-
-    // [DEBUG-mce6] dump every Text: prefix|w|iw|x|elide|op
-    function _mceScan(item, acc) {
-        if (!item)
-            return
-        var kids = item.children || []
-        for (var i = 0; i < kids.length; i++) {
-            var c = kids[i]
-            if ("elide" in c && typeof c.text === "string" && c.text.length > 0) {
-                var t = String(c.text)
-                var head = ""
-                for (var k = 0; k < Math.min(6, t.length); k++)
-                    head += t.charCodeAt(k).toString(16) + ","
-                acc.push(t.length + ":" + head + "|" + c.width.toFixed(0) + "|" +
-                    c.implicitWidth.toFixed(0) + "|" + c.x.toFixed(1) + "|" + c.elide + "|" + c.opacity.toFixed(2))
-            }
-            root._mceScan(c, acc)
-        }
-    }
 
     // Spectrum registration — mirrors the old bar spectrum integration.
     readonly property string spectrumComponentId: "media:" + (root.instanceKey !== "" ? root.instanceKey : (root.widgetId !== "" ? root.widgetId : root.screenName))
@@ -155,15 +114,15 @@ BarPill {
         const oldText = root.trackedPrimaryText
         root.trackedPrimaryText = root.primaryText
         if (MotionTokens.reducedMotion) {
-            titleLabel.x = 0
-            titleLabel.opacity = 1
+            titleMarquee.label.x = 0
+            titleMarquee.label.opacity = 1
             return
         }
         // Reset marquee before spawning so ghosts start at the same origin
         // the new line fades in from. Never stop() the animation imperatively
         // — its running binding only re-evaluates on condition changes, so a
         // stop() between two overflowing lines would kill scrolling for good.
-        titleLabel.x = 0
+        titleMarquee.label.x = 0
         spawnLyricGhosts(oldText)
         startCharEnter(root.primaryText)
     }
@@ -173,36 +132,36 @@ BarPill {
             return
         var count = Math.min(oldText.length, root.lyricMaxChars)
         for (var i = 0; i < count; i++) {
-            ghostMetrics.font = titleLabel.font
+            ghostMetrics.font = titleMarquee.label.font
             ghostMetrics.text = oldText.slice(0, i)
-            lyricGhostComponent.createObject(ghostLayer, {
+            lyricGhostComponent.createObject(titleMarquee.overlay, {
                 text: oldText[i],
                 color: LazerTheme.textPrimary,
-                font: titleLabel.font,
+                font: titleMarquee.label.font,
                 x: ghostMetrics.advanceWidth,
                 y: 0,
                 opacity: 1,
                 delay: i * root.lyricCharStaggerExit,
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
-                fallDistance: Math.max(1, titleLabel.height) * root.lyricGhostFallDistanceScale
+                fallDistance: Math.max(1, titleMarquee.label.height) * root.lyricGhostFallDistanceScale
             })
         }
     }
 
     // Entrance renders per-character fade-ins on a temporary row while the
     // real label stays hidden; once the last char lands the row is retired
-    // and the (elide/marquee-capable) label takes over again.
+    // and the (marquee-capable) label takes over again.
     function startCharEnter(text) {
         if (root._enterRow) {
             root._enterRow.destroy()
             root._enterRow = null
         }
         if (text === "" || MotionTokens.reducedMotion) {
-            titleLabel.opacity = 1
+            titleMarquee.label.opacity = 1
             return
         }
-        titleLabel.opacity = 0
-        root._enterRow = enterRowComponent.createObject(titleSlot, { chars: text })
+        titleMarquee.label.opacity = 0
+        root._enterRow = enterRowComponent.createObject(titleMarquee.slot, { chars: text })
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
         enterGuard.restart()
@@ -217,8 +176,8 @@ BarPill {
                 root._enterRow.destroy()
                 root._enterRow = null
             }
-            titleLabel.opacity = 1
-            titleLabel.x = 0
+            titleMarquee.label.opacity = 1
+            titleMarquee.label.x = 0
         }
     }
 
@@ -344,85 +303,29 @@ BarPill {
 
             // Primary line grows with content; once past the cap it clips
             // and marquee-scrolls (static elide under reduced motion). Ghosts
-            // overlay this slot without clipping so they can fall past the pill.
-            Item {
-                id: titleContainer
-                width: Math.min(titleLabel.implicitWidth, root.maxTextWidth)
-                height: titleLabel.implicitHeight
-                clip: false
+            // ride the label's unclipped overlay so they can fall past the pill.
+            MarqueeLabel {
+                id: titleMarquee
 
-                Item {
-                    id: titleSlot
-                    anchors.fill: parent
-                    clip: true
-
-                    Text {
-                        id: titleLabel
-                        text: root.primaryText
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 12
-                        font.bold: true
-                        opacity: 1
-                        // Overflow state drives width/elide declaratively —
-                        // never key them off the animation's running flag.
-                        width: root.titleOverflows ? implicitWidth : Math.min(implicitWidth, root.maxTextWidth)
-                        elide: root.titleOverflows ? Text.ElideNone : Text.ElideRight
-                    }
-
-                    // Marquee is fully state-driven: it runs only once the
-                    // label is revealed (opacity settled), and every cycle
-                    // pins explicit from/to so x can never start stale.
-                    SequentialAnimation {
-                        id: titleScroll
-                        running: root.titleOverflows && !MotionTokens.reducedMotion
-                            && titleLabel.opacity >= 0.99 && titleSlot.width > 0
-                        loops: Animation.Infinite
-
-                        PauseAnimation { duration: 1400 }
-                        NumberAnimation {
-                            target: titleLabel
-                            property: "x"
-                            from: 0
-                            to: -(titleLabel.implicitWidth - titleSlot.width)
-                            duration: Math.max(2000, (titleLabel.implicitWidth - titleSlot.width) * 18)
-                            easing.type: Easing.Linear
-                        }
-                        PauseAnimation { duration: 1400 }
-                        NumberAnimation {
-                            target: titleLabel
-                            property: "x"
-                            from: -(titleLabel.implicitWidth - titleSlot.width)
-                            to: 0
-                            duration: Math.max(2000, (titleLabel.implicitWidth - titleSlot.width) * 18)
-                            easing.type: Easing.Linear
-                        }
-                    }
-                }
-
-                // Ghosts share the slot's origin but live outside the clip so
-                // the fall remains visible as it exits the pill.
-                Item {
-                    id: ghostLayer
-                    anchors.fill: parent
-                    clip: false
-                    z: 10
-                }
+                text: root.primaryText
+                maxWidth: root.maxTextWidth
+                textColor: LazerTheme.textPrimary
+                pixelSize: 12
+                bold: true
             }
+        }
 
-            Text {
-                width: Math.min(implicitWidth, root.maxTextWidth)
-                // While lyrics lead the primary line the sub-line carries
-                // "artist - song"; otherwise it stays the artist alone.
-                text: Services.MediaControlService.showCompactLyric
-                    ? Services.MediaControlService.artist
-                        + (Services.MediaControlService.title !== ""
-                            ? " - " + Services.MediaControlService.title : "")
-                    : Services.MediaControlService.artist
-                visible: text.length > 0
-                color: LazerTheme.textMuted
-                elide: Text.ElideRight
-                font.pixelSize: 10
-            }
+        // Sub-line follows the same contract: scroll instead of ellipsis.
+        MarqueeLabel {
+            text: Services.MediaControlService.showCompactLyric
+                ? Services.MediaControlService.artist
+                    + (Services.MediaControlService.title !== ""
+                        ? " - " + Services.MediaControlService.title : "")
+                : Services.MediaControlService.artist
+            visible: text.length > 0
+            maxWidth: root.maxTextWidth
+            textColor: LazerTheme.textMuted
+            pixelSize: 10
         }
     }
 
@@ -559,8 +462,8 @@ BarPill {
                 interval: Math.min(enterRow.chars.length, root.lyricMaxChars) * root.lyricCharStaggerEnter
                     + root.lyricCharFadeTime + MotionTokens.fast
                 onTriggered: {
-                    titleLabel.opacity = 1
-                    titleLabel.x = 0
+                    titleMarquee.label.opacity = 1
+                    titleMarquee.label.x = 0
                     if (root._enterRow === enterRow)
                         root._enterRow = null
                     enterRow.destroy()

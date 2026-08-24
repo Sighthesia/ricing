@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
+import ".."
 import "../../lazerbar"
 import "../../../services" as Services
 
@@ -50,15 +51,16 @@ Item {
             Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
         }
 
-        Text {
+        // Long titles marquee-scroll instead of being elided short.
+        MarqueeLabel {
             id: titleText
 
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(implicitWidth, root.maxTitleWidth)
+            width: implicitWidth
             text: root.displayTitle
-            color: LazerTheme.textPrimary
-            elide: Text.ElideRight
-            font.pixelSize: 13
+            textColor: LazerTheme.textPrimary
+            maxWidth: root.maxTitleWidth
+            pixelSize: 13
         }
     }
 }
