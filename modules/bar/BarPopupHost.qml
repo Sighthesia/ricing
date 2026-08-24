@@ -27,6 +27,7 @@ Item {
     readonly property alias activeSurfaceItem: surfaceLoader.item
     onPopupVisibleChanged: {
         if (popupVisible) {
+            reuseMorph = surfaceLoader.item !== null
             shownKind = Services.BarPopupService.kind
             shownPayload = Services.BarPopupService.payload
             frameAnchorX = Services.BarPopupService.anchorX
@@ -34,7 +35,9 @@ Item {
             deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
             deformAnimation.easing.type = Easing.OutQuint
             deformAnimation.to = 1
-            deformProgress = MotionTokens.reducedMotion ? 1 : 0
+            // Single-instance reuse: never rewind the deform -- a reopen
+            // mid-exit reverses seamlessly from wherever the retreat got to
+            // (fully closed already sits at 0, so a fresh open is unchanged).
             deformAnimation.restart()
         } else {
             // Exit mirrors the settings panel exactly: settingsSlide InQuad,
@@ -50,6 +53,9 @@ Item {
     // Single deform progress drives scale and slide; there is no opacity
     // animation -- occlusion by the bar window does the hiding.
     property real deformProgress: 0
+    // True when this open found a live instance to reuse (settled or
+    // mid-exit); reused instances may morph geometry instead of jumping.
+    property bool reuseMorph: false
 
     // Confirm a widget's leave-request once the pointer had a fair chance to
     // travel into the popup surface.
@@ -157,7 +163,8 @@ Item {
         // Retargets while fully open glide to their new frame instead of
         // teleporting; entrance/exit geometry stays unanimated so the
         // occlusion slide owns those phases.
-        readonly property bool morphReady: root.popupVisible && root.deformProgress >= 1
+        readonly property bool morphReady: root.popupVisible
+                && (root.deformProgress >= 1 || root.reuseMorph)
         Behavior on x {
             enabled: surfaceLoader.morphReady
             NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
