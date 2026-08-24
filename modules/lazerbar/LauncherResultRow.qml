@@ -122,6 +122,16 @@ Item {
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
+        // Selected background tint sits UNDER the rail, icon, and text so
+        // the focus highlight never washes out the content above it.
+        Rectangle {
+            anchors.fill: parent
+            radius: 6
+            color: root.selected ? LazerTheme.settingsSelected : "transparent"
+            enabled: false
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+
         // Icon rail background like the notification icon column.
         Rectangle {
             anchors.left: parent.left
@@ -138,7 +148,9 @@ Item {
             id: iconImage
             visible: root.iconSource.length > 0
             anchors.left: parent.left
-            anchors.leftMargin: 10
+            // (railWidth - iconSize) / 2 keeps the icon horizontally
+            // centered inside the 40px rail block.
+            anchors.leftMargin: 6
             anchors.verticalCenter: parent.verticalCenter
             width: 28
             height: 28

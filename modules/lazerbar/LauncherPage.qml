@@ -648,9 +648,10 @@ Item {
             objectName: "selectionFrame"
             z: 5
             radius: 6
-            // Translucent accent fill makes the sliding card itself visible
-            // mid-glide; a single moving element cannot crossfade-flicker.
-            color: LazerTheme.settingsSelected
+            // Border-only glide: the landing highlight lives in each row as
+            // a tint UNDER its content, so the moving frame never covers
+            // text or icons.
+            color: "transparent"
             border.width: root.selectionAnchor ? 1.5 : 0
             border.color: LazerTheme.settingsAccent
             enabled: false
