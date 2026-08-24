@@ -37,8 +37,26 @@ Item {
     readonly property string iconSource: root.activeAppId.length > 0 ? Quickshell.iconPath(root.activeAppId, true) : ""
     readonly property bool hasIcon: root.showIcon && root.hasWindow && root.iconSource !== ""
 
+    // Tracks the last choreographed title so the first render never plays
+    // the exit/enter transition for content that was never visible.
+    property string trackedTitle: ""
+
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
+
+    Component.onCompleted: root.trackedTitle = root.displayTitle
+
+    onDisplayTitleChanged: {
+        var previous = root.trackedTitle
+        if (previous === "" || root.displayTitle === previous) {
+            root.trackedTitle = root.displayTitle
+            return
+        }
+        root.trackedTitle = root.displayTitle
+        // Per-char fade-in entrance plus staggered falling ghost exit,
+        // reusing the media pill's main-line contract via MarqueeLabel.
+        titleText.transitionFrom(previous)
+    }
 
     // Smooth width morph: title changes ease instead of snapping, so the
     // Row layout smoothly pushes neighboring widgets aside.

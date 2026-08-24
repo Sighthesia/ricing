@@ -125,4 +125,177 @@ Item {
             easing.type: Easing.Linear
         }
     }
+
+    // --- Text transition choreography (ported from the media pill) ---
+    // The outgoing line falls away per character with a left-to-right
+    // stagger while the incoming line fades in character by character.
+    // Inert unless a host calls transitionTo(); plain text assignments
+    // never trigger it.
+    readonly property int ghostFallTime: 200
+    readonly property real ghostFallDistanceScale: 1.5
+    readonly property int charStaggerExit: 16
+    readonly property int charStaggerEnter: 22
+    readonly property int charFadeTime: 140
+    readonly property int transitionMaxChars: 48
+    property var _enterRow: null
+
+    // Play the exit/enter choreography for a just-applied text change.
+    // Callers pass the previously displayed text because a live `text:`
+    // binding has already updated by the time any change handler runs.
+    function transitionFrom(oldText) {
+        if (oldText === "" || oldText === root.text)
+            return
+        if (MotionTokens.reducedMotion)
+            return
+        spawnGhosts(oldText)
+        startCharEnter(root.text)
+    }
+
+    // Ghost exit reuses OsuTextField's FallingDownContainer contract,
+    // applied per character with a left-to-right stagger; ghosts ride the
+    // unclipped overlay so they can fall past the surface.
+    function spawnGhosts(oldText) {
+        if (oldText === "")
+            return
+        var count = Math.min(oldText.length, root.transitionMaxChars)
+        for (var i = 0; i < count; i++) {
+            ghostMetrics.font = label.font
+            ghostMetrics.text = oldText.slice(0, i)
+            lyricGhostComponent.createObject(overlayLayer, {
+                text: oldText[i],
+                color: textColor,
+                font: label.font,
+                x: ghostMetrics.advanceWidth,
+                y: 0,
+                opacity: 1,
+                delay: i * root.charStaggerExit,
+                // Travel one-and-a-half line heights, like the field's delete ghosts.
+                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+            })
+        }
+    }
+
+    // Entrance renders per-character fade-ins on a temporary row while the
+    // real label stays hidden; once the last char lands the row is retired
+    // and the real label takes over again.
+    function startCharEnter(text) {
+        if (root._enterRow) {
+            root._enterRow.destroy()
+            root._enterRow = null
+        }
+        label.opacity = 0
+        label.x = 0
+        root._enterRow = enterRowComponent.createObject(clipSlot, { chars: text })
+        // Safety net: no matter what happens inside the row, the real
+        // label always comes back.
+        enterGuard.restart()
+    }
+
+    // Fallback restores the label if the enter row's own timers ever fail.
+    Timer {
+        id: enterGuard
+
+        interval: 2400
+        onTriggered: {
+            if (root._enterRow) {
+                root._enterRow.destroy()
+                root._enterRow = null
+            }
+            label.opacity = 1
+            label.x = 0
+        }
+    }
+
+    TextMetrics {
+        id: ghostMetrics
+    }
+
+    Component {
+        id: lyricGhostComponent
+
+        Text {
+            id: ghost
+
+            property real fallDistance: 10
+            property int delay: 0
+
+            font.pixelSize: root.pixelSize
+            elide: Text.ElideNone
+
+            Behavior on y { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.InQuad } }
+            Behavior on opacity { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.InQuad } }
+
+            Timer {
+                id: fallTimer
+
+                interval: ghost.delay > 0 ? ghost.delay + 1 : 1
+                onTriggered: {
+                    ghost.y += ghost.fallDistance
+                    ghost.opacity = 0
+                }
+            }
+            Timer {
+                id: retireTimer
+
+                running: true
+                interval: (ghost.delay > 0 ? ghost.delay : 0) + root.ghostFallTime + 2
+                onTriggered: ghost.destroy()
+            }
+            Component.onCompleted: {
+                fallTimer.restart()
+                retireTimer.restart()
+            }
+        }
+    }
+
+    Component {
+        id: enterRowComponent
+
+        Row {
+            id: enterRow
+
+            property string chars: ""
+
+            spacing: 0
+
+            Repeater {
+                model: Math.min(enterRow.chars.length, root.transitionMaxChars)
+
+                Text {
+                    id: charItem
+
+                    required property int index
+
+                    text: enterRow.chars[index]
+                    color: root.textColor
+                    font.pixelSize: root.pixelSize
+                    font.bold: root.bold
+                    opacity: 0
+
+                    Behavior on opacity { NumberAnimation { duration: root.charFadeTime; easing.type: Easing.OutQuad } }
+
+                    Timer {
+                        running: true
+                        interval: charItem.index * root.charStaggerEnter + 1
+                        onTriggered: charItem.opacity = 1
+                    }
+                }
+            }
+
+            Timer {
+                id: retireTimer
+
+                running: true
+                interval: Math.min(enterRow.chars.length, root.transitionMaxChars) * root.charStaggerEnter
+                    + root.charFadeTime + MotionTokens.fast
+                onTriggered: {
+                    label.opacity = 1
+                    label.x = 0
+                    if (root._enterRow === enterRow)
+                        root._enterRow = null
+                    enterRow.destroy()
+                }
+            }
+        }
+    }
 }
