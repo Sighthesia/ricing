@@ -56,13 +56,19 @@ BarPill {
     // Spectrum registration — mirrors the old bar spectrum integration.
     readonly property string spectrumComponentId: "media:" + (root.instanceKey !== "" ? root.instanceKey : (root.widgetId !== "" ? root.widgetId : root.screenName))
     readonly property var mediaSettings: Services.SettingsService.widgetSettingsObject("media", root.instanceKey)
-    readonly property bool needsSpectrum: root.hasMedia && root.playing && !MotionTokens.reducedMotion
+    // Resident while the pill exists: the spectrum survives pause and player
+    // close instead of tearing down with playback state.
+    readonly property bool needsSpectrum: !MotionTokens.reducedMotion
         && (root.mediaSettings ? root.mediaSettings.showAudioSpectrum !== false : true)
+    // Floors for pill and spectrum so a short title cannot squeeze the
+    // mirrored bar field into an unreadable sliver.
+    readonly property int minPillWidth: 140
+    readonly property int minSpectrumWidth: 100
 
     property string trackedPrimaryText: ""
 
     visible: hasMedia
-    implicitWidth: visible ? contentRow.implicitWidth + 12 : 0
+    implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12) : 0
     hoverable: hasMedia
 
     onClicked: Services.MediaService.playPause()
@@ -222,7 +228,7 @@ BarPill {
                     color: LazerTheme.textPrimary
                     opacity: MotionTokens.reducedMotion
                         ? 0
-                        : Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity
+                        : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 1.8)
                     visible: opacity > 0.01
 
                     Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
@@ -305,9 +311,11 @@ BarPill {
             Text {
                 width: Math.min(implicitWidth, root.maxTextWidth)
                 // While lyrics lead the primary line the sub-line carries
-                // the song name; otherwise it stays the artist.
+                // "artist - song"; otherwise it stays the artist alone.
                 text: Services.MediaControlService.showCompactLyric
-                    ? Services.MediaControlService.title
+                    ? Services.MediaControlService.artist
+                        + (Services.MediaControlService.title !== ""
+                            ? " - " + Services.MediaControlService.title : "")
                     : Services.MediaControlService.artist
                 visible: text.length > 0
                 color: LazerTheme.textMuted
@@ -322,9 +330,10 @@ BarPill {
     Item {
         id: spectrumBg
 
-        // Left aligns exactly with textColumn to avoid exceeding text X range.
+        // Left aligns exactly with textColumn to avoid exceeding text X range;
+        // floored so short titles cannot squeeze the field too narrow.
         x: contentRow.x + textColumn.x
-        width: textColumn.width
+        width: Math.max(root.minSpectrumWidth, textColumn.width)
         anchors.top: parent.top
         anchors.topMargin: 3
         anchors.bottom: parent.bottom

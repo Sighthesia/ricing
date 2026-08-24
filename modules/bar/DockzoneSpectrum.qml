@@ -81,7 +81,7 @@ Item {
                 root.barColor.r,
                 root.barColor.g,
                 root.barColor.b,
-                Math.min(1, root.barColor.a * emphasis + waveBoost * 0.55))
+                Math.min(1, root.barColor.a * emphasis + waveBoost * 0.85))
             visible: height > 0.5 && root.visible
         }
     }
