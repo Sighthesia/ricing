@@ -415,6 +415,7 @@ Item {
             color: LazerTheme.textMuted
             font.pixelSize: 14
         }
+
     }
 
     // Result viewport: settings-panel structure (Flickable + folding rows)
@@ -611,32 +612,6 @@ Item {
             }
         }
 
-        // One shared focus frame for the whole list: glides between rows
-        // like the settings sidebar's shared indicator instead of every row
-        // showing/hiding its own.
-        Rectangle {
-            id: selectionFrame
-            z: 5
-            x: 0
-            width: resultsColumn.width
-            height: 0
-            radius: 6
-            color: "transparent"
-            border.width: 1.5
-            border.color: LazerTheme.settingsAccent
-            opacity: 0
-            enabled: false
-
-            Behavior on y {
-                enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
-            }
-            Behavior on height {
-                enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
-            }
-            Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
-        }
 
         Column {
             id: resultsColumn
@@ -667,7 +642,35 @@ Item {
                 }
             }
         }
-    }
+    
+        // One shared focus frame for the whole list: glides between rows
+        // like the settings sidebar's shared indicator instead of every row
+        // showing/hiding its own.
+        Rectangle {
+            id: selectionFrame
+            objectName: "selectionFrame"
+            z: 5
+            x: 0
+            width: resultsColumn.width
+            height: 0
+            radius: 6
+            color: "transparent"
+            border.width: 1.5
+            border.color: LazerTheme.settingsAccent
+            opacity: 0
+            enabled: false
+
+            Behavior on y {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
+            }
+            Behavior on height {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
+            }
+            Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
+        }
+}
 
     // Loading surface keeps its own body color so stale rows never linger.
     Rectangle {
