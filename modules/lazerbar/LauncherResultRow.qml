@@ -120,11 +120,7 @@ Item {
             radius: 6
             color: rowHover.hovered && !root._closing ? LazerTheme.settingsCardHover
                     : LazerTheme.settingsCard
-            border.width: root.selected ? 1.5 : 0
-            border.color: root.selected ? LazerTheme.settingsAccent : "transparent"
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
-            Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         // Icon rail background like the notification icon column.
@@ -203,6 +199,24 @@ Item {
             color: LazerTheme.textMuted
             font.pixelSize: 11
             elide: Text.ElideRight
+        }
+
+        // Selection frame rides above the rail and content so its left
+        // edge is never covered — mirrors the settings cardHighlight layer.
+        Rectangle {
+            id: selectionFrame
+            z: 1
+            anchors.fill: parent
+            radius: 6
+            color: "transparent"
+            border.width: root.selected ? 1.5 : 0
+            border.color: root.selected ? LazerTheme.settingsAccent : "transparent"
+            enabled: false
+            Behavior on border.width {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            }
+            Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         // Click-flash overlay above content.
