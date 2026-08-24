@@ -120,7 +120,11 @@ Item {
             radius: 6
             color: rowHover.hovered && !root._closing ? LazerTheme.settingsCardHover
                     : LazerTheme.settingsCard
+            border.width: root.selected ? 1.5 : 0
+            border.color: root.selected ? LazerTheme.settingsAccent : "transparent"
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
+            Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         // Icon rail background like the notification icon column.
@@ -160,7 +164,7 @@ Item {
             id: iconImage
             visible: root.iconSource.length > 0
             anchors.left: parent.left
-            anchors.leftMargin: 13
+            anchors.leftMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             width: 28
             height: 28
