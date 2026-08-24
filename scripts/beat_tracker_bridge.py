@@ -15,10 +15,12 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import struct
 import subprocess
 import sys
+import threading
 
 import aubio
 
@@ -65,10 +67,30 @@ def main() -> int:
     tempo = aubio.tempo("default", BUF_SIZE, HOP_SIZE, SAMPLE_RATE)
     bytes_per_hop = HOP_SIZE * 4  # f32le mono
 
+    # Reader thread with a deep queue: PipeWire capture must never block on
+    # the analysis/consumer side, or the graph xruns and drops samples —
+    # which silently compresses beat timestamps and corrupts tempo.
+    chunks: "queue.Queue[bytes | None]" = queue.Queue(maxsize=4096)
+
+    def read_pcm() -> None:
+        try:
+            while True:
+                chunk = recorder.stdout.read(bytes_per_hop)
+                if not chunk or len(chunk) < bytes_per_hop:
+                    break
+                chunks.put(chunk)
+        except OSError:
+            pass
+        finally:
+            chunks.put(None)
+
+    reader = threading.Thread(target=read_pcm, daemon=True)
+    reader.start()
+
     try:
         while True:
-            chunk = recorder.stdout.read(bytes_per_hop)
-            if not chunk or len(chunk) < bytes_per_hop:
+            chunk = chunks.get()
+            if chunk is None:
                 break
             samples = aubio.fvec(struct.unpack(f"<{HOP_SIZE}f", chunk))
             is_beat = tempo(samples)
