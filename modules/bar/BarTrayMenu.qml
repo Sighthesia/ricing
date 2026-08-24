@@ -222,25 +222,28 @@ Rectangle {
             }
         }
 
+        // Icon slot: always reserved at full width so every row's text
+        // starts on the same left edge, whether or not an icon is present.
         Image {
             id: entryIcon
 
             anchors.left: checkIndicator.right
             anchors.leftMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            width: entryRow.iconSource !== "" ? 16 : 0
+            width: 16
             height: 16
             source: entryRow.iconSource
             sourceSize: Qt.size(16, 16)
             fillMode: Image.PreserveAspectFit
             smooth: true
             asynchronous: true
+            visible: entryRow.iconSource !== ""
             opacity: entryRow.entryEnabled ? 1 : MotionTokens.disabledOpacity
         }
 
         Text {
             anchors.left: entryIcon.right
-            anchors.leftMargin: entryIcon.width > 0 ? 10 : 0
+            anchors.leftMargin: 10
             anchors.right: chevronText.visible ? chevronText.left : parent.right
             anchors.rightMargin: chevronText.visible ? 10 : entryRow.rowPadding
             anchors.verticalCenter: parent.verticalCenter
