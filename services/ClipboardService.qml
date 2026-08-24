@@ -12,6 +12,9 @@ Singleton {
     readonly property string _firstSeenCachePath: root._cacheDir + "/clipboard-first-seen.json"
 
     property bool available: false
+    // True once the startup cliphist probe has exited, so consumers can
+    // distinguish "still probing" from "definitively unavailable".
+    property bool probeFinished: false
     property var items: []
     property int revision: 0
     property int firstSeenRevision: 0
@@ -79,6 +82,7 @@ Singleton {
         stdout: StdioCollector {}
 
         onExited: code => {
+            root.probeFinished = true
             root.available = (code === 0)
             // Pre-fetch history immediately so the first panel open is not blank.
             if (root.available) root.list()

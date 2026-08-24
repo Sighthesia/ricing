@@ -50,6 +50,21 @@ Item {
         }
     }
 
+    // Backend that starts unavailable mid-probe and flips available later,
+    // mirroring ClipboardService's boot sequence (availableChanged +
+    // probeFinished contract).
+    Component {
+        id: probeBackendComponent
+        QtObject {
+            property bool available: false
+            property bool probeFinished: false
+            property var items: [{ id: "7", preview: "later", mime: "text/plain", isImage: false, firstSeenMs: 1 }]
+            property int revision: 1
+            function list() {}
+            function becomeAvailable() { available = true }
+        }
+    }
+
     // Fixture shortcut backend mirroring NiriShortcutService's public
     // surface: load state, surfaced error text, binds model, reload signal.
     QtObject {
@@ -298,6 +313,34 @@ Item {
             compare(clipBackend.copies.length, 1)
             compare(clipBackend.copies[0], "42")
             verify(executed && executed.ok === true)
+        }
+
+        function test_clipboardAdapterWaitsForProbeBeforeErroring() {
+            clipBackend.reset()
+            clipBackend.available = false
+            var probingBackend = probeBackendComponent.createObject(clipBackend)
+            var adapters = LauncherAdapters.createAdapters({ clipboardBackend: probingBackend })
+
+            var outcome = "pending"
+            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
+            compare(outcome, "pending")
+
+            probingBackend.becomeAvailable()
+            verify(Array.isArray(outcome))
+            compare(outcome.length, 1)
+            compare(outcome[0].id, "7")
+            probingBackend.destroy()
+        }
+
+        function test_clipboardAdapterErrorsOnceProbeFinishedUnavailable() {
+            var deadBackend = probeBackendComponent.createObject(clipBackend)
+            deadBackend.probeFinished = true
+            var adapters = LauncherAdapters.createAdapters({ clipboardBackend: deadBackend })
+
+            var outcome = "pending"
+            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
+            verify(outcome && outcome.error === "clipboard history unavailable")
+            deadBackend.destroy()
         }
 
         function test_clipboardAdapterWaitsForFirstHistoryFetch() {

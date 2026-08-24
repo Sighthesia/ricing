@@ -198,6 +198,7 @@ function createClipboardAdapter(config) {
     var backend = config.clipboardBackend || null
     var waiting = null
     var completionHandler = null
+    var availabilityHandler = null
 
     function settle() {
         if (!completionHandler)
@@ -210,7 +211,27 @@ function createClipboardAdapter(config) {
             pending.done(mapClipboardItems(Array.isArray(backend.items) ? backend.items : [], pending.needle))
     }
 
-    return {
+    // During the startup probe the service is not yet marked available.
+    // Rather than surfacing an instant error that forces a manual retry,
+    // hold the request until availability flips, then re-run the normal
+    // fetch path. Definitive unavailability (probe finished, still false)
+    // still errors immediately.
+    function armAvailabilityWait(queryText, modeName, done) {
+        if (availabilityHandler) {
+            try { backend.availableChanged.disconnect(availabilityHandler) } catch (e) {}
+            availabilityHandler = null
+        }
+        availabilityHandler = function() {
+            try { backend.availableChanged.disconnect(availabilityHandler) } catch (e) {}
+            availabilityHandler = null
+            if (!backend.available)
+                return
+            adapter.refresh(queryText, modeName, done)
+        }
+        backend.availableChanged.connect(availabilityHandler)
+    }
+
+    var adapter = {
         refresh: function(queryText, modeName, done) {
             if (typeof done !== "function")
                 return
@@ -219,6 +240,10 @@ function createClipboardAdapter(config) {
                 return
             }
             if (!backend.available) {
+                if (isSignal(backend, "availableChanged") && backend.probeFinished === false) {
+                    armAvailabilityWait(queryText, modeName, done)
+                    return
+                }
                 done({ error: "clipboard history unavailable" })
                 return
             }
@@ -259,6 +284,8 @@ function createClipboardAdapter(config) {
             done({ ok: true })
         }
     }
+
+    return adapter
 }
 
 // ---- Shortcuts ----
