@@ -17,6 +17,11 @@ Item {
     property real floatingMargin: 0
 
     readonly property bool popupVisible: Services.BarPopupService.visible
+    // A brand-new loader instance is born at zero geometry; morph must stay
+    // off for that single placement tick or the surface visibly flies in
+    // from the top-left. Live-instance opens (mid-exit reuse, content swap)
+    // keep morphing because the loader already carries real geometry.
+    property bool placingSurface: false
     // Frozen copies keep the exiting surface intact during the close reveal.
     property string shownKind: ""
     property var shownPayload: null
@@ -27,9 +32,15 @@ Item {
     readonly property alias activeSurfaceItem: surfaceLoader.item
     onPopupVisibleChanged: {
         if (popupVisible) {
+            // Geometry inputs before the content swap: assigning shownKind
+            // creates the surface item synchronously, and with morph
+            // behaviors live from frame one the item's first binding
+            // evaluation must already see the final anchor.
+            frameAnchorX = Services.BarPopupService.anchorX
+            placingSurface = surfaceLoader.item === null
+            placementSettle.start()
             shownKind = Services.BarPopupService.kind
             shownPayload = Services.BarPopupService.payload
-            frameAnchorX = Services.BarPopupService.anchorX
             // Settings-panel rhythm: OutQuint over settingsSlide.
             deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
             deformAnimation.easing.type = Easing.OutQuint
@@ -82,9 +93,10 @@ Item {
         function onKindChanged() {
             if (!Services.BarPopupService.visible)
                 return
+            // Same ordering law: anchor first, then swap content.
+            root.frameAnchorX = Services.BarPopupService.anchorX
             root.shownKind = Services.BarPopupService.kind
             root.shownPayload = Services.BarPopupService.payload
-            root.frameAnchorX = Services.BarPopupService.anchorX
         }
         // Re-anchoring stays live only while the popup is open, so a close
         // can never drag the fading frame toward the reset-to-zero anchor.
@@ -99,6 +111,33 @@ Item {
 
         target: root
         property: "deformProgress"
+    }
+
+    // Ends the placement phase when the fresh instance's frame actually
+    // carries geometry: the loader activates after the open tick, so no
+    // fixed delay is correct. The zero-born 0 -> dock transition thus
+    // snaps while still hidden behind the bar; every later change glides.
+    readonly property bool frameLive: surfaceLoader.width > 1 && surfaceLoader.height > 1
+    onFrameLiveChanged: {
+        if (frameLive)
+            // Clear only after the whole creation binding pass has landed
+            // (next event-loop turn), so x/y never get caught mid-pass.
+            placementDone.start()
+    }
+
+    // Safety valve: never let the guard stick if a surface stays empty.
+    Timer {
+        id: placementSettle
+
+        interval: 250
+        onTriggered: root.placingSurface = false
+    }
+
+    Timer {
+        id: placementDone
+
+        interval: 0
+        onTriggered: root.placingSurface = false
     }
 
     // Pointer presence on the popup keeps the widget-side leave from closing;
@@ -159,11 +198,11 @@ Item {
         // Retargets while fully open glide to their new frame instead of
         // teleporting; entrance/exit geometry stays unanimated so the
         // occlusion slide owns those phases.
-        // Morph behaviors run for the whole open lifetime. The service
-        // commits anchor/payload before `kind` flips visible, so the first
-        // binding evaluation already lands on the correct dock -- gliding
-        // is safe from frame one, including mid-entrance retargets.
-        readonly property bool morphReady: root.popupVisible
+        // Morph behaviors run for the whole open lifetime except the single
+        // placement tick of a freshly created loader (zero-born geometry
+        // must dock instantly, hidden behind the bar). Retargets on a live
+        // instance always glide.
+        readonly property bool morphReady: root.popupVisible && !root.placingSurface
         Behavior on x {
             enabled: surfaceLoader.morphReady
             NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
