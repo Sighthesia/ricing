@@ -34,7 +34,9 @@ Item {
     Timer {
         id: openDelay
 
-        interval: Math.max(0, root.openDelayMs)
+        // Menu-bar convention: the first open waits out the delay, but a
+        // popup that is already open retargets instantly while sweeping.
+        interval: Services.BarPopupService.visible ? 0 : Math.max(0, root.openDelayMs)
         onTriggered: {
             if (!popupHover.hovered)
                 return

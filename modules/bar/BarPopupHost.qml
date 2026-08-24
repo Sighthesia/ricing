@@ -134,18 +134,44 @@ Item {
         // Frame geometry is fully declarative: centered on the hover
         // anchor, docked just past the window edge that faces the bar
         // (this window excludes the bar strip), clamped to the screen.
-        width: item ? item.implicitWidth : 0
-        height: item ? item.implicitHeight : 0
-        x: {
+        // Targets are computed from unanimated values so paired x/width
+        // (and y/height) Behaviors glide in lockstep instead of chasing.
+        readonly property real frameWidth: item ? item.implicitWidth : 0
+        readonly property real frameHeight: item ? item.implicitHeight : 0
+        readonly property real frameX: {
             if (!item)
                 return 0
             var anchorScreenX = root.frameAnchorX + root.floatingMargin
-            return Math.max(8, Math.min(anchorScreenX - width / 2,
-                                        root.width - width - 8))
+            return Math.max(8, Math.min(anchorScreenX - frameWidth / 2,
+                                        root.width - frameWidth - 8))
         }
-        y: root.barTopAnchored
+        readonly property real frameY: root.barTopAnchored
            ? 4
-           : root.height - height - 4
+           : root.height - frameHeight - 4
+        width: frameWidth
+        height: frameHeight
+        x: frameX
+        y: frameY
+        // Retargets while fully open glide to their new frame instead of
+        // teleporting; entrance/exit geometry stays unanimated so the
+        // occlusion slide owns those phases.
+        readonly property bool morphReady: root.popupVisible && root.deformProgress >= 1
+        Behavior on x {
+            enabled: surfaceLoader.morphReady
+            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        }
+        Behavior on y {
+            enabled: surfaceLoader.morphReady
+            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        }
+        Behavior on width {
+            enabled: surfaceLoader.morphReady
+            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        }
+        Behavior on height {
+            enabled: surfaceLoader.morphReady
+            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        }
         sourceComponent: {
             switch (root.shownKind) {
             case "tray": return trayMenuComponent

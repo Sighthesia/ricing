@@ -18,8 +18,19 @@ Rectangle {
             ? Math.max(180, Screen.desktopAvailableHeight * 0.7) : 420
 
     implicitWidth: menuWidth
-    implicitHeight: Math.min(maxHeight, contentFlickable.contentHeight)
-    // Explicit dims keep the hosting Loader from stretching the surface.
+    // Sweeping between tray items swaps the DBusMenu handle and the new
+    // children arrive asynchronously; hold the last settled height so the
+    // frame never collapses mid-swap.
+    property int settledHeight: 0
+    readonly property int naturalHeight: Math.min(maxHeight, contentFlickable.contentHeight)
+    implicitHeight: entries.length > 0 || settledHeight === 0
+                    ? naturalHeight : Math.max(settledHeight, naturalHeight)
+    onEntriesChanged: {
+        if (entries.length > 0)
+            settledHeight = naturalHeight
+        closeSubmenu()
+    }
+    onPayloadChanged: closeSubmenu()
     width: implicitWidth
     height: implicitHeight
     radius: 10
