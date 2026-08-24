@@ -107,19 +107,30 @@ Item {
     }
 
     // Content height settles asynchronously (tray menus load their entries
-    // late), so reposition whenever it moves.
-    Connections {
-        target: surfaceLoader.item
-        function onImplicitHeightChanged() { root.reposition() }
-    }
+    // late); the declarative frame bindings above track it automatically.
 
     // Load the popup surface one tick after closing so the exit animation
-    // can finish before the content unloads.
+    // can finish before the content unloads. The loader itself is the popup
+    // frame: this Quickshell build stretches a fill-loader's item regardless
+    // of the item's own size, so sizing must live here.
     Loader {
         id: surfaceLoader
 
-        anchors.fill: parent
         active: root.revealProgress > 0
+        // Frame geometry is fully declarative: centered on the hover
+        // anchor, docked below (or above) the bar, clamped to the screen.
+        width: item ? item.implicitWidth : 0
+        height: item ? item.implicitHeight : 0
+        x: {
+            if (!item)
+                return 0
+            var anchorScreenX = Services.BarPopupService.anchorX + root.floatingMargin
+            return Math.max(8, Math.min(anchorScreenX - width / 2,
+                                        root.width - width - 8))
+        }
+        y: root.barTopAnchored
+           ? root.floatingMargin + root.barHeight + 4
+           : root.height - root.floatingMargin - root.barHeight - 4 - height
         sourceComponent: {
             switch (root.shownKind) {
             case "tray": return trayMenuComponent
@@ -131,8 +142,6 @@ Item {
             default: return null
             }
         }
-        onItemChanged: Qt.callLater(root.reposition)
-        onActiveChanged: if (active) Qt.callLater(root.reposition)
 
         Component {
             id: trayMenuComponent
@@ -184,34 +193,18 @@ Item {
         }
     }
 
-    // Position the loaded surface under (or above) the bar around the hover
-    // anchor, clamped to the screen. Runs once per open/content swap.
-    function reposition() {
-        var surface = surfaceLoader.item
-        if (!surface)
-            return
-        var anchorScreenX = Services.BarPopupService.anchorX + root.floatingMargin
-        var clampedX = Math.max(8, Math.min(
-            anchorScreenX - surface.implicitWidth / 2,
-            root.width - surface.implicitWidth - 8))
-        surface.x = Math.max(8, clampedX)
-        if (root.barTopAnchored)
-            surface.y = root.floatingMargin + root.barHeight + 4
-        else
-            surface.y = root.height - root.floatingMargin - root.barHeight - 4 - surface.implicitHeight
-    }
-
     // Reveal motion stays inside the surface so the overlay window geometry
     // never changes per frame.
     transform: [
         Scale {
             origin.x: {
                 var surface = surfaceLoader.item
-                return surface ? surface.x + surface.implicitWidth / 2 : root.width / 2
+                return surface ? surfaceLoader.x + surfaceLoader.width / 2 : root.width / 2
             }
             origin.y: {
                 var surface = surfaceLoader.item
-                return surface ? (root.barTopAnchored ? surface.y : surface.y + surface.implicitHeight) : root.height / 2
+                return surface ? (root.barTopAnchored ? surfaceLoader.y
+                                                      : surfaceLoader.y + surfaceLoader.height) : root.height / 2
             }
             xScale: MotionTokens.reducedMotion ? 1 : MotionTokens.popupFromScale + (1 - MotionTokens.popupFromScale) * root.revealProgress
             yScale: MotionTokens.reducedMotion ? 1 : MotionTokens.popupFromScale + (1 - MotionTokens.popupFromScale) * root.revealProgress
