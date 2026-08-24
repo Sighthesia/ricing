@@ -126,23 +126,26 @@ Item {
         }
     }
 
-    // --- Text transition choreography (ported from the media pill) ---
-    // The outgoing line falls away per character with a left-to-right
-    // stagger while the incoming line fades in character by character.
-    // Inert unless a host calls transitionTo(); plain text assignments
-    // never trigger it.
+    // --- Text transition: scan-line sweep ---
+    // A virtual scan line sweeps left to right across the label. Where it
+    // just passed, new characters fade in semi-transparent; where it has
+    // not yet reached, old characters fall away in sequence; at the line
+    // itself there is a brief blank gap. Once the sweep completes the
+    // revealed line settles to full opacity. Inert unless a host calls
+    // transitionFrom().
     readonly property int ghostFallTime: 200
     readonly property real ghostFallDistanceScale: 1.5
-    readonly property int charStaggerExit: 16
-    readonly property int charStaggerEnter: 22
-    readonly property int charFadeTime: 140
-    // Entrance settle time and lift distance for the rise-in handoff.
-    readonly property int charEnterTime: 180
-    readonly property int charRiseDistance: Math.max(3, Math.round(root.pixelSize * 0.45))
+    // Per-character sweep step — the scan line's travel speed.
+    readonly property int scanStepMs: 16
+    // Blank window the line leaves before the next char starts fading in.
+    readonly property int scanGapMs: 45
+    readonly property int scanRevealMs: 130
+    // Swept characters rest semi-transparent until the whole sweep ends.
+    readonly property real scanRestOpacity: 0.65
     readonly property int transitionMaxChars: 48
     property var _enterRow: null
 
-    // Play the exit/enter choreography for a just-applied text change.
+    // Play the scan-line transition for a just-applied text change.
     // Both texts are passed explicitly: a live `text:` binding may not have
     // re-evaluated yet when the host's change handler runs, so root.text
     // cannot be trusted as either value here.
@@ -150,12 +153,20 @@ Item {
         if (MotionTokens.reducedMotion || oldText === "" || oldText === newText)
             return
         spawnGhosts(oldText)
-        startCharEnter(newText)
+        label.opacity = 0
+        label.x = 0
+        if (root._enterRow) {
+            root._enterRow.destroy()
+            root._enterRow = null
+        }
+        root._enterRow = scanRowComponent.createObject(clipSlot, { chars: newText })
+        // Safety net: no matter what happens inside the row, the real
+        // label always comes back.
+        enterGuard.restart()
     }
 
-    // Ghost exit reuses OsuTextField's FallingDownContainer contract,
-    // applied per character with a left-to-right stagger; ghosts ride the
-    // unclipped overlay so they can fall past the surface.
+    // Old characters fall away in sequence, one per sweep step; ghosts ride
+    // the unclipped overlay so they can fall past the surface.
     function spawnGhosts(oldText) {
         if (oldText === "")
             return
@@ -170,27 +181,11 @@ Item {
                 x: ghostMetrics.advanceWidth,
                 y: 0,
                 opacity: 1,
-                delay: i * root.charStaggerExit,
+                delay: i * root.scanStepMs,
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
-    }
-
-    // Entrance renders per-character fade-ins on a temporary row while the
-    // real label stays hidden; once the last char lands the row is retired
-    // and the real label takes over again.
-    function startCharEnter(text) {
-        if (root._enterRow) {
-            root._enterRow.destroy()
-            root._enterRow = null
-        }
-        label.opacity = 0
-        label.x = 0
-        root._enterRow = enterRowComponent.createObject(clipSlot, { chars: text })
-        // Safety net: no matter what happens inside the row, the real
-        // label always comes back.
-        enterGuard.restart()
     }
 
     // Fallback restores the label if the enter row's own timers ever fail.
@@ -251,7 +246,7 @@ Item {
     }
 
     Component {
-        id: enterRowComponent
+        id: scanRowComponent
 
         Row {
             id: enterRow
@@ -259,6 +254,10 @@ Item {
             property string chars: ""
 
             spacing: 0
+
+            // When the sweep finishes: total travel + gap + one reveal.
+            readonly property int sweepTotal:
+                Math.min(chars.length, root.transitionMaxChars) * root.scanStepMs
 
             Repeater {
                 model: Math.min(enterRow.chars.length, root.transitionMaxChars)
@@ -273,21 +272,23 @@ Item {
                     font.pixelSize: root.pixelSize
                     font.bold: root.bold
                     opacity: 0
-                    // Chars rise a fraction of the line height into place:
-                    // the outgoing line sinks away, the incoming one floats
-                    // up to meet the reader — one continuous vertical handoff.
-                    y: root.charRiseDistance
 
-                    Behavior on y { NumberAnimation { duration: root.charEnterTime; easing.type: Easing.OutCubic } }
-                    Behavior on opacity { NumberAnimation { duration: root.charFadeTime; easing.type: Easing.OutQuad } }
+                    Behavior on opacity { NumberAnimation { duration: root.scanRevealMs; easing.type: Easing.OutQuad } }
 
+                    // The line passes this char: fade in to the resting
+                    // semi-transparent level (the drop gap keeps the line
+                    // itself blank).
                     Timer {
                         running: true
-                        interval: charItem.index * root.charStaggerEnter + 1
-                        onTriggered: {
-                            charItem.opacity = 1
-                            charItem.y = 0
-                        }
+                        interval: charItem.index * root.scanStepMs + root.scanGapMs + 1
+                        onTriggered: charItem.opacity = root.scanRestOpacity
+                    }
+
+                    // Sweep done: the revealed line settles to full ink.
+                    Timer {
+                        running: true
+                        interval: enterRow.sweepTotal + root.scanGapMs + root.scanRevealMs + 1
+                        onTriggered: charItem.opacity = 1
                     }
                 }
             }
@@ -296,8 +297,7 @@ Item {
                 id: retireTimer
 
                 running: true
-                interval: Math.min(enterRow.chars.length, root.transitionMaxChars) * root.charStaggerEnter
-                    + root.charFadeTime + MotionTokens.fast
+                interval: enterRow.sweepTotal + root.scanGapMs + root.scanRevealMs + MotionTokens.fast
                 onTriggered: {
                     label.opacity = 1
                     label.x = 0
