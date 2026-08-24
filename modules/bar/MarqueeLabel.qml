@@ -133,13 +133,17 @@ Item {
     // itself there is a brief blank gap. Once the sweep completes the
     // revealed line settles to full opacity. Inert unless a host calls
     // transitionFrom().
-    readonly property int ghostFallTime: 200
-    readonly property real ghostFallDistanceScale: 1.5
+    // Wavefront tightness rule: each per-char animation lasts about one
+    // sweep step, so only a single char falls on the leading side and a
+    // single char fades on the trailing side at any instant. The animated
+    // zone's width is therefore speed × duration ≈ one character.
+    readonly property int ghostFallTime: 40
+    readonly property real ghostFallDistanceScale: 1.0
     // Per-character sweep step — the scan line's travel speed.
-    readonly property int scanStepMs: 16
+    readonly property int scanStepMs: 40
     // Blank window the line leaves before the next char starts fading in.
-    readonly property int scanGapMs: 45
-    readonly property int scanRevealMs: 130
+    readonly property int scanGapMs: 24
+    readonly property int scanRevealMs: 40
     // Swept characters rest semi-transparent until the whole sweep ends.
     readonly property real scanRestOpacity: 0.65
     readonly property int transitionMaxChars: 48
