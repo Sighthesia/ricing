@@ -460,6 +460,7 @@ BarPill {
             }
             Timer {
                 id: retireTimer
+                running: true
                 interval: (ghost.delay > 0 ? ghost.delay : 0) + root.lyricGhostFallTime + 2
                 onTriggered: ghost.destroy()
             }
@@ -497,6 +498,7 @@ BarPill {
                     Behavior on opacity { NumberAnimation { duration: root.lyricCharFadeTime; easing.type: Easing.OutQuad } }
 
                     Timer {
+                        running: true
                         interval: charItem.index * root.lyricCharStaggerEnter + 1
                         onTriggered: charItem.opacity = 1
                     }
@@ -505,6 +507,7 @@ BarPill {
 
             Timer {
                 id: retireTimer
+                running: true
                 interval: Math.min(enterRow.chars.length, root.lyricMaxChars) * root.lyricCharStaggerEnter
                     + root.lyricCharFadeTime + MotionTokens.fast
                 onTriggered: {
