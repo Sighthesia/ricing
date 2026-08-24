@@ -73,7 +73,10 @@ Item {
             resultsView.positionToSelection()
         }
         function onDisplayPoolChanged() {
-            Qt.callLater(root._scheduleReleases)
+            // Delegates exist synchronously after the model assignment, so
+            // hold-and-schedule here without an async gap a fresh row could
+            // slip through unreleased.
+            root._holdAndScheduleReleases()
         }
     }
 
@@ -289,14 +292,14 @@ Item {
         entranceSettle.restart()
     }
 
-    // Route each fresh result set through the wave (first fill after open)
-    // or the lighter cascade (subsequent query refills).
-    function _scheduleReleases() {
+    // Hold every current row synchronously, then route the set through the
+    // wave (first fill after open) or the lighter cascade (query refills).
+    function _holdAndScheduleReleases() {
+        var children = resultsColumn.children
+        for (var h = 0; h < children.length; h++)
+            if (children[h].holdInstantly !== undefined)
+                children[h].holdInstantly()
         if (resultsView.resultCount <= 0)
-            return
-        // Incremental pool updates recreate nothing; only genuinely held
-        // rows (fresh sets) need a release schedule.
-        if (!root.entranceBusy && !root._anyRowHeld())
             return
         if (root._firstFillPending) {
             root._firstFillPending = false
@@ -561,7 +564,6 @@ Item {
                     width: resultsColumn.width
                     result: modelData
                     searchQuery: root.activeSearchText
-                    revealHeld: true
                     selected: {
                         if (!root.session || !root.session.results || root.session.selectedIndex < 0)
                             return false

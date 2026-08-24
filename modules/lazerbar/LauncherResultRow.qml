@@ -4,7 +4,9 @@ import "../../services/LauncherLogic.js" as LauncherLogic
 // Present one launcher result as a notification-like card: 6px rounded
 // settingsCard surface with a 40px icon rail, colorful enlarged icon,
 // title/description stack, accent selection strip, shared click-flash,
-// and the notification parabolic fling exit on activation.
+// and the notification parabolic fling exit on activation. All visuals
+// nest inside dragContainer in explicit z order so the card can never
+// cover its own content.
 Item {
     id: root
 
@@ -22,8 +24,6 @@ Item {
     readonly property string descriptionText: result && result.description != null ? String(result.description) : ""
     readonly property string iconSource: result && result.icon ? String(result.icon) : ""
 
-    // Slightly taller than the old 56px to mirror the notification minimum and
-    // comfortably host a 28px colorful icon.
     readonly property real rowHeight: 64
     implicitWidth: 480
     activeFocusOnTab: true
@@ -43,6 +43,7 @@ Item {
 
     property bool _closing: false
     readonly property real gravity: 0.005
+    readonly property bool reducedMotion: MotionTokens.reducedMotion
 
     signal activated()
 
@@ -61,21 +62,18 @@ Item {
     visible: !geometryHeld || height > 0.5 || opacity > 0.01
     opacity: geometryHeld ? 0 : 1
     x: geometryHeld ? -8 : 0
-    enabled: !geometryHeld && !root._closing
+    enabled: !geometryHeld && !_closing
 
-    // Search-driven folds animate immediately and together; staggering here
-    // made every keystroke ripple the entire list (entrance stagger lives in
-    // the wave scheduler, not in these behaviors).
     Behavior on height {
-        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
+        enabled: !reducedMotion && !snapTransitions
         NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
     }
     Behavior on opacity {
-        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
+        enabled: !reducedMotion && !snapTransitions
         NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
     }
     Behavior on x {
-        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
+        enabled: !reducedMotion && !snapTransitions
         NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
     }
 
@@ -89,14 +87,12 @@ Item {
         }
     }
 
-    // Collapse instantly for the open-session wave, then release on schedule.
     function holdInstantly() {
         revealTimer.stop()
         root.snapTransitions = true
         root.revealHeld = true
     }
 
-    // Leave the held state without animation (wave cancelled).
     function releaseInstantly() {
         revealTimer.stop()
         root.snapTransitions = true
@@ -104,13 +100,13 @@ Item {
         Qt.callLater(function () { root.snapTransitions = false })
     }
 
-    // The timer owns the wave stagger so releases animate immediately.
     function playReveal(delayMs) {
         revealTimer.interval = Math.max(0, Math.round(Number(delayMs) || 0))
         revealTimer.restart()
     }
 
-    // --- fling exit (parabolic, gravity-driven, like LazerNotificationPopup) ---
+    // Fling physics: integrate gravity per frame exactly like the
+    // notification popup's DragContainer fall.
     FrameAnimation {
         id: fallAnim
         onTriggered: {
@@ -138,9 +134,8 @@ Item {
         duration: root.reducedMotion ? 0 : 100
     }
 
-    readonly property bool reducedMotion: MotionTokens.reducedMotion
-
-    // Physics, drag, and rotation owner — mirrors notification DragContainer.
+    // Physics, drag, and rotation owner. All visuals nest here in explicit
+    // z order: card, rail, strip, icon, text, flash, focus ring.
     Item {
         id: dragContainer
         width: root.width
@@ -154,113 +149,111 @@ Item {
         property real dragY: 0
         property real velocityX: 0
         property real velocityY: 0
-    }
 
-    // Card surface — notification-like 6px rounded card.
-    Rectangle {
-        id: card
-        parent: dragContainer
-        anchors.fill: parent
-        radius: 6
-        color: root.selected ? LazerTheme.settingsSelected
-                : rowHover.hovered && !root._closing ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-        border.width: root.selected ? 1.5 : 0
-        border.color: root.selected ? LazerTheme.settingsAccent : "transparent"
-        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-        Behavior on border.width { NumberAnimation { duration: 100 } }
-        Behavior on border.color { ColorAnimation { duration: 100 } }
-    }
-
-    // Icon rail like notification's iconStrip — 40px wide, rail background.
-    Rectangle {
-        id: iconStrip
-        parent: dragContainer
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        width: 40
-        radius: 6
-        color: LazerTheme.settingsRail
-    }
-
-    // Selected indicator — thin sharp accent strip on the leading edge, above card.
-    Rectangle {
-        id: selectionStrip
-        parent: dragContainer
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        width: 4
-        radius: 0
-        color: LazerTheme.settingsAccent
-        visible: root.selected && !root._closing
-        opacity: root.selected ? 1 : 0
-        Behavior on opacity { enabled: !MotionTokens.reducedMotion; ColorAnimation { duration: MotionTokens.fast } }
-    }
-
-    // Colorful enlarged icon — preserved original colors, no colorization.
-    Image {
-        id: iconImage
-        parent: dragContainer
-        visible: root.iconSource.length > 0
-        anchors.left: parent.left
-        anchors.leftMargin: (40 - width) / 2
-        anchors.verticalCenter: parent.verticalCenter
-        width: 28
-        height: 28
-        source: root.iconSource
-        fillMode: Image.PreserveAspectFit
-        asynchronous: true
-        scale: rowPress.pressed && !root._closing ? MotionTokens.pressScale : 1
-        Behavior on scale {
-            enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        // Card surface: selected tint outranks hover swap.
+        Rectangle {
+            id: card
+            anchors.fill: parent
+            radius: 6
+            color: root.selected ? LazerTheme.settingsSelected
+                    : rowHover.hovered && !root._closing ? LazerTheme.settingsCardHover
+                    : LazerTheme.settingsCard
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
-    }
 
-    // Title: left of icon rail, vertically centered when no description.
-    Text {
-        id: titleText
-        parent: dragContainer
-        x: 52
-        anchors.top: parent.top
-        anchors.topMargin: root.descriptionText.length > 0 ? 12 : 0
-        anchors.verticalCenter: root.descriptionText.length > 0 ? undefined : parent.verticalCenter
-        width: Math.max(0, parent.width - x - 12)
-        text: root.displayName
-        color: LazerTheme.textPrimary
-        font.pixelSize: 14
-        font.weight: Font.DemiBold
-        elide: Text.ElideRight
-        verticalAlignment: Text.AlignVCenter
-    }
+        // Icon rail background like the notification icon column.
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: 40
+            radius: 6
+            color: LazerTheme.settingsRail
+        }
 
-    Text {
-        id: descriptionLabel
-        parent: dragContainer
-        x: titleText.x
-        anchors.top: titleText.bottom
-        anchors.topMargin: 2
-        width: titleText.width
-        visible: root.descriptionText.length > 0
-        text: root.descriptionText
-        color: LazerTheme.textMuted
-        font.pixelSize: 11
-        elide: Text.ElideRight
-        wrapMode: Text.NoWrap
-    }
+        // Selected indicator: thin sharp accent strip on the leading edge.
+        Rectangle {
+            id: selectionStrip
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: 4
+            radius: 0
+            color: LazerTheme.settingsAccent
+            visible: root.selected
+            Behavior on opacity { enabled: !root.reducedMotion; ColorAnimation { duration: MotionTokens.fast } }
+        }
 
-    // Confirm activation with the shared osu click-flash recipe without
-    // owning input or changing the row's hit area.
-    Rectangle {
-        id: flashOverlay
-        parent: dragContainer
-        z: 2
-        anchors.fill: parent
-        radius: 6
-        color: LazerTheme.textPrimary
-        opacity: 0
-        enabled: false
+        // Colorful enlarged icon: original colors preserved.
+        Image {
+            id: iconImage
+            visible: root.iconSource.length > 0
+            anchors.left: parent.left
+            anchors.leftMargin: (40 - width) / 2
+            anchors.verticalCenter: parent.verticalCenter
+            width: 28
+            height: 28
+            source: root.iconSource
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            scale: rowPress.pressed ? MotionTokens.pressScale : 1
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            }
+        }
+
+        Text {
+            id: titleText
+            x: 52
+            width: Math.max(0, parent.width - x - 12)
+            anchors.top: root.descriptionText.length > 0 ? parent.top : undefined
+            anchors.topMargin: 12
+            anchors.verticalCenter: root.descriptionText.length > 0 ? undefined : parent.verticalCenter
+            text: root.displayName
+            color: LazerTheme.textPrimary
+            font.pixelSize: 14
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+        }
+
+        Text {
+            id: descriptionLabel
+            x: titleText.x
+            width: titleText.width
+            anchors.top: titleText.bottom
+            anchors.topMargin: 2
+            visible: root.descriptionText.length > 0
+            text: root.descriptionText
+            color: LazerTheme.textMuted
+            font.pixelSize: 11
+            elide: Text.ElideRight
+        }
+
+        // Click-flash overlay above content.
+        Rectangle {
+            id: flashOverlay
+            z: 2
+            anchors.fill: parent
+            radius: 6
+            color: LazerTheme.textPrimary
+            opacity: 0
+            enabled: false
+        }
+
+        // Keyboard-focus ring above everything, non-input.
+        Rectangle {
+            id: focusRing
+            z: 3
+            anchors.fill: parent
+            radius: 6
+            color: "transparent"
+            border.width: root.activeFocus ? 1.5 : 0
+            border.color: LazerTheme.settingsAccent
+            enabled: false
+            Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
+            Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
+        }
     }
 
     NumberAnimation {
@@ -274,23 +267,8 @@ Item {
         running: false
     }
 
-    // Keyboard-focus ring rides above content as a non-input layer.
-    Rectangle {
-        id: focusRing
-        parent: dragContainer
-        z: 3
-        anchors.fill: parent
-        radius: 6
-        color: "transparent"
-        border.width: root.activeFocus ? 1.5 : 0
-        border.color: LazerTheme.settingsAccent
-        enabled: false
-        Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
-        Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
-    }
-
     function restartFlash() {
-        if (MotionTokens.reducedMotion) {
+        if (reducedMotion) {
             flashAnimation.stop()
             flashOverlay.opacity = 0
             return
@@ -298,15 +276,14 @@ Item {
         flashAnimation.restart()
     }
 
-    // Activate with notification-style parabolic fling and immediate emit
-    // (visual fling runs in parallel so tests stay synchronous).
+    // Activate with the notification parabolic fling and immediate emit;
+    // the fling is purely visual so execution contracts stay synchronous.
     function activate() {
-        if (root._closing || root.geometryHeld)
+        if (_closing || geometryHeld)
             return
-        root.restartFlash()
-        root._closing = true
-        rowHover.enabled = false
-        if (!MotionTokens.reducedMotion) {
+        restartFlash()
+        _closing = true
+        if (!reducedMotion) {
             if (dragContainer.velocityX > -0.3)
                 dragContainer.velocityX = -0.3 - Math.random() * 0.5
             dragContainer.velocityY = 0
@@ -315,7 +292,7 @@ Item {
         } else {
             quickFade.restart()
         }
-        root.activated()
+        activated()
     }
 
     HoverHandler {
@@ -338,7 +315,7 @@ Item {
     Connections {
         target: MotionTokens
         function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
+            if (root.reducedMotion)
                 root.restartFlash()
         }
     }
