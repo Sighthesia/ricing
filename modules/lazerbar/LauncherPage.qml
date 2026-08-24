@@ -656,16 +656,21 @@ Item {
             border.color: LazerTheme.settingsAccent
             enabled: false
 
+            // Size snaps from constants and visibility fades; only y glides.
+            // Tracking the anchor row's animated height made every search
+            // re-rank visibly squash the frame through fold mid-heights.
+            opacity: root.selectionAnchor && !root.selectionAnchor.geometryHeld ? 1 : 0
+            Behavior on opacity {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            }
+
             x: root.selectionAnchor ? root.selectionAnchor.x : 0
             y: root.selectionAnchor ? root.selectionAnchor.y : 0
             width: root.selectionAnchor ? root.selectionAnchor.width : 0
-            height: root.selectionAnchor ? root.selectionAnchor.bodyHeight : 0
+            height: root.selectionAnchor ? root.selectionAnchor.rowHeight : 0
 
             Behavior on y {
-                enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
-            }
-            Behavior on height {
                 enabled: !MotionTokens.reducedMotion
                 NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
             }
