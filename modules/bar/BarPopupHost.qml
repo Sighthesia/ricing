@@ -30,19 +30,34 @@ Item {
             shownKind = Services.BarPopupService.kind
             shownPayload = Services.BarPopupService.payload
             frameAnchorX = Services.BarPopupService.anchorX
-            revealAnimation.duration = MotionTokens.dropdownExpand
-            revealAnimation.to = 1
+            // osu!lazer popover law: elasticity only for the deform, fades
+            // stay smooth.
+            fadeAnimation.duration = MotionTokens.slow
+            deformAnimation.duration = MotionTokens.popupDeformIn
+            deformAnimation.easing.type = Easing.OutElastic
+            deformAnimation.easing.amplitude = 0.5
             revealProgress = MotionTokens.reducedMotion ? 1 : 0
-            revealAnimation.restart()
+            deformProgress = MotionTokens.reducedMotion ? 1 : 0
+            fadeAnimation.to = 1
+            deformAnimation.to = 1
+            fadeAnimation.restart()
+            deformAnimation.restart()
         } else {
-            revealAnimation.duration = MotionTokens.fast
-            revealAnimation.to = 0
-            revealAnimation.restart()
+            fadeAnimation.duration = MotionTokens.slow
+            deformAnimation.duration = MotionTokens.slow
+            deformAnimation.easing.type = Easing.OutQuint
+            fadeAnimation.to = 0
+            deformAnimation.to = 0
+            fadeAnimation.restart()
+            deformAnimation.restart()
             Services.BarPopupService.pointerInPopup = false
         }
     }
 
+    // Opacity rides a smooth curve only; scale and slide share the deform
+    // progress that carries the elastic enter settle.
     property real revealProgress: 0
+    property real deformProgress: 0
 
     // Confirm a widget's leave-request once the pointer had a fair chance to
     // travel into the popup surface.
@@ -86,12 +101,18 @@ Item {
     }
 
     NumberAnimation {
-        id: revealAnimation
+        id: fadeAnimation
 
         target: root
         property: "revealProgress"
-        easing.type: Easing.BezierSpline
-        easing.bezierCurve: MotionTokens.outSoft
+        easing.type: Easing.OutQuint
+    }
+
+    NumberAnimation {
+        id: deformAnimation
+
+        target: root
+        property: "deformProgress"
     }
 
     // Pointer presence on the popup keeps the widget-side leave from closing;
@@ -127,7 +148,7 @@ Item {
     Loader {
         id: surfaceLoader
 
-        active: root.revealProgress > 0
+        active: root.revealProgress > 0 || root.deformProgress > 0
         // Frame geometry is fully declarative: centered on the hover
         // anchor, docked below (or above) the bar, clamped to the screen.
         width: item ? item.implicitWidth : 0
@@ -221,12 +242,12 @@ Item {
                 return surface ? (root.barTopAnchored ? surfaceLoader.y
                                                       : surfaceLoader.y + surfaceLoader.height) : root.height / 2
             }
-            xScale: MotionTokens.reducedMotion ? 1 : MotionTokens.popupFromScale + (1 - MotionTokens.popupFromScale) * root.revealProgress
-            yScale: MotionTokens.reducedMotion ? 1 : MotionTokens.popupFromScale + (1 - MotionTokens.popupFromScale) * root.revealProgress
+            xScale: MotionTokens.reducedMotion ? 1 : MotionTokens.popupFromScale + (1 - MotionTokens.popupFromScale) * root.deformProgress
+            yScale: MotionTokens.reducedMotion ? 1 : MotionTokens.popupFromScale + (1 - MotionTokens.popupFromScale) * root.deformProgress
         },
         Translate {
             y: MotionTokens.reducedMotion ? 0
-               : (root.barTopAnchored ? -1 : 1) * root.enterTravel * (1 - root.revealProgress)
+               : (root.barTopAnchored ? -1 : 1) * root.enterTravel * (1 - root.deformProgress)
         }
     ]
     opacity: root.revealProgress
