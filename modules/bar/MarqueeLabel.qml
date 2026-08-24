@@ -136,6 +136,9 @@ Item {
     readonly property int charStaggerExit: 16
     readonly property int charStaggerEnter: 22
     readonly property int charFadeTime: 140
+    // Entrance settle time and lift distance for the rise-in handoff.
+    readonly property int charEnterTime: 180
+    readonly property int charRiseDistance: Math.max(3, Math.round(root.pixelSize * 0.45))
     readonly property int transitionMaxChars: 48
     property var _enterRow: null
 
@@ -270,13 +273,21 @@ Item {
                     font.pixelSize: root.pixelSize
                     font.bold: root.bold
                     opacity: 0
+                    // Chars rise a fraction of the line height into place:
+                    // the outgoing line sinks away, the incoming one floats
+                    // up to meet the reader — one continuous vertical handoff.
+                    y: root.charRiseDistance
 
+                    Behavior on y { NumberAnimation { duration: root.charEnterTime; easing.type: Easing.OutCubic } }
                     Behavior on opacity { NumberAnimation { duration: root.charFadeTime; easing.type: Easing.OutQuad } }
 
                     Timer {
                         running: true
                         interval: charItem.index * root.charStaggerEnter + 1
-                        onTriggered: charItem.opacity = 1
+                        onTriggered: {
+                            charItem.opacity = 1
+                            charItem.y = 0
+                        }
                     }
                 }
             }
