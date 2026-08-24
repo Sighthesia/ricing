@@ -20,12 +20,16 @@ Item {
     // Frozen copies keep the exiting surface intact during the close reveal.
     property string shownKind: ""
     property var shownPayload: null
+    // Anchor snapshot: service.close() zeroes anchorX immediately, and the
+    // frame must not chase that zero while fading out.
+    property real frameAnchorX: 0
     // The loaded surface, exposed so the window mask can track its bounds.
     readonly property alias activeSurfaceItem: surfaceLoader.item
     onPopupVisibleChanged: {
         if (popupVisible) {
             shownKind = Services.BarPopupService.kind
             shownPayload = Services.BarPopupService.payload
+            frameAnchorX = Services.BarPopupService.anchorX
             revealAnimation.duration = MotionTokens.dropdownExpand
             revealAnimation.to = 1
             revealProgress = MotionTokens.reducedMotion ? 1 : 0
@@ -71,6 +75,13 @@ Item {
                 return
             root.shownKind = Services.BarPopupService.kind
             root.shownPayload = Services.BarPopupService.payload
+            root.frameAnchorX = Services.BarPopupService.anchorX
+        }
+        // Re-anchoring stays live only while the popup is open, so a close
+        // can never drag the fading frame toward the reset-to-zero anchor.
+        function onAnchorXChanged() {
+            if (Services.BarPopupService.visible)
+                root.frameAnchorX = Services.BarPopupService.anchorX
         }
     }
 
@@ -124,7 +135,7 @@ Item {
         x: {
             if (!item)
                 return 0
-            var anchorScreenX = Services.BarPopupService.anchorX + root.floatingMargin
+            var anchorScreenX = root.frameAnchorX + root.floatingMargin
             return Math.max(8, Math.min(anchorScreenX - width / 2,
                                         root.width - width - 8))
         }
