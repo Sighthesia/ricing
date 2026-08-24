@@ -169,7 +169,8 @@ Singleton {
         if (!isFinite(timestamp) || timestamp < 0)
             return
 
-        const bpm = BeatClock.feedBeat(root._beatClock, timestamp)
+        const confidence = Number(payload.conf)
+        const bpm = BeatClock.feedBeat(root._beatClock, timestamp, isFinite(confidence) ? confidence : undefined)
         root._reportedPulse = 1
         root.beat()
 
@@ -181,6 +182,7 @@ Singleton {
             event: "beat",
             t: Math.round(timestamp * 1000) / 1000,
             bpm: Math.round(bpm * 10) / 10,
+            conf: isFinite(confidence) ? confidence : -1,
             intervals: root._beatClock.intervals.length
         }))
         if (rounded !== root._lastLoggedBpm) {

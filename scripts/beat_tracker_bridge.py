@@ -76,6 +76,7 @@ def main() -> int:
                 payload = {
                     "t": round(float(tempo.get_last_s()), 6),
                     "bpm": round(float(tempo.get_bpm()), 2),
+                    "conf": round(float(tempo.get_confidence()), 4),
                 }
                 print(json.dumps(payload), flush=True)
     except KeyboardInterrupt:

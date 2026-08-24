@@ -13,7 +13,14 @@ var defaultOptions = {
     minBpm: 80,
     maxBpm: 170,
     // Ignore beats closer than this to the previous one (double-triggers).
-    minGapSeconds: 0.12
+    minGapSeconds: 0.12,
+    // --- tempo lock (instrumentation-change stability) ---
+    // Once locked, intervals whose implied tempo drifts more than this
+    // fraction from the current readout are held out of the history.
+    lockBandFraction: 0.07,
+    // After this many consecutive out-of-band beats the tempo genuinely
+    // changed: drop the history and relock onto the new tempo.
+    relockAfterBeats: 6
 }
 
 function createClock(options) {
@@ -25,10 +32,13 @@ function createClock(options) {
         minBpm: typeof opts.minBpm === "number" ? opts.minBpm : defaultOptions.minBpm,
         maxBpm: typeof opts.maxBpm === "number" ? opts.maxBpm : defaultOptions.maxBpm,
         minGapSeconds: typeof opts.minGapSeconds === "number" ? opts.minGapSeconds : defaultOptions.minGapSeconds,
+        lockBandFraction: typeof opts.lockBandFraction === "number" ? opts.lockBandFraction : defaultOptions.lockBandFraction,
+        relockAfterBeats: typeof opts.relockAfterBeats === "number" ? opts.relockAfterBeats : defaultOptions.relockAfterBeats,
 
         lastBeatSeconds: -1,
         intervals: [],
-        bpm: 0
+        bpm: 0,
+        divergentStreak: 0
     }
 }
 
@@ -41,8 +51,9 @@ function median(values) {
 }
 
 // Consume one beat timestamp; returns the updated BPM readout (0 until at
-// least two usable intervals have been seen).
-function feedBeat(clock, seconds) {
+// least two usable intervals have been seen). `confidence` (0..1, optional)
+// marks low-trust beats: they keep phase but never touch interval history.
+function feedBeat(clock, seconds, confidence) {
     if (!(seconds >= 0))
         return clock.bpm
 
@@ -68,6 +79,29 @@ function feedBeat(clock, seconds) {
         return clock.bpm
     }
 
+    // Low-confidence beats (sparse breakdowns, quiet bridges) must not
+    // rewrite tempo history; phase tracking above is enough for visuals.
+    if (typeof confidence === "number" && confidence < defaultLowConfidence())
+        return clock.bpm
+
+    // Tempo lock: once a readout exists, hold divergent intervals out of the
+    // history so instrumentation changes (fills, solos, half-time sections)
+    // do not drag it away. A sustained divergence relocks after a few beats.
+    if (clock.bpm > 0) {
+        var implied = 60 / elapsed
+        if (Math.abs(implied - clock.bpm) / clock.bpm > clock.lockBandFraction) {
+            clock.divergentStreak += 1
+            if (clock.divergentStreak < clock.relockAfterBeats)
+                return clock.bpm
+            // Genuine tempo change: start over from the new interval.
+            clock.divergentStreak = 0
+            clock.intervals = [elapsed]
+            clock.bpm = clampBpm(clock, implied)
+            return clock.bpm
+        }
+        clock.divergentStreak = 0
+    }
+
     clock.intervals.push(elapsed)
     if (clock.intervals.length > clock.intervalHistory)
         clock.intervals.shift()
@@ -76,13 +110,26 @@ function feedBeat(clock, seconds) {
         return clock.bpm
 
     var estimated = 60 / median(clock.intervals)
-    if (estimated < clock.minBpm * 0.95 || estimated > clock.maxBpm * 1.05)
+    estimated = clampBpm(clock, estimated)
+    if (estimated <= 0)
         return clock.bpm
-    estimated = Math.min(Math.max(estimated, clock.minBpm), clock.maxBpm)
 
     // Light smoothing keeps the readout stable between beats.
     clock.bpm = clock.bpm > 0 ? clock.bpm * 0.7 + estimated * 0.3 : estimated
     return clock.bpm
+}
+
+function defaultLowConfidence() {
+    return 0.15
+}
+
+// Accept an implied tempo only inside the band (with edge tolerance).
+function clampBpm(clock, bpm) {
+    if (!(bpm > 0))
+        return 0
+    if (bpm < clock.minBpm * 0.97 || bpm > clock.maxBpm * 1.03)
+        return 0
+    return Math.min(Math.max(bpm, clock.minBpm), clock.maxBpm)
 }
 
 // Reset all state (track change / stream idle).
@@ -90,4 +137,5 @@ function resetClock(clock) {
     clock.lastBeatSeconds = -1
     clock.intervals = []
     clock.bpm = 0
+    clock.divergentStreak = 0
 }
