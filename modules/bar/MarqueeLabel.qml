@@ -134,18 +134,15 @@ Item {
     // revealed line settles to full opacity. Inert unless a host calls
     // transitionFrom().
     // Wavefront tightness rule: each per-char animation lasts about one
-    // sweep step, so only a single char falls on the leading side and a
-    // single char fades on the trailing side at any instant. The animated
-    // zone's width is therefore speed × duration ≈ one character.
-    readonly property int ghostFallTime: 40
-    readonly property real ghostFallDistanceScale: 1.0
+    // sweep step, so only about a single char falls on the leading side
+    // and a single char fades on the trailing side at any instant.
+    readonly property int ghostFallTime: 60
+    readonly property real ghostFallDistanceScale: 1.5
     // Per-character sweep step — the scan line's travel speed.
-    readonly property int scanStepMs: 40
+    readonly property int scanStepMs: 60
     // Blank window the line leaves before the next char starts fading in.
-    readonly property int scanGapMs: 24
-    readonly property int scanRevealMs: 40
-    // Swept characters rest semi-transparent until the whole sweep ends.
-    readonly property real scanRestOpacity: 0.65
+    readonly property int scanGapMs: 20
+    readonly property int scanRevealMs: 90
     readonly property int transitionMaxChars: 48
     property var _enterRow: null
 
@@ -279,19 +276,11 @@ Item {
 
                     Behavior on opacity { NumberAnimation { duration: root.scanRevealMs; easing.type: Easing.OutQuad } }
 
-                    // The line passes this char: fade in to the resting
-                    // semi-transparent level (the drop gap keeps the line
-                    // itself blank).
+                    // The line passes this char: fade straight in to full
+                    // ink (the drop gap keeps the line itself blank).
                     Timer {
                         running: true
                         interval: charItem.index * root.scanStepMs + root.scanGapMs + 1
-                        onTriggered: charItem.opacity = root.scanRestOpacity
-                    }
-
-                    // Sweep done: the revealed line settles to full ink.
-                    Timer {
-                        running: true
-                        interval: enterRow.sweepTotal + root.scanGapMs + root.scanRevealMs + 1
                         onTriggered: charItem.opacity = 1
                     }
                 }
