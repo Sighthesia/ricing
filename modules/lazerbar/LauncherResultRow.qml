@@ -118,8 +118,7 @@ Item {
             id: card
             anchors.fill: parent
             radius: 6
-            color: root.selected ? LazerTheme.settingsSelected
-                    : rowHover.hovered && !root._closing ? LazerTheme.settingsCardHover
+            color: rowHover.hovered && !root._closing ? LazerTheme.settingsCardHover
                     : LazerTheme.settingsCard
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
@@ -139,7 +138,7 @@ Item {
         // selection without any flash.
         Rectangle {
             id: selectionStrip
-            x: 46
+            x: 5
             anchors.verticalCenter: parent.verticalCenter
             width: root.selected ? 4 : 0
             height: root.selected ? 24 : 0
@@ -161,7 +160,7 @@ Item {
             id: iconImage
             visible: root.iconSource.length > 0
             anchors.left: parent.left
-            anchors.leftMargin: (40 - width) / 2
+            anchors.leftMargin: 13
             anchors.verticalCenter: parent.verticalCenter
             width: 28
             height: 28
