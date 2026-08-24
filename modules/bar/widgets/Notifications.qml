@@ -49,4 +49,9 @@ BarPill {
             visible: root.unread > 0 && !root.dnd
         }
     }
+
+    // Hover opens this widget's popup in the shared overlay host.
+    WidgetHoverPopup {
+        kind: "notifications"
+    }
 }

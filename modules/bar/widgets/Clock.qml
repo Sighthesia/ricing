@@ -67,4 +67,9 @@ Item {
             font.pixelSize: 10
         }
     }
+
+    // Hover opens this widget's popup in the shared overlay host.
+    WidgetHoverPopup {
+        kind: "clock"
+    }
 }

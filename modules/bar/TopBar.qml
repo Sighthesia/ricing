@@ -80,6 +80,34 @@ Variants {
             }
         }
 
+        // Hover popups live in their own overlay owner so menu/slider content
+        // can escape the bar silhouette without resizing the bar surface.
+        // Input stays limited to the visible popup via a mask region.
+        PanelWindow {
+            id: popupWindow
+
+            screen: screenScope.modelData
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            exclusiveZone: -1
+            anchors { top: true; bottom: true; left: true; right: true }
+            WlrLayershell.layer: WlrLayer.Overlay
+            // Take keyboard only while a popup is up so Escape reaches it and
+            // global keys stay free when closed.
+            WlrLayershell.keyboardFocus: Services.BarPopupService.visible
+                    ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+            mask: Region { item: popupHost.revealProgress > 0 ? popupHost.activeSurfaceItem : null }
+
+            BarPopupHost {
+                id: popupHost
+
+                anchors.fill: parent
+                barHeight: screenScope.effectiveHeight
+                barTopAnchored: Services.SettingsService.bar.position === "top"
+                floatingMargin: screenScope.floatingMargin
+            }
+        }
+
         // Keep the launcher wave below the bar while only its internal viewport moves.
         PanelWindow {
             id: launcherWindow

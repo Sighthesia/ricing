@@ -26,7 +26,7 @@ singleton WindowHintTriggerService 1.0 WindowHintTriggerService.qml
 singleton TextSize 1.0 TextSize.qml
 singleton WindowHintService 1.0 WindowHintService.qml
 singleton LaunchCountService 1.0 LaunchCountService.qml
-singleton TrayMenuService 1.0 TrayMenuService.qml
+singleton BarPopupService 1.0 BarPopupService.qml
 singleton TransientMessageService 1.0 TransientMessageService.qml
 singleton SpectrumService 1.0 SpectrumService.qml
 singleton SystemMonitorService 1.0 SystemMonitorService.qml

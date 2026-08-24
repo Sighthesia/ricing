@@ -73,4 +73,9 @@ BarPill {
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
     }
+
+    // Hover opens this widget's popup in the shared overlay host.
+    WidgetHoverPopup {
+        kind: "volume"
+    }
 }

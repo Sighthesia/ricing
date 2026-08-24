@@ -1,4 +1,5 @@
 import QtQuick
+import ".."
 import "../../lazerbar"
 import "../../../services" as Services
 
@@ -65,5 +66,10 @@ Item {
                 NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
             }
         }
+    }
+
+    // Hover opens this widget's popup in the shared overlay host.
+    WidgetHoverPopup {
+        kind: "brightness"
     }
 }
