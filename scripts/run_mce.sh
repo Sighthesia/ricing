@@ -10,8 +10,8 @@ cd "$(dirname "$0")/.." || exit 1
 timeout -k 2 25 qs -p harness_media_char.qml >/dev/null 2>&1
 latest=$(ls -t /run/user/1000/quickshell/by-id/ | head -1)
 log="/run/user/1000/quickshell/by-id/$latest/log.qslog"
-strings "$log" | grep -a "DEBUG-mce2"
-if strings "$log" | grep -aq "DEBUG-mce2.*FAIL"; then
+strings "$log" | grep -a "DEBUG-mce4"
+if strings "$log" | grep -aq "DEBUG-mce4.*FAIL"; then
     echo "RED: lyric transition lost the primary label"
     exit 1
 fi

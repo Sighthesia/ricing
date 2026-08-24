@@ -114,14 +114,14 @@ BarPill {
         const oldText = root.trackedPrimaryText
         root.trackedPrimaryText = root.primaryText
         if (MotionTokens.reducedMotion) {
-            titleScroll.stop()
             titleLabel.x = 0
             titleLabel.opacity = 1
             return
         }
         // Reset marquee before spawning so ghosts start at the same origin
-        // the new line fades in from.
-        titleScroll.stop()
+        // the new line fades in from. Never stop() the animation imperatively
+        // — its running binding only re-evaluates on condition changes, so a
+        // stop() between two overflowing lines would kill scrolling for good.
         titleLabel.x = 0
         spawnLyricGhosts(oldText)
         startCharEnter(root.primaryText)
@@ -177,6 +177,7 @@ BarPill {
                 root._enterRow = null
             }
             titleLabel.opacity = 1
+            titleLabel.x = 0
         }
     }
 
@@ -321,21 +322,26 @@ BarPill {
                         font.pixelSize: 12
                         font.bold: true
                         opacity: 1
-                        width: titleScroll.running ? implicitWidth : Math.min(implicitWidth, root.maxTextWidth)
-                        elide: titleScroll.running ? Text.ElideNone : Text.ElideRight
+                        // Overflow state drives width/elide declaratively —
+                        // never key them off the animation's running flag.
+                        width: root.titleOverflows ? implicitWidth : Math.min(implicitWidth, root.maxTextWidth)
+                        elide: root.titleOverflows ? Text.ElideNone : Text.ElideRight
                     }
 
+                    // Marquee is fully state-driven: it runs only once the
+                    // label is revealed (opacity settled), and every cycle
+                    // pins explicit from/to so x can never start stale.
                     SequentialAnimation {
                         id: titleScroll
                         running: root.titleOverflows && !MotionTokens.reducedMotion
+                            && titleLabel.opacity >= 0.99 && titleSlot.width > 0
                         loops: Animation.Infinite
-
-                        onRunningChanged: if (!running) titleLabel.x = 0
 
                         PauseAnimation { duration: 1400 }
                         NumberAnimation {
                             target: titleLabel
                             property: "x"
+                            from: 0
                             to: -(titleLabel.implicitWidth - titleSlot.width)
                             duration: Math.max(2000, (titleLabel.implicitWidth - titleSlot.width) * 18)
                             easing.type: Easing.Linear
@@ -344,6 +350,7 @@ BarPill {
                         NumberAnimation {
                             target: titleLabel
                             property: "x"
+                            from: -(titleLabel.implicitWidth - titleSlot.width)
                             to: 0
                             duration: Math.max(2000, (titleLabel.implicitWidth - titleSlot.width) * 18)
                             easing.type: Easing.Linear
@@ -512,6 +519,7 @@ BarPill {
                     + root.lyricCharFadeTime + MotionTokens.fast
                 onTriggered: {
                     titleLabel.opacity = 1
+                    titleLabel.x = 0
                     if (root._enterRow === enterRow)
                         root._enterRow = null
                     enterRow.destroy()
