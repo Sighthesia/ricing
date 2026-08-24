@@ -313,19 +313,19 @@ BarPill {
                 pixelSize: 12
                 bold: true
             }
-        }
 
-        // Sub-line follows the same contract: scroll instead of ellipsis.
-        MarqueeLabel {
-            text: Services.MediaControlService.showCompactLyric
-                ? Services.MediaControlService.artist
-                    + (Services.MediaControlService.title !== ""
-                        ? " - " + Services.MediaControlService.title : "")
-                : Services.MediaControlService.artist
-            visible: text.length > 0
-            maxWidth: root.maxTextWidth
-            textColor: LazerTheme.textMuted
-            pixelSize: 10
+            // Sub-line follows the same contract: scroll instead of ellipsis.
+            MarqueeLabel {
+                text: Services.MediaControlService.showCompactLyric
+                    ? Services.MediaControlService.artist
+                        + (Services.MediaControlService.title !== ""
+                            ? " - " + Services.MediaControlService.title : "")
+                    : Services.MediaControlService.artist
+                visible: text.length > 0
+                maxWidth: root.maxTextWidth
+                textColor: LazerTheme.textMuted
+                pixelSize: 10
+            }
         }
     }
 
