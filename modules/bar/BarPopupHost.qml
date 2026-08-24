@@ -30,15 +30,17 @@ Item {
             shownKind = Services.BarPopupService.kind
             shownPayload = Services.BarPopupService.payload
             frameAnchorX = Services.BarPopupService.anchorX
-            // Settings-panel rhythm: OutQuint, settingsEnter in / settingsExit out.
-            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsEnter
+            // Settings-panel rhythm: OutQuint over settingsSlide.
+            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
             deformAnimation.easing.type = Easing.OutQuint
             deformAnimation.to = 1
             deformProgress = MotionTokens.reducedMotion ? 1 : 0
             deformAnimation.restart()
         } else {
-            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsExit
-            deformAnimation.easing.type = Easing.OutQuint
+            // Exit mirrors the settings panel exactly: settingsSlide InQuad,
+            // giving the scale-down room to read instead of snapping shut.
+            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
+            deformAnimation.easing.type = Easing.InQuad
             deformAnimation.to = 0
             deformAnimation.restart()
             Services.BarPopupService.pointerInPopup = false
