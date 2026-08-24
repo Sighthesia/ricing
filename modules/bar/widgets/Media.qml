@@ -68,13 +68,35 @@ BarPill {
         interval: 50
         repeat: true
         onTriggered: {
-            var sig = [root.primaryText.length, titleLabel.implicitWidth.toFixed(0),
-                titleLabel.width.toFixed(0), titleLabel.x.toFixed(1), titleSlot.width.toFixed(0),
-                titleLabel.elide, titleLabel.opacity.toFixed(2), titleScroll.running].join("|")
+            var texts = []
+            root._mceScan(root, texts)
+            var sig = texts.join("|")
             if (sig !== root._mceLast) {
                 root._mceLast = sig
-                console.log("[DEBUG-mce6]", sig)
+                for (var i = 0; i < texts.length; i++)
+                    console.log("[DEBUG-mce6]", i, texts[i])
+                if (texts.length === 0)
+                    console.log("[DEBUG-mce6] no-texts n=" + root.children.length)
             }
+        }
+    }
+
+    // [DEBUG-mce6] dump every Text: prefix|w|iw|x|elide|op
+    function _mceScan(item, acc) {
+        if (!item)
+            return
+        var kids = item.children || []
+        for (var i = 0; i < kids.length; i++) {
+            var c = kids[i]
+            if ("elide" in c && typeof c.text === "string" && c.text.length > 0) {
+                var t = String(c.text)
+                var head = ""
+                for (var k = 0; k < Math.min(6, t.length); k++)
+                    head += t.charCodeAt(k).toString(16) + ","
+                acc.push(t.length + ":" + head + "|" + c.width.toFixed(0) + "|" +
+                    c.implicitWidth.toFixed(0) + "|" + c.x.toFixed(1) + "|" + c.elide + "|" + c.opacity.toFixed(2))
+            }
+            root._mceScan(c, acc)
         }
     }
 
