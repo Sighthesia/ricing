@@ -49,9 +49,15 @@ BarPill {
         return Services.NeteaseWebLyricsService.artUrl !== ""
     }
 
-    // Ghost exit reuses OsuTextField's FallingDownContainer contract.
+    // Ghost exit reuses OsuTextField's FallingDownContainer contract,
+    // applied per character with a left-to-right stagger.
     readonly property int lyricGhostFallTime: 200
     readonly property real lyricGhostFallDistanceScale: 1.5
+    readonly property int lyricCharStaggerExit: 16
+    readonly property int lyricCharStaggerEnter: 22
+    readonly property int lyricCharFadeTime: 140
+    readonly property int lyricMaxChars: 48
+    property var _enterRow: null
 
     // Spectrum registration — mirrors the old bar spectrum integration.
     readonly property string spectrumComponentId: "media:" + (root.instanceKey !== "" ? root.instanceKey : (root.widgetId !== "" ? root.widgetId : root.screenName))
@@ -69,6 +75,12 @@ BarPill {
 
     visible: hasMedia
     implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12) : 0
+    // Smooth width morph like the legacy media pill: growth/shrink eases
+    // instead of snapping when lyric lengths change.
+    Behavior on implicitWidth {
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+    }
     hoverable: hasMedia
 
     onClicked: Services.MediaService.playPause()
@@ -87,7 +99,11 @@ BarPill {
             Services.SettingsService.ensureWidgetSettings("media", root.instanceKey)
         syncSpectrumRegistration()
     }
-    Component.onDestruction: Services.SpectrumService.unregisterComponent(root.spectrumComponentId)
+    Component.onDestruction: {
+        Services.SpectrumService.unregisterComponent(root.spectrumComponentId)
+        if (root._enterRow)
+            root._enterRow.destroy()
+    }
     onNeedsSpectrumChanged: syncSpectrumRegistration()
 
     onPrimaryTextChanged: {
@@ -107,24 +123,61 @@ BarPill {
         // the new line fades in from.
         titleScroll.stop()
         titleLabel.x = 0
-        spawnLyricGhost(oldText)
-        titleLabel.opacity = 0
-        lyricFadeIn.restart()
+        spawnLyricGhosts(oldText)
+        startCharEnter(root.primaryText)
     }
 
-    function spawnLyricGhost(oldText) {
+    function spawnLyricGhosts(oldText) {
         if (oldText === "")
             return
-        lyricGhostComponent.createObject(ghostLayer, {
-            text: oldText,
-            color: LazerTheme.textPrimary,
-            font: titleLabel.font,
-            x: 0,
-            y: 0,
-            opacity: 1,
-            // Travel one-and-a-half line heights, like the field's delete ghosts.
-            fallDistance: Math.max(1, titleLabel.height) * root.lyricGhostFallDistanceScale
-        })
+        var count = Math.min(oldText.length, root.lyricMaxChars)
+        for (var i = 0; i < count; i++) {
+            ghostMetrics.font = titleLabel.font
+            ghostMetrics.text = oldText.slice(0, i)
+            lyricGhostComponent.createObject(ghostLayer, {
+                text: oldText[i],
+                color: LazerTheme.textPrimary,
+                font: titleLabel.font,
+                x: ghostMetrics.advanceWidth,
+                y: 0,
+                opacity: 1,
+                delay: i * root.lyricCharStaggerExit,
+                // Travel one-and-a-half line heights, like the field's delete ghosts.
+                fallDistance: Math.max(1, titleLabel.height) * root.lyricGhostFallDistanceScale
+            })
+        }
+    }
+
+    // Entrance renders per-character fade-ins on a temporary row while the
+    // real label stays hidden; once the last char lands the row is retired
+    // and the (elide/marquee-capable) label takes over again.
+    function startCharEnter(text) {
+        if (root._enterRow) {
+            root._enterRow.destroy()
+            root._enterRow = null
+        }
+        if (text === "" || MotionTokens.reducedMotion) {
+            titleLabel.opacity = 1
+            return
+        }
+        titleLabel.opacity = 0
+        root._enterRow = enterRowComponent.createObject(titleSlot, { chars: text })
+        // Safety net: no matter what happens inside the row, the real
+        // label always comes back.
+        enterGuard.restart()
+    }
+
+    // Fallback restores the label if the enter row's own timers ever fail.
+    Timer {
+        id: enterGuard
+        interval: 2400
+        onTriggered: {
+            if (root._enterRow) {
+                root._enterRow.destroy()
+                root._enterRow = null
+            }
+            titleLabel.opacity = 1
+        }
     }
 
     WheelHandler {
@@ -373,16 +426,12 @@ BarPill {
         }
     }
 
-    // Incoming lyric fades in transparently; outgoing lyric is handled by
-    // the ghost layer above reusing the text-field fall contract.
-    NumberAnimation {
-        id: lyricFadeIn
-        target: titleLabel
-        property: "opacity"
-        from: 0
-        to: 1
-        duration: root.lyricGhostFallTime
-        easing.type: Easing.OutQuad
+    // Incoming lyric fades in per character via enterRowComponent; the
+    // outgoing line is handled by the per-char ghost layer above reusing
+    // the text-field fall contract.
+    // Shared per-character advance measuring for ghost placement.
+    TextMetrics {
+        id: ghostMetrics
     }
 
     Component {
@@ -392,6 +441,7 @@ BarPill {
             id: ghost
 
             property real fallDistance: 10
+            property int delay: 0
 
             font.bold: true
             font.pixelSize: 12
@@ -402,7 +452,7 @@ BarPill {
 
             Timer {
                 id: fallTimer
-                interval: 1
+                interval: ghost.delay > 0 ? ghost.delay + 1 : 1
                 onTriggered: {
                     ghost.y += ghost.fallDistance
                     ghost.opacity = 0
@@ -410,12 +460,59 @@ BarPill {
             }
             Timer {
                 id: retireTimer
-                interval: root.lyricGhostFallTime + 1
+                interval: (ghost.delay > 0 ? ghost.delay : 0) + root.lyricGhostFallTime + 2
                 onTriggered: ghost.destroy()
             }
             Component.onCompleted: {
                 fallTimer.restart()
                 retireTimer.restart()
+            }
+        }
+    }
+
+    Component {
+        id: enterRowComponent
+
+        Row {
+            id: enterRow
+
+            property string chars: ""
+
+            spacing: 0
+
+            Repeater {
+                model: Math.min(enterRow.chars.length, root.lyricMaxChars)
+
+                Text {
+                    id: charItem
+
+                    required property int index
+
+                    text: enterRow.chars[index]
+                    color: LazerTheme.textPrimary
+                    font.bold: true
+                    font.pixelSize: 12
+                    opacity: 0
+
+                    Behavior on opacity { NumberAnimation { duration: root.lyricCharFadeTime; easing.type: Easing.OutQuad } }
+
+                    Timer {
+                        interval: charItem.index * root.lyricCharStaggerEnter + 1
+                        onTriggered: charItem.opacity = 1
+                    }
+                }
+            }
+
+            Timer {
+                id: retireTimer
+                interval: Math.min(enterRow.chars.length, root.lyricMaxChars) * root.lyricCharStaggerEnter
+                    + root.lyricCharFadeTime + MotionTokens.fast
+                onTriggered: {
+                    titleLabel.opacity = 1
+                    if (root._enterRow === enterRow)
+                        root._enterRow = null
+                    enterRow.destroy()
+                }
             }
         }
     }
