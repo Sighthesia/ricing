@@ -334,11 +334,9 @@ Singleton {
         if (playerTrackKey !== "")
             root._latchedPlayerTrackKey = playerTrackKey
 
-        // Update stable lyric properties from service values when available
+        // No-lyric fallback is the bare title: never join the artist with
+        // " · " on the primary row.
         var fallbackText = Services.NeteaseWebLyricsService.title
-        if (Services.NeteaseWebLyricsService.title !== "" && Services.NeteaseWebLyricsService.artist !== "") {
-            fallbackText = Services.NeteaseWebLyricsService.title + " · " + Services.NeteaseWebLyricsService.artist
-        }
         
         // For primary/original lyrics: show fallback (title/artist) when no actual lyric
         if (Services.NeteaseWebLyricsService.currentLyric !== "")

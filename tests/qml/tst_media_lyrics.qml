@@ -233,7 +233,7 @@ TestCase {
         compare(Services.MediaControlService.artUrl, "file:///tmp/mpris-cover.jpg")
     }
 
-    function test_compact_display_uses_title_artist_before_first_lyric_without_secondary() {
+    function test_compact_display_uses_title_before_first_lyric_without_secondary() {
         resetState()
 
         Services.NeteaseWebLyricsService.title = "Song"
@@ -244,7 +244,7 @@ TestCase {
 
         Services.MediaControlService._refreshLyricsSession()
 
-        compare(Services.MediaControlService.compactOriginalLyric, "Song · Artist")
+        compare(Services.MediaControlService.compactOriginalLyric, "Song")
         compare(Services.MediaControlService.compactTranslatedLyric, "")
         compare(Services.MediaControlService.showCompactLyric, true)
     }

@@ -193,6 +193,19 @@ BarPill {
             color: Qt.rgba(1, 1, 1, 0.14)
             clip: true
 
+            // Beat flash across the whole track (reads mostly on the
+            // unplayed remainder); sits under the played fill overlay.
+            Rectangle {
+                anchors.fill: parent
+                color: LazerTheme.textPrimary
+                opacity: MotionTokens.reducedMotion
+                    ? 0
+                    : Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 0.5
+                visible: opacity > 0.01
+
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+            }
+
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -291,7 +304,11 @@ BarPill {
 
             Text {
                 width: Math.min(implicitWidth, root.maxTextWidth)
-                text: Services.MediaControlService.artist
+                // While lyrics lead the primary line the sub-line carries
+                // the song name; otherwise it stays the artist.
+                text: Services.MediaControlService.showCompactLyric
+                    ? Services.MediaControlService.title
+                    : Services.MediaControlService.artist
                 visible: text.length > 0
                 color: LazerTheme.textMuted
                 elide: Text.ElideRight
