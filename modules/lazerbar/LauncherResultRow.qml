@@ -134,16 +134,26 @@ Item {
             color: LazerTheme.settingsRail
         }
 
-        // Selected indicator: thin sharp accent strip on the leading edge.
+        // Selected indicator: settings-sidebar accent pill — a rounded line
+        // inset between the icon rail and the text column, growing in on
+        // selection without any flash.
         Rectangle {
             id: selectionStrip
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: 4
-            radius: 0
+            x: 46
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.selected ? 4 : 0
+            height: root.selected ? 24 : 0
+            radius: 2
             color: LazerTheme.settingsAccent
-            visible: root.selected
+
+            Behavior on width {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            }
+            Behavior on height {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            }
         }
 
         // Colorful enlarged icon: original colors preserved.
