@@ -30,6 +30,13 @@ Item {
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
 
+    // Smooth width morph: title changes ease instead of snapping, so the
+    // Row layout smoothly pushes neighboring widgets aside.
+    Behavior on implicitWidth {
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+    }
+
     Row {
         id: contentRow
 
