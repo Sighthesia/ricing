@@ -38,9 +38,12 @@ QtObject {
             closePending = false
             return
         }
-        kind = popupKind
+        // Anchor and payload before kind: flipping `kind` makes `visible`
+        // true synchronously, and the host snapshots state in that same
+        // instant -- it must never read the previous popup's anchor/payload.
         anchorX = x
         payload = popupPayload
+        kind = popupKind
         pointerInPopup = false
         closePending = false
     }

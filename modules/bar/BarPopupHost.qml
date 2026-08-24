@@ -27,7 +27,6 @@ Item {
     readonly property alias activeSurfaceItem: surfaceLoader.item
     onPopupVisibleChanged: {
         if (popupVisible) {
-            reuseMorph = surfaceLoader.item !== null
             shownKind = Services.BarPopupService.kind
             shownPayload = Services.BarPopupService.payload
             frameAnchorX = Services.BarPopupService.anchorX
@@ -53,9 +52,6 @@ Item {
     // Single deform progress drives scale and slide; there is no opacity
     // animation -- occlusion by the bar window does the hiding.
     property real deformProgress: 0
-    // True when this open found a live instance to reuse (settled or
-    // mid-exit); reused instances may morph geometry instead of jumping.
-    property bool reuseMorph: false
 
     // Confirm a widget's leave-request once the pointer had a fair chance to
     // travel into the popup surface.
@@ -163,8 +159,11 @@ Item {
         // Retargets while fully open glide to their new frame instead of
         // teleporting; entrance/exit geometry stays unanimated so the
         // occlusion slide owns those phases.
+        // Morph behaviors run for the whole open lifetime. The service
+        // commits anchor/payload before `kind` flips visible, so the first
+        // binding evaluation already lands on the correct dock -- gliding
+        // is safe from frame one, including mid-entrance retargets.
         readonly property bool morphReady: root.popupVisible
-                && (root.deformProgress >= 1 || root.reuseMorph)
         Behavior on x {
             enabled: surfaceLoader.morphReady
             NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
