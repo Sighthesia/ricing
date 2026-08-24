@@ -126,6 +126,13 @@ Singleton {
         for (let fillIndex = index; fillIndex < buffer.length; fillIndex += 1)
             buffer[fillIndex] = 0
 
+        // Decay the beat pulse on every visual frame — including idle-stable
+        // frames that skip the publish below — so a beat arriving after the
+        // spectrum idled still fades instead of freezing flash highlights on.
+        root._reportedPulse *= 0.85
+        if (root._reportedPulse < 0.01)
+            root._reportedPulse = 0
+
         if (allZero) {
             root._idleFrameCount += 1
             if (root._idleFrameCount >= root._idleThreshold) {
@@ -137,11 +144,6 @@ Singleton {
             root._idleFrameCount = 0
             root.isIdle = false
         }
-
-        // Decay the beat pulse on every visual frame so flash effects fade.
-        root._reportedPulse *= 0.85
-        if (root._reportedPulse < 0.01)
-            root._reportedPulse = 0
 
         root._bufToggle = !root._bufToggle
         root.values = buffer

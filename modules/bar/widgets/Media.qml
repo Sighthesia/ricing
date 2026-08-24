@@ -62,9 +62,18 @@ BarPill {
     // mirrored bar field into an unreadable sliver.
     readonly property int minPillWidth: 140
     readonly property int minSpectrumWidth: 100
+    // Distance from contentRow's left edge to the text column: cover glyph,
+    // row spacing, progress track, row spacing again.
+    readonly property int textColumnOffset: root.coverSize + 8 + 3 + 8
+    // Pill width needed so the floored spectrum field ends inside the pill:
+    // with contentRow centered, its x is (W - R) / 2, and the spectrum's
+    // right edge must stay within the hoverable surface (6px breathing).
+    readonly property int spectrumFitWidth: !root.needsSpectrum ? 0
+        : Math.max(0, 2 * (root.textColumnOffset + Math.max(root.minSpectrumWidth, textColumn.width) + 6)
+            - contentRow.implicitWidth)
 
     visible: hasMedia
-    implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12) : 0
+    implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12, root.spectrumFitWidth) : 0
     // Smooth width morph like the legacy media pill: growth/shrink eases
     // instead of snapping when lyric lengths change.
     Behavior on implicitWidth {
