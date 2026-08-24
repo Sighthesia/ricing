@@ -1,4 +1,5 @@
 import QtQuick
+import ".."
 import "../../lazerbar"
 import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 

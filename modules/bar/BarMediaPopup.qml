@@ -1,6 +1,6 @@
 import QtQuick
 import "../lazerbar"
-import "../../../services" as Services
+import "../../services" as Services
 
 // Transport card for the media hover popup: track identity, progress strip,
 // and geometric transport controls.

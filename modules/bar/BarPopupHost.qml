@@ -1,7 +1,8 @@
 import QtQuick
 import Quickshell
+import "."
 import "../lazerbar"
-import "../../../services" as Services
+import "../../services" as Services
 
 // Host every hover-driven bar popup in one overlay owner. The outer surface
 // stays static per open so per-frame geometry never crosses a costly commit
@@ -144,7 +145,7 @@ Item {
 
             BarSliderPopup {
                 title: "Volume"
-                iconSource: "../icons/volume.svg"
+                iconSource: "icons/volume.svg"
                 value: Services.VolumeService.sinkVolume
                 showMute: true
                 muted: Services.VolumeService.sinkMuted
@@ -158,7 +159,7 @@ Item {
 
             BarSliderPopup {
                 title: "Brightness"
-                iconSource: "../icons/brightness.svg"
+                iconSource: "icons/brightness.svg"
                 value: Services.BrightnessService.brightness
                 onValueModified: value => Services.BrightnessService.setBrightness(value)
             }

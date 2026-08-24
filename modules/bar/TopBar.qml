@@ -96,7 +96,9 @@ Variants {
             // global keys stay free when closed.
             WlrLayershell.keyboardFocus: Services.BarPopupService.visible
                     ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-            mask: Region { item: popupHost.revealProgress > 0 ? popupHost.activeSurfaceItem : null }
+            mask: Region {
+                item: popupHost.revealProgress > 0 ? popupHost.activeSurfaceItem : null
+            }
 
             BarPopupHost {
                 id: popupHost

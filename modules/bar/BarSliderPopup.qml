@@ -1,6 +1,6 @@
 import QtQuick
 import "../lazerbar"
-import "../../../services" as Services
+import "../../services" as Services
 
 // Slider card for volume/brightness hover popups, reusing the settings
 // panel's verified slider control inside a sharp popup surface.

@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import "../lazerbar"
-import "../../../services" as Services
+import "../../services" as Services
 
 // Render one tray item's DBusMenu with the lazer popup language: sharp
 // surface, brightness-diff hover, and geometric state indicators.

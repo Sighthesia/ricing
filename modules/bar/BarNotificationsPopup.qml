@@ -1,6 +1,6 @@
 import QtQuick
 import "../lazerbar"
-import "../../../services" as Services
+import "../../services" as Services
 
 // Quick actions for the notifications hover popup: do-not-disturb toggle
 // and mark-all-read, in the shared sharp row language.
