@@ -205,7 +205,11 @@ Item {
     }
 
     // Reveal motion stays inside the surface so the overlay window geometry
-    // never changes per frame.
+    // never changes per frame. Enter: the popup starts over the bar and
+    // slides down to its dock while scaling up; exit reverses both moves.
+    // Travel equals the full dock offset so the surface emerges from the
+    // bar's own footprint.
+    readonly property real enterTravel: root.floatingMargin + root.barHeight + 4
     transform: [
         Scale {
             origin.x: {
@@ -222,7 +226,7 @@ Item {
         },
         Translate {
             y: MotionTokens.reducedMotion ? 0
-               : (root.barTopAnchored ? -1 : 1) * MotionTokens.popupFromY * (1 - root.revealProgress)
+               : (root.barTopAnchored ? -1 : 1) * root.enterTravel * (1 - root.revealProgress)
         }
     ]
     opacity: root.revealProgress
