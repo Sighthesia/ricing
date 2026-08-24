@@ -1,11 +1,10 @@
 import QtQuick
-import QtQuick.Effects
 import "../../services/LauncherLogic.js" as LauncherLogic
 
-// Present one launcher result as a fixed-height sharp osu!lazer row: accent
-// selection strip and tinted fill, settings-panel hover swap and focus ring,
-// press scale, shared click-flash contract, and icon/title/description
-// metadata. Selection is service-driven; the row never steals search focus.
+// Present one launcher result as a notification-like card: 6px rounded
+// settingsCard surface with a 40px icon rail, colorful enlarged icon,
+// title/description stack, accent selection strip, shared click-flash,
+// and the notification parabolic fling exit on activation.
 Item {
     id: root
 
@@ -23,14 +22,16 @@ Item {
     readonly property string descriptionText: result && result.description != null ? String(result.description) : ""
     readonly property string iconSource: result && result.icon ? String(result.icon) : ""
 
-    readonly property real rowHeight: 56
+    // Slightly taller than the old 56px to mirror the notification minimum and
+    // comfortably host a 28px colorful icon.
+    readonly property real rowHeight: 64
     implicitWidth: 480
     activeFocusOnTab: true
     Accessible.role: Accessible.ListItem
     Accessible.name: root.displayName
 
     readonly property bool hovered: rowHover.hovered
-    readonly property alias surfaceItem: rowSurface
+    readonly property alias surfaceItem: card
     readonly property alias selectionStripItem: selectionStrip
     readonly property alias titleItem: titleText
     readonly property alias descriptionItem: descriptionLabel
@@ -38,6 +39,10 @@ Item {
     readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
     readonly property Item flashOverlayItem: flashOverlay
     readonly property Animation flashAnimationItem: flashAnimation
+    readonly property bool closing: _closing
+
+    property bool _closing: false
+    readonly property real gravity: 0.005
 
     signal activated()
 
@@ -56,7 +61,7 @@ Item {
     visible: !geometryHeld || height > 0.5 || opacity > 0.01
     opacity: geometryHeld ? 0 : 1
     x: geometryHeld ? -8 : 0
-    enabled: !geometryHeld
+    enabled: !geometryHeld && !root._closing
 
     // Search-driven folds animate immediately and together; staggering here
     // made every keystroke ripple the entire list (entrance stagger lives in
@@ -105,75 +110,134 @@ Item {
         revealTimer.restart()
     }
 
-    // Sharp full-row surface: selected tint outranks the plain hover swap.
-    Rectangle {
-        id: rowSurface
-        anchors.left: parent.left
-        anchors.top: parent.top
-        width: parent.width
-        height: root.bodyHeight
-        radius: 0
-        color: root.selected ? LazerTheme.settingsSelected
-                : rowHover.hovered ? LazerTheme.hoverFill : "transparent"
-        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+    // --- fling exit (parabolic, gravity-driven, like LazerNotificationPopup) ---
+    FrameAnimation {
+        id: fallAnim
+        onTriggered: {
+            const dt = frameTime * 1000
+            dragContainer.velocityY += dt * root.gravity
+            dragContainer.dragX += dragContainer.velocityX * dt
+            dragContainer.dragY += dragContainer.velocityY * dt
+        }
     }
 
-    // Selected indicator stays a thin sharp accent strip on the leading edge.
+    NumberAnimation {
+        id: flingFade
+        target: root
+        property: "opacity"
+        to: 0
+        duration: 600
+        easing.type: Easing.InQuad
+    }
+
+    NumberAnimation {
+        id: quickFade
+        target: root
+        property: "opacity"
+        to: 0
+        duration: root.reducedMotion ? 0 : 100
+    }
+
+    readonly property bool reducedMotion: MotionTokens.reducedMotion
+
+    // Physics, drag, and rotation owner — mirrors notification DragContainer.
+    Item {
+        id: dragContainer
+        width: root.width
+        height: root.bodyHeight
+        x: dragX
+        y: dragY
+        rotation: Math.min(0, dragX * 0.1)
+        transformOrigin: Item.Center
+
+        property real dragX: 0
+        property real dragY: 0
+        property real velocityX: 0
+        property real velocityY: 0
+    }
+
+    // Card surface — notification-like 6px rounded card.
+    Rectangle {
+        id: card
+        parent: dragContainer
+        anchors.fill: parent
+        radius: 6
+        color: root.selected ? LazerTheme.settingsSelected
+                : rowHover.hovered && !root._closing ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+        border.width: root.selected ? 1.5 : 0
+        border.color: root.selected ? LazerTheme.settingsAccent : "transparent"
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on border.width { NumberAnimation { duration: 100 } }
+        Behavior on border.color { ColorAnimation { duration: 100 } }
+    }
+
+    // Icon rail like notification's iconStrip — 40px wide, rail background.
+    Rectangle {
+        id: iconStrip
+        parent: dragContainer
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: 40
+        radius: 6
+        color: LazerTheme.settingsRail
+    }
+
+    // Selected indicator — thin sharp accent strip on the leading edge, above card.
     Rectangle {
         id: selectionStrip
+        parent: dragContainer
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 4
         radius: 0
         color: LazerTheme.settingsAccent
-        visible: root.selected
+        visible: root.selected && !root._closing
         opacity: root.selected ? 1 : 0
         Behavior on opacity { enabled: !MotionTokens.reducedMotion; ColorAnimation { duration: MotionTokens.fast } }
     }
 
-    // Result icon at osu's left margin, colorized with the muted text tone
-    // until the row is selected or hovered.
+    // Colorful enlarged icon — preserved original colors, no colorization.
     Image {
         id: iconImage
+        parent: dragContainer
         visible: root.iconSource.length > 0
-        x: 16
+        anchors.left: parent.left
+        anchors.leftMargin: (40 - width) / 2
         anchors.verticalCenter: parent.verticalCenter
-        width: 20
-        height: 20
+        width: 28
+        height: 28
         source: root.iconSource
         fillMode: Image.PreserveAspectFit
-        scale: rowPress.pressed ? MotionTokens.pressScale : 1
+        asynchronous: true
+        scale: rowPress.pressed && !root._closing ? MotionTokens.pressScale : 1
         Behavior on scale {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
         }
     }
 
-    MultiEffect {
-        anchors.fill: iconImage
-        source: iconImage
-        visible: iconImage.visible
-        colorization: 1
-        colorizationColor: root.selected || rowHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
-        Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
-    }
-
+    // Title: left of icon rail, vertically centered when no description.
     Text {
         id: titleText
+        parent: dragContainer
         x: 52
         anchors.top: parent.top
-        anchors.topMargin: root.descriptionText.length > 0 ? 9 : 0
+        anchors.topMargin: root.descriptionText.length > 0 ? 12 : 0
         anchors.verticalCenter: root.descriptionText.length > 0 ? undefined : parent.verticalCenter
         width: Math.max(0, parent.width - x - 12)
         text: root.displayName
         color: LazerTheme.textPrimary
         font.pixelSize: 14
+        font.weight: Font.DemiBold
         elide: Text.ElideRight
+        verticalAlignment: Text.AlignVCenter
     }
 
     Text {
         id: descriptionLabel
+        parent: dragContainer
         x: titleText.x
         anchors.top: titleText.bottom
         anchors.topMargin: 2
@@ -183,18 +247,17 @@ Item {
         color: LazerTheme.textMuted
         font.pixelSize: 11
         elide: Text.ElideRight
+        wrapMode: Text.NoWrap
     }
 
     // Confirm activation with the shared osu click-flash recipe without
     // owning input or changing the row's hit area.
     Rectangle {
         id: flashOverlay
+        parent: dragContainer
         z: 2
-        anchors.left: parent.left
-        anchors.top: parent.top
-        width: parent.width
-        height: root.bodyHeight
-        radius: 0
+        anchors.fill: parent
+        radius: 6
         color: LazerTheme.textPrimary
         opacity: 0
         enabled: false
@@ -214,12 +277,10 @@ Item {
     // Keyboard-focus ring rides above content as a non-input layer.
     Rectangle {
         id: focusRing
+        parent: dragContainer
         z: 3
-        anchors.left: parent.left
-        anchors.top: parent.top
-        width: parent.width
-        height: root.bodyHeight
-        radius: 0
+        anchors.fill: parent
+        radius: 6
         color: "transparent"
         border.width: root.activeFocus ? 1.5 : 0
         border.color: LazerTheme.settingsAccent
@@ -237,18 +298,34 @@ Item {
         flashAnimation.restart()
     }
 
-    // Activate without moving keyboard focus away from the search session.
+    // Activate with notification-style parabolic fling and immediate emit
+    // (visual fling runs in parallel so tests stay synchronous).
     function activate() {
+        if (root._closing || root.geometryHeld)
+            return
         root.restartFlash()
+        root._closing = true
+        rowHover.enabled = false
+        if (!MotionTokens.reducedMotion) {
+            if (dragContainer.velocityX > -0.3)
+                dragContainer.velocityX = -0.3 - Math.random() * 0.5
+            dragContainer.velocityY = 0
+            fallAnim.start()
+            flingFade.restart()
+        } else {
+            quickFade.restart()
+        }
         root.activated()
     }
 
     HoverHandler {
         id: rowHover
         blocking: false
+        enabled: !root._closing
     }
     TapHandler {
         id: rowPress
+        enabled: !root._closing
         onTapped: root.activate()
     }
     Keys.onPressed: event => {
