@@ -140,6 +140,9 @@ Item {
         }
     }
 
+    // Probe/test access to the hosted page.
+    property alias waveHostItem: waveHost
+
     WaveSurfaceHost {
         id: waveHost
         anchors.fill: parent

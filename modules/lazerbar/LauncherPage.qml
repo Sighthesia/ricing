@@ -425,6 +425,22 @@ Item {
     // Result viewport: settings-panel structure (Flickable + folding rows)
     // so entrance wave, query reordering, and the scroll contract behave
     // exactly like LazerSettingsSections.
+    // Result windowing: instantiating every pooled row (clipboard can carry
+    // 750+) floods the entrance wave and scroll path. Materialize a base
+    // slice and grow it as the user scrolls or navigates deeper; queries
+    // reset the window so filtered sets always start cheap.
+    readonly property int resultWindowBase: 96
+    readonly property int resultWindowStep: 80
+    property int _resultWindowExtra: 0
+    readonly property int _resultWindowLimit: resultWindowBase + _resultWindowExtra
+    readonly property var windowedResults: {
+        var pool = root.session ? root.session.displayPool : null
+        if (!pool || pool.length <= _resultWindowLimit)
+            return pool || []
+        return pool.slice(0, _resultWindowLimit)
+    }
+    onActiveSearchTextChanged: root._resultWindowExtra = 0
+
     Flickable {
         id: resultsView
         anchors.top: searchSurface.bottom
@@ -440,6 +456,10 @@ Item {
         contentHeight: resultsColumn.height
         onContentHeightChanged: syncSelectionFrame()
         boundsBehavior: Flickable.StopAtBounds
+        onContentYChanged: {
+            if (contentY > contentHeight - height - 900)
+                extendResultWindow()
+        }
         flickDeceleration: 2000
         interactive: !root.entranceBusy
 
@@ -470,10 +490,26 @@ Item {
             return resultsRepeater.itemAt(index)
         }
 
+        // Grow the materialized window when the viewport approaches its
+        // end so long histories browse without a hard cap.
+        function extendResultWindow() {
+            var pool = root.session ? root.session.displayPool : null
+            if (pool && pool.length > root._resultWindowLimit)
+                root._resultWindowExtra += root.resultWindowStep
+        }
+
         function positionToSelection() {
             var service = root.session
             if (!service || service.selectedIndex < 0 || !service.results)
                 return
+            // Keyboard navigation can outrun the window; extend until the
+            // target row exists before positioning.
+            while (service.selectedIndex >= resultsRepeater.count) {
+                var before = resultsRepeater.count
+                extendResultWindow()
+                if (resultsRepeater.count === before)
+                    return
+            }
             var current = service.results[service.selectedIndex]
             if (!current)
                 return
@@ -617,7 +653,7 @@ Item {
 
             Repeater {
                 id: resultsRepeater
-                model: root.session && root.session.displayPool ? root.session.displayPool : []
+                model: root.windowedResults
 
                 delegate: LauncherResultRow {
                     required property var modelData

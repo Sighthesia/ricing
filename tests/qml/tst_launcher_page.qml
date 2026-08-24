@@ -319,7 +319,7 @@ Item {
             ])
             var frame = findFrame()
             verify(frame)
-            compare(frame.opacity, 1)
+            tryCompare(frame, "opacity", 1)
 
             keyClick(Qt.Key_Down)
             tryCompare(svc(), "selectedIndex", 1)
@@ -327,7 +327,18 @@ Item {
                 return frame.opacity === 1 && Math.round(frame.height) === 64
             }, 600)
 
-            // Exactly one shared instance across the whole list.
+            function test_resultWindowCapsInitialRowsAndExtends() {
+            var many = []
+            for (var i = 0; i < 200; i++)
+                many.push(makeItem("item" + i, "Item " + i, 0, 0))
+            openWithResults(many)
+            compare(page.resultCount, 96)
+
+            page.resultsView.extendResultWindow()
+            compare(page.resultCount, 176)
+        }
+
+        // Exactly one shared instance across the whole list.
             var count = 0
             function countAll(it) {
                 if (!it) return

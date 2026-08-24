@@ -226,13 +226,12 @@ function createClipboardAdapter(config) {
             availabilityHandler = null
             if (!backend.available)
                 return
-            adapter.refresh(queryText, modeName, done)
+            refresh(queryText, modeName, done)
         }
         backend.availableChanged.connect(availabilityHandler)
     }
 
-    var adapter = {
-        refresh: function(queryText, modeName, done) {
+    function refresh(queryText, modeName, done) {
             if (typeof done !== "function")
                 return
             if (!backend) {
@@ -262,9 +261,9 @@ function createClipboardAdapter(config) {
                 backend.listCompleted.connect(completionHandler)
             }
             backend.list()
-        },
+    }
 
-        execute: function(item, done) {
+    function execute(item, done) {
             if (typeof done !== "function")
                 return
             if (!backend) {
@@ -282,9 +281,9 @@ function createClipboardAdapter(config) {
             if (typeof backend.copyItem === "function")
                 backend.copyItem(String(item.id))
             done({ ok: true })
-        }
     }
 
+    var adapter = { refresh: refresh, execute: execute }
     return adapter
 }
 
