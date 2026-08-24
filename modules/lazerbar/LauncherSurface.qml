@@ -20,6 +20,8 @@ Item {
 
     // Exposed for owner-window mask and layer keyboard-focus bindings.
     readonly property alias host: waveHost
+    // Exit-card layer above the host, exposed for tests.
+    readonly property alias ghostLayer: ghostLayer
 
     // Opener Item awaiting the coordinated open dispatch (bar entry path).
     property Item pendingOpener: null
@@ -156,6 +158,31 @@ Item {
 
     Component {
         id: launcherPageComponent
-        LauncherPage { session: root.session }
+        LauncherPage {
+            session: root.session
+            onExitFlingRequested: spec => root.spawnExitCard(spec)
+        }
+    }
+
+    // Ghost layer above the wave host: exit cards continue their parabolic
+    // fling here while (and after) the panel closes underneath.
+    Item {
+        id: ghostLayer
+        anchors.fill: parent
+        z: 100
+    }
+
+    function spawnExitCard(spec) {
+        var card = Qt.createComponent("LauncherExitCard.qml")
+        if (card.status !== Component.Ready)
+            return
+        var instance = card.createObject(ghostLayer, {
+            x: spec.x, y: spec.y,
+            width: spec.width, height: spec.height,
+            title: spec.title || "",
+            description: spec.description || "",
+            iconSource: spec.icon || "",
+            accent: !!spec.accent
+        })
     }
 }

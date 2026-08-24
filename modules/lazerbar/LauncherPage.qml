@@ -37,6 +37,9 @@ Item {
 
     // Emitted when a sidebar-driven mode change is applied to the session.
     signal modeChangeRequested(string mode)
+    // Bubbled from the activated result row so the owning surface can replay
+    // the card's parabolic exit in a layer above the closing panel.
+    signal exitFlingRequested(var spec)
 
     readonly property alias searchField: searchSurface
     // Result access for tests and shell wiring.
@@ -73,6 +76,7 @@ Item {
             resultsView.positionToSelection()
         }
         function onDisplayPoolChanged() {
+            console.log("[DBG] pool changed handler")
             // Delegates exist synchronously after the model assignment, so
             // hold-and-schedule here without an async gap a fresh row could
             // slip through unreleased.
@@ -317,6 +321,7 @@ Item {
     // Hold every current row synchronously, then route the set through the
     // wave (first fill after open) or the lighter cascade (query refills).
     function _holdAndScheduleReleases() {
+        console.log("[DBG] holdAndSchedule rows=" + resultsView.resultCount + " firstPending=" + _firstFillPending)
         var children = resultsColumn.children
         for (var h = 0; h < children.length; h++)
             if (children[h].holdInstantly !== undefined)
@@ -596,6 +601,7 @@ Item {
                         if (root.session)
                             root.session.execute(modelData)
                     }
+                    onExitFlingRequested: spec => root.exitFlingRequested(spec)
                 }
             }
         }

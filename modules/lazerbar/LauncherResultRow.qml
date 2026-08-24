@@ -3,10 +3,10 @@ import "../../services/LauncherLogic.js" as LauncherLogic
 
 // Present one launcher result as a notification-like card: 6px rounded
 // settingsCard surface with a 40px icon rail, colorful enlarged icon,
-// title/description stack, accent selection strip, shared click-flash,
-// and the notification parabolic fling exit on activation. All visuals
-// nest inside dragContainer in explicit z order so the card can never
-// cover its own content.
+// title/description stack, accent selection strip, shared click-flash.
+// Activation hands this card's geometry/content to a higher ghost layer
+// (exitFlingRequested) which replays the notification parabolic fling
+// above the closing panel; the row itself vanishes instantly.
 Item {
     id: root
 
@@ -42,10 +42,11 @@ Item {
     readonly property bool closing: _closing
 
     property bool _closing: false
-    readonly property real gravity: 0.005
-    readonly property bool reducedMotion: MotionTokens.reducedMotion
 
     signal activated()
+    // Window-coordinate geometry plus content, consumed by the owning
+    // surface's ghost layer to replay the parabolic fling above the panel.
+    signal exitFlingRequested(var spec)
 
     // Settings-panel reveal contract (mirrors LazerSettingsRow verbatim):
     // held rows fold to zero height with opacity and a leftward slide, then
@@ -59,21 +60,21 @@ Item {
     // Position-based reveal slot used by the page's entrance/refill waves.
     readonly property real entryExitDelay: Math.round(Math.min(150, Math.max(0, root.y / 6)))
     height: geometryHeld ? 0 : rowHeight + listGap
-    visible: !geometryHeld || height > 0.5 || opacity > 0.01
+    visible: !_closing && (!geometryHeld || height > 0.5 || opacity > 0.01)
     opacity: geometryHeld ? 0 : 1
     x: geometryHeld ? -8 : 0
     enabled: !geometryHeld && !_closing
 
     Behavior on height {
-        enabled: !reducedMotion && !snapTransitions
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
     }
     Behavior on opacity {
-        enabled: !reducedMotion && !snapTransitions
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
     }
     Behavior on x {
-        enabled: !reducedMotion && !snapTransitions
+        enabled: !MotionTokens.reducedMotion && !root.snapTransitions
         NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
     }
 
@@ -81,8 +82,7 @@ Item {
         id: revealTimer
         interval: 0
         repeat: false
-        onTriggered: {
-            root.snapTransitions = false
+        onTriggered: {            root.snapTransitions = false
             root.revealHeld = false
         }
     }
@@ -101,33 +101,8 @@ Item {
     }
 
     function playReveal(delayMs) {
-        revealTimer.interval = Math.max(0, Math.round(Number(delayMs) || 0))
-        revealTimer.restart()
-    }
-
-    // Fling physics: integrate gravity per frame exactly like the
-    // notification popup's DragContainer fall.
-    FrameAnimation {
-        id: fallAnim
-        onTriggered: {
-            const dt = frameTime * 1000
-            dragContainer.velocityY += dt * root.gravity
-            dragContainer.dragX += dragContainer.velocityX * dt
-            dragContainer.dragY += dragContainer.velocityY * dt
-        }
-    }
-
-    SequentialAnimation {
-        id: flingFade
-        NumberAnimation { target: root; property: "opacity"; to: 0; duration: reducedMotion ? 0 : 600; easing.type: Easing.InQuad }
-        ScriptAction { script: root.activated() }
-    }
-
-    SequentialAnimation {
-        id: quickFade
-        NumberAnimation { target: root; property: "opacity"; to: 0; duration: root.reducedMotion ? 0 : 100 }
-        ScriptAction { script: root.activated() }
-    }
+        revealTimer.interval = Math.max(1, Math.round(Number(delayMs) || 0))
+        revealTimer.restart()    }
 
     // Physics, drag, and rotation owner. All visuals nest here in explicit
     // z order: card, rail, strip, icon, text, flash, focus ring.
@@ -135,15 +110,8 @@ Item {
         id: dragContainer
         width: root.width
         height: root.bodyHeight
-        x: dragX
-        y: dragY
-        rotation: Math.min(0, dragX * 0.1)
-        transformOrigin: Item.Center
-
-        property real dragX: 0
-        property real dragY: 0
-        property real velocityX: 0
-        property real velocityY: 0
+        x: 0
+        y: 0
 
         // Card surface: selected tint outranks hover swap.
         Rectangle {
@@ -176,7 +144,6 @@ Item {
             radius: 0
             color: LazerTheme.settingsAccent
             visible: root.selected
-            Behavior on opacity { enabled: !root.reducedMotion; ColorAnimation { duration: MotionTokens.fast } }
         }
 
         // Colorful enlarged icon: original colors preserved.
@@ -193,7 +160,7 @@ Item {
             asynchronous: true
             scale: rowPress.pressed ? MotionTokens.pressScale : 1
             Behavior on scale {
-                enabled: !root.reducedMotion
+                enabled: !MotionTokens.reducedMotion
                 NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
             }
         }
@@ -263,7 +230,7 @@ Item {
     }
 
     function restartFlash() {
-        if (reducedMotion) {
+        if (MotionTokens.reducedMotion) {
             flashAnimation.stop()
             flashOverlay.opacity = 0
             return
@@ -271,23 +238,26 @@ Item {
         flashAnimation.restart()
     }
 
-    // Activate exactly like the notification card: replay the parabolic
-    // fling exit and execute only once the fade completes, so the launch
-    // lands as the card leaves instead of snapping the panel away.
+    // Activate per the panel-exit contract: report this card's window-space
+    // geometry and content to the higher ghost layer, vanish instantly, then
+    // fire execution synchronously so launch and panel close happen at once.
     function activate() {
         if (_closing || geometryHeld)
             return
         restartFlash()
         _closing = true
-        if (!reducedMotion) {
-            if (dragContainer.velocityX > -0.3)
-                dragContainer.velocityX = -0.3 - Math.random() * 0.5
-            dragContainer.velocityY = 0
-            fallAnim.start()
-            flingFade.restart()
-        } else {
-            quickFade.restart()
-        }
+        var origin = mapToItem(null, 0, 0)
+        exitFlingRequested({
+            x: origin.x,
+            y: origin.y,
+            width: width - listGap,
+            height: bodyHeight,
+            title: displayName,
+            description: descriptionText,
+            icon: iconSource,
+            accent: selected
+        })
+        activated()
     }
 
     HoverHandler {
@@ -310,7 +280,7 @@ Item {
     Connections {
         target: MotionTokens
         function onReducedMotionChanged() {
-            if (root.reducedMotion)
+            if (MotionTokens.reducedMotion)
                 root.restartFlash()
         }
     }

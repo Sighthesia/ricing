@@ -38,8 +38,7 @@ Item {
     signal opened()
     signal sidebarSelected(string id)
 
-    function openRoute(nextRoute, source) {
-        var normalized = Logic.normalizeRoute(nextRoute)
+    function openRoute(nextRoute, source) {        var normalized = Logic.normalizeRoute(nextRoute)
         if (!normalized)
             return false
 
@@ -69,8 +68,7 @@ Item {
         return true
     }
 
-    function close() {
-        if (!interactive)
+    function close() {        if (!interactive)
             return
         openBody.stop()
         openWaves.stop()

@@ -49,3 +49,4 @@ FullscreenHeader 1.0 FullscreenHeader.qml
 FullscreenSidebar 1.0 FullscreenSidebar.qml
 LauncherPage 1.0 LauncherPage.qml
 LauncherResultRow 1.0 LauncherResultRow.qml
+LauncherExitCard 1.0 LauncherExitCard.qml
