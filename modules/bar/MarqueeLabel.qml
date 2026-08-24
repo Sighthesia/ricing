@@ -142,28 +142,58 @@ Item {
     readonly property int scanStepMs: 60
     // Blank window the line leaves before the next char starts fading in.
     readonly property int scanGapMs: 20
-    readonly property int scanRevealMs: 90
+    readonly property int scanRevealMs: 60
     readonly property int transitionMaxChars: 48
     property var _enterRow: null
+    property bool _sweepActive: false
+
+    // Tear down any in-flight sweep row and restore the real label.
+    function _stopSweepRow() {
+        if (root._enterRow) {
+            root._enterRow.destroy()
+            root._enterRow = null
+        }
+        label.opacity = 1
+        label.x = 0
+    }
 
     // Play the scan-line transition for a just-applied text change.
     // Both texts are passed explicitly: a live `text:` binding may not have
     // re-evaluated yet when the host's change handler runs, so root.text
     // cannot be trusted as either value here.
+    //
+    // A change arriving while a sweep is still running never stacks a
+    // second wavefront on the first: the sweep collapses and the newest
+    // text fades in as one line, so rapid switching stays readable.
     function transitionFrom(oldText, newText) {
         if (MotionTokens.reducedMotion || oldText === "" || oldText === newText)
             return
+        if (root._sweepActive) {
+            root._sweepActive = false
+            _stopSweepRow()
+            label.opacity = 0
+            enterFade.restart()
+            return
+        }
+        root._sweepActive = true
         spawnGhosts(oldText)
         label.opacity = 0
         label.x = 0
-        if (root._enterRow) {
-            root._enterRow.destroy()
-            root._enterRow = null
-        }
         root._enterRow = scanRowComponent.createObject(clipSlot, { chars: newText })
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
         enterGuard.restart()
+    }
+
+    NumberAnimation {
+        id: enterFade
+
+        target: label
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: 140
+        easing.type: Easing.OutCubic
     }
 
     // Old characters fall away in sequence, one per sweep step; ghosts ride
@@ -195,12 +225,8 @@ Item {
 
         interval: 2400
         onTriggered: {
-            if (root._enterRow) {
-                root._enterRow.destroy()
-                root._enterRow = null
-            }
-            label.opacity = 1
-            label.x = 0
+            root._sweepActive = false
+            root._stopSweepRow()
         }
     }
 
@@ -292,10 +318,11 @@ Item {
                 running: true
                 interval: enterRow.sweepTotal + root.scanGapMs + root.scanRevealMs + MotionTokens.fast
                 onTriggered: {
-                    label.opacity = 1
-                    label.x = 0
+                    root._sweepActive = false
                     if (root._enterRow === enterRow)
                         root._enterRow = null
+                    label.opacity = 1
+                    label.x = 0
                     enterRow.destroy()
                 }
             }
