@@ -59,11 +59,9 @@ QtObject {
     readonly property real pressScale: 0.985
     readonly property real sliderTickBumpScale: 1.015
     readonly property real clickFlashOpacity: 0.3
-    // osu!lazer OsuPopover contract: pop surfaces scale from 0.7 with a
-    // half-elastic settle on enter and return to 0.7 on exit.
+    // Popup surfaces deform (scale+slide) from/to this factor while the bar
+    // occludes them; opacity stays constant.
     readonly property real popupFromScale: 0.7
-    // Deform (scale+slide) enter time; fades stay on smooth tokens.
-    readonly property int popupDeformIn: 500
     readonly property real popupFromY: -4
     readonly property real overlayFromY: 8
     readonly property real buttonNudge: 1

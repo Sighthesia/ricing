@@ -30,33 +30,23 @@ Item {
             shownKind = Services.BarPopupService.kind
             shownPayload = Services.BarPopupService.payload
             frameAnchorX = Services.BarPopupService.anchorX
-            // osu!lazer popover law: elasticity only for the deform, fades
-            // stay smooth.
-            fadeAnimation.duration = MotionTokens.slow
-            deformAnimation.duration = MotionTokens.popupDeformIn
-            deformAnimation.easing.type = Easing.OutElastic
-            deformAnimation.easing.amplitude = 0.5
-            revealProgress = MotionTokens.reducedMotion ? 1 : 0
-            deformProgress = MotionTokens.reducedMotion ? 1 : 0
-            fadeAnimation.to = 1
+            // Settings-panel rhythm: OutQuint, settingsEnter in / settingsExit out.
+            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsEnter
+            deformAnimation.easing.type = Easing.OutQuint
             deformAnimation.to = 1
-            fadeAnimation.restart()
+            deformProgress = MotionTokens.reducedMotion ? 1 : 0
             deformAnimation.restart()
         } else {
-            fadeAnimation.duration = MotionTokens.slow
-            deformAnimation.duration = MotionTokens.slow
+            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsExit
             deformAnimation.easing.type = Easing.OutQuint
-            fadeAnimation.to = 0
             deformAnimation.to = 0
-            fadeAnimation.restart()
             deformAnimation.restart()
             Services.BarPopupService.pointerInPopup = false
         }
     }
 
-    // Opacity rides a smooth curve only; scale and slide share the deform
-    // progress that carries the elastic enter settle.
-    property real revealProgress: 0
+    // Single deform progress drives scale and slide; there is no opacity
+    // animation -- occlusion by the bar window does the hiding.
     property real deformProgress: 0
 
     // Confirm a widget's leave-request once the pointer had a fair chance to
@@ -101,14 +91,6 @@ Item {
     }
 
     NumberAnimation {
-        id: fadeAnimation
-
-        target: root
-        property: "revealProgress"
-        easing.type: Easing.OutQuint
-    }
-
-    NumberAnimation {
         id: deformAnimation
 
         target: root
@@ -148,9 +130,10 @@ Item {
     Loader {
         id: surfaceLoader
 
-        active: root.revealProgress > 0 || root.deformProgress > 0
+        active: root.deformProgress > 0
         // Frame geometry is fully declarative: centered on the hover
-        // anchor, docked below (or above) the bar, clamped to the screen.
+        // anchor, docked just past the window edge that faces the bar
+        // (this window excludes the bar strip), clamped to the screen.
         width: item ? item.implicitWidth : 0
         height: item ? item.implicitHeight : 0
         x: {
@@ -161,8 +144,8 @@ Item {
                                         root.width - width - 8))
         }
         y: root.barTopAnchored
-           ? root.floatingMargin + root.barHeight + 4
-           : root.height - root.floatingMargin - root.barHeight - 4 - height
+           ? 4
+           : root.height - height - 4
         sourceComponent: {
             switch (root.shownKind) {
             case "tray": return trayMenuComponent
@@ -225,12 +208,17 @@ Item {
         }
     }
 
-    // Reveal motion stays inside the surface so the overlay window geometry
-    // never changes per frame. Enter: the popup starts over the bar and
-    // slides down to its dock while scaling up; exit reverses both moves.
-    // Travel equals the full dock offset so the surface emerges from the
-    // bar's own footprint.
-    readonly property real enterTravel: root.floatingMargin + root.barHeight + 4
+    // Reveal motion stays inside the surface so the window geometry never
+    // changes per frame. Enter: the popup starts fully behind the bar (past
+    // the window edge facing it) and slides into dock while scaling up;
+    // exit reverses both moves. The bar strip lies outside this window, so
+    // the traveling surface is occluded by the bar itself.
+    readonly property real enterTravel: {
+        var gapToBar = root.barTopAnchored
+                ? surfaceLoader.y
+                : root.height - surfaceLoader.y - surfaceLoader.height
+        return gapToBar + surfaceLoader.height * MotionTokens.popupFromScale + 4
+    }
     transform: [
         Scale {
             origin.x: {
@@ -250,5 +238,4 @@ Item {
                : (root.barTopAnchored ? -1 : 1) * root.enterTravel * (1 - root.deformProgress)
         }
     ]
-    opacity: root.revealProgress
 }

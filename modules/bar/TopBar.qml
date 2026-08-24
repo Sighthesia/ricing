@@ -80,8 +80,9 @@ Variants {
             }
         }
 
-        // Hover popups live in their own overlay owner so menu/slider content
-        // can escape the bar silhouette without resizing the bar surface.
+        // Hover popups live in their own owner that hugs the far side of the
+        // bar: the bar strip is outside this window, so surfaces sliding home
+        // are occluded by the bar exactly like iOS banners under their source.
         // Input stays limited to the visible popup via a mask region.
         PanelWindow {
             id: popupWindow
@@ -90,14 +91,28 @@ Variants {
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             exclusiveZone: -1
-            anchors { top: true; bottom: true; left: true; right: true }
-            WlrLayershell.layer: WlrLayer.Overlay
+            anchors {
+                top: Services.SettingsService.bar.position === "top"
+                bottom: Services.SettingsService.bar.position === "bottom"
+                left: true
+                right: true
+            }
+            margins {
+                top: Services.SettingsService.bar.position === "top"
+                     ? screenScope.floatingMargin + screenScope.effectiveHeight : screenScope.floatingMargin
+                bottom: Services.SettingsService.bar.position === "bottom"
+                        ? screenScope.floatingMargin + screenScope.effectiveHeight : screenScope.floatingMargin
+                left: screenScope.floatingMargin
+                right: screenScope.floatingMargin
+            }
+            implicitHeight: screenScope.modelData.height - screenScope.effectiveHeight
+                    - screenScope.floatingMargin * 2
             // Take keyboard only while a popup is up so Escape reaches it and
             // global keys stay free when closed.
             WlrLayershell.keyboardFocus: Services.BarPopupService.visible
                     ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
             mask: Region {
-                item: popupHost.revealProgress > 0 ? popupHost.activeSurfaceItem : null
+                item: popupHost.deformProgress > 0 ? popupHost.activeSurfaceItem : null
             }
 
             BarPopupHost {
