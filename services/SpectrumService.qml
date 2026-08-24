@@ -3,7 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "spectrum/BeatDetect.js" as BeatDetect
+import "spectrum/BeatClock.js" as BeatClock
 
 // Provide shared PipeWire spectrum data for lightweight background visualizers.
 Singleton {
@@ -14,18 +14,17 @@ Singleton {
     property var values: []
     property bool isIdle: true
 
-    // Bass-onset BPM estimate derived from the same cava frames (0 when unknown).
-    // The tracker is a plain JS object, so its fields carry no change
-    // notifications — these mirrors are assigned per frame to make the
-    // values reactive for QML consumers.
+    // Beat tracking (aubio bridge over the default monitor). The clock is a
+    // plain JS object, so its fields carry no change notifications — these
+    // mirrors are assigned explicitly to make the values reactive for QML.
     readonly property real bpm: _reportedBpm
-    // Decaying 0..1 beat pulse for visual accents; spikes to 1 on each onset.
+    // Decaying 0..1 beat pulse for visual accents; spikes to 1 on each beat.
     readonly property real beatPulse: _reportedPulse
     signal beat()
 
     property real _reportedBpm: 0
     property real _reportedPulse: 0
-    property var _beatTracker: BeatDetect.createTracker({})
+    property var _beatClock: BeatClock.createClock({})
     // Debug logging for beat tracking, gated by AFLOAT_SPECTRUM_DEBUG=1.
     readonly property bool _debugBeat: (Quickshell.env("AFLOAT_SPECTRUM_DEBUG") || "").trim() === "1"
     property int _lastLoggedBpm: 0
@@ -91,7 +90,7 @@ Singleton {
         root.values = new Array(root.barsCount).fill(0)
         root.isIdle = true
         root._idleFrameCount = 0
-        BeatDetect.resetTracker(root._beatTracker)
+        root._reportedPulse = 0
     }
 
     function _parseFrame(data) {
@@ -145,37 +144,50 @@ Singleton {
             root.isIdle = false
         }
 
+        // Decay the beat pulse on every visual frame so flash effects fade.
+        root._reportedPulse *= 0.85
+        if (root._reportedPulse < 0.01)
+            root._reportedPulse = 0
+
         root._bufToggle = !root._bufToggle
         root.values = buffer
-
-        // Bass-onset BPM tracking rides the same frames as the visualizers.
-        const fired = BeatDetect.feedFrame(root._beatTracker, buffer)
-        root._reportedBpm = root._beatTracker.bpm
-        root._reportedPulse = root._beatTracker.pulse
-        if (fired)
-            root.beat()
     }
 
-    // Debug beat log: one line per onset plus a line when the settled BPM
-    // readout moves by a whole BPM, so tempo drift stays visible.
-    onBeat: {
+    // One line per aubio-detected beat: {"t": seconds, "bpm": estimate}.
+    function _onBeatLine(data) {
+        const text = String(data || "").trim()
+        if (!text.startsWith("{"))
+            return
+
+        let payload
+        try {
+            payload = JSON.parse(text)
+        } catch (e) {
+            return
+        }
+        const timestamp = Number(payload.t)
+        if (!isFinite(timestamp) || timestamp < 0)
+            return
+
+        const bpm = BeatClock.feedBeat(root._beatClock, timestamp)
+        root._reportedPulse = 1
+        root.beat()
+
         if (!root._debugBeat)
             return
 
-        const bpm = root._reportedBpm
         const rounded = Math.round(bpm)
         console.log("[afloat:SpectrumBeat]", JSON.stringify({
             event: "beat",
+            t: Math.round(timestamp * 1000) / 1000,
             bpm: Math.round(bpm * 10) / 10,
-            pulse: Math.round(root._reportedPulse * 100) / 100,
-            bassAverage: Math.round(root._beatTracker.average * 1000) / 1000
+            intervals: root._beatClock.intervals.length
         }))
         if (rounded !== root._lastLoggedBpm) {
             root._lastLoggedBpm = rounded
             console.log("[afloat:SpectrumBeat]", JSON.stringify({
                 event: "bpm-settle",
-                bpm: rounded,
-                pendingSwitches: root._beatTracker.pendingCount
+                bpm: rounded
             }))
         }
     }
@@ -183,11 +195,18 @@ Singleton {
     on_ShouldRunChanged: {
         if (root._shouldRun && !cavaProcess.running) {
             cavaProcess.running = true
-            return
+        } else if (!root._shouldRun && cavaProcess.running) {
+            cavaProcess.running = false
         }
 
-        if (!root._shouldRun && cavaProcess.running)
-            cavaProcess.running = false
+        if (root._shouldRun && !beatProcess.running) {
+            BeatClock.resetClock(root._beatClock)
+            root._reportedBpm = 0
+            root._lastLoggedBpm = 0
+            beatProcess.running = true
+        } else if (!root._shouldRun && beatProcess.running) {
+            beatProcess.running = false
+        }
     }
 
     Component.onCompleted: root._resetValues()
@@ -233,6 +252,37 @@ Singleton {
                 restartTimer.restart()
             else
                 console.warn("SpectrumService: cava exited repeatedly, code =", exitCode)
+        }
+    }
+
+    // Aubio tempo tracker over the default monitor; prints one JSON beat per line.
+    Process {
+        id: beatProcess
+
+        running: false
+        command: {
+            const override = (Quickshell.env("AFLOAT_BEAT_TRACKER_CMD") || "").trim()
+            return override !== ""
+                ? ["sh", "-c", override]
+                : ["python3", Quickshell.shellDir + "/scripts/beat_tracker_bridge.py"]
+        }
+
+        stdout: SplitParser {
+            onRead: data => root._onBeatLine(String(data || ""))
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const text = this.text.trim()
+                if (text)
+                    console.warn("SpectrumService beat:", text)
+            }
+        }
+
+        onExited: {
+            root._reportedPulse = 0
+            BeatClock.resetClock(root._beatClock)
+            root._reportedBpm = 0
         }
     }
 
