@@ -195,14 +195,16 @@ Rectangle {
             visible: entryRow.isSeparator
         }
 
-        // Check indicator: square for checkbox, circle for radio.
+        // Check indicator: square for checkbox, circle for radio. The slot
+        // is reserved on every row (visible or not) so text shares one left
+        // edge across checkable and plain items.
         Rectangle {
             id: checkIndicator
 
             anchors.left: parent.left
             anchors.leftMargin: entryRow.rowPadding
             anchors.verticalCenter: parent.verticalCenter
-            width: entryRow.showsIndicator ? 14 : 0
+            width: 14
             height: 14
             visible: entryRow.showsIndicator
             radius: entryRow.buttonType === QsMenuButtonType.RadioButton ? width / 2 : 3
