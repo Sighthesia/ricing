@@ -98,6 +98,15 @@ Item {
             root.shownKind = Services.BarPopupService.kind
             root.shownPayload = Services.BarPopupService.payload
         }
+        // Same-kind payload swaps (tray icon A -> B) never flip `kind`, so
+        // the surface must hear about the new payload directly. During a
+        // fresh open the service commits payload before `kind`, so this
+        // guard correctly skips that pre-visible assignment.
+        function onPayloadChanged() {
+            if (!Services.BarPopupService.visible)
+                return
+            root.shownPayload = Services.BarPopupService.payload
+        }
         // Re-anchoring stays live only while the popup is open, so a close
         // can never drag the fading frame toward the reset-to-zero anchor.
         function onAnchorXChanged() {
@@ -203,21 +212,23 @@ Item {
         // must dock instantly, hidden behind the bar). Retargets on a live
         // instance always glide.
         readonly property bool morphReady: root.popupVisible && !root.placingSurface
+        // slow(240) keeps the inter-widget glide readable; fast(100) read
+        // as a flick. OutQuint matches every other popup transition.
         Behavior on x {
             enabled: surfaceLoader.morphReady
-            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         Behavior on y {
             enabled: surfaceLoader.morphReady
-            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         Behavior on width {
             enabled: surfaceLoader.morphReady
-            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         Behavior on height {
             enabled: surfaceLoader.morphReady
-            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         sourceComponent: {
             switch (root.shownKind) {
