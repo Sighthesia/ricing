@@ -16,11 +16,13 @@ var defaultOptions = {
     minGapSeconds: 0.12,
     // --- tempo lock (instrumentation-change stability) ---
     // Once locked, intervals whose implied tempo drifts more than this
-    // fraction from the current readout are held out of the history.
-    lockBandFraction: 0.07,
+    // fraction from the current readout are held out of the history. Must
+    // stay wider than aubio's natural timestamp jitter (~±5-9% on busy
+    // sections) or normal micro-timing trips a relock storm.
+    lockBandFraction: 0.14,
     // After this many consecutive out-of-band beats the tempo genuinely
     // changed: drop the history and relock onto the new tempo.
-    relockAfterBeats: 6
+    relockAfterBeats: 8
 }
 
 function createClock(options) {
