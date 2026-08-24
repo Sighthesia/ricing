@@ -51,9 +51,12 @@ function median(values) {
 }
 
 // Consume one beat timestamp; returns the updated BPM readout (0 until at
-// least two usable intervals have been seen). `confidence` (0..1, optional)
-// marks low-trust beats: they keep phase but never touch interval history.
-function feedBeat(clock, seconds, confidence) {
+// least two usable intervals have been seen).
+//
+// Note: aubio's beat confidence is unbounded (observed range -100..+10), so
+// it must not be used as a 0..1 quality gate — stability comes from the
+// tempo-lock hysteresis below alone.
+function feedBeat(clock, seconds) {
     if (!(seconds >= 0))
         return clock.bpm
 
@@ -79,27 +82,34 @@ function feedBeat(clock, seconds, confidence) {
         return clock.bpm
     }
 
-    // Low-confidence beats (sparse breakdowns, quiet bridges) must not
-    // rewrite tempo history; phase tracking above is enough for visuals.
-    if (typeof confidence === "number" && confidence < defaultLowConfidence())
-        return clock.bpm
-
     // Tempo lock: once a readout exists, hold divergent intervals out of the
     // history so instrumentation changes (fills, solos, half-time sections)
-    // do not drag it away. A sustained divergence relocks after a few beats.
+    // do not drag it away. A sustained divergence clears the state and lets
+    // fresh intervals rebuild the estimate (no single-interval adoption).
     if (clock.bpm > 0) {
         var implied = 60 / elapsed
         if (Math.abs(implied - clock.bpm) / clock.bpm > clock.lockBandFraction) {
             clock.divergentStreak += 1
             if (clock.divergentStreak < clock.relockAfterBeats)
                 return clock.bpm
-            // Genuine tempo change: start over from the new interval.
+            // Genuine tempo change: start over from scratch.
             clock.divergentStreak = 0
-            clock.intervals = [elapsed]
-            clock.bpm = clampBpm(clock, implied)
-            return clock.bpm
+            clock.intervals = []
+            clock.bpm = 0
+            return 0
         }
         clock.divergentStreak = 0
+    }
+
+    // Rebuild guard: with fewer than three intervals (fresh start or just
+    // after a relock) an outlier seed must not anchor the median — replace
+    // the seed instead of stacking against it.
+    if (clock.intervals.length > 0 && clock.intervals.length < 3) {
+        var seedMedian = median(clock.intervals)
+        if (Math.abs(elapsed - seedMedian) / seedMedian > 0.3) {
+            clock.intervals = [elapsed]
+            return clock.bpm
+        }
     }
 
     clock.intervals.push(elapsed)
@@ -117,10 +127,6 @@ function feedBeat(clock, seconds, confidence) {
     // Light smoothing keeps the readout stable between beats.
     clock.bpm = clock.bpm > 0 ? clock.bpm * 0.7 + estimated * 0.3 : estimated
     return clock.bpm
-}
-
-function defaultLowConfidence() {
-    return 0.15
 }
 
 // Accept an implied tempo only inside the band (with edge tolerance).

@@ -169,14 +169,14 @@ Singleton {
         if (!isFinite(timestamp) || timestamp < 0)
             return
 
-        const confidence = Number(payload.conf)
-        const bpm = BeatClock.feedBeat(root._beatClock, timestamp, isFinite(confidence) ? confidence : undefined)
+        const bpm = BeatClock.feedBeat(root._beatClock, timestamp)
         root._reportedPulse = 1
         root.beat()
 
         if (!root._debugBeat)
             return
 
+        const confidence = Number(payload.conf)
         const rounded = Math.round(bpm)
         console.log("[afloat:SpectrumBeat]", JSON.stringify({
             event: "beat",

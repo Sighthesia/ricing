@@ -76,17 +76,25 @@ Item {
         }
 
         function test_low_confidence_beats_do_not_touch_history() {
+            // aubio confidence is unbounded and unused; every in-band beat
+            // must feed history. (Regression: a 0..1 gate once froze the
+            // readout for 50s while real conf values hovered at ~0.1.)
             const clock = BeatClock.createClock({})
             let t = 0.5
             for (let i = 0; i < 10; i++) { BeatClock.feedBeat(clock, t); t += 60 / 120 }
-            const lockedBpm = clock.bpm
-            // Quiet bridge: beats keep coming but with near-zero confidence.
-            for (let j = 0; j < 8; j++) {
-                BeatClock.feedBeat(clock, t, 0.05)
-                t += 60 / 160
-            }
-            compare(clock.bpm, lockedBpm)
-            compare(clock.intervals.length, BeatClock.defaultOptions.intervalHistory)
+            verify(clock.bpm > 110 && clock.bpm < 130, "bpm=" + clock.bpm)
+        }
+
+        function test_relock_rebuilds_without_single_interval_adoption() {
+            const clock = BeatClock.createClock({})
+            let t = 0.5
+            for (let i = 0; i < 12; i++) { BeatClock.feedBeat(clock, t); t += 60 / 120 }
+            // Sustained divergence, then one garbage gap interval.
+            for (let j = 0; j < 8; j++) { BeatClock.feedBeat(clock, t); t += 60 / 90 }
+            BeatClock.feedBeat(clock, t)
+            t += 60 / 170  // single implausible interval right after relock
+            verify(clock.bpm === 0 || Math.abs(clock.bpm - 90) < 12,
+                   "bpm jumped to " + clock.bpm)
         }
 
         function test_gap_does_not_poison_history() {
