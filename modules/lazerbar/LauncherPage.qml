@@ -74,6 +74,11 @@ Item {
         }
         function onSelectedIndexChanged() {
             resultsView.positionToSelection()
+            resultsView.syncSelectionFrame()
+        }
+        function onResultsChanged() {
+            Qt.callLater(root._holdAndScheduleReleases)
+            Qt.callLater(resultsView.syncSelectionFrame)
         }
         function onDisplayPoolChanged() {
             console.log("[DBG] pool changed handler")
@@ -240,6 +245,7 @@ Item {
         interval: MotionTokens.slow + MotionTokens.slow / 2 + 100
         repeat: false
         onTriggered: {
+            resultsView.syncSelectionFrame()
             if (root._deferredScrollIndex >= 0) {
                 var deferred = root._deferredScrollIndex
                 root._deferredScrollIndex = -1
@@ -427,11 +433,40 @@ Item {
         visible: !root.stateVisible
         contentWidth: width
         contentHeight: resultsColumn.height
+        onContentHeightChanged: syncSelectionFrame()
         boundsBehavior: Flickable.StopAtBounds
         flickDeceleration: 2000
         interactive: !root.entranceBusy
 
         readonly property int resultCount: resultsRepeater.count
+
+        // Glide the shared frame onto the selected row; hide it while the
+        // selection is empty or the target row is still folded.
+        function syncSelectionFrame() {
+            var service = root.session
+            var current = service && service.results && service.selectedIndex >= 0
+                    ? service.results[service.selectedIndex] : null
+            var row = null
+            if (current) {
+                for (var i = 0; i < resultsRepeater.count; i++) {
+                    var candidate = resultsRepeater.itemAt(i)
+                    if (candidate && candidate.result
+                            && String(candidate.result.id) === String(current.id)) {
+                        row = candidate
+                        break
+                    }
+                }
+            }
+            if (!row || row.height <= 4) {
+                selectionFrame.opacity = 0
+                return
+            }
+            selectionFrame.x = row.x
+            selectionFrame.width = row.width
+            selectionFrame.y = row.y
+            selectionFrame.height = row.bodyHeight
+            selectionFrame.opacity = 1
+        }
 
         function resultAt(index) {
             return resultsRepeater.itemAt(index)
@@ -574,6 +609,33 @@ Item {
                     scrollBounce.restart()
                 }
             }
+        }
+
+        // One shared focus frame for the whole list: glides between rows
+        // like the settings sidebar's shared indicator instead of every row
+        // showing/hiding its own.
+        Rectangle {
+            id: selectionFrame
+            z: 5
+            x: 0
+            width: resultsColumn.width
+            height: 0
+            radius: 6
+            color: "transparent"
+            border.width: 1.5
+            border.color: LazerTheme.settingsAccent
+            opacity: 0
+            enabled: false
+
+            Behavior on y {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            }
+            Behavior on height {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            }
+            Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         Column {

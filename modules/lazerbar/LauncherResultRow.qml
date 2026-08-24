@@ -32,7 +32,6 @@ Item {
 
     readonly property bool hovered: rowHover.hovered
     readonly property alias surfaceItem: card
-    readonly property alias selectionStripItem: selectionStrip
     readonly property alias titleItem: titleText
     readonly property alias descriptionItem: descriptionLabel
     readonly property alias iconItem: iconImage
@@ -133,27 +132,6 @@ Item {
             color: LazerTheme.settingsRail
         }
 
-        // Selected indicator: settings-sidebar accent pill — a rounded line
-        // inset between the icon rail and the text column, growing in on
-        // selection without any flash.
-        Rectangle {
-            id: selectionStrip
-            x: 5
-            anchors.verticalCenter: parent.verticalCenter
-            width: root.selected ? 4 : 0
-            height: root.selected ? 24 : 0
-            radius: 2
-            color: LazerTheme.settingsAccent
-
-            Behavior on width {
-                enabled: !root.reducedMotion
-                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
-            }
-            Behavior on height {
-                enabled: !root.reducedMotion
-                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
-            }
-        }
 
         // Colorful enlarged icon: original colors preserved.
         Image {
