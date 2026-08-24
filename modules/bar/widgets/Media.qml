@@ -1,5 +1,6 @@
 import QtQuick
 import Qt5Compat.GraphicalEffects
+import Quickshell
 import ".."
 import "../../lazerbar"
 import "../../../services" as Services
@@ -58,6 +59,24 @@ BarPill {
     readonly property int lyricCharFadeTime: 140
     readonly property int lyricMaxChars: 48
     property var _enterRow: null
+    // [DEBUG-mce6] temporary probe, remove after diagnosis.
+    readonly property bool _mceDebug: (Quickshell.env("AFLOAT_MEDIA_DEBUG") || "") === "1"
+    property string _mceLast: ""
+    Timer {
+        id: _mceProbe
+        running: root._mceDebug
+        interval: 50
+        repeat: true
+        onTriggered: {
+            var sig = [root.primaryText.length, titleLabel.implicitWidth.toFixed(0),
+                titleLabel.width.toFixed(0), titleLabel.x.toFixed(1), titleSlot.width.toFixed(0),
+                titleLabel.elide, titleLabel.opacity.toFixed(2), titleScroll.running].join("|")
+            if (sig !== root._mceLast) {
+                root._mceLast = sig
+                console.log("[DEBUG-mce6]", sig)
+            }
+        }
+    }
 
     // Spectrum registration — mirrors the old bar spectrum integration.
     readonly property string spectrumComponentId: "media:" + (root.instanceKey !== "" ? root.instanceKey : (root.widgetId !== "" ? root.widgetId : root.screenName))
