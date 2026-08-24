@@ -109,6 +109,7 @@ Item {
             requestOpen(pendingOpener)
         } else {
             var action = Logic.closeAction(snapshot())
+            console.log("[DBG-sync] closeAction=" + action + " phase=" + waveHost.phase)
             if (action === "request-coordinated-close" && root.coordinator)
                 root.coordinator.request("launcher")
             else if (action === "cancel-stale-open" && root.coordinator)

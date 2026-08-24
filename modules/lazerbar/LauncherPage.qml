@@ -8,6 +8,8 @@ import "../../services/LauncherLogic.js" as LauncherLogic
 // state flows through the injected session; the page never owns launcher data.
 Item {
     id: root
+    objectName: "launcherPage"
+    property double _born: Date.now()
 
     // Session contract: any object exposing the observable LauncherService
     // state (visible, query, mode, results, loading, error, selectedIndex)
@@ -54,6 +56,10 @@ Item {
     implicitWidth: 400
     implicitHeight: 300
 
+    // Row currently carrying the shared focus frame; pure var property so
+    // imperative updates are safe under the qs engine.
+    property var selectionAnchor: null
+
     LauncherSession { id: embeddedSession }
 
     Component.onCompleted: root.adoptSessionFocus()
@@ -81,7 +87,6 @@ Item {
             Qt.callLater(resultsView.syncSelectionFrame)
         }
         function onDisplayPoolChanged() {
-            console.log("[DBG] pool changed handler")
             // Delegates exist synchronously after the model assignment, so
             // hold-and-schedule here without an async gap a fresh row could
             // slip through unreleased.
@@ -327,7 +332,6 @@ Item {
     // Hold every current row synchronously, then route the set through the
     // wave (first fill after open) or the lighter cascade (query refills).
     function _holdAndScheduleReleases() {
-        console.log("[DBG] holdAndSchedule rows=" + resultsView.resultCount + " firstPending=" + _firstFillPending)
         var children = resultsColumn.children
         for (var h = 0; h < children.length; h++)
             if (children[h].holdInstantly !== undefined)
@@ -458,15 +462,8 @@ Item {
                     }
                 }
             }
-            if (!row || row.height <= 4) {
-                selectionFrame.opacity = 0
-                return
-            }
-            selectionFrame.x = row.x
-            selectionFrame.width = row.width
-            selectionFrame.y = row.y
-            selectionFrame.height = row.bodyHeight
-            selectionFrame.opacity = 1
+            // Hide while the target row is folded; reveal once it stands up.
+            root.selectionAnchor = (row && row.height > 4) ? row : null
         }
 
         function resultAt(index) {
@@ -650,15 +647,16 @@ Item {
             id: selectionFrame
             objectName: "selectionFrame"
             z: 5
-            x: 0
-            width: resultsColumn.width
-            height: 0
             radius: 6
             color: "transparent"
-            border.width: 1.5
+            border.width: root.selectionAnchor ? 1.5 : 0
             border.color: LazerTheme.settingsAccent
-            opacity: 0
             enabled: false
+
+            x: root.selectionAnchor ? root.selectionAnchor.x : 0
+            y: root.selectionAnchor ? root.selectionAnchor.y : 0
+            width: root.selectionAnchor ? root.selectionAnchor.width : 0
+            height: root.selectionAnchor ? root.selectionAnchor.bodyHeight : 0
 
             Behavior on y {
                 enabled: !MotionTokens.reducedMotion
@@ -668,8 +666,8 @@ Item {
                 enabled: !MotionTokens.reducedMotion
                 NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
             }
-            Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
         }
+
 }
 
     // Loading surface keeps its own body color so stale rows never linger.

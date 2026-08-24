@@ -297,6 +297,49 @@ Item {
             compare(apps.executions[0].id, "b")
         }
 
+        // Shared focus frame: exactly one instance rides the selected row.
+        function findFrame() {
+            var f = null
+            function walk(it) {
+                if (f || !it) return
+                for (var i = 0; i < it.children.length; i++) {
+                    var c = it.children[i]
+                    if (c.objectName === "selectionFrame") { f = c; return }
+                    walk(c)
+                }
+            }
+            walk(page)
+            return f
+        }
+
+        function test_sharedFocusFrameFollowsSelection() {
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0)
+            ])
+            var frame = findFrame()
+            verify(frame)
+            compare(frame.opacity, 1)
+
+            keyClick(Qt.Key_Down)
+            tryCompare(svc(), "selectedIndex", 1)
+            tryVerify(function() {
+                return frame.opacity === 1 && Math.round(frame.height) === 64
+            }, 600)
+
+            // Exactly one shared instance across the whole list.
+            var count = 0
+            function countAll(it) {
+                if (!it) return
+                for (var i = 0; i < it.children.length; i++) {
+                    if (it.children[i].objectName === "selectionFrame") count++
+                    countAll(it.children[i])
+                }
+            }
+            countAll(page)
+            compare(count, 1)
+        }
+
         // --- empty state ---
 
         function test_emptyStateShowsWithoutDroppingSearchFocus() {
