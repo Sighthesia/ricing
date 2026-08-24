@@ -137,9 +137,31 @@ Item {
             root.session.refresh()
     }
 
+    // Route execution through the selected row so it replays the
+    // notification-style fling exit before the launch fires; fall back to
+    // the session path when no row backs the current selection.
     function executeSelected() {
-        if (root.session && typeof root.session.executeSelected === "function")
-            root.session.executeSelected()
+        var service = root.session
+        if (!service)
+            return
+        var current = service.results && service.selectedIndex >= 0
+                ? service.results[service.selectedIndex] : null
+        if (current) {
+            for (var i = 0; i < resultsRepeater.count; i++) {
+                var row = resultsRepeater.itemAt(i)
+                if (row && row.result && String(row.result.id) === String(current.id)
+                        && typeof row.activate === "function") {
+                    // A row still held by the entrance wave must release
+                    // first or the activation guard would swallow the key.
+                    if (row.geometryHeld && typeof row.releaseInstantly === "function")
+                        row.releaseInstantly()
+                    row.activate()
+                    return
+                }
+            }
+        }
+        if (typeof service.executeSelected === "function")
+            service.executeSelected()
     }
 
     function navigateSelection(direction) {

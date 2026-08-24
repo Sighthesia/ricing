@@ -117,21 +117,16 @@ Item {
         }
     }
 
-    NumberAnimation {
+    SequentialAnimation {
         id: flingFade
-        target: root
-        property: "opacity"
-        to: 0
-        duration: 600
-        easing.type: Easing.InQuad
+        NumberAnimation { target: root; property: "opacity"; to: 0; duration: reducedMotion ? 0 : 600; easing.type: Easing.InQuad }
+        ScriptAction { script: root.activated() }
     }
 
-    NumberAnimation {
+    SequentialAnimation {
         id: quickFade
-        target: root
-        property: "opacity"
-        to: 0
-        duration: root.reducedMotion ? 0 : 100
+        NumberAnimation { target: root; property: "opacity"; to: 0; duration: root.reducedMotion ? 0 : 100 }
+        ScriptAction { script: root.activated() }
     }
 
     // Physics, drag, and rotation owner. All visuals nest here in explicit
@@ -276,8 +271,9 @@ Item {
         flashAnimation.restart()
     }
 
-    // Activate with the notification parabolic fling and immediate emit;
-    // the fling is purely visual so execution contracts stay synchronous.
+    // Activate exactly like the notification card: replay the parabolic
+    // fling exit and execute only once the fade completes, so the launch
+    // lands as the card leaves instead of snapping the panel away.
     function activate() {
         if (_closing || geometryHeld)
             return
@@ -292,7 +288,6 @@ Item {
         } else {
             quickFade.restart()
         }
-        activated()
     }
 
     HoverHandler {

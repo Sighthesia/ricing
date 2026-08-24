@@ -272,7 +272,8 @@ Item {
 
             keyClick(Qt.Key_Return)
 
-            compare(apps.executions.length, 1)
+            // Execution fires after the card's fling exit completes.
+            tryCompare(apps.executions, "length", 1, 1500)
             compare(apps.executions[0].id, "beta")
 
             resolveExecute(apps, 0, { ok: true })
@@ -292,7 +293,7 @@ Item {
             tryVerify(function() { return row.enabled && row.opacity === 1 }, 800)
             mouseClick(row, row.width / 2, row.height / 2)
 
-            compare(apps.executions.length, 1)
+            tryCompare(apps.executions, "length", 1, 1500)
             compare(apps.executions[0].id, "b")
         }
 
