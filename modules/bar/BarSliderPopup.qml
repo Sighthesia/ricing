@@ -20,6 +20,9 @@ Rectangle {
 
     implicitWidth: 280
     implicitHeight: 104
+    // Explicit dims keep the hosting Loader from stretching the surface.
+    width: implicitWidth
+    height: implicitHeight
     radius: 10
     color: LazerTheme.popupBackground
     border.width: 1

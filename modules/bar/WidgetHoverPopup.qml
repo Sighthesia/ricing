@@ -1,5 +1,5 @@
 import QtQuick
-import "../../../services" as Services
+import "../../services" as Services
 
 // Hover-driven bridge between a bar widget and the shared popup host.
 // A short open delay avoids drive-by popups; closing goes through the
