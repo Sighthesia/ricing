@@ -12,7 +12,7 @@ Afloat is a Wayland desktop shell built with **Quickshell** (QML-based composito
 - `modules/bar/` — layout-driven top bar (`TopBar`, `BarContent`) and per-widget components in `widgets/`.
 - `modules/lazerbar/` — osu!lazer-styled surfaces: settings panel (`LazerSettings*`), launcher page, notifications, fullscreen overlay/music pages. Shared singletons here: `LazerTheme`, `MotionTokens`, `SettingsOverlayBridge` (see its `qmldir`).
 - `modules/shared/glsl/` — shader sources.
-- `scripts/` — Python/shell helpers: `afloat-ipc` (IPC via `qs ipc`), `netease_web_lyrics_bridge.py` (tested by `scripts/tests/test_netease_web_lyrics_bridge.py`), `theming/`, `window_hint_trigger.py`.
+- `scripts/` — Python/shell helpers: `afloat-ipc` (IPC wrapper around `qs ipc -p <config> call <target> <function>`), `netease_web_lyrics_bridge.py` + `beat_tracker_bridge.py` (tested under `scripts/tests/`, run with `pytest`), `theming/`, `tampermonkey/`, `window_hint_trigger.py`.
 - `tests/qml/` — QML tests (`TestCase` from QtTest), one file per unit, importing service `.js` logic directly via relative paths.
 - `docs/superpowers/` — implementation plans and specs (dated); consult for design intent of existing features.
 
@@ -57,3 +57,5 @@ Load these for detailed context on specific topics:
 | [multi-instance-focus-ownership](.agents/skills/multi-instance-focus-ownership/SKILL.md) | Text field works on first open but loses keyboard input on reopen/page switch. |
 | [per-frame-surface-resize-jank](.agents/skills/per-frame-surface-resize-jank/SKILL.md) | Expand/collapse stutters because per-frame size hits an expensive commit boundary. Fix: fixed outer surface, animate clipped inner content. |
 | [reveal-before-clip](.agents/skills/reveal-before-clip/SKILL.md) | Content inside an expanding surface overflows during grow/shrink. Drive reveal from host progress before clip masks. |
+| [browser-media-metadata-fallback](.agents/skills/browser-media-metadata-fallback/SKILL.md) | Web-player (Firefox/Chrome) MPRIS metadata is incomplete, delayed, or churns; lyrics/artwork flicker or vanish. |
+| [first-batch-cold-path-prewarm](.agents/skills/first-batch-cold-path-prewarm/SKILL.md) | Search/picker/results list stutters only on the first large match or open, smooth afterwards. |
