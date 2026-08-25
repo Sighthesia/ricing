@@ -165,6 +165,13 @@ Singleton {
         if (!isFinite(timestamp) || timestamp < 0)
             return
 
+        // Aubio keeps hallucinating a steady tempo in silence (observed
+        // conf 0.0-0.26 with no audio), which would re-spike the beat
+        // pulse forever. Only trust beats while cava reports actual
+        // sound; quiet passages then stay visually calm as well.
+        if (root.isIdle)
+            return
+
         // Caelestia-style passthrough: trust aubio's own tempo estimate.
         const bpm = Number(payload.bpm)
         root._reportedBpm = isFinite(bpm) && bpm > 0 ? bpm : root._reportedBpm
