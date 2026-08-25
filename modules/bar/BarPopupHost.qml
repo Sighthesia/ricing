@@ -57,10 +57,12 @@ Item {
             // (fully closed already sits at 0, so a fresh open is unchanged).
             deformAnimation.restart()
         } else {
-            // Exit mirrors the settings panel exactly: settingsSlide InQuad,
-            // giving the scale-down room to read instead of snapping shut.
-            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
-            deformAnimation.easing.type = Easing.InQuad
+            // Exit shares the submenu retract's parameters: slow(240ms) on
+            // the inOut spline — a visible start, accelerating away under
+            // the bar's occlusion — instead of the longer settings slide.
+            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.slow
+            deformAnimation.easing.type = Easing.BezierSpline
+            deformAnimation.easing.bezierCurve = MotionTokens.inOut
             deformAnimation.to = 0
             deformAnimation.restart()
             Services.BarPopupService.pointerInPopup = false

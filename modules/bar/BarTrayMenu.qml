@@ -204,14 +204,12 @@ Rectangle {
         // submenu fetches its entries asynchronously, so while nothing has
         // arrived yet the previous height is held — otherwise the morph
         // would dip through an empty column before the real frame lands.
-        readonly property int submenuNaturalHeight: {
-            var nat = submenuColumn.implicitHeight
-            if (nat > 20) {
-                heldHeight = nat
-                return nat
-            }
-            return heldHeight > 0 ? heldHeight : nat
-        }
+        readonly property int rawColumnHeight: submenuColumn.implicitHeight
+        onRawColumnHeightChanged:
+            if (rawColumnHeight > 20) heldHeight = rawColumnHeight
+        readonly property int submenuNaturalHeight:
+            rawColumnHeight > 20 ? rawColumnHeight
+                                 : (heldHeight > 0 ? heldHeight : rawColumnHeight)
         property int heldHeight: 0
         height: submenuNaturalHeight
 
