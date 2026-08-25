@@ -65,6 +65,38 @@ Rectangle {
         menu: root.menuHandle
     }
 
+    // Submenu reveal mirrors DropdownMenu's guarded lifecycle: one progress
+    // drives opacity/scale/slide, retargets between submenus never replay,
+    // and reduced motion snaps straight to the settled frame.
+    property string submenuPhase: "closed"
+    property real submenuProgress: 0
+
+    onSubmenuEntryChanged: {
+        if (root.submenuEntry !== null) {
+            if (root.submenuPhase === "opening" || root.submenuPhase === "open")
+                return
+            root.submenuPhase = "opening"
+            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.medium
+            submenuAnimation.to = 1
+            submenuAnimation.restart()
+        } else if (root.submenuPhase !== "closed") {
+            root.submenuPhase = "closing"
+            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.fast
+            submenuAnimation.to = 0
+            submenuAnimation.restart()
+        }
+    }
+
+    NumberAnimation {
+        id: submenuAnimation
+
+        target: root
+        property: "submenuProgress"
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: MotionTokens.outSoft
+        onFinished: root.submenuPhase = root.submenuProgress === 1 ? "open" : "closed"
+    }
+
     // Scrollable entry column; menus stay short so stop-at-bounds scrolling
     // is enough here.
     Flickable {
@@ -104,28 +136,38 @@ Rectangle {
         }
     }
 
-    // Second-level submenu surface sharing the same visual language.
+    // Second-level submenu surface sharing the same visual language. The
+    // reveal replays DropdownMenu's fade + scale + drop-in; the layout
+    // rectangle stays unanimated so only paint properties move per frame.
     Rectangle {
         id: submenuSurface
 
-        visible: root.submenuEntry !== null
+        visible: root.submenuProgress > 0
+        enabled: root.submenuPhase === "opening" || root.submenuPhase === "open"
+        opacity: root.submenuProgress
+        transformOrigin: Item.TopLeft
+        scale: MotionTokens.reducedMotion ? 1
+               : MotionTokens.popupFromScale
+                 + (1 - MotionTokens.popupFromScale) * root.submenuProgress
         radius: 10
         color: LazerTheme.popupBackground
         border.width: 1
         border.color: LazerTheme.popupBorder
 
         width: root.menuWidth
-        height: submenuColumn.implicitHeight + 16
+        // The column's own top/bottom padding already spaces the content;
+        // adding more left a dead band at the bottom.
+        height: submenuColumn.implicitHeight
         // Open toward the screen center; fall back to the left edge-side
         // when the right side would overflow the window.
-        x: {
-            if (!visible)
+        readonly property real dockedX: {
+            if (root.submenuProgress <= 0)
                 return 0
             var rootRightInWindow = root.mapToItem(null, root.x + root.width, 0).x
             return rootRightInWindow + width + 24 > root.Window.width
                    ? -width - 4 : root.width + 4
         }
-        y: {
+        readonly property real dockedY: {
             if (!root.submenuAnchorRow)
                 return 0
             // Map in root coordinates: mapping into the surface itself
@@ -133,6 +175,9 @@ Rectangle {
             var rowY = root.submenuAnchorRow.mapToItem(root, 0, 0).y
             return Math.max(4, Math.min(rowY - 4, root.height - height - 8))
         }
+        x: dockedX
+        y: dockedY + (MotionTokens.reducedMotion ? 0
+                       : MotionTokens.popupFromY * (1 - root.submenuProgress))
 
         Column {
             id: submenuColumn
