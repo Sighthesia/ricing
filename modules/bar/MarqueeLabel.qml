@@ -243,16 +243,18 @@ Item {
         }
         _stopSweepRow()
         root._sweepActive = true
-        // Both wavefronts must share one span so they move at the same
-        // pixel velocity: at every position the new char starts exactly
-        // one gap after its old char finished falling, no matter how
-        // differently the two texts measure.
+        // Pace both wavefronts over the incoming title's VISIBLE width:
+        // the scan always crosses what can be seen in one sweep duration,
+        // so a fully-visible line cascades across the full range instead
+        // of compressing into a wall (pacing over the raw text width would
+        // squeeze the visible part into a fraction of the sweep). Same
+        // span for both fronts keeps the per-position gap exact.
         ghostMetrics.font = label.font
         ghostMetrics.text = oldText
         var oldWidth = ghostMetrics.advanceWidth
         ghostMetrics.text = newText
         var newWidth = ghostMetrics.advanceWidth
-        var span = Math.max(1, Math.max(oldWidth, newWidth))
+        var span = Math.max(1, Math.min(newWidth, root.maxWidth))
         // The outgoing viewport: syncScroll already zeroed label.x for this
         // text change, so the scroll offset comes from the preserved state;
         // the visible width is the old text clipped to the label's cap.
