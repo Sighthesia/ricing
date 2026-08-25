@@ -175,16 +175,12 @@ Item {
     }
 
     // Fall delay for a ghost at pixel offset x. Within the incoming
-    // title's width the line moves at sweep pace; past its right edge the
-    // remaining old chars compress into a short bounded tail, so they fall
-    // in sequence and promptly instead of trailing the whole sweep.
+    // title's width the line moves at sweep pace; past its right edge no
+    // incoming char will ever appear, so the caller drops those orphans
+    // immediately instead of pacing them behind the reveal.
     function _fallDelayAt(xOffset, span) {
         var s = Math.max(1, span)
-        if (xOffset <= s)
-            return Math.round(root.scanSweepMs * Math.max(0, xOffset / s))
-        var maxX = Math.max(s + 1, root.maxWidth)
-        return Math.round(root.scanSweepMs
-            + 240 * (xOffset - s) / (maxX - s))
+        return Math.round(root.scanSweepMs * Math.max(0, xOffset / s))
     }
 
     // Tear down any in-flight sweep row and restore the real label.
@@ -223,14 +219,21 @@ Item {
             var revealAge = elapsed - startedAt
             var opacity = revealAge >= root.scanRevealMs
                 ? 1 : Math.max(0.08, revealAge / root.scanRevealMs)
+            // Chars within the incoming title's width ride the wavefront;
+            // orphans past its edge fall right away — nothing will fade in
+            // there, so pacing them would leave stragglers hanging.
+            var xOff = offsets[i]
+            var delay = xOff > span
+                ? i * 8
+                : root._fallDelayAt(xOff, span)
             lyricGhostComponent.createObject(overlayLayer, {
                 text: chars[i],
                 color: textColor,
                 font: label.font,
-                x: offsets[i],
+                x: xOff,
                 y: 0,
                 opacity: opacity,
-                delay: root._fallDelayAt(offsets[i], span),
+                delay: delay,
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
@@ -352,6 +355,13 @@ Item {
             if (viewRight > 0 && (charEnd <= 0 || x >= viewRight))
                 continue
             ghostMetrics.text = oldText.slice(0, i)
+            // Orphans past the incoming title's edge fall right away with
+            // a light stagger — no incoming char will ever claim those
+            // positions, so pacing them behind the reveal only leaves
+            // stragglers hanging after the new title settled.
+            var delay = x > span
+                ? i * 8
+                : root._fallDelayAt(x, span)
             lyricGhostComponent.createObject(overlayLayer, {
                 text: oldText[i],
                 color: textColor,
@@ -359,7 +369,7 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                delay: root._fallDelayAt(x, span),
+                delay: Math.round(delay),
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
