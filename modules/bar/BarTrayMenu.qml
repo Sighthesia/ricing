@@ -76,12 +76,12 @@ Rectangle {
             if (root.submenuPhase === "opening" || root.submenuPhase === "open")
                 return
             root.submenuPhase = "opening"
-            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.medium
+            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
             submenuAnimation.to = 1
             submenuAnimation.restart()
         } else if (root.submenuPhase !== "closed") {
             root.submenuPhase = "closing"
-            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.fast
+            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
             submenuAnimation.to = 0
             submenuAnimation.restart()
         }
@@ -147,7 +147,12 @@ Rectangle {
 
         visible: root.submenuProgress > 0
         enabled: root.submenuPhase === "opening" || root.submenuPhase === "open"
-        opacity: root.submenuProgress
+        // The first-level popup keeps opacity constant and lets the bar
+        // occlude its birth; nothing occludes this surface, so opacity
+        // ramps off in the first fifth of the deform instead of tracking
+        // it — the scale/slide stays the visible story, on the way in and
+        // on the retract back into the row.
+        opacity: MotionTokens.reducedMotion ? 1 : Math.min(1, root.submenuProgress * 5)
         radius: 10
         color: LazerTheme.popupBackground
         border.width: 1
@@ -202,15 +207,18 @@ Rectangle {
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         // Vertical anchor for the scale origin: the parent row's center,
-        // clamped inside the surface. Falls back near the first row when
-        // no anchor exists (mid-close).
+        // clamped inside the surface. The frozen copy keeps the retract
+        // pivoting on the same point after closeSubmenu() clears the
+        // anchor, instead of jumping to a fallback mid-animation.
         readonly property real anchorCenterYInSurface: {
             if (!root.submenuAnchorRow)
-                return Math.min(20, height / 2)
+                return frozenOriginY
             var rowCenter = root.submenuAnchorRow.mapToItem(root, 0, 0).y
                     + root.submenuAnchorRow.height / 2
             return Math.max(10, Math.min(rowCenter - y, height - 10))
         }
+        property real frozenOriginY: 20
+        onAnchorCenterYInSurfaceChanged: frozenOriginY = anchorCenterYInSurface
         x: dockedX
         y: dockedY
 
