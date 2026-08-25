@@ -412,6 +412,24 @@ Item {
             compare(apps.executions.length, 1)
         }
 
+        function test_throwingAdapterStillCompletesExecution() {
+            // An adapter that throws synchronously inside execute() must not
+            // swallow the completion: the activated row is already hidden
+            // for its exit fling, so a lost outcome strands the surface.
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+            apps.execute = function(item, done) {
+                throw new Error("broken entry")
+            }
+            svc().executeSelected()
+
+            compare(svc().error.length > 0, true)
+            verify(String(svc().error).indexOf("broken entry") >= 0)
+        }
+
         // --- IPC entry helpers keep their prefix behavior ---
 
         function test_openClipboardOpensWithClipboardPrefix() {

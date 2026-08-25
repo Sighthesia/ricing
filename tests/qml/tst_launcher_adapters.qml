@@ -290,6 +290,40 @@ Item {
             verify(String(missing.error).indexOf("ghost") >= 0)
         }
 
+        function test_appsAdapterExecuteReportsFailedLaunch() {
+            // entry.execute() returning false (launch refused) must surface
+            // as a failed outcome, not a silent ok that closes the panel.
+            var refusing = makeAppEntry("refuser", "Refuser", "")
+            refusing.execute = function() { return false }
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([refusing]),
+                launchCounts: makeLaunchCounts({})
+            })
+
+            var outcome = null
+            adapters.apps.execute({ id: "refuser", displayName: "Refuser" }, function(result) { outcome = result })
+            verify(outcome && outcome.ok === false)
+            verify(String(outcome.error).length > 0)
+        }
+
+        function test_appsAdapterExecuteSurvivesThrowingEntry() {
+            // A desktop entry whose execute() throws must still complete the
+            // callback or the activated row strands hidden mid-fling.
+            var bomb = makeAppEntry("bomb", "Bomb", "")
+            bomb.execute = function() { throw new Error("broken Exec") }
+            var counts = makeLaunchCounts({})
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([bomb]),
+                launchCounts: counts
+            })
+
+            var outcome = null
+            adapters.apps.execute({ id: "bomb", displayName: "Bomb" }, function(result) { outcome = result })
+            verify(outcome && outcome.ok === false)
+            verify(String(outcome.error).length > 0)
+            compare(counts.recorded.length, 0)
+        }
+
         // --- built-in shell commands ---
 
         function test_appsAdapterSurfacesBuiltinCommands() {

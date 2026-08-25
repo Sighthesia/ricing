@@ -187,9 +187,16 @@ QtObject {
             return
         var adapter = _adapterFor(mode)
         var sessionToken = _refreshToken
-        adapter.execute(item, function(outcome) {
-            root._completeExecute(sessionToken, outcome)
-        })
+        // A throwing adapter must not swallow the completion callback: the
+        // activated row is already hidden for its exit fling, so a lost
+        // outcome would strand the surface with an invisible selection.
+        try {
+            adapter.execute(item, function(outcome) {
+                root._completeExecute(sessionToken, outcome)
+            })
+        } catch (err) {
+            root._completeExecute(sessionToken, { ok: false, error: String(err) })
+        }
     }
 
     // Successful execution closes the surface; failures preserve the session

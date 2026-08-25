@@ -92,6 +92,18 @@ Item {
             // slip through unreleased.
             root._holdAndScheduleReleases()
         }
+        function onErrorChanged() {
+            if (!root.session || !root.session.error)
+                return
+            // A failed launch leaves its row hidden for a fling exit that
+            // never plays; restore the card so the surface stays usable.
+            for (var i = 0; i < resultsRepeater.count; i++) {
+                var row = resultsRepeater.itemAt(i)
+                if (row && row.closing && typeof row.restoreFromClosing === "function")
+                    row.restoreFromClosing()
+            }
+            resultsView.syncSelectionFrame()
+        }
     }
 
     // Fallback key handling for focus held by the page itself or by rows;
@@ -578,7 +590,9 @@ Item {
             if (current) {
                 for (var i = 0; i < resultsRepeater.count; i++) {
                     var candidate = resultsRepeater.itemAt(i)
-                    if (candidate && candidate.result
+                    // A row mid-fling-exit is invisible; it must never
+                    // anchor the shared frame over blank space.
+                    if (candidate && !candidate.closing && candidate.result
                             && String(candidate.result.id) === String(current.id)) {
                         row = candidate
                         break

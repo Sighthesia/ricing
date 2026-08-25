@@ -212,7 +212,20 @@ function createAppsAdapter(config) {
                 done({ ok: false, error: "application cannot be launched: " + String(entry.name || entry.id) })
                 return
             }
-            entry.execute()
+            // entry.execute() reports failure through a false return or a
+            // thrown exception; either way done() must fire so the session
+            // never strands between "row hidden for fling" and "closed".
+            var launched = true
+            try {
+                launched = entry.execute()
+            } catch (err) {
+                done({ ok: false, error: "application launch failed: " + String(entry.name || entry.id) })
+                return
+            }
+            if (launched === false) {
+                done({ ok: false, error: "application failed to launch: " + String(entry.name || entry.id) })
+                return
+            }
             if (launchCounts && typeof launchCounts.recordLaunch === "function")
                 launchCounts.recordLaunch(String(entry.id))
             done({ ok: true })

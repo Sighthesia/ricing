@@ -269,6 +269,14 @@ Item {
     // Activate per the panel-exit contract: report this card's window-space
     // geometry and content to the higher ghost layer, vanish instantly, then
     // fire execution synchronously so launch and panel close happen at once.
+    // Undo a fling exit whose launch failed: the card reappears in place
+    // so a dead activation never strands an invisible row in the list.
+    function restoreFromClosing() {
+        if (!_closing)
+            return
+        _closing = false
+    }
+
     function activate() {
         if (_closing || geometryHeld)
             return
