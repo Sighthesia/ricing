@@ -438,15 +438,116 @@ Item {
     }
     onActiveSearchTextChanged: root._resultWindowExtra = 0
 
+    // Clipboard preview pane: the selected entry rendered large — decoded
+    // image or full multi-line text — beside a narrowed results list.
+    Rectangle {
+        id: previewPane
+        readonly property var selectedResult: {
+            var s = root.session
+            if (!s || s.mode !== "clipboard" || s.selectedIndex < 0 || !s.results)
+                return null
+            return s.results[s.selectedIndex] || null
+        }
+        readonly property bool shown: !!selectedResult
+        anchors.top: searchSurface.bottom
+        anchors.topMargin: 12
+        anchors.right: parent.right
+        anchors.rightMargin: 8
+        anchors.bottom: parent.bottom
+        width: 240
+        visible: shown
+        color: LazerTheme.settingsCard
+        radius: 6
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 8
+
+            // Full text preview for text entries.
+            Text {
+                id: paneText
+                visible: previewPane.selectedResult && !previewPane.selectedResult.isImage
+                width: parent.width
+                text: previewPane.selectedResult && previewPane.selectedResult.previewText != null
+                      ? String(previewPane.selectedResult.previewText) : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WrapAnywhere
+                color: LazerTheme.textPrimary
+                font.pixelSize: 12
+                elide: Text.ElideRight
+                maximumLineCount: 14
+            }
+
+            // Large decoded image for image entries.
+            Rectangle {
+                id: paneImageFrame
+                visible: previewPane.selectedResult && previewPane.selectedResult.isImage
+                width: parent.width
+                height: Math.min(220, parent.height - 60)
+                radius: 4
+                color: LazerTheme.settingsCardHover
+
+                Image {
+                    id: paneImage
+                    property string source_: ""
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width - 8, sourceSize.width * parent.height / Math.max(1, sourceSize.height))
+                    height: Math.min(parent.height - 8, sourceSize.height)
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
+                    cache: false
+                    source: paneImage.source_
+                }
+            }
+
+            Text {
+                visible: previewPane.shown
+                width: parent.width
+                text: previewPane.selectedResult
+                      ? (previewPane.selectedResult.displayName || "") : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WrapAnywhere
+                elide: Text.ElideRight
+                maximumLineCount: 2
+                color: LazerTheme.textMuted
+                font.pixelSize: 11
+            }
+        }
+
+        onSelectedResultChanged: refreshPreview()
+        Component.onCompleted: refreshPreview()
+
+        function refreshPreview() {
+            var r = previewPane.selectedResult
+            if (!r) {
+                paneImage.source_ = ""
+                return
+            }
+            if (!r.isImage) {
+                paneImage.source_ = ""
+                return
+            }
+            if (!root.session)
+                return
+            var wanted = String(r.id)
+            root.session.decodeThumbnail(wanted, String(r.mime || ""), function(path) {
+                if (path && previewPane.selectedResult
+                        && String(previewPane.selectedResult.id) === wanted)
+                    paneImage.source_ = path
+            })
+        }
+    }
+
     Flickable {
         id: resultsView
         anchors.top: searchSurface.bottom
         anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.right: previewPane.visible ? previewPane.left : parent.right
         anchors.bottom: parent.bottom
         anchors.topMargin: 12
         anchors.leftMargin: 8
-        anchors.rightMargin: 8
+        anchors.rightMargin: previewPane.visible ? 12 : 8
         clip: true
         visible: !root.stateVisible
         contentWidth: width
