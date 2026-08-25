@@ -73,11 +73,26 @@ Item {
             compare(TextDiff.staggerDelayMs(0, 2, 24, 120), 24)
         }
 
-        function test_staggerTotalIsCapped() {
-            // 10 characters: step shrinks so the last delay never exceeds the cap.
-            verify(TextDiff.staggerDelayMs(0, 10, 24, 120) <= 120)
-            var step = TextDiff.staggerDelayMs(8, 10, 24, 120) - TextDiff.staggerDelayMs(9, 10, 24, 120)
-            compare(step, Math.floor(120 / 9))
+        function test_staggerStepShrinksThenFloors() {
+            // Short removals keep the 24ms pace; longer ones shrink toward
+            // the perceptible floor instead of collapsing to zero.
+            compare(TextDiff.staggerDelayMs(8, 10, 24, 120) - TextDiff.staggerDelayMs(9, 10, 24, 120),
+                    Math.floor(120 / 9))
+            compare(TextDiff.staggerDelayMs(8, 10, 24, 120), 16 * 2)
+        }
+
+        function test_staggerStepFloorsAtPerceptibleMinimum() {
+            // Long removals must never compress adjacent delays below ~16ms:
+            // the tail of the cascade would read as one simultaneous drop.
+            for (var n = 2; n <= 30; n++) {
+                var minGap = 999
+                for (var i = 0; i < n - 1; i++) {
+                    var gap = TextDiff.staggerDelayMs(i, n, 24, 120)
+                              - TextDiff.staggerDelayMs(i + 1, n, 24, 120)
+                    minGap = Math.min(minGap, gap)
+                }
+                verify(minGap >= 16, "n=" + n + " collapsed to " + minGap + "ms/glyph")
+            }
         }
     }
 
@@ -148,6 +163,21 @@ Item {
             field.text = "abc"
             tryCompare(field, "ghostCount", 3)
             tryCompare(field, "ghostCount", 0, 900)
+        }
+
+        function test_bulkRemovalSweepsAirborneGeneration() {
+            // Rapid consecutive edits: a bulk removal must retire ghosts
+            // still falling from the previous edit so generations never
+            // stack on screen.
+            field.suppressDeleteFx = true
+            field.text = "abcdefgh"
+            field.suppressDeleteFx = false
+            field.text = "abcdef"   // 2 ghosts airborne (lifetime 200ms+)
+            tryCompare(field, "ghostCount", 2)
+            field.text = ""         // bulk removal sweeps them + spawns 8
+            tryVerify(function() { return field.ghostCount <= 8 }, 50)
+            verify(field.ghostCount === 8,
+                   "expected exactly the new generation, got " + field.ghostCount)
         }
 
         function test_suppressedSyncSpawnsNoGhosts() {

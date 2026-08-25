@@ -48,10 +48,14 @@ function cumulativeOffsets(text, advanceOf) {
 
 // Cascade delay for character `index` inside an n-character removal so the
 // rightmost glyph detaches first and the wave travels toward the cursor.
-// Total stagger is capped so bulk deletes never outlive the fall itself.
+// Adjacent glyphs must stay at least 16ms apart or the tail reads as one
+// simultaneous drop, so the step floors there instead of shrinking to zero
+// under the old total-time cap.
 function staggerDelayMs(index, count, stepMs, maxTotalMs) {
     if (count <= 1)
         return 0
-    var step = Math.min(stepMs, Math.max(1, Math.floor(maxTotalMs / (count - 1))))
+    var step = Math.min(stepMs, Math.floor(maxTotalMs / (count - 1)))
+    if (step < 16)
+        step = 16
     return (count - 1 - index) * step
 }

@@ -87,6 +87,11 @@ TextInput {
         var range = TextDiff.removeRange(oldText, newText)
         if (!range)
             return
+        // A bulk removal sweeps ghosts still airborne from a previous edit:
+        // rapid consecutive switches must read as one cascade, never two
+        // overlapping generations. Single-character edits keep their ripple.
+        if (range.removed.length >= 3)
+            sweepGhosts()
         var anchor = positionToRectangle(range.start)
         var offsets = TextDiff.cumulativeOffsets(range.removed, function(ch) {
             metrics.text = ch
@@ -97,6 +102,13 @@ TextInput {
             createGhost(range.removed[i], anchor.x + offsets[i], anchor,
                         TextDiff.staggerDelayMs(i, count, ghostStaggerStepMs, ghostStaggerMaxTotalMs))
         }
+    }
+
+    // Destroy every live ghost immediately; used by the bulk-removal sweep.
+    function sweepGhosts() {
+        var kids = ghostLayer.children
+        for (var i = kids.length - 1; i >= 0; i--)
+            kids[i].destroy()
     }
 
     function createGhost(ch, x, anchorRect, delayMs) {
