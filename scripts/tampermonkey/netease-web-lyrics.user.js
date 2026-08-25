@@ -374,6 +374,10 @@
       const audioSet = new Set();
       let lastSignature = '';
       let latestLyricRequestId = '';
+      // Tabs that never played must not push sessions: a freshly opened
+      // background tab would otherwise evict the tab that is actually
+      // playing in the shell's single lyric session.
+      let hasPlayedOnce = false;
 
       function normalizeText(value) {
         return value == null ? '' : String(value).trim();
@@ -387,6 +391,9 @@
       }
 
       function emitState() {
+        if (!hasPlayedOnce)
+          return;
+
         const payload = {
           songId: normalizeText(state.songId),
           title: normalizeText(state.title),
@@ -593,6 +600,8 @@
         }
 
         const nextPlaybackState = normalizeText(session.playbackState);
+        if (nextPlaybackState === 'playing')
+          hasPlayedOnce = true;
         if (nextPlaybackState && nextPlaybackState !== 'none' && nextPlaybackState !== state.playbackState) {
           state.playbackState = nextPlaybackState;
           changed = true;
@@ -771,6 +780,9 @@
           const target = event && event.target;
           if (!target || target.tagName !== 'AUDIO')
             return;
+
+          if (eventName === 'play' && target.paused === false)
+            hasPlayedOnce = true;
 
           audioSet.add(target);
           const sessionChanged = mergeMediaSession();

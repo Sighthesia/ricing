@@ -462,6 +462,19 @@ Singleton {
             : (nextDurationMs > 0 ? Math.max(0, Math.round(nextProgress * nextDurationMs)) : 0)
         const nextRawLyric = root._normalizeText(payload.rawLyric || payload.lyric)
         const nextTranslatedLyric = root._normalizeText(payload.translatedLyric || payload.tlyric)
+
+        // Multi-tab arbitration: while a track is actively playing here, a
+        // paused/stopped payload for a different track (another browser tab)
+        // must not evict the live session.
+        const incomingTrackDiffers = nextSongId !== "" && root.songId !== ""
+            ? nextSongId !== root.songId
+            : ((nextTitle !== "" || nextArtist !== "")
+                && !root._trackMetadataMatches(nextTitle, nextArtist, root.title, root.artist))
+        if (incomingTrackDiffers && root.playbackState === "playing"
+                && nextPlaybackState !== "playing") {
+            console.warn("[afloat:NeteaseWebLyricsService] Ignoring non-playing payload from another track")
+            return
+        }
         const hasSessionContent = root.hasLyrics || root.rawLyric !== "" || root.translatedLyric !== ""
         const emptyMetadataPayload = nextSongId === "" && nextTitle === "" && nextArtist === ""
         const pauseSessionGap = hasSessionContent
