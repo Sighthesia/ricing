@@ -64,19 +64,37 @@ QtObject {
     Component.onCompleted: extractColors(Services.SettingsService.appearance.wallpaperPath)
 
     // Regenerate palettes whenever the requested scheme or template changes.
+    // A template/mode switch is served from the preview cache when fresh, so
+    // switching feels instant; the script only runs on a cache miss.
     property Connections _schemeConnection: Connections {
         target: Services.SettingsService.appearance
         function onColorSchemeChanged() {
-            root.extractColors(Services.SettingsService.appearance.wallpaperPath)
+            root.applyScheme(Services.SettingsService.appearance.wallpaperPath)
         }
         function onThemeSchemeChanged() {
-            root.extractColors(Services.SettingsService.appearance.wallpaperPath)
+            root.applyScheme(Services.SettingsService.appearance.wallpaperPath)
         }
     }
 
     // Run the per-scheme preview batch so the theme template cards show the
     // current wallpaper's palettes. Triggered from the settings overlay open.
     property string _lastPreviewKey: ""
+    // Scheme awaiting a script-driven extraction; drives the card busy state.
+    property string pendingScheme: ""
+
+    // Merged per-scheme themes written by previewSchemes().
+    property var previewsData: null
+    property FileView _previewFile: FileView {
+        path: Quickshell.cacheDir + "/theme-previews.json"
+        watchChanges: false
+        printErrors: false
+        onLoaded: root.previewsData = root._parse(text())
+        onLoadFailed: root.previewsData = null
+    }
+
+    function _parse(raw) {
+        try { return JSON.parse(raw) } catch (e) { return null }
+    }
 
     function previewSchemes() {
         const path = Services.SettingsService.appearance.wallpaperPath
@@ -86,6 +104,35 @@ QtObject {
         previewProcess.command = ["sh", "-c", previewCommandFor(path)]
         isPreviewing = true
         previewProcess.running = true
+    }
+
+    // Serve a template/mode switch from the cached previews when they belong
+    // to the current wallpaper; otherwise fall back to the extraction script.
+    function applyScheme(path) {
+        if (!path) return
+        if (path === _lastPreviewKey && applyFromPreviews(requestedScheme)) {
+            pendingScheme = ""
+            return
+        }
+        pendingScheme = requestedScheme
+        extractColors(path)
+    }
+
+    // Write colors.json straight from the merged preview data. Returns true
+    // when the palette was available and the file was updated.
+    function applyFromPreviews(scheme) {
+        const data = previewsData ? previewsData[scheme] : null
+        if (!data || !data.dark || !data.light) return false
+        _colorsWriter.setText(JSON.stringify({ "dark": data.dark, "light": data.light }))
+        return true
+    }
+
+    // Dedicated writer for colors.json; atomic by default so the watcher in
+    // Color.qml always reads a complete palette.
+    property FileView _colorsWriter: FileView {
+        path: Quickshell.cacheDir + "/colors.json"
+        watchChanges: false
+        printErrors: false
     }
 
     property Timer _debounce: Timer {
@@ -115,6 +162,7 @@ QtObject {
 
         onExited: function(exitCode, exitStatus) {
             root.isExtracting = false
+            root.pendingScheme = ""
             if (root._pendingPath) {
                 root._execute()
             }
@@ -134,8 +182,13 @@ QtObject {
 
         onExited: function(exitCode, exitStatus) {
             root.isPreviewing = false
-            if (exitCode !== 0)
+            if (exitCode !== 0) {
                 root._lastPreviewKey = ""
+            } else {
+                // Refresh the parsed cache so template switches can be served
+                // without rerunning the extraction script.
+                root._previewFile.reload()
+            }
         }
 
         stderr: StdioCollector {
