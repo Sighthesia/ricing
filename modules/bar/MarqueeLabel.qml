@@ -207,10 +207,10 @@ Item {
         var count = Math.min(oldText.length, root.transitionMaxChars)
         ghostMetrics.font = label.font
         ghostMetrics.text = oldText
-        var fullWidth = ghostMetrics.advanceWidth
-        // Cap the traverse distance to the visible slot width so an
-        // overflowing line still sweeps at the same perceived speed.
-        var span = clipSlot.width > 0 ? Math.min(fullWidth, clipSlot.width) : fullWidth
+        // Span over the text's own full width — never the live slot width,
+        // which still carries the previous text's geometry during the
+        // change handler and would clamp all later chars to one delay.
+        var span = Math.max(1, ghostMetrics.advanceWidth)
         for (var i = 0; i < count; i++) {
             ghostMetrics.text = oldText.slice(0, i)
             lyricGhostComponent.createObject(overlayLayer, {
@@ -233,8 +233,7 @@ Item {
         var delays = []
         ghostMetrics.font = label.font
         ghostMetrics.text = text
-        var fullWidth = ghostMetrics.advanceWidth
-        var span = clipSlot.width > 0 ? Math.min(fullWidth, clipSlot.width) : fullWidth
+        var span = Math.max(1, ghostMetrics.advanceWidth)
         for (var i = 0; i < count; i++) {
             ghostMetrics.text = text.slice(0, i)
             delays.push(root._scanDelayAt(ghostMetrics.advanceWidth, span))
