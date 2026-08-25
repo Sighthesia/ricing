@@ -49,6 +49,8 @@ WlSessionLockSurface {
     Connections {
         target: Services.LockService
         function onUnlockRequested() {
+            revealDelay.stop()
+            revealStarted = true
             openBody.stop()
             openWaves.stop()
             exitAnimation.restart()
@@ -87,24 +89,32 @@ WlSessionLockSurface {
         easing.type: Easing.OutQuad
     }
 
-    // Start the reveal on the first presented frame: `visible` reflects the
-    // requested state and is already true while the session-lock commit and
-    // first render are still in flight, so an earlier start would burn the
-    // timeline before any pixel shows.
+    // Start the reveal after a short grace delay. Client-side signals cannot
+    // tell us what the compositor has shown: frames swap into buffers before
+    // the session-lock commit is displayed, so both object creation and
+    // frameSwapped fire while the screen still shows nothing. Niri maps lock
+    // surfaces well under this delay, guaranteeing the floor is on screen
+    // before the sweep begins.
     property bool revealStarted: false
-    Connections {
-        target: root.contentItem ? root.contentItem.window : null
-        function onFrameSwapped() {
-            if (root.revealStarted || !root.visible)
+    Timer {
+        id: revealDelay
+        interval: 250
+        running: false
+        repeat: false
+        onTriggered: {
+            if (root.revealStarted)
                 return
             root.revealStarted = true
-            if (MotionTokens.reducedMotion) {
-                root.waveProgress = 1
-                root.bodyProgress = 1
-                return
-            }
             openWaves.restart()
             openBody.restart()
+        }
+    }
+    Component.onCompleted: {
+        if (MotionTokens.reducedMotion) {
+            root.waveProgress = 1
+            root.bodyProgress = 1
+        } else {
+            revealDelay.restart()
         }
     }
 
