@@ -191,7 +191,7 @@ Item {
 
     function requestRetry() {
         if (root.session && typeof root.session.refresh === "function")
-            root.session.refresh()
+            root.session.refresh(true)
     }
 
     // Route execution through the selected row so it replays the

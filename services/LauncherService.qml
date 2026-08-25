@@ -41,7 +41,9 @@ Singleton {
         repeat: false
         onTriggered: {
             if (session.visible && session.mode === "apps" && !session.loading)
-                session.refresh()
+                // Force a pull: the pooled fast path would otherwise keep
+                // filtering the pre-scan pool forever.
+                session.refresh(true)
         }
     }
     on_DesktopEntryCountChanged: entryScanRefreshTimer.restart()

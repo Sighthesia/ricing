@@ -67,7 +67,7 @@ QtObject {
         function onListCompleted() {
             if (root.visible && !root.loading
                     && LauncherLogic.parseQuery(root.query).mode === "clipboard")
-                root.refresh()
+                root.refresh(true)
         }
     }
 
@@ -108,14 +108,18 @@ QtObject {
         root.open()
     }
 
-    function refresh() {
+    // Refreshes the visible session. Text edits ride the pooled fast path
+    // (the pool holds the full set for this open); callers announcing real
+    // upstream changes - desktop-entry rescans, new clipboard history -
+    // must pass forcePull so the pool is re-fetched from the source.
+    function refresh(forcePull) {
         if (!root.visible)
             return
         var parsed = LauncherLogic.parseQuery(query)
 
         // Text-only edits inside a pooled mode never re-hit the data source;
         // the pool already holds the full sorted set for this open session.
-        if (parsed.mode === _pooledMode && displayPool.length > 0) {
+        if (!forcePull && parsed.mode === _pooledMode && displayPool.length > 0) {
             var previous = root.results
             var filtered = LauncherLogic.filterResults(displayPool, parsed.text)
             // Clearing the query always lands back on the first row; only a

@@ -430,6 +430,25 @@ Item {
             verify(String(svc().error).indexOf("broken entry") >= 0)
         }
 
+        function test_forceRefreshRepullsPooledMode() {
+            // Upstream-change announcers (entry rescans, clipboard polls)
+            // must bypass the pooled fast path or their new data never
+            // reaches an open list.
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+            var queriesBefore = apps.queries.length
+
+            svc().refresh(true)
+            compare(apps.queries.length, queriesBefore + 1)
+
+            resolveRefresh(apps, queriesBefore, [makeItem("a", "Alpha", 0, 0), makeItem("n", "New app", 0, 1)])
+            compare(svc().results.length, 2)
+            compare(svc().results[0].id, "n")
+        }
+
         function test_identicalRefreshKeepsResultsIdentity() {
             // Background polls (clipboard every 5s) re-resolve with the same
             // ids; the results array must keep its identity so the surface
