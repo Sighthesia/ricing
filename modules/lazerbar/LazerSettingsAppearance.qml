@@ -19,6 +19,7 @@ LazerSettingsSection {
     property alias glassHighlightIntensitySlider: glassHighlightIntensitySliderControl
     property alias glassGlowIntensitySlider: glassGlowIntensitySliderControl
     property alias glassThemeAdaptiveToggle: glassThemeAdaptiveToggleControl
+    property alias themeAdaptationToggle: themeAdaptationToggleControl
     property alias ripplePulseToggle: ripplePulseToggleControl
     property alias wallpaperRow: wallpaperRow
     property alias colorSchemeRow: colorSchemeRow
@@ -188,6 +189,16 @@ LazerSettingsSection {
         currentValue: root.settingsObject ? root.settingsObject.glassThemeAdaptive : null
         resetCallback: function() { root.resetKey("glassThemeAdaptive") }
         LazerSettingsToggle { id: glassThemeAdaptiveToggleControl; checked: root.settingsObject ? root.settingsObject.glassThemeAdaptive : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.glassThemeAdaptive = value; root.save() } } }
+    }
+    LazerSettingsRow {
+        id: themeAdaptationRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: "壁纸主题色"; descriptionText: "从壁纸提取主题色并应用到界面"
+        defaultValue: root.defaultOf("themeAdaptation")
+        currentValue: root.settingsObject ? root.settingsObject.themeAdaptation : null
+        resetCallback: function() { root.resetKey("themeAdaptation") }
+        LazerSettingsToggle { id: themeAdaptationToggleControl; checked: root.settingsObject ? root.settingsObject.themeAdaptation !== false : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.themeAdaptation = value; root.save() } } }
     }
     LazerSettingsRow {
         id: rippleRow
