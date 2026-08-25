@@ -194,13 +194,18 @@ Item {
         return Math.round(root.scanSweepMs * Math.min(1, Math.max(0, xOffset / span)))
     }
 
-    // Fall delay for a ghost at pixel offset x. Within the incoming
-    // title's width the line moves at sweep pace; past its right edge no
-    // incoming char will ever appear, so the caller drops those orphans
-    // immediately instead of pacing them behind the reveal.
+    // Fall delay for a ghost at pixel offset x — ONE monotonic wavefront:
+    // within the incoming title's width the line moves at sweep pace;
+    // past its right edge the pace compresses into a bounded tail, so
+    // surplus chars keep falling in sequence instead of forming a second,
+    // faster front.
     function _fallDelayAt(xOffset, span) {
         var s = Math.max(1, span)
-        return Math.round(root.scanSweepMs * Math.max(0, xOffset / s))
+        if (xOffset <= s)
+            return Math.round(root.scanSweepMs * Math.max(0, xOffset / s))
+        var maxX = Math.max(s + 1, root.maxWidth)
+        return Math.round(root.scanSweepMs
+            + 240 * (xOffset - s) / (maxX - s))
     }
 
     // Tear down any in-flight sweep row and restore the real label.
@@ -376,13 +381,6 @@ Item {
             if (viewRight > 0 && (charEnd <= 0 || x >= viewRight))
                 continue
             ghostMetrics.text = oldText.slice(0, i)
-            // Orphans past the incoming title's edge fall right away with
-            // a light stagger — no incoming char will ever claim those
-            // positions, so pacing them behind the reveal only leaves
-            // stragglers hanging after the new title settled.
-            var delay = x > span
-                ? i * 8
-                : root._fallDelayAt(x, span)
             lyricGhostComponent.createObject(overlayLayer, {
                 text: oldText[i],
                 color: textColor,
@@ -390,7 +388,7 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                delay: Math.round(delay),
+                delay: root._fallDelayAt(x, span),
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
