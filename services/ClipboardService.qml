@@ -277,10 +277,13 @@ Singleton {
         actionProc.running = true
     }
 
-    // Decode an image entry to a cached file and report its path. The
-    // decode runs through a throwaway process so concurrent thumbnails do
-    // not clobber each other; repeat calls skip cliphist via the on-disk
-    // cache test.
+    // Decode image entries to cached files and report their paths. Jobs run
+    // through ONE persistent process (a transient Qt.createQmlObject process
+    // gets garbage-collected before exiting and silently drops callbacks);
+    // repeat requests skip cliphist via the on-disk cache test.
+    property var _thumbQueue: []
+    property bool _thumbBusy: false
+
     function decodeThumbnail(id: string, mime: string, callback: var) {
         var safeId = String(id == null ? "" : id)
         if (!root.available || !/^[0-9]+$/.test(safeId)) {
@@ -294,16 +297,35 @@ Singleton {
         else if (m.indexOf("gif") >= 0) ext = "gif"
         var dir = root._cacheDir + "/clipboard-thumbs"
         var path = dir + "/" + safeId + "." + ext
-        var proc = Qt.createQmlObject(
-            "import Quickshell;\nimport Quickshell.Io;\nProcess { command: []; running: false; stdout: StdioCollector {} }",
-            root)
-        proc.command = ["sh", "-c",
-            "mkdir -p '" + dir + "' && { test -f '" + path + "' || cliphist decode " + safeId + " > '" + path + "'; }"]
-        proc.exited.connect(function() {
-            if (callback) callback(path)
-            proc.destroy()
-        })
-        proc.running = true
+        root._thumbQueue.push({ path: path, clipId: safeId, cb: callback })
+        root._pumpThumbQueue()
+    }
+
+    function _pumpThumbQueue() {
+        if (root._thumbBusy || !root._thumbQueue.length)
+            return
+        var job = root._thumbQueue.shift()
+        root._thumbBusy = true
+        thumbProc.job = job
+        thumbProc.command = ["sh", "-c",
+            "mkdir -p '" + root._cacheDir + "/clipboard-thumbs' && { test -f '" + job.path + "' || cliphist decode " + job.clipId + " > '" + job.path + "'; }"]
+        thumbProc.running = true
+    }
+
+    property Process thumbProc: Process {
+        id: thumbProc
+        command: []
+        running: false
+        property var job: null
+        stdout: StdioCollector {}
+        onExited: {
+            var done = job
+            job = null
+            root._thumbBusy = false
+            if (done && done.cb)
+                done.cb(done.path)
+            root._pumpThumbQueue()
+        }
     }
 
     function pasteItem(id: string) {

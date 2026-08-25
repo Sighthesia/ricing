@@ -61,6 +61,7 @@ Item {
     readonly property alias iconItem: iconImage
     // Exposed for probes/tests to inspect thumbnail load state.
     readonly property alias thumbnailItem: thumbImage
+    readonly property alias thumbnailBackingItem: thumbBacking
 
     readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
     readonly property Item flashOverlayItem: flashOverlay
@@ -203,6 +204,9 @@ Item {
             height: Math.min(52, root.rowHeight - 12)
             radius: 4
             color: LazerTheme.settingsCardHover
+            // Temporary high-visibility marker while diagnosing blank rails.
+            border.width: 2
+            border.color: LazerTheme.settingsAccent
 
             Image {
                 id: thumbImage
