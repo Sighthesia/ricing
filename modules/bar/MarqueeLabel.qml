@@ -70,6 +70,14 @@ Item {
     function syncScroll() {
         var shouldRun = root.overflowing && !MotionTokens.reducedMotion
             && label.opacity >= 0.99 && clipSlot.width > 0
+        // Remember the scroll offset before zeroing it: a transition fired
+        // for this same text change still needs the outgoing viewport.
+        if (label.x < 0) {
+            root._preservedScrollX = label.x
+            root._scrollActive = true
+        } else {
+            root._scrollActive = false
+        }
         scroll.stop()
         label.x = 0
         if (shouldRun)
@@ -152,6 +160,10 @@ Item {
     property string _sweepRowChars: ""
     property var _sweepDelays: []
     property real _sweepStart: 0
+    // Scroll state of the outgoing label, captured by syncScroll before it
+    // zeroes x — the transition needs to know where the viewport was.
+    property real _preservedScrollX: 0
+    property bool _scrollActive: false
 
     // Delay until the scan line reaches pixel offset x on a line `width`
     // wide — percentage-of-length mapping, constant px/s velocity.
@@ -241,8 +253,14 @@ Item {
         ghostMetrics.text = newText
         var newWidth = ghostMetrics.advanceWidth
         var span = Math.max(1, Math.max(oldWidth, newWidth))
+        // The outgoing viewport: syncScroll already zeroed label.x for this
+        // text change, so the scroll offset comes from the preserved state;
+        // the visible width is the old text clipped to the label's cap.
+        var scrollX = root._scrollActive ? Math.min(0, root._preservedScrollX) : 0
+        root._scrollActive = false
+        var viewRight = Math.min(oldWidth, root.maxWidth)
         if (!wasActive)
-            spawnGhosts(oldText, span)
+            spawnGhosts(oldText, span, scrollX, viewRight)
         label.opacity = 0
         label.x = 0
         var offsets = _charOffsets(newText)
@@ -263,22 +281,30 @@ Item {
     // Old characters fall away as the line reaches them; ghosts ride the
     // unclipped overlay so they can fall past the surface. `span` is the
     // shared sweep width so the fall front matches the reveal front's
-    // pixel velocity.
-    function spawnGhosts(oldText, span) {
+    // pixel velocity. A scrolling label shows a window into the text:
+    // ghosts fall at their on-screen positions and chars outside the
+    // viewport (scrolled past or not yet reached) never materialize.
+    function spawnGhosts(oldText, span, scrollX, viewRight) {
         if (oldText === "")
             return
         var count = Math.min(oldText.length, root.transitionMaxChars)
         ghostMetrics.font = label.font
         for (var i = 0; i < count; i++) {
             ghostMetrics.text = oldText.slice(0, i)
+            var x = ghostMetrics.advanceWidth + scrollX
+            ghostMetrics.text = oldText.slice(0, i + 1)
+            var charEnd = ghostMetrics.advanceWidth + scrollX
+            if (viewRight > 0 && (charEnd <= 0 || x >= viewRight))
+                continue
+            ghostMetrics.text = oldText.slice(0, i)
             lyricGhostComponent.createObject(overlayLayer, {
                 text: oldText[i],
                 color: textColor,
                 font: label.font,
-                x: ghostMetrics.advanceWidth,
+                x: x,
                 y: 0,
                 opacity: 1,
-                delay: root._scanDelayAt(ghostMetrics.advanceWidth, span),
+                delay: root._scanDelayAt(x, span),
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
