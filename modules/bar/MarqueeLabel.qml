@@ -155,7 +155,6 @@ Item {
 
     // Tear down any in-flight sweep row and restore the real label.
     function _stopSweepRow() {
-        enterFade.stop()
         if (root._enterRow) {
             root._enterRow.destroy()
             root._enterRow = null
@@ -177,23 +176,17 @@ Item {
     // re-evaluated yet when the host's change handler runs, so root.text
     // cannot be trusted as either value here.
     //
-    // A change arriving while a sweep is still running never stacks a
-    // second wavefront on the first: the sweep collapses and the newest
-    // text fades in as one line, so rapid switching stays readable.
+    // Any in-flight choreography collapses into this sweep — row, ghosts,
+    // and any pending fade are torn down first, so wavefronts never stack
+    // and every change (including rapid focus switches that pass through
+    // transient titles) plays the scan.
     function transitionFrom(oldText, newText) {
         if (MotionTokens.reducedMotion || oldText === "" || oldText === newText)
             return
-        if (root._sweepActive) {
-            root._sweepActive = false
-            _stopSweepRow()
-            _clearGhosts()
-            label.opacity = 0
-            enterFade.restart()
-            return
-        }
-        root._sweepActive = true
-        enterFade.stop()
+        root._sweepActive = false
+        _stopSweepRow()
         _clearGhosts()
+        root._sweepActive = true
         spawnGhosts(oldText)
         label.opacity = 0
         label.x = 0
@@ -204,17 +197,6 @@ Item {
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
         enterGuard.restart()
-    }
-
-    NumberAnimation {
-        id: enterFade
-
-        target: label
-        property: "opacity"
-        from: 0
-        to: 1
-        duration: 140
-        easing.type: Easing.OutCubic
     }
 
     // Old characters fall away as the line reaches them; ghosts ride the
