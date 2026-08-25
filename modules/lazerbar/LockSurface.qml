@@ -60,10 +60,11 @@ WlSessionLockSurface {
     }
 
     // Same contracts as the launcher surface: waves lead the body so they
-    // stay visible while content slides over them.
+    // stay visible while content slides over them. They must not start at
+    // object creation: session-lock mapping lags instantiation, so the
+    // timeline would burn down before the first frame is ever shown.
     NumberAnimation {
         id: openBody
-        running: !MotionTokens.reducedMotion
         target: root
         property: "bodyProgress"
         to: 1
@@ -72,12 +73,27 @@ WlSessionLockSurface {
     }
     NumberAnimation {
         id: openWaves
-        running: !MotionTokens.reducedMotion
         target: root
         property: "waveProgress"
         to: 1
         duration: MotionTokens.waveBackdropEnter
         easing.type: Easing.OutQuad
+    }
+
+    // Start the reveal when the compositor actually maps the surface.
+    Connections {
+        target: root
+        function onVisibleChanged() {
+            if (!root.visible)
+                return
+            if (MotionTokens.reducedMotion) {
+                root.waveProgress = 1
+                root.bodyProgress = 1
+                return
+            }
+            openWaves.restart()
+            openBody.restart()
+        }
     }
 
     // Retreat the panel first, then fade the floor so the desktop reappears
