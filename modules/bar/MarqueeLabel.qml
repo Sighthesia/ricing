@@ -306,7 +306,13 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                delay: root._scanDelayAt(x, span),
+                // No clamp: the scan line keeps moving right past the
+                // incoming title's edge, so surplus old chars fall in
+                // sequence instead of batching at the sweep boundary.
+                // Hard cap keeps extreme titles from trailing forever.
+                delay: Math.round(Math.min(
+                    root.scanSweepMs * Math.max(0, x / span),
+                    root.scanSweepMs * 2)),
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
