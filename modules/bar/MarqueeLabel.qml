@@ -140,7 +140,10 @@ Item {
     // Time for the scan line to cross one whole label.
     readonly property int scanSweepMs: 480
     // Blank window the line leaves before the char behind it fades in.
-    readonly property int scanGapMs: 24
+    // Pinned to the fall duration (+ margin) so a position's new char only
+    // starts appearing after its old char has fully dropped away — no
+    // same-spot overlap between the falling ghost and the reveal.
+    readonly property int scanGapMs: ghostFallTime + 20
     readonly property int scanRevealMs: 140
     readonly property int transitionMaxChars: 48
     property var _enterRow: null
