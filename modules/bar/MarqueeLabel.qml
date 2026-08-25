@@ -126,27 +126,32 @@ Item {
         }
     }
 
-    // --- Text transition: scan-line sweep ---
-    // A virtual scan line sweeps left to right across the label. Where it
-    // just passed, new characters fade in semi-transparent; where it has
-    // not yet reached, old characters fall away in sequence; at the line
-    // itself there is a brief blank gap. Once the sweep completes the
-    // revealed line settles to full opacity. Inert unless a host calls
-    // transitionFrom().
-    // Wavefront tightness vs legibility: the fall lasts long enough to be
-    // read (~3 chars wide at this sweep speed) while the line itself keeps
-    // moving quickly. The animated zone stays a compact local cascade,
-    // never a whole-row effect.
-    readonly property int ghostFallTime: 130
+    // --- Text transition: scan-line trigger ---
+    // A virtual scan line sweeps left to right across the label in a fixed
+    // time (a percentage-of-length pace, so the traverse speed reads the
+    // same on any text). The line is only a trigger: each character it
+    // passes enters its full animation at standard durations — old chars
+    // fall with the shared ghost contract (200ms), new chars fade in
+    // (140ms). The wavefront width simply emerges from speed × duration.
+    // At the line itself there is a brief blank gap. Inert unless a host
+    // calls transitionFrom().
+    readonly property int ghostFallTime: 200
     readonly property real ghostFallDistanceScale: 1.5
-    // Per-character sweep step — the scan line's travel speed.
-    readonly property int scanStepMs: 40
-    // Blank window the line leaves before the next char starts fading in.
-    readonly property int scanGapMs: 16
-    readonly property int scanRevealMs: 80
+    // Time for the scan line to cross one whole label.
+    readonly property int scanSweepMs: 480
+    // Blank window the line leaves before the char behind it fades in.
+    readonly property int scanGapMs: 24
+    readonly property int scanRevealMs: 140
     readonly property int transitionMaxChars: 48
     property var _enterRow: null
     property bool _sweepActive: false
+
+    // Delay until the scan line reaches pixel offset x on a line `width`
+    // wide — percentage-of-length mapping, constant px/s velocity.
+    function _scanDelayAt(xOffset, lineWidth) {
+        var span = Math.max(1, lineWidth)
+        return Math.round(root.scanSweepMs * Math.min(1, Math.max(0, xOffset / span)))
+    }
 
     // Tear down any in-flight sweep row and restore the real label.
     function _stopSweepRow() {
@@ -180,7 +185,10 @@ Item {
         spawnGhosts(oldText)
         label.opacity = 0
         label.x = 0
-        root._enterRow = scanRowComponent.createObject(clipSlot, { chars: newText })
+        root._enterRow = scanRowComponent.createObject(clipSlot, {
+            chars: newText,
+            delays: _charDelays(newText)
+        })
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
         enterGuard.restart()
@@ -197,14 +205,19 @@ Item {
         easing.type: Easing.OutCubic
     }
 
-    // Old characters fall away in sequence, one per sweep step; ghosts ride
-    // the unclipped overlay so they can fall past the surface.
+    // Old characters fall away as the line reaches them; ghosts ride the
+    // unclipped overlay so they can fall past the surface.
     function spawnGhosts(oldText) {
         if (oldText === "")
             return
         var count = Math.min(oldText.length, root.transitionMaxChars)
+        ghostMetrics.font = label.font
+        ghostMetrics.text = oldText
+        var fullWidth = ghostMetrics.advanceWidth
+        // Cap the traverse distance to the visible slot width so an
+        // overflowing line still sweeps at the same perceived speed.
+        var span = clipSlot.width > 0 ? Math.min(fullWidth, clipSlot.width) : fullWidth
         for (var i = 0; i < count; i++) {
-            ghostMetrics.font = label.font
             ghostMetrics.text = oldText.slice(0, i)
             lyricGhostComponent.createObject(overlayLayer, {
                 text: oldText[i],
@@ -213,11 +226,26 @@ Item {
                 x: ghostMetrics.advanceWidth,
                 y: 0,
                 opacity: 1,
-                delay: i * root.scanStepMs,
+                delay: root._scanDelayAt(ghostMetrics.advanceWidth, span),
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
+    }
+
+    // Per-char scan arrival delays for the incoming text, in ms.
+    function _charDelays(text) {
+        var count = Math.min(text.length, root.transitionMaxChars)
+        var delays = []
+        ghostMetrics.font = label.font
+        ghostMetrics.text = text
+        var fullWidth = ghostMetrics.advanceWidth
+        var span = clipSlot.width > 0 ? Math.min(fullWidth, clipSlot.width) : fullWidth
+        for (var i = 0; i < count; i++) {
+            ghostMetrics.text = text.slice(0, i)
+            delays.push(root._scanDelayAt(ghostMetrics.advanceWidth, span))
+        }
+        return delays
     }
 
     // Fallback restores the label if the enter row's own timers ever fail.
@@ -280,12 +308,9 @@ Item {
             id: enterRow
 
             property string chars: ""
-
-            spacing: 0
-
-            // When the sweep finishes: total travel + gap + one reveal.
-            readonly property int sweepTotal:
-                Math.min(chars.length, root.transitionMaxChars) * root.scanStepMs
+            // Scan arrival delay per char, ms — computed from the text's
+            // own pixel positions so the line moves at constant speed.
+            property var delays: []
 
             Repeater {
                 model: Math.min(enterRow.chars.length, root.transitionMaxChars)
@@ -294,6 +319,11 @@ Item {
                     id: charItem
 
                     required property int index
+                    // Delay for this char; falls back to an even pace when
+                    // the host supplies no measured array.
+                    readonly property int delay:
+                        enterRow.delays && enterRow.delays.length > index
+                        ? enterRow.delays[index] : index * 16
 
                     text: enterRow.chars[index]
                     color: root.textColor
@@ -307,7 +337,7 @@ Item {
                     // ink (the drop gap keeps the line itself blank).
                     Timer {
                         running: true
-                        interval: charItem.index * root.scanStepMs + root.scanGapMs + 1
+                        interval: charItem.delay + root.scanGapMs + 1
                         onTriggered: charItem.opacity = 1
                     }
                 }
@@ -317,7 +347,7 @@ Item {
                 id: retireTimer
 
                 running: true
-                interval: enterRow.sweepTotal + root.scanGapMs + root.scanRevealMs + MotionTokens.fast
+                interval: root.scanSweepMs + root.scanGapMs + root.scanRevealMs + MotionTokens.fast
                 onTriggered: {
                     root._sweepActive = false
                     if (root._enterRow === enterRow)
