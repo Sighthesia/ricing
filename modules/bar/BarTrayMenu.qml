@@ -158,22 +158,45 @@ Rectangle {
         // The column's own top/bottom padding already spaces the content;
         // adding more left a dead band at the bottom.
         height: submenuColumn.implicitHeight
-        // Open toward the screen center; fall back to the left edge-side
-        // when the right side would overflow the window.
+        // One persistent surface serves every submenu: switching between
+        // parent rows glides x/y/height to the new frame (same rhythm as
+        // the host's inter-widget morph) instead of teleporting. Frozen
+        // copies hold the last docked position so the close fade never
+        // chases a cleared anchor off toward the corner.
+        property real frozenX: 0
+        property real frozenY: 0
         readonly property real dockedX: {
-            if (root.submenuProgress <= 0)
-                return 0
+            // Independent of the anchor row; only window bounds matter.
             var rootRightInWindow = root.mapToItem(null, root.x + root.width, 0).x
             return rootRightInWindow + width + 24 > root.Window.width
                    ? -width - 4 : root.width + 4
         }
         readonly property real dockedY: {
             if (!root.submenuAnchorRow)
-                return 0
+                return frozenY
             // Map in root coordinates: mapping into the surface itself
             // would fold its own y into the result and oscillate.
             var rowY = root.submenuAnchorRow.mapToItem(root, 0, 0).y
-            return Math.max(4, Math.min(rowY - 4, root.height - height - 8))
+            // Clamp against the unanimated target height so paired y/height
+            // morphs glide in lockstep instead of chasing each other.
+            return Math.max(4, Math.min(rowY - 4,
+                    root.height - submenuColumn.implicitHeight - 8))
+        }
+        onDockedXChanged: frozenX = dockedX
+        onDockedYChanged: frozenY = dockedY
+        // Morphs only glide once fully open; birth snaps while still
+        // transparent, mirroring the host's placement guard.
+        Behavior on x {
+            enabled: root.submenuPhase === "open"
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
+        Behavior on y {
+            enabled: root.submenuPhase === "open"
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
+        Behavior on height {
+            enabled: root.submenuPhase === "open"
+            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         x: dockedX
         y: dockedY + (MotionTokens.reducedMotion ? 0
