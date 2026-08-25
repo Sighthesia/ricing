@@ -129,6 +129,6 @@ Singleton {
     IpcHandler {
         target: "lock"
         function activate() { root.lock() }
-        function isLocked() { return root.locked }
+        function isLocked(): bool { return root.locked }
     }
 }

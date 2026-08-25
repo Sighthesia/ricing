@@ -89,13 +89,39 @@ WlSessionLockSurface {
         easing.type: Easing.OutQuad
     }
 
-    // Start the reveal after a short grace delay. Client-side signals cannot
-    // tell us what the compositor has shown: frames swap into buffers before
-    // the session-lock commit is displayed, so both object creation and
-    // frameSwapped fire while the screen still shows nothing. Niri maps lock
-    // surfaces well under this delay, guaranteeing the floor is on screen
-    // before the sweep begins.
+    // Reveal arming: Quickshell keeps session-lock surfaces alive across
+    // unlock/lock cycles, so the choreography must re-arm on every show and
+    // reset on every hide instead of running once at object creation.
     property bool revealStarted: false
+
+    function armReveal() {
+        if (revealStarted)
+            return
+        if (MotionTokens.reducedMotion) {
+            revealStarted = true
+            root.waveProgress = 1
+            root.bodyProgress = 1
+            return
+        }
+        // Grace delay: niri maps the committed lock surface slightly after
+        // the client-side window reports visible, so give the floor a beat
+        // on screen before the sweep begins.
+        revealDelay.restart()
+    }
+
+    onVisibleChanged: {
+        if (!visible) {
+            revealStarted = false
+            revealDelay.stop()
+            openBody.stop()
+            openWaves.stop()
+            root.waveProgress = 0
+            root.bodyProgress = 0
+            return
+        }
+        armReveal()
+    }
+
     Timer {
         id: revealDelay
         interval: 250
@@ -107,14 +133,6 @@ WlSessionLockSurface {
             root.revealStarted = true
             openWaves.restart()
             openBody.restart()
-        }
-    }
-    Component.onCompleted: {
-        if (MotionTokens.reducedMotion) {
-            root.waveProgress = 1
-            root.bodyProgress = 1
-        } else {
-            revealDelay.restart()
         }
     }
 
