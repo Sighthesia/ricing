@@ -150,8 +150,9 @@ Item {
     // Blank window the line leaves before the char behind it fades in.
     // Pinned to the fall duration (+ margin) so a position's new char only
     // starts appearing after its old char has fully dropped away — no
-    // same-spot overlap between the falling ghost and the reveal.
-    readonly property int scanGapMs: ghostFallTime + 20
+    // same-spot overlap between the falling ghost and the reveal. The
+    // margin absorbs timer/frame jitter; 20ms was tight enough to rub.
+    readonly property int scanGapMs: ghostFallTime + 60
     readonly property int scanRevealMs: 140
     readonly property int transitionMaxChars: 48
     property var _enterRow: null
