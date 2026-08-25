@@ -174,18 +174,17 @@ Item {
         return Math.round(root.scanSweepMs * Math.min(1, Math.max(0, xOffset / span)))
     }
 
-    // Fall delay for a ghost at pixel offset x, unclamped so the line
-    // keeps sweeping past the incoming title's edge; past 2x span the
-    // pace compresses into a bounded tail instead of a hard cap, so
-    // surplus chars still fall in sequence rather than as one batch.
+    // Fall delay for a ghost at pixel offset x. Within the incoming
+    // title's width the line moves at sweep pace; past its right edge the
+    // remaining old chars compress into a short bounded tail, so they fall
+    // in sequence and promptly instead of trailing the whole sweep.
     function _fallDelayAt(xOffset, span) {
         var s = Math.max(1, span)
-        var capX = 2 * s
-        if (xOffset <= capX)
+        if (xOffset <= s)
             return Math.round(root.scanSweepMs * Math.max(0, xOffset / s))
-        var maxX = Math.max(capX + 1, root.maxWidth)
-        return Math.round(root.scanSweepMs * 2
-            + 400 * (xOffset - capX) / (maxX - capX))
+        var maxX = Math.max(s + 1, root.maxWidth)
+        return Math.round(root.scanSweepMs
+            + 240 * (xOffset - s) / (maxX - s))
     }
 
     // Tear down any in-flight sweep row and restore the real label.
@@ -345,10 +344,6 @@ Item {
             return
         var count = Math.min(oldText.length, root.transitionMaxChars)
         ghostMetrics.font = label.font
-        // Chars past 2x span would batch at the hard cap; spread the
-        // excess across a bounded tail so the cascade stays sequential.
-        var capX = 2 * span
-        var tailSpan = Math.max(1, viewRight - capX)
         for (var i = 0; i < count; i++) {
             ghostMetrics.text = oldText.slice(0, i)
             var x = ghostMetrics.advanceWidth + scrollX
@@ -357,9 +352,6 @@ Item {
             if (viewRight > 0 && (charEnd <= 0 || x >= viewRight))
                 continue
             ghostMetrics.text = oldText.slice(0, i)
-            var delay = x <= capX
-                ? root.scanSweepMs * x / span
-                : root.scanSweepMs * 2 + 400 * (x - capX) / tailSpan
             lyricGhostComponent.createObject(overlayLayer, {
                 text: oldText[i],
                 color: textColor,
@@ -367,7 +359,7 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                delay: Math.round(delay),
+                delay: root._fallDelayAt(x, span),
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
