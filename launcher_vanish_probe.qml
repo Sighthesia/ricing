@@ -195,11 +195,6 @@ Item {
         var errorShown = page.errorState.visible
         var frameOpacity = frameRef.opacity
         var row0 = page.resultAt(0)
-        console.log("[DEBUG-lr2] assert row0=" + (row0 ? ("closing="+row0.closing+" held="+row0.revealHeld+" h="+row0.height+" vis="+row0.visible+" op="+row0.opacity+" x="+row0.x) : "null")
-                    + " anchor=" + (page.selectionAnchor ? ("set vis="+page.selectionAnchor.visible+" h="+page.selectionAnchor.height) : "null")
-                    + " flickVis=" + page.resultsView.visible
-                    + " colVis=" + (row0.parent ? row0.parent.visible : "?")
-                    + " err=" + session.error)
         // Restore criterion: own-state flags cleared (list-wide visibility
         // is legitimately suppressed by the error overlay).
         var cardRestored = !!row0 && !row0.closing && !row0.revealHeld

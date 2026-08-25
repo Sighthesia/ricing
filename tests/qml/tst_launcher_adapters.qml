@@ -256,6 +256,28 @@ Item {
             compare(byId[0].id, "web-thing")
         }
 
+        function test_appsAdapterDropsNamelessEntries() {
+            // A broken .desktop with no Name would render as a blank,
+            // clickable card whenever its id matched a query; it is
+            // unpresentable and must never reach the results.
+            var nameless = makeAppEntry("searchterm", "", "")
+            var healthy = makeAppEntry("other", "Other", "")
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([nameless, healthy]),
+                launchCounts: makeLaunchCounts({})
+            })
+
+            var outcome = null
+            adapters.apps.refresh("searchterm", "apps", function(result) { outcome = result })
+            verify(outcome && !outcome.error)
+            compare(outcome.length, 0)
+
+            adapters.apps.refresh("", "apps", function(result) { outcome = result })
+            verify(outcome && !outcome.error)
+            compare(outcome.length, 1)
+            compare(outcome[0].id, "other")
+        }
+
         function test_appsAdapterSurfacesUnavailableSource() {
             var adapters = LauncherAdapters.createAdapters({})
 

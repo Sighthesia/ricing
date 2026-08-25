@@ -165,6 +165,10 @@ function createAppsAdapter(config) {
                 var entry = values[index]
                 if (!entry || entry.noDisplay)
                     continue
+                // A nameless entry renders as a blank card; it is only ever
+                // reachable through an id-substring match, so drop it.
+                if (!normalizeText(entry.name))
+                    continue
                 if (!appMatches(entry, needle))
                     continue
                 out.push(appItem(entry, launchCounts, iconResolver))

@@ -42,7 +42,6 @@ Item {
     readonly property alias iconItem: iconImage
     // Exposed for probes/tests to inspect thumbnail load state.
     readonly property alias thumbnailItem: thumbImage
-    readonly property alias thumbnailBackingItem: thumbBacking
 
     readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
     readonly property Item flashOverlayItem: flashOverlay
@@ -173,35 +172,23 @@ Item {
             }
         }
 
-        // Clipboard image preview: decoded entry sits on a slightly lighter
-        // backing so dark screenshots stay visible against the rail.
-        Rectangle {
-            id: thumbBacking
+        // Clipboard image preview: the decoded entry sits directly in the
+        // icon rail with no extra frame - the pixels speak for themselves.
+        Image {
+            id: thumbImage
             visible: root.isClipboardImage && root.thumbPath.length > 0
             anchors.left: parent.left
             anchors.leftMargin: 2
             anchors.verticalCenter: parent.verticalCenter
             width: 36
             height: Math.min(52, root.rowHeight - 12)
-            radius: 4
-            color: LazerTheme.settingsCardHover
-            // Temporary high-visibility marker while diagnosing blank rails.
-            border.width: 2
-            border.color: LazerTheme.settingsAccent
-
-            Image {
-                id: thumbImage
-                visible: root.isClipboardImage && root.thumbPath.length > 0
-                anchors.fill: parent
-                anchors.margins: 2
-                source: root.thumbPath
-                fillMode: Image.PreserveAspectFit
-                asynchronous: true
-                enabled: false
-                onStatusChanged: {
-                    if (status === Image.Error)
-                        root.thumbPath = ""
-                }
+            source: root.thumbPath
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            enabled: false
+            onStatusChanged: {
+                if (status === Image.Error)
+                    root.thumbPath = ""
             }
         }
 
