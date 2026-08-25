@@ -52,6 +52,8 @@ Item {
     readonly property alias emptyState: emptyStateHost
     readonly property alias errorState: errorStateHost
     readonly property alias retryButton: retryButton
+    // Current preview-pane item for probes/tests and shell wiring.
+    readonly property alias previewSelectedResult: previewPane.selectedResult
 
     implicitWidth: 400
     implicitHeight: 300
@@ -474,13 +476,31 @@ Item {
 
     // Clipboard preview pane: the selected entry rendered large — decoded
     // image or full multi-line text — beside a narrowed results list.
+    // Pointing at any row previews it ahead of the keyboard selection.
+    property var _hoveredResult: null
+
+    // Hover tracking for the preview pane; leaving a row hands preview
+    // back to the keyboard selection, destruction never leaves a stale ref.
+    function trackHover(item, entered) {
+        if (entered)
+            _hoveredResult = item
+        else if (_hoveredResult === item)
+            _hoveredResult = null
+    }
+    function clearHover(item) {
+        if (_hoveredResult === item)
+            _hoveredResult = null
+    }
+
     Rectangle {
         id: previewPane
         readonly property var selectedResult: {
             var s = root.session
-            if (!s || s.mode !== "clipboard" || s.selectedIndex < 0 || !s.results)
+            if (!s || s.mode !== "clipboard" || !s.results)
                 return null
-            return s.results[s.selectedIndex] || null
+            if (root._hoveredResult)
+                return root._hoveredResult
+            return s.selectedIndex >= 0 ? (s.results[s.selectedIndex] || null) : null
         }
         readonly property bool shown: !!selectedResult
         readonly property string paneThumbSource: {
@@ -789,6 +809,8 @@ Item {
                         if (root.session)
                             root.session.execute(modelData)
                     }
+                    onHoveredChanged: root.trackHover(modelData, hovered)
+                    Component.onDestruction: root.clearHover(modelData)
                     onExitFlingRequested: spec => root.exitFlingRequested(spec)
                 }
             }

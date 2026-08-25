@@ -19,15 +19,30 @@ Item {
     property bool _dieOnExecute: false
     readonly property var vanishingAdapter: ({
         refresh: function(queryText, modeName, done) {
-            done(_appGone ? [] : [{
-                id: "app.vanishing",
-                displayName: "Vanishing App",
-                description: "demo",
-                searchText: "vanishing app demo",
-                icon: "",
-                favoriteWeight: 0,
-                lastUsedAt: 0
-            }])
+            var items = []
+            if (!_appGone) {
+                items.push({
+                    id: "app.vanishing",
+                    displayName: "Vanishing App",
+                    description: "demo",
+                    searchText: "vanishing app demo",
+                    icon: "",
+                    favoriteWeight: 0,
+                    lastUsedAt: 0
+                })
+                // Second clipboard entry so hover-vs-selection can differ.
+                if (modeName === "clipboard")
+                    items.push({
+                        id: "clip.other",
+                        displayName: "Other clip",
+                        description: "text/plain · copied 01-01 00:00:00",
+                        searchText: "other clip",
+                        icon: "",
+                        favoriteWeight: 0,
+                        lastUsedAt: 0
+                    })
+            }
+            done(items)
         },
         execute: function(item, done) {
             if (root._dieOnExecute) {
@@ -43,7 +58,7 @@ Item {
 
     LauncherSession {
         id: session
-        _adapters: ({ apps: root.vanishingAdapter })
+        _adapters: ({ apps: root.vanishingAdapter, clipboard: root.vanishingAdapter })
     }
 
     LauncherPage {
@@ -216,6 +231,45 @@ Item {
             fail("frame anchored to self-hidden row")
         else
             pass("scenario3 frame consistent")
+        scenario4()
+    }
+
+    // Scenario 4: pointing at a row previews it in the right pane ahead of
+    // the keyboard selection; leaving the row hands preview back.
+    function scenario4() {
+        if (session.visible)
+            session.close()
+        session.query = ">clip "
+        session.open()
+        step.next = scenario4_hover
+        step.restart()
+    }
+    function scenario4_hover() {
+        if (session.loading) { step.restart(); return }
+        if (!session.results || session.results.length < 1) {
+            fail("scenario4 expected results, got " + (session.results ? session.results.length : "null"))
+            return finish()
+        }
+        var selected = page.previewSelectedResult
+        if (!selected)
+            fail("preview pane empty despite selection")
+        else
+            pass("scenario4 pane follows selection")
+
+        // Hover a row that is NOT the keyboard-selected one.
+        var hoveredItem = session.results[session.results.length - 1]
+        session.selectedIndex = 0
+        page.trackHover(hoveredItem, true)
+        if (page.previewSelectedResult !== hoveredItem)
+            fail("hovered row did not take over the preview")
+        else
+            pass("scenario4 hover drives preview")
+
+        page.trackHover(hoveredItem, false)
+        if (page.previewSelectedResult === hoveredItem)
+            fail("leaving hover did not hand back to selection")
+        else
+            pass("scenario4 hover release falls back to selection")
         finish()
     }
 }
