@@ -134,6 +134,7 @@ Rectangle {
             if (root.submenuProgress !== 1) {
                 root.submenuEntry = null
                 root.submenuAnchorRow = null
+                submenuSurface.heldHeight = 0
             }
         }
     }
@@ -199,8 +200,20 @@ Rectangle {
 
         width: root.menuWidth
         // The column's own top/bottom padding already spaces the content;
-        // adding more left a dead band at the bottom.
-        height: submenuColumn.implicitHeight
+        // adding more left a dead band at the bottom. A freshly switched
+        // submenu fetches its entries asynchronously, so while nothing has
+        // arrived yet the previous height is held — otherwise the morph
+        // would dip through an empty column before the real frame lands.
+        readonly property int submenuNaturalHeight: {
+            var nat = submenuColumn.implicitHeight
+            if (nat > 20) {
+                heldHeight = nat
+                return nat
+            }
+            return heldHeight > 0 ? heldHeight : nat
+        }
+        property int heldHeight: 0
+        height: submenuNaturalHeight
 
         // Which side of the root menu this frame docks on; the reveal and
         // slide direction both follow it.
@@ -227,22 +240,26 @@ Rectangle {
             // Clamp against the unanimated target height so paired y/height
             // morphs glide in lockstep instead of chasing each other.
             return Math.max(4, Math.min(rowY - 4,
-                    root.height - submenuColumn.implicitHeight - 8))
+                    root.height - submenuSurface.submenuNaturalHeight - 8))
         }
         onDockedXChanged: frozenX = dockedX
         onDockedYChanged: frozenY = dockedY
-        // Morphs only glide once fully open; birth snaps while still
-        // transparent, mirroring the host's placement guard.
+        // Morphs glide whenever the surface is at all visible — moving
+        // between submenus usually passes over plain rows, which folds the
+        // panel into "closing" before the next row re-opens it as
+        // "opening"; gating on those phases would teleport instead of
+        // glide. Only birth (progress still 0) snaps, mirroring the
+        // host's placement guard.
         Behavior on x {
-            enabled: root.submenuPhase === "open"
+            enabled: root.submenuProgress > 0
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         Behavior on y {
-            enabled: root.submenuPhase === "open"
+            enabled: root.submenuProgress > 0
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         Behavior on height {
-            enabled: root.submenuPhase === "open"
+            enabled: root.submenuProgress > 0
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         // Vertical anchor for the scale origin: the parent row's center,
