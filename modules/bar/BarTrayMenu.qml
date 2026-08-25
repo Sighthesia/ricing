@@ -76,14 +76,19 @@ Rectangle {
             if (root.submenuPhase === "opening" || root.submenuPhase === "open")
                 return
             root.submenuPhase = "opening"
+            submenuAnimation.easing.bezierCurve = MotionTokens.outSoft
             submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
             submenuAnimation.to = 1
             submenuAnimation.restart()
         } else if (root.submenuPhase !== "closed") {
             root.submenuPhase = "closing"
-            // Faster than the open, and sequenced against the host: the
-            // retract must finish before the host's own close deform
-            // carries the whole popup behind the bar, or it never shows.
+            // Retract reads only while the surface is still outside the
+            // occluding face, so it eases IN: a slow visible start, then
+            // acceleration under the menu. An ease-out here spent its
+            // whole travel in the first frames and read as an instant
+            // disappearance. Duration still fits inside the host's grace
+            // window so the fold finishes before the popup slides away.
+            submenuAnimation.easing.bezierCurve = MotionTokens.inOut
             submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.slow
             submenuAnimation.to = 0
             submenuAnimation.restart()
