@@ -44,6 +44,19 @@ Singleton {
             || currentTranslatedLyric !== ""
             || nextTranslatedLyric !== ""
 
+    // The lyric session belongs to the visible media surface only while its
+    // track matches the active MPRIS player (or no player exists). When
+    // another player takes focus the session is suspended, not cleared:
+    // switching back restores the lyric window without refetching.
+    readonly property bool boundToActivePlayer:
+        !Services.MediaService.hasPlayer
+            || root._trackMetadataMatches(
+                root.title,
+                root.artist,
+                Services.MediaService.title,
+                Services.MediaService.artist
+            )
+
     property string songId: ""
     property string title: ""
     property string artist: ""
@@ -278,6 +291,20 @@ Singleton {
     }
 
     function _syncLyricWindow() {
+        // Suspended session: keep the fetched lyrics but show nothing, so a
+        // background tab's song never bleeds into another player's display.
+        if (!root.boundToActivePlayer) {
+            root.currentLyric = ""
+            root.nextLyric = ""
+            root.currentLyricIndex = -1
+            root.nextLyricIndex = -1
+            root.currentTranslatedLyric = ""
+            root.nextTranslatedLyric = ""
+            root.currentTranslatedLyricIndex = -1
+            root.nextTranslatedLyricIndex = -1
+            return
+        }
+
         const previousOriginalCurrent = root.currentLyric
         const previousOriginalNext = root.nextLyric
         const previousTranslatedCurrent = root.currentTranslatedLyric
@@ -611,6 +638,30 @@ Singleton {
         onTriggered: {
             root._clearIfStale()
             root._syncLyricWindow()
+        }
+    }
+
+    // Re-evaluate the lyric window when the active player changes. The
+    // refresh must run on the next event-loop turn: mediaChanged fires
+    // mid-cascade while sibling MPRIS-derived bindings still hold stale
+    // values, which would suspend/resume against outdated metadata.
+    function _scheduleLyricWindowSync() {
+        lyricWindowSyncTimer.restart()
+    }
+
+    Timer {
+        id: lyricWindowSyncTimer
+
+        interval: 0
+        repeat: false
+        onTriggered: root._syncLyricWindow()
+    }
+
+    Connections {
+        target: Services.MediaService
+
+        function onMediaChanged() {
+            root._scheduleLyricWindowSync()
         }
     }
 }

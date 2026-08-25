@@ -21,15 +21,19 @@ Singleton {
     readonly property string _playerTrackKey: Services.MediaService.hasPlayer
         ? root._normalizedTrackKey(Services.MediaService.title, Services.MediaService.artist)
         : ""
+    // A suspended lyric session (bound to a non-active player) must not
+    // drive the merged media surface; fall back to the active MPRIS player.
     readonly property bool _lyricsSignalActive:
         root.preferLyrics
+            && Services.NeteaseWebLyricsService.boundToActivePlayer
             && (Services.NeteaseWebLyricsService.active
                 || Services.NeteaseWebLyricsService.hasLyrics
                 || Services.NeteaseWebLyricsService.currentLyric !== ""
                 || Services.NeteaseWebLyricsService.nextLyric !== ""
                 || Services.NeteaseWebLyricsService.currentTranslatedLyric !== ""
                 || Services.NeteaseWebLyricsService.nextTranslatedLyric !== "")
-    readonly property bool _preferLyricsMediaSource: root._lyricsSourceLatched
+    readonly property bool _preferLyricsMediaSource:
+        root._lyricsSourceLatched && Services.NeteaseWebLyricsService.boundToActivePlayer
 
     property bool _lyricsSourceLatched: false
     property string _latchedLyricsSessionKey: ""
@@ -472,5 +476,6 @@ Singleton {
         function onCurrentTranslatedLyricChanged() { root._scheduleLyricsRefresh() }
         function onNextTranslatedLyricChanged() { root._scheduleLyricsRefresh() }
         function onPlaybackStateChanged() { root._scheduleLyricsRefresh() }
+        function onBoundToActivePlayerChanged() { root._scheduleLyricsRefresh() }
     }
 }
