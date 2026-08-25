@@ -155,12 +155,21 @@ Item {
 
     // Tear down any in-flight sweep row and restore the real label.
     function _stopSweepRow() {
+        enterFade.stop()
         if (root._enterRow) {
             root._enterRow.destroy()
             root._enterRow = null
         }
         label.opacity = 1
         label.x = 0
+    }
+
+    // Kill ghosts still mid-fall so an interrupted sweep can never rain
+    // old characters over the next transition.
+    function _clearGhosts() {
+        var kids = overlayLayer.children
+        for (var i = kids.length - 1; i >= 0; i--)
+            kids[i].destroy()
     }
 
     // Play the scan-line transition for a just-applied text change.
@@ -177,11 +186,14 @@ Item {
         if (root._sweepActive) {
             root._sweepActive = false
             _stopSweepRow()
+            _clearGhosts()
             label.opacity = 0
             enterFade.restart()
             return
         }
         root._sweepActive = true
+        enterFade.stop()
+        _clearGhosts()
         spawnGhosts(oldText)
         label.opacity = 0
         label.x = 0
