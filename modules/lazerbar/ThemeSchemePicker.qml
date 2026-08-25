@@ -63,6 +63,24 @@ Item {
         onLoadFailed: root.previews = null
     }
 
+    // A file created after startup never fires watchChanges, so re-check
+    // whenever the preview batch finishes (and once when the panel opens).
+    Connections {
+        target: Services.ColorService
+        function onIsPreviewingChanged() {
+            if (!Services.ColorService.isPreviewing)
+                reloadTimer.restart()
+        }
+    }
+
+    Connections {
+        target: Services.SettingsService
+        function onPanelVisibleChanged() {
+            if (Services.SettingsService.panelVisible)
+                reloadTimer.restart()
+        }
+    }
+
     function parsePreviews(raw) {
         try { return JSON.parse(raw) } catch (e) { return null }
     }
