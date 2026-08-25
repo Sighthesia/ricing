@@ -13,8 +13,6 @@ Item {
     // Normalized result item consumed from LauncherService.results:
     // { id, displayName, description, icon } with every field optional.
     property var result: null
-    // Owning session, used for clipboard thumbnail decoding; optional.
-    property var session: null
     property bool selected: false
     // Settings-style search folding: non-matching rows cascade their exit
     // while survivors glide, all through the same height/opacity/x contract.
@@ -26,53 +24,10 @@ Item {
     readonly property string descriptionText: result && result.description != null ? String(result.description) : ""
     readonly property string iconSource: result && result.icon ? String(result.icon) : ""
 
-    // Clipboard image entries decode to a cached thumbnail that replaces
-    // the app-icon slot in the rail.
+    // Clipboard image entries show a page-provided decoded thumbnail in
+    // place of the app-icon slot; decoding and caching live on the page.
     readonly property bool isClipboardImage: !!result && result.isImage === true
-    property string thumbSource: ""
-    onIsClipboardImageChanged: refreshThumbnail()
-    onResultChanged: refreshThumbnail()
-
-    // Belt-and-braces for the rail thumbnail: the visible chain proved
-    // flaky in the live shell while the pane (same file, later request)
-    // worked, so visibility is re-asserted imperatively and failed decodes
-    // retry a few times instead of relying on a single callback.
-    function refreshThumbnail() {
-        if (!isClipboardImage || !result || root.result.id == null) {
-            thumbSource = ""
-            thumbImage.visible = Qt.binding(function () { return root.isClipboardImage && root.thumbSource.length > 0 })
-            return
-        }
-        var wanted = String(root.result.id)
-        if (!root.session)
-            return
-        root.session.decodeThumbnail(wanted, String(root.result.mime || ""), function(path) {
-            if (!path || wanted !== String(root.result.id))
-                return
-            thumbSource = path
-            thumbImage.visible = true
-        })
-        thumbRetry.restart()
-    }
-    Component.onCompleted: refreshThumbnail()
-
-    Timer {
-        id: thumbRetry
-        interval: 1500
-        repeat: true
-        property int tries: 0
-        onTriggered: {
-            if (!root.isClipboardImage || root.thumbSource.length > 0 || root.closing) {
-                stop()
-                return
-            }
-            if (++tries > 5) {
-                stop()
-                return
-            }
-            root.refreshThumbnail()
-        }
-    }
+    property string thumbPath: ""
 
     readonly property real rowHeight: 64
     implicitWidth: 480
@@ -222,7 +177,7 @@ Item {
         // backing so dark screenshots stay visible against the rail.
         Rectangle {
             id: thumbBacking
-            visible: thumbImage.visible
+            visible: root.isClipboardImage && root.thumbPath.length > 0
             anchors.left: parent.left
             anchors.leftMargin: 2
             anchors.verticalCenter: parent.verticalCenter
@@ -236,17 +191,16 @@ Item {
 
             Image {
                 id: thumbImage
+                visible: root.isClipboardImage && root.thumbPath.length > 0
                 anchors.fill: parent
                 anchors.margins: 2
-                source: root.thumbSource
+                source: root.thumbPath
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 enabled: false
-                // A failed decode falls back to the plain icon slot instead
-                // of leaving a blank rail.
                 onStatusChanged: {
                     if (status === Image.Error)
-                        root.thumbSource = ""
+                        root.thumbPath = ""
                 }
             }
         }

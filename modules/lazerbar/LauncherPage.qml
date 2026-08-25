@@ -438,6 +438,28 @@ Item {
     }
     onActiveSearchTextChanged: root._resultWindowExtra = 0
 
+    // Clipboard thumbnail cache: one decode per entry id, owned here so
+    // rows and the preview pane share the exact same proven path.
+    readonly property var _thumbPaths: ({})
+    property int _thumbRev: 0
+    function clipThumbPath(item) {
+        if (!item || !item.isImage)
+            return ""
+        var id = String(item.id == null ? "" : item.id)
+        if (!/^[0-9]+$/.test(id))
+            return ""
+        if (root._thumbPaths[id])
+            return root._thumbPaths[id]
+        if (root.session)
+            root.session.decodeThumbnail(id, String(item.mime || ""), function(p) {
+                if (p) {
+                    root._thumbPaths[id] = p
+                    root._thumbRev++
+                }
+            })
+        return ""
+    }
+
     // Clipboard preview pane: the selected entry rendered large — decoded
     // image or full multi-line text — beside a narrowed results list.
     Rectangle {
@@ -449,6 +471,13 @@ Item {
             return s.results[s.selectedIndex] || null
         }
         readonly property bool shown: !!selectedResult
+        readonly property string paneThumbSource: {
+            var r = selectedResult
+            if (!r || !r.isImage)
+                return ""
+            root._thumbRev
+            return root.clipThumbPath(r)
+        }
         anchors.top: searchSurface.bottom
         anchors.topMargin: 12
         anchors.right: parent.right
@@ -490,14 +519,13 @@ Item {
 
                 Image {
                     id: paneImage
-                    property string source_: ""
                     anchors.centerIn: parent
                     width: Math.min(parent.width - 8, sourceSize.width * parent.height / Math.max(1, sourceSize.height))
                     height: Math.min(parent.height - 8, sourceSize.height)
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
                     cache: false
-                    source: paneImage.source_
+                    source: root.paneThumbSource
                 }
             }
 
@@ -513,29 +541,6 @@ Item {
                 color: LazerTheme.textMuted
                 font.pixelSize: 11
             }
-        }
-
-        onSelectedResultChanged: refreshPreview()
-        Component.onCompleted: refreshPreview()
-
-        function refreshPreview() {
-            var r = previewPane.selectedResult
-            if (!r) {
-                paneImage.source_ = ""
-                return
-            }
-            if (!r.isImage) {
-                paneImage.source_ = ""
-                return
-            }
-            if (!root.session)
-                return
-            var wanted = String(r.id)
-            root.session.decodeThumbnail(wanted, String(r.mime || ""), function(path) {
-                if (path && previewPane.selectedResult
-                        && String(previewPane.selectedResult.id) === wanted)
-                    paneImage.source_ = path
-            })
         }
     }
 
@@ -758,7 +763,7 @@ Item {
                     required property int index
                     width: resultsColumn.width
                     result: modelData
-                    session: root.session
+                    thumbPath: root._thumbRev >= 0 ? root.clipThumbPath(modelData) : ""
                     searchQuery: root.activeSearchText
                     selected: {
                         if (!root.session || !root.session.results || root.session.selectedIndex < 0)
