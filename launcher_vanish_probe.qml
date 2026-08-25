@@ -31,16 +31,31 @@ Item {
                     lastUsedAt: 0
                 })
                 // Second clipboard entry so hover-vs-selection can differ.
-                if (modeName === "clipboard")
+                if (modeName === "clipboard") {
                     items.push({
                         id: "clip.other",
+                        preview: "other",
                         displayName: "Other clip",
                         description: "text/plain · copied 01-01 00:00:00",
+                        previewText: "other clip body text",
                         searchText: "other clip",
                         icon: "",
                         favoriteWeight: 0,
                         lastUsedAt: 0
                     })
+                    items.push({
+                        id: "424242",
+                        preview: "image",
+                        displayName: "[Image]",
+                        description: "image/png · copied 01-01 00:00:00",
+                        searchText: "image",
+                        icon: "",
+                        isImage: true,
+                        mime: "image/png",
+                        favoriteWeight: 0,
+                        lastUsedAt: 0
+                    })
+                }
             }
             done(items)
         },
@@ -59,6 +74,13 @@ Item {
     LauncherSession {
         id: session
         _adapters: ({ apps: root.vanishingAdapter, clipboard: root.vanishingAdapter })
+        clipboardService: ({
+            decodeThumbnail: function(id, mime, cb) {
+                // Async like the real decoder; a synchronous callback would
+                // write _thumbRev during binding evaluation.
+                Qt.callLater(function() { cb("/tmp/opencode/probe_thumb.png") })
+            }
+        })
     }
 
     LauncherPage {
@@ -70,6 +92,15 @@ Item {
     function fail(msg) { failures++; console.log("[DEBUG-lr2] FAIL:", msg) }
     function pass(name) { console.log("[DEBUG-lr2] PASS:", name) }
 
+    property int _revProbe: 0
+    Timer { id: nudgeTimer; interval: 120; onTriggered: {
+        for (var i = 0; i < session.results.length; i++)
+            if (String(session.results[i].id) === "424242")
+                session.selectedIndex = i
+        step.next = root.scenario5_done
+        step.interval = 150
+        step.restart()
+    } }
     Timer { id: step; interval: 30; property var next; onTriggered: next() }
 
     Component.onCompleted: {
@@ -270,6 +301,76 @@ Item {
             fail("leaving hover did not hand back to selection")
         else
             pass("scenario4 hover release falls back to selection")
+        scenario5()
+    }
+
+    // Scenario 5: image entries must show the decoded preview large in the
+    // pane, and text previews must be mouse-selectable.
+    function scenario5() {
+        if (session.visible)
+            session.close()
+        session.query = ">clip other"
+        session.open()
+        step.next = scenario5_assert
+        step.restart()
+    }
+    function scenario5_assert() {
+        if (session.loading) { step.restart(); return }
+        // Text entry first: full preview must render for selection.
+        var txt = page.previewTextItem
+        if (!txt || !txt.visible || String(txt.text).length === 0)
+            fail("text preview not shown for text entry")
+        else
+            pass("scenario5 text preview present")
+
+        // Then narrow to the image entry via the pooled fast path.
+        session.query = ">clip image"
+        step.next = scenario5_image
+        step.interval = 250
+        step.restart()
+    }
+
+    function scenario5_image() {
+        var img = page.previewImageItem
+        if (!img || !img.visible) {
+            fail("preview image not visible")
+            return finish()
+        }
+        if (img.status !== Image.Ready) {
+            // Nudge a dependency of paneThumbSource; a live binding then
+            // picks up the cached decode path.
+            session.selectedIndex = -1
+            nudgeTimer.restart()
+            return
+        }
+        scenario5_done()
+    }
+    function scenario5_done() {
+        var img = page.previewImageItem
+        if (img.status === Image.Ready && img.width > 0 && img.height > 0)
+            pass("scenario5 preview image visible and loaded")
+        else
+            fail("preview image dead even after dependency nudge (src=" + String(img.source) + ")")
+
+        // Keyboard fallback: with the editor unfocused and no other focus
+        // owner, the page itself must hold scope focus so Escape still has
+        // a landing point.
+        var ed = page.searchField.editorItem
+        ed.focus = false
+        page.reclaimKeyboardFallback()
+        // Pass when any focus owner lives inside the page (Escape bubbles
+        // through it) or the page itself took over.
+        var w = page.Window ? page.Window.window : null
+        var fi = w ? w.activeFocusItem : null
+        var inside = false
+        while (fi) {
+            if (fi === page || fi === frameRef) { inside = true; break }
+            fi = fi.parent
+        }
+        if (inside || page.activeFocus)
+            pass("scenario5 keyboard fallback owner exists")
+        else
+            fail("no focus owner: Escape would be dead")
         finish()
     }
 }

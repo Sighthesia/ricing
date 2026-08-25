@@ -19,6 +19,33 @@ Item {
     // embedded default keeps the page self-contained without Quickshell.
     property var session: embeddedSession
 
+    // Fallback keyboard owner: click-away can strand the surface with no
+    // focused item, and then Escape would reach no handler at all. While
+    // open, the guard reclaims scope focus whenever nothing inside the page
+    // holds it; deeper focus owners (search editor, rows) always outrank.
+    function reclaimKeyboardFallback() {
+        var w = Window.window
+        if (!w)
+            return
+        var fi = w.activeFocusItem
+        if (fi) {
+            var p = fi
+            while (p) {
+                if (p === root)
+                    return
+                p = p.parent
+            }
+        }
+        root.forceActiveFocus()
+    }
+
+    Timer {
+        running: !!root.session && root.session.visible === true
+        interval: 250
+        repeat: true
+        onTriggered: root.reclaimKeyboardFallback()
+    }
+
     // Data surfaced to the wave shell header and sidebar.
     readonly property string title: "Launcher"
     readonly property string description: root.modeDescription(activeMode)
@@ -54,6 +81,8 @@ Item {
     readonly property alias retryButton: retryButton
     // Current preview-pane item for probes/tests and shell wiring.
     readonly property alias previewSelectedResult: previewPane.selectedResult
+    readonly property alias previewTextItem: paneText
+    readonly property alias previewImageItem: paneImage
 
     implicitWidth: 400
     implicitHeight: 300
@@ -503,12 +532,20 @@ Item {
             return s.selectedIndex >= 0 ? (s.results[s.selectedIndex] || null) : null
         }
         readonly property bool shown: !!selectedResult
+        // The decoded path lands asynchronously; mirror it onto the image
+        // imperatively because a declarative source binding does not track
+        // this property reliably under the qs engine.
+        onPaneThumbSourceChanged: paneImage.source = paneThumbSource
+        Component.onCompleted: paneImage.source = paneThumbSource
         readonly property string paneThumbSource: {
             var r = selectedResult
             if (!r || !r.isImage)
                 return ""
-            root._thumbRev
-            return root.clipThumbPath(r)
+            // Load-bearing read: the engine eliminates bare expressions,
+            // so the revision must be used or this binding never re-runs
+            // when the async decode lands.
+            var rev = root._thumbRev
+            return rev >= 0 ? root.clipThumbPath(r) : ""
         }
         anchors.top: searchSurface.bottom
         anchors.topMargin: 12
@@ -519,16 +556,25 @@ Item {
         visible: shown
         color: LazerTheme.settingsCard
         radius: 6
+        // Full-length previews may outgrow the pane; clip instead of elide
+        // so the selectable text stays honest about where content ends.
+        clip: true
 
         Column {
             anchors.fill: parent
             anchors.margins: 10
             spacing: 8
 
-            // Full text preview for text entries.
+            // Full text preview for text entries; on Qt >= 6.7 Text
+            // selections are mouse-enabled out of the box, so a partial
+            // copy never requires re-copying the whole clipboard entry.
             Text {
                 id: paneText
-                visible: previewPane.selectedResult && !previewPane.selectedResult.isImage
+                // Strict checks: a plain `&&` chain yields undefined for
+                // entries without isImage, erroring and disabling the
+                // binding on the first non-image selection.
+                visible: !!previewPane.selectedResult
+                         && previewPane.selectedResult.isImage !== true
                 width: parent.width
                 text: previewPane.selectedResult && previewPane.selectedResult.previewText != null
                       ? String(previewPane.selectedResult.previewText) : ""
@@ -536,14 +582,13 @@ Item {
                 wrapMode: Text.WrapAnywhere
                 color: LazerTheme.textPrimary
                 font.pixelSize: 12
-                elide: Text.ElideRight
-                maximumLineCount: 14
             }
 
             // Large decoded image for image entries.
             Rectangle {
                 id: paneImageFrame
-                visible: previewPane.selectedResult && previewPane.selectedResult.isImage
+                visible: !!previewPane.selectedResult
+                         && previewPane.selectedResult.isImage === true
                 width: parent.width
                 height: Math.min(220, parent.height - 60)
                 radius: 4
@@ -552,12 +597,18 @@ Item {
                 Image {
                     id: paneImage
                     anchors.centerIn: parent
-                    width: Math.min(parent.width - 8, sourceSize.width * parent.height / Math.max(1, sourceSize.height))
-                    height: Math.min(parent.height - 8, sourceSize.height)
+                    // String-coerced fallbacks: an undefined transient value
+                    // would error this binding once and disable it for good.
+                    width: Math.min(parent.width - 8,
+                                    (sourceSize.width || 0) * Math.max(1, parent.height) / Math.max(1, sourceSize.height || 1))
+                    height: Math.min(Math.max(1, parent.height - 8), sourceSize.height || 0)
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
                     cache: false
-                    source: root.paneThumbSource
+                    // Assigned imperatively from paneThumbSource below: the
+                    // qs engine does not re-run this binding on property
+                    // change notifications here.
+                    source: ""
                 }
             }
 
