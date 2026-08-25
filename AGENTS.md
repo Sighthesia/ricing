@@ -13,15 +13,18 @@ Afloat is a Wayland desktop shell built with **Quickshell** (QML-based composito
 - `modules/lazerbar/` — osu!lazer-styled surfaces: settings panel (`LazerSettings*`), launcher page, notifications, fullscreen overlay/music pages. Shared singletons here: `LazerTheme`, `MotionTokens`, `SettingsOverlayBridge` (see its `qmldir`).
 - `modules/shared/glsl/` — shader sources.
 - `scripts/` — Python/shell helpers: `afloat-ipc` (IPC wrapper around `qs ipc -p <config> call <target> <function>`), `netease_web_lyrics_bridge.py` + `beat_tracker_bridge.py` (tested under `scripts/tests/`, run with `pytest`), `theming/`, `tampermonkey/`, `window_hint_trigger.py`.
-- `tests/qml/` — QML tests (`TestCase` from QtTest), one file per unit, importing service `.js` logic directly via relative paths.
+- `tests/qml/` — QML logic tests (`TestCase` from QtTest), one file per unit, importing service `.js` logic directly via relative paths. Root-level `tst_*.qml` files are behavioral harnesses for singleton services (see qml-testing skill).
 - `docs/superpowers/` — implementation plans and specs (dated); consult for design intent of existing features.
 
 ## Running
 
 - Launch config: `qs -p /path/to/afloat` (or symlink).
 - IPC: `scripts/afloat-ipc <target> <function> [args...]`
-- Tests run **per file** — there is no test runner aggregate:
-  `qs -p tests/qml/tst_bar_layout.qml`
+- Tests run per file — there is no test runner aggregate. `qs -p` does NOT
+  execute QtTest; use the Qt6 runner for logic tests and root-level
+  harnesses for singleton services (see qml-testing skill):
+  - `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt`
+  - `qs -p tst_media_binding.qml` (from repo root)
 - **After every QML change**, run the relevant test files and fix any WARN/ERROR output before considering the task done.
 
 ## Conventions
@@ -60,3 +63,4 @@ Load these for detailed context on specific topics:
 | [browser-media-metadata-fallback](.agents/skills/browser-media-metadata-fallback/SKILL.md) | Web-player (Firefox/Chrome) MPRIS metadata is incomplete, delayed, or churns; lyrics/artwork flicker or vanish. |
 | [first-batch-cold-path-prewarm](.agents/skills/first-batch-cold-path-prewarm/SKILL.md) | Search/picker/results list stutters only on the first large match or open, smooth afterwards. |
 | [submenu-surface-motion](.agents/skills/submenu-surface-motion/SKILL.md) | Tray menu (BarTrayMenu), submenu panels, or popup deform/retract/morph motion. Preserves occlusion-based reveal, ease-in retract with data retention, visibility-gated morphs. |
+| [qml-testing](.agents/skills/qml-testing/SKILL.md) | Running or writing tests. `qs -p` does not run QtTest; use the Qt6 qmltestrunner for logic tests and root-level harnesses for services. |
