@@ -12,6 +12,8 @@ Singleton {
     readonly property string _firstSeenCachePath: root._cacheDir + "/clipboard-first-seen.json"
 
     property bool available: false
+    // Mirrors _listProc.listing: a cliphist list fetch is in flight.
+    property bool listing: false
     // True once the startup cliphist probe has exited, so consumers can
     // distinguish "still probing" from "definitively unavailable".
     property bool probeFinished: false
@@ -94,6 +96,12 @@ Singleton {
         id: listProc
         command: ["cliphist", "list"]
         running: false
+
+        // True while a cliphist list is in flight, so consumers can wait
+        // for fresh data instead of binding a stale snapshot.
+        property bool listing: false
+        onListingChanged: root.listing = listing
+        onRunningChanged: listing = running
 
         stdout: StdioCollector {
             onStreamFinished: {

@@ -318,7 +318,10 @@ function createClipboardAdapter(config) {
             }
             var needle = normalizeText(queryText).toLowerCase()
             var items = Array.isArray(backend.items) ? backend.items : []
-            var canWait = toCount(backend.revision) <= 0
+            // Wait when history has never loaded OR a fresh fetch is in
+            // flight; returning immediately would surface stale content
+            // that then requires reopening the panel to update.
+            var canWait = (toCount(backend.revision) <= 0 || backend.listing === true)
                           && isSignal(backend, "listCompleted")
                           && typeof backend.list === "function"
             if (items.length > 0 || !canWait) {

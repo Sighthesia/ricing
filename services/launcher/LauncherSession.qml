@@ -58,6 +58,19 @@ QtObject {
             root.refresh()
     }
 
+    // Clipboard history lands asynchronously (5s polling); while a
+    // clipboard session is open, fresh data must reach the open list
+    // without the user reopening the panel.
+    property Connections _clipboardConn: Connections {
+        target: root.clipboardService
+        ignoreUnknownSignals: true
+        function onListCompleted() {
+            if (root.visible && !root.loading
+                    && LauncherLogic.parseQuery(root.query).mode === "clipboard")
+                root.refresh()
+        }
+    }
+
     function open() {
         if (root.visible)
             return
