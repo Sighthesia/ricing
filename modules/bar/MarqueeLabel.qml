@@ -219,21 +219,19 @@ Item {
             var revealAge = elapsed - startedAt
             var opacity = revealAge >= root.scanRevealMs
                 ? 1 : Math.max(0.08, revealAge / root.scanRevealMs)
-            // Chars within the incoming title's width ride the wavefront;
-            // orphans past its edge fall right away — nothing will fade in
-            // there, so pacing them would leave stragglers hanging.
-            var xOff = offsets[i]
-            var delay = xOff > span
-                ? i * 8
-                : root._fallDelayAt(xOff, span)
+            // All revealed chars fall immediately in a light left-to-right
+            // stagger. Positional pacing here would just make middle chars
+            // stand frozen waiting for the wavefront — and an immediate
+            // fall can never overlap the reveal, which arrives at any
+            // position no earlier than 220ms from now.
             lyricGhostComponent.createObject(overlayLayer, {
                 text: chars[i],
                 color: textColor,
                 font: label.font,
-                x: xOff,
+                x: offsets[i],
                 y: 0,
                 opacity: opacity,
-                delay: delay,
+                delay: i * 8,
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
