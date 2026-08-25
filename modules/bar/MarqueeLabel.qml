@@ -160,6 +160,7 @@ Item {
     // State of the in-flight sweep, for collapsing it mid-flight.
     property string _sweepRowChars: ""
     property var _sweepDelays: []
+    property var _sweepOffsets: []
     property real _sweepStart: 0
     // Scroll state of the outgoing label, captured by syncScroll before it
     // zeroes x — the transition needs to know where the viewport was.
@@ -171,6 +172,16 @@ Item {
     function _scanDelayAt(xOffset, lineWidth) {
         var span = Math.max(1, lineWidth)
         return Math.round(root.scanSweepMs * Math.min(1, Math.max(0, xOffset / span)))
+    }
+
+    // Fall delay for a ghost at pixel offset x, unclamped so the line
+    // keeps sweeping past the incoming title's edge; hard cap keeps
+    // extreme titles from trailing forever.
+    function _fallDelayAt(xOffset, span) {
+        var s = Math.max(1, span)
+        return Math.round(Math.min(
+            root.scanSweepMs * Math.max(0, xOffset / s),
+            root.scanSweepMs * 2))
     }
 
     // Tear down any in-flight sweep row and restore the real label.
@@ -191,41 +202,41 @@ Item {
             kids[i].destroy()
     }
 
-    // A sweep interrupted mid-reveal: the partially revealed chars fade
-    // out IN PLACE (no fall) so the interrupt reads as one clean
-    // transition — a falling cascade here would overlap the incoming
-    // sweep and read as two stacked title switches. Chars never revealed
-    // simply vanish.
-    function _collapseRevealedChars(elapsed) {
+    // A sweep interrupted mid-reveal: the already-revealed chars fall on
+    // the NEW sweep's wavefront — delay paced by position over the shared
+    // span, exactly one gap ahead of the incoming char at the same spot —
+    // so the interrupt reads as one continuous scan, never two stacked
+    // transitions. Chars never revealed simply vanish.
+    function _collapseRevealedChars(elapsed, span) {
         var chars = root._sweepRowChars
         var delays = root._sweepDelays
+        var offsets = root._sweepOffsets
         var count = Math.min(chars.length, root.transitionMaxChars)
         ghostMetrics.font = label.font
-        for (var i = 0; i < count && i < delays.length; i++) {
+        for (var i = 0; i < count && i < delays.length && i < offsets.length - 1; i++) {
             var startedAt = delays[i] + root.scanGapMs
             if (startedAt > elapsed)
                 break
             var revealAge = elapsed - startedAt
             var opacity = revealAge >= root.scanRevealMs
                 ? 1 : Math.max(0.08, revealAge / root.scanRevealMs)
-            ghostMetrics.text = chars.slice(0, i)
             lyricGhostComponent.createObject(overlayLayer, {
                 text: chars[i],
                 color: textColor,
                 font: label.font,
-                x: ghostMetrics.advanceWidth,
+                x: offsets[i],
                 y: 0,
                 opacity: opacity,
-                delay: 0,
-                fallDistance: 0
+                delay: root._fallDelayAt(offsets[i], span),
+                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
     }
 
-    // Standing ghosts of the interrupted sweep fade out in place too,
-    // matching the revealed-char collapse above. Their fall timers were
-    // fixed at creation, so they are rebuilt with fade-only parameters.
-    function _collapseStandingGhosts() {
+    // Standing ghosts of the interrupted sweep re-anchor onto the new
+    // wavefront too: they fall when the line reaches their position
+    // instead of lingering on their original (possibly much slower) pace.
+    function _collapseStandingGhosts(span) {
         var kids = overlayLayer.children
         // Snapshot the count: creates below append after it.
         var n = kids.length
@@ -243,8 +254,8 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                delay: 0,
-                fallDistance: 0
+                delay: root._fallDelayAt(x, span),
+                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
     }
@@ -264,26 +275,27 @@ Item {
         var wasActive = root._sweepActive
         var elapsed = wasActive ? Date.now() - root._sweepStart : 0
         root._sweepActive = false
-        if (wasActive) {
-            _collapseRevealedChars(elapsed)
-            _collapseStandingGhosts()
-        } else {
-            _clearGhosts()
-        }
-        _stopSweepRow()
-        root._sweepActive = true
         // Pace both wavefronts over the incoming title's VISIBLE width:
         // the scan always crosses what can be seen in one sweep duration,
         // so a fully-visible line cascades across the full range instead
         // of compressing into a wall (pacing over the raw text width would
         // squeeze the visible part into a fraction of the sweep). Same
-        // span for both fronts keeps the per-position gap exact.
+        // span for both fronts keeps the per-position gap exact. The span
+        // is needed up front: the collapse rides this same wavefront.
         ghostMetrics.font = label.font
         ghostMetrics.text = oldText
         var oldWidth = ghostMetrics.advanceWidth
         ghostMetrics.text = newText
         var newWidth = ghostMetrics.advanceWidth
         var span = Math.max(1, Math.min(newWidth, root.maxWidth))
+        if (wasActive) {
+            _collapseRevealedChars(elapsed, span)
+            _collapseStandingGhosts(span)
+        } else {
+            _clearGhosts()
+        }
+        _stopSweepRow()
+        root._sweepActive = true
         // The outgoing viewport: syncScroll already zeroed label.x for this
         // text change, so the scroll offset comes from the preserved state;
         // the visible width is the old text clipped to the label's cap.
@@ -303,6 +315,7 @@ Item {
         })
         root._sweepRowChars = newText
         root._sweepDelays = delays
+        root._sweepOffsets = offsets
         root._sweepStart = Date.now()
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
