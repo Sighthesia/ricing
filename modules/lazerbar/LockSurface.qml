@@ -109,6 +109,10 @@ WlSessionLockSurface {
         revealDelay.restart()
     }
 
+    // Belt-and-braces arming: visibleChanged covers reuse across locks;
+    // completion covers creations where visible is already true up front.
+    Component.onCompleted: armReveal()
+
     onVisibleChanged: {
         if (!visible) {
             revealStarted = false
