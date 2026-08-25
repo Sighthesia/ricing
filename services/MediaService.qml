@@ -139,9 +139,18 @@ Singleton {
             root._syncArtUrl()
     }
 
+    // Unique per player instance: two windows of the same app are distinct
+    // D-Bus names. identity/desktopEntry alone would conflate them.
     function _artPlayerKey(player) {
         if (!player)
             return ""
+
+        const dbusName = root._normalizeArtUrl(player.dbusName || "")
+        if (dbusName !== "")
+            return dbusName
+
+        if (player.uniqueId !== undefined && player.uniqueId !== null && player.uniqueId !== "")
+            return "uid:" + player.uniqueId
 
         return player.identity || player.desktopEntry || ""
     }
