@@ -296,10 +296,14 @@ Item {
         }
         _stopSweepRow()
         root._sweepActive = true
-        // The outgoing viewport: syncScroll already zeroed label.x for this
-        // text change, so the scroll offset comes from the preserved state;
-        // the visible width is the old text clipped to the label's cap.
-        var scrollX = root._scrollActive ? Math.min(0, root._preservedScrollX) : 0
+        // The outgoing viewport: the scroll offset is read live off label.x
+        // (the handler may run before the text binding updates, while the
+        // label is still scrolled); if syncScroll already zeroed it, fall
+        // back to the offset preserved at that moment. The visible width is
+        // the old text clipped to the label's cap.
+        var scrollX = label.x !== 0
+            ? Math.min(0, label.x)
+            : (root._scrollActive ? Math.min(0, root._preservedScrollX) : 0)
         root._scrollActive = false
         var viewRight = Math.min(oldWidth, root.maxWidth)
         if (!wasActive)
@@ -333,6 +337,10 @@ Item {
             return
         var count = Math.min(oldText.length, root.transitionMaxChars)
         ghostMetrics.font = label.font
+        // Chars past 2x span would batch at the hard cap; spread the
+        // excess across a bounded tail so the cascade stays sequential.
+        var capX = 2 * span
+        var tailSpan = Math.max(1, viewRight - capX)
         for (var i = 0; i < count; i++) {
             ghostMetrics.text = oldText.slice(0, i)
             var x = ghostMetrics.advanceWidth + scrollX
@@ -341,6 +349,9 @@ Item {
             if (viewRight > 0 && (charEnd <= 0 || x >= viewRight))
                 continue
             ghostMetrics.text = oldText.slice(0, i)
+            var delay = x <= capX
+                ? root.scanSweepMs * x / span
+                : root.scanSweepMs * 2 + 400 * (x - capX) / tailSpan
             lyricGhostComponent.createObject(overlayLayer, {
                 text: oldText[i],
                 color: textColor,
@@ -348,13 +359,7 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                // No clamp: the scan line keeps moving right past the
-                // incoming title's edge, so surplus old chars fall in
-                // sequence instead of batching at the sweep boundary.
-                // Hard cap keeps extreme titles from trailing forever.
-                delay: Math.round(Math.min(
-                    root.scanSweepMs * Math.max(0, x / span),
-                    root.scanSweepMs * 2)),
+                delay: Math.round(delay),
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
