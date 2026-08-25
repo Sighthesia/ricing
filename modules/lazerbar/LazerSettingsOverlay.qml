@@ -1,5 +1,6 @@
 import QtQuick
 import "LazerSettingsLogic.js" as Logic
+import "../../services" as Services
 
 // Own the fixed left settings surface; its sidebar and content layers move apart.
 Item {
@@ -37,6 +38,8 @@ Item {
         panel.beginSession()
         panelMotion.stop()
         phase = "opening"
+        // Kick off (or reuse) the wallpaper palette previews for the theme cards.
+        Services.ColorService.previewSchemes()
         panelMotion.duration = MotionTokens.reducedMotion ? MotionTokens.fast : panelEnterDuration
         panelMotion.easing.type = Easing.OutQuint
         panelMotion.to = 1

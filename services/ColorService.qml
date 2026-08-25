@@ -74,18 +74,8 @@ QtObject {
         }
     }
 
-    // Run the per-scheme preview batch whenever the settings panel opens so
-    // the theme template cards always show the current wallpaper's palettes.
-    property Connections _panelConnection: Connections {
-        target: Services.SettingsService
-        function onPanelVisibleChanged() {
-            if (Services.SettingsService.panelVisible)
-                root.previewSchemes()
-        }
-    }
-
-    // Regenerate every scheme preview for one wallpaper. Skips when the same
-    // batch already ran so repeated panel opens stay cheap.
+    // Run the per-scheme preview batch so the theme template cards show the
+    // current wallpaper's palettes. Triggered from the settings overlay open.
     property string _lastPreviewKey: ""
 
     function previewSchemes() {

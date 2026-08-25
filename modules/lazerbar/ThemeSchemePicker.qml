@@ -64,7 +64,8 @@ Item {
     }
 
     // A file created after startup never fires watchChanges, so re-check
-    // whenever the preview batch finishes (and once when the panel opens).
+    // whenever the preview batch finishes. A wallpaper swap while the panel
+    // is open starts a fresh batch for the new image.
     Connections {
         target: Services.ColorService
         function onIsPreviewingChanged() {
@@ -74,10 +75,9 @@ Item {
     }
 
     Connections {
-        target: Services.SettingsService
-        function onPanelVisibleChanged() {
-            if (Services.SettingsService.panelVisible)
-                reloadTimer.restart()
+        target: Services.SettingsService.appearance
+        function onWallpaperPathChanged() {
+            Services.ColorService.previewSchemes()
         }
     }
 
