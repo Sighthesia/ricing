@@ -70,13 +70,63 @@ function appItem(entry, launchCounts, iconResolver) {
     }
 }
 
+// ---- Built-in shell commands ----
+
+// Shell-managed actions surfaced beside applications so they are reachable
+// from plain queries without memorizing IPC targets. Execution reuses the
+// managed-bind seam: actionArgv routes actionId "shell.<target>.<fn>" through
+// the afloat IPC helper.
+function builtinCommands() {
+    return [
+        {
+            id: "builtin-lock",
+            label: "锁定屏幕",
+            description: "锁屏 · lock screen",
+            keywords: "lock 锁屏 锁定 屏幕 lockscreen",
+            icon: "icons/lock.svg",
+            actionId: "shell.lock.activate"
+        }
+    ]
+}
+
+function commandMatches(command, needle) {
+    if (!needle)
+        return true
+    return containsNormalized(command.label, needle)
+        || containsNormalized(command.description, needle)
+        || containsNormalized(command.keywords, needle)
+}
+
+function commandItem(command, index) {
+    var label = command.label == null ? "" : String(command.label)
+    var description = command.description == null ? "" : String(command.description)
+    return {
+        id: command.id == null ? "builtin-" + index : String(command.id),
+        kind: "command",
+        displayName: label,
+        description: description,
+        searchText: normalizeText(label + " " + description + " "
+                                  + (command.keywords == null ? "" : String(command.keywords))).toLowerCase(),
+        icon: command.icon == null ? "" : String(command.icon),
+        actionId: command.actionId == null ? "" : String(command.actionId),
+        managedByShell: true,
+        favoriteWeight: toCount(command.favoriteWeight),
+        lastUsedAt: 0
+    }
+}
+
 // Desktop-entry applications: favorites from launch counts drive ordering,
 // execution launches through the entry itself and records recent use.
+// Optional built-in shell commands ride the same result set and route their
+// execution through the shared IPC helper seam.
 function createAppsAdapter(config) {
     config = config || {}
     var source = config.appsSource || null
     var launchCounts = config.launchCounts || null
     var iconResolver = typeof config.iconResolver === "function" ? config.iconResolver : null
+    var commands = Array.isArray(config.commands) ? config.commands : []
+    var actionRunner = typeof config.actionRunner === "function" ? config.actionRunner : null
+    var ipcHelperPath = config.ipcHelperPath == null ? "" : String(config.ipcHelperPath)
 
     // DesktopEntries.applications.values is a QML list object rather than a
     // JavaScript array; accept anything indexable with a numeric length.
@@ -119,12 +169,32 @@ function createAppsAdapter(config) {
                     continue
                 out.push(appItem(entry, launchCounts, iconResolver))
             }
+            for (var commandIndex = 0; commandIndex < commands.length; commandIndex++) {
+                var candidate = commands[commandIndex]
+                if (!candidate || !commandMatches(candidate, needle))
+                    continue
+                out.push(commandItem(candidate, commandIndex))
+            }
             done(out)
         },
 
         execute: function(item, done) {
             if (typeof done !== "function")
                 return
+            // Built-in commands execute through the managed-bind seam.
+            if (item && item.kind === "command") {
+                if (!actionRunner) {
+                    done({ ok: false, error: "command actions unavailable" })
+                    return
+                }
+                var argv = actionArgv(item, ipcHelperPath)
+                if (!argv.length) {
+                    done({ ok: false, error: "command has no runnable action" })
+                    return
+                }
+                actionRunner(argv, done)
+                return
+            }
             if (!entryValues()) {
                 done({ ok: false, error: "application source unavailable" })
                 return
@@ -483,7 +553,10 @@ function createAdapters(config) {
         apps: createAppsAdapter({
             appsSource: config.appsSource || null,
             launchCounts: config.launchCounts || null,
-            iconResolver: config.iconResolver || null
+            iconResolver: config.iconResolver || null,
+            commands: config.commands,
+            actionRunner: config.actionRunner,
+            ipcHelperPath: config.ipcHelperPath
         }),
         clipboard: createClipboardAdapter({
             clipboardBackend: config.clipboardBackend || null

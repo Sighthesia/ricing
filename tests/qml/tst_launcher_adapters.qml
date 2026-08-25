@@ -290,6 +290,86 @@ Item {
             verify(String(missing.error).indexOf("ghost") >= 0)
         }
 
+        // --- built-in shell commands ---
+
+        function test_appsAdapterSurfacesBuiltinCommands() {
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([makeAppEntry("alpha", "Alpha", "")]),
+                commands: LauncherAdapters.builtinCommands()
+            })
+
+            var outcome = "pending"
+            adapters.apps.refresh("", "apps", function(result) { outcome = result })
+
+            compare(outcome.length, 2)
+            var lock = outcome[1]
+            compare(lock.id, "builtin-lock")
+            compare(lock.kind, "command")
+            compare(lock.displayName, "锁定屏幕")
+            compare(lock.actionId, "shell.lock.activate")
+            verify(lock.managedByShell === true)
+        }
+
+        function test_appsAdapterFiltersCommandsByQuery() {
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([]),
+                commands: LauncherAdapters.builtinCommands()
+            })
+
+            var hit = "pending"
+            adapters.apps.refresh("锁屏", "apps", function(result) { hit = result })
+            compare(hit.length, 1)
+            compare(hit[0].id, "builtin-lock")
+
+            var english = "pending"
+            adapters.apps.refresh("lock", "apps", function(result) { english = result })
+            compare(english.length, 1)
+
+            var miss = "pending"
+            adapters.apps.refresh("firefox", "apps", function(result) { miss = result })
+            compare(miss.length, 0)
+        }
+
+        function test_appsAdapterExecutesCommandsThroughIpcHelper() {
+            var ran = []
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([]),
+                commands: LauncherAdapters.builtinCommands(),
+                ipcHelperPath: "/opt/afloat-ipc",
+                actionRunner: function(argv, done) { ran.push(argv); done({ ok: true }) }
+            })
+
+            var outcome = null
+            adapters.apps.execute({
+                id: "builtin-lock",
+                kind: "command",
+                actionId: "shell.lock.activate",
+                managedByShell: true
+            }, function(result) { outcome = result })
+
+            verify(outcome && outcome.ok === true)
+            compare(ran.length, 1)
+            compare(ran[0].join(" "), "/opt/afloat-ipc lock activate")
+        }
+
+        function test_appsAdapterCommandWithoutRunnerErrors() {
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([]),
+                commands: LauncherAdapters.builtinCommands()
+            })
+
+            var outcome = null
+            adapters.apps.execute({
+                id: "builtin-lock",
+                kind: "command",
+                actionId: "shell.lock.activate",
+                managedByShell: true
+            }, function(result) { outcome = result })
+
+            verify(outcome && outcome.ok === false)
+            verify(String(outcome.error).length > 0)
+        }
+
         // --- clipboard ---
 
         function test_clipboardAdapterMapsEntriesWithWriteBackExecution() {

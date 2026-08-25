@@ -22,6 +22,7 @@ Singleton {
         clipboardBackend: Services.ClipboardService,
         shortcutsBackend: Services.NiriShortcutService,
         iconResolver: function(name) { return name ? String(Quickshell.iconPath(name, true)) : "" },
+        commands: LauncherAdapters.builtinCommands(),
         ipcHelperPath: Quickshell.shellDir + "/scripts/afloat-ipc",
         actionRunner: root._runShortcutAction
     })
