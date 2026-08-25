@@ -94,19 +94,6 @@ Item {
     Component.onCompleted: syncScroll()
     onTextChanged: syncScroll()
 
-    // [DEBUG-sx1] scroll phase trace
-    Timer {
-        interval: 250
-        running: true
-        repeat: true
-        onTriggered: {
-            if (root.overflowing)
-                console.log("[DEBUG-sx1]", "x:", label.x.toFixed(1),
-                            "scrollRunning:", scroll.running,
-                            "opacity:", label.opacity.toFixed(2))
-        }
-    }
-
     Connections {
         target: label
         function onOpacityChanged() { root.syncScroll() }
@@ -319,11 +306,17 @@ Item {
         ghostMetrics.text = newText
         var newWidth = ghostMetrics.advanceWidth
         var span = Math.max(1, Math.min(newWidth, root.maxWidth))
+        // The fall front spans the outgoing viewport whenever it is wider
+        // than the incoming title: one constant velocity across everything
+        // visible — no slow crawl over the overlap region followed by a
+        // fast rush through the orphaned tail.
+        var viewRight = Math.min(oldWidth, root.maxWidth)
+        var fallSpan = Math.max(1, Math.max(span, viewRight))
         if (wasActive) {
             // Debris first (snapshot excludes the collapse ghosts that the
             // second call appends), then the positional reveal-char fall.
             _collapseStandingGhosts()
-            _collapseRevealedChars(elapsed, span)
+            _collapseRevealedChars(elapsed, fallSpan)
         } else {
             _clearGhosts()
         }
@@ -337,13 +330,9 @@ Item {
         var scrollX = label.x !== 0
             ? Math.min(0, label.x)
             : (root._scrollActive ? Math.min(0, root._preservedScrollX) : 0)
-        console.log("[DEBUG-sx1]", "transition scrollX:", scrollX,
-                    "liveX:", label.x.toFixed(1), "preserved:", root._preservedScrollX.toFixed(1),
-                    "active:", root._scrollActive)
         root._scrollActive = false
-        var viewRight = Math.min(oldWidth, root.maxWidth)
         if (!wasActive)
-            spawnGhosts(oldText, span, scrollX, viewRight)
+            spawnGhosts(oldText, fallSpan, scrollX, viewRight)
         label.opacity = 0
         label.x = 0
         var offsets = _charOffsets(newText)
