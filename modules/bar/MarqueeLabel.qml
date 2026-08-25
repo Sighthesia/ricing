@@ -148,6 +148,10 @@ Item {
     readonly property int transitionMaxChars: 48
     property var _enterRow: null
     property bool _sweepActive: false
+    // State of the in-flight sweep, for collapsing it mid-flight.
+    property string _sweepRowChars: ""
+    property var _sweepDelays: []
+    property real _sweepStart: 0
 
     // Delay until the scan line reaches pixel offset x on a line `width`
     // wide — percentage-of-length mapping, constant px/s velocity.
@@ -174,21 +178,58 @@ Item {
             kids[i].destroy()
     }
 
+    // A sweep interrupted mid-reveal: only the chars whose fade-in had
+    // already started are on screen, so only they fall — each from its
+    // current opacity, with a light left-to-right stagger. Chars that were
+    // never revealed simply vanish; materializing them as ghosts would
+    // make the title flash complete before collapsing.
+    function _collapseRevealedChars(elapsed) {
+        var chars = root._sweepRowChars
+        var delays = root._sweepDelays
+        var count = Math.min(chars.length, root.transitionMaxChars)
+        ghostMetrics.font = label.font
+        for (var i = 0; i < count && i < delays.length; i++) {
+            var startedAt = delays[i] + root.scanGapMs
+            if (startedAt > elapsed)
+                break
+            var revealAge = elapsed - startedAt
+            var opacity = revealAge >= root.scanRevealMs
+                ? 1 : Math.max(0.08, revealAge / root.scanRevealMs)
+            ghostMetrics.text = chars.slice(0, i)
+            lyricGhostComponent.createObject(overlayLayer, {
+                text: chars[i],
+                color: textColor,
+                font: label.font,
+                x: ghostMetrics.advanceWidth,
+                y: 0,
+                opacity: opacity,
+                delay: i * 12,
+                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+            })
+        }
+    }
+
     // Play the scan-line transition for a just-applied text change.
     // Both texts are passed explicitly: a live `text:` binding may not have
     // re-evaluated yet when the host's change handler runs, so root.text
     // cannot be trusted as either value here.
     //
-    // Any in-flight choreography collapses into this sweep — row, ghosts,
-    // and any pending fade are torn down first, so wavefronts never stack
-    // and every change (including rapid focus switches that pass through
-    // transient titles) plays the scan.
+    // A change arriving while a sweep is still running collapses it: only
+    // the already-revealed chars fall (from their current opacity), chars
+    // never shown vanish, and the new sweep starts cleanly — wavefronts
+    // never stack and nothing flashes complete before falling.
     function transitionFrom(oldText, newText) {
         if (MotionTokens.reducedMotion || oldText === "" || oldText === newText)
             return
+        var wasActive = root._sweepActive
+        var elapsed = wasActive ? Date.now() - root._sweepStart : 0
         root._sweepActive = false
+        if (wasActive) {
+            _collapseRevealedChars(elapsed)
+        } else {
+            _clearGhosts()
+        }
         _stopSweepRow()
-        _clearGhosts()
         root._sweepActive = true
         // Both wavefronts must share one span so they move at the same
         // pixel velocity: at every position the new char starts exactly
@@ -200,15 +241,20 @@ Item {
         ghostMetrics.text = newText
         var newWidth = ghostMetrics.advanceWidth
         var span = Math.max(1, Math.max(oldWidth, newWidth))
-        spawnGhosts(oldText, span)
+        if (!wasActive)
+            spawnGhosts(oldText, span)
         label.opacity = 0
         label.x = 0
         var offsets = _charOffsets(newText)
+        var delays = _charDelays(offsets, span)
         root._enterRow = scanRowComponent.createObject(clipSlot, {
             chars: newText,
-            delays: _charDelays(offsets, span),
+            delays: delays,
             offsets: offsets
         })
+        root._sweepRowChars = newText
+        root._sweepDelays = delays
+        root._sweepStart = Date.now()
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
         enterGuard.restart()
