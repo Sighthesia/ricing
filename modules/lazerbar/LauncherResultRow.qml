@@ -59,6 +59,9 @@ Item {
     readonly property alias titleItem: titleText
     readonly property alias descriptionItem: descriptionLabel
     readonly property alias iconItem: iconImage
+    // Exposed for probes/tests to inspect thumbnail load state.
+    readonly property alias thumbnailItem: thumbImage
+
     readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
     readonly property Item flashOverlayItem: flashOverlay
     readonly property Animation flashAnimationItem: flashAnimation
@@ -188,20 +191,34 @@ Item {
             }
         }
 
-        // Clipboard image preview: the decoded entry fills the left rail
-        // as a thumbnail; the app-icon slot yields while it is active.
-        Image {
-            id: thumbImage
-            visible: root.isClipboardImage && thumbSource.length > 0
+        // Clipboard image preview: decoded entry sits on a slightly lighter
+        // backing so dark screenshots stay visible against the rail.
+        Rectangle {
+            id: thumbBacking
+            visible: thumbImage.visible
             anchors.left: parent.left
-            anchors.leftMargin: 4
+            anchors.leftMargin: 2
             anchors.verticalCenter: parent.verticalCenter
-            width: 32
-            height: Math.min(48, root.rowHeight - 12)
-            source: thumbSource
-            fillMode: Image.PreserveAspectFit
-            asynchronous: true
-            enabled: false
+            width: 36
+            height: Math.min(52, root.rowHeight - 12)
+            radius: 4
+            color: LazerTheme.settingsCardHover
+
+            Image {
+                id: thumbImage
+                anchors.fill: parent
+                anchors.margins: 2
+                source: root.thumbSource
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                enabled: false
+                // A failed decode falls back to the plain icon slot instead
+                // of leaving a blank rail.
+                onStatusChanged: {
+                    if (status === Image.Error)
+                        root.thumbSource = ""
+                }
+            }
         }
 
         Text {
@@ -212,6 +229,8 @@ Item {
             anchors.topMargin: 12
             anchors.verticalCenter: root.descriptionText.length > 0 ? undefined : parent.verticalCenter
             text: root.displayName
+            // Clipboard previews carry raw pasted markup; always plain.
+            textFormat: Text.PlainText
             color: LazerTheme.textPrimary
             font.pixelSize: 14
             font.weight: Font.DemiBold

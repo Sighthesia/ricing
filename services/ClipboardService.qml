@@ -111,12 +111,10 @@ Singleton {
                         root._firstSeenById[id] = Date.now()
                         root._enqueueFirstSeenSignature(id, index)
                     }
-                    // cliphist image previews vary by version: bracketed mime,
-                    // binary-data text, or an HTML img snippet.
-                    let isImage = (preview.startsWith("[") && /image/.test(preview))
-                        || lowerPreview.startsWith("[image]")
-                        || lowerPreview.includes(" binary data ")
-                        || lowerPreview.includes("<img")
+                    // cliphist marks binary/image entries with the exact
+                    // "[[ binary data ... ]]" preview prefix; loose substring
+                    // matches misclassify text that merely mentions <img.
+                    let isImage = preview.startsWith("[[")
                     let mime = "text/plain"
                     if (isImage) {
                         if (lowerPreview.includes("png"))
