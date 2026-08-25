@@ -233,13 +233,15 @@ Item {
         }
     }
 
-    // Standing ghosts of the interrupted sweep re-anchor onto the new
-    // wavefront too: they fall when the line reaches their position
-    // instead of lingering on their original (possibly much slower) pace.
-    function _collapseStandingGhosts(span) {
+    // Standing ghosts of the interrupted sweep are debris from an older
+    // title: they fall immediately in a tight stagger. Re-anchoring them
+    // onto the new wavefront instead lets rapid switching defer them
+    // indefinitely (each interrupt resets their delay), so they never
+    // exit at all. Snapshot the count first — creates below append after.
+    function _collapseStandingGhosts() {
         var kids = overlayLayer.children
-        // Snapshot the count: creates below append after it.
         var n = kids.length
+        var stagger = 0
         for (var i = 0; i < n; i++) {
             var gh = kids[i]
             if (gh.y > 0 || gh.opacity < 0.99)
@@ -254,7 +256,7 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                delay: root._fallDelayAt(x, span),
+                delay: (stagger++) * 8,
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
@@ -289,8 +291,10 @@ Item {
         var newWidth = ghostMetrics.advanceWidth
         var span = Math.max(1, Math.min(newWidth, root.maxWidth))
         if (wasActive) {
+            // Debris first (snapshot excludes the collapse ghosts that the
+            // second call appends), then the positional reveal-char fall.
+            _collapseStandingGhosts()
             _collapseRevealedChars(elapsed, span)
-            _collapseStandingGhosts(span)
         } else {
             _clearGhosts()
         }
