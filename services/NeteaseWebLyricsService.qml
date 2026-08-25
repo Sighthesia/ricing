@@ -516,6 +516,14 @@ Singleton {
         if (root.playbackState === "paused")
             return
 
+        // A background tab gets its timers throttled well past this window
+        // while the song keeps playing. When MPRIS corroborates that the
+        // same track is still actively playing, trust the media timeline
+        // over post recency instead of wiping and replaying lyric lines.
+        if (root._shouldUseMediaTimeline()
+                && Services.MediaService.playbackState === "playing")
+            return
+
         root._resetState()
     }
 

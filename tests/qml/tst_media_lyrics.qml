@@ -307,6 +307,39 @@ TestCase {
         compare(Services.NeteaseWebLyricsService.currentLyric, "")
     }
 
+    function test_stale_posts_keep_session_while_mpris_confirms_playback() {
+        resetState()
+
+        // Background tabs throttle page posts far past the stale window
+        // while the song keeps playing; MPRIS corroborating the same track
+        // must keep the loaded lyric session alive.
+        Services.MediaService._activePlayerRef = makePlayer(5000)
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.NeteaseWebLyricsService._applyPayload({
+            songId: "9",
+            title: "Song",
+            artist: "Artist",
+            playbackState: "playing",
+            positionMs: 5000,
+            durationMs: 60000,
+            rawLyric: "[00:01.00]Line one\n[00:03.00]Line two"
+        })
+
+        Services.NeteaseWebLyricsService._lastUpdateMs = Date.now() - 60000
+        Services.NeteaseWebLyricsService._clearIfStale()
+
+        compare(Services.NeteaseWebLyricsService.songId, "9")
+        compare(Services.NeteaseWebLyricsService.currentLyric, "Line two")
+
+        // Without a player the same staleness still expires the session.
+        Services.MediaService._activePlayerRef = null
+        Services.MediaService._preferredPlayerKey = ""
+        Services.NeteaseWebLyricsService._clearIfStale()
+
+        compare(Services.NeteaseWebLyricsService.songId, "")
+        compare(Services.NeteaseWebLyricsService.currentLyric, "")
+    }
+
     function test_compact_translated_line_survives_transient_service_gap() {
         resetState()
 
