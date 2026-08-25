@@ -18,6 +18,9 @@ Rectangle {
             ? Math.max(180, Screen.desktopAvailableHeight * 0.7) : 420
 
     implicitWidth: menuWidth
+    // Exposed so the popup window's input mask can cover the floating
+    // submenu; without it pointer events over the panel never arrive.
+    readonly property alias submenuSurfaceItem: submenuSurface
     // Sweeping between tray items swaps the DBusMenu handle and the new
     // children arrive asynchronously; hold the last settled height so the
     // frame never collapses mid-swap.
@@ -45,6 +48,15 @@ Rectangle {
     function closeSubmenu() {
         submenuEntry = null
         submenuAnchorRow = null
+    }
+
+    // Submenu entries resolve through their own opener: reading a handle's
+    // `children` never triggers the lazy DBusMenu fetch in this build, so
+    // the panel would stay empty forever without it.
+    QsMenuOpener {
+        id: submenuOpener
+
+        menu: root.submenuEntry
     }
 
     QsMenuOpener {
@@ -116,7 +128,9 @@ Rectangle {
         y: {
             if (!root.submenuAnchorRow)
                 return 0
-            var rowY = root.submenuAnchorRow.mapToItem(submenuSurface, 0, 0).y
+            // Map in root coordinates: mapping into the surface itself
+            // would fold its own y into the result and oscillate.
+            var rowY = root.submenuAnchorRow.mapToItem(root, 0, 0).y
             return Math.max(4, Math.min(rowY - 4, root.height - height - 8))
         }
 
@@ -131,8 +145,7 @@ Rectangle {
             spacing: 2
 
             Repeater {
-                model: root.submenuEntry && root.submenuEntry.children
-                       ? [...root.submenuEntry.children.values] : []
+                model: [...submenuOpener.children.values]
 
                 delegate: MenuEntryRow {
                     onTriggered: {
@@ -285,17 +298,21 @@ Rectangle {
             }
         }
 
+        // Auto-expand on hover: hovering a child row opens its panel at
+        // once; hovering any plain row folds the open one, matching native
+        // menu traversal. No click required anywhere in the flow.
         HoverHandler {
             id: entryHover
 
             enabled: !entryRow.isSeparator
             onHoveredChanged: {
-                if (!hovered || !root.submenuAnchorRow)
+                if (!hovered || !entryRow.entryEnabled)
                     return
-                // Moving between rows retargets or folds the open submenu.
-                if (entryRow.hasChildren)
+                if (entryRow.hasChildren) {
                     entryRow.openSubmenu(entryRow.entry, entryRow)
-                else if (root.submenuAnchorRow === entryRow)
+                    return
+                }
+                if (root.submenuAnchorRow)
                     root.closeSubmenu()
             }
         }

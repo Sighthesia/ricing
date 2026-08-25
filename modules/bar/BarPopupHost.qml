@@ -30,6 +30,13 @@ Item {
     property real frameAnchorX: 0
     // The loaded surface, exposed so the window mask can track its bounds.
     readonly property alias activeSurfaceItem: surfaceLoader.item
+    // The active surface's floating submenu (tray menus only), so the
+    // window's input mask can cover it too.
+    readonly property Item submenuSurfaceItem: {
+        var surface = surfaceLoader.item
+        return surface && surface.submenuSurfaceItem !== undefined
+               ? surface.submenuSurfaceItem : null
+    }
     onPopupVisibleChanged: {
         if (popupVisible) {
             // Geometry inputs before the content swap: assigning shownKind

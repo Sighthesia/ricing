@@ -111,8 +111,16 @@ Variants {
             // global keys stay free when closed.
             WlrLayershell.keyboardFocus: Services.BarPopupService.visible
                     ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+            // Input stays limited to the visible popup via a mask region;
+            // the nested region unions in the tray submenu panel so it
+            // remains interactive while open.
             mask: Region {
                 item: popupHost.deformProgress > 0 ? popupHost.activeSurfaceItem : null
+
+                Region {
+                    item: popupHost.deformProgress > 0
+                          ? popupHost.submenuSurfaceItem : null
+                }
             }
 
             BarPopupHost {
