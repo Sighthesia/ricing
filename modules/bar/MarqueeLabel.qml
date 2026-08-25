@@ -175,13 +175,17 @@ Item {
     }
 
     // Fall delay for a ghost at pixel offset x, unclamped so the line
-    // keeps sweeping past the incoming title's edge; hard cap keeps
-    // extreme titles from trailing forever.
+    // keeps sweeping past the incoming title's edge; past 2x span the
+    // pace compresses into a bounded tail instead of a hard cap, so
+    // surplus chars still fall in sequence rather than as one batch.
     function _fallDelayAt(xOffset, span) {
         var s = Math.max(1, span)
-        return Math.round(Math.min(
-            root.scanSweepMs * Math.max(0, xOffset / s),
-            root.scanSweepMs * 2))
+        var capX = 2 * s
+        if (xOffset <= capX)
+            return Math.round(root.scanSweepMs * Math.max(0, xOffset / s))
+        var maxX = Math.max(capX + 1, root.maxWidth)
+        return Math.round(root.scanSweepMs * 2
+            + 400 * (xOffset - capX) / (maxX - capX))
     }
 
     // Tear down any in-flight sweep row and restore the real label.
