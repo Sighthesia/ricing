@@ -136,19 +136,18 @@ Rectangle {
         }
     }
 
-    // Second-level submenu surface sharing the same visual language. The
-    // reveal replays DropdownMenu's fade + scale + drop-in; the layout
-    // rectangle stays unanimated so only paint properties move per frame.
+    // Second-level submenu surface sharing the same visual language. Like
+    // the first-level popup it deforms (scale+slide) from its anchor — but
+    // here the anchor is inside the parent menu item, so growth is
+    // horizontal: scaling from the row's near edge while sliding outward.
+    // The layout rectangle stays unanimated so only paint properties move
+    // per frame.
     Rectangle {
         id: submenuSurface
 
         visible: root.submenuProgress > 0
         enabled: root.submenuPhase === "opening" || root.submenuPhase === "open"
         opacity: root.submenuProgress
-        transformOrigin: Item.TopLeft
-        scale: MotionTokens.reducedMotion ? 1
-               : MotionTokens.popupFromScale
-                 + (1 - MotionTokens.popupFromScale) * root.submenuProgress
         radius: 10
         color: LazerTheme.popupBackground
         border.width: 1
@@ -158,6 +157,10 @@ Rectangle {
         // The column's own top/bottom padding already spaces the content;
         // adding more left a dead band at the bottom.
         height: submenuColumn.implicitHeight
+
+        // Which side of the root menu this frame docks on; the reveal and
+        // slide direction both follow it.
+        readonly property bool popsRight: dockedX >= 0
         // One persistent surface serves every submenu: switching between
         // parent rows glides x/y/height to the new frame (same rhythm as
         // the host's inter-widget morph) instead of teleporting. Frozen
@@ -198,9 +201,39 @@ Rectangle {
             enabled: root.submenuPhase === "open"
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
+        // Vertical anchor for the scale origin: the parent row's center,
+        // clamped inside the surface. Falls back near the first row when
+        // no anchor exists (mid-close).
+        readonly property real anchorCenterYInSurface: {
+            if (!root.submenuAnchorRow)
+                return Math.min(20, height / 2)
+            var rowCenter = root.submenuAnchorRow.mapToItem(root, 0, 0).y
+                    + root.submenuAnchorRow.height / 2
+            return Math.max(10, Math.min(rowCenter - y, height - 10))
+        }
         x: dockedX
-        y: dockedY + (MotionTokens.reducedMotion ? 0
-                       : MotionTokens.popupFromY * (1 - root.submenuProgress))
+        y: dockedY
+
+        // Deform from the row's near edge outward, mirroring the host
+        // popup's scale-from-anchor; the slide starts tucked toward the
+        // root menu and travels out with the same progress.
+        transform: [
+            Scale {
+                origin.x: submenuSurface.popsRight ? 0 : submenuSurface.width
+                origin.y: submenuSurface.anchorCenterYInSurface
+                xScale: MotionTokens.reducedMotion ? 1
+                        : MotionTokens.popupFromScale
+                          + (1 - MotionTokens.popupFromScale) * root.submenuProgress
+                yScale: MotionTokens.reducedMotion ? 1
+                        : MotionTokens.popupFromScale
+                          + (1 - MotionTokens.popupFromScale) * root.submenuProgress
+            },
+            Translate {
+                x: MotionTokens.reducedMotion ? 0
+                   : (submenuSurface.popsRight ? -1 : 1)
+                     * MotionTokens.popupFromX * (1 - root.submenuProgress)
+            }
+        ]
 
         Column {
             id: submenuColumn

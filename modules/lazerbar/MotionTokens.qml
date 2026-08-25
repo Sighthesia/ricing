@@ -63,6 +63,9 @@ QtObject {
     // occludes them; opacity stays constant.
     readonly property real popupFromScale: 0.7
     readonly property real popupFromY: -4
+    // Horizontal counterpart for surfaces that pop sideways out of their
+    // anchor (submenu panels leaving their parent menu item).
+    readonly property real popupFromX: 8
     readonly property real overlayFromY: 8
     readonly property real buttonNudge: 1
     readonly property real backdropOpacity: 0.55
