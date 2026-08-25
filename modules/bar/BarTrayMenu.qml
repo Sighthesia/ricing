@@ -42,12 +42,42 @@ Rectangle {
     border.color: LazerTheme.popupBorder
 
     // One open submenu level at a time, anchored beside its parent row.
+    // Both stay set through the whole retract: clearing the entry early
+    // empties the submenu column and its height collapses into a thin
+    // strip that is all the animation would carry.
     property var submenuEntry: null
     property Item submenuAnchorRow: null
 
+    function openSubmenu(entry, row) {
+        if (row)
+            root.submenuAnchorRow = row
+        // The entry is kept set through a retract, so re-hovering the same
+        // row mid-fold must still flip the phase back to opening.
+        root.submenuEntry = entry
+        if (root.submenuPhase === "opening" || root.submenuPhase === "open")
+            return
+        root.submenuPhase = "opening"
+        _startSubmenuAnimation(1, MotionTokens.outSoft, MotionTokens.settingsSlide)
+    }
+
     function closeSubmenu() {
-        submenuEntry = null
-        submenuAnchorRow = null
+        if (root.submenuPhase === "closed" || root.submenuPhase === "closing")
+            return
+        root.submenuPhase = "closing"
+        // Retract reads only while the surface is still outside the
+        // occluding face, so it eases IN: a slow visible start, then
+        // acceleration under the menu. An ease-out here spent its whole
+        // travel in the first frames and read as an instant
+        // disappearance. Duration still fits inside the host's grace
+        // window so the fold finishes before the popup slides away.
+        _startSubmenuAnimation(0, MotionTokens.inOut, MotionTokens.slow)
+    }
+
+    function _startSubmenuAnimation(toValue, curve, durationMs) {
+        submenuAnimation.easing.bezierCurve = curve
+        submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : durationMs
+        submenuAnimation.to = toValue
+        submenuAnimation.restart()
     }
 
     // Submenu entries resolve through their own opener: reading a handle's
@@ -71,29 +101,8 @@ Rectangle {
     property string submenuPhase: "closed"
     property real submenuProgress: 0
 
-    onSubmenuEntryChanged: {
-        if (root.submenuEntry !== null) {
-            if (root.submenuPhase === "opening" || root.submenuPhase === "open")
-                return
-            root.submenuPhase = "opening"
-            submenuAnimation.easing.bezierCurve = MotionTokens.outSoft
-            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
-            submenuAnimation.to = 1
-            submenuAnimation.restart()
-        } else if (root.submenuPhase !== "closed") {
-            root.submenuPhase = "closing"
-            // Retract reads only while the surface is still outside the
-            // occluding face, so it eases IN: a slow visible start, then
-            // acceleration under the menu. An ease-out here spent its
-            // whole travel in the first frames and read as an instant
-            // disappearance. Duration still fits inside the host's grace
-            // window so the fold finishes before the popup slides away.
-            submenuAnimation.easing.bezierCurve = MotionTokens.inOut
-            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.slow
-            submenuAnimation.to = 0
-            submenuAnimation.restart()
-        }
-    }
+    // Submenu lifecycle is driven by openSubmenu()/closeSubmenu(); the
+    // entry and anchor are only released once the retract has finished.
 
     // The popup can leave without anyone hovering a plain row — the
     // pointer exits toward the bar and the widget asks for a close. Fold
@@ -120,7 +129,13 @@ Rectangle {
         property: "submenuProgress"
         easing.type: Easing.BezierSpline
         easing.bezierCurve: MotionTokens.outSoft
-        onFinished: root.submenuPhase = root.submenuProgress === 1 ? "open" : "closed"
+        onFinished: {
+            root.submenuPhase = root.submenuProgress === 1 ? "open" : "closed"
+            if (root.submenuProgress !== 1) {
+                root.submenuEntry = null
+                root.submenuAnchorRow = null
+            }
+        }
     }
 
     // Scrollable entry column; menus stay short so stop-at-bounds scrolling
@@ -151,10 +166,7 @@ Rectangle {
                 model: root.entries
 
                 delegate: MenuEntryRow {
-                    onOpenSubmenu: (entry, row) => {
-                        root.submenuEntry = entry
-                        root.submenuAnchorRow = row
-                    }
+                    onOpenSubmenu: (entry, row) => root.openSubmenu(entry, row)
                     onCloseSubmenu: root.closeSubmenu()
                     onTriggered: {
                         root.closeSubmenu()
