@@ -191,11 +191,11 @@ Item {
             kids[i].destroy()
     }
 
-    // A sweep interrupted mid-reveal: only the chars whose fade-in had
-    // already started are on screen, so only they fall — each from its
-    // current opacity, with a light left-to-right stagger. Chars that were
-    // never revealed simply vanish; materializing them as ghosts would
-    // make the title flash complete before collapsing.
+    // A sweep interrupted mid-reveal: the partially revealed chars fade
+    // out IN PLACE (no fall) so the interrupt reads as one clean
+    // transition — a falling cascade here would overlap the incoming
+    // sweep and read as two stacked title switches. Chars never revealed
+    // simply vanish.
     function _collapseRevealedChars(elapsed) {
         var chars = root._sweepRowChars
         var delays = root._sweepDelays
@@ -216,21 +216,19 @@ Item {
                 x: ghostMetrics.advanceWidth,
                 y: 0,
                 opacity: opacity,
-                delay: i * 12,
-                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+                delay: 0,
+                fallDistance: 0
             })
         }
     }
 
-    // Standing ghosts of the interrupted sweep (paced delays that had not
-    // fired yet) are re-anchored into the collapse: they fall now, in a
-    // light stagger, instead of lingering until the new reveal catches up
-    // and overlaps them. Ghosts already mid-fall are left alone.
+    // Standing ghosts of the interrupted sweep fade out in place too,
+    // matching the revealed-char collapse above. Their fall timers were
+    // fixed at creation, so they are rebuilt with fade-only parameters.
     function _collapseStandingGhosts() {
         var kids = overlayLayer.children
         // Snapshot the count: creates below append after it.
         var n = kids.length
-        var stagger = 0
         for (var i = 0; i < n; i++) {
             var gh = kids[i]
             if (gh.y > 0 || gh.opacity < 0.99)
@@ -245,8 +243,8 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                delay: (stagger++) * 12,
-                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+                delay: 0,
+                fallDistance: 0
             })
         }
     }
