@@ -262,25 +262,21 @@ Item {
             compare(LauncherAdapters.timeLabel(stamp), "01-05 07:08:09")
         }
 
-        function test_appsAdapterDropsNamelessEntries() {            // A broken .desktop with no Name would render as a blank,
-            // clickable card whenever its id matched a query; it is
-            // unpresentable and must never reach the results.
+        function test_appsAdapterNamelessEntriesFallBackToId() {
+            // A broken .desktop with no Name previously rendered as a blank
+            // card or vanished entirely; falling back to the id keeps the
+            // app listed, searchable by its id, and presentable.
             var nameless = makeAppEntry("searchterm", "", "")
-            var healthy = makeAppEntry("other", "Other", "")
             var adapters = LauncherAdapters.createAdapters({
-                appsSource: makeAppsSource([nameless, healthy]),
+                appsSource: makeAppsSource([nameless]),
                 launchCounts: makeLaunchCounts({})
             })
 
             var outcome = null
             adapters.apps.refresh("searchterm", "apps", function(result) { outcome = result })
             verify(outcome && !outcome.error)
-            compare(outcome.length, 0)
-
-            adapters.apps.refresh("", "apps", function(result) { outcome = result })
-            verify(outcome && !outcome.error)
             compare(outcome.length, 1)
-            compare(outcome[0].id, "other")
+            compare(outcome[0].displayName, "searchterm")
         }
 
         function test_appsAdapterSurfacesUnavailableSource() {

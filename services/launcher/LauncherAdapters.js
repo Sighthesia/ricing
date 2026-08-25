@@ -63,7 +63,9 @@ function appItem(entry, launchCounts, iconResolver) {
     var rawIcon = entry.icon == null ? "" : String(entry.icon)
     return {
         id: entry.id == null ? "" : String(entry.id),
-        displayName: entry.name == null ? "" : String(entry.name),
+        // A broken .desktop may lack Name; fall back to the id so the app
+        // stays listed (and launchable) instead of rendering a blank card.
+        displayName: normalizeText(entry.name) || String(entry.id == null ? "" : entry.id),
         description: entry.comment == null ? "" : String(entry.comment),
         searchText: normalizeText(entry.name + " " + entry.comment + " " + entry.id).toLowerCase(),
         icon: iconResolver ? String(iconResolver(rawIcon)) : directIconPath(rawIcon),
@@ -166,10 +168,6 @@ function createAppsAdapter(config) {
             for (var index = 0; index < values.length; index++) {
                 var entry = values[index]
                 if (!entry || entry.noDisplay)
-                    continue
-                // A nameless entry renders as a blank card; it is only ever
-                // reachable through an id-substring match, so drop it.
-                if (!normalizeText(entry.name))
                     continue
                 if (!appMatches(entry, needle))
                     continue
