@@ -59,3 +59,4 @@ Load these for detailed context on specific topics:
 | [reveal-before-clip](.agents/skills/reveal-before-clip/SKILL.md) | Content inside an expanding surface overflows during grow/shrink. Drive reveal from host progress before clip masks. |
 | [browser-media-metadata-fallback](.agents/skills/browser-media-metadata-fallback/SKILL.md) | Web-player (Firefox/Chrome) MPRIS metadata is incomplete, delayed, or churns; lyrics/artwork flicker or vanish. |
 | [first-batch-cold-path-prewarm](.agents/skills/first-batch-cold-path-prewarm/SKILL.md) | Search/picker/results list stutters only on the first large match or open, smooth afterwards. |
+| [submenu-surface-motion](.agents/skills/submenu-surface-motion/SKILL.md) | Tray menu (BarTrayMenu), submenu panels, or popup deform/retract/morph motion. Preserves occlusion-based reveal, ease-in retract with data retention, visibility-gated morphs. |
