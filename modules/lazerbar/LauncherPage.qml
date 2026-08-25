@@ -40,7 +40,9 @@ Item {
     }
 
     Timer {
-        running: !!root.session && root.session.visible === true
+        // Disabled copies (the surface's prewarm page shares this session)
+        // must never steal keyboard ownership.
+        running: !!root.session && root.session.visible === true && root.enabled
         interval: 250
         repeat: true
         onTriggered: root.reclaimKeyboardFallback()
@@ -116,8 +118,10 @@ Item {
         function onResultsChanged() {
             Qt.callLater(root._holdAndScheduleReleases)
             Qt.callLater(resultsView.syncSelectionFrame)
+            Qt.callLater(resultsView.normalizeViewport)
         }
         function onDisplayPoolChanged() {
+            Qt.callLater(resultsView.normalizeViewport)
             // Delegates exist synchronously after the model assignment, so
             // hold-and-schedule here without an async gap a fresh row could
             // slip through unreleased.
@@ -479,7 +483,10 @@ Item {
             return pool || []
         return pool.slice(0, _resultWindowLimit)
     }
-    onActiveSearchTextChanged: root._resultWindowExtra = 0
+    onActiveSearchTextChanged: {
+        root._resultWindowExtra = 0
+        resultsView.normalizeViewport()
+    }
 
     // Clipboard thumbnail cache: one decode per entry id, owned here so
     // rows and the preview pane share the exact same proven path.
@@ -676,6 +683,18 @@ Item {
 
         function resultAt(index) {
             return resultsRepeater.itemAt(index)
+        }
+
+        // Folding collapses most rows on a query change; a reused page can
+        // keep a stale contentY far past the new end, parking the viewport
+        // on blank space where matches exist but are invisible. Clamp it
+        // whenever the content shape changes.
+        function normalizeViewport() {
+            var maximumY = Math.max(0, resultsView.contentHeight - resultsView.height)
+            if (resultsView.contentY < -1)
+                resultsView.contentY = 0
+            else if (resultsView.contentY > maximumY + 1)
+                resultsView.contentY = maximumY
         }
 
         // Grow the materialized window when the viewport approaches its

@@ -30,6 +30,17 @@ Item {
                     favoriteWeight: 0,
                     lastUsedAt: 0
                 })
+                // Filler apps so ordering/windowing paths are exercised.
+                for (var f = 0; f < 8; f++)
+                    items.push({
+                        id: "app.filler" + f,
+                        displayName: "Filler " + f,
+                        description: "filler",
+                        searchText: "filler " + f,
+                        icon: "",
+                        favoriteWeight: 0,
+                        lastUsedAt: 100 - f
+                    })
                 // Second clipboard entry so hover-vs-selection can differ.
                 if (modeName === "clipboard") {
                     items.push({
@@ -70,6 +81,19 @@ Item {
             done({ ok: true })
         }
     })
+
+    // Mirror of LauncherSurface's prewarm page: a second, disabled page
+    // sharing the same session.
+    property bool _prewarm: false
+    Loader {
+        id: prewarm
+        active: root._prewarm
+        visible: false
+        enabled: false
+        x: -10000; y: -10000
+        width: 480; height: 640
+        sourceComponent: LauncherPage { session: session }
+    }
 
     LauncherSession {
         id: session
@@ -135,11 +159,15 @@ Item {
         step.restart()
     }
     function scenario1_loaded() {
-        if (!session.results || session.results.length !== 1) {
-            fail("expected 1 result on open, got " + (session.results ? session.results.length : "null"))
+        var vIdx = -1
+        for (var i = 0; i < (session.results || []).length; i++)
+            if (String(session.results[i].id) === "app.vanishing")
+                vIdx = i
+        if (vIdx < 0) {
+            fail("vanishing entry missing on open")
             return scenario2()
         }
-        session.selectedIndex = 0
+        session.selectedIndex = vIdx
         // Simulate the activation path without the fling ghost layer.
         session.execute(session.results[0])
         step.next = scenario1_reopened
@@ -227,11 +255,15 @@ Item {
     }
     function scenario3_activate() {
         if (session.loading) { step.restart(); return }
-        if (!session.results || session.results.length !== 1) {
-            fail("scenario3 expected 1 result, got " + (session.results ? session.results.length : "null"))
+        var vIdx = -1
+        for (var j = 0; j < (session.results || []).length; j++)
+            if (String(session.results[j].id) === "app.vanishing")
+                vIdx = j
+        if (vIdx < 0) {
+            fail("scenario3 expected vanishing result")
             return finish()
         }
-        session.selectedIndex = 0
+        session.selectedIndex = vIdx
         page.executeSelected()   // routes through row.activate() like Enter
         step.interval = 350      // let the frame fade-out Behavior finish
         step.next = scenario3_assert
@@ -371,6 +403,87 @@ Item {
             pass("scenario5 keyboard fallback owner exists")
         else
             fail("no focus owner: Escape would be dead")
+        scenario6()
+    }
+
+    // Scenario 6: searching an app shows its unfolded row - across the
+    // refill cascade, a forced upstream re-pull, and a clipboard round
+    // trip. Data presence alone is not enough; the card must stand.
+    function findRow(id) {
+        for (var i = 0; i < resultsViewCount(); i++) {
+            var row = page.resultAt(i)
+            if (row && row.result && String(row.result.id) === id)
+                return row
+        }
+        return null
+    }
+    function resultsViewCount() {
+        var n = 0
+        while (page.resultAt(n) !== null && page.resultAt(n) !== undefined)
+            n++
+        return n
+    }
+    function assertRowStanding(id, label) {
+        var row = findRow(id)
+        if (!row) { fail(label + ": no delegate for " + id); return }
+        if (row.searchHidden) fail(label + ": row folded by search")
+        else if (row.revealHeld) fail(label + ": row stuck held by wave")
+        else if (row.height <= 4 || row.opacity < 0.9) fail(label + ": row not standing (h=" + row.height + " op=" + row.opacity + ")")
+        else pass(label + ": row standing")
+    }
+    function scenario6() {
+        root._prewarm = true   // arm the prewarm copy like production
+        if (session.visible)
+            session.close()
+        session.open()
+        step.next = scenario6_type
+        step.restart()
+    }
+    function scenario6_type() {
+        if (session.loading) { step.restart(); return }
+        // Simulate a reused page parked past the end of the shrunken list.
+        page.resultsView.contentY = 9999
+        session.selectedIndex = -1
+        session.query = "filler 3"
+        step.interval = 900      // let the refill cascade settle
+        step.next = scenario6_afterType
+        step.restart()
+    }
+    function scenario6_afterType() {
+        var cy = page.resultsView.contentY
+        var maxY = Math.max(0, page.resultsView.contentHeight - page.resultsView.height)
+        if (cy > maxY + 1)
+            fail("s6 viewport parked past end (contentY=" + cy + " max=" + maxY + ")")
+        else
+            pass("s6 viewport clamped")
+        assertRowStanding("app.filler3", "s6 typed")
+        // Upstream churn while open: forced pull with identical data.
+        session.refresh(true)
+        step.next = scenario6_afterPull
+        step.restart()
+    }
+    function scenario6_afterPull() {
+        assertRowStanding("app.filler3", "s6 after repull")
+        // Clipboard round trip and back.
+        session.query = ">clip "
+        step.next = scenario6_backToApps
+        step.interval = 400
+        step.restart()
+    }
+    function scenario6_backToApps() {
+        session.query = ""
+        step.next = scenario6_retype
+        step.interval = 400
+        step.restart()
+    }
+    function scenario6_retype() {
+        session.query = "filler 3"
+        step.interval = 900
+        step.next = scenario6_finalAssert
+        step.restart()
+    }
+    function scenario6_finalAssert() {
+        assertRowStanding("app.filler3", "s6 roundtrip")
         finish()
     }
 }
