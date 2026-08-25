@@ -81,7 +81,10 @@ Rectangle {
             submenuAnimation.restart()
         } else if (root.submenuPhase !== "closed") {
             root.submenuPhase = "closing"
-            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
+            // Faster than the open: the retract must finish before the
+            // host's own close deform starts squashing the whole popup,
+            // or the two motions read as one collapse into a sliver.
+            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.medium
             submenuAnimation.to = 0
             submenuAnimation.restart()
         }
@@ -98,9 +101,12 @@ Rectangle {
     }
 
     // Scrollable entry column; menus stay short so stop-at-bounds scrolling
-    // is enough here.
+    // is enough here. Sits above the occluding face so rows stay visible
+    // and interactive.
     Flickable {
         id: contentFlickable
+
+        z: 3
 
         anchors.fill: parent
         contentHeight: contentColumn.implicitHeight
@@ -136,23 +142,21 @@ Rectangle {
         }
     }
 
-    // Second-level submenu surface sharing the same visual language. Like
-    // the first-level popup it deforms (scale+slide) from its anchor — but
-    // here the anchor is inside the parent menu item, so growth is
-    // horizontal: scaling from the row's near edge while sliding outward.
-    // The layout rectangle stays unanimated so only paint properties move
-    // per frame.
+    // Second-level submenu surface sharing the same visual language. It
+    // sits BELOW the root menu's face: like the first-level popup, it is
+    // born fully hidden behind the occluding surface and slides out while
+    // scaling up from the parent row, and the exit reverses both moves —
+    // a genuine retract back underneath. The layout rectangle stays
+    // unanimated so only paint properties move per frame.
     Rectangle {
         id: submenuSurface
 
+        z: 1
         visible: root.submenuProgress > 0
         enabled: root.submenuPhase === "opening" || root.submenuPhase === "open"
-        // The first-level popup keeps opacity constant and lets the bar
-        // occlude its birth; nothing occludes this surface, so opacity
-        // ramps off in the first fifth of the deform instead of tracking
-        // it — the scale/slide stays the visible story, on the way in and
-        // on the retract back into the row.
-        opacity: MotionTokens.reducedMotion ? 1 : Math.min(1, root.submenuProgress * 5)
+        // Occlusion by the menu face does the hiding; opacity stays out of
+        // the story entirely, exactly like the host popup.
+        opacity: 1
         radius: 10
         color: LazerTheme.popupBackground
         border.width: 1
@@ -223,8 +227,9 @@ Rectangle {
         y: dockedY
 
         // Deform from the row's near edge outward, mirroring the host
-        // popup's scale-from-anchor; the slide starts tucked toward the
-        // root menu and travels out with the same progress.
+        // popup: born fully under the menu face and sliding its own
+        // scaled width plus the docking gap to emerge.
+        readonly property real enterTravel: 4 + width * MotionTokens.popupFromScale + 4
         transform: [
             Scale {
                 origin.x: submenuSurface.popsRight ? 0 : submenuSurface.width
@@ -239,7 +244,7 @@ Rectangle {
             Translate {
                 x: MotionTokens.reducedMotion ? 0
                    : (submenuSurface.popsRight ? -1 : 1)
-                     * MotionTokens.popupFromX * (1 - root.submenuProgress)
+                     * submenuSurface.enterTravel * (1 - root.submenuProgress)
             }
         ]
 
@@ -269,6 +274,22 @@ Rectangle {
         HoverHandler {
             onHoveredChanged: if (!hovered) root.closeSubmenu()
         }
+    }
+
+    // Opaque face redrawn over the submenu: the submenu (z 1) paints above
+    // the root's own fill but below this, so wherever it overlaps it is
+    // genuinely hidden and emerges from underneath — the same occlusion
+    // law the host popup gets from the bar. A plain Rectangle accepts no
+    // input, so events fall through to whatever lies beneath.
+    Rectangle {
+        id: menuFace
+
+        z: 2
+        anchors.fill: parent
+        radius: root.radius
+        color: root.color
+        border.width: root.border.width
+        border.color: LazerTheme.popupBorder
     }
 
     // One DBus menu entry: separator hairline or an actionable lazer row.
