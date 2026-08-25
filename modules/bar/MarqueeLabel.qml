@@ -175,13 +175,17 @@ Item {
     }
 
     // Fall delay for a ghost at pixel offset x, unclamped so the line
-    // keeps sweeping past the incoming title's edge; hard cap keeps
-    // extreme titles from trailing forever.
+    // keeps sweeping past the incoming title's edge; past 2x span the
+    // pace compresses into a bounded tail instead of a hard cap, so
+    // surplus chars still fall in sequence rather than as one batch.
     function _fallDelayAt(xOffset, span) {
         var s = Math.max(1, span)
-        return Math.round(Math.min(
-            root.scanSweepMs * Math.max(0, xOffset / s),
-            root.scanSweepMs * 2))
+        var capX = 2 * s
+        if (xOffset <= capX)
+            return Math.round(root.scanSweepMs * Math.max(0, xOffset / s))
+        var maxX = Math.max(capX + 1, root.maxWidth)
+        return Math.round(root.scanSweepMs * 2
+            + 400 * (xOffset - capX) / (maxX - capX))
     }
 
     // Tear down any in-flight sweep row and restore the real label.
@@ -233,21 +237,23 @@ Item {
         }
     }
 
-    // Standing ghosts of the interrupted sweep are debris from an older
-    // title: they fall immediately in a tight stagger. Re-anchoring them
-    // onto the new wavefront instead lets rapid switching defer them
-    // indefinitely (each interrupt resets their delay), so they never
-    // exit at all. Snapshot the count first — creates below append after.
+    // Standing ghosts of the interrupted sweep dissolve IN PLACE: they are
+    // debris of an older title, usually sharing glyphs and positions with
+    // the incoming one — re-anchoring them into a fall produced two
+    // identical glyphs dropping at the same spot. Fading them under the
+    // new sweep keeps exactly one falling instance per glyph.
     function _collapseStandingGhosts() {
         var kids = overlayLayer.children
+        // Snapshot the count: creates below append after it.
         var n = kids.length
-        var stagger = 0
         for (var i = 0; i < n; i++) {
             var gh = kids[i]
             if (gh.y > 0 || gh.opacity < 0.99)
                 continue
             var text = gh.text
             var x = gh.x
+            // Their fall timers were fixed at creation — rebuild with
+            // fade-only parameters so the debris dissolves immediately.
             gh.destroy()
             lyricGhostComponent.createObject(overlayLayer, {
                 text: text,
@@ -256,8 +262,8 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                delay: (stagger++) * 8,
-                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+                delay: 0,
+                fallDistance: 0
             })
         }
     }
