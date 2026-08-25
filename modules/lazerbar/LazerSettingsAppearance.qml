@@ -23,6 +23,7 @@ LazerSettingsSection {
     property alias ripplePulseToggle: ripplePulseToggleControl
     property alias wallpaperRow: wallpaperRow
     property alias colorSchemeRow: colorSchemeRow
+    property alias themeSchemePicker: themeSchemePicker
     property alias panelOpacityRow: panelOpacityRow
     property alias enableBlurRow: enableBlurRow
     property alias blurSurfaceRow: blurSurfaceRow
@@ -99,6 +100,17 @@ LazerSettingsSection {
                 }
             }
         }
+    }
+
+    // Theme template cards previewing the wallpaper palette per scheme.
+    ThemeSchemePicker {
+        id: themeSchemePicker
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        settingsObject: root.settingsObject
+        saveCallback: root.saveCallback
+        defaults: root.defaults
+        resetCallback: function(key, value) { root.resetKey(key) }
     }
 
     LazerSettingsRow {

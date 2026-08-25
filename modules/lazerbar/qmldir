@@ -29,6 +29,7 @@ LazerSettingsChoice 1.0 LazerSettingsChoice.qml
 LazerSettingsTextField 1.0 LazerSettingsTextField.qml
 SettingsDropdownMenu 1.0 SettingsDropdownMenu.qml
 LazerSettingsAppearance 1.0 LazerSettingsAppearance.qml
+ThemeSchemePicker 1.0 ThemeSchemePicker.qml
 LazerSettingsBar 1.0 LazerSettingsBar.qml
 LazerSettingsNotifications 1.0 LazerSettingsNotifications.qml
 LazerSettingsSection 1.0 LazerSettingsSection.qml
@@ -50,3 +51,5 @@ FullscreenSidebar 1.0 FullscreenSidebar.qml
 LauncherPage 1.0 LauncherPage.qml
 LauncherResultRow 1.0 LauncherResultRow.qml
 LauncherExitCard 1.0 LauncherExitCard.qml
+LockScreen 1.0 LockScreen.qml
+LockSurface 1.0 LockSurface.qml

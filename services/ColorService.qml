@@ -9,6 +9,16 @@ QtObject {
     id: root
 
     property bool isExtracting: false
+    // True while the per-scheme preview batch for the settings panel runs.
+    property bool isPreviewing: false
+    readonly property var schemeTypes: [
+        "tonal-spot", "content", "fruit-salad", "rainbow",
+        "monochrome", "vibrant", "faithful", "muted",
+    ]
+    readonly property string requestedScheme: {
+        const value = String(Services.SettingsService.appearance.themeScheme || "tonal-spot")
+        return schemeTypes.indexOf(value) >= 0 ? value : "tonal-spot"
+    }
     readonly property string requestedMode: {
         const value = String(Services.SettingsService.appearance.colorScheme || "auto")
         return value === "dark" || value === "light" ? value : "auto"
@@ -23,23 +33,69 @@ QtObject {
         _debounce.restart()
     }
 
-    function commandFor(wallpaperPath, outputPath, mode) {
+    function commandFor(wallpaperPath, outputPath, mode, scheme) {
         const modeFlag = mode === "dark" ? " --dark" : mode === "light" ? " --light" : ""
         const scriptPath = Quickshell.shellDir + "/scripts/theming/template-processor.py"
         return 'mkdir -p "' + Quickshell.cacheDir + '" && python3 "' + scriptPath
-                + '" "' + wallpaperPath + '"' + modeFlag + ' -o "' + outputPath + '"'
+                + '" "' + wallpaperPath + '"' + modeFlag
+                + ' --scheme-type ' + (scheme || requestedScheme)
+                + ' -o "' + outputPath + '"'
+    }
+
+    // One parallel run per scheme type, then a merged previews JSON the
+    // settings panel watches. Preview themes always cover both modes.
+    function previewCommandFor(wallpaperPath) {
+        const scriptPath = Quickshell.shellDir + "/scripts/theming/template-processor.py"
+        const mergeScript = Quickshell.shellDir + "/scripts/theming/merge_previews.py"
+        const dir = Quickshell.cacheDir + "/theme-previews"
+        const merged = Quickshell.cacheDir + "/theme-previews.json"
+        let jobs = ''
+        for (let i = 0; i < schemeTypes.length; i++) {
+            const s = schemeTypes[i]
+            jobs += 'python3 "' + scriptPath + '" "' + wallpaperPath
+                    + '" --scheme-type ' + s + ' -o "' + dir + '/' + s + '.json" & '
+        }
+        return 'mkdir -p "' + dir + '" && rm -f "' + dir + '"/*.json && ('
+                + jobs + 'wait) && python3 "' + mergeScript + '" "' + dir + '" "' + merged + '"'
     }
 
     // Refresh the cached palette once at startup so a fresh shell always
     // matches the current wallpaper without waiting for a wallpaper change.
     Component.onCompleted: extractColors(Services.SettingsService.appearance.wallpaperPath)
 
-    // Regenerate the current wallpaper palette whenever the requested scheme changes.
+    // Regenerate palettes whenever the requested scheme or template changes.
     property Connections _schemeConnection: Connections {
         target: Services.SettingsService.appearance
         function onColorSchemeChanged() {
             root.extractColors(Services.SettingsService.appearance.wallpaperPath)
         }
+        function onThemeSchemeChanged() {
+            root.extractColors(Services.SettingsService.appearance.wallpaperPath)
+        }
+    }
+
+    // Run the per-scheme preview batch whenever the settings panel opens so
+    // the theme template cards always show the current wallpaper's palettes.
+    property Connections _panelConnection: Connections {
+        target: Services.SettingsService
+        function onPanelVisibleChanged() {
+            if (Services.SettingsService.panelVisible)
+                root.previewSchemes()
+        }
+    }
+
+    // Regenerate every scheme preview for one wallpaper. Skips when the same
+    // batch already ran so repeated panel opens stay cheap.
+    property string _lastPreviewKey: ""
+
+    function previewSchemes() {
+        const path = Services.SettingsService.appearance.wallpaperPath
+        if (!path || isPreviewing) return
+        if (path === _lastPreviewKey) return
+        _lastPreviewKey = path
+        previewProcess.command = ["sh", "-c", previewCommandFor(path)]
+        isPreviewing = true
+        previewProcess.running = true
     }
 
     property Timer _debounce: Timer {
@@ -78,6 +134,24 @@ QtObject {
             onStreamFinished: {
                 var text = this.text.trim()
                 if (text) console.warn("ColorService:", text)
+            }
+        }
+    }
+
+    property Process _previewProc: Process {
+        id: previewProcess
+        running: false
+
+        onExited: function(exitCode, exitStatus) {
+            root.isPreviewing = false
+            if (exitCode !== 0)
+                root._lastPreviewKey = ""
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                var text = this.text.trim()
+                if (text) console.warn("ColorService previews:", text)
             }
         }
     }

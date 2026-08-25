@@ -19,6 +19,7 @@ QtObject {
     readonly property var appearanceDefaults: ({
         wallpaperPath: "",
         colorScheme: "auto",
+        themeScheme: "tonal-spot",
         panelOpacity: 0.9,
         cornerRadius: 12,
         enableBlur: true,
@@ -347,7 +348,9 @@ QtObject {
 
             property JsonObject appearance: JsonObject {
                 property string wallpaperPath: ""
-       property string colorScheme: "auto"
+                property string colorScheme: "auto"
+                // Wallpaper palette scheme template (Material scheme type).
+                property string themeScheme: "tonal-spot"
    property real panelOpacity: 0.9
              property int cornerRadius: 12
                 property bool enableBlur: true
