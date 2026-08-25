@@ -69,6 +69,10 @@ Singleton {
     property real _positionAnchorMs: 0
     property string _lastPayloadSignature: ""
     property bool _restartPending: false
+    property int _consecutiveFastFailures: 0
+    property real _lastStartMs: 0
+    readonly property real _fastFailureWindowMs: 5000
+    readonly property int _maxRestartDelayMs: 10000
 
     function _normalizedTrackKey(trackTitle, trackArtist) {
         const normalizedTitle = root._normalizedTrackTitle(trackTitle)
@@ -539,17 +543,26 @@ Singleton {
         }
     }
 
+    // Restart the helper with exponential backoff so a persistent failure
+    // (e.g. port held by an orphaned predecessor) cannot busy-loop forever.
     function _restartBridge() {
         if (!root.available || bridgeProcess.running || root._restartPending)
             return
 
         root._restartPending = true
+        const backoffStep = Math.min(root._consecutiveFastFailures, 4)
+        restartTimer.interval = Math.min(1000 * (1 << backoffStep), root._maxRestartDelayMs)
         restartTimer.restart()
+    }
+
+    function _markBridgeStarted() {
+        root._lastStartMs = Date.now()
+        bridgeProcess.running = true
     }
 
     Component.onCompleted: {
         if (root.available)
-            bridgeProcess.running = true
+            root._markBridgeStarted()
     }
 
     // Keep the helper process attached to the lyric service lifecycle.
@@ -563,7 +576,13 @@ Singleton {
             onRead: line => root._handleLine(line)
         }
 
-        onExited: () => {
+        onExited: (exitCode) => {
+            const ranLongEnough = Date.now() - root._lastStartMs >= root._fastFailureWindowMs
+            root._consecutiveFastFailures = ranLongEnough ? 0 : root._consecutiveFastFailures + 1
+
+            if (exitCode !== 0)
+                console.warn("[afloat:NeteaseWebLyricsService] Bridge exited with code", exitCode)
+
             if (root.active)
                 root._clearIfStale()
 
@@ -581,7 +600,7 @@ Singleton {
             if (!root.available || bridgeProcess.running)
                 return
 
-            bridgeProcess.running = true
+            root._markBridgeStarted()
         }
     }
 
