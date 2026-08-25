@@ -541,15 +541,15 @@ Item {
                 }
             }
 
+            // Metadata caption under the preview; the full text already
+            // renders above, so this never repeats the content itself.
             Text {
                 visible: previewPane.shown
                 width: parent.width
                 text: previewPane.selectedResult
-                      ? (previewPane.selectedResult.displayName || "") : ""
+                      ? (previewPane.selectedResult.description || "") : ""
                 textFormat: Text.PlainText
-                wrapMode: Text.WrapAnywhere
                 elide: Text.ElideRight
-                maximumLineCount: 2
                 color: LazerTheme.textMuted
                 font.pixelSize: 11
             }

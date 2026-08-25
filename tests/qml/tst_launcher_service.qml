@@ -430,6 +430,30 @@ Item {
             verify(String(svc().error).indexOf("broken entry") >= 0)
         }
 
+        function test_identicalRefreshKeepsResultsIdentity() {
+            // Background polls (clipboard every 5s) re-resolve with the same
+            // ids; the results array must keep its identity so the surface
+            // does not replay the refill cascade - that read as list jitter.
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 1)])
+            var first = svc().results
+
+            // Background-poll equivalent: the session stays open and the
+            // pooled fast path re-filters the unchanged data.
+            svc().refresh()
+            verify(svc().results === first,
+                   "identical refresh replaced the results array")
+
+            // A genuinely changed pull swaps the array.
+            svc().close()
+            svc().open()
+            resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0)])
+            verify(svc().results !== first, "changed refresh must swap arrays")
+        }
+
         // --- IPC entry helpers keep their prefix behavior ---
 
         function test_openClipboardOpensWithClipboardPrefix() {

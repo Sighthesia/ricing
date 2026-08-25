@@ -256,8 +256,13 @@ Item {
             compare(byId[0].id, "web-thing")
         }
 
-        function test_appsAdapterDropsNamelessEntries() {
-            // A broken .desktop with no Name would render as a blank,
+        function test_clipboardTimeLabelShowsMonthDayAndSeconds() {
+            // Copy timestamps read "MM-dd HH:mm:ss" in local time.
+            var stamp = new Date(2026, 0, 5, 7, 8, 9).getTime()
+            compare(LauncherAdapters.timeLabel(stamp), "01-05 07:08:09")
+        }
+
+        function test_appsAdapterDropsNamelessEntries() {            // A broken .desktop with no Name would render as a blank,
             // clickable card whenever its id matched a query; it is
             // unpresentable and must never reach the results.
             var nameless = makeAppEntry("searchterm", "", "")

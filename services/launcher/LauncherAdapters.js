@@ -24,12 +24,14 @@ function isSignal(target, name) {
     return !!target && !!target[name] && typeof target[name].connect === "function"
 }
 
-// Formats a first-seen timestamp as a short HH:MM label for row metadata.
+// Formats a first-seen timestamp as "MM-dd HH:mm:ss" for row metadata.
 function timeLabel(milliseconds) {
     var stamp = new Date(toCount(milliseconds))
     if (isNaN(stamp.getTime()))
         return ""
-    return pad2(stamp.getHours()) + ":" + pad2(stamp.getMinutes())
+    return pad2(stamp.getMonth() + 1) + "-" + pad2(stamp.getDate())
+            + " " + pad2(stamp.getHours()) + ":"
+            + pad2(stamp.getMinutes()) + ":" + pad2(stamp.getSeconds())
 }
 
 function pad2(value) {

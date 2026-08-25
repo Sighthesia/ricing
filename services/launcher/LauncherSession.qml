@@ -123,7 +123,11 @@ QtObject {
             root.selectedIndex = parsed.text.length > 0
                     ? LauncherLogic.refilterSelection(previous, root.selectedIndex, filtered)
                     : LauncherLogic.clampSelection(0, filtered.length)
-            root.results = filtered
+            // Keep the previous array when the ids did not change: a fresh
+            // array fires resultsChanged and replays the refill cascade,
+            // which read as the list jittering on every background poll.
+            root.results = LauncherLogic.poolMatches(previous, filtered)
+                    ? previous : filtered
             return
         }
 
@@ -161,7 +165,10 @@ QtObject {
         root.selectedIndex = requestText.length > 0
                 ? LauncherLogic.refilterSelection(previous, root.selectedIndex, filtered)
                 : LauncherLogic.clampSelection(0, filtered.length)
-        root.results = filtered
+        // Same array-identity guard as the pooled path: unchanged ids must
+        // not reassign results or the surface replays its refill animation.
+        root.results = LauncherLogic.poolMatches(previous, filtered)
+                ? previous : filtered
     }
 
     function selectNext() {
