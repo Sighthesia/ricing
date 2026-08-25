@@ -24,6 +24,10 @@ QtObject {
     property color mOnSurface: defaults.mOnSurface
     property color mSurfaceVariant: defaults.mSurfaceVariant
     property color mOnSurfaceVariant: defaults.mOnSurfaceVariant
+    property color mPrimaryContainer: defaults.mPrimaryContainer
+    property color mSurfaceContainerLow: defaults.mSurfaceContainerLow
+    property color mSurfaceContainerHigh: defaults.mSurfaceContainerHigh
+    property color mSurfaceContainerHighest: defaults.mSurfaceContainerHighest
     property color mOutline: defaults.mOutline
     property color mShadow: defaults.mShadow
 
@@ -40,6 +44,10 @@ QtObject {
     Behavior on mOnSurface { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
     Behavior on mSurfaceVariant { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
     Behavior on mOnSurfaceVariant { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mPrimaryContainer { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mSurfaceContainerLow { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mSurfaceContainerHigh { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
+    Behavior on mSurfaceContainerHighest { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
     Behavior on mOutline { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
     Behavior on mShadow { enabled: !root.skipTransition; ColorAnimation { duration: Services.Motion.color.transitionDuration; easing.type: Services.Motion.color.transitionEasing } }
 
@@ -61,6 +69,10 @@ QtObject {
         root.mOnSurface = Qt.colorEqual(d.on_surface, "transparent") ? defaults.mOnSurface : d.on_surface
         root.mSurfaceVariant = Qt.colorEqual(d.surface_variant, "transparent") ? defaults.mSurfaceVariant : d.surface_variant
         root.mOnSurfaceVariant = Qt.colorEqual(d.on_surface_variant, "transparent") ? defaults.mOnSurfaceVariant : d.on_surface_variant
+        root.mPrimaryContainer = Qt.colorEqual(d.primary_container, "transparent") ? defaults.mPrimaryContainer : d.primary_container
+        root.mSurfaceContainerLow = Qt.colorEqual(d.surface_container_low, "transparent") ? defaults.mSurfaceContainerLow : d.surface_container_low
+        root.mSurfaceContainerHigh = Qt.colorEqual(d.surface_container_high, "transparent") ? defaults.mSurfaceContainerHigh : d.surface_container_high
+        root.mSurfaceContainerHighest = Qt.colorEqual(d.surface_container_highest, "transparent") ? defaults.mSurfaceContainerHighest : d.surface_container_highest
         root.mOutline = Qt.colorEqual(d.outline, "transparent") ? defaults.mOutline : d.outline
         root.mShadow = Qt.colorEqual(d.shadow, "transparent") ? defaults.mShadow : d.shadow
     }
@@ -91,6 +103,10 @@ QtObject {
         readonly property color mOnSurface: "#e6e1e5"
         readonly property color mSurfaceVariant: "#49454f"
         readonly property color mOnSurfaceVariant: "#cac4d0"
+        readonly property color mPrimaryContainer: "#4a4277"
+        readonly property color mSurfaceContainerLow: "#242228"
+        readonly property color mSurfaceContainerHigh: "#2f2c33"
+        readonly property color mSurfaceContainerHighest: "#3a373f"
         readonly property color mOutline: "#938f99"
         readonly property color mShadow: "#000000"
     }
@@ -135,6 +151,10 @@ QtObject {
                 property color on_surface
                 property color surface_variant
                 property color on_surface_variant
+                property color primary_container
+                property color surface_container_low
+                property color surface_container_high
+                property color surface_container_highest
                 property color outline
                 property color shadow
             }
@@ -151,6 +171,10 @@ QtObject {
                 property color on_surface
                 property color surface_variant
                 property color on_surface_variant
+                property color primary_container
+                property color surface_container_low
+                property color surface_container_high
+                property color surface_container_highest
                 property color outline
                 property color shadow
             }

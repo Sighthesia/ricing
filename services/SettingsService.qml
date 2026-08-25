@@ -32,6 +32,7 @@ QtObject {
         glassGlowWidth: 5,
         glassGlowIntensity: 0.22,
         glassThemeAdaptive: true,
+        themeAdaptation: true,
         ripplePulseEnabled: true,
         ripplePulseFullscreen: false,
         transientMediaCover: false,
@@ -360,6 +361,8 @@ QtObject {
                 property real glassGlowWidth: 5
                 property real glassGlowIntensity: 0.22
                 property bool glassThemeAdaptive: true
+                // Recolor shell surfaces from the wallpaper-extracted palette.
+                property bool themeAdaptation: true
                 property bool ripplePulseEnabled: true
                 property bool ripplePulseFullscreen: false
                 // Show album art in media transient messages (off by default since

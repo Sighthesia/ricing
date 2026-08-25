@@ -30,6 +30,10 @@ QtObject {
                 + '" "' + wallpaperPath + '"' + modeFlag + ' -o "' + outputPath + '"'
     }
 
+    // Refresh the cached palette once at startup so a fresh shell always
+    // matches the current wallpaper without waiting for a wallpaper change.
+    Component.onCompleted: extractColors(Services.SettingsService.appearance.wallpaperPath)
+
     // Regenerate the current wallpaper palette whenever the requested scheme changes.
     property Connections _schemeConnection: Connections {
         target: Services.SettingsService.appearance
