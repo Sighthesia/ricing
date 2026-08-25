@@ -41,6 +41,13 @@ Item {
             color: root.textColor
             font.pixelSize: root.pixelSize
             font.bold: root.bold
+            // Track the live scroll offset every frame: a transition can
+            // fire before or after syncScroll zeroes x, and this always
+            // holds the true current viewport position.
+            onXChanged: if (x < 0) {
+                root._preservedScrollX = x
+                root._scrollActive = true
+            }
             // Reduced motion keeps a static ellipsis; otherwise the label
             // always renders at full natural width and scrolls instead.
             width: MotionTokens.reducedMotion ? Math.min(metrics.advanceWidth, root.maxWidth) : metrics.advanceWidth
@@ -86,6 +93,19 @@ Item {
 
     Component.onCompleted: syncScroll()
     onTextChanged: syncScroll()
+
+    // [DEBUG-sx1] scroll phase trace
+    Timer {
+        interval: 250
+        running: true
+        repeat: true
+        onTriggered: {
+            if (root.overflowing)
+                console.log("[DEBUG-sx1]", "x:", label.x.toFixed(1),
+                            "scrollRunning:", scroll.running,
+                            "opacity:", label.opacity.toFixed(2))
+        }
+    }
 
     Connections {
         target: label
@@ -312,6 +332,9 @@ Item {
         var scrollX = label.x !== 0
             ? Math.min(0, label.x)
             : (root._scrollActive ? Math.min(0, root._preservedScrollX) : 0)
+        console.log("[DEBUG-sx1]", "transition scrollX:", scrollX,
+                    "liveX:", label.x.toFixed(1), "preserved:", root._preservedScrollX.toFixed(1),
+                    "active:", root._scrollActive)
         root._scrollActive = false
         var viewRight = Math.min(oldWidth, root.maxWidth)
         if (!wasActive)
