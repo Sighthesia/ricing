@@ -28,6 +28,34 @@ Singleton {
     signal unlockRequested()
     signal failed()
 
+    // TEMPORARY testing failsafe: release the lock 10s after activation so a
+    // bug can never strand the session behind an ununlockable screen. It
+    // rides the normal unlockRequested path (animated exit). Remove once the
+    // lock screen is proven stable.
+    readonly property bool failsafeEnabled: true
+    readonly property int failsafeDelayMs: 10000
+
+    onLockedChanged: {
+        if (locked && failsafeEnabled)
+            failsafeTimer.restart()
+        else
+            failsafeTimer.stop()
+    }
+
+    Timer {
+        id: failsafeTimer
+        interval: root.failsafeDelayMs
+        running: false
+        repeat: false
+        onTriggered: {
+            if (!root.locked)
+                return
+            console.warn("LockService: failsafe fired, releasing lock after", root.failsafeDelayMs, "ms")
+            root.unlockInProgress = false
+            root.unlockRequested()
+        }
+    }
+
     function lock() {
         if (!locked)
             locked = true

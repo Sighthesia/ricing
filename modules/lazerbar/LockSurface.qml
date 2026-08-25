@@ -5,11 +5,12 @@ import "../../services" as Services
 import "WaveSurfaceLogic.js" as Waves
 
 // One per-screen lock surface wearing the launcher's wave-panel language:
-// four angled FullscreenWave layers sweep in ahead of an 85% sharp body,
-// all choreography mirroring WaveSurfaceHost's timing contracts. A opaque
-// floor stays painted underneath every frame — a session-lock surface must
-// never reveal the desktop while locked. The lock releases only after the
-// exit animation finishes, via LockService.finishUnlock().
+// four angled FullscreenWave layers sweep in ahead of a full-width sharp
+// body that covers everything below the bar, mirroring WaveSurfaceHost's
+// timing contracts. An opaque floor stays painted underneath every frame —
+// a session-lock surface must never reveal the desktop while locked. The
+// lock releases only after the exit animation finishes, via
+// LockService.finishUnlock().
 WlSessionLockSurface {
     id: root
 
@@ -19,7 +20,13 @@ WlSessionLockSurface {
     // backdrop waves lead, the body slides over them.
     property real waveProgress: MotionTokens.reducedMotion ? 1 : 0
     property real bodyProgress: MotionTokens.reducedMotion ? 1 : 0
-    readonly property real surfaceWidth: Math.max(0, width) * 0.85
+    // Leave the bar's strip uncovered so the lock reads as a full-width
+    // panel docked against it, matching the launcher window geometry.
+    readonly property bool barOnTop: Services.SettingsService.bar.position !== "bottom"
+    readonly property int barEdgeInset:
+        (Services.SettingsService.bar.floating
+            ? Math.max(0, Math.min(24, Number(Services.SettingsService.bar.floatingMargin) || 0)) : 0)
+        + Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
     readonly property var lockPalette: ({
         light4: "#F492B8",
         light3: "#E56E97",
@@ -80,12 +87,17 @@ WlSessionLockSurface {
         easing.type: Easing.OutQuad
     }
 
-    // Start the reveal when the compositor actually maps the surface.
+    // Start the reveal on the first presented frame: `visible` reflects the
+    // requested state and is already true while the session-lock commit and
+    // first render are still in flight, so an earlier start would burn the
+    // timeline before any pixel shows.
+    property bool revealStarted: false
     Connections {
-        target: root
-        function onVisibleChanged() {
-            if (!root.visible)
+        target: root.contentItem ? root.contentItem.window : null
+        function onFrameSwapped() {
+            if (root.revealStarted || !root.visible)
                 return
+            root.revealStarted = true
             if (MotionTokens.reducedMotion) {
                 root.waveProgress = 1
                 root.bodyProgress = 1
@@ -133,12 +145,13 @@ WlSessionLockSurface {
         Keys.onEnterPressed: Services.LockService.tryUnlock()
     }
 
-    // Clip all angled layers to the exact wave-panel viewport.
+    // Full-width wave-panel viewport docked against the bar edge.
     Item {
         id: clippedViewport
-        x: (root.width - root.surfaceWidth) / 2
-        width: root.surfaceWidth
-        height: root.height
+        x: 0
+        width: root.width
+        y: root.barOnTop ? root.barEdgeInset : 0
+        height: Math.max(0, root.height - root.barEdgeInset)
         clip: true
 
         Repeater {
@@ -163,7 +176,7 @@ WlSessionLockSurface {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             x: 0
-            y: MotionTokens.reducedMotion ? 0 : root.height * (1 - root.bodyProgress)
+            y: MotionTokens.reducedMotion ? 0 : parent.height * (1 - root.bodyProgress)
             width: parent.width
             radius: 0
             color: LazerTheme.settingsPanel
