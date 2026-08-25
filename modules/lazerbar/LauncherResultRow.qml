@@ -13,6 +13,8 @@ Item {
     // Normalized result item consumed from LauncherService.results:
     // { id, displayName, description, icon } with every field optional.
     property var result: null
+    // Owning session, used for clipboard thumbnail decoding; optional.
+    property var session: null
     property bool selected: false
     // Settings-style search folding: non-matching rows cascade their exit
     // while survivors glide, all through the same height/opacity/x contract.
@@ -23,6 +25,28 @@ Item {
     readonly property string displayName: result && result.displayName != null ? String(result.displayName) : ""
     readonly property string descriptionText: result && result.description != null ? String(result.description) : ""
     readonly property string iconSource: result && result.icon ? String(result.icon) : ""
+
+    // Clipboard image entries decode to a cached thumbnail that replaces
+    // the app-icon slot in the rail.
+    readonly property bool isClipboardImage: !!result && result.isImage === true
+    property string thumbSource: ""
+    onIsClipboardImageChanged: refreshThumbnail()
+    onResultChanged: refreshThumbnail()
+
+    function refreshThumbnail() {
+        if (!isClipboardImage || !result || root.result.id == null) {
+            thumbSource = ""
+            return
+        }
+        var wanted = String(root.result.id)
+        if (!root.session)
+            return
+        root.session.decodeThumbnail(wanted, String(root.result.mime || ""), function(path) {
+            if (path && wanted === String(root.result.id))
+                thumbSource = path
+        })
+    }
+    Component.onCompleted: refreshThumbnail()
 
     readonly property real rowHeight: 64
     implicitWidth: 480
@@ -146,7 +170,7 @@ Item {
         // Colorful enlarged icon: original colors preserved.
         Image {
             id: iconImage
-            visible: root.iconSource.length > 0
+            visible: root.iconSource.length > 0 && !thumbImage.visible
             anchors.left: parent.left
             // (railWidth - iconSize) / 2 keeps the icon horizontally
             // centered inside the 40px rail block.
@@ -162,6 +186,22 @@ Item {
                 enabled: !MotionTokens.reducedMotion
                 NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
             }
+        }
+
+        // Clipboard image preview: the decoded entry fills the left rail
+        // as a thumbnail; the app-icon slot yields while it is active.
+        Image {
+            id: thumbImage
+            visible: root.isClipboardImage && thumbSource.length > 0
+            anchors.left: parent.left
+            anchors.leftMargin: 4
+            anchors.verticalCenter: parent.verticalCenter
+            width: 32
+            height: Math.min(48, root.rowHeight - 12)
+            source: thumbSource
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            enabled: false
         }
 
         Text {

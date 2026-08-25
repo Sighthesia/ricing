@@ -49,10 +49,13 @@ Singleton {
     LauncherSession {
         id: session
         _adapters: root._adapters
+        clipboardService: Services.ClipboardService
     }
 
     // Observable session state.
     readonly property alias visible: session.visible
+    // Clipboard thumbnail decoding passthrough for result rows.
+    function decodeThumbnail(id, mime, callback) { return session.decodeThumbnail(id, mime, callback) }
     property alias query: session.query
     readonly property alias mode: session.mode
     property alias results: session.results

@@ -657,6 +657,7 @@ Item {
                     required property int index
                     width: resultsColumn.width
                     result: modelData
+                    session: root.session
                     searchQuery: root.activeSearchText
                     selected: {
                         if (!root.session || !root.session.results || root.session.selectedIndex < 0)

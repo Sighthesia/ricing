@@ -279,6 +279,35 @@ Singleton {
         actionProc.running = true
     }
 
+    // Decode an image entry to a cached file and report its path. The
+    // decode runs through a throwaway process so concurrent thumbnails do
+    // not clobber each other; repeat calls skip cliphist via the on-disk
+    // cache test.
+    function decodeThumbnail(id: string, mime: string, callback: var) {
+        var safeId = String(id == null ? "" : id)
+        if (!root.available || !/^[0-9]+$/.test(safeId)) {
+            if (callback) callback("")
+            return
+        }
+        var ext = "png"
+        var m = String(mime == null ? "" : mime).toLowerCase()
+        if (m.indexOf("jpeg") >= 0 || m.indexOf("jpg") >= 0) ext = "jpg"
+        else if (m.indexOf("webp") >= 0) ext = "webp"
+        else if (m.indexOf("gif") >= 0) ext = "gif"
+        var dir = root._cacheDir + "/clipboard-thumbs"
+        var path = dir + "/" + safeId + "." + ext
+        var proc = Qt.createQmlObject(
+            "import Quickshell;\nimport Quickshell.Io;\nProcess { command: []; running: false; stdout: StdioCollector {} }",
+            root)
+        proc.command = ["sh", "-c",
+            "mkdir -p '" + dir + "' && { test -f '" + path + "' || cliphist decode " + safeId + " > '" + path + "'; }"]
+        proc.exited.connect(function() {
+            if (callback) callback(path)
+            proc.destroy()
+        })
+        proc.running = true
+    }
+
     function pasteItem(id: string) {
         if (!root.available) return
         // Decode into clipboard then synthesise the paste shortcut via wtype

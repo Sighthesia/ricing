@@ -30,6 +30,17 @@ QtObject {
     // modes without a registered adapter resolve to an empty result set.
     property var _adapters: ({})
 
+    // Clipboard service seam for thumbnail decoding; injected by the
+    // production service, stubbed (or null) in tests.
+    property var clipboardService: null
+
+    function decodeThumbnail(id, mime, callback) {
+        if (clipboardService)
+            return clipboardService.decodeThumbnail(id, mime, callback)
+        if (callback)
+            callback("")
+    }
+
     // Stable per-mode pool of every sorted item; text filtering runs locally
     // over this so result rows keep their identity across keystrokes and the
     // surface can fold/reveal instead of reloading the whole list.
