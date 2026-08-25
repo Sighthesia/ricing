@@ -39,11 +39,9 @@ Item {
             return
         }
         var wanted = String(root.result.id)
-        console.log("[DEBUG-thumb] row request id=" + wanted + " mime=" + (root.result.mime || ""))
         if (!root.session)
             return
         root.session.decodeThumbnail(wanted, String(root.result.mime || ""), function(path) {
-            console.log("[DEBUG-thumb] row callback id=" + wanted + " path=" + path)
             if (path && wanted === String(root.result.id))
                 thumbSource = path
         })
