@@ -10,4 +10,7 @@ ShellRoot {
     Bar.TopBar {}
 
     LazerBar.NotificationHost {}
+
+    // Session lock: the protocol fans one declaration out to every output.
+    LazerBar.LockScreen {}
 }
