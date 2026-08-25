@@ -203,9 +203,11 @@ Item {
         spawnGhosts(oldText, span)
         label.opacity = 0
         label.x = 0
+        var offsets = _charOffsets(newText)
         root._enterRow = scanRowComponent.createObject(clipSlot, {
             chars: newText,
-            delays: _charDelays(newText, span)
+            delays: _charDelays(offsets, span),
+            offsets: offsets
         })
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
@@ -237,17 +239,29 @@ Item {
         }
     }
 
-    // Per-char scan arrival delays for the incoming text, in ms, paced on
-    // the shared sweep span so the reveal front matches the fall front.
-    function _charDelays(text, span) {
-        var count = Math.min(text.length, root.transitionMaxChars)
+    // Per-char scan arrival delays (ms), paced on the shared sweep span so
+    // the reveal front matches the fall front. Takes precomputed offsets.
+    function _charDelays(offsets, span) {
         var delays = []
-        ghostMetrics.font = label.font
-        for (var i = 0; i < count; i++) {
-            ghostMetrics.text = text.slice(0, i)
-            delays.push(root._scanDelayAt(ghostMetrics.advanceWidth, span))
-        }
+        for (var i = 0; i < offsets.length - 1; i++)
+            delays.push(root._scanDelayAt(offsets[i], span))
         return delays
+    }
+
+    // Per-char pixel offsets (prefix advance widths, total at the end) so
+    // the scan row places every character exactly where the real label
+    // renders it: a natural Row accumulates fractional advances differently,
+    // and the handback to the single-Text label shifted ~1px, reading as a
+    // twitch right when a long title settled into its marquee.
+    function _charOffsets(text) {
+        var count = Math.min(text.length, root.transitionMaxChars)
+        var xs = []
+        ghostMetrics.font = label.font
+        for (var i = 0; i <= count; i++) {
+            ghostMetrics.text = text.slice(0, i)
+            xs.push(ghostMetrics.advanceWidth)
+        }
+        return xs
     }
 
     // Fallback restores the label if the enter row's own timers ever fail.
@@ -306,16 +320,25 @@ Item {
     Component {
         id: scanRowComponent
 
-        Row {
+        // Characters sit at the label's own measured prefix offsets instead
+        // of flowing in a Row, so the handback to the real single-Text
+        // label lands pixel-for-pixel with no horizontal twitch.
+        Item {
             id: enterRow
 
             property string chars: ""
             // Scan arrival delay per char, ms — computed from the text's
             // own pixel positions so the line moves at constant speed.
             property var delays: []
+            // Prefix advance widths shared with the real label's metrics.
+            property var offsets: []
+            readonly property int count: Math.min(chars.length, root.transitionMaxChars)
+
+            width: offsets && offsets.length > count ? offsets[count] : 0
+            height: root.label.height
 
             Repeater {
-                model: Math.min(enterRow.chars.length, root.transitionMaxChars)
+                model: enterRow.count
 
                 Text {
                     id: charItem
@@ -326,7 +349,11 @@ Item {
                     readonly property int delay:
                         enterRow.delays && enterRow.delays.length > index
                         ? enterRow.delays[index] : index * 16
+                    readonly property real xOffset:
+                        enterRow.offsets && enterRow.offsets.length > index
+                        ? enterRow.offsets[index] : 0
 
+                    x: xOffset
                     text: enterRow.chars[index]
                     color: root.textColor
                     font.pixelSize: root.pixelSize
