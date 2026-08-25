@@ -140,6 +140,7 @@ WlSessionLockSurface {
         }
     }
 
+
     // Retreat the panel first, then fade the floor so the desktop reappears
     // through the transparent surface before the lock actually drops.
     SequentialAnimation {
