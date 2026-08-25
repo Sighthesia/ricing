@@ -192,23 +192,20 @@ Item {
         return false
     }
 
-    // Decides Escape through the shared pure keyboard contract: with input,
-    // clear the query and consume the key; otherwise report "close" to the
-    // owning wave shell by leaving the key unaccepted. The page never tears
-    // down its own session.
+    // Decides Escape through the shared pure contract: typed text clears
+    // back to the active route's bare prefix (never falls back to apps);
+    // with nothing typed beyond the prefix, report "close" to the owning
+    // wave shell by leaving the key unaccepted. The page never tears down
+    // its own session.
     function handleEscape() {
         if (!root.session)
             return false
-        var query = root.session.query == null ? "" : String(root.session.query)
-        var action = LauncherLogic.keyboardAction(
-            "escape",
-            query.length > 0,
-            root.session.selectedIndex >= 0,
-            !root.session.loading && !root.session.error
-        )
-        if (action === "clear")
-            root.session.query = ""
-        return action === "clear"
+        var esc = LauncherLogic.escapeAction(root.session.query)
+        if (esc.action === "clear") {
+            root.session.query = esc.query
+            return true
+        }
+        return false
     }
 
     function focusSearch() {

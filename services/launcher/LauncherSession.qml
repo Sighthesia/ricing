@@ -183,6 +183,17 @@ QtObject {
     // Maps raw key names onto launcher actions through the shared contract
     // and applies them; returns the action for callers that need it.
     function handleKey(key) {
+        var normalized = key == null ? "" : String(key).toLowerCase()
+        if (normalized === "escape" || normalized === "esc") {
+            // Clearing keeps the active route's prefix; an empty input
+            // closes instead of falling back to the apps list.
+            var esc = LauncherLogic.escapeAction(query)
+            if (esc.action === "clear")
+                query = esc.query
+            else
+                root.close()
+            return esc.action
+        }
         var action = LauncherLogic.keyboardAction(
             key,
             query.length > 0,

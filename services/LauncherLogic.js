@@ -83,6 +83,18 @@ function keyboardAction(key, hasInput, hasSelection, interactive) {
     return "none"
 }
 
+// Escape contract for routed sessions: clearing must not fall back to the
+// apps list, so the query rewinds to the active route's bare prefix (e.g.
+// ">clip") instead of "". Once nothing is typed beyond the prefix there is
+// no input left and Escape closes.
+function escapeAction(queryText) {
+    var text = queryText == null ? "" : String(queryText)
+    var parsed = parseQuery(text)
+    if (parsed.text.length > 0)
+        return { action: "clear", query: parsed.prefix }
+    return { action: "close", query: text }
+}
+
 // Client-side filtering over a pooled result set: keeps row identity stable
 // across keystrokes so the surface can fold/reveal instead of reloading.
 // Matching mirrors the adapter needles via each item's searchText.

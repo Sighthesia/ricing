@@ -144,6 +144,22 @@ TestCase {
         compare(Logic.keyboardAction("escape", true, false, false), "clear")
     }
 
+    function test_escapeActionKeepsRoutePrefix() {
+        var r = Logic.escapeAction(">clip foo")
+        compare(r.action, "clear")
+        compare(r.query, ">clip ")
+
+        r = Logic.escapeAction(">clip ")
+        compare(r.action, "close")
+
+        r = Logic.escapeAction("fir")
+        compare(r.action, "clear")
+        compare(r.query, "")
+
+        r = Logic.escapeAction("")
+        compare(r.action, "close")
+    }
+
     function test_keyboardAction_enterExecute() {
         compare(Logic.keyboardAction("enter", true, true, true), "execute")
         compare(Logic.keyboardAction("return", true, true, true), "execute")

@@ -372,6 +372,19 @@ Item {
             compare(svc().visible, false)
         }
 
+        function test_escapeInRoutedModeKeepsPrefixAndClosesOnEmpty() {
+            svc().open()
+            svc().query = ">clip foo"
+
+            compare(svc().handleKey("escape"), "clear")
+            compare(svc().visible, true)
+            compare(svc().query, ">clip ")
+            compare(svc().mode, "clipboard")
+
+            compare(svc().handleKey("escape"), "close")
+            compare(svc().visible, false)
+        }
+
         function test_escapeClearsInputBeforeClosingSession() {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
