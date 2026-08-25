@@ -81,12 +81,30 @@ Rectangle {
             submenuAnimation.restart()
         } else if (root.submenuPhase !== "closed") {
             root.submenuPhase = "closing"
-            // Faster than the open: the retract must finish before the
-            // host's own close deform starts squashing the whole popup,
-            // or the two motions read as one collapse into a sliver.
-            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.medium
+            // Faster than the open, and sequenced against the host: the
+            // retract must finish before the host's own close deform
+            // carries the whole popup behind the bar, or it never shows.
+            submenuAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.slow
             submenuAnimation.to = 0
             submenuAnimation.restart()
+        }
+    }
+
+    // The popup can leave without anyone hovering a plain row — the
+    // pointer exits toward the bar and the widget asks for a close. Fold
+    // the submenu at the close *intent* (the host's grace window then
+    // covers the retract) so the exit motion actually plays instead of
+    // riding out fully open behind the bar.
+    Connections {
+        target: Services.BarPopupService
+
+        function onClosePendingChanged() {
+            if (Services.BarPopupService.closePending)
+                root.closeSubmenu()
+        }
+        function onVisibleChanged() {
+            if (!Services.BarPopupService.visible)
+                root.closeSubmenu()
         }
     }
 
