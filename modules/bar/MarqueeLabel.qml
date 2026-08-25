@@ -190,12 +190,22 @@ Item {
         _stopSweepRow()
         _clearGhosts()
         root._sweepActive = true
-        spawnGhosts(oldText)
+        // Both wavefronts must share one span so they move at the same
+        // pixel velocity: at every position the new char starts exactly
+        // one gap after its old char finished falling, no matter how
+        // differently the two texts measure.
+        ghostMetrics.font = label.font
+        ghostMetrics.text = oldText
+        var oldWidth = ghostMetrics.advanceWidth
+        ghostMetrics.text = newText
+        var newWidth = ghostMetrics.advanceWidth
+        var span = Math.max(1, Math.max(oldWidth, newWidth))
+        spawnGhosts(oldText, span)
         label.opacity = 0
         label.x = 0
         root._enterRow = scanRowComponent.createObject(clipSlot, {
             chars: newText,
-            delays: _charDelays(newText)
+            delays: _charDelays(newText, span)
         })
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
@@ -203,17 +213,14 @@ Item {
     }
 
     // Old characters fall away as the line reaches them; ghosts ride the
-    // unclipped overlay so they can fall past the surface.
-    function spawnGhosts(oldText) {
+    // unclipped overlay so they can fall past the surface. `span` is the
+    // shared sweep width so the fall front matches the reveal front's
+    // pixel velocity.
+    function spawnGhosts(oldText, span) {
         if (oldText === "")
             return
         var count = Math.min(oldText.length, root.transitionMaxChars)
         ghostMetrics.font = label.font
-        ghostMetrics.text = oldText
-        // Span over the text's own full width — never the live slot width,
-        // which still carries the previous text's geometry during the
-        // change handler and would clamp all later chars to one delay.
-        var span = Math.max(1, ghostMetrics.advanceWidth)
         for (var i = 0; i < count; i++) {
             ghostMetrics.text = oldText.slice(0, i)
             lyricGhostComponent.createObject(overlayLayer, {
@@ -230,13 +237,12 @@ Item {
         }
     }
 
-    // Per-char scan arrival delays for the incoming text, in ms.
-    function _charDelays(text) {
+    // Per-char scan arrival delays for the incoming text, in ms, paced on
+    // the shared sweep span so the reveal front matches the fall front.
+    function _charDelays(text, span) {
         var count = Math.min(text.length, root.transitionMaxChars)
         var delays = []
         ghostMetrics.font = label.font
-        ghostMetrics.text = text
-        var span = Math.max(1, ghostMetrics.advanceWidth)
         for (var i = 0; i < count; i++) {
             ghostMetrics.text = text.slice(0, i)
             delays.push(root._scanDelayAt(ghostMetrics.advanceWidth, span))
