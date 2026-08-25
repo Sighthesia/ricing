@@ -143,6 +143,43 @@ Item {
     // Probe/test access to the hosted page.
     property alias waveHostItem: waveHost
 
+    // Cold-path prewarm: the first open pays LauncherPage compilation plus
+    // delegate/icon/font warmup all at once and visibly stalls. Arm a
+    // hidden, disabled copy at idle shortly after startup, let the engine
+    // caches fill, then release it; the real open path is untouched.
+    Loader {
+        id: prewarmLoader
+        active: false
+        visible: false
+        enabled: false
+        opacity: 0
+        x: -10000
+        y: -10000
+        width: 480
+        height: 640
+
+        sourceComponent: LauncherPage {
+            session: root.session
+            enabled: false
+        }
+    }
+
+    Timer {
+        id: prewarmArmTimer
+        interval: 2500
+        repeat: false
+        running: !!root.session
+        onTriggered: prewarmLoader.active = true
+    }
+
+    Timer {
+        id: prewarmReleaseTimer
+        interval: 4000
+        repeat: false
+        running: prewarmLoader.active
+        onTriggered: prewarmLoader.active = false
+    }
+
     WaveSurfaceHost {
         id: waveHost
         anchors.fill: parent
