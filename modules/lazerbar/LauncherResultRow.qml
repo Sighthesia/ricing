@@ -33,20 +33,46 @@ Item {
     onIsClipboardImageChanged: refreshThumbnail()
     onResultChanged: refreshThumbnail()
 
+    // Belt-and-braces for the rail thumbnail: the visible chain proved
+    // flaky in the live shell while the pane (same file, later request)
+    // worked, so visibility is re-asserted imperatively and failed decodes
+    // retry a few times instead of relying on a single callback.
     function refreshThumbnail() {
         if (!isClipboardImage || !result || root.result.id == null) {
             thumbSource = ""
+            thumbImage.visible = Qt.binding(function () { return root.isClipboardImage && root.thumbSource.length > 0 })
             return
         }
         var wanted = String(root.result.id)
         if (!root.session)
             return
         root.session.decodeThumbnail(wanted, String(root.result.mime || ""), function(path) {
-            if (path && wanted === String(root.result.id))
-                thumbSource = path
+            if (!path || wanted !== String(root.result.id))
+                return
+            thumbSource = path
+            thumbImage.visible = true
         })
+        thumbRetry.restart()
     }
     Component.onCompleted: refreshThumbnail()
+
+    Timer {
+        id: thumbRetry
+        interval: 1500
+        repeat: true
+        property int tries: 0
+        onTriggered: {
+            if (!root.isClipboardImage || root.thumbSource.length > 0 || root.closing) {
+                stop()
+                return
+            }
+            if (++tries > 5) {
+                stop()
+                return
+            }
+            root.refreshThumbnail()
+        }
+    }
 
     readonly property real rowHeight: 64
     implicitWidth: 480
