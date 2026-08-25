@@ -222,6 +222,35 @@ Item {
         }
     }
 
+    // Standing ghosts of the interrupted sweep (paced delays that had not
+    // fired yet) are re-anchored into the collapse: they fall now, in a
+    // light stagger, instead of lingering until the new reveal catches up
+    // and overlaps them. Ghosts already mid-fall are left alone.
+    function _collapseStandingGhosts() {
+        var kids = overlayLayer.children
+        // Snapshot the count: creates below append after it.
+        var n = kids.length
+        var stagger = 0
+        for (var i = 0; i < n; i++) {
+            var gh = kids[i]
+            if (gh.y > 0 || gh.opacity < 0.99)
+                continue
+            var text = gh.text
+            var x = gh.x
+            gh.destroy()
+            lyricGhostComponent.createObject(overlayLayer, {
+                text: text,
+                color: textColor,
+                font: label.font,
+                x: x,
+                y: 0,
+                opacity: 1,
+                delay: (stagger++) * 12,
+                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+            })
+        }
+    }
+
     // Play the scan-line transition for a just-applied text change.
     // Both texts are passed explicitly: a live `text:` binding may not have
     // re-evaluated yet when the host's change handler runs, so root.text
@@ -239,6 +268,7 @@ Item {
         root._sweepActive = false
         if (wasActive) {
             _collapseRevealedChars(elapsed)
+            _collapseStandingGhosts()
         } else {
             _clearGhosts()
         }
