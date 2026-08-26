@@ -116,16 +116,14 @@ Item {
             resultsView.syncSelectionFrame()
         }
         function onResultsChanged() {
-            Qt.callLater(root._holdAndScheduleReleases)
-            Qt.callLater(resultsView.syncSelectionFrame)
-            Qt.callLater(resultsView.normalizeViewport)
+            Qt.callLater(root._scheduleRowsCommit)
         }
         function onDisplayPoolChanged() {
             Qt.callLater(resultsView.normalizeViewport)
             // Delegates exist synchronously after the model assignment, so
             // hold-and-schedule here without an async gap a fresh row could
             // slip through unreleased.
-            root._holdAndScheduleReleases()
+            root._scheduleRowsCommit()
         }
         function onErrorChanged() {
             if (!root.session || !root.session.error)
@@ -373,19 +371,43 @@ Item {
         entranceSettle.restart()
     }
 
-    // Hold every current row synchronously, then route the set through the
-    // wave (first fill after open) or the lighter cascade (query refills).
+    // Coalesce the commit choreography across the display-pool and results
+    // writes landing in one refresh so hold/wave/cascade plays exactly once.
+    property bool _rowsCommitScheduled: false
+    function _scheduleRowsCommit() {
+        if (root._rowsCommitScheduled)
+            return
+        root._rowsCommitScheduled = true
+        Qt.callLater(function () {
+            root._rowsCommitScheduled = false
+            root._holdAndScheduleReleases()
+            resultsView.syncSelectionFrame()
+            resultsView.normalizeViewport()
+        })
+    }
+
+    // Hold only rows this commit has not claimed yet, then route the newly
+    // built set through the wave (first fill after open) or the lighter
+    // cascade. Surviving rows are left untouched so a query edit that keeps
+    // a row visible and in place never folds it shut and re-reveals it.
     function _holdAndScheduleReleases() {
         var children = resultsColumn.children
-        for (var h = 0; h < children.length; h++)
-            if (children[h].holdInstantly !== undefined)
-                children[h].holdInstantly()
+        var claimedFresh = false
+        for (var h = 0; h < children.length; h++) {
+            var row = children[h]
+            if (row.freshFromBuild === true) {
+                row.freshFromBuild = false
+                if (row.holdInstantly !== undefined)
+                    row.holdInstantly()
+                claimedFresh = true
+            }
+        }
         if (resultsView.resultCount <= 0)
             return
         if (root._firstFillPending) {
             root._firstFillPending = false
             root.playEntranceWave()
-        } else {
+        } else if (claimedFresh) {
             root.playRefillCascade()
         }
     }
@@ -484,8 +506,15 @@ Item {
         return pool.slice(0, _resultWindowLimit)
     }
     onActiveSearchTextChanged: {
+        var hadWindow = root._resultWindowExtra > 0
         root._resultWindowExtra = 0
         resultsView.normalizeViewport()
+        // Resetting the window swaps the Repeater model and rebuilds every
+        // delegate; route that rebuild through the commit choreography.
+        // Plain keystrokes with an intact window rebuild nothing and must
+        // not touch the rows at all.
+        if (hadWindow)
+            Qt.callLater(root._scheduleRowsCommit)
     }
 
     // Clipboard thumbnail cache: one decode per entry id, owned here so

@@ -61,6 +61,10 @@ Item {
     // lives inside the height so an exited row frees exactly zero space.
     readonly property real listGap: 8
     readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
+    // True until the page's commit choreography first claims this row; lets
+    // refill animations target only freshly built delegates so surviving
+    // rows keep their exact geometry across query edits.
+    property bool freshFromBuild: true
     property bool revealHeld: false
     property bool snapTransitions: true
     readonly property bool geometryHeld: revealHeld || searchHidden
