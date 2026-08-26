@@ -371,14 +371,20 @@ Rectangle {
             }
         }
 
-        // Leaving the submenu surface folds it back into the root menu.
+        // Leaving the submenu surface folds it back into the root menu —
+        // but only once settled. While the reveal is still playing the
+        // surface keeps sliding outward, so a stationary pointer gets left
+        // behind its trailing edge; honoring that unhover would kill the
+        // panel the moment it moved under construction.
         HoverHandler {
             id: submenuHover
 
             onHoveredChanged: {
-                console.debug("[SUBDBG] surface hovered=" + hovered)
-                if (!hovered) root.closeSubmenu()
+                console.debug("[SUBDBG] surface hovered=" + hovered
+                              + " phase=" + root.submenuPhase)
+                if (!hovered && root.submenuPhase === "open") root.closeSubmenu()
             }
+        }
         }
     }
 
