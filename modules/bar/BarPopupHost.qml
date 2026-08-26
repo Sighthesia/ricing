@@ -269,6 +269,7 @@ Item {
             id: barContextMenuComponent
 
             BarContextMenu {
+                availHeight: root.height
                 onOpenSettingsRequested: {
                     Services.BarPopupService.close()
                     SettingsOverlayBridge.openRequested()
