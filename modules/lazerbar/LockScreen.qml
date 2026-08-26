@@ -11,5 +11,5 @@ WlSessionLock {
 
     locked: Services.LockService.locked
 
-    LockSurface {}
+    LockSurface { lock: sessionLock }
 }

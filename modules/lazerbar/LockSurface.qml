@@ -13,6 +13,8 @@ import "WaveSurfaceLogic.js" as Waves
 WlSessionLockSurface {
     id: root
 
+    required property WlSessionLock lock
+
     color: "transparent"
 
     // Reveal progresses drive the phased sweep: backdrop waves lead, the
@@ -164,7 +166,10 @@ WlSessionLockSurface {
         to: 0
         duration: MotionTokens.slow
         easing.type: Easing.InCubic
-        onFinished: Services.LockService.finishUnlock()
+        onFinished: {
+            Services.LockService.finishUnlock()
+            root.lock.locked = false
+        }
     }
 
     SequentialAnimation {
@@ -256,10 +261,10 @@ WlSessionLockSurface {
             id: body
             z: 5
             anchors.top: parent.top
-            anchors.bottom: parent.bottom
             x: 0
             y: MotionTokens.reducedMotion ? 0 : parent.height * (1 - root.bodyProgress)
             width: parent.width
+            height: parent.height
             radius: 0
             color: LazerTheme.settingsPanel
 
