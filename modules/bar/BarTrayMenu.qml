@@ -45,6 +45,27 @@ Rectangle {
     border.width: 1
     border.color: LazerTheme.popupBorder
 
+    // TEMP DEBUG: live input-delivery probe. S= surface hover reached,
+    // R= last row hover received, T= last tap received. Remove after use.
+    property string debugLastRow: "-"
+    property string debugLastTap: "-"
+    Rectangle {
+        z: 99
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        width: 150; height: 30
+        color: "#80000000"
+        Text {
+            anchors.fill: parent
+            color: "#ffcc00"
+            font.pixelSize: 10
+            text: "S:" + (submenuHover.hovered ? "1" : "0")
+                  + " R:" + root.debugLastRow
+                  + " T:" + root.debugLastTap
+                  + " P:" + Number(root.submenuProgress).toFixed(2)
+        }
+    }
+
     // One open submenu level at a time, anchored beside its parent row.
     // Both stay set through the whole retract: clearing the entry early
     // empties the submenu column and its height collapses into a thin
@@ -350,7 +371,10 @@ Rectangle {
         HoverHandler {
             id: submenuHover
 
-            onHoveredChanged: if (!hovered) root.closeSubmenu()
+            onHoveredChanged: {
+                console.debug("[SUBDBG] surface hovered=" + hovered)
+                if (!hovered) root.closeSubmenu()
+            }
         }
     }
 
@@ -498,6 +522,8 @@ Rectangle {
             enabled: !entryRow.isSeparator
             gesturePolicy: TapHandler.ReleaseWithinBounds
             onTapped: {
+                root.debugLastTap = "L" + entryRow.level
+                console.debug("[SUBDBG] tap L" + entryRow.level)
                 if (!entryRow.entryEnabled)
                     return
                 if (entryRow.hasChildren) {
@@ -520,6 +546,10 @@ Rectangle {
 
             enabled: !entryRow.isSeparator
             onHoveredChanged: {
+                console.debug("[SUBDBG] row L" + entryRow.level + " hovered=" + hovered
+                              + " text=" + (entryRow.entry ? String(entryRow.entry.text || "") : ""))
+                if (hovered)
+                    root.debugLastRow = entryRow.level + ":" + String(entryRow.entry ? entryRow.entry.text || "?" : "?").slice(0, 6)
                 if (!hovered || !entryRow.entryEnabled)
                     return
                 if (entryRow.hasChildren) {
