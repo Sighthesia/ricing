@@ -112,14 +112,19 @@ Variants {
             WlrLayershell.keyboardFocus: Services.BarPopupService.visible
                     ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
             // Input stays limited to the visible popup via a mask region;
-            // the nested region unions in the tray submenu panel so it
-            // remains interactive while open.
+            // the nested regions union in the tray submenu panel and the
+            // corridor bridge so traversing between them never reads as a
+            // pointer leave.
             mask: Region {
                 item: popupHost.deformProgress > 0 ? popupHost.activeSurfaceItem : null
 
                 Region {
                     item: popupHost.deformProgress > 0
                           ? popupHost.submenuSurfaceItem : null
+                }
+                Region {
+                    item: popupHost.deformProgress > 0
+                          ? popupHost.submenuBridgeItem : null
                 }
             }
 

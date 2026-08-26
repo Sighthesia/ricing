@@ -37,6 +37,13 @@ Item {
         return surface && surface.submenuSurfaceItem !== undefined
                ? surface.submenuSurfaceItem : null
     }
+    // Corridor bridge between the menu and its submenu; covering it keeps
+    // gap traversal from registering as a pointer leave.
+    readonly property Item submenuBridgeItem: {
+        var surface = surfaceLoader.item
+        return surface && surface.submenuBridgeItem !== undefined
+               ? surface.submenuBridgeItem : null
+    }
     onPopupVisibleChanged: {
         if (popupVisible) {
             // Geometry inputs before the content swap: assigning shownKind

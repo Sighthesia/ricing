@@ -21,6 +21,10 @@ Rectangle {
     // Exposed so the popup window's input mask can cover the floating
     // submenu; without it pointer events over the panel never arrive.
     readonly property alias submenuSurfaceItem: submenuSurface
+    // Input-only bridge over the corridor between the menu and its
+    // submenu: without it, crossing the 4px gap is a Wayland leave, which
+    // reads as pointer-gone and folds everything mid-traversal.
+    readonly property alias submenuBridgeItem: submenuBridge
     // Sweeping between tray items swaps the DBusMenu handle and the new
     // children arrive asynchronously; hold the last settled height so the
     // frame never collapses mid-swap.
@@ -108,18 +112,38 @@ Rectangle {
     // pointer exits toward the bar and the widget asks for a close. Fold
     // the submenu at the close *intent* (the host's grace window then
     // covers the retract) so the exit motion actually plays instead of
-    // riding out fully open behind the bar.
+    // riding out fully open behind the bar. If the pointer already sits
+    // on the submenu, the intent is a traversal race, not a departure —
+    // leave it open and let cancelClose win.
     Connections {
         target: Services.BarPopupService
 
         function onClosePendingChanged() {
-            if (Services.BarPopupService.closePending)
+            if (Services.BarPopupService.closePending && !submenuHover.hovered)
                 root.closeSubmenu()
         }
         function onVisibleChanged() {
             if (!Services.BarPopupService.visible)
                 root.closeSubmenu()
         }
+    }
+
+    // Input-only corridor bridge; geometry tracks the animated surface so
+    // morphs stay covered. Zero-sized while nothing is open.
+    Item {
+        id: submenuBridge
+
+        readonly property bool active: root.submenuProgress > 0 && submenuSurface.visible
+        readonly property bool popsRight: submenuSurface.dockedX >= 0
+        readonly property real menuEdge: popsRight ? root.width : 0
+        readonly property real surfEdge: popsRight
+                ? submenuSurface.x : submenuSurface.x + submenuSurface.width
+
+        x: Math.min(menuEdge, surfEdge) - 1
+        y: Math.max(0, submenuSurface.y)
+        width: active ? Math.abs(menuEdge - surfEdge) + 2 : 0
+        height: active ? Math.min(root.height,
+                                  submenuSurface.y + submenuSurface.height) - y : 0
     }
 
     NumberAnimation {
@@ -322,6 +346,8 @@ Rectangle {
 
         // Leaving the submenu surface folds it back into the root menu.
         HoverHandler {
+            id: submenuHover
+
             onHoveredChanged: if (!hovered) root.closeSubmenu()
         }
     }
