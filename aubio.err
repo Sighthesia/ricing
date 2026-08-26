@@ -1,4 +1,0 @@
-AUBIO ERROR: source_avcodec: Failed opening stream.wav (Invalid data found when processing input)
-AUBIO ERROR: source_sndfile: Failed opening stream.wav (Format not recognised.)
-AUBIO ERROR: source_wavread: Failed opening stream.wav (could not find RIFF header)
-Error: could not open input file stream.wav
