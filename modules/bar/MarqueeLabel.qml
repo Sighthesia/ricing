@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import "../lazerbar"
 
 // Single-line label that grows with its natural width up to a cap, then
@@ -173,6 +174,8 @@ Item {
     // zeroes x — the transition needs to know where the viewport was.
     property real _preservedScrollX: 0
     property bool _scrollActive: false
+    // [SCROLLDIAG] set AFLOAT_SCROLL_DIAG=1 to enable diagnosis logging
+    property bool _diag: Quickshell.env("AFLOAT_SCROLL_DIAG") === "1"
 
     // Delay until the scan line reaches pixel offset x on a line `width`
     // wide — percentage-of-length mapping, constant px/s velocity.
@@ -312,6 +315,15 @@ Item {
         // fast rush through the orphaned tail.
         var viewRight = Math.min(oldWidth, root.maxWidth)
         var fallSpan = Math.max(1, Math.max(span, viewRight))
+        // [SCROLLDIAG] env-gated diagnosis probe (AFLOAT_SCROLL_DIAG=1)
+        if (root._diag)
+            console.log("[SCROLLDIAG]", "transition liveX:", label.x.toFixed(1),
+                        "preserved:", root._preservedScrollX.toFixed(1),
+                        "active:", root._scrollActive,
+                        "oldW:", oldWidth, "newW:", newWidth,
+                        "span:", span, "viewRight:", viewRight,
+                        "fallSpan:", fallSpan,
+                        "maxW:", root.maxWidth)
         if (wasActive) {
             // Debris first (snapshot excludes the collapse ghosts that the
             // second call appends), then the positional reveal-char fall.

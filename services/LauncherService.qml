@@ -46,7 +46,20 @@ Singleton {
                 session.refresh(true)
         }
     }
-    on_DesktopEntryCountChanged: entryScanRefreshTimer.restart()
+
+    // True while the desktop-entry scan is still adding entries (quiet for
+    // 1.5s); the launcher surface shows an indexing notice so early searches
+    // explain why applications may land a few seconds late.
+    readonly property bool appsIndexing: entryScanSettleTimer.running
+    Timer {
+        id: entryScanSettleTimer
+        interval: 1500
+        repeat: false
+    }
+    on_DesktopEntryCountChanged: {
+        entryScanRefreshTimer.restart()
+        entryScanSettleTimer.restart()
+    }
 
     // Quickshell-free session core (unit tested directly under qmltestrunner).
     LauncherSession {

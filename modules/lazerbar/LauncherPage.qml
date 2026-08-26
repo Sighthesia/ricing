@@ -86,6 +86,13 @@ Item {
     readonly property alias previewTextItem: paneText
     readonly property alias previewImageItem: paneImage
 
+    // Injected by the production surface from LauncherService.appsIndexing;
+    // standalone/test sessions simply leave it false.
+    property bool appsIndexing: false
+    readonly property bool showIndexNotice: appsIndexing
+                                            && root.session && root.session.visible
+                                            && root.activeMode === "apps"
+
     implicitWidth: 400
     implicitHeight: 300
 
@@ -120,6 +127,7 @@ Item {
         }
         function onDisplayPoolChanged() {
             Qt.callLater(resultsView.normalizeViewport)
+            root._syncWindowToMatches()
             // Delegates exist synchronously after the model assignment, so
             // hold-and-schedule here without an async gap a fresh row could
             // slip through unreleased.
@@ -494,9 +502,12 @@ Item {
     // Result windowing: instantiating every pooled row (clipboard can carry
     // 750+) floods the entrance wave and scroll path. Materialize a base
     // slice and grow it as the user scrolls or navigates deeper; queries
-    // reset the window so filtered sets always start cheap.
+    // additionally stretch the window over every current match (capped) so
+    // rarely-used apps ranked deep in the pool surface immediately instead
+    // of waiting for a scroll that folded rows can never trigger.
     readonly property int resultWindowBase: 96
     readonly property int resultWindowStep: 80
+    readonly property int resultWindowCap: 384
     property int _resultWindowExtra: 0
     readonly property int _resultWindowLimit: resultWindowBase + _resultWindowExtra
     readonly property var windowedResults: {
@@ -505,17 +516,23 @@ Item {
             return pool || []
         return pool.slice(0, _resultWindowLimit)
     }
-    onActiveSearchTextChanged: {
-        var hadWindow = root._resultWindowExtra > 0
-        root._resultWindowExtra = 0
-        resultsView.normalizeViewport()
-        // Resetting the window swaps the Repeater model and rebuilds every
-        // delegate; route that rebuild through the commit choreography.
-        // Plain keystrokes with an intact window rebuild nothing and must
-        // not touch the rows at all.
-        if (hadWindow)
-            Qt.callLater(root._scheduleRowsCommit)
+    // Stretch the materialized window past the base slice only when a query
+    // actually matches rows beyond it; growing swaps the Repeater model and
+    // rebuilds delegates, so it must never fire per keystroke without need.
+    function _syncWindowToMatches() {
+        if (!root.activeSearchText)
+            return
+        var pool = root.session ? root.session.displayPool : null
+        if (!pool || !pool.length)
+            return
+        var needed = Math.min(root.resultWindowCap,
+                              LauncherLogic.lastMatchIndex(pool, root.activeSearchText) + 1)
+        if (needed <= root._resultWindowLimit)
+            return
+        root._resultWindowExtra = needed - root.resultWindowBase
+        Qt.callLater(root._scheduleRowsCommit)
     }
+    onActiveSearchTextChanged: resultsView.normalizeViewport()
 
     // Clipboard thumbnail cache: one decode per entry id, owned here so
     // rows and the preview pane share the exact same proven path.
@@ -668,13 +685,35 @@ Item {
         }
     }
 
+    // Slim indexing notice between the search rail and the results; explains
+    // why a freshly opened session may miss applications for a few seconds.
+    Rectangle {
+        id: indexNotice
+        anchors.top: searchSurface.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: visible ? 26 : 0
+        visible: root.showIndexNotice
+        color: LazerTheme.settingsRail
+
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Indexing applications…"
+            color: LazerTheme.textMuted
+            font.pixelSize: 11
+            font.italic: true
+        }
+    }
+
     Flickable {
         id: resultsView
-        anchors.top: searchSurface.bottom
+        anchors.top: indexNotice.visible ? indexNotice.bottom : searchSurface.bottom
         anchors.left: parent.left
         anchors.right: previewPane.visible ? previewPane.left : parent.right
         anchors.bottom: parent.bottom
-        anchors.topMargin: 12
+        anchors.topMargin: indexNotice.visible ? 4 : 12
         anchors.leftMargin: 8
         anchors.rightMargin: previewPane.visible ? 12 : 8
         clip: true

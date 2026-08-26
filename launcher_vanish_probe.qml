@@ -382,7 +382,7 @@ Item {
         if (img.status === Image.Ready && img.width > 0 && img.height > 0)
             pass("scenario5 preview image visible and loaded")
         else
-            fail("preview image dead even after dependency nudge (src=" + String(img.source) + ")")
+            fail("preview image dead after nudge (src=" + String(img.source) + " st=" + img.status + " prog=" + img.progress + ")")
 
         // Keyboard fallback: with the editor unfocused and no other focus
         // owner, the page itself must hold scope focus so Escape still has

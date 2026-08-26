@@ -57,20 +57,26 @@ function appMatches(entry, needle) {
 }
 
 function appItem(entry, launchCounts, iconResolver) {
+    var appId = String(entry.id == null ? "" : entry.id)
     var weight = launchCounts && typeof launchCounts.getLaunchCount === "function"
-                 ? toCount(launchCounts.getLaunchCount(String(entry.id == null ? "" : entry.id)))
+                 ? toCount(launchCounts.getLaunchCount(appId))
                  : 0
+    // Recency breaks frequency ties so a just-launched app surfaces at the
+    // front of its frequency band instead of staying alphabetical.
+    var lastUsedAt = launchCounts && typeof launchCounts.getLastLaunchAt === "function"
+                     ? toCount(launchCounts.getLastLaunchAt(appId))
+                     : 0
     var rawIcon = entry.icon == null ? "" : String(entry.icon)
     return {
-        id: entry.id == null ? "" : String(entry.id),
+        id: appId,
         // A broken .desktop may lack Name; fall back to the id so the app
         // stays listed (and launchable) instead of rendering a blank card.
-        displayName: normalizeText(entry.name) || String(entry.id == null ? "" : entry.id),
+        displayName: normalizeText(entry.name) || appId,
         description: entry.comment == null ? "" : String(entry.comment),
         searchText: normalizeText(entry.name + " " + entry.comment + " " + entry.id).toLowerCase(),
         icon: iconResolver ? String(iconResolver(rawIcon)) : directIconPath(rawIcon),
         favoriteWeight: weight,
-        lastUsedAt: 0
+        lastUsedAt: lastUsedAt
     }
 }
 

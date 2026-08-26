@@ -220,6 +220,23 @@ TestCase {
         verify(!Logic.resultMatches(null, "x"))
     }
 
+    function test_lastMatchIndexCoversWindowSizing() {
+        var alpha = { id: "a", displayName: "Alpha", searchText: "alpha editor" }
+        var beta = { id: "b", displayName: "Beta", searchText: "beta browser" }
+        var gamma = { id: "c", displayName: "Gamma", searchText: "gamma mail" }
+
+        // Deep match reports its pool position; empty needle spans all.
+        compare(Logic.lastMatchIndex([alpha, beta, gamma], "mail"), 2)
+        compare(Logic.lastMatchIndex([alpha, beta, gamma], ""), 2)
+        compare(Logic.lastMatchIndex([alpha, beta, gamma], "   "), 2)
+
+        // No match, nullish input, and null items are safe.
+        compare(Logic.lastMatchIndex([alpha, beta], "mail"), -1)
+        compare(Logic.lastMatchIndex([], "x"), -1)
+        compare(Logic.lastMatchIndex(null, "x"), -1)
+        compare(Logic.lastMatchIndex([alpha, null, gamma], "mail"), 2)
+    }
+
     function test_preservedSelectionKeepsSurvivorAndClampsOtherwise() {
         var alpha = { id: "a", displayName: "Alpha" }
         var beta = { id: "b", displayName: "Beta" }

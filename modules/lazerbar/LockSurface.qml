@@ -142,6 +142,20 @@ WlSessionLockSurface {
 
 
 
+
+    // [DBG-grab] temporary frame captures of the rendered surface
+    function dbgGrab(ms) {
+        clippedViewport.grabToImage(function(r) {
+            r.image.save("/tmp/opencode/lockframes/f" + ms + "ms.png")
+            console.warn("[DBG-grab] saved f" + ms + "ms wave=" + root.waveProgress.toFixed(2) + " body=" + root.bodyProgress.toFixed(2))
+        })
+    }
+    Timer { interval: 100;  running: root.visible; onTriggered: root.dbgGrab(100) }
+    Timer { interval: 400;  running: root.visible; onTriggered: root.dbgGrab(400) }
+    Timer { interval: 800;  running: root.visible; onTriggered: root.dbgGrab(800) }
+    Timer { interval: 1500; running: root.visible; onTriggered: root.dbgGrab(1500) }
+    Timer { interval: 3000; running: root.visible; onTriggered: root.dbgGrab(3000) }
+
     // Retreat the panel first, then fade the floor so the desktop reappears
     // through the transparent surface before the lock actually drops.
     SequentialAnimation {
@@ -162,202 +176,81 @@ WlSessionLockSurface {
         onFinished: Services.LockService.finishUnlock()
     }
 
-    // Security floor: opaque from the first committed frame so no desktop
-    // pixels ever leak while the session is locked.
+    // [MINIMAL] bisect build: plain nodes only
     Rectangle {
         id: securityFloor
         anchors.fill: parent
-        color: LazerTheme.bgDark
-    }
+        color: "#2244FF"
 
-    // Keyboard owner: WlSessionLockSurface is not an Item, so all key routing
-    // lands on this focused inner item.
-    Item {
-        id: keyboardScope
-        focus: true
-        Keys.onReturnPressed: Services.LockService.tryUnlock()
-        Keys.onEnterPressed: Services.LockService.tryUnlock()
-    }
+        Text {
+            anchors.centerIn: parent
+            text: "MINIMAL " + Math.round(root.waveProgress * 100) + "/" + Math.round(root.bodyProgress * 100)
+            color: "white"
+            font.pixelSize: 40
+        }
 
-    // Full-width wave-panel viewport docked against the bar edge.
-    Item {
-        id: clippedViewport
-        x: 0
-        width: root.width
-        y: root.barOnTop ? root.barEdgeInset : 0
-        height: Math.max(0, root.height - root.barEdgeInset)
-        clip: true
-
-        // Four fixed wave layers, statically declared: Repeater delegates do
-        // not render reliably inside a WlSessionLockSurface. They ride ABOVE
-        // the body (z:10) and fade out as the body settles, otherwise the
-        // opaque full-width panel would occlude them for their whole life.
         FullscreenWave {
             anchors.fill: parent
-            z: 10
-            opacity: 1 - root.bodyProgress
             progress: root.waveProgress
             angle: Waves.waveAngle(0)
-            colour: root.lockPalette.light4
+            colour: "#FF00FF"
             restOffset: -parent.height * 0.72
         }
         FullscreenWave {
             anchors.fill: parent
-            z: 10
-            opacity: 1 - root.bodyProgress
             progress: root.waveProgress
             angle: Waves.waveAngle(1)
-            colour: root.lockPalette.light3
+            colour: "#00FFAA"
             restOffset: -parent.height * 0.5
         }
-        FullscreenWave {
-            anchors.fill: parent
-            z: 10
-            opacity: 1 - root.bodyProgress
-            progress: root.waveProgress
-            angle: Waves.waveAngle(2)
-            colour: root.lockPalette.dark4
-            restOffset: -parent.height * 0.32
-        }
-        FullscreenWave {
-            anchors.fill: parent
-            z: 10
-            opacity: 1 - root.bodyProgress
-            progress: root.waveProgress
-            angle: Waves.waveAngle(3)
-            colour: root.lockPalette.dark3
-            restOffset: -parent.height * 0.16
+
+        // [BISECT-R1] credential bar under test
+        Item {
+            id: keyboardScope
+            focus: true
+            Keys.onReturnPressed: Services.LockService.tryUnlock()
+            Keys.onEnterPressed: Services.LockService.tryUnlock()
         }
 
-        // Sharp body carrying the credential UI; slides up over the waves.
         Rectangle {
-            id: body
-            z: 5
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            x: 0
-            y: MotionTokens.reducedMotion ? 0 : parent.height * (1 - root.bodyProgress)
-            width: parent.width
+            width: 360
+            height: 52
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: 80
             radius: 0
-            color: LazerTheme.settingsPanel
+            color: LazerTheme.settingsControlSurface
 
-            Column {
-                id: contentColumn
-                spacing: 28
-                anchors.centerIn: parent
-                // Shake rides a Translate so the centering anchor stays authoritative.
-                transform: Translate { id: shakeOffset }
+            Row {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 6
 
-                // Clock block above the credential bar.
-                Column {
-                    width: parent.width
-                    spacing: 4
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        property date now: new Date()
-                        text: Qt.formatDateTime(now, "HH:mm")
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 72
-                        font.bold: true
-
-                        Timer {
-                            interval: 1000
-                            running: true
-                            repeat: true
-                            triggeredOnStart: true
-                            onTriggered: parent.now = new Date()
-                        }
-                    }
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        property date now: new Date()
-                        text: Qt.formatDateTime(now, "yyyy年M月d日 dddd")
-                        color: LazerTheme.textMuted
-                        font.pixelSize: 16
-
-                        Timer {
-                            interval: 30000
-                            running: true
-                            repeat: true
-                            triggeredOnStart: true
-                            onTriggered: parent.now = new Date()
-                        }
-                    }
+                OsuTextField {
+                    id: passwordField
+                    width: parent.width - LazerTheme.targetSize - 12
+                    height: parent.height
+                    echoMode: TextInput.Password
+                    passwordCharacter: "\u25CF"
+                    font.pixelSize: 18
+                    color: LazerTheme.textPrimary
+                    verticalAlignment: TextInput.AlignVCenter
+                    Component.onCompleted: forceActiveFocus()
+                    onTextChanged: if (text !== Services.LockService.buffer) Services.LockService.setBuffer(text)
                 }
 
-                // Sharp credential bar: right-angled osu surface with the shared
-                // password buffer and a submit action on the right edge.
-                Rectangle {
-                    id: passwordBar
-                    width: 360
-                    height: 52
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    radius: 0
-                    color: LazerTheme.settingsControlSurface
-                    border.width: 1
-                    border.color: Services.LockService.failureState === "none"
-                            && !Services.LockService.unlockInProgress ? LazerTheme.divider : LazerTheme.osuButtonActive
-
-                    Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
-
-                    Row {
-                        anchors.fill: parent
-                        anchors.leftMargin: 16
-                        anchors.rightMargin: 6
-
-                        OsuTextField {
-                            id: passwordField
-                            width: parent.width - LazerTheme.targetSize - 12
-                            height: parent.height
-                            echoMode: TextInput.Password
-                            passwordCharacter: "●"
-                            font.pixelSize: 18
-                            color: LazerTheme.textPrimary
-                            verticalAlignment: TextInput.AlignVCenter
-                            focus: true
-                            enabled: !Services.LockService.unlockInProgress
-                            // Shared buffer keeps every per-screen surface in sync.
-                            // Sync is imperative: typing breaks a `text` binding, so
-                            // service changes are mirrored through the signal guard
-                            // instead, and both directions ignore equal writes.
-                            Component.onCompleted: {
-                                text = Services.LockService.buffer
-                                forceActiveFocus()
-                            }
-                            onTextChanged: if (text !== Services.LockService.buffer) Services.LockService.setBuffer(text)
-                            Connections {
-                                target: Services.LockService
-                                function onBufferChanged() {
-                                    if (passwordField.text !== Services.LockService.buffer)
-                                        passwordField.text = Services.LockService.buffer
-                                }
-                            }
-                            Keys.onReturnPressed: Services.LockService.tryUnlock()
-                            Keys.onEnterPressed: Services.LockService.tryUnlock()
-                        }
-
-                        IconButton {
-                            anchors.verticalCenter: parent.verticalCenter
-                            source: "icons/chevron-right.svg"
-                            accessibleName: "解锁"
-                            enabled: !Services.LockService.unlockInProgress
-                            supportsHover: false
-                            onClicked: Services.LockService.tryUnlock()
-                        }
-                    }
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: root.statusText
-                    color: root.statusColor
-                    font.pixelSize: 13
-
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                IconButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    source: "icons/chevron-right.svg"
+                    accessibleName: "解锁"
+                    supportsHover: false
+                    onClicked: Services.LockService.tryUnlock()
                 }
             }
+        }
+
+        Timer { interval: 100; running: true; repeat: true; property int n: 0
+            onTriggered: { n++; if (n <= 12) console.warn("[DBG-min] wp=" + root.waveProgress.toFixed(2) + " bp=" + root.bodyProgress.toFixed(2)) }
         }
     }
 }

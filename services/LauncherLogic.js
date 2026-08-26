@@ -95,9 +95,19 @@ function escapeAction(queryText) {
     return { action: "close", query: text }
 }
 
+// Searchable text for one pooled item; mirrors the adapter needles via
+// searchText with a displayName+description fallback.
+function haystackOf(item) {
+    if (item == null)
+        return ""
+    return item.searchText != null && String(item.searchText).length > 0
+            ? String(item.searchText)
+            : String(item.displayName == null ? "" : item.displayName) + " "
+              + String(item.description == null ? "" : item.description)
+}
+
 // Client-side filtering over a pooled result set: keeps row identity stable
 // across keystrokes so the surface can fold/reveal instead of reloading.
-// Matching mirrors the adapter needles via each item's searchText.
 function filterResults(items, text) {
     if (!items || !items.length)
         return []
@@ -109,14 +119,29 @@ function filterResults(items, text) {
         var item = items[i]
         if (!item)
             continue
-        var haystack = item.searchText != null && String(item.searchText).length > 0
-                ? String(item.searchText)
-                : String(item.displayName == null ? "" : item.displayName) + " "
-                  + String(item.description == null ? "" : item.description)
-        if (haystack.toLowerCase().indexOf(needle) >= 0)
+        if (haystackOf(item).toLowerCase().indexOf(needle) >= 0)
             out.push(item)
     }
     return out
+}
+
+// Index of the last item matching text, or -1 when nothing matches; lets a
+// windowed list size itself so every current match is materialized instead
+// of waiting for a scroll that folded rows can never trigger. An empty
+// needle matches everything and reports the full range.
+function lastMatchIndex(items, text) {
+    if (!items || !items.length)
+        return -1
+    var needle = String(text == null ? "" : text).replace(/\s+/g, " ").trim().toLowerCase()
+    if (!needle)
+        return items.length - 1
+    for (var i = items.length - 1; i >= 0; i--) {
+        if (!items[i])
+            continue
+        if (haystackOf(items[i]).toLowerCase().indexOf(needle) >= 0)
+            return i
+    }
+    return -1
 }
 
 // Single-item match used by rows deciding their own fold state.
@@ -126,11 +151,7 @@ function resultMatches(item, text) {
         return true
     if (!item)
         return false
-    var haystack = item.searchText != null && String(item.searchText).length > 0
-            ? String(item.searchText)
-            : String(item.displayName == null ? "" : item.displayName) + " "
-              + String(item.description == null ? "" : item.description)
-    return haystack.toLowerCase().indexOf(needle) >= 0
+    return haystackOf(item).toLowerCase().indexOf(needle) >= 0
 }
 
 // Keeps the same item selected across a refilter when it still matches;
