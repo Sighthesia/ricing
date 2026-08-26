@@ -58,22 +58,19 @@ BarPill {
     // close instead of tearing down with playback state.
     readonly property bool needsSpectrum: !MotionTokens.reducedMotion
         && (root.mediaSettings ? root.mediaSettings.showAudioSpectrum !== false : true)
-    // Floors for pill and spectrum so a short title cannot squeeze the
-    // mirrored bar field into an unreadable sliver.
+    // Floors for pill so a short title cannot collapse the widget.
     readonly property int minPillWidth: 140
-    readonly property int minSpectrumWidth: 100
-    // Distance from contentRow's left edge to the text column: cover glyph,
-    // row spacing, progress track, row spacing again.
-    readonly property int textColumnOffset: root.coverSize + 8 + 3 + 8
-    // Pill width needed so the floored spectrum field ends inside the pill:
-    // with contentRow centered, its x is (W - R) / 2, and the spectrum's
-    // right edge must stay within the hoverable surface (6px breathing).
-    readonly property int spectrumFitWidth: !root.needsSpectrum ? 0
-        : Math.max(0, 2 * (root.textColumnOffset + Math.max(root.minSpectrumWidth, textColumn.width) + 6)
-            - contentRow.implicitWidth)
+    // Width floor held by the outgoing primary line while its scan
+    // transition retires: the island-media morph contract — the surface
+    // grows to fit the wider of old/new first, and only settles to the
+    // incoming width after the handback, so the pill never clips the
+    // falling ghosts by shrinking under them.
+    property real outgoingHoldWidth: 0
+    readonly property int outgoingHoldPillWidth: root.coverSize + 8 + 3 + 8
+        + Math.min(root.outgoingHoldWidth, root.maxTextWidth) + 12
 
     visible: hasMedia
-    implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12, root.spectrumFitWidth) : 0
+    implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12, root.outgoingHoldPillWidth) : 0
     // Smooth width morph like the legacy media pill: growth/shrink eases
     // instead of snapping when lyric lengths change.
     Behavior on implicitWidth {
@@ -110,9 +107,39 @@ BarPill {
         }
         const oldText = root.trackedPrimaryText
         root.trackedPrimaryText = root.primaryText
+        // Island-style width morph: hold the outgoing line's visible width
+        // until the scan transition finishes retiring its ghosts, so the
+        // pill grows first and settles afterwards instead of shrinking
+        // under the falling characters.
+        root.outgoingHoldWidth = root._cappedAdvance(oldText)
+        morphHoldTimer.restart()
         // Shared per-character contract: staggered falling ghost exit plus
         // left-to-right fade-in entrance, living in MarqueeLabel.
         titleMarquee.transitionFrom(oldText, root.primaryText)
+    }
+
+    // Measure text with the title label's own font in an independent
+    // context — the label's internal metrics must never be fed foreign
+    // text, or the live layout would briefly follow the probe.
+    TextMetrics {
+        id: morphProbe
+
+        font: titleMarquee.label.font
+    }
+
+    function _cappedAdvance(text) {
+        morphProbe.text = text
+        return Math.min(morphProbe.advanceWidth, root.maxTextWidth)
+    }
+
+    // One full scan transition: sweep across, gap, reveal, plus the ghost
+    // fall tail. Releasing exactly after this keeps the hold invisible.
+    Timer {
+        id: morphHoldTimer
+
+        interval: titleMarquee.scanSweepMs + titleMarquee.scanGapMs
+            + titleMarquee.scanRevealMs + MotionTokens.fast
+        onTriggered: root.outgoingHoldWidth = 0
     }
 
     WheelHandler {
@@ -263,19 +290,20 @@ BarPill {
         }
     }
 
-    // Spectrum backdrop — X strictly inside textColumn, Y fills the pill.
-    // No left bleed: left edge aligns exactly with text, right bleeds slightly for breathing.
+    // Spectrum band — the island-media contract: a full-width strip pinned
+    // to the pill's lower edge, fading out when cava reports idle so the
+    // resting bar stays clean. Bars grow up from the floor inset inside
+    // DockzoneSpectrum, so the band reads as an ambient base under the
+    // content row.
     Item {
-        id: spectrumBg
+        id: spectrumBand
 
-        // Left aligns exactly with textColumn to avoid exceeding text X range;
-        // floored so short titles cannot squeeze the field too narrow.
-        x: contentRow.x + textColumn.x
-        width: Math.max(root.minSpectrumWidth, textColumn.width)
-        anchors.top: parent.top
-        anchors.topMargin: 3
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 3
+        anchors.bottomMargin: 2
+        anchors.top: parent.top
+        anchors.topMargin: 10
         z: -1
         visible: root.needsSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
         clip: true
@@ -307,7 +335,7 @@ BarPill {
         target: Services.SpectrumService
 
         function onBeat() {
-            spectrumBg.triggerWave()
+            spectrumBand.triggerWave()
         }
     }
 
