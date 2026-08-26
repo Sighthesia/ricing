@@ -141,6 +141,7 @@ WlSessionLockSurface {
     }
 
 
+
     // Retreat the panel first, then fade the floor so the desktop reappears
     // through the transparent surface before the lock actually drops.
     SequentialAnimation {
@@ -187,19 +188,45 @@ WlSessionLockSurface {
         height: Math.max(0, root.height - root.barEdgeInset)
         clip: true
 
-        Repeater {
-            model: 4
-            delegate: FullscreenWave {
-                required property int index
-                anchors.fill: parent
-                progress: root.waveProgress
-                angle: Waves.waveAngle(index)
-                colour: index === 0 ? root.lockPalette.light4
-                        : index === 1 ? root.lockPalette.light3
-                        : index === 2 ? root.lockPalette.dark4
-                        : root.lockPalette.dark3
-                restOffset: -parent.height * [0.72, 0.5, 0.32, 0.16][index]
-            }
+        // Four fixed wave layers, statically declared: Repeater delegates do
+        // not render reliably inside a WlSessionLockSurface. They ride ABOVE
+        // the body (z:10) and fade out as the body settles, otherwise the
+        // opaque full-width panel would occlude them for their whole life.
+        FullscreenWave {
+            anchors.fill: parent
+            z: 10
+            opacity: 1 - root.bodyProgress
+            progress: root.waveProgress
+            angle: Waves.waveAngle(0)
+            colour: root.lockPalette.light4
+            restOffset: -parent.height * 0.72
+        }
+        FullscreenWave {
+            anchors.fill: parent
+            z: 10
+            opacity: 1 - root.bodyProgress
+            progress: root.waveProgress
+            angle: Waves.waveAngle(1)
+            colour: root.lockPalette.light3
+            restOffset: -parent.height * 0.5
+        }
+        FullscreenWave {
+            anchors.fill: parent
+            z: 10
+            opacity: 1 - root.bodyProgress
+            progress: root.waveProgress
+            angle: Waves.waveAngle(2)
+            colour: root.lockPalette.dark4
+            restOffset: -parent.height * 0.32
+        }
+        FullscreenWave {
+            anchors.fill: parent
+            z: 10
+            opacity: 1 - root.bodyProgress
+            progress: root.waveProgress
+            angle: Waves.waveAngle(3)
+            colour: root.lockPalette.dark3
+            restOffset: -parent.height * 0.16
         }
 
         // Sharp body carrying the credential UI; slides up over the waves.
