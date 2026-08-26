@@ -164,7 +164,6 @@ function createAppsAdapter(config) {
                 return
             }
             var needle = normalizeText(queryText).toLowerCase()
-            console.log("[DEBUG-rs3] appsPull values=" + values.length)
             var out = []
             for (var index = 0; index < values.length; index++) {
                 var entry = values[index]

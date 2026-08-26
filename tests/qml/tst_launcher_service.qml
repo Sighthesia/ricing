@@ -449,6 +449,35 @@ Item {
             compare(svc().results[0].id, "n")
         }
 
+        function test_reopenWithIdenticalPoolEngagesFastPath() {
+            // close() clears _pooledMode but keeps displayPool; if a
+            // fresh-open pull returns the same ids, the pooled mode marker
+            // must still be restored - otherwise every keystroke re-hits
+            // the data source and can capture mid-rescan snapshots.
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+
+            // Production toggle: close resets _pooledMode but keeps the
+            // pool; the reopen pull returns identical ids.
+            svc().close()
+            svc().open()
+            var queriesAfterReopen = apps.queries.length
+            resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0)])
+            compare(apps.queries.length, queriesAfterReopen)
+
+            svc().query = "a"
+            compare(apps.queries.length, queriesAfterReopen,
+                    "keystroke after identical reopen re-pulled the source")
+
+            svc().query = "al"
+            compare(apps.queries.length, queriesAfterReopen,
+                    "second keystroke re-pulled the source")
+            verify(svc().results.length >= 1)
+        }
+
         function test_identicalRefreshKeepsResultsIdentity() {
             // Background polls (clipboard every 5s) re-resolve with the same
             // ids; the results array must keep its identity so the surface
