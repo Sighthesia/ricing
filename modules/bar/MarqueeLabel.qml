@@ -243,6 +243,13 @@ Item {
             var revealAge = elapsed - startedAt
             var opacity = revealAge >= root.scanRevealMs
                 ? 1 : Math.max(0.08, revealAge / root.scanRevealMs)
+            ghostMetrics.text = chars.slice(0, i)
+            var charX = offsets[i]
+            var charStart = ghostMetrics.advanceWidth
+            ghostMetrics.text = chars.slice(0, i + 1)
+            var charWidth = Math.max(1, ghostMetrics.advanceWidth - charStart)
+            if (_ghostOverlaps(charX, charWidth))
+                continue
             // All revealed chars fall immediately in a light left-to-right
             // stagger. Positional pacing here would just make middle chars
             // stand frozen waiting for the wavefront — and an immediate
@@ -252,13 +259,34 @@ Item {
                 text: chars[i],
                 color: textColor,
                 font: label.font,
-                x: offsets[i],
+                x: charX,
                 y: 0,
                 opacity: opacity,
                 delay: i * 8,
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
+    }
+
+    // A rapid title switch can carry standing ghosts from the prior sweep
+    // into the same positions occupied by revealed characters. Keep one
+    // falling glyph per horizontal span so two generations cannot read as
+    // overlapping text or a doubled fall.
+    function _ghostOverlaps(x, width, ignoredGhost) {
+        var kids = overlayLayer.children
+        var right = x + Math.max(1, width)
+        for (var i = 0; i < kids.length; i++) {
+            var ghost = kids[i]
+            if (ghost === ignoredGhost)
+                continue
+            if (ghost.opacity <= 0)
+                continue
+            var overlap = Math.min(right, ghost.x + ghost.width)
+                - Math.max(x, ghost.x)
+            if (Math.abs(x - ghost.x) < 0.5 && overlap > 1)
+                return true
+        }
+        return false
     }
 
     // Standing ghosts of the interrupted sweep are debris from an older
@@ -276,7 +304,10 @@ Item {
                 continue
             var text = gh.text
             var x = gh.x
+            var width = gh.width
             gh.destroy()
+            if (_ghostOverlaps(x, width, gh))
+                continue
             lyricGhostComponent.createObject(overlayLayer, {
                 text: text,
                 color: textColor,
@@ -325,9 +356,10 @@ Item {
         var viewRight = Math.min(oldWidth, root.maxWidth)
         var fallSpan = Math.max(1, Math.max(span, viewRight))
         if (wasActive) {
-            // Debris first (snapshot excludes the collapse ghosts that the
-            // second call appends), then the positional reveal-char fall.
-            _collapseStandingGhosts()
+            // A fresh interrupt owns the outgoing layer. Previous standing
+            // ghosts belong to an older title generation; keeping them while
+            // collapsing the current sweep creates doubled falling glyphs.
+            _clearGhosts()
             _collapseRevealedChars(elapsed, fallSpan)
         } else {
             _clearGhosts()

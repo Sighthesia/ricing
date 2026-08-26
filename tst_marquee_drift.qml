@@ -30,6 +30,7 @@ Item {
     property real _maxD: 0
     property bool _deepSeen: false
     property bool _ghostSeen: false
+    property int _maxGhostCount: 0
 
     function check(labelText, actual, expected) {
         root._checks += 1
@@ -66,6 +67,9 @@ Item {
         if (root._phase === "deep-exit-ghost")
             root.check("deep-exit-ghost: old characters remain visible to fall",
                        root._ghostSeen, true)
+        if (root._phase === "rapid-interrupt")
+            root.check("rapid-interrupt: only one ghost generation remains",
+                       root._maxGhostCount <= root._label.transitionMaxChars, true)
         _label.destroy()
         _label = null
         Qt.callLater(root._phases.shift())
@@ -90,6 +94,11 @@ Item {
         running: false
         onTriggered: {
             root._elapsed += root.sampleMs
+            if (root._phase === "rapid-interrupt") {
+                var ghosts = root._label.overlay.children
+                if (ghosts.length > root._maxGhostCount)
+                    root._maxGhostCount = ghosts.length
+            }
             // Give entrance choreography time to hand back to the real label.
             if (root._elapsed < 1200)
                 return
@@ -187,13 +196,17 @@ Item {
             // 3 — interrupt an in-flight sweep with another long title.
             function () {
                 var m = root.makeLabel()
-                m.text = "Neovim — ~/.config/quickshell/afloat/modules/bar/widgets/ActiveWindow.qml"
-                m.transitionFrom("short", m.text)
+                var firstTitle = "Neovim — ~/.config/quickshell/afloat/modules/bar/widgets/ActiveWindow.qml"
+                var secondTitle = firstTitle + " [one]"
+                var oldTitle = firstTitle + " [old]"
+                m.text = firstTitle
+                m.transitionFrom(oldTitle, firstTitle)
                 var t = Qt.createQmlObject("import QtQuick; Timer { }", root)
                 t.interval = 300
                 t.triggered.connect(function () {
                     t.stop()
-                    m.transitionFrom(m.label.text, m.text + " v2")
+                    m.text = secondTitle
+                    m.transitionFrom(firstTitle, secondTitle)
                 })
                 t.start()
                 root.beginSampling("rapid-interrupt", 9000)
