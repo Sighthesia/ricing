@@ -29,6 +29,7 @@ Item {
     property real _minX: 0
     property real _maxD: 0
     property bool _deepSeen: false
+    property bool _ghostSeen: false
 
     function check(labelText, actual, expected) {
         root._checks += 1
@@ -62,6 +63,9 @@ Item {
                     "bound:", (-(boundD + 4)).toFixed(1))
         root.check(root._phase + ": label.x never exits left viewport",
                    root._minX >= -(boundD + 4), true)
+        if (root._phase === "deep-exit-ghost")
+            root.check("deep-exit-ghost: old characters remain visible to fall",
+                       root._ghostSeen, true)
         _label.destroy()
         _label = null
         Qt.callLater(root._phases.shift())
@@ -115,6 +119,17 @@ Item {
                     root._label = null
                     Qt.callLater(root._phases.shift())
                     return
+                }
+            }
+            if (root._phase === "deep-exit-ghost") {
+                var kids = root._label.overlay.children
+                for (var k = 0; k < kids.length; k++) {
+                    if (kids[k].text && kids[k].text.length === 1
+                            && kids[k].x < root._label.slot.width
+                            && kids[k].x + kids[k].width > 0) {
+                        root._ghostSeen = true
+                        break
+                    }
                 }
             }
             if (root._elapsed >= root._phaseMs)
@@ -201,7 +216,25 @@ Item {
                 t.start()
                 root.beginSampling("title-churn", 9000)
             },
-            // 5 — pacing: huge title must complete its cycle inside the cap.
+            // 5 — a deeply scrolled old title must still leave visible ghosts.
+            function () {
+                var m = root.makeLabel()
+                var oldTitle = "old-title-"
+                for (var i = 0; i < 20; i++)
+                    oldTitle += "segment-" + i + "-"
+                m.text = oldTitle
+                var t = Qt.createQmlObject("import QtQuick; Timer { }", root)
+                t.interval = 9000
+                t.triggered.connect(function () {
+                    t.stop()
+                    m.text = "new-title"
+                    m.transitionFrom(oldTitle, "new-title")
+                    root._ghostSeen = false
+                })
+                t.start()
+                root.beginSampling("deep-exit-ghost", 12000)
+            },
+            // 6 — pacing: huge title must complete its cycle inside the cap.
             function () {
                 var m = root.makeLabel()
                 var huge = ""
