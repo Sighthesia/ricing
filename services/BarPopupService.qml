@@ -23,6 +23,8 @@ QtObject {
     // Set when a widget asks for a close; the host confirms after its grace
     // window unless hover returns first.
     property bool closePending: false
+    // TEMP DEBUG: last known pointer position inside the popup window.
+    property string debugPoint: "-"
     // Suppress hover-driven re-open while another higher-priority surface
     // (for example a drag) owns the same area.
     property bool suppressHoverOpen: false

@@ -57,16 +57,20 @@ Rectangle {
         z: 99
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        width: 150; height: 30
+        width: 170; height: 46
         color: "#80000000"
         Text {
             anchors.fill: parent
             color: "#ffcc00"
-            font.pixelSize: 10
+            font.pixelSize: 9
             text: "S:" + (submenuHover.hovered ? "1" : "0")
                   + " R:" + root.debugLastRow
-                  + " T:" + root.debugLastTap
                   + " P:" + Number(root.submenuProgress).toFixed(2)
+                  + "\nXY:" + Services.BarPopupService.debugPoint
+                  + "\nSUB:" + Math.round(submenuSurface.x) + ","
+                    + Math.round(submenuSurface.y) + " "
+                    + Math.round(submenuSurface.width) + "x"
+                    + Math.round(submenuSurface.height)
         }
     }
 
