@@ -27,6 +27,65 @@ Item {
         return Qt.resolvedUrl(String(source || ""))
     }
 
+    // Pixel bounds of one section as a {left, width} pair; zero width while
+    // geometry has not been published yet.
+    function sectionBound(sectionName) {
+        var bounds = Services.BarLayoutService.sectionBounds
+        for (var index = 0; index < bounds.length; index++) {
+            if (bounds[index].name === sectionName)
+                return { left: bounds[index].left, width: bounds[index].right - bounds[index].left }
+        }
+        return { left: 0, width: 0 }
+    }
+
+    // X of the drop caret: midway between the neighbors framing the ghost
+    // insertion slot, or the section middle when it holds no widgets.
+    function dropCaretX() {
+        var service = Services.BarLayoutService
+        if (!service.isDragging || !service.ghostSection)
+            return -10
+        var bound = root.sectionBound(service.ghostSection)
+        var centers = service.widgetCentersBySection[service.ghostSection] || []
+        if (!centers.length)
+            return bound.left + bound.width / 2 - dropCaret.width / 2
+        var index = service.ghostIndex
+        if (index <= 0)
+            return centers[0].centerX - BarLayoutSections.widgetSpacing / 2 - dropCaret.width / 2
+        if (index >= centers.length)
+            return centers[centers.length - 1].centerX + BarLayoutSections.widgetSpacing / 2
+                    - dropCaret.width / 2
+        return (centers[index - 1].centerX + centers[index].centerX) / 2 - dropCaret.width / 2
+    }
+
+    // Hit-test the section rows for the loader under a bar-local point.
+    function widgetAt(x, y) {
+        var rows = [
+            { row: leftRow },
+            { row: centerRow },
+            { row: rightRow },
+        ]
+
+        for (var index = 0; index < rows.length; index++) {
+            var row = rows[index].row
+            for (var childIndex = 0; childIndex < row.children.length; childIndex++) {
+                var loader = row.children[childIndex]
+                if (!loader || !loader.item)
+                    continue
+                var pos = loader.mapToItem(root, 0, 0)
+                if (x >= pos.x && x <= pos.x + loader.width
+                        && y >= pos.y && y <= pos.y + loader.height) {
+                    return {
+                        instanceKey: loader.item.instanceKey || "",
+                        widgetId: loader.item.widgetId || "",
+                        centerX: pos.x + loader.width / 2,
+                    }
+                }
+            }
+        }
+
+        return null
+    }
+
     // Publish section bounds and widget centers for the layout service.
     function publishGeometry() {
         var bounds = []
@@ -75,6 +134,14 @@ Item {
     Connections {
         target: Services.BarLayoutService
         function onLayoutModelChanged() { root.schedulePublish() }
+        // Layout mode owns the bar surface: hover popups step aside and any
+        // open popup closes so the arrangement state starts clean.
+        function onSettingsModeChanged() {
+            var active = Services.BarLayoutService.settingsMode
+            Services.BarPopupService.suppressHoverOpen = active
+            if (active)
+                Services.BarPopupService.close()
+        }
     }
 
     component SectionRow: Row {
@@ -107,6 +174,11 @@ Item {
                     item.section = sectionRow.section
                     item.screenName = root.screenName
                 }
+
+                // The dragged widget recedes so the caret carries the intent.
+                opacity: Services.BarLayoutService.draggedInstanceKey === modelData.instanceKey
+                         ? 0.3 : 1
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
         }
     }
@@ -132,5 +204,74 @@ Item {
         section: "right"
         anchors.right: parent.right
         anchors.rightMargin: root.sidePadding
+    }
+
+    // Dockzone outlines: reveal each section frame while arranging widgets.
+    Repeater {
+        model: ["left", "center", "right"]
+
+        delegate: Rectangle {
+            required property string modelData
+
+            readonly property var bound: root.sectionBound(modelData)
+
+            x: bound.left - 6
+            y: 4
+            width: bound.width + 12
+            height: parent.height - 8
+            radius: 0
+            color: "transparent"
+            border.width: 1
+            border.color: LazerTheme.divider
+            visible: opacity > 0 && width > 12
+            opacity: Services.BarLayoutService.settingsMode ? 1 : 0
+
+            Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+        }
+    }
+
+    // Drop caret: sharp accent strip marking the slot a dragged widget
+    // will occupy; follows the ghost section/index from the layout service.
+    Rectangle {
+        id: dropCaret
+
+        visible: Services.BarLayoutService.isDragging
+        x: root.dropCaretX()
+        y: 6
+        width: 3
+        height: parent.height - 12
+        radius: 0
+        color: LazerTheme.osuGreen
+    }
+
+    // Layout-mode drag surface: grabs left-button presses over any widget
+    // and feeds the pointer's bar-local X to the layout drag state machine.
+    MouseArea {
+        anchors.fill: parent
+        z: 50
+        enabled: Services.BarLayoutService.settingsMode
+        acceptedButtons: Qt.LeftButton
+        cursorShape: Qt.DragMoveCursor
+
+        onPressed: mouse => {
+            var hit = root.widgetAt(mouse.x, mouse.y)
+            if (!hit)
+                return
+            Services.BarLayoutService.beginDrag(hit.instanceKey, hit.widgetId, mouse.x)
+        }
+        onPositionChanged: mouse => Services.BarLayoutService.updateDrag(mouse.x)
+        onReleased: Services.BarLayoutService.endDrag()
+        onCanceled: Services.BarLayoutService.cancelDrag()
+    }
+
+    // Route right clicks anywhere on the bar into the shell menu; left
+    // interactions pass through untouched because only RightButton is held.
+    MouseArea {
+        anchors.fill: parent
+        z: 60
+        acceptedButtons: Qt.RightButton
+
+        onClicked: mouse => Services.BarPopupService.open(
+            "barmenu", mouse.x, { screenName: root.screenName }, true)
     }
 }

@@ -249,6 +249,7 @@ Item {
         sourceComponent: {
             switch (root.shownKind) {
             case "tray": return trayMenuComponent
+            case "barmenu": return barContextMenuComponent
             case "volume": return volumePopupComponent
             case "brightness": return brightnessPopupComponent
             case "clock": return calendarPopupComponent
@@ -262,6 +263,21 @@ Item {
             id: trayMenuComponent
 
             BarTrayMenu { payload: root.shownPayload }
+        }
+
+        Component {
+            id: barContextMenuComponent
+
+            BarContextMenu {
+                onOpenSettingsRequested: {
+                    Services.BarPopupService.close()
+                    SettingsOverlayBridge.openRequested()
+                }
+                onLayoutModeToggled: {
+                    Services.BarPopupService.close()
+                    Services.BarLayoutService.toggleSettingsMode()
+                }
+            }
         }
 
         Component {

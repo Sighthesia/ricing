@@ -7,8 +7,8 @@ import QtQuick
 QtObject {
     id: root
 
-    // Which popup kind is currently shown: "tray", "volume", "brightness",
-    // "clock", "media", or "notifications". Empty while closed.
+    // Which popup kind is currently shown: "tray", "barmenu", "volume",
+    // "brightness", "clock", "media", or "notifications". Empty while closed.
     property string kind: ""
     // Whether the popup surface should currently be shown.
     readonly property bool visible: kind !== ""
@@ -29,9 +29,11 @@ QtObject {
 
     // Open (or re-anchor) the popup for one kind. Idempotent: re-hovering
     // the same already-open payload only refreshes the anchor, so jitter at
-    // the widget edge does not re-trigger the open animation.
-    function open(popupKind, x, popupPayload) {
-        if (suppressHoverOpen)
+    // the widget edge does not re-trigger the open animation. `force`
+    // bypasses hover suppression so explicit intents (right-click menu)
+    // stay reachable while hover popups are suppressed in layout mode.
+    function open(popupKind, x, popupPayload, force) {
+        if (suppressHoverOpen && !force)
             return
         if (kind === popupKind && visible && payload === popupPayload) {
             anchorX = x
