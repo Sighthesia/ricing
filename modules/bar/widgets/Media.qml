@@ -290,20 +290,19 @@ BarPill {
         }
     }
 
-    // Spectrum band — the island-media contract: a full-width strip pinned
-    // to the pill's lower edge, fading out when cava reports idle so the
-    // resting bar stays clean. Bars grow up from the floor inset inside
-    // DockzoneSpectrum, so the band reads as an ambient base under the
-    // content row.
+    // Spectrum backdrop — confined to the lyrics range: left edge aligns
+    // exactly with the text column, width tracks it, so the bar field can
+    // never reach outside the words it visualizes. Fades out when cava
+    // reports idle so the resting pill stays clean.
     Item {
         id: spectrumBand
 
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 2
+        x: contentRow.x + textColumn.x
+        width: textColumn.width
         anchors.top: parent.top
-        anchors.topMargin: 10
+        anchors.topMargin: 3
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 3
         z: -1
         visible: root.needsSpectrum && width > 0 && height > 0 && (opacity > 0.01 || !Services.SpectrumService.isIdle)
         clip: true
