@@ -542,7 +542,12 @@ Item {
         // The decoded path lands asynchronously; mirror it onto the image
         // imperatively because a declarative source binding does not track
         // this property reliably under the qs engine.
-        onPaneThumbSourceChanged: paneImage.source = paneThumbSource
+        onPaneThumbSourceChanged: {
+            // Guard identical writes: with cache:false a redundant assign
+            // restarts the async load and can starve Image.Ready.
+            if (paneImage.source !== paneThumbSource)
+                paneImage.source = paneThumbSource
+        }
         Component.onCompleted: paneImage.source = paneThumbSource
         readonly property string paneThumbSource: {
             var r = selectedResult
