@@ -149,7 +149,8 @@ Rectangle {
         interval: 120
         onTriggered: {
             if (Services.BarPopupService.closePending && !submenuHover.hovered)
-                root.closeSubmenu("pending-timeout hovered=" + submenuHover.hovered)
+                root.closeSubmenu("pending-timeout hovered=" + submenuHover.hovered
+                                  + " P=" + Number(root.submenuProgress).toFixed(2))
         }
     }
 
@@ -573,7 +574,8 @@ Rectangle {
             enabled: !entryRow.isSeparator
             onHoveredChanged: {
                 console.debug("[SUBDBG] row L" + entryRow.level + " hovered=" + hovered
-                              + " text=" + (entryRow.entry ? String(entryRow.entry.text || "") : ""))
+                              + " text=" + (entryRow.entry ? String(entryRow.entry.text || "") : "")
+                              + " P=" + Number(root.submenuProgress).toFixed(2))
                 if (hovered)
                     root.debugLastRow = entryRow.level + ":" + String(entryRow.entry ? entryRow.entry.text || "?" : "?").slice(0, 6)
                 if (!hovered || !entryRow.entryEnabled)
