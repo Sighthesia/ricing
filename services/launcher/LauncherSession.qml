@@ -173,6 +173,15 @@ QtObject {
         // not reassign results or the surface replays its refill animation.
         root.results = LauncherLogic.poolMatches(previous, filtered)
                 ? previous : filtered
+        if (pooledMode === "apps")
+            console.log("[DEBUG-rs3] commit mode=" + pooledMode
+                        + " pool=" + root.displayPool.length
+                        + " results=" + root.results.length
+                        + " q='" + requestText + "'"
+                        + (root.results.length === 0 && requestText.length > 0
+                           ? " POOLHIT=" + LauncherLogic.poolMatches(root.displayPool, [])
+                             + " sampleIds=" + root.displayPool.slice(0, 5).map(function (r) { return r.id }).join(",")
+                           : ""))
     }
 
     function selectNext() {
