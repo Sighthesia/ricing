@@ -77,9 +77,24 @@ Rectangle {
     property var submenuEntry: null
     property Item submenuAnchorRow: null
 
+    // Vertical lock: DBusMenu layout churn (AboutToShow pings, refetches)
+    // makes dockedY's inputs wobble a few px at random moments; following
+    // them slides the settled panel out from under a stationary pointer,
+    // which reads as the submenu refusing to be hovered. The frame is
+    // captured once per open/retarget and held until the anchor row
+    // actually changes.
+    property bool yLocked: false
+
     function openSubmenu(entry, row) {
-        if (row)
+        var retarget = row && row !== root.submenuAnchorRow
+        if (retarget) {
             root.submenuAnchorRow = row
+            root.yLocked = false
+        } else if (!root.yLocked) {
+            root.submenuAnchorRow = row || root.submenuAnchorRow
+            submenuSurface.frozenY = submenuSurface.dockedY
+            root.yLocked = true
+        }
         // The entry is kept set through a retract, so re-hovering the same
         // row mid-fold must still flip the phase back to opening.
         root.submenuEntry = entry
@@ -181,6 +196,9 @@ Rectangle {
                 root.submenuEntry = null
                 root.submenuAnchorRow = null
                 submenuSurface.heldHeight = 0
+            } else if (!root.yLocked && root.submenuAnchorRow) {
+                submenuSurface.frozenY = submenuSurface.dockedY
+                root.yLocked = true
             }
         }
     }
@@ -287,7 +305,9 @@ Rectangle {
                     root.height - submenuSurface.submenuNaturalHeight - 8))
         }
         onDockedXChanged: frozenX = dockedX
-        onDockedYChanged: frozenY = dockedY
+        // While the vertical frame is locked, churn in dockedY's inputs
+        // must not drag the settled panel around under the pointer.
+        onDockedYChanged: if (!root.yLocked) frozenY = dockedY
         // Morphs glide whenever the surface is at all visible — moving
         // between submenus usually passes over plain rows, which folds the
         // panel into "closing" before the next row re-opens it as
@@ -320,7 +340,7 @@ Rectangle {
         property real frozenOriginY: 20
         onAnchorCenterYInSurfaceChanged: frozenOriginY = anchorCenterYInSurface
         x: dockedX
-        y: dockedY
+        y: root.yLocked ? frozenY : dockedY
 
         // Deform from the row's near edge outward, mirroring the host
         // popup: born fully under the menu face and sliding its own
