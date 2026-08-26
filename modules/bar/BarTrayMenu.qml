@@ -35,7 +35,11 @@ Rectangle {
     onEntriesChanged: {
         if (entries.length > 0)
             settledHeight = naturalHeight
-        closeSubmenu()
+        // Deliberately NOT folding here: hovering anything makes quickshell
+        // ping AboutToShow/refetch the layout, which rebuilds this array
+        // even when nothing visibly changed — folding on that collapsed the
+        // submenu mid-traversal, seemingly at random. Genuine payload
+        // swaps fold through onPayloadChanged below.
     }
     onPayloadChanged: closeSubmenu()
     width: implicitWidth
