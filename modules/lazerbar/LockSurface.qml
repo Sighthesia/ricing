@@ -182,6 +182,8 @@ WlSessionLockSurface {
     Rectangle {
         id: securityFloor
         anchors.fill: parent
+        // Keep the protocol-safe floor behind the animated lock content.
+        z: -1
         // Keep the protocol-safe first frame in the same visual family as the sweep.
         color: root.lockPalette.light4
     }
@@ -198,10 +200,7 @@ WlSessionLockSurface {
     // Full-width wave-panel viewport docked against the bar edge.
     Item {
         id: clippedViewport
-        x: 0
-        width: root.width
-        y: root.barOnTop ? root.barEdgeInset : 0
-        height: Math.max(0, root.height - root.barEdgeInset)
+        anchors.fill: parent
         clip: true
 
         // Four fixed wave layers, statically declared: Repeater delegates do
