@@ -23,6 +23,8 @@ description: 修改 Afloat 的托盘菜单（BarTrayMenu）、二级子菜单面
 
 生命周期用显式函数驱动：`openSubmenu(entry,row)` / `closeSubmenu()`，不要依赖 property change handler（重悬停同一行时属性不变、无法翻回 opening）。
 
+**共享行组件的规则必须按层级作用域化**：`MenuEntryRow` 同时服务两级菜单，"悬停普通行折叠当前子菜单"的规则若不限定 `level === 1`，指针一进入子菜单内部的任何条目就会把面板自己杀掉（症状：二级菜单"不会停留、直接消失"，且探针测不出来——无头环境没有真实 hover）。子菜单行标记 `level: 2`，折叠分支只对根级行生效。
+
 ## 跨面板流转
 
 - x/y/height 的 Behavior 门控条件是 **`submenuProgress > 0`（可见即可滑），不是 phase**。行间移动几乎总会扫过普通行触发折叠（closing）再重开（opening），按相位门控必然瞬移。
