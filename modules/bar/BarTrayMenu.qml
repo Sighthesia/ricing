@@ -135,39 +135,18 @@ Rectangle {
     // Submenu lifecycle is driven by openSubmenu()/closeSubmenu(); the
     // entry and anchor are only released once the retract has finished.
 
-    // The popup can leave without anyone hovering a plain row — the
-    // pointer exits toward the bar and the widget asks for a close. Fold
-    // the submenu at the close *intent* so the retract plays inside the
-    // host's grace window instead of riding out fully open behind the
-    // bar. The fold is armed on a short delay: crossing the menu/submenu
-    // corridor also produces a transient leave→pending, and folding at
-    // once killed the panel mid-traversal before the pointer ever landed.
-    // Canceling the close disarms it.
-    Timer {
-        id: pendingFoldTimer
-
-        interval: 120
-        onTriggered: {
-            if (Services.BarPopupService.closePending && !submenuHover.hovered)
-                root.closeSubmenu("pending-timeout hovered=" + submenuHover.hovered
-                                  + " P=" + Number(root.submenuProgress).toFixed(2))
-        }
-    }
-
+    // Fold when the service actually closes. Folding at the mere close
+    // *intent* proved unfixable in practice: transient leaves from normal
+    // traversal set closePending while the pointer is still en route, and
+    // every guard against that raced real departures. With both levels
+    // now exiting at slow(240ms) inOut, folding here reads as one
+    // synchronized collapse instead of a sliver.
     Connections {
         target: Services.BarPopupService
 
-        function onClosePendingChanged() {
-            if (Services.BarPopupService.closePending)
-                pendingFoldTimer.restart()
-            else
-                pendingFoldTimer.stop()
-        }
         function onVisibleChanged() {
-            if (!Services.BarPopupService.visible) {
-                pendingFoldTimer.stop()
+            if (!Services.BarPopupService.visible)
                 root.closeSubmenu("svc-invisible")
-            }
         }
     }
 
