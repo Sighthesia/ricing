@@ -101,7 +101,12 @@ Rectangle {
         if (root.submenuPhase === "opening" || root.submenuPhase === "open")
             return
         root.submenuPhase = "opening"
-        _startSubmenuAnimation(1, MotionTokens.outSoft, MotionTokens.settingsSlide)
+        // Menus are interaction surfaces, not showcase panels: the reveal
+        // is a quick 160ms flick so the pointer's landing zone stops
+        // moving almost immediately. A 600ms slide left a narrow moving
+        // strip beside the menu for most of a second — approaching it
+        // meant falling through onto root rows instead of the panel.
+        _startSubmenuAnimation(1, MotionTokens.outSoft, MotionTokens.medium)
     }
 
     function closeSubmenu(reason) {
