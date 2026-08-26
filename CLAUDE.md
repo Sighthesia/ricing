@@ -12,3 +12,5 @@ Load these for detailed context on specific topics:
 | [lazer-settings-surface-details](.agents/skills/lazer-settings-surface-details/SKILL.md) | When modifying the lazer settings panel, settings rows, reset-default button, category blocks, search strip, or their hover/press/motion behavior. Preserves verified geometry, z-order, input isolation, and slide transition contracts. |
 | [visual-transition-rules](.agents/skills/visual-transition-rules/SKILL.md) | When adjusting QML visual styles, colors, radii, opacity, blur, shadows, spacing, scale, or related presentation variables. |
 | [qml-testing](.agents/skills/qml-testing/SKILL.md) | Running or writing tests. `qs -p` does not run QtTest; use the Qt6 qmltestrunner for logic tests and root-level harnesses for singleton services. |
+| [active-window-live-sync](.agents/skills/active-window-live-sync/SKILL.md) | Active-window title or app identity stops updating after Niri focus, workspace, or event-stream changes. |
+| [marquee-exit-ghosts](.agents/skills/marquee-exit-ghosts/SKILL.md) | Modifying marquee scrolling or diagnosing long titles whose old characters disappear instead of falling during a switch. |

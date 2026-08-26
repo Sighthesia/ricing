@@ -10,6 +10,9 @@ Singleton {
 
     property ListModel workspaces: ListModel {}
     property ListModel windows: ListModel {}
+    // ListModel role changes do not reliably invalidate bindings that scan
+    // `get()` rows, so expose an explicit revision for derived focus state.
+    property int _windowsRevision: 0
     signal workspacesUpdated()
     signal workspaceActivated()
     signal windowsUpdated()
@@ -27,6 +30,7 @@ Singleton {
 
     // Find focused window title
     readonly property string activeTitle: {
+        const revision = root._windowsRevision
         for (let i = 0; i < windows.count; i++) {
             let win = windows.get(i)
             if (win.isFocused) return win.title
@@ -35,6 +39,7 @@ Singleton {
     }
 
     readonly property string activeAppId: {
+        const revision = root._windowsRevision
         for (let i = 0; i < windows.count; i++) {
             let win = windows.get(i)
             if (win.isFocused) return win.appId
@@ -149,6 +154,9 @@ Singleton {
     }
 
     function updateWindows(windowListArray) {
+        if (windowListArray && !Array.isArray(windowListArray)
+                && windowListArray.WindowsChanged)
+            windowListArray = windowListArray.WindowsChanged.windows
         if (!windowListArray) return
         windows.clear()
         for (let i = 0; i < windowListArray.length; i++) {
@@ -165,6 +173,7 @@ Singleton {
                 rowIdx: pos ? pos[1] : 9999
             })
         }
+        root._windowsRevision++
         windowsUpdated()
     }
 
@@ -227,6 +236,7 @@ Singleton {
                 workspaces.setProperty(i, "isActive", isNowActive)
         }
         workspaceActivated()
+        root.reloadWindows()
     }
 
     // Initial fetch
@@ -268,6 +278,7 @@ Singleton {
             if (windows.get(i).isFocused !== isNow)
                 windows.setProperty(i, "isFocused", isNow)
         }
+        root._windowsRevision++
         windowsUpdated()
     }
 
@@ -286,6 +297,8 @@ Singleton {
                         root.activateWorkspace(event.WorkspaceActivated)
                     else if (event.WindowFocusChanged)
                         root.setFocusedWindow(event.WindowFocusChanged.id)
+                    else if (event.WindowsChanged)
+                        root.updateWindows(event.WindowsChanged.windows)
                     else if (event.WindowOpenedOrChanged || event.WindowClosed)
                         root.reloadWindows()
                 } catch (e) {}

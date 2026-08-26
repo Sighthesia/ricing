@@ -61,6 +61,8 @@ Load these for detailed context on specific topics:
 | [per-frame-surface-resize-jank](.agents/skills/per-frame-surface-resize-jank/SKILL.md) | Expand/collapse stutters because per-frame size hits an expensive commit boundary. Fix: fixed outer surface, animate clipped inner content. |
 | [reveal-before-clip](.agents/skills/reveal-before-clip/SKILL.md) | Content inside an expanding surface overflows during grow/shrink. Drive reveal from host progress before clip masks. |
 | [browser-media-metadata-fallback](.agents/skills/browser-media-metadata-fallback/SKILL.md) | Web-player (Firefox/Chrome) MPRIS metadata is incomplete, delayed, or churns; lyrics/artwork flicker or vanish. |
+| [active-window-live-sync](.agents/skills/active-window-live-sync/SKILL.md) | Active-window title or app identity stops updating after Niri focus, workspace, or event-stream changes. |
+| [marquee-exit-ghosts](.agents/skills/marquee-exit-ghosts/SKILL.md) | Modifying marquee scrolling or diagnosing long titles whose old characters disappear instead of falling during a switch. |
 | [first-batch-cold-path-prewarm](.agents/skills/first-batch-cold-path-prewarm/SKILL.md) | Search/picker/results list stutters only on the first large match or open, smooth afterwards. |
 | [submenu-surface-motion](.agents/skills/submenu-surface-motion/SKILL.md) | Tray menu (BarTrayMenu), submenu panels, or popup deform/retract/morph motion. Preserves occlusion-based reveal, ease-in retract with data retention, visibility-gated morphs. |
 | [qml-testing](.agents/skills/qml-testing/SKILL.md) | Running or writing tests. `qs -p` does not run QtTest; use the Qt6 qmltestrunner for logic tests and root-level harnesses for services. |
