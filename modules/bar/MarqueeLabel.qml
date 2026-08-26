@@ -221,8 +221,11 @@ Item {
     // old characters over the next transition.
     function _clearGhosts() {
         var kids = overlayLayer.children
-        for (var i = kids.length - 1; i >= 0; i--)
+        for (var i = kids.length - 1; i >= 0; i--) {
+            kids[i].visible = false
+            kids[i].opacity = 0
             kids[i].destroy()
+        }
     }
 
     // A sweep interrupted mid-reveal: the already-revealed chars fall on
@@ -334,7 +337,6 @@ Item {
         if (MotionTokens.reducedMotion || oldText === "" || oldText === newText)
             return
         var wasActive = root._sweepActive
-        var elapsed = wasActive ? Date.now() - root._sweepStart : 0
         root._sweepActive = false
         // Pace both wavefronts over the incoming title's VISIBLE width:
         // the scan always crosses what can be seen in one sweep duration,
@@ -355,14 +357,20 @@ Item {
         // fast rush through the orphaned tail.
         var viewRight = Math.min(oldWidth, root.maxWidth)
         var fallSpan = Math.max(1, Math.max(span, viewRight))
+        // Capture the outgoing viewport before clearing an interrupted sweep.
+        // The old title must still fall even when the previous incoming scan
+        // had not revealed a character yet.
+        var scrollX = label.x !== 0
+            ? Math.min(0, label.x)
+            : (root._scrollActive ? Math.min(0, root._preservedScrollX) : 0)
         if (wasActive) {
-            // A fresh interrupt owns the outgoing layer. Previous standing
-            // ghosts belong to an older title generation; keeping them while
-            // collapsing the current sweep creates doubled falling glyphs.
+            // A fresh interrupt owns the outgoing layer. Previous ghosts
+            // belong to an older title generation and must not be retained.
             _clearGhosts()
-            _collapseRevealedChars(elapsed, fallSpan)
+            spawnGhosts(oldText, fallSpan, scrollX, viewRight)
         } else {
             _clearGhosts()
+            spawnGhosts(oldText, fallSpan, scrollX, viewRight)
         }
         _stopSweepRow()
         root._sweepActive = true
@@ -371,12 +379,7 @@ Item {
         // label is still scrolled); if syncScroll already zeroed it, fall
         // back to the offset preserved at that moment. The visible width is
         // the old text clipped to the label's cap.
-        var scrollX = label.x !== 0
-            ? Math.min(0, label.x)
-            : (root._scrollActive ? Math.min(0, root._preservedScrollX) : 0)
         root._scrollActive = false
-        if (!wasActive)
-            spawnGhosts(oldText, fallSpan, scrollX, viewRight)
         label.opacity = 0
         label.x = 0
         var offsets = _charOffsets(newText)

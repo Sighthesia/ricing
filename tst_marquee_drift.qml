@@ -96,8 +96,13 @@ Item {
             root._elapsed += root.sampleMs
             if (root._phase === "rapid-interrupt") {
                 var ghosts = root._label.overlay.children
-                if (ghosts.length > root._maxGhostCount)
-                    root._maxGhostCount = ghosts.length
+                var activeGhosts = 0
+                for (var ghostIndex = 0; ghostIndex < ghosts.length; ghostIndex++) {
+                    if (ghosts[ghostIndex].visible && ghosts[ghostIndex].opacity > 0)
+                        activeGhosts++
+                }
+                if (activeGhosts > root._maxGhostCount)
+                    root._maxGhostCount = activeGhosts
             }
             // Give entrance choreography time to hand back to the real label.
             if (root._elapsed < 1200)
