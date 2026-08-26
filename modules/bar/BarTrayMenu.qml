@@ -336,6 +336,8 @@ Rectangle {
                 model: [...submenuOpener.children.values]
 
                 delegate: MenuEntryRow {
+                    level: 2
+
                     onTriggered: {
                         root.closeSubmenu()
                         Services.BarPopupService.close()
@@ -383,6 +385,10 @@ Rectangle {
         readonly property bool isSeparator: entry ? (entry.isSeparator ?? false) : false
         readonly property bool entryEnabled: entry ? (entry.enabled ?? true) : false
         readonly property bool hasChildren: entry ? (entry.hasChildren ?? false) : false
+        // 1 = root menu row, 2 = submenu row. The fold-on-plain-hover rule
+        // only makes sense at the root level; applied inside the submenu it
+        // killed the panel the moment the pointer reached any of its rows.
+        property int level: 1
         readonly property int buttonType: entry ? (entry.buttonType ?? QsMenuButtonType.None) : QsMenuButtonType.None
         readonly property bool checked: entry ? entry.checkState === Qt.Checked : false
         readonly property bool showsIndicator: buttonType !== QsMenuButtonType.None
@@ -504,9 +510,11 @@ Rectangle {
             }
         }
 
-        // Auto-expand on hover: hovering a child row opens its panel at
-        // once; hovering any plain row folds the open one, matching native
-        // menu traversal. No click required anywhere in the flow.
+        // Auto-expand on hover: hovering a root child row opens its panel
+        // at once; hovering a root plain row folds the open one, matching
+        // native menu traversal. Submenu rows (level 2) never fold — their
+        // hover is just highlight, otherwise the panel would die the
+        // moment the pointer reached into it.
         HoverHandler {
             id: entryHover
 
@@ -518,7 +526,7 @@ Rectangle {
                     entryRow.openSubmenu(entryRow.entry, entryRow)
                     return
                 }
-                if (root.submenuAnchorRow)
+                if (entryRow.level === 1 && root.submenuAnchorRow)
                     root.closeSubmenu()
             }
         }
