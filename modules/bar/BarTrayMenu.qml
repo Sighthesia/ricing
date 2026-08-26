@@ -137,21 +137,36 @@ Rectangle {
 
     // The popup can leave without anyone hovering a plain row — the
     // pointer exits toward the bar and the widget asks for a close. Fold
-    // the submenu at the close *intent* (the host's grace window then
-    // covers the retract) so the exit motion actually plays instead of
-    // riding out fully open behind the bar. If the pointer already sits
-    // on the submenu, the intent is a traversal race, not a departure —
-    // leave it open and let cancelClose win.
+    // the submenu at the close *intent* so the retract plays inside the
+    // host's grace window instead of riding out fully open behind the
+    // bar. The fold is armed on a short delay: crossing the menu/submenu
+    // corridor also produces a transient leave→pending, and folding at
+    // once killed the panel mid-traversal before the pointer ever landed.
+    // Canceling the close disarms it.
+    Timer {
+        id: pendingFoldTimer
+
+        interval: 120
+        onTriggered: {
+            if (Services.BarPopupService.closePending && !submenuHover.hovered)
+                root.closeSubmenu("pending-timeout hovered=" + submenuHover.hovered)
+        }
+    }
+
     Connections {
         target: Services.BarPopupService
 
         function onClosePendingChanged() {
-            if (Services.BarPopupService.closePending && !submenuHover.hovered)
-                root.closeSubmenu("pending hovered=" + submenuHover.hovered)
+            if (Services.BarPopupService.closePending)
+                pendingFoldTimer.restart()
+            else
+                pendingFoldTimer.stop()
         }
         function onVisibleChanged() {
-            if (!Services.BarPopupService.visible)
+            if (!Services.BarPopupService.visible) {
+                pendingFoldTimer.stop()
                 root.closeSubmenu("svc-invisible")
+            }
         }
     }
 
