@@ -20,6 +20,8 @@ Singleton {
     property string buffer: ""
     // True between a submit and the PAM completion.
     property bool unlockInProgress: false
+    // Prevent multiple per-screen surfaces from releasing one session twice.
+    property bool unlockFinished: false
     // Last failure feedback state: none | failed | maxTries | error.
     property string failureState: "none"
 
@@ -57,8 +59,10 @@ Singleton {
     }
 
     function lock() {
-        if (!locked)
+        if (!locked) {
+            unlockFinished = false
             locked = true
+        }
     }
 
     // Route one key event through the pure buffer contracts. Surfaces with a
@@ -95,6 +99,9 @@ Singleton {
 
     // Called by the surface after the unlock exit animation finishes.
     function finishUnlock() {
+        if (!locked || unlockFinished)
+            return
+        unlockFinished = true
         unlockInProgress = false
         buffer = ""
         failureState = "none"
