@@ -385,7 +385,6 @@ Rectangle {
                 if (!hovered && root.submenuPhase === "open") root.closeSubmenu()
             }
         }
-        }
     }
 
     // Opaque face redrawn over the submenu: the submenu (z 1) paints above
