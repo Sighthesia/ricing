@@ -41,7 +41,7 @@ Rectangle {
         // submenu mid-traversal, seemingly at random. Genuine payload
         // swaps fold through onPayloadChanged below.
     }
-    onPayloadChanged: closeSubmenu()
+    onPayloadChanged: closeSubmenu("payload")
     width: implicitWidth
     height: implicitHeight
     radius: 10
@@ -89,7 +89,9 @@ Rectangle {
         _startSubmenuAnimation(1, MotionTokens.outSoft, MotionTokens.settingsSlide)
     }
 
-    function closeSubmenu() {
+    function closeSubmenu(reason) {
+        console.debug("[SUBDBG] fold reason=" + (reason || "unknown")
+                      + " phase=" + root.submenuPhase)
         if (root.submenuPhase === "closed" || root.submenuPhase === "closing")
             return
         root.submenuPhase = "closing"
@@ -145,11 +147,11 @@ Rectangle {
 
         function onClosePendingChanged() {
             if (Services.BarPopupService.closePending && !submenuHover.hovered)
-                root.closeSubmenu()
+                root.closeSubmenu("pending hovered=" + submenuHover.hovered)
         }
         function onVisibleChanged() {
             if (!Services.BarPopupService.visible)
-                root.closeSubmenu()
+                root.closeSubmenu("svc-invisible")
         }
     }
 
@@ -217,9 +219,9 @@ Rectangle {
 
                 delegate: MenuEntryRow {
                     onOpenSubmenu: (entry, row) => root.openSubmenu(entry, row)
-                    onCloseSubmenu: root.closeSubmenu()
+                    onCloseSubmenu: root.closeSubmenu("row-signal")
                     onTriggered: {
-                        root.closeSubmenu()
+                        root.closeSubmenu("triggered")
                         Services.BarPopupService.close()
                     }
                 }
@@ -364,7 +366,7 @@ Rectangle {
                     level: 2
 
                     onTriggered: {
-                        root.closeSubmenu()
+                        root.closeSubmenu("triggered")
                         Services.BarPopupService.close()
                     }
                 }
@@ -382,7 +384,7 @@ Rectangle {
             onHoveredChanged: {
                 console.debug("[SUBDBG] surface hovered=" + hovered
                               + " phase=" + root.submenuPhase)
-                if (!hovered && root.submenuPhase === "open") root.closeSubmenu()
+                if (!hovered && root.submenuPhase === "open") root.closeSubmenu("surface-unhover")
             }
         }
     }
@@ -565,8 +567,11 @@ Rectangle {
                     entryRow.openSubmenu(entryRow.entry, entryRow)
                     return
                 }
-                if (entryRow.level === 1 && root.submenuAnchorRow)
-                    root.closeSubmenu()
+                if (entryRow.level === 1 && root.submenuAnchorRow) {
+                    console.debug("[SUBDBG] row-fold L1 text="
+                                  + String(entryRow.entry ? entryRow.entry.text || "" : ""))
+                    root.closeSubmenu("plain-row-hover L1")
+                }
             }
         }
     }
