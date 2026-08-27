@@ -8,8 +8,8 @@ LazerSplitSurface {
     property string title: ""
     property string iconSource: ""
     property string extraText: ""
-    readonly property alias contentItem: contentSurfaceItem
-    readonly property alias headerCard: headerSurfaceItem
+    readonly property Item contentItem: root.contentSurfaceItem
+    readonly property Item headerCard: root.headerSurfaceItem
 
     implicitWidth: Math.max(headerRow.implicitWidth + 32, contentSurfaceItem.implicitWidth + 24)
     implicitHeight: headerSurfaceItem.height + dividerItem.height + contentSurfaceItem.implicitHeight
