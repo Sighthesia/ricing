@@ -72,6 +72,15 @@ Item {
             compare(surface.contentSurfaceItem.opacity, 1)
         }
 
+        function test_surfaceMotionTravelsTowardTheDivider() {
+            surface.revealProgress = 0
+            verify(surface.headerSurfaceItem.transform[0].y < 0)
+            verify(surface.contentSurfaceItem.transform[0].y > 0)
+            surface.revealProgress = 1
+            compare(surface.headerSurfaceItem.transform[0].y, 0)
+            compare(surface.contentSurfaceItem.transform[0].y, 0)
+        }
+
         function test_contentProgressStartsAfterDelay() {
             var total = Lazer.MotionTokens.settingsSidebarFade + Lazer.MotionTokens.settingsContentDelay
             var delay = Lazer.MotionTokens.settingsContentDelay

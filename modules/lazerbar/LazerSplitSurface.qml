@@ -77,6 +77,6 @@ Item {
         opacity: 1
         // Keep non-visual QObjects such as QsMenuOpener alive while revealing.
         enabled: root.interactive
-        transform: Translate { y: -PopupMotion.offset(root.contentProgress, 14) }
+        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
     }
 }
