@@ -102,8 +102,8 @@ Rectangle {
     implicitHeight: Math.max(240, availHeight - 8)
     radius: 0
     color: LazerTheme.settingsPanel
-    border.width: 1
-    border.color: LazerTheme.popupBorder
+    // Settings-panel surfaces are separated by tonal blocks, not outlines.
+    border.width: 0
     clip: true
 
     // ── Top header: bar-proximal layer naming the selected component ──

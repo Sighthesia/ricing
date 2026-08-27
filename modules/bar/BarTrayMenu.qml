@@ -64,8 +64,8 @@ Rectangle {
     height: implicitHeight
     radius: 0
     color: LazerTheme.settingsPanel
-    border.width: 1
-    border.color: LazerTheme.popupBorder
+    // Match the settings panel's unframed surface hierarchy.
+    border.width: 0
     clip: true
 
     // -- Header layer (settingsRail) --
@@ -320,8 +320,7 @@ Rectangle {
         opacity: 1
         radius: 0
         color: LazerTheme.settingsPanel
-        border.width: 1
-        border.color: LazerTheme.popupBorder
+        border.width: 0
         clip: true
 
         width: root.menuWidth
@@ -505,8 +504,7 @@ Rectangle {
         anchors.fill: parent
         radius: root.radius
         color: root.color
-        border.width: root.border.width
-        border.color: LazerTheme.popupBorder
+        border.width: 0
     }
 
     // One DBus menu entry: separator hairline or an actionable lazer row.

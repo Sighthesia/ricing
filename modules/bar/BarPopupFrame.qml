@@ -17,8 +17,8 @@ Rectangle {
 
     radius: 0
     color: LazerTheme.settingsPanel
-    border.width: 1
-    border.color: LazerTheme.popupBorder
+    // The settings panel uses color blocks for structure, not a popup outline.
+    border.width: 0
     clip: true
 
     // Implicit size follows the content plus the two-layer chrome.
