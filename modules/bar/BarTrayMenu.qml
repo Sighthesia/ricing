@@ -32,6 +32,15 @@ Rectangle {
     readonly property int naturalHeight: Math.min(maxHeight, contentFlickable.contentHeight)
     implicitHeight: entries.length > 0 || settledHeight === 0
                     ? naturalHeight : Math.max(settledHeight, naturalHeight)
+    // Layout churn (entries rebuilt on every AboutToShow ping) makes
+    // contentHeight collapse for a frame before repopulating; an raw snap
+    // to that dip punched a hole in the window's input mask under a
+    // stationary pointer — the compositor delivered a leave and the whole
+    // popup went dead. Riding transients over fast smoothing means the
+    // region never actually excludes the pointer.
+    Behavior on implicitHeight {
+        NumberAnimation { duration: MotionTokens.fast }
+    }
     onEntriesChanged: {
         if (entries.length > 0)
             settledHeight = naturalHeight
