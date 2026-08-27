@@ -72,13 +72,12 @@ Item {
         text: root.text
     }
 
-    // One-way marquee leg time: linear with overflow up to a cap. The cap
-    // keeps very long titles from crawling left for tens of seconds —
-    // past ~8s the traversal reads as drift instead of motion.
-    readonly property int maxScrollLegMs: 8000
+    // One-way marquee leg time: linear with overflow at constant speed.
+    // No cap — every marquee travels at the same px/s so long titles are
+    // not accelerated relative to short ones.
     function marqueeLegDuration() {
         var overflow = Math.max(0, metrics.advanceWidth - clipSlot.width)
-        return Math.max(2000, Math.min(root.maxScrollLegMs, overflow * 18))
+        return Math.max(2000, overflow * 18)
     }
 
     // Marquee is sync-driven: every input change (text, reveal opacity, slot
@@ -138,10 +137,7 @@ Item {
             property: "x"
             from: 0
             to: -(metrics.advanceWidth - clipSlot.width)
-            // One-way leg time grows with overflow but stays capped: an
-            // unclamped linear pace sends very long titles crawling left
-            // for half a minute, which reads as the title drifting out of
-            // view and never coming back.
+            // One-way leg time at constant px/s.
             duration: marqueeLegDuration()
             easing.type: Easing.Linear
         }

@@ -8,9 +8,8 @@ import "./modules/bar"
 //  1..4 — after switches/interrupts/morphs/churn, label.x must stay inside
 //         [-(overflow), 0]; drifting past -(overflow) means the text fully
 //         exits the left viewport (the reported bug).
-//  5    — pacing: a huge title must finish its full out-and-back cycle
-//         quickly; an unclamped linear pace once crawled left for ~40s,
-//         reading as the title drifting away and never coming back.
+//  5    — pacing: with constant px/s the huge title's leg is linear
+//         (overflow*18). No cap — long titles are not accelerated.
 //
 // Run from repo root: qs -p tst_marquee_drift.qml
 Item {
@@ -269,17 +268,21 @@ Item {
                 t.start()
                 root.beginSampling("deep-exit-ghost", 12000)
             },
-            // 6 — pacing: huge title must complete its cycle inside the cap.
+            // 6 — pacing: huge title at constant speed must NOT be capped.
             function () {
                 var m = root.makeLabel()
                 var huge = ""
                 for (var i = 0; i < 200; i++)
                     huge += "word "
                 m.text = huge
-                root._deepSeen = false
-                root._cycleElapsed = 0
-                cycleClock.start()
-                root.beginSampling("pacing-full-cycle", 120000)
+                // Constant speed: leg duration must equal overflow*18, no 8s cap.
+                var overflow = Math.max(0, m.label.width - m.slot.width)
+                var expected = Math.max(2000, overflow * 18)
+                var actual = m.marqueeLegDuration()
+                console.log("[pacing] overflow", overflow, "expected", expected, "actual", actual)
+                root.check("pacing-constant-speed: leg duration is linear (no cap)", actual, expected)
+                // Still bounded: never exits viewport.
+                root.beginSampling("pacing-bounded", 8000)
             },
             function () {
                 console.log("Totals:", root._checks - root._failures, "passed,",
