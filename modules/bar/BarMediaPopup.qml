@@ -1,21 +1,20 @@
 import QtQuick
+import "."
 import "../lazerbar"
 import "../../services" as Services
 
 // Transport card for the media hover popup: track identity, progress strip,
-// and geometric transport controls.
-Rectangle {
+// and geometric transport controls. Wrapped in the two-layer frame.
+BarPopupFrame {
     id: root
 
+    title: "Now Playing"
+    extraText: Services.MediaService.artist !== "" ? Services.MediaService.artist : ""
+
     implicitWidth: 300
-    implicitHeight: 148
     // Explicit dims keep the hosting Loader from stretching the surface.
     width: implicitWidth
     height: implicitHeight
-    radius: 10
-    color: LazerTheme.popupBackground
-    border.width: 1
-    border.color: LazerTheme.popupBorder
 
     readonly property real progressFraction:
         Services.MediaService.lengthMs > 0
@@ -30,7 +29,9 @@ Rectangle {
     }
 
     Column {
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
         anchors.margins: 14
         spacing: 10
 
