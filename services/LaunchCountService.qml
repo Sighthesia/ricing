@@ -11,11 +11,21 @@ import Quickshell.Io
 Singleton {
     id: root
 
+    // Emitted after the on-disk maps have been adopted. Consumers can refresh
+    // rankings if they opened during the short initial load window.
+    signal persistenceReady()
+
     // Map of desktop entry id -> launch count.
     property var counts: ({})
 
     // Map of desktop entry id -> last launch epoch ms, for recency ranking.
     property var lastAt: ({})
+
+    // A launcher action can arrive before FileView finishes its first read.
+    // Keep those mutations separate so an early write can never overwrite
+    // the persisted maps with the still-empty in-memory defaults.
+    property var _pendingCounts: ({})
+    property var _pendingLastAt: ({})
 
     // First reader may reach this singleton before the async file load
     // lands; force adoption as soon as the load is available so counts are
@@ -25,9 +35,42 @@ Singleton {
             root._adopt(launchCountFile.text())
     }
 
+    function _queueLaunch(appId) {
+        var nextCounts = Object.assign({}, root._pendingCounts)
+        nextCounts[appId] = (nextCounts[appId] || 0) + 1
+        root._pendingCounts = nextCounts
+
+        var nextLastAt = Object.assign({}, root._pendingLastAt)
+        nextLastAt[appId] = Date.now()
+        root._pendingLastAt = nextLastAt
+    }
+
+    function _mergePending() {
+        var pendingIds = Object.keys(root._pendingCounts)
+        if (!pendingIds.length && !Object.keys(root._pendingLastAt).length)
+            return false
+
+        var nextCounts = Object.assign({}, root.counts)
+        for (var i = 0; i < pendingIds.length; i++) {
+            var id = pendingIds[i]
+            nextCounts[id] = (nextCounts[id] || 0) + root._pendingCounts[id]
+        }
+        root.counts = nextCounts
+
+        var nextLastAt = Object.assign({}, root.lastAt, root._pendingLastAt)
+        root.lastAt = nextLastAt
+        root._pendingCounts = ({})
+        root._pendingLastAt = ({})
+        return true
+    }
+
     function recordLaunch(appId: string) {
         if (!appId) return
         _ensureLoaded()
+        if (!root._adopted) {
+            _queueLaunch(appId)
+            return
+        }
         var nextCounts = Object.assign({}, counts)
         nextCounts[appId] = (counts[appId] || 0) + 1
         counts = nextCounts
@@ -41,13 +84,13 @@ Singleton {
 
     function getLaunchCount(appId: string): int {
         _ensureLoaded()
-        return counts[appId] || 0
+        return (counts[appId] || 0) + (root._pendingCounts[appId] || 0)
     }
 
     // Epoch ms; must stay wider than 32-bit or timestamps truncate.
     function getLastLaunchAt(appId: string): real {
         _ensureLoaded()
-        return lastAt[appId] || 0
+        return Math.max(lastAt[appId] || 0, root._pendingLastAt[appId] || 0)
     }
 
     function _persist() {
@@ -60,18 +103,24 @@ Singleton {
     function _adopt(text) {
         if (root._adopted)
             return
-        root._adopted = true
-        if (!text)
-            return
+        var parsed = {}
         try {
-            var parsed = JSON.parse(String(text))
-            if (parsed && parsed.launchCounts && typeof parsed.launchCounts === "object")
-                root.counts = parsed.launchCounts
-            if (parsed && parsed.lastLaunches && typeof parsed.lastLaunches === "object")
-                root.lastAt = parsed.lastLaunches
+            if (text)
+                parsed = JSON.parse(String(text))
         } catch (err) {
             console.warn("LaunchCountService: unreadable launch-counts.json:", err)
+            return
         }
+
+        if (parsed && parsed.launchCounts && typeof parsed.launchCounts === "object")
+            root.counts = parsed.launchCounts
+        if (parsed && parsed.lastLaunches && typeof parsed.lastLaunches === "object")
+            root.lastAt = parsed.lastLaunches
+
+        root._adopted = true
+        if (root._mergePending())
+            root._persist()
+        root.persistenceReady()
     }
 
     property bool _adopted: false
@@ -83,9 +132,13 @@ Singleton {
         watchChanges: false
         onLoaded: root._adopt(launchCountFile.text())
         onLoadFailed: error => {
-            if (error !== FileViewError.FileNotFound)
+            if (error !== FileViewError.FileNotFound) {
                 console.warn("LaunchCountService: failed to load launch-counts.json:", error)
-            root._adopted = true
+                return
+            }
+            // A missing file is a valid empty initial state. It is safe to
+            // adopt it and flush any launch queued during construction.
+            root._adopt("")
         }
     }
 

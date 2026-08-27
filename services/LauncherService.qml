@@ -40,7 +40,7 @@ Singleton {
         interval: 400
         repeat: false
         onTriggered: {
-            if (session.visible && session.mode === "apps" && !session.loading)
+            if (session.visible && session.mode === "apps")
                 // Force a pull: the pooled fast path would otherwise keep
                 // filtering the pre-scan pool forever.
                 session.refresh(true)
@@ -59,6 +59,19 @@ Singleton {
     on_DesktopEntryCountChanged: {
         entryScanRefreshTimer.restart()
         entryScanSettleTimer.restart()
+    }
+
+    // The launch-count file can finish loading after the first launcher pull.
+    // Rebuild the app pool once so the initial list is ranked with persisted
+    // usage data instead of the empty defaults.
+    Connections {
+        target: Services.LaunchCountService
+        function onPersistenceReady() {
+            // refresh(true) intentionally supersedes an in-flight first pull;
+            // LauncherSession drops the older completion by refresh token.
+            if (session.visible && session.mode === "apps")
+                session.refresh(true)
+        }
     }
 
     // Quickshell-free session core (unit tested directly under qmltestrunner).
