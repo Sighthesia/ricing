@@ -75,7 +75,7 @@ Item {
         function test_surfaceMotionTravelsTowardTheDivider() {
             surface.revealProgress = 0
             verify(surface.headerSurfaceItem.transform[0].y < 0)
-            verify(surface.contentSurfaceItem.transform[0].y > 0)
+            verify(surface.contentSurfaceItem.transform[0].y < 0)
             surface.revealProgress = 1
             compare(surface.headerSurfaceItem.transform[0].y, 0)
             compare(surface.contentSurfaceItem.transform[0].y, 0)
@@ -89,6 +89,16 @@ Item {
             surface.revealProgress = 1
             compare(surface.headerSurfaceItem.transform[0].y, 0)
             compare(surface.contentSurfaceItem.transform[0].y, 0)
+        }
+
+        function test_surfaceLayersTravelFromTheSameBarSide() {
+            surface.revealProgress = 0
+            verify(surface.headerSurfaceItem.transform[0].y < 0)
+            verify(surface.contentSurfaceItem.transform[0].y < 0)
+            surface.topAnchored = false
+            verify(surface.headerSurfaceItem.transform[0].y > 0)
+            verify(surface.contentSurfaceItem.transform[0].y > 0)
+            surface.topAnchored = true
         }
 
         function test_contentProgressStartsAfterDelay() {

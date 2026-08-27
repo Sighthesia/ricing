@@ -363,7 +363,7 @@ LazerSplitSurface {
             color: LazerTheme.settingsPanel
             border.width: 0
             opacity: 1
-            transform: Translate { y: PopupMotion.offset(submenuSurface.contentRevealProgress, 14) }
+            transform: Translate { y: -PopupMotion.offset(submenuSurface.contentRevealProgress, 14) }
         }
 
         // Which side of the root menu this frame docks on; the reveal and
@@ -454,7 +454,7 @@ LazerSplitSurface {
             bottomPadding: 8
             spacing: 2
             opacity: 1
-            transform: Translate { y: PopupMotion.offset(submenuSurface.contentRevealProgress, 14) }
+            transform: Translate { y: -PopupMotion.offset(submenuSurface.contentRevealProgress, 14) }
 
             Repeater {
                 model: [...submenuOpener.children.values]

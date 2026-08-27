@@ -94,7 +94,7 @@ Item {
         // Keep non-visual QObjects such as QsMenuOpener alive while revealing.
         enabled: root.interactive
         transform: Translate {
-            y: (root.topAnchored ? 1 : -1) * root.contentTravel
+            y: (root.topAnchored ? -1 : 1) * root.contentTravel
                     * (1 - root.contentProgress)
         }
     }
