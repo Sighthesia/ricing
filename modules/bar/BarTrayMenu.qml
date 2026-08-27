@@ -544,8 +544,8 @@ Item {
 
         z: 2
         anchors.fill: parent
-        radius: root.radius
-        color: root.color
+        radius: 0
+        color: LazerTheme.settingsRail
         border.width: 0
     }
 

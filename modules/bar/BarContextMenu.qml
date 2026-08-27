@@ -167,7 +167,6 @@ Item {
     Flickable {
         anchors.fill: railCard
         anchors.margins: 6
-        clip: true
         contentHeight: railColumn.implicitHeight + 16
         clip: true
         interactive: contentHeight > height
