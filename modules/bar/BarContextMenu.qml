@@ -10,7 +10,7 @@ import "BarPopupMotion.js" as PopupMotion
 // column showing the selected component's actions and related entries
 // (level two). The host drops it flush beneath the bar with the shared
 // occlusion reveal.
-Item {
+LazerSplitSurface {
     id: root
 
     signal openSettingsRequested()
@@ -21,12 +21,9 @@ Item {
 
     readonly property int railWidth: LazerTheme.settingsSidebarExpandedWidth
     readonly property int contentWidth: 264
+    contentColor: LazerTheme.settingsSection
     // The host drives this shared layered reveal; the header leads the two
     // lower columns with the same offsets as BarPopupFrame and tray menus.
-    property real revealProgress: 1
-    readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
-    readonly property real headerProgress: PopupMotion.headerProgress(revealProgress, revealDuration, MotionTokens.settingsSidebarFade)
-    readonly property real contentProgress: PopupMotion.contentProgress(revealProgress, revealDuration, MotionTokens.settingsContentDelay, MotionTokens.settingsSidebarFade)
     // One entry shape for every rail row: widgets, tray items, and the two
     // global actions all ride the same selection model.
     readonly property var railEntries: {
@@ -109,43 +106,20 @@ Item {
     implicitHeight: Math.max(240, availHeight - 8)
     clip: true
 
-    // ── Top header card (settingsRail) ──
-    Rectangle {
-        id: headerCard
-
+    // Header title follows the shared rail surface reveal.
+    Text {
+        parent: root.headerSurfaceItem
         anchors.left: parent.left
+        anchors.leftMargin: 16
         anchors.right: parent.right
-        anchors.top: parent.top
-        height: 48
-        radius: 0
-        color: LazerTheme.settingsRail
-        border.width: 0
-        opacity: root.headerProgress
-        transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
-
-        Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 16
-            anchors.right: parent.right
-            anchors.rightMargin: 16
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.selectedEntry && root.selectedEntry.label ? root.selectedEntry.label : "Components"
-            color: LazerTheme.textPrimary
-            font.pixelSize: 14
-            font.weight: Font.DemiBold
-            elide: Text.ElideRight
-            maximumLineCount: 1
-        }
-    }
-
-    Rectangle {
-        id: topHeaderDivider
-
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: headerCard.bottom
-        height: 1
-        color: LazerTheme.divider
+        anchors.rightMargin: 16
+        anchors.verticalCenter: parent.verticalCenter
+        text: root.selectedEntry && root.selectedEntry.label ? root.selectedEntry.label : "Components"
+        color: LazerTheme.textPrimary
+        font.pixelSize: 14
+        font.weight: Font.DemiBold
+        elide: Text.ElideRight
+        maximumLineCount: 1
     }
 
     // ── Level one: rail card (settingsPanel) ──
@@ -153,18 +127,19 @@ Item {
     Rectangle {
         id: railCard
 
+        parent: root.contentSurfaceItem
         anchors.left: parent.left
-        anchors.top: topHeaderDivider.bottom
+        anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: root.railWidth
         radius: 0
         color: LazerTheme.settingsPanel
         border.width: 0
-        opacity: root.contentProgress
-        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
+        opacity: 1
     }
 
     Flickable {
+        parent: root.contentSurfaceItem
         anchors.fill: railCard
         anchors.margins: 6
         contentHeight: railColumn.implicitHeight + 16
@@ -194,20 +169,21 @@ Item {
     Rectangle {
         id: contentCard
 
+        parent: root.contentSurfaceItem
         anchors.left: railCard.right
         anchors.right: parent.right
-        anchors.top: topHeaderDivider.bottom
+        anchors.top: parent.top
         anchors.bottom: parent.bottom
         radius: 0
         color: LazerTheme.settingsSection
         border.width: 0
-        opacity: root.contentProgress
-        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
+        opacity: 1
     }
 
     Item {
         id: contentArea
 
+        parent: root.contentSurfaceItem
         anchors.fill: contentCard
         anchors.margins: 8
 

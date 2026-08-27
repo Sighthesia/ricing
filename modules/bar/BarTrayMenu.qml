@@ -6,7 +6,7 @@ import "BarPopupMotion.js" as PopupMotion
 
 // Render one tray item's DBusMenu with the lazer popup language: sharp
 // surface, brightness-diff hover, and geometric state indicators.
-Item {
+LazerSplitSurface {
     id: root
 
     // The SystemTray item whose menu should be rendered.
@@ -28,19 +28,13 @@ Item {
     readonly property alias submenuBridgeItem: submenuBridge
     // Header chrome: the bar-proximal layer names the tray component,
     // the bottom layer holds the menu rows — settings-panel split.
-    readonly property int headerHeight: 48
+    headerHeight: 48
     readonly property string headerTitle: {
         if (!payload) return "Tray"
         return String(payload.title || payload.tooltipTitle || payload.id || "Tray").replace(/[\n\r]+/g, " ")
     }
     readonly property string headerIconSource: payload && payload.icon ? String(payload.icon) : ""
     property real revealProgress: 1
-    readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
-    readonly property real headerProgress: PopupMotion.headerProgress(
-        revealProgress, revealDuration, MotionTokens.settingsSidebarFade)
-    readonly property real contentRevealProgress: PopupMotion.contentProgress(
-        revealProgress, revealDuration, MotionTokens.settingsContentDelay,
-        MotionTokens.settingsSidebarFade)
     // Sweeping between tray items swaps the DBusMenu handle and the new
     // children arrive asynchronously; hold the last settled height so the
     // frame never collapses mid-swap.
@@ -72,63 +66,38 @@ Item {
     height: implicitHeight
     clip: true
 
-    // -- Header card (settingsRail) --
-    Rectangle {
-        id: headerCard
-
+    // Header content follows the shared rail surface reveal.
+    Row {
+        parent: root.headerSurfaceItem
         anchors.left: parent.left
+        anchors.leftMargin: 16
         anchors.right: parent.right
-        anchors.top: parent.top
-        height: root.headerHeight
-        z: 4
-        radius: 0
-        color: LazerTheme.settingsRail
-        border.width: 0
-        opacity: root.headerProgress
-        transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
+        anchors.rightMargin: 16
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 8
 
-        Row {
-            anchors.left: parent.left
-            anchors.leftMargin: 16
-            anchors.right: parent.right
-            anchors.rightMargin: 16
+        Image {
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
-
-            Image {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 16
-                height: 16
-                source: root.headerIconSource
-                sourceSize: Qt.size(16, 16)
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                asynchronous: true
-                visible: root.headerIconSource !== ""
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - (parent.children[0].visible ? 24 : 0)
-                text: root.headerTitle
-                color: LazerTheme.textPrimary
-                font.pixelSize: 14
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
-                maximumLineCount: 1
-            }
+            width: 16
+            height: 16
+            source: root.headerIconSource
+            sourceSize: Qt.size(16, 16)
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            asynchronous: true
+            visible: root.headerIconSource !== ""
         }
-    }
 
-    Rectangle {
-        id: headerDivider
-
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: headerCard.bottom
-        height: 1
-        color: LazerTheme.divider
-        z: 4
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width - (parent.children[0].visible ? 24 : 0)
+            text: root.headerTitle
+            color: LazerTheme.textPrimary
+            font.pixelSize: 14
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+            maximumLineCount: 1
+        }
     }
 
     // One open submenu level at a time, anchored beside its parent row.
@@ -268,28 +237,10 @@ Item {
         }
     }
 
-    // Content card (settingsPanel) owning its background and motion.
-    Rectangle {
-        id: contentCard
-
-        z: 3
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: headerDivider.bottom
-        anchors.bottom: parent.bottom
-        radius: 0
-        color: LazerTheme.settingsPanel
-        border.width: 0
-        opacity: root.contentRevealProgress
-        transform: Translate { y: PopupMotion.offset(root.contentRevealProgress, 14) }
-    }
-
     Flickable {
         id: contentFlickable
-
-        z: 3
-
-        anchors.fill: contentCard
+        parent: root.contentSurfaceItem
+        anchors.fill: parent
         anchors.margins: 8
         contentHeight: contentColumn.implicitHeight
         clip: true

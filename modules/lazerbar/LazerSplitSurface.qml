@@ -36,6 +36,7 @@ Item {
 
     implicitWidth: Math.max(headerSurface.implicitWidth, contentSurface.implicitWidth)
     implicitHeight: headerSurface.height + divider.height + contentSurface.implicitHeight
+    clip: true
 
     // Header background surface with independent opacity and slide.
     Rectangle {
