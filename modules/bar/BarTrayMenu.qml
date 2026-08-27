@@ -6,7 +6,7 @@ import "BarPopupMotion.js" as PopupMotion
 
 // Render one tray item's DBusMenu with the lazer popup language: sharp
 // surface, brightness-diff hover, and geometric state indicators.
-Rectangle {
+Item {
     id: root
 
     // The SystemTray item whose menu should be rendered.
@@ -70,29 +70,22 @@ Rectangle {
     onPayloadChanged: closeSubmenu()
     width: implicitWidth
     height: implicitHeight
-    radius: 0
-    // Fixed owner is the rail tone; the content block moves inside it.
-    color: LazerTheme.settingsRail
-    // Match the settings panel's unframed surface hierarchy.
-    border.width: 0
     clip: true
 
-    // -- Header layer (settingsRail) --
-    Item {
-        id: header
+    // -- Header card (settingsRail) --
+    Rectangle {
+        id: headerCard
 
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         height: root.headerHeight
         z: 4
+        radius: 0
+        color: LazerTheme.settingsRail
+        border.width: 0
         opacity: root.headerProgress
         transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
-
-        Rectangle {
-            anchors.fill: parent
-            color: LazerTheme.settingsRail
-        }
 
         Row {
             anchors.left: parent.left
@@ -132,7 +125,7 @@ Rectangle {
 
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: header.bottom
+        anchors.top: headerCard.bottom
         height: 1
         color: LazerTheme.divider
         z: 4
@@ -275,28 +268,31 @@ Rectangle {
         }
     }
 
-    // Scrollable entry column below the header; menus stay short so
-    // stop-at-bounds scrolling is enough here. Sits above the occluding
-    // face so rows stay visible and interactive.
+    // Content card (settingsPanel) owning its background and motion.
+    Rectangle {
+        id: contentCard
+
+        z: 3
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: headerDivider.bottom
+        anchors.bottom: parent.bottom
+        radius: 0
+        color: LazerTheme.settingsPanel
+        border.width: 0
+        opacity: root.contentRevealProgress
+        transform: Translate { y: PopupMotion.offset(root.contentRevealProgress, 14) }
+    }
+
     Flickable {
         id: contentFlickable
 
         z: 3
 
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: headerDivider.bottom
-        anchors.bottom: parent.bottom
+        anchors.fill: contentCard
+        anchors.margins: 8
         contentHeight: contentColumn.implicitHeight
         clip: true
-        opacity: root.contentRevealProgress
-        transform: Translate { y: PopupMotion.offset(root.contentRevealProgress, 14) }
-
-        Rectangle {
-            z: -1
-            anchors.fill: parent
-            color: LazerTheme.settingsPanel
-        }
         interactive: contentHeight > height
         boundsBehavior: Flickable.StopAtBounds
 
@@ -368,21 +364,19 @@ Rectangle {
         property int heldHeight: 0
         height: submenuNaturalHeight
 
-        // Header layer for the submenu — mirrors the root header.
-        Item {
-            id: submenuHeader
+        // Header card for the submenu.
+        Rectangle {
+            id: submenuHeaderCard
 
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             height: submenuSurface.submenuHeaderHeight
+            radius: 0
+            color: LazerTheme.settingsRail
+            border.width: 0
             opacity: submenuSurface.headerRevealProgress
             transform: Translate { y: -PopupMotion.offset(submenuSurface.headerRevealProgress, 12) }
-
-            Rectangle {
-                anchors.fill: parent
-                color: LazerTheme.settingsRail
-            }
 
             Text {
                 anchors.left: parent.left
@@ -404,22 +398,24 @@ Rectangle {
 
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: submenuHeader.bottom
+            anchors.top: submenuHeaderCard.bottom
             height: 1
             color: LazerTheme.divider
         }
 
         Rectangle {
-            id: submenuContentBackground
+            id: submenuContentCard
 
             z: 0
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: submenuHeaderDivider.bottom
             anchors.bottom: parent.bottom
+            radius: 0
+            color: LazerTheme.settingsPanel
+            border.width: 0
             opacity: submenuSurface.contentRevealProgress
             transform: Translate { y: PopupMotion.offset(submenuSurface.contentRevealProgress, 14) }
-            color: LazerTheme.settingsPanel
         }
 
         // Which side of the root menu this frame docks on; the reveal and
@@ -585,12 +581,27 @@ Rectangle {
         // submenu's anchor row keeps its highlight as the selection marker.
         Rectangle {
             anchors.fill: parent
-            radius: 5
+            anchors.margins: 2
+            radius: 6
             color: (entryHover.hovered || root.submenuAnchorRow === entryRow)
                            && !entryRow.isSeparator
-                   ? LazerTheme.settingsMenuHover : "transparent"
-
+                    ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+            border.width: (entryHover.hovered || root.submenuAnchorRow === entryRow)
+                          && !entryRow.isSeparator ? 1.5 : 0
+            border.color: LazerTheme.settingsAccent
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            Behavior on border.width { NumberAnimation { duration: 100 } }
+            Behavior on border.color { ColorAnimation { duration: 100 } }
+        }
+        Rectangle {
+            z: 1
+            anchors.fill: parent
+            anchors.margins: 2
+            radius: 6
+            color: LazerTheme.textPrimary
+            opacity: 0
+            enabled: false
+            visible: !entryRow.isSeparator
         }
 
         // Separator: single hairline across the row's vertical middle.
