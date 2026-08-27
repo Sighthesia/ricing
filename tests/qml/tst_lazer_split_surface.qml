@@ -47,10 +47,10 @@ Item {
             surface.revealProgress = 0
             compare(surface.headerProgress, 0)
             compare(surface.contentProgress, 0)
-            compare(surface.headerSurfaceItem.opacity, 0)
-            compare(surface.contentSurfaceItem.opacity, 0)
+            compare(surface.headerSurfaceItem.opacity, 1)
+            compare(surface.contentSurfaceItem.opacity, 1)
             verify(!surface.interactable)
-            verify(!surface.contentSurfaceItem.enabled)
+            verify(surface.contentSurfaceItem.enabled)
         }
 
         function test_progressOneShowsBothLayers() {
@@ -61,6 +61,15 @@ Item {
             compare(surface.contentSurfaceItem.opacity, 1)
             verify(surface.interactable)
             verify(surface.contentSurfaceItem.enabled)
+        }
+
+        function test_surfaceMotionDoesNotChangeOpacity() {
+            surface.revealProgress = 0.1
+            compare(surface.headerSurfaceItem.opacity, 1)
+            compare(surface.contentSurfaceItem.opacity, 1)
+            surface.revealProgress = 0.8
+            compare(surface.headerSurfaceItem.opacity, 1)
+            compare(surface.contentSurfaceItem.opacity, 1)
         }
 
         function test_contentProgressStartsAfterDelay() {

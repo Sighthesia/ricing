@@ -20,9 +20,9 @@ Item {
 
     // Combined reveal duration mirrors BarPopupFrame's settings timing.
     readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
-    // Header fades from 0 while content is still delayed.
+    // Header visibility is occlusion-driven; progress only controls travel.
     readonly property real headerProgress: PopupMotion.headerProgress(revealProgress, revealDuration, MotionTokens.settingsSidebarFade)
-    // Content starts after the configured delay and tracks the same fade.
+    // Content starts after the configured delay and travels into place.
     readonly property real contentProgress: PopupMotion.contentProgress(revealProgress, revealDuration, MotionTokens.settingsContentDelay, MotionTokens.settingsSidebarFade)
     // Interaction is enabled only when fully revealed and host allows it.
     readonly property bool interactable: interactive && contentProgress > 0.99
@@ -48,7 +48,7 @@ Item {
         radius: 0
         color: LazerTheme.settingsRail
         border.width: 0
-        opacity: root.headerProgress
+        opacity: 1
         transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
     }
 
@@ -74,8 +74,9 @@ Item {
         radius: 0
         color: root.contentColor
         border.width: 0
-        opacity: root.contentProgress
-        enabled: root.interactable
-        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
+        opacity: 1
+        // Keep non-visual QObjects such as QsMenuOpener alive while revealing.
+        enabled: root.interactive
+        transform: Translate { y: -PopupMotion.offset(root.contentProgress, 14) }
     }
 }
