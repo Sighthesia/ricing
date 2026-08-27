@@ -19,7 +19,7 @@
 - 外层：`color: LazerTheme.settingsPanel`、`border.color: LazerTheme.popupBorder`、`radius: 0`、`clip: true`。所有主表面沿用设置侧栏的直角语言，不再呈现浮动卡片。
 - 标题层：`height: 48`（对齐 `barLiveHeight`），`color: LazerTheme.settingsRail`，底沿 1px `divider` 隔离内容；内部 `Row`：可选 `Image 16`（tray 图标/组件图标）+ `Text 14 DemiBold textPrimary elide`，左右 `16` 边距，垂直居中。
 - 内容层：`anchors.top: header.bottom` 至底，`topPadding` 由调用方决定，默认 `12`，作为 `default property alias contentData` 的 slot 容器；对外暴露 `implicitHeight = header.height + 1 + content.implicitHeight`。
-- 行为：无自身动画，依赖宿主 `BarPopupHost` 的单轴垂直揭示；取消缩放。减少动议时静默。`BarPopupMotion.js` 统一提供标题领先、内容延迟的错位进度与位移。
+- 行为：无自身动画，依赖固定宿主与 `BarPopupHost` 的进度；取消缩放。`BarPopupMotion.js` 使用设置面板的 `500ms` 层淡入、`200ms` 内容延迟，统一提供标题领先、内容延迟的错位进度与位移。
 
 ### 各弹出改造
 

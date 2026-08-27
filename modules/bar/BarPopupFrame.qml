@@ -15,8 +15,12 @@ Rectangle {
     // Host-owned progress lets the header and content enter at different
     // offsets, matching the settings sidebar's layered reveal.
     property real revealProgress: 1
-    readonly property real headerProgress: PopupMotion.headerProgress(revealProgress)
-    readonly property real contentProgress: PopupMotion.contentProgress(revealProgress)
+    readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
+    readonly property real headerProgress: PopupMotion.headerProgress(
+        revealProgress, revealDuration, MotionTokens.settingsSidebarFade)
+    readonly property real contentProgress: PopupMotion.contentProgress(
+        revealProgress, revealDuration, MotionTokens.settingsContentDelay,
+        MotionTokens.settingsSidebarFade)
 
     default property alias contentData: contentSlot.data
     readonly property alias contentItem: contentSlot

@@ -13,7 +13,7 @@
 - 复用 `LazerTheme.settingsRail / settingsPanel / popupBorder / divider / textPrimary`，标题 14 DemiBold，标题层高 48，分割线 1，主表面圆角 0，clip。
 - 标题文本 `ElideRight`，图标 16 可选。
 - 一/二级菜单均使用标题层（二级标题为父条目 `text`）。
-- 改造 `BarPopupHost` 为贴栏、触发组件边缘对齐、单轴垂直揭示；保留输入遮罩与 `BarPopupService` 状态机。两层 surface 复用 `BarPopupMotion.js` 的标题领先/内容延迟错位效果。
+- 改造 `BarPopupHost` 为贴栏、触发组件边缘对齐、固定 owner surface 的单轴垂直揭示；保留输入遮罩与 `BarPopupService` 状态机。两层 surface 复用 `BarPopupMotion.js` 的标题领先/内容延迟错位效果。
 
 ---
 

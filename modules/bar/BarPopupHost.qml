@@ -55,8 +55,10 @@ Item {
             placementSettle.start()
             shownKind = Services.BarPopupService.kind
             shownPayload = Services.BarPopupService.payload
-            // Settings-panel rhythm: OutQuint over settingsSlide.
-            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.settingsSlide
+            // Match the settings sidebar's 200ms content delay plus 500ms
+            // layer fade. The outer owner stays fixed; inner layers stagger.
+            deformAnimation.duration = MotionTokens.reducedMotion ? 0
+                    : MotionTokens.settingsContentDelay + MotionTokens.settingsSidebarFade
             deformAnimation.easing.type = Easing.OutQuint
             deformAnimation.to = 1
             // Single-instance reuse: never rewind the deform -- a reopen
@@ -64,20 +66,19 @@ Item {
             // (fully closed already sits at 0, so a fresh open is unchanged).
             deformAnimation.restart()
         } else {
-            // Exit shares the submenu retract's parameters: slow(240ms) on
-            // the inOut spline — a visible start, accelerating away under
-            // the bar's occlusion — instead of the longer settings slide.
-            deformAnimation.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.slow
-            deformAnimation.easing.type = Easing.BezierSpline
-            deformAnimation.easing.bezierCurve = MotionTokens.inOut
+            // Match the settings panel's 700ms layer timescale and InQuad
+            // exit so both staggered layers reverse completely together.
+            deformAnimation.duration = MotionTokens.reducedMotion ? 0
+                    : MotionTokens.settingsContentDelay + MotionTokens.settingsSidebarFade
+            deformAnimation.easing.type = Easing.InQuad
             deformAnimation.to = 0
             deformAnimation.restart()
             Services.BarPopupService.pointerInPopup = false
         }
     }
 
-    // Single deform progress drives scale and slide; there is no opacity
-    // animation -- occlusion by the bar window does the hiding.
+    // One progress value drives the fixed host lifecycle; the visible layers
+    // own their staggered opacity and offset animations.
     property real deformProgress: 0
 
     // Confirm a widget's leave-request once the pointer had a fair chance to
@@ -226,8 +227,8 @@ Item {
         x: frameX
         y: frameY
         // Retargets while fully open glide to their new frame instead of
-        // teleporting; entrance/exit geometry stays unanimated so the
-        // occlusion slide owns those phases.
+        // teleporting; entrance/exit geometry stays fixed so the inner
+        // layered reveal owns those phases.
         // Morph behaviors run for the whole open lifetime except the single
         // placement tick of a freshly created loader (zero-born geometry
         // must dock instantly, hidden behind the bar). Retargets on a live
@@ -240,14 +241,6 @@ Item {
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
         Behavior on y {
-            enabled: surfaceLoader.morphReady
-            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
-        }
-        Behavior on width {
-            enabled: surfaceLoader.morphReady
-            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
-        }
-        Behavior on height {
             enabled: surfaceLoader.morphReady
             NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
         }
@@ -335,11 +328,6 @@ Item {
         }
     }
 
-    // The surface is already docked to the bar. Keep the host transform
-    // translation-only; per-layer stagger belongs to BarPopupFrame.
-    readonly property real enterTravel: surfaceLoader.height
-    transform: Translate {
-        y: MotionTokens.reducedMotion ? 0
-           : (root.barTopAnchored ? -1 : 1) * root.enterTravel * (1 - root.deformProgress)
-    }
+    // The owner is already docked to the bar. Keep its geometry fixed so the
+    // compositor does not animate a whole surface; layers reveal internally.
 }

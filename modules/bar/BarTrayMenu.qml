@@ -35,8 +35,12 @@ Rectangle {
     }
     readonly property string headerIconSource: payload && payload.icon ? String(payload.icon) : ""
     property real revealProgress: 1
-    readonly property real headerProgress: PopupMotion.headerProgress(revealProgress)
-    readonly property real contentRevealProgress: PopupMotion.contentProgress(revealProgress)
+    readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
+    readonly property real headerProgress: PopupMotion.headerProgress(
+        revealProgress, revealDuration, MotionTokens.settingsSidebarFade)
+    readonly property real contentRevealProgress: PopupMotion.contentProgress(
+        revealProgress, revealDuration, MotionTokens.settingsContentDelay,
+        MotionTokens.settingsSidebarFade)
     // Sweeping between tray items swaps the DBusMenu handle and the new
     // children arrive asynchronously; hold the last settled height so the
     // frame never collapses mid-swap.
@@ -164,12 +168,12 @@ Rectangle {
         if (root.submenuPhase === "opening" || root.submenuPhase === "open")
             return
         root.submenuPhase = "opening"
-        // Menus are interaction surfaces, not showcase panels: the reveal
-        // is a quick 160ms flick so the pointer's landing zone stops
-        // moving almost immediately. A 600ms slide left a narrow moving
-        // strip beside the menu for most of a second — approaching it
-        // meant falling through onto root rows instead of the panel.
-        _startSubmenuAnimation(1, MotionTokens.outSoft, MotionTokens.medium)
+        // Match the settings sidebar's content choreography: the header
+        // begins immediately, while the content waits 200ms then fades over
+        // 500ms. The panel itself remains fixed; only its two layers move.
+        _startSubmenuAnimation(1, MotionTokens.outSoft,
+                               MotionTokens.settingsContentDelay
+                               + MotionTokens.settingsSidebarFade)
     }
 
     function closeSubmenu() {
@@ -182,7 +186,8 @@ Rectangle {
         // travel in the first frames and read as an instant
         // disappearance. Duration still fits inside the host's grace
         // window so the fold finishes before the popup slides away.
-        _startSubmenuAnimation(0, MotionTokens.inOut, MotionTokens.slow)
+        _startSubmenuAnimation(0, MotionTokens.inStd, MotionTokens.settingsContentDelay
+                                + MotionTokens.settingsSidebarFade)
     }
 
     function _startSubmenuAnimation(toValue, curve, durationMs) {
@@ -335,8 +340,12 @@ Rectangle {
         readonly property int submenuHeaderHeight: 48
         readonly property string submenuHeaderTitle: root.submenuEntry
                 ? String(root.submenuEntry.text || "").replace(/[\n\r]+/g, " ") : ""
-        readonly property real headerRevealProgress: PopupMotion.headerProgress(root.submenuProgress)
-        readonly property real contentRevealProgress: PopupMotion.contentProgress(root.submenuProgress)
+        readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
+        readonly property real headerRevealProgress: PopupMotion.headerProgress(
+            root.submenuProgress, revealDuration, MotionTokens.settingsSidebarFade)
+        readonly property real contentRevealProgress: PopupMotion.contentProgress(
+            root.submenuProgress, revealDuration, MotionTokens.settingsContentDelay,
+            MotionTokens.settingsSidebarFade)
         // The column's own top/bottom padding already spaces the content;
         // adding more left a dead band at the bottom. A freshly switched
         // submenu fetches its entries asynchronously, so while nothing has

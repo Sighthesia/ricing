@@ -1,7 +1,7 @@
 .pragma library
 
 // Shared layered-reveal math for popup surfaces. The header leads the
-// content, just like the settings sidebar's independently appearing layers.
+// content with the exact settings-sidebar delay/fade contract.
 function progress(value, start, end) {
     var current = Number(value)
     var from = Number(start)
@@ -11,12 +11,13 @@ function progress(value, start, end) {
     return Math.max(0, Math.min(1, (current - from) / (to - from)))
 }
 
-function headerProgress(value) {
-    return progress(value, 0, 0.72)
+function headerProgress(value, totalDuration, fadeDuration) {
+    return progress(value, 0, Number(fadeDuration) / Number(totalDuration))
 }
 
-function contentProgress(value) {
-    return progress(value, 0.16, 1)
+function contentProgress(value, totalDuration, delay, fadeDuration) {
+    var start = Number(delay) / Number(totalDuration)
+    return progress(value, start, start + Number(fadeDuration) / Number(totalDuration))
 }
 
 function offset(value, distance) {
