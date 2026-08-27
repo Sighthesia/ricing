@@ -12,3 +12,4 @@ BarSliderPopup 1.0 BarSliderPopup.qml
 BarCalendarPopup 1.0 BarCalendarPopup.qml
 BarMediaPopup 1.0 BarMediaPopup.qml
 BarNotificationsPopup 1.0 BarNotificationsPopup.qml
+BarPopupFrame 1.0 BarPopupFrame.qml
