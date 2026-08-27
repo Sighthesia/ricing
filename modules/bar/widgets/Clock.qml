@@ -51,7 +51,7 @@ Item {
 
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.timeText
-            color: LazerTheme.barTitle
+            color: LazerTheme.textPrimary
             font.family: "monospace"
             font.pixelSize: 15
             font.bold: true

@@ -272,7 +272,7 @@ BarPill {
 
                 text: root.primaryText
                 maxWidth: root.maxTextWidth
-                textColor: LazerTheme.barTitle
+                textColor: LazerTheme.textPrimary
                 pixelSize: 12
                 bold: true
             }

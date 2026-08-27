@@ -142,7 +142,7 @@ Item {
                 id: titleText
 
                 text: root.displayTitle
-                textColor: LazerTheme.barTitle
+                textColor: LazerTheme.textPrimary
                 maxWidth: root.maxTitleWidth
                 pixelSize: 12
                 bold: true

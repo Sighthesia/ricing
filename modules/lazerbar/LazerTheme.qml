@@ -36,12 +36,10 @@ QtObject {
     readonly property color iconInactive: adapt && colorService ? shade(colorService.mOnSurfaceVariant, 0.72) : "#A0A0A0"
     readonly property color textPrimary: adapt && colorService ? colorService.mOnSurface : "#FFFFFF"
     readonly property color textMuted: adapt && colorService ? colorService.mOnSurfaceVariant : "#B8B4BC"
-    // Top-bar widget typography and icons — always the wallpaper primary
-    // so the bar reads as a themed strip. Subtitle/icon uses a muted alpha
-    // derived from the same primary to keep hierarchy.
-    readonly property color barTitle: accentColor
-    readonly property color barSubtitle: shade(accentColor, 0.72)
-    readonly property color barIcon: accentColor
+    // Top-bar secondary text — A+C: brighter muted derived from
+    // textPrimary (white/mOnSurface) at 0.82 alpha so 10px subtitles
+    // stay readable on bgDark/mSurface without collapsing hierarchy.
+    readonly property color barSubtitle: shade(textPrimary, 0.82)
     readonly property color hoverForeground: "#FFFFFF"
     readonly property color hoverFill: "#18FFFFFF"
     readonly property color pressedFill: "#0FFFFFFF"
