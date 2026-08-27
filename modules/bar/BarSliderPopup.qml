@@ -1,14 +1,12 @@
 import QtQuick
+import "."
 import "../lazerbar"
-import "../../services" as Services
 
 // Slider card for volume/brightness hover popups, reusing the settings
-// panel's verified slider control inside a sharp popup surface.
-Rectangle {
+// panel's verified slider control inside the two-layer popup frame.
+BarPopupFrame {
     id: root
 
-    property string title: ""
-    property string iconSource: ""
     property real value: 0
     property bool showMute: false
     property bool muted: false
@@ -18,51 +16,22 @@ Rectangle {
 
     readonly property int percentValue: Math.round(Math.max(0, Math.min(1, value)) * 100)
 
+    // Title/icon are the frame's own properties; keep alias for host binding.
+    // host passes title/iconSource directly to the frame.
+
     implicitWidth: 280
-    implicitHeight: 104
     // Explicit dims keep the hosting Loader from stretching the surface.
     width: implicitWidth
+    // Header (48) + divider (1) + content (slider 40 + mute 26 + spacing/margins)
     height: implicitHeight
-    radius: 10
-    color: LazerTheme.popupBackground
-    border.width: 1
-    border.color: LazerTheme.popupBorder
+    extraText: (root.muted ? "\u2014" : root.percentValue) + "%"
 
     Column {
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
         anchors.margins: 14
         spacing: 10
-
-        Row {
-            width: parent.width
-            spacing: 8
-
-            Image {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 16
-                height: 16
-                source: root.iconSource
-                opacity: 0.9
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - parent.spacing - 16 - percentText.width
-                text: root.title
-                color: LazerTheme.textPrimary
-                font.pixelSize: 13
-                elide: Text.ElideRight
-            }
-
-            Text {
-                id: percentText
-
-                anchors.verticalCenter: parent.verticalCenter
-                text: (root.muted ? "\u2014" : root.percentValue) + "%"
-                color: LazerTheme.textMuted
-                font.pixelSize: 13
-            }
-        }
 
         // The settings panel owns the slider contract; map to percent steps.
         LazerSettingsSlider {
