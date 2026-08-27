@@ -154,7 +154,9 @@ BarPill {
     Row {
         id: contentRow
 
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.leftMargin: 6
+        anchors.verticalCenter: parent.verticalCenter
         spacing: 8
 
         // Cover region: rounded via OpacityMask (Rectangle clip is rectangular,
@@ -309,6 +311,13 @@ BarPill {
         opacity: Services.SpectrumService.isIdle ? 0 : 1
 
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+        // Continuous width morph together with the pill: lyric length changes
+        // animate instead of snapping, so both the overall field and each
+        // bar's slot continuously interpolate rather than popping.
+        Behavior on width {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+        }
 
         function triggerWave() {
             spectrumBars.triggerWave()
