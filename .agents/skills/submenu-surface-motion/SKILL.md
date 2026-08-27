@@ -19,11 +19,17 @@ description: 修改 Afloat 的托盘菜单（BarTrayMenu）、二级子菜单面
 
 1. **缓入曲线**：缩回用 `MotionTokens.inOut` + `slow(240ms)`。ease-out 会把全部位移压进前几十毫秒且随即钻入遮挡区——感知上就是瞬间消失。
 2. **数据保活**：`closeSubmenu()` 不得清空 entry/anchor。提前清空会让子项列表瞬间蒸发、高度塌成细条，动画拖的是空壳。数据在 `submenuAnimation.onFinished` 且 progress===0 时才释放。
-3. **关闭意图先行**：监听 `BarPopupService.closePending` 立即折返（240ms 恰好嵌进宿主 grace 窗口），否则指针离场路径下面板会全开着被宿主整体带走，退场动画从未播放。
+3. **服务关闭时折叠**：只在 `BarPopupService.visible` 真正变 false 时折叠，不在 `closePending` 意图时。穿越走廊的瞬态离开也会置位 pending，任何意图即折叠的防抖都与正常遍历竞态；两级同为 `slow(240ms) inOut` 时在服务关闭处同步收缩才是一致的离场。
 
 生命周期用显式函数驱动：`openSubmenu(entry,row)` / `closeSubmenu()`，不要依赖 property change handler（重悬停同一行时属性不变、无法翻回 opening）。
 
 **共享行组件的规则必须按层级作用域化**：`MenuEntryRow` 同时服务两级菜单，"悬停普通行折叠当前子菜单"的规则若不限定 `level === 1`，指针一进入子菜单内部的任何条目就会把面板自己杀掉（症状：二级菜单"不会停留、直接消失"，且探针测不出来——无头环境没有真实 hover）。子菜单行标记 `level: 2`，折叠分支只对根级行生效。
+
+## 输入与遮罩
+
+- **走廊桥接**：一级/二级间 4px 间隙叠加输入桥（`submenuBridge`，几何跟随面板实时更新）并入 TopBar 遮罩，否则穿越即是 Wayland leave。
+- **根菜单高度平滑**：`implicitHeight` 加 `fast` 过渡，骑过 `AboutToShow` 重取布局时一帧塌缩在遮罩上打出的空洞（实测主机在 (1484,105) 判定离开，但该点仍在菜单矩形内）。
+- **纵轴锁定**：`yLocked` 捕获落定帧，布局刷新抖动不再拖动已展开的面板把静止指针甩出边界；仅换行重定向时解锁滑移。
 
 ## 跨面板流转
 
@@ -33,7 +39,7 @@ description: 修改 Afloat 的托盘菜单（BarTrayMenu）、二级子菜单面
 
 ## 一级菜单对齐
 
-宿主关闭形变使用同一参数：`slow(240ms)` + `inOut`（BarPopupHost exit 分支），两级菜单共用一套离场语言。
+宿主关闭形变使用同一参数：`slow(240ms)` + `inOut`（BarPopupHost exit 分支），两级菜单共用一套离场语言。揭示则提速至 `medium(160ms)`：此前 600ms  slide 让可交互区长时间是一条窄条，移上去易落回根行。
 
 ## 诊断清单
 
