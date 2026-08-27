@@ -62,7 +62,7 @@ Rectangle {
     onPayloadChanged: closeSubmenu()
     width: implicitWidth
     height: implicitHeight
-    radius: 10
+    radius: 0
     color: LazerTheme.settingsPanel
     border.width: 1
     border.color: LazerTheme.popupBorder
@@ -80,15 +80,6 @@ Rectangle {
 
         Rectangle {
             anchors.fill: parent
-            radius: root.radius
-            color: LazerTheme.settingsRail
-        }
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: root.radius
             color: LazerTheme.settingsRail
         }
 
@@ -327,7 +318,7 @@ Rectangle {
         // Occlusion by the menu face does the hiding; opacity stays out of
         // the story entirely, exactly like the host popup.
         opacity: 1
-        radius: 10
+        radius: 0
         color: LazerTheme.settingsPanel
         border.width: 1
         border.color: LazerTheme.popupBorder
@@ -362,15 +353,6 @@ Rectangle {
 
             Rectangle {
                 anchors.fill: parent
-                radius: submenuSurface.radius
-                color: LazerTheme.settingsRail
-            }
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: submenuSurface.radius
                 color: LazerTheme.settingsRail
             }
 
@@ -464,25 +446,14 @@ Rectangle {
         x: dockedX
         y: root.yLocked ? frozenY : dockedY
 
-        // Deform from the row's near edge outward, mirroring the host
-        // popup: born fully under the menu face and sliding its own
-        // scaled width plus the docking gap to emerge.
-        readonly property real enterTravel: 4 + width * MotionTokens.popupFromScale + 4
+        // Deform from the row's near edge outward: born under the root face
+        // and translated horizontally until the full panel is exposed.
+        readonly property real enterTravel: width + 4
         transform: [
-            Scale {
-                origin.x: submenuSurface.popsRight ? 0 : submenuSurface.width
-                origin.y: submenuSurface.anchorCenterYInSurface
-                xScale: MotionTokens.reducedMotion ? 1
-                        : MotionTokens.popupFromScale
-                          + (1 - MotionTokens.popupFromScale) * root.submenuProgress
-                yScale: MotionTokens.reducedMotion ? 1
-                        : MotionTokens.popupFromScale
-                          + (1 - MotionTokens.popupFromScale) * root.submenuProgress
-            },
             Translate {
                 x: MotionTokens.reducedMotion ? 0
                    : (submenuSurface.popsRight ? -1 : 1)
-                     * submenuSurface.enterTravel * (1 - root.submenuProgress)
+                      * submenuSurface.enterTravel * (1 - root.submenuProgress)
             }
         ]
 

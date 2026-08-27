@@ -13,7 +13,7 @@ QtObject {
     // Whether the popup surface should currently be shown.
     readonly property bool visible: kind !== ""
     // Bar-window-local X (both windows share horizontal margins) of the
-    // hovered widget center; the host clamps and positions around it.
+    // hovered widget's leading edge; the host clamps the drawer from it.
     property real anchorX: 0
     // Kind-specific payload, e.g. the tray item's QsMenuHandle.
     property var payload: null

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将全部 bar 弹出（托盘一/二级、音量/亮度、日历、媒体、通知、BarContextMenu）统一为垂直两层：顶部 `settingsRail` 标题层贴顶栏、底部 `settingsPanel` 内容层，复用设置面板视觉。
+**Goal:** 将全部 bar 弹出（托盘一/二级、音量/亮度、日历、媒体、通知、BarContextMenu）统一为贴栏的直角垂直两层：顶部 `settingsRail` 标题层贴顶栏、底部 `settingsPanel` 内容层，复用设置面板视觉。
 
 **Architecture:** 新增共享 `BarPopupFrame` 封装标题层与内容槽；各弹出以 frame 为根重写，外层仍由 `BarPopupHost` 的 `scale+translate` 揭示驱动。托盘二级表面亦以同 frame 重写，标题取父条目文本，走廊桥、纵轴锁、高度保持等既有契约保持不变。
 
@@ -10,10 +10,10 @@
 
 ## Global Constraints
 
-- 复用 `LazerTheme.settingsRail / settingsPanel / popupBorder / divider / textPrimary`，标题 14 DemiBold，标题层高 48，分割线 1，圆角 10，clip。
+- 复用 `LazerTheme.settingsRail / settingsPanel / popupBorder / divider / textPrimary`，标题 14 DemiBold，标题层高 48，分割线 1，主表面圆角 0，clip。
 - 标题文本 `ElideRight`，图标 16 可选。
 - 一/二级菜单均使用标题层（二级标题为父条目 `text`）。
-- 不改 `BarPopupHost` 定位/遮罩/动画与 `BarPopupService` 状态机，仅替换 Loader 挂载表层形态。
+- 改造 `BarPopupHost` 为贴栏、触发组件边缘对齐、单轴垂直揭示；保留输入遮罩与 `BarPopupService` 状态机。
 
 ---
 

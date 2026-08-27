@@ -89,7 +89,7 @@ Item {
                 function requestMenu() {
                     if (!trayIcon.modelData || !trayIcon.modelData.hasMenu)
                         return
-                    var anchorX = trayIcon.mapToItem(null, trayIcon.width / 2, 0).x
+                    var anchorX = trayIcon.mapToItem(null, 0, 0).x
                     Services.BarPopupService.open("tray", anchorX, trayIcon.modelData)
                 }
 

@@ -1,7 +1,7 @@
 # 弹出菜单两层样式设计（Popup Two-Layer）
 
 日期：2026-08-27
-状态：已确认（方案 C：共享框架 + 设置面板色彩）
+状态：已确认（方案 C：共享框架 + 设置面板色彩；贴栏直角下拉）
 
 ## 背景与目标
 
@@ -16,10 +16,10 @@
 
 ### 共享框架 `modules/bar/BarPopupFrame.qml`
 
-- 外层：`color: LazerTheme.settingsPanel`、`border.color: LazerTheme.popupBorder`、`radius: 10`、`clip: true`，承载统一圆角与边框。
-- 标题层：`height: 48`（对齐 `barLiveHeight`），`color: LazerTheme.settingsRail`，顶侧跟随外层圆角，底沿 1px `divider` 隔离内容；内部 `Row`：可选 `Image 16`（tray 图标/组件图标）+ `Text 14 DemiBold textPrimary elide`，左右 `16` 边距，垂直居中。
+- 外层：`color: LazerTheme.settingsPanel`、`border.color: LazerTheme.popupBorder`、`radius: 0`、`clip: true`。所有主表面沿用设置侧栏的直角语言，不再呈现浮动卡片。
+- 标题层：`height: 48`（对齐 `barLiveHeight`），`color: LazerTheme.settingsRail`，底沿 1px `divider` 隔离内容；内部 `Row`：可选 `Image 16`（tray 图标/组件图标）+ `Text 14 DemiBold textPrimary elide`，左右 `16` 边距，垂直居中。
 - 内容层：`anchors.top: header.bottom` 至底，`topPadding` 由调用方决定，默认 `12`，作为 `default property alias contentData` 的 slot 容器；对外暴露 `implicitHeight = header.height + 1 + content.implicitHeight`。
-- 行为：无自身动画，依赖宿主 `BarPopupHost` 的 `scale+translate` 揭示；减少动议时静默。
+- 行为：无自身动画，依赖宿主 `BarPopupHost` 的单轴垂直揭示；取消缩放。减少动议时静默。
 
 ### 各弹出改造
 
@@ -32,12 +32,18 @@
 
 ### 视觉令牌
 
-- 直接复用 `LazerTheme.settingsRail / settingsPanel / popupBorder / divider / textPrimary`，字号 `13-14`、字重 `DemiBold`（标题），分割线 `1`，圆角 `10`。
-- 子菜单揭示沿用现有 `submenuProgress` 的 `Scale+Translate`，但容器改为 frame，`enterTravel` 仍按宽度计算。
+- 直接复用 `LazerTheme.settingsRail / settingsPanel / popupBorder / divider / textPrimary`，字号 `13-14`、字重 `DemiBold`（标题），分割线 `1`，主表面圆角 `0`。
+- 子菜单使用直角双层表面，保留横向 `Translate` 以从一级菜单边缘展开，取消 `Scale`。
+
+### 贴栏定位与揭示
+
+- 弹出面板与顶栏直接相接：顶部栏面板 `y: 0`，底部栏面板贴窗口底部；移除原有 `4px` 间隙。
+- 水平位置以触发组件左边缘对齐；越过右侧安全边距时转为右边缘对齐。
+- 宿主仅沿垂直轴平移以在顶栏遮挡区内展开/收回；不使用 `Scale`，不围绕组件居中。
 
 ### 非目标
 
-- 不改变 `BarPopupHost` 的定位、遮罩与 `BarPopupService` 状态机；仅替换各 `Loader` 挂载的表面形态。
+- 不改变 `BarPopupService` 状态机；调整 `BarPopupHost` 定位与揭示以实现贴栏下拉。输入遮罩逻辑保持。
 - 不引入新的持久化设置项。
 
 ## 验证

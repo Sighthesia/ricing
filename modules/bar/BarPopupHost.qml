@@ -199,9 +199,10 @@ Item {
         id: surfaceLoader
 
         active: root.deformProgress > 0
-        // Frame geometry is fully declarative: centered on the hover
-        // anchor, docked just past the window edge that faces the bar
-        // (this window excludes the bar strip), clamped to the screen.
+        // Frame geometry is fully declarative: its left edge starts at the
+        // trigger's left edge, then clamps against the screen's safe bounds.
+        // This joins the panel to its bar component instead of floating it
+        // around the trigger center.
         // Targets are computed from unanimated values so paired x/width
         // (and y/height) Behaviors glide in lockstep instead of chasing.
         readonly property real frameWidth: item ? item.implicitWidth : 0
@@ -210,12 +211,12 @@ Item {
             if (!item)
                 return 0
             var anchorScreenX = root.frameAnchorX + root.floatingMargin
-            return Math.max(8, Math.min(anchorScreenX - frameWidth / 2,
+            return Math.max(8, Math.min(anchorScreenX,
                                         root.width - frameWidth - 8))
         }
         readonly property real frameY: root.barTopAnchored
-           ? 4
-           : root.height - frameHeight - 4
+           ? 0
+           : root.height - frameHeight
         width: frameWidth
         height: frameHeight
         x: frameX

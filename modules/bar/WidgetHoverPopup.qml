@@ -40,9 +40,10 @@ Item {
         onTriggered: {
             if (!popupHover.hovered)
                 return
-            // Window-local X of this widget's center; the host adds the
-            // floating margin since both windows share horizontal insets.
-            var anchorX = root.mapToItem(null, root.width / 2, 0).x
+            // Window-local X of this widget's leading edge. The host joins
+            // its settings-style drawer to this edge rather than centering a
+            // floating card around the widget.
+            var anchorX = root.mapToItem(null, 0, 0).x
             Services.BarPopupService.open(root.kind, anchorX, root.payload)
         }
     }

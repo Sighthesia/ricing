@@ -15,7 +15,7 @@ Rectangle {
     default property alias contentData: contentSlot.data
     readonly property alias contentItem: contentSlot
 
-    radius: 10
+    radius: 0
     color: LazerTheme.settingsPanel
     border.width: 1
     border.color: LazerTheme.popupBorder
@@ -34,21 +34,11 @@ Rectangle {
         anchors.top: parent.top
         height: root.headerHeight
 
-        // Rounded rail that reads as the settings sidebar's rail at the top.
+        // Straight rail continues the settings sidebar's main-surface shape.
         Rectangle {
             id: headerBg
 
             anchors.fill: parent
-            radius: root.radius
-            color: LazerTheme.settingsRail
-        }
-
-        // Square off the bottom corners so only the top stays rounded.
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: root.radius
             color: LazerTheme.settingsRail
         }
 
