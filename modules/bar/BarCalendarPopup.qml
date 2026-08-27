@@ -1,20 +1,20 @@
 import QtQuick
+import "."
 import "../lazerbar"
 
 // Compact month calendar for the clock hover popup: sharp grid, accent
-// block on today, geometric month stepping.
-Rectangle {
+// block on today, geometric month stepping. Now wrapped in the two-layer
+// popup frame so the bar-proximal header names the component.
+BarPopupFrame {
     id: root
 
+    title: "Calendar"
+    iconSource: "icons/clock.svg"
+
     implicitWidth: 264
-    implicitHeight: 288
     // Explicit dims keep the hosting Loader from stretching the surface.
     width: implicitWidth
     height: implicitHeight
-    radius: 10
-    color: LazerTheme.popupBackground
-    border.width: 1
-    border.color: LazerTheme.popupBorder
 
     property int viewYear: new Date().getFullYear()
     property int viewMonth: new Date().getMonth()
@@ -26,7 +26,9 @@ Rectangle {
     }
 
     Column {
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
         anchors.margins: 14
         spacing: 10
 
