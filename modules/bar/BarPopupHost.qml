@@ -169,12 +169,7 @@ Item {
     // leaving the popup itself asks for a graceful close.
     HoverHandler {
         enabled: root.popupVisible
-        onPointChanged: Services.BarPopupService.debugPoint =
-                Math.round(point.position.x) + "," + Math.round(point.position.y)
         onHoveredChanged: {
-            console.debug("[SUBDBG] host hovered=" + hovered
-                          + " at " + Math.round(point.position.x) + ","
-                          + Math.round(point.position.y))
             Services.BarPopupService.pointerInPopup = hovered
             if (hovered)
                 Services.BarPopupService.cancelClose()

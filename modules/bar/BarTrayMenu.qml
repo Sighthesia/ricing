@@ -50,38 +50,13 @@ Rectangle {
         // submenu mid-traversal, seemingly at random. Genuine payload
         // swaps fold through onPayloadChanged below.
     }
-    onPayloadChanged: closeSubmenu("payload")
+    onPayloadChanged: closeSubmenu()
     width: implicitWidth
     height: implicitHeight
     radius: 10
     color: LazerTheme.popupBackground
     border.width: 1
     border.color: LazerTheme.popupBorder
-
-    // TEMP DEBUG: live input-delivery probe. S= surface hover reached,
-    // R= last row hover received, T= last tap received. Remove after use.
-    property string debugLastRow: "-"
-    property string debugLastTap: "-"
-    Rectangle {
-        z: 99
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        width: 170; height: 46
-        color: "#80000000"
-        Text {
-            anchors.fill: parent
-            color: "#ffcc00"
-            font.pixelSize: 9
-            text: "S:" + (submenuHover.hovered ? "1" : "0")
-                  + " R:" + root.debugLastRow
-                  + " P:" + Number(root.submenuProgress).toFixed(2)
-                  + "\nXY:" + Services.BarPopupService.debugPoint
-                  + "\nSUB:" + Math.round(submenuSurface.x) + ","
-                    + Math.round(submenuSurface.y) + " "
-                    + Math.round(submenuSurface.width) + "x"
-                    + Math.round(submenuSurface.height)
-        }
-    }
 
     // One open submenu level at a time, anchored beside its parent row.
     // Both stay set through the whole retract: clearing the entry early
@@ -122,9 +97,7 @@ Rectangle {
         _startSubmenuAnimation(1, MotionTokens.outSoft, MotionTokens.medium)
     }
 
-    function closeSubmenu(reason) {
-        console.debug("[SUBDBG] fold reason=" + (reason || "unknown")
-                      + " phase=" + root.submenuPhase)
+    function closeSubmenu() {
         if (root.submenuPhase === "closed" || root.submenuPhase === "closing")
             return
         root.submenuPhase = "closing"
@@ -179,7 +152,7 @@ Rectangle {
 
         function onVisibleChanged() {
             if (!Services.BarPopupService.visible)
-                root.closeSubmenu("svc-invisible")
+                root.closeSubmenu()
         }
     }
 
@@ -250,9 +223,9 @@ Rectangle {
 
                 delegate: MenuEntryRow {
                     onOpenSubmenu: (entry, row) => root.openSubmenu(entry, row)
-                    onCloseSubmenu: root.closeSubmenu("row-signal")
+                    onCloseSubmenu: root.closeSubmenu()
                     onTriggered: {
-                        root.closeSubmenu("triggered")
+                        root.closeSubmenu()
                         Services.BarPopupService.close()
                     }
                 }
@@ -399,7 +372,7 @@ Rectangle {
                     level: 2
 
                     onTriggered: {
-                        root.closeSubmenu("triggered")
+                        root.closeSubmenu()
                         Services.BarPopupService.close()
                     }
                 }
@@ -414,11 +387,7 @@ Rectangle {
         HoverHandler {
             id: submenuHover
 
-            onHoveredChanged: {
-                console.debug("[SUBDBG] surface hovered=" + hovered
-                              + " phase=" + root.submenuPhase)
-                if (!hovered && root.submenuPhase === "open") root.closeSubmenu("surface-unhover")
-            }
+            onHoveredChanged: if (!hovered && root.submenuPhase === "open") root.closeSubmenu()
         }
     }
 
@@ -566,8 +535,6 @@ Rectangle {
             enabled: !entryRow.isSeparator
             gesturePolicy: TapHandler.ReleaseWithinBounds
             onTapped: {
-                root.debugLastTap = "L" + entryRow.level
-                console.debug("[SUBDBG] tap L" + entryRow.level)
                 if (!entryRow.entryEnabled)
                     return
                 if (entryRow.hasChildren) {
@@ -590,22 +557,14 @@ Rectangle {
 
             enabled: !entryRow.isSeparator
             onHoveredChanged: {
-                console.debug("[SUBDBG] row L" + entryRow.level + " hovered=" + hovered
-                              + " text=" + (entryRow.entry ? String(entryRow.entry.text || "") : "")
-                              + " P=" + Number(root.submenuProgress).toFixed(2))
-                if (hovered)
-                    root.debugLastRow = entryRow.level + ":" + String(entryRow.entry ? entryRow.entry.text || "?" : "?").slice(0, 6)
                 if (!hovered || !entryRow.entryEnabled)
                     return
                 if (entryRow.hasChildren) {
                     entryRow.openSubmenu(entryRow.entry, entryRow)
                     return
                 }
-                if (entryRow.level === 1 && root.submenuAnchorRow) {
-                    console.debug("[SUBDBG] row-fold L1 text="
-                                  + String(entryRow.entry ? entryRow.entry.text || "" : ""))
-                    root.closeSubmenu("plain-row-hover L1")
-                }
+                if (entryRow.level === 1 && root.submenuAnchorRow)
+                    root.closeSubmenu()
             }
         }
     }
