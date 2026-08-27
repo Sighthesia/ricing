@@ -134,14 +134,6 @@ Item {
     Connections {
         target: Services.BarLayoutService
         function onLayoutModelChanged() { root.schedulePublish() }
-        // Layout mode owns the bar surface: hover popups step aside and any
-        // open popup closes so the arrangement state starts clean.
-        function onSettingsModeChanged() {
-            var active = Services.BarLayoutService.settingsMode
-            Services.BarPopupService.suppressHoverOpen = active
-            if (active)
-                Services.BarPopupService.close()
-        }
     }
 
     component SectionRow: Row {
@@ -264,14 +256,5 @@ Item {
         onCanceled: Services.BarLayoutService.cancelDrag()
     }
 
-    // Route right clicks anywhere on the bar into the shell menu; left
-    // interactions pass through untouched because only RightButton is held.
-    MouseArea {
-        anchors.fill: parent
-        z: 60
-        acceptedButtons: Qt.RightButton
 
-        onClicked: mouse => Services.BarPopupService.open(
-            "barmenu", mouse.x, { screenName: root.screenName }, true)
-    }
 }

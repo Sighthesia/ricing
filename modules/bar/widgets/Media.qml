@@ -342,8 +342,4 @@ BarPill {
     // away per character — the shared contract lives in MarqueeLabel and
     // runs from onPrimaryTextChanged via transitionFrom.
 
-    // Hover opens this widget's popup in the shared overlay host.
-    WidgetHoverPopup {
-        kind: "media"
-    }
 }

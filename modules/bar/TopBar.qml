@@ -82,68 +82,6 @@ Variants {
             }
         }
 
-        // Hover popups live in their own owner that hugs the far side of the
-        // bar: the bar strip is outside this window, so surfaces sliding home
-        // are occluded by the bar exactly like iOS banners under their source.
-        // Input stays limited to the visible popup via a mask region.
-        PanelWindow {
-            id: popupWindow
-            readonly property real popupTravelInset: 48
-
-            screen: screenScope.modelData
-            color: "transparent"
-            // Popup content stays above applications but below the bar layer.
-            WlrLayershell.layer: WlrLayer.Top
-            exclusionMode: ExclusionMode.Ignore
-            exclusiveZone: -1
-            anchors {
-                top: Services.SettingsService.bar.position === "top"
-                bottom: Services.SettingsService.bar.position === "bottom"
-                left: true
-                right: true
-            }
-            margins {
-                top: Services.SettingsService.bar.position === "top"
-                     ? screenScope.floatingMargin + screenScope.effectiveHeight - popupTravelInset : screenScope.floatingMargin
-                bottom: Services.SettingsService.bar.position === "bottom"
-                        ? screenScope.floatingMargin + screenScope.effectiveHeight - popupTravelInset : screenScope.floatingMargin
-                left: screenScope.floatingMargin
-                right: screenScope.floatingMargin
-            }
-            implicitHeight: screenScope.modelData.height - screenScope.effectiveHeight
-                    - screenScope.floatingMargin * 2 + popupTravelInset
-            // Take keyboard only while a popup is up so Escape reaches it and
-            // global keys stay free when closed.
-            WlrLayershell.keyboardFocus: Services.BarPopupService.visible
-                    ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-            // Input stays limited to the visible popup via a mask region;
-            // the nested regions union in the tray submenu panel and the
-            // corridor bridge so traversing between them never reads as a
-            // pointer leave.
-            mask: Region {
-                item: popupHost.deformProgress > 0 ? popupHost.activeSurfaceItem : null
-
-                Region {
-                    item: popupHost.deformProgress > 0
-                          ? popupHost.submenuSurfaceItem : null
-                }
-                Region {
-                    item: popupHost.deformProgress > 0
-                          ? popupHost.submenuBridgeItem : null
-                }
-            }
-
-            BarPopupHost {
-                id: popupHost
-
-                anchors.fill: parent
-                barHeight: screenScope.effectiveHeight
-                barTopAnchored: Services.SettingsService.bar.position === "top"
-                floatingMargin: screenScope.floatingMargin
-                travelInset: popupWindow.popupTravelInset
-            }
-        }
-
         // Keep the launcher wave below the bar while only its internal viewport moves.
         PanelWindow {
             id: launcherWindow

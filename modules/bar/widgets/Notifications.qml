@@ -50,8 +50,4 @@ BarPill {
         }
     }
 
-    // Hover opens this widget's popup in the shared overlay host.
-    WidgetHoverPopup {
-        kind: "notifications"
-    }
 }

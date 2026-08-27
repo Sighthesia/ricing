@@ -4,7 +4,6 @@ import Quickshell.Widgets
 import Quickshell.Services.SystemTray
 import ".."
 import "../../lazerbar"
-import "../../../services" as Services
 
 // StatusNotifier tray icons with activate and secondary actions.
 Item {
@@ -76,47 +75,16 @@ Item {
 
                 HoverHandler {
                     id: iconHover
-                }
-
-                // Hover opens this item's DBus menu in the shared popup host.
-                WidgetHoverPopup {
-                    kind: "tray"
-                    payload: trayIcon.modelData
-                    enabled: trayIcon.modelData && trayIcon.modelData.hasMenu
-                }
-
-                // Menu-only items surface their menu on any press intent.
-                function requestMenu() {
-                    if (!trayIcon.modelData || !trayIcon.modelData.hasMenu)
-                        return
-                    var anchorX = trayIcon.mapToItem(null, 0, 0).x
-                    Services.BarPopupService.open("tray", anchorX, trayIcon.modelData)
-                }
-
-                TapHandler {
+                }                TapHandler {
                     acceptedButtons: Qt.LeftButton
                     gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: {
-                        if (trayIcon.modelData.onlyMenu && trayIcon.modelData.hasMenu) {
-                            trayIcon.requestMenu()
-                            return
-                        }
-                        trayIcon.modelData.activate()
-                    }
+                    onTapped: trayIcon.modelData.activate()
                 }
 
-                // Right click prefers the full menu; fall back to the SNI
-                // secondary action when the item ships no menu.
                 TapHandler {
                     acceptedButtons: Qt.RightButton
                     gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: {
-                        if (trayIcon.modelData.hasMenu) {
-                            trayIcon.requestMenu()
-                            return
-                        }
-                        trayIcon.modelData.secondaryActivate()
-                    }
+                    onTapped: trayIcon.modelData.secondaryActivate()
                 }
             }
         }

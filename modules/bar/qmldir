@@ -4,12 +4,3 @@ MarqueeLabel 1.0 MarqueeLabel.qml
 BarContent 1.0 BarContent.qml
 TopBar 1.0 TopBar.qml
 DockzoneSpectrum 1.0 DockzoneSpectrum.qml
-WidgetHoverPopup 1.0 WidgetHoverPopup.qml
-BarPopupHost 1.0 BarPopupHost.qml
-BarTrayMenu 1.0 BarTrayMenu.qml
-BarContextMenu 1.0 BarContextMenu.qml
-BarSliderPopup 1.0 BarSliderPopup.qml
-BarCalendarPopup 1.0 BarCalendarPopup.qml
-BarMediaPopup 1.0 BarMediaPopup.qml
-BarNotificationsPopup 1.0 BarNotificationsPopup.qml
-BarPopupFrame 1.0 BarPopupFrame.qml
