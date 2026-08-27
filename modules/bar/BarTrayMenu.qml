@@ -25,13 +25,22 @@ Rectangle {
     // submenu: without it, crossing the 4px gap is a Wayland leave, which
     // reads as pointer-gone and folds everything mid-traversal.
     readonly property alias submenuBridgeItem: submenuBridge
+    // Header chrome: the bar-proximal layer names the tray component,
+    // the bottom layer holds the menu rows — settings-panel split.
+    readonly property int headerHeight: 48
+    readonly property string headerTitle: {
+        if (!payload) return "Tray"
+        return String(payload.title || payload.tooltipTitle || payload.id || "Tray").replace(/[\n\r]+/g, " ")
+    }
+    readonly property string headerIconSource: payload && payload.icon ? String(payload.icon) : ""
     // Sweeping between tray items swaps the DBusMenu handle and the new
     // children arrive asynchronously; hold the last settled height so the
     // frame never collapses mid-swap.
     property int settledHeight: 0
-    readonly property int naturalHeight: Math.min(maxHeight, contentFlickable.contentHeight)
+    readonly property int contentHeight: contentFlickable.contentHeight
+    readonly property int naturalHeight: Math.min(maxHeight, headerHeight + 1 + contentHeight)
     implicitHeight: entries.length > 0 || settledHeight === 0
-                    ? naturalHeight : Math.max(settledHeight, naturalHeight)
+                     ? naturalHeight : Math.max(settledHeight, naturalHeight)
     // Layout churn (entries rebuilt on every AboutToShow ping) makes
     // contentHeight collapse for a frame before repopulating; an raw snap
     // to that dip punched a hole in the window's input mask under a
@@ -54,9 +63,78 @@ Rectangle {
     width: implicitWidth
     height: implicitHeight
     radius: 10
-    color: LazerTheme.popupBackground
+    color: LazerTheme.settingsPanel
     border.width: 1
     border.color: LazerTheme.popupBorder
+    clip: true
+
+    // -- Header layer (settingsRail) --
+    Item {
+        id: header
+
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: root.headerHeight
+        z: 4
+
+        Rectangle {
+            anchors.fill: parent
+            radius: root.radius
+            color: LazerTheme.settingsRail
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: root.radius
+            color: LazerTheme.settingsRail
+        }
+
+        Row {
+            anchors.left: parent.left
+            anchors.leftMargin: 16
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 8
+
+            Image {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 16
+                height: 16
+                source: root.headerIconSource
+                sourceSize: Qt.size(16, 16)
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                asynchronous: true
+                visible: root.headerIconSource !== ""
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - (parent.children[0].visible ? 24 : 0)
+                text: root.headerTitle
+                color: LazerTheme.textPrimary
+                font.pixelSize: 14
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+                maximumLineCount: 1
+            }
+        }
+    }
+
+    Rectangle {
+        id: headerDivider
+
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: header.bottom
+        height: 1
+        color: LazerTheme.divider
+        z: 4
+    }
 
     // One open submenu level at a time, anchored beside its parent row.
     // Both stay set through the whole retract: clearing the entry early
@@ -194,15 +272,18 @@ Rectangle {
         }
     }
 
-    // Scrollable entry column; menus stay short so stop-at-bounds scrolling
-    // is enough here. Sits above the occluding face so rows stay visible
-    // and interactive.
+    // Scrollable entry column below the header; menus stay short so
+    // stop-at-bounds scrolling is enough here. Sits above the occluding
+    // face so rows stay visible and interactive.
     Flickable {
         id: contentFlickable
 
         z: 3
 
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: headerDivider.bottom
+        anchors.bottom: parent.bottom
         contentHeight: contentColumn.implicitHeight
         clip: true
         interactive: contentHeight > height
@@ -233,12 +314,10 @@ Rectangle {
         }
     }
 
-    // Second-level submenu surface sharing the same visual language. It
-    // sits BELOW the root menu's face: like the first-level popup, it is
-    // born fully hidden behind the occluding surface and slides out while
-    // scaling up from the parent row, and the exit reverses both moves —
-    // a genuine retract back underneath. The layout rectangle stays
-    // unanimated so only paint properties move per frame.
+    // Second-level submenu surface sharing the same visual language, now
+    // also two-layer: header names the parent entry, content holds its
+    // children. It sits BELOW the root menu's face and slides out while
+    // scaling up from the parent row.
     Rectangle {
         id: submenuSurface
 
@@ -249,11 +328,15 @@ Rectangle {
         // the story entirely, exactly like the host popup.
         opacity: 1
         radius: 10
-        color: LazerTheme.popupBackground
+        color: LazerTheme.settingsPanel
         border.width: 1
         border.color: LazerTheme.popupBorder
+        clip: true
 
         width: root.menuWidth
+        readonly property int submenuHeaderHeight: 48
+        readonly property string submenuHeaderTitle: root.submenuEntry
+                ? String(root.submenuEntry.text || "").replace(/[\n\r]+/g, " ") : ""
         // The column's own top/bottom padding already spaces the content;
         // adding more left a dead band at the bottom. A freshly switched
         // submenu fetches its entries asynchronously, so while nothing has
@@ -262,11 +345,59 @@ Rectangle {
         readonly property int rawColumnHeight: submenuColumn.implicitHeight
         onRawColumnHeightChanged:
             if (rawColumnHeight > 20) heldHeight = rawColumnHeight
-        readonly property int submenuNaturalHeight:
-            rawColumnHeight > 20 ? rawColumnHeight
+        readonly property int contentPart: rawColumnHeight > 20 ? rawColumnHeight
                                  : (heldHeight > 0 ? heldHeight : rawColumnHeight)
+        readonly property int submenuNaturalHeight: submenuHeaderHeight + 1 + contentPart
         property int heldHeight: 0
         height: submenuNaturalHeight
+
+        // Header layer for the submenu — mirrors the root header.
+        Item {
+            id: submenuHeader
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: submenuSurface.submenuHeaderHeight
+
+            Rectangle {
+                anchors.fill: parent
+                radius: submenuSurface.radius
+                color: LazerTheme.settingsRail
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: submenuSurface.radius
+                color: LazerTheme.settingsRail
+            }
+
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 16
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                text: submenuSurface.submenuHeaderTitle
+                color: LazerTheme.textPrimary
+                font.pixelSize: 14
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+                maximumLineCount: 1
+            }
+        }
+
+        Rectangle {
+            id: submenuHeaderDivider
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: submenuHeader.bottom
+            height: 1
+            color: LazerTheme.divider
+        }
 
         // Which side of the root menu this frame docks on; the reveal and
         // slide direction both follow it.
@@ -360,7 +491,7 @@ Rectangle {
 
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: parent.top
+            anchors.top: submenuHeaderDivider.bottom
             topPadding: 8
             bottomPadding: 8
             spacing: 2
