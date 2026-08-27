@@ -101,6 +101,11 @@ Item {
             surface.topAnchored = true
         }
 
+        function test_surfaceLayerOrderKeepsHeaderAboveContent() {
+            verify(surface.headerSurfaceItem.z > surface.contentSurfaceItem.z)
+            verify(surface.dividerItem.z > surface.contentSurfaceItem.z)
+        }
+
         function test_contentProgressStartsAfterDelay() {
             var total = Lazer.MotionTokens.settingsSidebarFade + Lazer.MotionTokens.settingsContentDelay
             var delay = Lazer.MotionTokens.settingsContentDelay

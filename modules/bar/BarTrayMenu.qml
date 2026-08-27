@@ -239,6 +239,7 @@ LazerSplitSurface {
     Flickable {
         id: contentFlickable
         parent: root.contentSurfaceItem
+        z: 2
         anchors.fill: parent
         anchors.margins: 8
         contentHeight: contentColumn.implicitHeight
@@ -490,10 +491,11 @@ LazerSplitSurface {
     Rectangle {
         id: menuFace
 
-        z: 2
+        z: 1
+        parent: root.contentSurfaceItem
         anchors.fill: parent
         radius: 0
-        color: LazerTheme.settingsRail
+        color: LazerTheme.settingsPanel
         border.width: 0
     }
 

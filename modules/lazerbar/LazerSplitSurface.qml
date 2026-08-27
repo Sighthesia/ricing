@@ -52,6 +52,7 @@ Item {
     // Header background surface with independent opacity and slide.
     Rectangle {
         id: headerSurface
+        z: 4
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
@@ -69,6 +70,7 @@ Item {
     // Thin divider separating header and content surfaces.
     Rectangle {
         id: divider
+        z: 4
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: headerSurface.bottom
@@ -79,6 +81,7 @@ Item {
     // Content background surface sized by its children with independent motion.
     Rectangle {
         id: contentSurface
+        z: 3
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: divider.bottom

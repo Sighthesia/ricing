@@ -58,6 +58,8 @@ Variants {
 
             screen: screenScope.modelData
             color: "transparent"
+            // Keep the physical bar above popup surfaces and normal windows.
+            WlrLayershell.layer: WlrLayer.Overlay
             implicitHeight: screenScope.effectiveHeight
             exclusiveZone: screenScope.floating ? 0 : implicitHeight
             anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true; right: true }
@@ -90,6 +92,8 @@ Variants {
 
             screen: screenScope.modelData
             color: "transparent"
+            // Popup content stays above applications but below the bar layer.
+            WlrLayershell.layer: WlrLayer.Top
             exclusionMode: ExclusionMode.Ignore
             exclusiveZone: -1
             anchors {
