@@ -147,7 +147,8 @@ Singleton {
     readonly property string compactPrimaryLyricKey: root.compactTranslatedLyric !== ""
         ? root.compactTranslatedLyricKey : root.compactOriginalLyricKey
     readonly property bool showCompactLyric:
-        root.preferLyrics && (root.compactOriginalLyric !== "" || root.compactTranslatedLyric !== "")
+        root.preferLyrics && root._preferLyricsMediaSource
+            && (root.compactOriginalLyric !== "" || root.compactTranslatedLyric !== "")
     readonly property real progress:
         root.lengthMs > 0 ? Math.max(0, Math.min(1, root.positionMs / root.lengthMs)) : 0
 
