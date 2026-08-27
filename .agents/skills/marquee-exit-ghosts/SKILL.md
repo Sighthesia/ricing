@@ -26,6 +26,12 @@ also suppress creation of the new transition's ghosts.
 - On a new interrupt, retire the previous standing ghost generation before
   creating ghosts for the current `oldText`. Capture `scrollX` first, then
   clear and create exactly one outgoing generation.
+- Do not omit the fresh `spawnGhosts(oldText, ...)` call after clearing an
+  interrupted sweep: early interrupts may have no revealed scan characters,
+  but the outgoing title still needs a falling effect.
+- Keep the real label and scan-row glyph layout on the same kerning setting;
+  otherwise handback from per-character `Text` items to the single `Text`
+  produces a small but visible spacing jump.
 
 ## Verification
 
@@ -36,3 +42,5 @@ also suppress creation of the new transition's ghosts.
 - Run the rapid-interrupt scenario and require only one active ghost generation.
 - Verify that an interrupt before the incoming scan reveals a character still
   produces falling ghosts for the outgoing title.
+- Verify that a long-title exit creates a visible ghost immediately at the
+  switch boundary and that the handback does not change prefix offsets.

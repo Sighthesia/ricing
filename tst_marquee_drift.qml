@@ -30,6 +30,7 @@ Item {
     property real _maxD: 0
     property bool _deepSeen: false
     property bool _ghostSeen: false
+    property bool _immediateGhostSeen: false
     property int _maxGhostCount: 0
 
     function check(labelText, actual, expected) {
@@ -67,6 +68,9 @@ Item {
         if (root._phase === "deep-exit-ghost")
             root.check("deep-exit-ghost: old characters remain visible to fall",
                        root._ghostSeen, true)
+        if (root._phase === "deep-exit-ghost")
+            root.check("deep-exit-ghost: exit starts with a visible ghost",
+                       root._immediateGhostSeen, true)
         if (root._phase === "rapid-interrupt")
             root.check("rapid-interrupt: only one ghost generation remains",
                        root._maxGhostCount <= root._label.transitionMaxChars, true)
@@ -248,6 +252,7 @@ Item {
                     m.text = "new-title"
                     m.transitionFrom(oldTitle, "new-title")
                     root._ghostSeen = false
+                    root._immediateGhostSeen = m.overlay.children.length > 0
                 })
                 t.start()
                 root.beginSampling("deep-exit-ghost", 12000)

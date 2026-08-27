@@ -41,6 +41,8 @@ Item {
             color: root.textColor
             font.pixelSize: root.pixelSize
             font.bold: root.bold
+            // Match the scan row's independent glyph layout at handback.
+            font.kerning: false
             // Track the live scroll offset every frame: a transition can
             // fire before or after syncScroll zeroes x, and this always
             // holds the true current viewport position.
@@ -363,6 +365,11 @@ Item {
         var scrollX = label.x !== 0
             ? Math.min(0, label.x)
             : (root._scrollActive ? Math.min(0, root._preservedScrollX) : 0)
+        // A text/width binding can briefly expose an offset measured against
+        // the next title. Clamp it to the outgoing title's real viewport so
+        // a long title can never have every ghost filtered as off-screen.
+        var maxScrollX = Math.max(0, oldWidth - viewRight)
+        scrollX = Math.max(-maxScrollX, Math.min(0, scrollX))
         if (wasActive) {
             // A fresh interrupt owns the outgoing layer. Previous ghosts
             // belong to an older title generation and must not be retained.
@@ -551,6 +558,7 @@ Item {
                     color: root.textColor
                     font.pixelSize: root.pixelSize
                     font.bold: root.bold
+                    font.kerning: false
                     opacity: 0
 
                     Behavior on opacity { NumberAnimation { duration: root.scanRevealMs; easing.type: Easing.OutQuad } }
