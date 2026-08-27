@@ -1,24 +1,24 @@
 import QtQuick
+import "."
 import "../lazerbar"
 import "../../services" as Services
 
 // Quick actions for the notifications hover popup: do-not-disturb toggle
-// and mark-all-read, in the shared sharp row language.
-Rectangle {
+// and mark-all-read, in the shared sharp row language. Two-layer frame.
+BarPopupFrame {
     id: root
+
+    title: "Notifications"
+    iconSource: "icons/bell.svg"
+    extraText: root.unread > 0 ? String(root.unread) : ""
 
     readonly property bool dnd: Services.NotificationService.dndEnabled
     readonly property int unread: Services.NotificationService.unreadCount
 
     implicitWidth: 240
-    implicitHeight: actionColumn.implicitHeight + 16
     // Explicit dims keep the hosting Loader from stretching the surface.
     width: implicitWidth
     height: implicitHeight
-    radius: 10
-    color: LazerTheme.popupBackground
-    border.width: 1
-    border.color: LazerTheme.popupBorder
 
     Column {
         id: actionColumn
