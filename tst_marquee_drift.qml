@@ -79,6 +79,18 @@ Item {
         Qt.callLater(root._phases.shift())
     }
 
+    function hasVisibleGhost(label) {
+        var kids = label.overlay.children
+        for (var i = 0; i < kids.length; i++) {
+            var ghost = kids[i]
+            if (ghost.visible && ghost.opacity > 0.01
+                    && ghost.x < label.slot.width
+                    && ghost.x + ghost.width > 0)
+                return true
+        }
+        return false
+    }
+
     function makeLabel() {
         var comp = Qt.createComponent("modules/bar/MarqueeLabel.qml")
         root._label = comp.createObject(root, {
@@ -252,7 +264,7 @@ Item {
                     m.text = "new-title"
                     m.transitionFrom(oldTitle, "new-title")
                     root._ghostSeen = false
-                    root._immediateGhostSeen = m.overlay.children.length > 0
+                    root._immediateGhostSeen = root.hasVisibleGhost(m)
                 })
                 t.start()
                 root.beginSampling("deep-exit-ghost", 12000)

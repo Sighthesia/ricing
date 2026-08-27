@@ -416,13 +416,18 @@ Item {
             return
         ghostMetrics.font = label.font
         var created = 0
-        for (var i = 0; i < oldText.length && created < root.transitionMaxChars; i++) {
+        // The visible portion of a marquee can be far past the first 48
+        // characters. Scan the whole outgoing title, but keep the creation
+        // cap for the visible ghosts so a scrolled suffix never vanishes.
+        for (var i = 0; i < oldText.length; i++) {
             ghostMetrics.text = oldText.slice(0, i)
             var x = ghostMetrics.advanceWidth + scrollX
             ghostMetrics.text = oldText.slice(0, i + 1)
             var charEnd = ghostMetrics.advanceWidth + scrollX
             if (viewRight > 0 && (charEnd <= 0 || x >= viewRight))
                 continue
+            if (created >= root.transitionMaxChars)
+                break
             ghostMetrics.text = oldText.slice(0, i)
             lyricGhostComponent.createObject(overlayLayer, {
                 text: oldText[i],
