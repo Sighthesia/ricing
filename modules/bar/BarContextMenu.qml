@@ -107,7 +107,9 @@ Rectangle {
     implicitWidth: railWidth + contentWidth
     implicitHeight: Math.max(240, availHeight - 8)
     radius: 0
-    color: LazerTheme.settingsPanel
+    // Keep a rail-toned fixed owner behind the moving content layer so the
+    // panel's two background blocks visibly separate during the reveal.
+    color: LazerTheme.settingsRail
     // Settings-panel surfaces are separated by tonal blocks, not outlines.
     border.width: 0
     clip: true
@@ -205,6 +207,16 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: topHeaderDivider.bottom
         anchors.bottom: parent.bottom
+
+        // The content block is an animated layer, matching the settings
+        // panel's moving content surface rather than a static card fill.
+        Rectangle {
+            z: -1
+            anchors.fill: parent
+            color: LazerTheme.settingsPanel
+            opacity: root.contentProgress
+            transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
+        }
 
         // Widget target: its operations as card rows. Tray target: the SNI
         // menu entries rendered with the same row language.

@@ -26,7 +26,9 @@ Rectangle {
     readonly property alias contentItem: contentSlot
 
     radius: 0
-    color: LazerTheme.settingsPanel
+    // The fixed owner supplies the rail tone behind the moving content layer;
+    // each visible layer below owns its own settings-panel color block.
+    color: LazerTheme.settingsRail
     // The settings panel uses color blocks for structure, not a popup outline.
     border.width: 0
     clip: true
@@ -124,5 +126,13 @@ Rectangle {
         // Let children define height; the frame tracks implicitHeight.
         implicitHeight: childrenRect.height
         implicitWidth: childrenRect.width
+
+        // Move the content color block with its controls. Without this layer
+        // only the text moves while the panel background appears static.
+        Rectangle {
+            z: -1
+            anchors.fill: parent
+            color: LazerTheme.settingsPanel
+        }
     }
 }

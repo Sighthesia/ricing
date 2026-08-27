@@ -71,7 +71,8 @@ Rectangle {
     width: implicitWidth
     height: implicitHeight
     radius: 0
-    color: LazerTheme.settingsPanel
+    // Fixed owner is the rail tone; the content block moves inside it.
+    color: LazerTheme.settingsRail
     // Match the settings panel's unframed surface hierarchy.
     border.width: 0
     clip: true
@@ -290,6 +291,12 @@ Rectangle {
         clip: true
         opacity: root.contentRevealProgress
         transform: Translate { y: PopupMotion.offset(root.contentRevealProgress, 14) }
+
+        Rectangle {
+            z: -1
+            anchors.fill: parent
+            color: LazerTheme.settingsPanel
+        }
         interactive: contentHeight > height
         boundsBehavior: Flickable.StopAtBounds
 
@@ -332,7 +339,8 @@ Rectangle {
         // the story entirely, exactly like the host popup.
         opacity: 1
         radius: 0
-        color: LazerTheme.settingsPanel
+        // Fixed owner is the rail tone; the content block moves inside it.
+        color: LazerTheme.settingsRail
         border.width: 0
         clip: true
 
@@ -399,6 +407,19 @@ Rectangle {
             anchors.top: submenuHeader.bottom
             height: 1
             color: LazerTheme.divider
+        }
+
+        Rectangle {
+            id: submenuContentBackground
+
+            z: 0
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: submenuHeaderDivider.bottom
+            anchors.bottom: parent.bottom
+            opacity: submenuSurface.contentRevealProgress
+            transform: Translate { y: PopupMotion.offset(submenuSurface.contentRevealProgress, 14) }
+            color: LazerTheme.settingsPanel
         }
 
         // Which side of the root menu this frame docks on; the reveal and
@@ -479,6 +500,8 @@ Rectangle {
 
         Column {
             id: submenuColumn
+
+            z: 1
 
             anchors.left: parent.left
             anchors.right: parent.right
