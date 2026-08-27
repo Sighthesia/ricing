@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import ".."
 import "../../lazerbar"
 import "../../../services" as Services
@@ -30,6 +31,7 @@ Item {
     }
 
     // Icon stays vertically centered; progress sits directly below it.
+    // White stroke SVG is tinted to the wallpaper primary.
     Image {
         id: brightnessIcon
 
@@ -38,6 +40,8 @@ Item {
         height: LazerTheme.barGlyphSize - 4
         source: "../icons/brightness.svg"
         opacity: 0.9
+        layer.enabled: true
+        layer.effect: ColorOverlay { color: LazerTheme.barIcon }
     }
 
     // Rounded horizontal level bar below the icon, replacing the percentage text.

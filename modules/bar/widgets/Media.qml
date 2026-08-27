@@ -272,7 +272,7 @@ BarPill {
 
                 text: root.primaryText
                 maxWidth: root.maxTextWidth
-                textColor: LazerTheme.textPrimary
+                textColor: LazerTheme.barTitle
                 pixelSize: 12
                 bold: true
             }
@@ -286,7 +286,7 @@ BarPill {
                     : Services.MediaControlService.artist
                 visible: text.length > 0
                 maxWidth: root.maxTextWidth
-                textColor: LazerTheme.textMuted
+                textColor: LazerTheme.barSubtitle
                 pixelSize: 10
             }
         }

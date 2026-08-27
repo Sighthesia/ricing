@@ -142,7 +142,7 @@ Item {
                 id: titleText
 
                 text: root.displayTitle
-                textColor: LazerTheme.textPrimary
+                textColor: LazerTheme.barTitle
                 maxWidth: root.maxTitleWidth
                 pixelSize: 12
                 bold: true
@@ -153,7 +153,7 @@ Item {
                 text: root.displayAppName
                 visible: text.length > 0
                 maxWidth: root.maxTitleWidth
-                textColor: LazerTheme.textMuted
+                textColor: LazerTheme.barSubtitle
                 pixelSize: 10
             }
         }

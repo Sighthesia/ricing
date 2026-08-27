@@ -51,7 +51,7 @@ Item {
 
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.timeText
-            color: LazerTheme.textPrimary
+            color: LazerTheme.barTitle
             font.family: "monospace"
             font.pixelSize: 15
             font.bold: true
@@ -63,7 +63,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             visible: root.showDate
             text: root.dateText
-            color: LazerTheme.textMuted
+            color: LazerTheme.barSubtitle
             font.family: "monospace"
             font.pixelSize: 10
         }

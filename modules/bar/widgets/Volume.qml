@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import ".."
 import "../../lazerbar"
 import "../../../services" as Services
@@ -33,6 +34,8 @@ BarPill {
     }
 
     // Icon stays vertically centered; progress sits directly below it.
+    // White stroke SVG is tinted to the wallpaper primary so the bar
+    // glyphs follow the theme like the titles.
     Image {
         id: volumeIcon
 
@@ -41,6 +44,8 @@ BarPill {
         height: LazerTheme.barGlyphSize - 4
         source: "../icons/volume.svg"
         opacity: root.muted ? 0.4 : 0.9
+        layer.enabled: true
+        layer.effect: ColorOverlay { color: LazerTheme.barIcon }
 
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
     }
