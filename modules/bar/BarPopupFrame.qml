@@ -1,5 +1,6 @@
 import QtQuick
 import "../lazerbar"
+import "BarPopupMotion.js" as PopupMotion
 
 // Shared two-layer popup frame reusing the settings panel language.
 // Top layer (near the bar) is a darker rail showing the component/tray name;
@@ -11,6 +12,11 @@ Rectangle {
     property string iconSource: ""
     property string extraText: ""
     property int headerHeight: 48
+    // Host-owned progress lets the header and content enter at different
+    // offsets, matching the settings sidebar's layered reveal.
+    property real revealProgress: 1
+    readonly property real headerProgress: PopupMotion.headerProgress(revealProgress)
+    readonly property real contentProgress: PopupMotion.contentProgress(revealProgress)
 
     default property alias contentData: contentSlot.data
     readonly property alias contentItem: contentSlot
@@ -33,6 +39,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         height: root.headerHeight
+        opacity: root.headerProgress
+        transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
 
         // Straight rail continues the settings sidebar's main-surface shape.
         Rectangle {
@@ -107,6 +115,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: divider.bottom
         anchors.bottom: parent.bottom
+        opacity: root.contentProgress
+        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
         // Let children define height; the frame tracks implicitHeight.
         implicitHeight: childrenRect.height
         implicitWidth: childrenRect.width

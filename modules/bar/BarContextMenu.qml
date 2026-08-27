@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import "../lazerbar"
 import "../../services" as Services
+import "BarPopupMotion.js" as PopupMotion
 
 // Shell menu rendered as a two-level vertical panel in the settings-panel
 // language: a darker rail listing component names (level one) and a content
@@ -20,6 +21,11 @@ Rectangle {
 
     readonly property int railWidth: LazerTheme.settingsSidebarExpandedWidth
     readonly property int contentWidth: 264
+    // The host drives this shared layered reveal; the header leads the two
+    // lower columns with the same offsets as BarPopupFrame and tray menus.
+    property real revealProgress: 1
+    readonly property real headerProgress: PopupMotion.headerProgress(revealProgress)
+    readonly property real contentProgress: PopupMotion.contentProgress(revealProgress)
     // One entry shape for every rail row: widgets, tray items, and the two
     // global actions all ride the same selection model.
     readonly property var railEntries: {
@@ -114,6 +120,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         height: 48
+        opacity: root.headerProgress
+        transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
 
         Rectangle {
             anchors.fill: parent
@@ -155,12 +163,16 @@ Rectangle {
         anchors.bottom: parent.bottom
         width: root.railWidth
         color: LazerTheme.settingsRail
+        opacity: root.contentProgress
+        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
     }
 
     Flickable {
         anchors.left: parent.left
         anchors.top: topHeaderDivider.bottom
         anchors.bottom: parent.bottom
+        opacity: root.contentProgress
+        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
         width: root.railWidth
         contentHeight: railColumn.implicitHeight + 16
         clip: true

@@ -149,6 +149,10 @@ Item {
             // (next event-loop turn), so x/y never get caught mid-pass.
             placementDone.start()
     }
+    onDeformProgressChanged: {
+        if (surfaceLoader.item && surfaceLoader.item.revealProgress !== undefined)
+            surfaceLoader.item.revealProgress = deformProgress
+    }
 
     // Safety valve: never let the guard stick if a surface stays empty.
     Timer {
@@ -260,6 +264,11 @@ Item {
             }
         }
 
+        onItemChanged: {
+            if (item && item.revealProgress !== undefined)
+                item.revealProgress = root.deformProgress
+        }
+
         Component {
             id: trayMenuComponent
 
@@ -326,34 +335,11 @@ Item {
         }
     }
 
-    // Reveal motion stays inside the surface so the window geometry never
-    // changes per frame. Enter: the popup starts fully behind the bar (past
-    // the window edge facing it) and slides into dock while scaling up;
-    // exit reverses both moves. The bar strip lies outside this window, so
-    // the traveling surface is occluded by the bar itself.
-    readonly property real enterTravel: {
-        var gapToBar = root.barTopAnchored
-                ? surfaceLoader.y
-                : root.height - surfaceLoader.y - surfaceLoader.height
-        return gapToBar + surfaceLoader.height * MotionTokens.popupFromScale + 4
+    // The surface is already docked to the bar. Keep the host transform
+    // translation-only; per-layer stagger belongs to BarPopupFrame.
+    readonly property real enterTravel: surfaceLoader.height
+    transform: Translate {
+        y: MotionTokens.reducedMotion ? 0
+           : (root.barTopAnchored ? -1 : 1) * root.enterTravel * (1 - root.deformProgress)
     }
-    transform: [
-        Scale {
-            origin.x: {
-                var surface = surfaceLoader.item
-                return surface ? surfaceLoader.x + surfaceLoader.width / 2 : root.width / 2
-            }
-            origin.y: {
-                var surface = surfaceLoader.item
-                return surface ? (root.barTopAnchored ? surfaceLoader.y
-                                                      : surfaceLoader.y + surfaceLoader.height) : root.height / 2
-            }
-            xScale: MotionTokens.reducedMotion ? 1 : MotionTokens.popupFromScale + (1 - MotionTokens.popupFromScale) * root.deformProgress
-            yScale: MotionTokens.reducedMotion ? 1 : MotionTokens.popupFromScale + (1 - MotionTokens.popupFromScale) * root.deformProgress
-        },
-        Translate {
-            y: MotionTokens.reducedMotion ? 0
-               : (root.barTopAnchored ? -1 : 1) * root.enterTravel * (1 - root.deformProgress)
-        }
-    ]
 }

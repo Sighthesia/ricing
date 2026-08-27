@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import "../lazerbar"
 import "../../services" as Services
+import "BarPopupMotion.js" as PopupMotion
 
 // Render one tray item's DBusMenu with the lazer popup language: sharp
 // surface, brightness-diff hover, and geometric state indicators.
@@ -33,6 +34,9 @@ Rectangle {
         return String(payload.title || payload.tooltipTitle || payload.id || "Tray").replace(/[\n\r]+/g, " ")
     }
     readonly property string headerIconSource: payload && payload.icon ? String(payload.icon) : ""
+    property real revealProgress: 1
+    readonly property real headerProgress: PopupMotion.headerProgress(revealProgress)
+    readonly property real contentRevealProgress: PopupMotion.contentProgress(revealProgress)
     // Sweeping between tray items swaps the DBusMenu handle and the new
     // children arrive asynchronously; hold the last settled height so the
     // frame never collapses mid-swap.
@@ -77,6 +81,8 @@ Rectangle {
         anchors.top: parent.top
         height: root.headerHeight
         z: 4
+        opacity: root.headerProgress
+        transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
 
         Rectangle {
             anchors.fill: parent
@@ -277,6 +283,8 @@ Rectangle {
         anchors.bottom: parent.bottom
         contentHeight: contentColumn.implicitHeight
         clip: true
+        opacity: root.contentRevealProgress
+        transform: Translate { y: PopupMotion.offset(root.contentRevealProgress, 14) }
         interactive: contentHeight > height
         boundsBehavior: Flickable.StopAtBounds
 
@@ -327,6 +335,8 @@ Rectangle {
         readonly property int submenuHeaderHeight: 48
         readonly property string submenuHeaderTitle: root.submenuEntry
                 ? String(root.submenuEntry.text || "").replace(/[\n\r]+/g, " ") : ""
+        readonly property real headerRevealProgress: PopupMotion.headerProgress(root.submenuProgress)
+        readonly property real contentRevealProgress: PopupMotion.contentProgress(root.submenuProgress)
         // The column's own top/bottom padding already spaces the content;
         // adding more left a dead band at the bottom. A freshly switched
         // submenu fetches its entries asynchronously, so while nothing has
@@ -349,6 +359,8 @@ Rectangle {
             anchors.right: parent.right
             anchors.top: parent.top
             height: submenuSurface.submenuHeaderHeight
+            opacity: submenuSurface.headerRevealProgress
+            transform: Translate { y: -PopupMotion.offset(submenuSurface.headerRevealProgress, 12) }
 
             Rectangle {
                 anchors.fill: parent
@@ -465,6 +477,8 @@ Rectangle {
             topPadding: 8
             bottomPadding: 8
             spacing: 2
+            opacity: submenuSurface.contentRevealProgress
+            transform: Translate { y: PopupMotion.offset(submenuSurface.contentRevealProgress, 14) }
 
             Repeater {
                 model: [...submenuOpener.children.values]
