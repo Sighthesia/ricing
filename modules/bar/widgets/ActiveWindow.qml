@@ -40,6 +40,24 @@ Item {
     // Tracks the last choreographed title so the first render never plays
     // the exit/enter transition for content that was never visible.
     property string trackedTitle: ""
+    // Coalesce a transient desktop fallback during workspace switches:
+    // Niri briefly reports no active window while the workspace animates,
+    // so displayTitle flicks window -> desktop -> next window. Holding
+    // the desktop for one scan gap avoids a full desktop flash that
+    // would clear the outgoing window's falling ghosts.
+    property string _pendingDesktopPrev: ""
+    Timer {
+        id: desktopHold
+        interval: 120
+        onTriggered: {
+            if (root.displayTitle !== root.desktopLabel || root._pendingDesktopPrev === "")
+                return
+            var prev = root._pendingDesktopPrev
+            root._pendingDesktopPrev = ""
+            root.trackedTitle = root.displayTitle
+            titleText.transitionFrom(prev, root.displayTitle)
+        }
+    }
 
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
@@ -49,9 +67,33 @@ Item {
     onDisplayTitleChanged: {
         var previous = root.trackedTitle
         if (previous === "" || root.displayTitle === previous) {
+            // A pending desktop hold would now be stale.
+            if (desktopHold.running) {
+                desktopHold.stop()
+                root._pendingDesktopPrev = ""
+            }
             root.trackedTitle = root.displayTitle
             return
         }
+        // Window -> desktop: hold briefly to see if a new window follows
+        // within the switch animation. This prevents the desktop label
+        // from stealing the outgoing ghosts mid-flight.
+        if (root.displayTitle === root.desktopLabel) {
+            root._pendingDesktopPrev = previous
+            desktopHold.restart()
+            return
+        }
+        // Desktop was held and a new window arrived: skip desktop entirely
+        // and animate directly from the original window to the new one.
+        if (desktopHold.running) {
+            desktopHold.stop()
+            var coalescedPrev = root._pendingDesktopPrev !== "" ? root._pendingDesktopPrev : previous
+            root._pendingDesktopPrev = ""
+            root.trackedTitle = root.displayTitle
+            titleText.transitionFrom(coalescedPrev, root.displayTitle)
+            return
+        }
+        root._pendingDesktopPrev = ""
         root.trackedTitle = root.displayTitle
         // Per-char fade-in entrance plus staggered falling ghost exit,
         // reusing the media pill's main-line contract via MarqueeLabel.
