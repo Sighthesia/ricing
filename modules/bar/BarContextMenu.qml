@@ -10,7 +10,7 @@ import "BarPopupMotion.js" as PopupMotion
 // column showing the selected component's actions and related entries
 // (level two). The host drops it flush beneath the bar with the shared
 // occlusion reveal.
-Rectangle {
+Item {
     id: root
 
     signal openSettingsRequested()
@@ -24,8 +24,9 @@ Rectangle {
     // The host drives this shared layered reveal; the header leads the two
     // lower columns with the same offsets as BarPopupFrame and tray menus.
     property real revealProgress: 1
-    readonly property real headerProgress: PopupMotion.headerProgress(revealProgress)
-    readonly property real contentProgress: PopupMotion.contentProgress(revealProgress)
+    readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
+    readonly property real headerProgress: PopupMotion.headerProgress(revealProgress, revealDuration, MotionTokens.settingsSidebarFade)
+    readonly property real contentProgress: PopupMotion.contentProgress(revealProgress, revealDuration, MotionTokens.settingsContentDelay, MotionTokens.settingsSidebarFade)
     // One entry shape for every rail row: widgets, tray items, and the two
     // global actions all ride the same selection model.
     readonly property var railEntries: {
@@ -106,29 +107,21 @@ Rectangle {
 
     implicitWidth: railWidth + contentWidth
     implicitHeight: Math.max(240, availHeight - 8)
-    radius: 0
-    // Keep a rail-toned fixed owner behind the moving content layer so the
-    // panel's two background blocks visibly separate during the reveal.
-    color: LazerTheme.settingsRail
-    // Settings-panel surfaces are separated by tonal blocks, not outlines.
-    border.width: 0
     clip: true
 
-    // ── Top header: bar-proximal layer naming the selected component ──
-    Item {
-        id: topHeader
+    // ── Top header card (settingsRail) ──
+    Rectangle {
+        id: headerCard
 
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         height: 48
+        radius: 0
+        color: LazerTheme.settingsRail
+        border.width: 0
         opacity: root.headerProgress
         transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
-
-        Rectangle {
-            anchors.fill: parent
-            color: LazerTheme.settingsRail
-        }
 
         Text {
             anchors.left: parent.left
@@ -150,32 +143,31 @@ Rectangle {
 
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: topHeader.bottom
+        anchors.top: headerCard.bottom
         height: 1
         color: LazerTheme.divider
     }
 
-    // ── Level one: the darker rail of component names ──
+    // ── Level one: rail card (settingsPanel) ──
 
     Rectangle {
-        id: railSurface
+        id: railCard
 
         anchors.left: parent.left
         anchors.top: topHeaderDivider.bottom
         anchors.bottom: parent.bottom
         width: root.railWidth
-        color: LazerTheme.settingsRail
+        radius: 0
+        color: LazerTheme.settingsPanel
+        border.width: 0
         opacity: root.contentProgress
         transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
     }
 
     Flickable {
-        anchors.left: parent.left
-        anchors.top: topHeaderDivider.bottom
-        anchors.bottom: parent.bottom
-        opacity: root.contentProgress
-        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
-        width: root.railWidth
+        anchors.fill: railCard
+        anchors.margins: 6
+        clip: true
         contentHeight: railColumn.implicitHeight + 16
         clip: true
         interactive: contentHeight > height
@@ -198,25 +190,27 @@ Rectangle {
         }
     }
 
-    // ── Level two: the selected component's actions and content ──
+    // ── Level two: content card (settingsSection) ──
+
+    Rectangle {
+        id: contentCard
+
+        anchors.left: railCard.right
+        anchors.right: parent.right
+        anchors.top: topHeaderDivider.bottom
+        anchors.bottom: parent.bottom
+        radius: 0
+        color: LazerTheme.settingsSection
+        border.width: 0
+        opacity: root.contentProgress
+        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
+    }
 
     Item {
         id: contentArea
 
-        anchors.left: railSurface.right
-        anchors.right: parent.right
-        anchors.top: topHeaderDivider.bottom
-        anchors.bottom: parent.bottom
-
-        // The content block is an animated layer, matching the settings
-        // panel's moving content surface rather than a static card fill.
-        Rectangle {
-            z: -1
-            anchors.fill: parent
-            color: LazerTheme.settingsPanel
-            opacity: root.contentProgress
-            transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
-        }
+        anchors.fill: contentCard
+        anchors.margins: 8
 
         // Widget target: its operations as card rows. Tray target: the SNI
         // menu entries rendered with the same row language.
