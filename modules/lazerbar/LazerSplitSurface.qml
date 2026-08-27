@@ -13,6 +13,8 @@ Item {
     property bool interactive: true
     // Fixed header height; host may override for different popup sizes.
     property int headerHeight: 48
+    // Popups mirror the bar edge so both cards travel from behind it.
+    property bool topAnchored: true
     // Content background color; defaults to the shared settings panel surface.
     property color contentColor: LazerTheme.settingsPanel
     // Header children are mounted in the rail surface, beside contentData.
@@ -26,6 +28,8 @@ Item {
     readonly property real contentProgress: PopupMotion.contentProgress(revealProgress, revealDuration, MotionTokens.settingsContentDelay, MotionTokens.settingsSidebarFade)
     // Interaction is enabled only when fully revealed and host allows it.
     readonly property bool interactable: interactive && contentProgress > 0.99
+    readonly property real headerTravel: root.headerHeight
+    readonly property real contentTravel: Math.max(0, contentSurface.height)
 
     // Default children are parented below the content background surface.
     default property alias contentData: contentSurface.data
@@ -35,8 +39,15 @@ Item {
     readonly property alias dividerItem: divider
 
     implicitWidth: Math.max(headerSurface.implicitWidth, contentSurface.implicitWidth)
-    implicitHeight: headerSurface.height + divider.height + contentSurface.implicitHeight
-    clip: true
+    // Prefer the host's settled height when available. This prevents an
+    // anchors.fill child (such as a Flickable) from making content height
+    // self-referential during Loader creation.
+    implicitHeight: headerSurface.height + divider.height
+            + (root.height > headerSurface.height + divider.height
+               ? root.height - headerSurface.height - divider.height
+               : contentSurface.implicitHeight)
+    // The popup window and bar provide occlusion. The owner must not clip
+    // cards while they travel into or out of that occluded area.
 
     // Header background surface with independent opacity and slide.
     Rectangle {
@@ -49,7 +60,10 @@ Item {
         color: LazerTheme.settingsRail
         border.width: 0
         opacity: 1
-        transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
+        transform: Translate {
+            y: (root.topAnchored ? -1 : 1) * root.headerTravel
+                    * (1 - root.headerProgress)
+        }
     }
 
     // Thin divider separating header and content surfaces.
@@ -70,13 +84,18 @@ Item {
         anchors.top: divider.bottom
         implicitHeight: childrenRect.height
         implicitWidth: childrenRect.width
-        height: implicitHeight
+        height: root.height > root.headerHeight + divider.height
+                ? root.height - root.headerHeight - divider.height
+                : implicitHeight
         radius: 0
         color: root.contentColor
         border.width: 0
         opacity: 1
         // Keep non-visual QObjects such as QsMenuOpener alive while revealing.
         enabled: root.interactive
-        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
+        transform: Translate {
+            y: (root.topAnchored ? 1 : -1) * root.contentTravel
+                    * (1 - root.contentProgress)
+        }
     }
 }

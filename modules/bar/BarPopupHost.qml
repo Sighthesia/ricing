@@ -15,6 +15,8 @@ Item {
     property int barHeight: 48
     property bool barTopAnchored: true
     property real floatingMargin: 0
+    // Clearance reserved by the popup window for the two-layer travel path.
+    property real travelInset: 48
 
     readonly property bool popupVisible: Services.BarPopupService.visible
     // A brand-new loader instance is born at zero geometry; morph must stay
@@ -220,8 +222,8 @@ Item {
                                         root.width - frameWidth - 8))
         }
         readonly property real frameY: root.barTopAnchored
-           ? 0
-           : root.height - frameHeight
+           ? root.travelInset
+           : root.height - root.travelInset - frameHeight
         width: frameWidth
         height: frameHeight
         x: frameX
@@ -258,6 +260,8 @@ Item {
         }
 
         onItemChanged: {
+            if (item && item.topAnchored !== undefined)
+                item.topAnchored = root.barTopAnchored
             if (item && item.revealProgress !== undefined)
                 item.revealProgress = root.deformProgress
         }

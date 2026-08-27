@@ -64,7 +64,6 @@ LazerSplitSurface {
     onPayloadChanged: closeSubmenu()
     width: implicitWidth
     height: implicitHeight
-    clip: true
 
     // Header content follows the shared rail surface reveal.
     Row {
@@ -243,7 +242,6 @@ LazerSplitSurface {
         anchors.fill: parent
         anchors.margins: 8
         contentHeight: contentColumn.implicitHeight
-        clip: true
         interactive: contentHeight > height
         boundsBehavior: Flickable.StopAtBounds
 
@@ -289,7 +287,6 @@ LazerSplitSurface {
         // Fixed owner is the rail tone; the content block moves inside it.
         color: LazerTheme.settingsRail
         border.width: 0
-        clip: true
 
         width: root.menuWidth
         readonly property int submenuHeaderHeight: 48

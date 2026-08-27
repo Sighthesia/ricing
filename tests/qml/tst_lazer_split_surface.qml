@@ -81,6 +81,16 @@ Item {
             compare(surface.contentSurfaceItem.transform[0].y, 0)
         }
 
+        function test_surfaceUsesFullCardTravelWithoutClipping() {
+            surface.revealProgress = 0
+            compare(surface.headerTravel, surface.headerHeight)
+            verify(surface.contentTravel >= surface.contentSurfaceItem.height)
+            verify(!surface.clip)
+            surface.revealProgress = 1
+            compare(surface.headerSurfaceItem.transform[0].y, 0)
+            compare(surface.contentSurfaceItem.transform[0].y, 0)
+        }
+
         function test_contentProgressStartsAfterDelay() {
             var total = Lazer.MotionTokens.settingsSidebarFade + Lazer.MotionTokens.settingsContentDelay
             var delay = Lazer.MotionTokens.settingsContentDelay

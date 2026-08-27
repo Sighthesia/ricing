@@ -86,6 +86,7 @@ Variants {
         // Input stays limited to the visible popup via a mask region.
         PanelWindow {
             id: popupWindow
+            readonly property real popupTravelInset: 48
 
             screen: screenScope.modelData
             color: "transparent"
@@ -99,14 +100,14 @@ Variants {
             }
             margins {
                 top: Services.SettingsService.bar.position === "top"
-                     ? screenScope.floatingMargin + screenScope.effectiveHeight : screenScope.floatingMargin
+                     ? screenScope.floatingMargin + screenScope.effectiveHeight - popupTravelInset : screenScope.floatingMargin
                 bottom: Services.SettingsService.bar.position === "bottom"
-                        ? screenScope.floatingMargin + screenScope.effectiveHeight : screenScope.floatingMargin
+                        ? screenScope.floatingMargin + screenScope.effectiveHeight - popupTravelInset : screenScope.floatingMargin
                 left: screenScope.floatingMargin
                 right: screenScope.floatingMargin
             }
             implicitHeight: screenScope.modelData.height - screenScope.effectiveHeight
-                    - screenScope.floatingMargin * 2
+                    - screenScope.floatingMargin * 2 + popupTravelInset
             // Take keyboard only while a popup is up so Escape reaches it and
             // global keys stay free when closed.
             WlrLayershell.keyboardFocus: Services.BarPopupService.visible
@@ -135,6 +136,7 @@ Variants {
                 barHeight: screenScope.effectiveHeight
                 barTopAnchored: Services.SettingsService.bar.position === "top"
                 floatingMargin: screenScope.floatingMargin
+                travelInset: popupWindow.popupTravelInset
             }
         }
 

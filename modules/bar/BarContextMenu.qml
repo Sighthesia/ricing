@@ -104,7 +104,6 @@ LazerSplitSurface {
 
     implicitWidth: railWidth + contentWidth
     implicitHeight: Math.max(240, availHeight - 8)
-    clip: true
 
     // Header title follows the shared rail surface reveal.
     Text {
