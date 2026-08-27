@@ -104,6 +104,46 @@ Rectangle {
     color: LazerTheme.settingsPanel
     border.width: 1
     border.color: LazerTheme.popupBorder
+    clip: true
+
+    // ── Top header: bar-proximal layer naming the selected component ──
+    Item {
+        id: topHeader
+
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: 48
+
+        Rectangle {
+            anchors.fill: parent
+            color: LazerTheme.settingsRail
+        }
+
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 16
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.selectedEntry && root.selectedEntry.label ? root.selectedEntry.label : "Components"
+            color: LazerTheme.textPrimary
+            font.pixelSize: 14
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+            maximumLineCount: 1
+        }
+    }
+
+    Rectangle {
+        id: topHeaderDivider
+
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: topHeader.bottom
+        height: 1
+        color: LazerTheme.divider
+    }
 
     // ── Level one: the darker rail of component names ──
 
@@ -111,7 +151,7 @@ Rectangle {
         id: railSurface
 
         anchors.left: parent.left
-        anchors.top: parent.top
+        anchors.top: topHeaderDivider.bottom
         anchors.bottom: parent.bottom
         width: root.railWidth
         color: LazerTheme.settingsRail
@@ -119,7 +159,7 @@ Rectangle {
 
     Flickable {
         anchors.left: parent.left
-        anchors.top: parent.top
+        anchors.top: topHeaderDivider.bottom
         anchors.bottom: parent.bottom
         width: root.railWidth
         contentHeight: railColumn.implicitHeight + 16
@@ -151,47 +191,13 @@ Rectangle {
 
         anchors.left: railSurface.right
         anchors.right: parent.right
-        anchors.top: parent.top
+        anchors.top: topHeaderDivider.bottom
         anchors.bottom: parent.bottom
-
-        // Header strip naming the selected component, mirroring the settings
-        // panel's section title treatment.
-        Item {
-            id: headerSlot
-
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: 52
-
-            Text {
-                anchors.left: parent.left
-                anchors.leftMargin: 16
-                anchors.right: parent.right
-                anchors.rightMargin: 16
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.selectedEntry && root.selectedEntry.label
-                      ? root.selectedEntry.label : "Components"
-                color: LazerTheme.textPrimary
-                font.pixelSize: 14
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
-                maximumLineCount: 1
-            }
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: 1
-                color: LazerTheme.divider
-            }
-        }
 
         // Widget target: its operations as card rows. Tray target: the SNI
         // menu entries rendered with the same row language.
         Flickable {
-            anchors.top: headerSlot.bottom
+            anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
