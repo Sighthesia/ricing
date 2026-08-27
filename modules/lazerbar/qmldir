@@ -54,3 +54,4 @@ LauncherExitCard 1.0 LauncherExitCard.qml
 LockScreen 1.0 LockScreen.qml
 LockSurface 1.0 LockSurface.qml
 LazerSplitSurface 1.0 LazerSplitSurface.qml
+TwoLayerPopup 1.0 TwoLayerPopup.qml
