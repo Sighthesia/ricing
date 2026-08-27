@@ -236,10 +236,16 @@ Item {
             return false
         if (direction < 0 && typeof root.session.selectPrevious === "function") {
             root.session.selectPrevious()
+            // Arrow navigation changes the selected row but must not move the
+            // keyboard owner away from the search editor. This also repairs
+            // focus when the event came from a result row or page fallback.
+            root.focusSearch()
             return true
         }
         if (direction > 0 && typeof root.session.selectNext === "function") {
             root.session.selectNext()
+            // Keep subsequent typing in the search field after navigation.
+            root.focusSearch()
             return true
         }
         return false
