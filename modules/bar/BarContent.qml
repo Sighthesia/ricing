@@ -242,8 +242,9 @@ Item {
         anchors.fill: parent
         z: 50
         enabled: Services.BarLayoutService.settingsMode
+        visible: Services.BarLayoutService.settingsMode
         acceptedButtons: Qt.LeftButton
-        cursorShape: Qt.DragMoveCursor
+        cursorShape: Services.BarLayoutService.settingsMode ? Qt.DragMoveCursor : Qt.ArrowCursor
 
         onPressed: mouse => {
             var hit = root.widgetAt(mouse.x, mouse.y)
