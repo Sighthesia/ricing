@@ -2,18 +2,15 @@ import QtQuick
 import "../lazerbar"
 import "BarPopupMotion.js" as PopupMotion
 
-// Shared two-layer popup frame reusing the settings panel language.
-// Top layer (near the bar) is a darker rail showing the component/tray name;
-// bottom layer is the content slot. Visual tokens mirror LazerSettings.
-Rectangle {
+// Shared two-card popup frame reusing the settings sidebar's independent surfaces.
+// Two brother cards (headerCard + contentCard) each own their background and motion.
+Item {
     id: root
 
     property string title: ""
     property string iconSource: ""
     property string extraText: ""
     property int headerHeight: 48
-    // Host-owned progress lets the header and content enter at different
-    // offsets, matching the settings sidebar's layered reveal.
     property real revealProgress: 1
     readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
     readonly property real headerProgress: PopupMotion.headerProgress(
@@ -22,39 +19,28 @@ Rectangle {
         revealProgress, revealDuration, MotionTokens.settingsContentDelay,
         MotionTokens.settingsSidebarFade)
 
-    default property alias contentData: contentSlot.data
-    readonly property alias contentItem: contentSlot
+    default property alias contentData: contentCard.data
+    readonly property alias contentItem: contentCard
+    readonly property alias headerCard: headerCard
 
-    radius: 0
-    // The fixed owner supplies the rail tone behind the moving content layer;
-    // each visible layer below owns its own settings-panel color block.
-    color: LazerTheme.settingsRail
-    // The settings panel uses color blocks for structure, not a popup outline.
-    border.width: 0
     clip: true
 
-    // Implicit size follows the content plus the two-layer chrome.
-    implicitWidth: Math.max(headerRow.implicitWidth + 32, contentSlot.implicitWidth + 24)
-    implicitHeight: header.height + divider.height + contentSlot.implicitHeight
+    implicitWidth: Math.max(headerRow.implicitWidth + 32, contentCard.implicitWidth + 24)
+    implicitHeight: headerCard.height + divider.height + contentCard.implicitHeight
 
-    // -- Header layer (settingsRail) --
-    Item {
-        id: header
+    // -- Header card (settingsRail) --
+    Rectangle {
+        id: headerCard
 
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         height: root.headerHeight
+        radius: 0
+        color: LazerTheme.settingsRail
+        border.width: 0
         opacity: root.headerProgress
         transform: Translate { y: -PopupMotion.offset(root.headerProgress, 12) }
-
-        // Straight rail continues the settings sidebar's main-surface shape.
-        Rectangle {
-            id: headerBg
-
-            anchors.fill: parent
-            color: LazerTheme.settingsRail
-        }
 
         Row {
             id: headerRow
@@ -108,31 +94,26 @@ Rectangle {
 
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: header.bottom
+        anchors.top: headerCard.bottom
         height: 1
         color: LazerTheme.divider
     }
 
-    // Content slot below the divider; callers fill it with Flickable/Column etc.
-    Item {
-        id: contentSlot
+    // -- Content card (settingsPanel) --
+    Rectangle {
+        id: contentCard
 
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: divider.bottom
-        anchors.bottom: parent.bottom
-        opacity: root.contentProgress
-        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
-        // Let children define height; the frame tracks implicitHeight.
+        // Height tracks children; let callers define via Column/Flickable.
         implicitHeight: childrenRect.height
         implicitWidth: childrenRect.width
-
-        // Move the content color block with its controls. Without this layer
-        // only the text moves while the panel background appears static.
-        Rectangle {
-            z: -1
-            anchors.fill: parent
-            color: LazerTheme.settingsPanel
-        }
+        height: implicitHeight
+        radius: 0
+        color: LazerTheme.settingsPanel
+        border.width: 0
+        opacity: root.contentProgress
+        transform: Translate { y: PopupMotion.offset(root.contentProgress, 14) }
     }
 }
