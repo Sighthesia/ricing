@@ -18,7 +18,6 @@ FluidText 1.0 FluidText.qml
 AnimatedTextSwitch 1.0 AnimatedTextSwitch.qml
 AnimatedIconSwitch 1.0 AnimatedIconSwitch.qml
 singleton LauncherService 1.0 LauncherService.qml
-singleton LockService 1.0 LockService.qml
 singleton MediaService 1.0 MediaService.qml
 singleton MediaControlService 1.0 MediaControlService.qml
 singleton NeteaseWebLyricsService 1.0 NeteaseWebLyricsService.qml

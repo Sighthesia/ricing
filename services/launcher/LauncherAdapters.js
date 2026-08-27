@@ -87,16 +87,7 @@ function appItem(entry, launchCounts, iconResolver) {
 // managed-bind seam: actionArgv routes actionId "shell.<target>.<fn>" through
 // the afloat IPC helper.
 function builtinCommands() {
-    return [
-        {
-            id: "builtin-lock",
-            label: "锁定屏幕",
-            description: "锁屏 · lock screen",
-            keywords: "lock 锁屏 锁定 屏幕 lockscreen",
-            icon: "icons/lock.svg",
-            actionId: "shell.lock.activate"
-        }
-    ]
+    return []
 }
 
 function commandMatches(command, needle) {

@@ -51,7 +51,5 @@ FullscreenSidebar 1.0 FullscreenSidebar.qml
 LauncherPage 1.0 LauncherPage.qml
 LauncherResultRow 1.0 LauncherResultRow.qml
 LauncherExitCard 1.0 LauncherExitCard.qml
-LockScreen 1.0 LockScreen.qml
-LockSurface 1.0 LockSurface.qml
 LazerSplitSurface 1.0 LazerSplitSurface.qml
 TwoLayerPopup 1.0 TwoLayerPopup.qml
