@@ -143,6 +143,13 @@ Item {
             compare(panel.barNav.labelItem.color, Lazer.LazerTheme.settingsNavInactive)
         }
 
+        function test_usesSharedTwoLayerPopupGeometry() {
+            compare(panel.sidebar.parent, panel.layerPopup.sidebarLayer)
+            compare(panel.content.parent, panel.layerPopup.contentLayer)
+            compare(panel.sidebar.x, panel.sidebarLayerX)
+            compare(panel.content.x, panel.contentLayerX)
+        }
+
         function test_sidebarIndicatorMovesAsOneContinuousSurface() {
             var indicator = panel.sidebar.selectionIndicator
             var appearanceY = indicator.y

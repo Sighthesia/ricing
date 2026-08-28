@@ -62,6 +62,7 @@ Item {
     property alias appearancePage: appearanceSection
     property alias barPage: barSection
     property alias notificationPage: notificationSection
+    property alias layerPopup: layerPopup
     property alias appearanceNav: sidebarLayer.appearanceNav
     property alias barNav: sidebarLayer.barNav
     property alias notificationNav: sidebarLayer.notificationNav
@@ -89,8 +90,8 @@ Item {
 
     function debugSnapshot() {
         return {
-            "rect": root._rect(root), "sidebar": { "rect": root._rect(sidebarLayer), "x": Number(sidebarLayer.x), "width": Number(sidebarLayer.width), "z": Number(sidebarLayer.z) },
-            "content": { "rect": root._rect(contentLayer), "x": Number(contentLayer.x), "width": Number(contentLayer.width), "z": Number(contentLayer.z) },
+            "rect": root._rect(root), "sidebar": { "rect": root._rect(layerPopup.sidebarLayer), "x": Number(sidebarLayer.x), "width": Number(sidebarLayer.width), "z": Number(sidebarLayer.z) },
+            "content": { "rect": root._rect(layerPopup.contentLayer), "x": Number(contentLayer.x), "width": Number(contentLayer.width), "z": Number(contentLayer.z) },
             "selectedCategory": root.selectedCategory, "currentIndex": root.selectedIndex,
             "interactive": root.interactive, "visible": root.visible, "enabled": root.enabled,
             "opacity": Number(root.opacity), "z": Number(root.z),
@@ -210,80 +211,87 @@ Item {
         }
     }
 
-    // Slide the sidebar rail as one independently animated owner layer.
-    // It must sit above the content layer (osu adds Sidebar last) so its rail
-    // and nav entries stay visible over the content background extension.
-    LazerSettingsSidebar {
-        id: sidebarLayer
-        z: 1
-        x: root.sidebarLayerX
-        y: 0
-        width: root.sidebarWidth
-        height: root.height
-        expanded: root.sidebarExpanded
-        expansionProgress: root.collapseProgress
-        interactive: root.interactive
-        selectedIndex: root.selectedIndex
-        categoryAvailable: root.categoryAvailable
-        opacity: root.layerOpacity
-        onCategorySelected: index => root.selectCategory(root.categoryAt(index))
-        onMoveRequested: direction => root.moveNavigation(direction)
-        onCollapseToggleRequested: root.toggleExpanded()
-        onCloseRequested: root.requestClose()
-    }
+    // Shared two-layer popup host for the settings panel.
+    // Keeps sidebar and content as sibling hosts driven by revealProgress.
+    TwoLayerPopup {
+        id: layerPopup
+        orientation: TwoLayerPopup.Orientation.Horizontal
+        revealProgress: root.progress
+        horizontalSidebarX: root.sidebarLayerX
+        horizontalContentX: root.contentLayerX
 
-    // Slide the content viewport as a second independent owner layer.
-    LazerSettingsContent {
-        id: contentLayer
-        x: root.contentLayerX
-        y: 0
-        width: root.contentWidth
-        height: root.height
-        backgroundExtend: Math.max(0, root.panelWidth - root.contentWidth)
-        searchQuery: root.searchQuery
-        interactive: root.interactive
-        contentReady: root.contentReady
-        expanded: root.sidebarExpanded
-        currentSectionIndex: root.selectedIndex
-        sections: sectionsItem
-        opacity: root.layerOpacity
-        onSearchQueryEdited: query => root.searchQuery = query
-
-        // Stack every category as one flat, scrollable section block.
-        LazerSettingsSections {
-            id: sectionsItem
-            width: parent.width
-            height: parent.height
-            interactionEnabled: root.interactive
+        // Preserve z-order via the injected layers; sidebar must sit above content.
+        sidebarData: LazerSettingsSidebar {
+            id: sidebarLayer
+            z: 1
+            x: root.sidebarLayerX
+            y: 0
+            width: root.sidebarWidth
+            height: root.height
+            expanded: root.sidebarExpanded
+            expansionProgress: root.collapseProgress
+            interactive: root.interactive
+            selectedIndex: root.selectedIndex
+            categoryAvailable: root.categoryAvailable
+            opacity: root.layerOpacity
+            onCategorySelected: index => root.selectCategory(root.categoryAt(index))
+            onMoveRequested: direction => root.moveNavigation(direction)
+            onCollapseToggleRequested: root.toggleExpanded()
+            onCloseRequested: root.requestClose()
+        }
+        contentData: LazerSettingsContent {
+            id: contentLayer
+            z: 0
+            x: root.contentLayerX
+            y: 0
+            width: root.contentWidth
+            height: root.height
+            backgroundExtend: Math.max(0, root.panelWidth - root.contentWidth)
             searchQuery: root.searchQuery
-            dropdownOpen: contentLayer.dropdownOpen
+            interactive: root.interactive
+            contentReady: root.contentReady
+            expanded: root.sidebarExpanded
+            currentSectionIndex: root.selectedIndex
+            sections: sectionsItem
+            opacity: root.layerOpacity
+            onSearchQueryEdited: query => root.searchQuery = query
 
-            LazerSettingsAppearance {
-                id: appearanceSection
-                settingsObject: root.appearanceSettings
-                saveCallback: root.saveCallback
-                wallpaperService: root.wallpaperService
-                defaults: root.appearanceDefaults
-                resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("appearance", key, value) }
-                onActivated: root.selectCategory("appearance")
-            }
+            // Stack every category as one flat, scrollable section block.
+            LazerSettingsSections {
+                id: sectionsItem
+                width: parent.width
+                height: parent.height
+                interactionEnabled: root.interactive
+                searchQuery: root.searchQuery
+                dropdownOpen: contentLayer.dropdownOpen
 
-            LazerSettingsBar {
-                id: barSection
-                settingsObject: root.barSettings
-                saveCallback: root.saveCallback
-                defaults: root.barDefaults
-                resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("bar", key, value) }
-                onActivated: root.selectCategory("bar")
-            }
+                LazerSettingsAppearance {
+                    id: appearanceSection
+                    settingsObject: root.appearanceSettings
+                    saveCallback: root.saveCallback
+                    wallpaperService: root.wallpaperService
+                    defaults: root.appearanceDefaults
+                    resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("appearance", key, value) }
+                    onActivated: root.selectCategory("appearance")
+                }
 
-            LazerSettingsNotifications {
-                id: notificationSection
-                settingsObject: root.notificationSettings
-                saveCallback: root.saveCallback
-                defaults: root.notificationDefaults
-                resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("notifications", key, value) }
-                onActivated: root.selectCategory("notifications")
+                LazerSettingsBar {
+                    id: barSection
+                    settingsObject: root.barSettings
+                    saveCallback: root.saveCallback
+                    defaults: root.barDefaults
+                    resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("bar", key, value) }
+                    onActivated: root.selectCategory("bar")
+                }
+
+                LazerSettingsNotifications {
+                    id: notificationSection
+                    settingsObject: root.notificationSettings
+                    saveCallback: root.saveCallback
+                    defaults: root.notificationDefaults
+                    resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("notifications", key, value) }
+                    onActivated: root.selectCategory("notifications")
+                }
             }
         }
     }
