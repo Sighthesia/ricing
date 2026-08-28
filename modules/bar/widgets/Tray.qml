@@ -18,6 +18,48 @@ Item {
     implicitWidth: trayRow.implicitWidth
     implicitHeight: LazerTheme.barWidgetHeight
 
+    // Opt-in hover intent publication for BarPopupHost (per-delegate).
+    signal popupRequested(var intent)
+    signal popupCloseRequested()
+    signal popupAnchorUpdate(var intent)
+
+    // Track current hovered delegate for anchor updates when the tray moves.
+    property var hoveredTrayModel: null
+    property Item hoveredTrayDelegate: null
+
+    // Build hover intent for a specific tray delegate.
+    function buildTrayIntent(modelData, delegateItem) {
+        var centerX = 0
+        try { centerX = delegateItem.mapToGlobal(delegateItem.width / 2, delegateItem.height / 2).x } catch (e) {
+            try { centerX = delegateItem.mapToItem(root, delegateItem.width / 2, 0).x + root.mapToGlobal(0, 0).x } catch (e2) { centerX = 0 }
+        }
+        if (!isFinite(centerX)) centerX = 0
+        var titleText = (delegateItem && delegateItem.label) ? delegateItem.label : (modelData.title || modelData.tooltipTitle || modelData.id || "Tray item")
+        var iconSrc = (delegateItem && delegateItem.iconSource) ? delegateItem.iconSource : (modelData.icon || "")
+        var summaryText = modelData.tooltipTitle || modelData.tooltipSubTitle || ""
+        return {
+            widgetId: root.widgetId,
+            instanceKey: root.instanceKey,
+            screenName: root.screenName,
+            title: titleText,
+            iconSource: iconSrc,
+            summary: summaryText,
+            actionKind: "tray",
+            anchorX: centerX,
+            payload: {
+                trayModel: modelData,
+                trayItem: modelData,
+                title: titleText,
+                iconSource: iconSrc,
+                onActivate: function() { try { modelData.activate() } catch (e) {} },
+                onSecondaryActivate: function() { try { modelData.secondaryActivate() } catch (e) {} }
+            }
+        }
+    }
+
+    onXChanged: if (hoveredTrayDelegate) popupAnchorUpdate(buildTrayIntent(hoveredTrayModel, hoveredTrayDelegate))
+    onWidthChanged: if (hoveredTrayDelegate) popupAnchorUpdate(buildTrayIntent(hoveredTrayModel, hoveredTrayDelegate))
+
     Row {
         id: trayRow
 
@@ -75,7 +117,25 @@ Item {
 
                 HoverHandler {
                     id: iconHover
-                }                TapHandler {
+                    onHoveredChanged: {
+                        if (hovered) {
+                            root.hoveredTrayModel = trayIcon.modelData
+                            root.hoveredTrayDelegate = trayIcon
+                            root.popupRequested(root.buildTrayIntent(trayIcon.modelData, trayIcon))
+                        } else {
+                            if (root.hoveredTrayDelegate === trayIcon) {
+                                root.hoveredTrayModel = null
+                                root.hoveredTrayDelegate = null
+                                root.popupCloseRequested()
+                            }
+                        }
+                    }
+                }
+
+                // Update anchor while the delegate or bar layout moves.
+                onXChanged: if (iconHover.hovered) root.popupAnchorUpdate(root.buildTrayIntent(trayIcon.modelData, trayIcon))
+
+                TapHandler {
                     acceptedButtons: Qt.LeftButton
                     gesturePolicy: TapHandler.ReleaseWithinBounds
                     onTapped: trayIcon.modelData.activate()

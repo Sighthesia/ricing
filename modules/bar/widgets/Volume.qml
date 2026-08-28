@@ -16,10 +16,49 @@ BarPill {
     readonly property bool muted: Services.VolumeService.sinkMuted
     readonly property real level: root.muted ? 0 : Math.max(0, Math.min(1, Services.VolumeService.sinkVolume))
 
+    // Opt-in hover intent for BarPopupHost.
+    hoverIntentEnabled: true
+
     onClicked: Services.VolumeService.toggleSinkMute()
 
     implicitWidth: LazerTheme.barWidgetHeight
     implicitHeight: LazerTheme.barWidgetHeight
+
+    // Build hover intent payload for the two-layer popup.
+    function buildHoverIntent() {
+        var centerX = 0
+        try { centerX = root.mapToGlobal(root.width / 2, root.height / 2).x } catch (e) {
+            try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
+        }
+        if (!isFinite(centerX)) centerX = 0
+        var summaryText = root.muted ? "Muted \u00B7 " + Math.round(root.level * 100) + "%" : Math.round(root.level * 100) + "%"
+        return {
+            widgetId: root.widgetId,
+            instanceKey: root.instanceKey,
+            screenName: root.screenName,
+            title: "Volume",
+            iconSource: "../icons/volume.svg",
+            summary: summaryText,
+            actionKind: "volume",
+            anchorX: centerX,
+            payload: {
+                volume: Services.VolumeService.sinkVolume,
+                muted: Services.VolumeService.sinkMuted,
+                volumeService: Services.VolumeService,
+                onVolumeChanged: function(v) { Services.VolumeService.setSinkVolume(v) },
+                onToggleMute: function() { Services.VolumeService.toggleSinkMute() }
+            }
+        }
+    }
+
+    onHoveredChanged: {
+        if (hovered) popupRequested(buildHoverIntent())
+        else popupCloseRequested()
+    }
+
+    // Update anchor while the bar layout moves.
+    onXChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
+    onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad

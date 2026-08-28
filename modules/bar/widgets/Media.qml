@@ -79,7 +79,49 @@ BarPill {
     }
     hoverable: hasMedia
 
+    // Opt-in hover intent for BarPopupHost.
+    hoverIntentEnabled: hasMedia
+
     onClicked: Services.MediaService.playPause()
+
+    // Build hover intent payload for the two-layer popup.
+    function buildHoverIntent() {
+        var centerX = 0
+        try { centerX = root.mapToGlobal(root.width / 2, root.height / 2).x } catch (e) {
+            try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
+        }
+        if (!isFinite(centerX)) centerX = 0
+        var titleText = Services.MediaControlService.title || Services.MediaService.title || "Media"
+        if (titleText === "") titleText = "Media"
+        var summaryText = Services.MediaControlService.artist || Services.MediaService.artist || Services.MediaService.playerName || ""
+        return {
+            widgetId: root.widgetId,
+            instanceKey: root.instanceKey,
+            screenName: root.screenName,
+            title: titleText,
+            iconSource: "../../lazerbar/icons/music.svg",
+            summary: summaryText,
+            actionKind: "media",
+            anchorX: centerX,
+            payload: {
+                title: titleText,
+                artist: summaryText,
+                mediaService: Services.MediaService,
+                onPrevious: function() { Services.MediaService.previous() },
+                onPlayPause: function() { Services.MediaService.playPause() },
+                onNext: function() { Services.MediaService.next() }
+            }
+        }
+    }
+
+    onHoveredChanged: {
+        if (hovered) popupRequested(buildHoverIntent())
+        else popupCloseRequested()
+    }
+
+    // Update anchor while the bar layout moves.
+    onXChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
+    onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
     function syncSpectrumRegistration() {
         if (root.needsSpectrum)

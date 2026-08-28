@@ -12,6 +12,12 @@ Item {
     signal rightClicked
     signal middleClicked
 
+    // Opt-in hover intent publication for two-layer popup.
+    property bool hoverIntentEnabled: false
+    signal popupRequested(var intent)
+    signal popupCloseRequested()
+    signal popupAnchorUpdate(var intent)
+
     implicitHeight: LazerTheme.barWidgetHeight
 
     // Paint the sharp interactive surface without rounding the pill body.

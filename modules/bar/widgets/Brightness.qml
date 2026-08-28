@@ -15,8 +15,50 @@ Item {
 
     readonly property real level: Math.max(0, Math.min(1, Services.BrightnessService.brightness))
 
+    // Opt-in hover intent publication for BarPopupHost.
+    signal popupRequested(var intent)
+    signal popupCloseRequested()
+    signal popupAnchorUpdate(var intent)
+
     implicitWidth: LazerTheme.barWidgetHeight
     implicitHeight: LazerTheme.barWidgetHeight
+
+    // Hover observation for brightness pill.
+    HoverHandler {
+        id: brightnessHover
+        onHoveredChanged: {
+            if (hovered) root.popupRequested(root.buildHoverIntent())
+            else root.popupCloseRequested()
+        }
+    }
+
+    // Build hover intent payload for the two-layer popup.
+    function buildHoverIntent() {
+        var centerX = 0
+        try { centerX = root.mapToGlobal(root.width / 2, root.height / 2).x } catch (e) {
+            try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
+        }
+        if (!isFinite(centerX)) centerX = 0
+        var summaryText = Math.round(root.level * 100) + "%"
+        return {
+            widgetId: root.widgetId,
+            instanceKey: root.instanceKey,
+            screenName: root.screenName,
+            title: "Brightness",
+            iconSource: "../icons/brightness.svg",
+            summary: summaryText,
+            actionKind: "brightness",
+            anchorX: centerX,
+            payload: {
+                brightness: Services.BrightnessService.brightness,
+                brightnessService: Services.BrightnessService,
+                onBrightnessChanged: function(v) { Services.BrightnessService.setBrightness(v) }
+            }
+        }
+    }
+
+    onXChanged: if (brightnessHover.hovered) popupAnchorUpdate(buildHoverIntent())
+    onWidthChanged: if (brightnessHover.hovered) popupAnchorUpdate(buildHoverIntent())
 
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad

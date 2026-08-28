@@ -11,9 +11,96 @@ Item {
     property string screenName: ""
     readonly property int sidePadding: 12
 
+    // Hover intent publication for BarPopupHost.
+    signal popupRequested(var intent)
+    signal popupCloseRequested()
+    signal popupAnchorUpdate(var intent)
+
+    // Track active hover intent for anchor re-emission when layout moves.
+    property var _activeHoverIntent: null
+    property var _activeHoverLoader: null
+
     // Widget loaders start one tick late so every service singleton is
     // fully registered before widget bindings evaluate.
     property bool widgetsReady: false
+
+    // Attach popup signals from a widget item to the BarContent forwarders.
+    function attachPopupForwarding(loaderItem, loaderRef) {
+        if (!loaderItem) return
+        if (loaderItem.popupRequested) {
+            loaderItem.popupRequested.connect(function(intent) {
+                root._activeHoverIntent = intent
+                root._activeHoverLoader = loaderRef
+                root.popupRequested(intent)
+            })
+        }
+        if (loaderItem.popupCloseRequested) {
+            loaderItem.popupCloseRequested.connect(function() {
+                root._activeHoverIntent = null
+                root._activeHoverLoader = null
+                root.popupCloseRequested()
+            })
+        }
+        if (loaderItem.popupAnchorUpdate) {
+            loaderItem.popupAnchorUpdate.connect(function(intent) {
+                root._activeHoverIntent = intent
+                root.popupAnchorUpdate(intent)
+            })
+        }
+    }
+
+    // Find loader for a given intent (used for anchor refresh on layout change).
+    function findLoaderForIntent(intent) {
+        if (!intent) return null
+        var targetId = intent.widgetId || ""
+        var targetKey = intent.instanceKey || ""
+        var rows = [leftRow, centerRow, rightRow]
+        for (var r = 0; r < rows.length; r++) {
+            var row = rows[r]
+            for (var c = 0; c < row.children.length; c++) {
+                var loader = row.children[c]
+                if (!loader || !loader.item) continue
+                if ((loader.item.widgetId || "") === targetId
+                        && (loader.item.instanceKey || "") === targetKey)
+                    return loader
+            }
+        }
+        return null
+    }
+
+    // Recompute anchor when geometry shifts while a widget is hovered.
+    function refreshActiveAnchor() {
+        if (!root._activeHoverIntent || !root._activeHoverLoader) return
+        var loader = root._activeHoverLoader
+        if (!loader || !loader.item) {
+            loader = root.findLoaderForIntent(root._activeHoverIntent)
+            if (!loader || !loader.item) return
+            root._activeHoverLoader = loader
+        }
+        var item = loader.item
+        var updated = null
+        try {
+            if (typeof item.buildHoverIntent === "function") {
+                updated = item.buildHoverIntent()
+            } else if (typeof item.buildTrayIntent === "function" && item.hoveredTrayDelegate) {
+                updated = item.buildTrayIntent(item.hoveredTrayModel, item.hoveredTrayDelegate)
+            }
+        } catch (e) { updated = null }
+        if (updated) {
+            root._activeHoverIntent = updated
+            root.popupAnchorUpdate(updated)
+            return
+        }
+        // Fallback: patch anchor from loader position.
+        try {
+            var cx = item.mapToGlobal(item.width / 2, item.height / 2).x
+            if (!isFinite(cx)) cx = root._activeHoverIntent.anchorX
+            var patched = Object.assign({}, root._activeHoverIntent)
+            patched.anchorX = cx
+            root._activeHoverIntent = patched
+            root.popupAnchorUpdate(patched)
+        } catch (e2) {}
+    }
 
     // Filter a section's entries down to implemented widgets; the shipped
     // set lives in the shared ShippedWidgets source so it cannot drift
@@ -133,8 +220,13 @@ Item {
 
     Connections {
         target: Services.BarLayoutService
-        function onLayoutModelChanged() { root.schedulePublish() }
+        function onLayoutModelChanged() {
+            root.schedulePublish()
+            Qt.callLater(root.refreshActiveAnchor)
+        }
     }
+
+    onWidthChanged: Qt.callLater(root.refreshActiveAnchor)
 
     component SectionRow: Row {
         id: sectionRow
@@ -165,6 +257,7 @@ Item {
                     item.instanceKey = modelData.instanceKey || ""
                     item.section = sectionRow.section
                     item.screenName = root.screenName
+                    root.attachPopupForwarding(item, widgetLoader)
                 }
 
                 // The dragged widget recedes so the caret carries the intent.

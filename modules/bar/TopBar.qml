@@ -77,9 +77,48 @@ Variants {
             }
 
             BarContent {
+                id: barContent
                 anchors.fill: parent
                 screenName: screenScope.modelData ? String(screenScope.modelData.name || "") : ""
+
+                // Forward hover intents to the per-screen popup host.
+                onPopupRequested: intent => {
+                    if (!intent) return
+                    var enriched = Object.assign({}, intent)
+                    enriched.screenWidth = screenScope.modelData ? Number(screenScope.modelData.width) : 1920
+                    enriched.barPosition = String(Services.SettingsService.bar.position || "top")
+                    popupHost.widgetHovered = true
+                    popupHost.showIntent(enriched)
+                }
+                onPopupCloseRequested: {
+                    popupHost.widgetHovered = false
+                    popupHost.requestClose()
+                }
+                onPopupAnchorUpdate: intent => {
+                    if (!intent || !popupHost.open) return
+                    var enriched = Object.assign({}, intent)
+                    enriched.screenWidth = screenScope.modelData ? Number(screenScope.modelData.width) : 1920
+                    enriched.barPosition = String(Services.SettingsService.bar.position || "top")
+                    var nextX = Number(enriched.anchorX)
+                    if (isFinite(nextX)) popupHost.anchorX = nextX
+                    // Keep intent anchor in sync without recreating the reveal.
+                    if (popupHost.intent) {
+                        var patched = Object.assign({}, popupHost.intent)
+                        patched.anchorX = popupHost.anchorX
+                        popupHost.intent = patched
+                    }
+                    popupHost.cancelClose()
+                }
             }
+        }
+
+        // Per-screen hover popup host. One instance per screen scope; no per-widget hosts.
+        BarPopupHost {
+            id: popupHost
+            screen: screenScope.modelData
+            screenWidth: screenScope.modelData ? Number(screenScope.modelData.width) : 1920
+            effectiveBarHeight: screenScope.effectiveHeight
+            floatingMargin: screenScope.floatingMargin
         }
 
         // Keep the launcher wave below the bar while only its internal viewport moves.
