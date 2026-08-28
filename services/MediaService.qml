@@ -35,6 +35,8 @@ Singleton {
     property var _failedArtUrlCache: ({})
     property string _lastSeenArtKey: ""
     property int _cacheVersion: 0
+    property var _playerLastPlayingAt: ({})
+    property var _playerWasPlaying: ({})
 
     readonly property var activePlayer: root._activePlayerRef
     readonly property bool hasPlayer: activePlayer !== null
@@ -249,7 +251,16 @@ Singleton {
     function _selectActivePlayer() {
         const players = Mpris.players.values
         let preferredPlayer = null
-        let lastPlayingPlayer = null
+        let bestPlayingPlayer = null
+        let bestPlayingAt = -1
+
+        // Track when each player last transitioned to playing so the most
+        // recently started playing player can preempt, and pausing a newer
+        // player immediately falls back to the still-playing previous one.
+        const wasPlayingMap = root._playerWasPlaying || {}
+        const playingAtMap = Object.assign({}, root._playerLastPlayingAt || {})
+        let playingAtDirty = false
+        let wasPlayingDirty = false
 
         for (let index = 0; index < players.length; index += 1) {
             const player = players[index]
@@ -261,9 +272,50 @@ Singleton {
             if (playerKey !== "" && playerKey === root._preferredPlayerKey)
                 preferredPlayer = player
 
-            if (player.isPlaying)
-                lastPlayingPlayer = player
+            const isPlaying = !!player.isPlaying
+            const wasPlaying = !!wasPlayingMap[playerKey]
+            if (isPlaying && !wasPlaying) {
+                playingAtMap[playerKey] = Date.now()
+                playingAtDirty = true
+            }
+            if (wasPlaying !== isPlaying) {
+                wasPlayingMap[playerKey] = isPlaying
+                wasPlayingDirty = true
+            }
+
+            if (isPlaying) {
+                const at = playingAtMap[playerKey] || 0
+                if (bestPlayingPlayer === null || at >= bestPlayingAt) {
+                    bestPlayingPlayer = player
+                    bestPlayingAt = at
+                }
+            }
         }
+
+        // Prune stale keys for players that disappeared
+        const liveKeys = {}
+        for (let p = 0; p < players.length; p += 1) {
+            const k = root._artPlayerKey(players[p])
+            if (k !== "")
+                liveKeys[k] = true
+        }
+        for (const k in playingAtMap) {
+            if (!liveKeys[k]) {
+                delete playingAtMap[k]
+                playingAtDirty = true
+            }
+        }
+        for (const k in wasPlayingMap) {
+            if (!liveKeys[k]) {
+                delete wasPlayingMap[k]
+                wasPlayingDirty = true
+            }
+        }
+
+        if (playingAtDirty)
+            root._playerLastPlayingAt = playingAtMap
+        if (wasPlayingDirty)
+            root._playerWasPlaying = wasPlayingMap
 
         // User-locked player takes priority until it stops or disappears.
         if (root._userLockedPlayer && root._userLockedPlayerKey !== "") {
@@ -290,15 +342,15 @@ Singleton {
         const current = root._activePlayerRef
         const currentKey = root._artPlayerKey(current)
 
-        // Prefer any currently playing player. Using the last playing entry
-        // (newest in Mpris.players order) lets a newly started player preempt
-        // the previous one, and when that new player pauses we immediately fall
-        // back to the still-playing previous one without debounce churn.
-        if (lastPlayingPlayer !== null) {
-            const candidateKey = root._artPlayerKey(lastPlayingPlayer)
+        // Prefer any currently playing player. The most recently started
+        // playing player wins, so a newly started player preempts the previous
+        // one, and when that new player pauses we immediately fall back to the
+        // still-playing previous one without debounce churn.
+        if (bestPlayingPlayer !== null) {
+            const candidateKey = root._artPlayerKey(bestPlayingPlayer)
             if (currentKey !== candidateKey)
                 root._lastSelectionChangeAt = Date.now()
-            return lastPlayingPlayer
+            return bestPlayingPlayer
         }
 
         if (preferredPlayer !== null)
