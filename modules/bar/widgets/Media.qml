@@ -27,6 +27,11 @@ BarPill {
         Services.MediaControlService.showCompactLyric
                 ? Services.MediaControlService.compactPrimaryLyric
                 : Services.MediaControlService.title
+    readonly property string secondaryText:
+        Services.MediaControlService.showCompactLyric
+                ? Services.MediaControlService.artist
+                    + (Services.MediaControlService.title !== "" ? " - " + Services.MediaControlService.title : "")
+                : Services.MediaControlService.artist
     // Width cap where dynamic growth stops and the title starts scrolling.
     readonly property int maxTextWidth: 300
     // Square cover region centered on the music glyph, translucent over text.
@@ -50,6 +55,8 @@ BarPill {
     }
 
     property string trackedPrimaryText: ""
+    property string trackedSecondaryText: ""
+    property string trackedArtUrl: ""
 
     // Spectrum registration — mirrors the old bar spectrum integration.
     readonly property string spectrumComponentId: "media:" + (root.instanceKey !== "" ? root.instanceKey : (root.widgetId !== "" ? root.widgetId : root.screenName))
@@ -99,7 +106,7 @@ BarPill {
             instanceKey: root.instanceKey,
             screenName: root.screenName,
             title: titleText,
-            iconSource: "../../lazerbar/icons/music.svg",
+            iconSource: Qt.resolvedUrl("../../lazerbar/icons/music.svg"),
             summary: summaryText,
             actionKind: "media",
             anchorX: centerX,
@@ -133,6 +140,8 @@ BarPill {
 
     Component.onCompleted: {
         root.trackedPrimaryText = root.primaryText
+        root.trackedSecondaryText = root.secondaryText
+        root.trackedArtUrl = Services.MediaControlService.artUrl
         // Ensure widget defaults exist so showAudioSpectrum can be toggled later.
         if (root.instanceKey !== "")
             Services.SettingsService.ensureWidgetSettings("media", root.instanceKey)
@@ -159,6 +168,53 @@ BarPill {
         // Shared per-character contract: staggered falling ghost exit plus
         // left-to-right fade-in entrance, living in MarqueeLabel.
         titleMarquee.transitionFrom(oldText, root.primaryText)
+    }
+
+    onSecondaryTextChanged: {
+        if (MotionTokens.reducedMotion) {
+            root.trackedSecondaryText = root.secondaryText
+            return
+        }
+        if (root.trackedSecondaryText === "" || root.trackedSecondaryText === root.secondaryText) {
+            root.trackedSecondaryText = root.secondaryText
+            return
+        }
+        const oldSec = root.trackedSecondaryText
+        root.trackedSecondaryText = root.secondaryText
+        subtitleMarquee.transitionFrom(oldSec, root.secondaryText)
+    }
+
+    Connections {
+        target: Services.MediaControlService
+        function onArtUrlChanged() {
+            if (MotionTokens.reducedMotion) {
+                root.trackedArtUrl = Services.MediaControlService.artUrl
+                coverPrevImage.opacity = 0
+                return
+            }
+            const oldUrl = root.trackedArtUrl
+            const newUrl = Services.MediaControlService.artUrl
+            if (oldUrl === "" || oldUrl === newUrl) {
+                root.trackedArtUrl = newUrl
+                coverPrevImage.opacity = 0
+                return
+            }
+            root.trackedArtUrl = newUrl
+            const hadCover = oldUrl !== "" && root.hasCoverArt
+            const hasNewCover = newUrl !== "" && root.hasCoverArt
+            if (!hadCover || !hasNewCover) {
+                coverPrevImage.opacity = 0
+                return
+            }
+            coverPrevImage.source = oldUrl
+            coverPrevImage.opacity = 1
+            coverImage.opacity = 0
+            Qt.callLater(() => {
+                if (root.trackedArtUrl !== newUrl) return
+                coverImage.opacity = 1
+                coverPrevImage.opacity = 0
+            })
+        }
     }
 
     // Measure text with the title label's own font in an independent
@@ -223,6 +279,19 @@ BarPill {
                 }
             }
 
+            // Previous cover for crossfade transition
+            Image {
+                id: coverPrevImage
+
+                anchors.fill: parent
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                visible: root.hasCoverArt && status !== Image.Error && opacity > 0.01
+                opacity: 0
+
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+            }
+
             Image {
                 id: coverImage
 
@@ -233,7 +302,7 @@ BarPill {
                 visible: root.hasCoverArt && status !== Image.Error
                 opacity: visible ? 1 : 0
 
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             }
 
             // Music glyph only appears when there is no usable cover art.
@@ -241,7 +310,7 @@ BarPill {
                 anchors.centerIn: parent
                 width: LazerTheme.barGlyphSize - 6
                 height: LazerTheme.barGlyphSize - 6
-                source: "../../lazerbar/icons/music.svg"
+                 source: Qt.resolvedUrl("../../lazerbar/icons/music.svg")
                 visible: !root.hasCoverArt || !coverImage.visible
                 opacity: visible ? (root.playing ? 0.95 : 0.5) : 0
 
@@ -323,11 +392,9 @@ BarPill {
 
             // Sub-line follows the same contract: scroll instead of ellipsis.
             MarqueeLabel {
-                text: Services.MediaControlService.showCompactLyric
-                    ? Services.MediaControlService.artist
-                        + (Services.MediaControlService.title !== ""
-                            ? " - " + Services.MediaControlService.title : "")
-                    : Services.MediaControlService.artist
+                id: subtitleMarquee
+
+                text: root.secondaryText
                 visible: text.length > 0
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.barSubtitle

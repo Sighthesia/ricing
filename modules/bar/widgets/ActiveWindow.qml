@@ -40,6 +40,7 @@ Item {
     // Tracks the last choreographed title so the first render never plays
     // the exit/enter transition for content that was never visible.
     property string trackedTitle: ""
+    property string trackedAppName: ""
     // Coalesce a transient desktop fallback during workspace switches:
     // Niri briefly reports no active window while the workspace animates,
     // so displayTitle flicks window -> desktop -> next window. Holding
@@ -62,7 +63,10 @@ Item {
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
 
-    Component.onCompleted: root.trackedTitle = root.displayTitle
+    Component.onCompleted: {
+        root.trackedTitle = root.displayTitle
+        root.trackedAppName = root.displayAppName
+    }
 
     onDisplayTitleChanged: {
         var previous = root.trackedTitle
@@ -98,6 +102,20 @@ Item {
         // Per-char fade-in entrance plus staggered falling ghost exit,
         // reusing the media pill's main-line contract via MarqueeLabel.
         titleText.transitionFrom(previous, root.displayTitle)
+    }
+
+    onDisplayAppNameChanged: {
+        if (MotionTokens.reducedMotion) {
+            root.trackedAppName = root.displayAppName
+            return
+        }
+        var prevApp = root.trackedAppName
+        if (prevApp === "" || root.displayAppName === prevApp) {
+            root.trackedAppName = root.displayAppName
+            return
+        }
+        root.trackedAppName = root.displayAppName
+        appNameText.transitionFrom(prevApp, root.displayAppName)
     }
 
     // Smooth width morph: title changes ease instead of snapping, so the
@@ -150,6 +168,8 @@ Item {
 
             // Sub-line shows the application name like Media's artist line.
             MarqueeLabel {
+                id: appNameText
+
                 text: root.displayAppName
                 visible: text.length > 0
                 maxWidth: root.maxTitleWidth
