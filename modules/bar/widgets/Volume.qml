@@ -37,7 +37,7 @@ BarPill {
             instanceKey: root.instanceKey,
             screenName: root.screenName,
             title: "Volume",
-            iconSource: "../icons/volume.svg",
+            iconSource: Qt.resolvedUrl("../icons/volume.svg"),
             summary: summaryText,
             actionKind: "volume",
             anchorX: centerX,
@@ -79,7 +79,7 @@ BarPill {
         anchors.centerIn: parent
         width: LazerTheme.barGlyphSize - 4
         height: LazerTheme.barGlyphSize - 4
-        source: "../icons/volume.svg"
+        source: Qt.resolvedUrl("../icons/volume.svg")
         opacity: root.muted ? 0.4 : 0.9
 
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }

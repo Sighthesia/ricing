@@ -45,7 +45,7 @@ Item {
             instanceKey: root.instanceKey,
             screenName: root.screenName,
             title: "Brightness",
-            iconSource: "../icons/brightness.svg",
+            iconSource: Qt.resolvedUrl("../icons/brightness.svg"),
             summary: summaryText,
             actionKind: "brightness",
             anchorX: centerX,
@@ -79,7 +79,7 @@ Item {
         anchors.centerIn: parent
         width: LazerTheme.barGlyphSize - 4
         height: LazerTheme.barGlyphSize - 4
-        source: "../icons/brightness.svg"
+        source: Qt.resolvedUrl("../icons/brightness.svg")
         opacity: 0.9
     }
 

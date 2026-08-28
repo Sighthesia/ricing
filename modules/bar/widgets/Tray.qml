@@ -28,6 +28,15 @@ Item {
     property Item hoveredTrayDelegate: null
 
     // Build hover intent for a specific tray delegate.
+    function resolveIconSource(source) {
+        var normalized = String(source || "").trim()
+        if (normalized === "" || normalized.indexOf(":") >= 0)
+            return normalized
+        if (normalized.charAt(0) === "." || normalized.charAt(0) === "/")
+            return Qt.resolvedUrl(normalized)
+        return String(Quickshell.iconPath(normalized, true) || "")
+    }
+
     function buildTrayIntent(modelData, delegateItem) {
         var centerX = 0
         try { centerX = delegateItem.mapToGlobal(delegateItem.width / 2, delegateItem.height / 2).x } catch (e) {
@@ -35,7 +44,8 @@ Item {
         }
         if (!isFinite(centerX)) centerX = 0
         var titleText = (delegateItem && delegateItem.label) ? delegateItem.label : (modelData.title || modelData.tooltipTitle || modelData.id || "Tray item")
-        var iconSrc = (delegateItem && delegateItem.iconSource) ? delegateItem.iconSource : (modelData.icon || "")
+        var iconSrc = resolveIconSource((delegateItem && delegateItem.iconSource)
+                ? delegateItem.iconSource : (modelData.icon || ""))
         var summaryText = modelData.tooltipTitle || modelData.tooltipSubTitle || ""
         return {
             widgetId: root.widgetId,
@@ -85,10 +95,11 @@ Item {
                     // image provider cannot resolve without conversion.
                     var pathSplit = icon.indexOf("?path=")
                     if (pathSplit < 0)
-                        return icon
+                        return root.resolveIconSource(icon)
                     var name = icon.substring(0, pathSplit)
                     var dir = icon.substring(pathSplit + 6)
-                    return "file://" + dir + "/" + name.substring(name.lastIndexOf("/") + 1)
+                    return root.resolveIconSource("file://" + dir + "/"
+                            + name.substring(name.lastIndexOf("/") + 1))
                 }
 
                 width: LazerTheme.barWidgetHeight

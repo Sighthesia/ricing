@@ -37,6 +37,20 @@ Item {
         console.log("FAIL:", label, "expected true got", JSON.stringify(value))
     }
 
+    function checkIdentityIcon(label, intent) {
+        root.checkTrue(label + " source is absolute or empty",
+                intent.iconSource === "" || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(String(intent.iconSource)))
+        host.showIntent(intent)
+        var identity = findByName(host.popupItem, "identityIcon")
+        root.checkTrue(label + " identity icon exists", identity !== null)
+        if (identity) {
+            root.checkTrue(label + " identity icon source is visible",
+                    String(identity.source) === String(intent.iconSource))
+            root.checkTrue(label + " identity icon loads or stays empty",
+                    intent.iconSource === "" || identity.status !== Image.Error)
+        }
+    }
+
     function finish() {
         console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
         var forcedFailure = Quickshell.env("AFLOAT_TASK5_FORCE_FAILURE") === "1"
@@ -101,6 +115,7 @@ Item {
     Widgets.Brightness { id: brightnessWidget; visible: false }
     Widgets.Media { id: mediaWidget; visible: false }
     Widgets.Notifications { id: notificationsWidget; visible: false }
+    Widgets.Tray { id: trayWidget; visible: false }
 
     // Timers for async hover-bridge waits.
     Timer {
@@ -186,6 +201,9 @@ Item {
         root.check("top: sidebar y is 0", sidebarY, 0)
         root.checkTrue("top: content y is sidebar height +1", contentY === host.popupItem.sidebarLayer.height + 1)
         root.check("top: popup absolute y below bar", host.popupContainerItem.y, 52)
+        root.check("middle anchor positions popup around trigger center", host.popupContainerItem.x,
+                BarHoverLogic.clampAnchor(host.anchorX - host.popupContainerItem.width / 2,
+                    host.popupContainerItem.width, host.activeScreenWidth, 8))
         root.checkTrue("top: popup absolute placement stays inside screen",
                 host.popupContainerItem.y >= 52
                 && host.popupContainerItem.y + host.popupContainerItem.height <= host.activeScreenHeight)
@@ -268,7 +286,7 @@ Item {
     function checkEdgeLeft() {
         var w = host.popupContainerItem.width
         var x = host.popupContainerItem.x
-        var expectedLeft = BarHoverLogic.clampAnchor(2, w, 1000, 8)
+        var expectedLeft = BarHoverLogic.clampAnchor(2 - w / 2, w, 1000, 8)
         root.check("left edge popup remains inside screen width", x, expectedLeft)
         root.checkTrue("left edge x >= margin", x >= 8)
         root.checkTrue("left edge popup inside screen", x + w <= 1000 - 8 + 0.5)
@@ -296,7 +314,7 @@ Item {
     function checkEdgeRight() {
         var w = host.popupContainerItem.width
         var x = host.popupContainerItem.x
-        var expectedRight = BarHoverLogic.clampAnchor(990, w, 1000, 8)
+        var expectedRight = BarHoverLogic.clampAnchor(990 - w / 2, w, 1000, 8)
         root.check("right edge popup remains inside screen width", x, expectedRight)
         root.checkTrue("right edge x + width <= screen - margin", x + w <= 1000 - 8 + 0.5)
         root.checkTrue("right edge x >= margin", x >= 8)
@@ -338,6 +356,15 @@ Item {
         root.check("tray anchor updated in place", host.anchorX, 400)
         var trayIdentity = findByName(host.popupItem, "popupIdentity")
         if (trayIdentity) root.check("tray identity reflects updated icon", String(trayIdentity.iconSource), String(Qt.resolvedUrl("modules/lazerbar/icons/apps.svg")))
+
+        // Every actionable producer must hand the identity layer a stable URL.
+        checkIdentityIcon("volume producer", volumeWidget.buildHoverIntent())
+        checkIdentityIcon("brightness producer", brightnessWidget.buildHoverIntent())
+        checkIdentityIcon("media producer", mediaWidget.buildHoverIntent())
+        checkIdentityIcon("notification producer", notificationsWidget.buildHoverIntent())
+        checkIdentityIcon("tray producer", trayWidget.buildTrayIntent({
+            title: "Tray", icon: Qt.resolvedUrl("modules/lazerbar/icons/apps.svg")
+        }, null))
 
         // Start hover bridge sequence.
         Qt.callLater(root.runHoverBridge)

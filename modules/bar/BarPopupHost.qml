@@ -153,7 +153,10 @@ PanelWindow {
         // Size follows both slots so clamping uses the rendered surface bounds.
         width: Math.max(popup.sidebarLayer.width, popup.contentLayer.width, 240)
         height: popup.sidebarLayer.height + popup.contentLayer.height + 1
-        x: BarHoverLogic.clampAnchor(root.anchorX, width, root.activeScreenWidth, 8)
+        // Convert the producer's trigger center into the popup's left edge
+        // before applying the existing screen-edge clamp contract.
+        x: BarHoverLogic.clampAnchor(root.anchorX - width / 2,
+                width, root.activeScreenWidth, 8)
         y: root.direction === "down"
             ? root.activeBarHeight + root.activeFloatingMargin
             : Math.max(0, root.activeScreenHeight - root.activeBarHeight

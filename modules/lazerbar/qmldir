@@ -44,6 +44,7 @@ LazerNotificationStack 1.0 LazerNotificationStack.qml
 NotificationHost 1.0 NotificationHost.qml
 OverlayCoordinator 1.0 OverlayCoordinator.qml
 FullscreenWave 1.0 FullscreenWave.qml
+WaveRevealLayers 1.0 WaveRevealLayers.qml
 WaveSurfaceHost 1.0 WaveSurfaceHost.qml
 LauncherSurface 1.0 LauncherSurface.qml
 FullscreenHeader 1.0 FullscreenHeader.qml

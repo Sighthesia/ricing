@@ -37,7 +37,7 @@ BarPill {
             instanceKey: root.instanceKey,
             screenName: root.screenName,
             title: "Notifications",
-            iconSource: "../../lazerbar/icons/bell.svg",
+            iconSource: Qt.resolvedUrl("../../lazerbar/icons/bell.svg"),
             summary: summaryText,
             actionKind: "notifications",
             anchorX: centerX,
@@ -71,7 +71,7 @@ BarPill {
             anchors.centerIn: parent
             width: LazerTheme.barGlyphSize
             height: LazerTheme.barGlyphSize
-            source: "../../lazerbar/icons/bell.svg"
+            source: Qt.resolvedUrl("../../lazerbar/icons/bell.svg")
             opacity: root.dnd ? 0.4 : 0.9
 
             Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
