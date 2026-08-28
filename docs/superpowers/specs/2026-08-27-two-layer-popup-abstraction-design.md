@@ -15,7 +15,8 @@
 - 通过 `sidebarData` 和 `contentData` 两个 slot 注入两层内容，并暴露 `sidebarLayer`、`contentLayer` 供宿主绑定尺寸和状态。
 - 每层拥有独立 surface、opacity 和 Translate；主栏按 `contentDelay` 延迟进入。
 - `revealProgress` 由消费者驱动，`beginReveal()` 和 `endReveal()` 提供标准生命周期；`MotionTokens.reducedMotion` 时直接落到终态。
-- `orientation` 支持横向设置面板和纵向弹出菜单；纵向 `direction` 支持 `Up` 与 `Down`。
+- `orientation` 支持 `TwoLayerPopup.Orientation.Horizontal`（横向设置面板）与 `TwoLayerPopup.Orientation.Vertical`（纵向弹出菜单）；纵向 `direction` 支持 `TwoLayerPopup.Direction.Up` 与 `TwoLayerPopup.Direction.Down`。
+- 常量通过 `enum Orientation { Horizontal, Vertical }` 与 `enum Direction { Up, Down }` 暴露，调用侧必须使用 `TwoLayerPopup.Orientation.Horizontal/Vertical` 与 `TwoLayerPopup.Direction.Up/Down` 完整路径；禁止提供 `TwoLayerPopup.Horizontal` 等非法大写属性别名。
 - 横向模式允许消费者指定两层打开位置，保留设置面板现有的独立 owner 几何；纵向模式根据方向和层尺寸自动排列。
 - 组件不持有菜单数据、不处理 pointer 事件、不引入外部状态机。
 
@@ -25,7 +26,7 @@
 
 ## 未来消费者
 
-bar 组件和右键菜单可以将 `orientation` 设为纵向，按触发位置选择 `direction: Up` 或 `Down`，分别向上或向下展开。它们只需注入侧栏标题/工具层和主内容层，不依赖设置面板类型。
+bar 组件和右键菜单可以将 `orientation` 设为 `TwoLayerPopup.Orientation.Vertical`，按触发位置选择 `direction: TwoLayerPopup.Direction.Up` 或 `TwoLayerPopup.Direction.Down`，分别向上或向下展开。它们只需注入侧栏标题/工具层和主内容层，不依赖设置面板类型。
 
 ## 验证
 

@@ -33,6 +33,30 @@ Item {
         }
     }
 
+    // Declarative injection target for sidebarData/contentData alias coverage.
+    Lazer.TwoLayerPopup {
+        id: injectedPopup
+        width: 200
+        height: 100
+        orientation: 1
+        direction: 1
+        revealProgress: 1
+
+        sidebarData: Rectangle {
+            objectName: "injectedSidebar"
+            width: 200
+            height: 24
+            color: "green"
+        }
+
+        contentData: Rectangle {
+            objectName: "injectedContent"
+            width: 200
+            height: 40
+            color: "yellow"
+        }
+    }
+
     TestCase {
         name: "TwoLayerPopup"
         when: windowShown
@@ -81,6 +105,25 @@ Item {
             popup.beginReveal()
             compare(popup.sidebarRevealProgress, 1)
             compare(popup.contentRevealProgress, 1)
+        }
+
+        function test_sidebarDataAndContentDataInjection() {
+            var sidebarChild = null
+            var contentChild = null
+            for (var i = 0; i < injectedPopup.sidebarLayer.children.length; ++i) {
+                if (injectedPopup.sidebarLayer.children[i].objectName === "injectedSidebar")
+                    sidebarChild = injectedPopup.sidebarLayer.children[i]
+            }
+            for (var j = 0; j < injectedPopup.contentLayer.children.length; ++j) {
+                if (injectedPopup.contentLayer.children[j].objectName === "injectedContent")
+                    contentChild = injectedPopup.contentLayer.children[j]
+            }
+            verify(sidebarChild !== null, "sidebarData should inject into sidebarLayer")
+            verify(contentChild !== null, "contentData should inject into contentLayer")
+            compare(sidebarChild.parent, injectedPopup.sidebarLayer)
+            compare(contentChild.parent, injectedPopup.contentLayer)
+            verify(injectedPopup.sidebarData.length > 0)
+            verify(injectedPopup.contentData.length > 0)
         }
     }
 }

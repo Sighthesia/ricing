@@ -23,7 +23,7 @@ Item {
     property real horizontalContentX: 0
 
     readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
-    readonly property real sidebarRevealProgress: MotionTokens.reducedMotion ? root.revealProgress : root.revealProgress
+    readonly property real sidebarRevealProgress: root.revealProgress
     readonly property real contentRevealProgress: MotionTokens.reducedMotion
         ? root.revealProgress
         : root.contentDelay <= 0

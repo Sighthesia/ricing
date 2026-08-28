@@ -12,11 +12,12 @@
 
 - 根节点固定为 `Item`，不因动画修改自身尺寸。
 - 通过 `sidebarData` 和 `contentData` 注入内容，并暴露 `sidebarLayer`、`contentLayer` host。
-- `orientation` 支持横向 `Horizontal` 与纵向 `Vertical`；纵向 `direction` 支持 `Up` 与 `Down`。
+- `orientation` 支持 `TwoLayerPopup.Orientation.Horizontal` 与 `TwoLayerPopup.Orientation.Vertical`；纵向 `direction` 支持 `TwoLayerPopup.Direction.Up` 与 `TwoLayerPopup.Direction.Down`。
 - 标题层立即进入，主栏使用 `contentDelay` 延迟进入；默认延迟引用 `MotionTokens.settingsContentDelay`。
 - 所有动画使用 `MotionTokens`，并受 `MotionTokens.reducedMotion` 门控。
 - 组件不处理 pointer 事件、不持有菜单数据、不恢复旧 bar popup 状态机。
 - QML 主元素声明前添加简短英文注释；新建文件默认 ASCII。
+- 常量通过 `enum Orientation { Horizontal, Vertical }` 与 `enum Direction { Up, Down }` 暴露，调用侧必须使用 `TwoLayerPopup.Orientation.Horizontal/Vertical` 与 `TwoLayerPopup.Direction.Up/Down` 完整路径；禁止新增 `TwoLayerPopup.Horizontal` 等非法大写属性别名。
 
 ---
 
@@ -35,21 +36,21 @@
 
 ```qml
 function test_downDirectionStacksSidebarBeforeContent() {
-    popup.orientation = Lazer.TwoLayerPopup.Vertical
-    popup.direction = Lazer.TwoLayerPopup.Down
+    popup.orientation = Lazer.TwoLayerPopup.Orientation.Vertical
+    popup.direction = Lazer.TwoLayerPopup.Direction.Down
     compare(popup.sidebarLayer.y, 0)
     compare(popup.contentLayer.y, popup.sidebarLayer.height + 1)
 }
 
 function test_upDirectionStacksContentBeforeSidebar() {
-    popup.orientation = Lazer.TwoLayerPopup.Vertical
-    popup.direction = Lazer.TwoLayerPopup.Up
+    popup.orientation = Lazer.TwoLayerPopup.Orientation.Vertical
+    popup.direction = Lazer.TwoLayerPopup.Direction.Up
     compare(popup.contentLayer.y, 0)
     compare(popup.sidebarLayer.y, popup.contentLayer.height + 1)
 }
 
 function test_contentRevealWaitsForDelay() {
-    popup.orientation = Lazer.TwoLayerPopup.Vertical
+    popup.orientation = Lazer.TwoLayerPopup.Orientation.Vertical
     popup.revealProgress = 0.2
     verify(popup.sidebarRevealProgress > popup.contentRevealProgress)
 }
@@ -66,12 +67,10 @@ Expected: component/type or property failures because `TwoLayerPopup` does not e
 Use a root `Item` with `sidebarSlot` and `contentSlot`. Expose their `data` aliases, keep the hosts as fixed siblings, and calculate geometry as follows:
 
 ```qml
-readonly property int Horizontal: 0
-readonly property int Vertical: 1
-readonly property int Up: 0
-readonly property int Down: 1
-property int orientation: TwoLayerPopup.Horizontal
-property int direction: TwoLayerPopup.Down
+enum Orientation { Horizontal, Vertical }
+enum Direction { Up, Down }
+property int orientation: TwoLayerPopup.Orientation.Horizontal
+property int direction: TwoLayerPopup.Direction.Down
 property real revealProgress: 1
 property int contentDelay: MotionTokens.settingsContentDelay
 readonly property real sidebarRevealProgress: root.revealProgress
@@ -121,7 +120,7 @@ function test_usesSharedTwoLayerPopupGeometry() {
 
 - [ ] **Step 2: Migrate the two layer declarations**
 
-Create a `TwoLayerPopup` named `layerPopup` before the existing sidebar/content declarations. Set `orientation: TwoLayerPopup.Horizontal`, `revealProgress: root.progress`, and bind `horizontalSidebarX`/`horizontalContentX` to the existing calculated values. Put `LazerSettingsSidebar` and `LazerSettingsContent` into the corresponding data aliases, preserving their existing properties and handlers. Keep the existing `z: 1` on the sidebar host and `z: 0` on the content host.
+Create a `TwoLayerPopup` named `layerPopup` before the existing sidebar/content declarations. Set `orientation: TwoLayerPopup.Orientation.Horizontal`, `revealProgress: root.progress`, and bind `horizontalSidebarX`/`horizontalContentX` to the existing calculated values. Put `LazerSettingsSidebar` and `LazerSettingsContent` into the corresponding data aliases, preserving their existing properties and handlers. Keep the existing `z: 1` on the sidebar host and `z: 0` on the content host.
 
 - [ ] **Step 3: Update panel aliases and debug snapshots**
 
