@@ -249,7 +249,7 @@ Singleton {
     function _selectActivePlayer() {
         const players = Mpris.players.values
         let preferredPlayer = null
-        let firstPlayingPlayer = null
+        let lastPlayingPlayer = null
 
         for (let index = 0; index < players.length; index += 1) {
             const player = players[index]
@@ -261,8 +261,8 @@ Singleton {
             if (playerKey !== "" && playerKey === root._preferredPlayerKey)
                 preferredPlayer = player
 
-            if (firstPlayingPlayer === null && player.isPlaying)
-                firstPlayingPlayer = player
+            if (player.isPlaying)
+                lastPlayingPlayer = player
         }
 
         // User-locked player takes priority until it stops or disappears.
@@ -290,28 +290,15 @@ Singleton {
         const current = root._activePlayerRef
         const currentKey = root._artPlayerKey(current)
 
-        // Sticky: keep the current player while it is still playing so a
-        // newly started second player does not preempt it.
-        if (current && current.isPlaying)
-            return current
-
-        // If current is paused and another player starts playing, debounce
-        // the switch so brief play-state flickers do not cause churn.
-        if (firstPlayingPlayer !== null) {
-            const candidateKey = root._artPlayerKey(firstPlayingPlayer)
-            if (currentKey === candidateKey)
-                return firstPlayingPlayer
-
-            const now = Date.now()
-            if (root._lastSelectionChangeAt === 0
-                    || (now - root._lastSelectionChangeAt) >= root._selectionDebounceMs) {
-                root._lastSelectionChangeAt = now
-                return firstPlayingPlayer
-            }
-            // Within the debounce window: keep current if it still exists.
-            if (current)
-                return current
-            return firstPlayingPlayer
+        // Prefer any currently playing player. Using the last playing entry
+        // (newest in Mpris.players order) lets a newly started player preempt
+        // the previous one, and when that new player pauses we immediately fall
+        // back to the still-playing previous one without debounce churn.
+        if (lastPlayingPlayer !== null) {
+            const candidateKey = root._artPlayerKey(lastPlayingPlayer)
+            if (currentKey !== candidateKey)
+                root._lastSelectionChangeAt = Date.now()
+            return lastPlayingPlayer
         }
 
         if (preferredPlayer !== null)

@@ -358,22 +358,15 @@ Singleton {
         if (sourceTrackKey !== "")
             root._latchedSourceTrackKey = sourceTrackKey
 
-        // No-lyric fallback is the bare title: never join the artist with
-        // " · " on the primary row.
-        var fallbackText = Services.NeteaseWebLyricsService.title
-        
-        // For primary/original lyrics: show fallback (title/artist) when no actual lyric
         if (Services.NeteaseWebLyricsService.currentLyric !== "")
             root._stableCurrentLyric = Services.NeteaseWebLyricsService.currentLyric
         else
-            // Fallback to title/artist when no current lyric (e.g., before first timestamp)
-            root._stableCurrentLyric = fallbackText
-            
+            root._stableCurrentLyric = ""
+
         if (Services.NeteaseWebLyricsService.nextLyric !== "")
             root._stableNextLyric = Services.NeteaseWebLyricsService.nextLyric
         else
-            // Fallback to title/artist when no next lyric
-            root._stableNextLyric = fallbackText
+            root._stableNextLyric = ""
             
         // For translated/secondary lyrics: keep empty when no actual translated lyric
         // (don't use fallback, so secondary line stays blank)
