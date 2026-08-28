@@ -24,3 +24,15 @@ function nextState(state, event) {
 function shouldReleaseLock(state, animationFinished) {
     return state === States.exiting && animationFinished === true
 }
+
+function failureTransition(failureReported, currentMessage, nextMessage) {
+    var message = currentMessage || ""
+    var candidate = nextMessage || ""
+    if (!message && candidate)
+        message = candidate
+    return {
+        failureReported: true,
+        message: message,
+        shouldNotify: failureReported !== true,
+    }
+}

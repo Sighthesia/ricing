@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Services.Pam
+import "./LockLogic.js" as LockLogic
 
 // Own the password conversation and expose only its transient UI state.
 Scope {
@@ -12,6 +13,7 @@ Scope {
     property bool unlockInProgress: false
     property bool showFailure: false
     property string errorMessage: ""
+    property bool failureReported: false
 
     signal unlocked()
     signal failed()
@@ -22,6 +24,7 @@ Scope {
 
         showFailure = false
         errorMessage = ""
+        failureReported = false
         unlockInProgress = pam.start()
         return unlockInProgress
     }
@@ -32,6 +35,16 @@ Scope {
         unlockInProgress = false
         showFailure = false
         errorMessage = ""
+        failureReported = false
+    }
+
+    function reportFailure(message): void {
+        var transition = LockLogic.failureTransition(failureReported, errorMessage, message)
+        failureReported = true
+        errorMessage = transition.message
+        showFailure = true
+        if (transition.shouldNotify)
+            failed()
     }
 
     // Keep the PAM conversation isolated from the surface that renders it.
@@ -60,17 +73,13 @@ Scope {
                 return
             }
 
-            root.showFailure = true
-            root.errorMessage = pam.message
-            root.failed()
+            root.reportFailure(pam.message)
         }
 
         onError: error => {
             root.unlockInProgress = false
             root.currentText = ""
-            root.showFailure = true
-            root.errorMessage = PamError.toString(error)
-            root.failed()
+            root.reportFailure(PamError.toString(error))
         }
     }
 }
