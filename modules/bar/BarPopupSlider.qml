@@ -8,6 +8,7 @@ Item {
     property real value: 0.5
     property bool muted: false
     property string label: ""
+    property bool showMute: true
 
     // Qt forbids a property `value` and a signal `valueChanged(real)` on the
     // same object (duplicate notify). The spec's `valueChanged(real)` is the
@@ -43,7 +44,7 @@ Item {
         Text {
             id: labelText
             objectName: "sliderLabel"
-            width: parent.width - muteButton.width - 8
+            width: root.showMute ? parent.width - muteButton.width - 8 : parent.width
             text: root.label
             color: root.effectiveMuted ? LazerTheme.textMuted : LazerTheme.textPrimary
             font.pixelSize: 11
@@ -65,7 +66,7 @@ Item {
             Item {
                 id: trackHost
                 objectName: "sliderTrackHost"
-                width: parent.width - muteButton.width - controlRow.spacing
+                width: root.showMute ? parent.width - muteButton.width - controlRow.spacing : parent.width
                 height: parent.height
                 clip: false
 
@@ -180,13 +181,15 @@ Item {
                 }
             }
 
-            // Mute toggle button with hover/press feedback.
+            // Mute toggle button with hover/press feedback. Hidden for brightness.
             Rectangle {
                 id: muteButton
                 objectName: "sliderMuteButton"
                 width: 32
                 height: 28
                 radius: 6
+                visible: root.showMute
+                enabled: root.showMute
                 color: root.mutePressed ? LazerTheme.pressedFill : root.muteHovered ? LazerTheme.hoverFill : "transparent"
                 border.width: 0
 

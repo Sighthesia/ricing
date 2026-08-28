@@ -126,7 +126,7 @@ git commit -m "feat(bar): add fixed per-screen hover popup host"
 **Interfaces:**
 - `BarPopupIdentity { title; iconSource; summary }` renders the settings-sidebar-like first layer.
 - `BarPopupActions { actionKind; payload; }` renders the content body for `volume`, `brightness`, `media`, `notifications`, and `tray`.
-- `BarPopupSlider { value; muted; label; valueChanged(real); toggleRequested() }` is the shared slider/mute operation surface.
+- `BarPopupSlider { value; muted; label; valueCommitted(real); toggleRequested() }` is the shared slider/mute operation surface. Note: Qt6 forbids `property value` + `signal valueChanged(real)` on the same object (duplicate implicit notify), so the commit signal is `valueCommitted(real)`; `onValueChanged` remains the property binding notify and hosts handle `onValueCommitted`.
 
 - [ ] **Step 1: Write content contract tests**
 

@@ -123,13 +123,10 @@ Item {
             compare(labelNode.text, "Volume")
             var muteBtn = findByName(item, "sliderMuteButton")
             verify(muteBtn !== null, "mute button should exist")
+            verify(muteBtn.visible, "mute button visible when showMute true")
+            verify(item.showMute)
             verify(item.effectiveMuted)
-            // Signal spy for valueChanged and toggleRequested.
-            var valueSpy = createTemporaryObject(
-                Qt.createComponent("QtTest/SignalSpy.qml"),
-                root, {})
-            // Use SignalSpy via dynamic creation: fallback to manual spy if component unavailable.
-            // Manual spy using Connections.
+            // Manual spy for valueCommitted and toggleRequested.
             var valueCalls = 0
             var lastValue = -1
             var toggleCalls = 0
@@ -178,6 +175,10 @@ Item {
             verify(!findByName(item, "brightnessContent").visible, "brightness hidden for volume")
             compare(slider.value, 0.42)
             verify(slider.muted)
+            verify(slider.showMute, "volume exposes mute control")
+            var volMuteBtn = findByName(slider, "sliderMuteButton")
+            verify(volMuteBtn !== null, "volume mute button should exist")
+            verify(volMuteBtn.visible, "volume mute button visible")
             // Trigger slider interaction via signal emission.
             fake.setCalls = 0
             fake.last = -1
@@ -200,6 +201,11 @@ Item {
             verify(findByName(item, "brightnessContent").visible)
             verify(!findByName(item, "volumeContent").visible)
             compare(slider.value, 0.33)
+            verify(!slider.showMute, "brightness hides mute control")
+            var brightMuteBtn = findByName(slider, "sliderMuteButton")
+            verify(brightMuteBtn !== null, "brightness mute button node exists")
+            verify(!brightMuteBtn.visible, "brightness mute button not visible")
+            verify(!brightMuteBtn.enabled, "brightness mute button disabled")
             fakeB.setCalls = 0
             slider.valueCommitted(0.6)
             compare(fakeB.setCalls, 1)

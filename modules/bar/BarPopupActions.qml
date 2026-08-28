@@ -230,6 +230,7 @@ Item {
                 value: root.volumeValue
                 muted: root.volumeMuted
                 label: "Volume"
+                showMute: true
                 onValueCommitted: function(v) { root.handleVolumeValue(v) }
                 onToggleRequested: root.handleToggleMute()
             }
@@ -250,8 +251,8 @@ Item {
                 value: root.brightnessValue
                 muted: false
                 label: "Brightness"
+                showMute: false
                 onValueCommitted: function(v) { root.handleBrightnessValue(v) }
-                onToggleRequested: root.handleBrightnessValue(root.brightnessValue)
             }
         }
 
