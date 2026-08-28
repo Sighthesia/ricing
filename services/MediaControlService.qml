@@ -80,7 +80,9 @@ Singleton {
             return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
         if (root._mprisPlaying)
             return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
-        if (root._neteasePlaying && neteaseArt !== "")
+        // MPRIS not playing: fall back to any available Netease art so the
+        // cover follows the still-playing previous source like title/progress.
+        if (neteaseArt !== "")
             return neteaseArt
         return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
     }
