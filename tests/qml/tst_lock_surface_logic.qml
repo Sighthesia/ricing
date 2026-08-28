@@ -1,7 +1,8 @@
 import QtQuick
 import QtTest
+import "../../modules/lock/LockSurfaceLogic.js" as SurfaceLogic
 
-// Exercise the LockSurface animation contract without requiring the optional Wayland plugin.
+// Exercise the lock animation seam and production snapshot component without the Wayland plugin.
 Item {
     id: harness
     width: 800
@@ -9,7 +10,6 @@ Item {
 
     property bool released: false
 
-    // Mirror the public state machine used by the real WlSessionLockSurface.
     Item {
         id: lockSurface
         anchors.fill: parent
@@ -24,11 +24,10 @@ Item {
             exitStarted = false
             releaseSent = false
             if (reducedMotion) {
-                waveProgress = 1
-                authOpacity = 1
+                SurfaceLogic.applyRevealImmediately(lockSurface, enterAnimation, exitAnimation)
                 return
             }
-            exitAnimation.stop()
+            SurfaceLogic.stopAnimations(enterAnimation, exitAnimation)
             enterAnimation.start()
         }
 
@@ -41,9 +40,8 @@ Item {
             if (exitStarted)
                 return
             exitStarted = true
-            authOpacity = 0
             if (reducedMotion) {
-                waveProgress = 0
+                SurfaceLogic.applyExitImmediately(lockSurface, enterAnimation, exitAnimation)
                 if (!releaseSent) {
                     releaseSent = true
                     releaseRequested()
@@ -51,6 +49,7 @@ Item {
                 return
             }
             enterAnimation.stop()
+            exitAnimation.stop()
             exitAnimation.from = waveProgress
             exitAnimation.start()
         }
@@ -129,6 +128,104 @@ Item {
             lockSurface.startExit()
             compare(lockSurface.waveProgress, 0)
             verify(harness.released)
+        }
+
+        function test_reducedMotionStopsBothAnimationsBeforeFinalState() {
+            lockSurface.reducedMotion = false
+            lockSurface.startReveal()
+            wait(40)
+            lockSurface.reducedMotion = true
+            lockSurface.startReveal()
+            compare(lockSurface.waveProgress, 1)
+            compare(lockSurface.authOpacity, 1)
+            lockSurface.startExit()
+            compare(lockSurface.waveProgress, 0)
+            compare(lockSurface.authOpacity, 0)
+            verify(harness.released)
+        }
+    }
+
+    TestCase {
+        name: "LockSnapshot"
+        when: windowShown
+
+        property var snapshot: null
+        property int preparedSignals: 0
+
+        function init() {
+            var component = Qt.createComponent(Qt.resolvedUrl("../../modules/lock/LockSnapshot.qml"))
+            verify(component.status === Component.Ready, component.errorString())
+            snapshot = component.createObject(harness)
+            verify(snapshot !== null)
+            preparedSignals = 0
+            snapshot.prepared.connect(function() { preparedSignals += 1 })
+        }
+
+        function cleanup() {
+            if (snapshot)
+                snapshot.destroy()
+            snapshot = null
+        }
+
+        function test_generationIsCapturedPerProviderCallback() {
+            var firstCallback = null
+            var generations = []
+            snapshot.snapshotProvider = function(screen, count, generation, callback) {
+                generations.push(generation)
+                if (!firstCallback)
+                    firstCallback = callback
+                return { ready: false }
+            }
+            snapshot.request(1)
+            snapshot.request(1)
+            compare(generations.length, 2)
+            verify(generations[0] < generations[1])
+            firstCallback(0, "old.png")
+            verify(!snapshot.ready)
+            compare(snapshot.preparedScreenCount, 0)
+        }
+
+        function test_rejectsInvalidAndDuplicateIndices() {
+            var callback = null
+            snapshot.snapshotProvider = function(screen, count, generation, report) {
+                callback = report
+                return { ready: false }
+            }
+            snapshot.request(2)
+            callback(-1, "invalid.png")
+            callback(2, "invalid.png")
+            callback(0, "one.png")
+            callback(0, "duplicate.png")
+            compare(snapshot.preparedScreenCount, 1)
+            verify(!snapshot.ready)
+            callback(1, "two.png")
+            verify(snapshot.ready)
+            compare(preparedSignals, 1)
+        }
+
+        function test_staleCallbackCannotCompleteCurrentRequest() {
+            var callbacksByGeneration = ({})
+            snapshot.snapshotProvider = function(screen, count, generation, callback) {
+                callbacksByGeneration[generation] = callback
+                return { ready: false }
+            }
+            snapshot.request(1)
+            var firstGeneration = snapshot.generation
+            snapshot.request(2)
+            callbacksByGeneration[firstGeneration](0, "stale.png")
+            compare(snapshot.preparedScreenCount, 0)
+            verify(!snapshot.ready)
+            callbacksByGeneration[snapshot.generation](0, "current-one.png")
+            callbacksByGeneration[snapshot.generation](1, "current-two.png")
+            verify(snapshot.ready)
+        }
+
+        function test_timeoutFallbackResolvesWithoutImage() {
+            snapshot.snapshotProvider = function() { return { ready: false } }
+            snapshot.request(1)
+            tryCompare(snapshot, "ready", true, 500)
+            compare(snapshot.snapshotUrl, "")
+            compare(preparedSignals, 1)
         }
     }
 }

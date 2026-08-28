@@ -13,28 +13,35 @@ QtObject {
     property int requestedScreenCount: 0
     property int preparedScreenCount: 0
     property var preparedScreens: []
+    property var expectedScreens: []
 
     signal prepared(int generation)
 
     function request(screenCount): void {
+        fallbackTimer.stop()
         generation += 1
-        requestedScreenCount = Math.max(0, Number(screenCount) || 0)
+        requestedScreenCount = Math.max(0, Math.floor(Number(screenCount) || 0))
         preparedScreenCount = 0
         preparedScreens = []
+        expectedScreens = []
+        for (var screenIndex = 0; screenIndex < requestedScreenCount; ++screenIndex)
+            expectedScreens.push(screenIndex)
         ready = false
         snapshotUrl = ""
+
+        var requestGeneration = generation
 
         var result = null
         if (snapshotProvider) {
             if (typeof snapshotProvider === "function")
-                result = snapshotProvider(screen, requestedScreenCount, generation,
+                result = snapshotProvider(screen, requestedScreenCount, requestGeneration,
                                           function(index, url) {
-                                              root.reportReady(generation, index, url)
+                                              root.reportReady(requestGeneration, index, url)
                                           })
             else if (typeof snapshotProvider.request === "function")
-                result = snapshotProvider.request(screen, requestedScreenCount, generation,
+                result = snapshotProvider.request(screen, requestedScreenCount, requestGeneration,
                                                   function(index, url) {
-                                                      root.reportReady(generation, index, url)
+                                                      root.reportReady(requestGeneration, index, url)
                                                   })
         }
 
@@ -44,7 +51,7 @@ QtObject {
             else if (result.url)
                 snapshotUrl = result.url
             if (result.ready !== false)
-                finish(generation)
+                finish(requestGeneration)
             else
                 fallbackTimer.restart()
             return
@@ -61,7 +68,10 @@ QtObject {
     function reportReady(requestGeneration, screenIndex, url): void {
         if (requestGeneration !== generation || ready)
             return
-        var index = Math.max(0, Number(screenIndex) || 0)
+        var index = Number(screenIndex)
+        if (!isFinite(index) || index !== Math.floor(index)
+                || expectedScreens.indexOf(index) < 0)
+            return
         if (preparedScreens.indexOf(index) >= 0)
             return
         var nextScreens = preparedScreens.slice()
@@ -77,13 +87,13 @@ QtObject {
     function finish(requestGeneration): void {
         if (requestGeneration !== generation || ready)
             return
+        fallbackTimer.stop()
         ready = true
         prepared(requestGeneration)
     }
 
     // The timeout deliberately resolves to an opaque-background-only state.
-    Timer {
-        id: fallbackTimer
+    property Timer fallbackTimer: Timer {
         interval: Lazer.MotionTokens.medium
         repeat: false
         onTriggered: root.finish(root.generation)

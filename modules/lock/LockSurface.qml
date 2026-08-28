@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell.Wayland
 import "../lazerbar" as Lazer
 import "./LockLogic.js" as LockLogic
+import "./LockSurfaceLogic.js" as SurfaceLogic
 
 // Own one compositor-enforced full-screen session-lock surface.
 WlSessionLockSurface {
@@ -23,11 +24,10 @@ WlSessionLockSurface {
         exitStarted = false
         releaseSent = false
         if (reducedMotion) {
-            waveProgress = 1
-            authOpacity = 1
+            SurfaceLogic.applyRevealImmediately(root, enterAnimation, exitAnimation)
             return
         }
-        exitAnimation.stop()
+        SurfaceLogic.stopAnimations(enterAnimation, exitAnimation)
         enterAnimation.start()
     }
 
@@ -35,13 +35,14 @@ WlSessionLockSurface {
         if (exitStarted)
             return
         exitStarted = true
-        authOpacity = 0
         if (reducedMotion) {
-            waveProgress = 0
+            SurfaceLogic.applyExitImmediately(root, enterAnimation, exitAnimation)
             requestRelease()
             return
         }
+        authOpacity = 0
         enterAnimation.stop()
+        exitAnimation.stop()
         exitAnimation.from = waveProgress
         exitAnimation.start()
     }

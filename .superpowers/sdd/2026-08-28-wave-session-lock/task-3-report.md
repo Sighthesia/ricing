@@ -147,3 +147,69 @@ production surface was still parsed and loaded through `qs`.
 - A real compositor-backed session-lock integration test remains unavailable
   in this environment because the distro package lacks the Wayland plugin
   binary and a running compositor lock protocol is not part of qmltestrunner.
+
+## Review Fix Report
+
+### Findings addressed
+
+- Captured `requestGeneration` in every function/object provider callback, so an
+  older callback cannot read the current generation and mutate a newer request.
+- Built the exact expected screen index set for each request and reject
+  non-integer, out-of-range, and duplicate indexes before updating readiness.
+- Added a shared `LockSurfaceLogic.js` seam used by production `LockSurface`
+  and the Qt6 harness. Reduced-motion reveal and exit paths stop both
+  animations before applying final values; exit then emits release once.
+- Reworked the focused test to instantiate production `LockSnapshot.qml` and
+  cover generation capture, invalid/duplicate indexes, stale callbacks, and
+  timeout fallback. Animation tests reuse the production immediate-path seam.
+
+### Verification
+
+Focused lock test:
+
+```bash
+QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner \
+  -input tests/qml/tst_lock_surface_logic.qml -o -,txt
+```
+
+Result: PASS, 12 passed, 0 failed, 0 skipped, 0 blacklisted, no WARN/ERROR.
+
+Related lock logic test:
+
+```bash
+QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner \
+  -input tests/qml/tst_lock_logic.qml -o -,txt
+```
+
+Result: PASS, 7 passed, 0 failed, 0 skipped, 0 blacklisted, no WARN/ERROR.
+
+Related wave renderer test:
+
+```bash
+QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner \
+  -input tests/qml/tst_wave_reveal_layers.qml -o -,txt
+```
+
+Result: PASS, 4 passed, 0 failed, 0 skipped, 0 blacklisted, no WARN/ERROR.
+
+Static check:
+
+```bash
+qmllint -I /usr/lib/qt6/qml \
+  modules/lock/LockSnapshot.qml modules/lock/LockSurface.qml \
+  modules/lock/LockSurfaceLogic.js tests/qml/tst_lock_surface_logic.qml
+```
+
+Result: PASS, no output.
+
+Production load smoke check:
+
+```bash
+qs -p tst_lock_surface_smoke.qml
+```
+
+Result: configuration loaded successfully and the temporary harness created
+and destroyed `LockSurface.qml`. Quickshell emitted the same two existing
+`QML ProxyFloatingWindow` deprecation warnings for `width` and `height`; they
+come from the installed Quickshell proxy surface, not the changed lock files.
+The temporary harness was removed afterward.
