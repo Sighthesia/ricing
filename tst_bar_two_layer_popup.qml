@@ -37,18 +37,76 @@ Item {
         console.log("FAIL:", label, "expected true got", JSON.stringify(value))
     }
 
-    function checkIdentityIcon(label, intent) {
-        root.checkTrue(label + " source is absolute or empty",
-                intent.iconSource === "" || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(String(intent.iconSource)))
-        host.showIntent(intent)
-        var identity = findByName(host.popupItem, "identityIcon")
-        root.checkTrue(label + " identity icon exists", identity !== null)
-        if (identity) {
-            root.checkTrue(label + " identity icon source is visible",
-                    String(identity.source) === String(intent.iconSource))
-            root.checkTrue(label + " identity icon loads or stays empty",
-                    intent.iconSource === "" || identity.status !== Image.Error)
+    property var _iconChecks: []
+    property int _iconCheckIndex: 0
+    property int _iconWaitAttempts: 0
+    property bool _iconExistenceChecked: false
+
+    function checkIdentityIcon(label, intent, allowEmptySource) {
+        var source = String(intent.iconSource || "")
+        root.checkTrue(label + " source is absolute or explicitly empty",
+                source !== ""
+                ? /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(source)
+                : allowEmptySource === true)
+        root._iconChecks.push({ label: label, intent: intent, allowEmpty: allowEmptySource === true })
+    }
+
+    function beginIdentityIconChecks() {
+        root._iconCheckIndex = 0
+        root._iconWaitAttempts = 0
+        root._iconExistenceChecked = false
+        identityIconWait.restart()
+    }
+
+    function checkNextIdentityIcon() {
+        if (root._iconCheckIndex >= root._iconChecks.length) {
+            identityIconWait.stop()
+            Qt.callLater(root.runHoverBridge)
+            return
         }
+
+        var check = root._iconChecks[root._iconCheckIndex]
+        host.showIntent(check.intent)
+        var identity = findByName(host.popupItem, "identityIcon")
+        if (!root._iconExistenceChecked) {
+            root.checkTrue(check.label + " identity icon exists", identity !== null)
+            root._iconExistenceChecked = true
+        }
+        if (!identity) {
+            root._iconCheckIndex++
+            root._iconWaitAttempts = 0
+            root._iconExistenceChecked = false
+            return
+        }
+
+        var source = String(check.intent.iconSource || "")
+        if (source === "" && check.allowEmpty) {
+            root.check(check.label + " empty source stays empty", String(identity.source), "")
+            root._iconCheckIndex++
+            root._iconWaitAttempts = 0
+            root._iconExistenceChecked = false
+            return
+        }
+
+        if (identity.status === Image.Loading || identity.status === Image.Null) {
+            root._iconWaitAttempts++
+            if (root._iconWaitAttempts < 100)
+                return
+            root.checkTrue(check.label + " identity icon reaches Ready before timeout", false)
+        } else {
+            root.check(check.label + " identity icon source is bound", String(identity.source), source)
+            root.check(check.label + " identity icon reaches Ready", identity.status, Image.Ready)
+        }
+        root._iconCheckIndex++
+        root._iconWaitAttempts = 0
+        root._iconExistenceChecked = false
+    }
+
+    Timer {
+        id: identityIconWait
+        interval: 20
+        repeat: true
+        onTriggered: root.checkNextIdentityIcon()
     }
 
     function finish() {
@@ -358,16 +416,37 @@ Item {
         if (trayIdentity) root.check("tray identity reflects updated icon", String(trayIdentity.iconSource), String(Qt.resolvedUrl("modules/lazerbar/icons/apps.svg")))
 
         // Every actionable producer must hand the identity layer a stable URL.
-        checkIdentityIcon("volume producer", volumeWidget.buildHoverIntent())
-        checkIdentityIcon("brightness producer", brightnessWidget.buildHoverIntent())
-        checkIdentityIcon("media producer", mediaWidget.buildHoverIntent())
-        checkIdentityIcon("notification producer", notificationsWidget.buildHoverIntent())
+        root._iconChecks = []
+        checkIdentityIcon("volume producer", volumeWidget.buildHoverIntent(), false)
+        checkIdentityIcon("brightness producer", brightnessWidget.buildHoverIntent(), false)
+        checkIdentityIcon("media producer", mediaWidget.buildHoverIntent(), false)
+        checkIdentityIcon("notification producer", notificationsWidget.buildHoverIntent(), false)
         checkIdentityIcon("tray producer", trayWidget.buildTrayIntent({
             title: "Tray", icon: Qt.resolvedUrl("modules/lazerbar/icons/apps.svg")
-        }, null))
+        }, null), false)
 
-        // Start hover bridge sequence.
-        Qt.callLater(root.runHoverBridge)
+        // Exercise the real tray delegate normalization contract without
+        // depending on SystemTray.items or a running SNI provider.
+        root.check("tray SNI path icon converts to file URL",
+                trayWidget.normalizeTrayIconSource("/usr/share/icons/demo.png?path=/tmp/sni-icons"),
+                "file:///tmp/sni-icons/demo.png")
+        root.check("tray absolute icon remains valid",
+                trayWidget.normalizeTrayIconSource("file:///tmp/demo.png"),
+                "file:///tmp/demo.png")
+        root.check("tray empty icon uses documented fallback",
+                trayWidget.normalizeTrayIconSource(""), "")
+        var trayModelFallback = { title: "Fallback", icon: Qt.resolvedUrl("modules/lazerbar/icons/apps.svg") }
+        var trayFallbackIntent = trayWidget.buildTrayIntent(trayModelFallback, null)
+        root.check("tray model icon fallback reaches intent",
+                String(trayFallbackIntent.iconSource), String(trayModelFallback.icon))
+        var trayDelegateFallbackIntent = trayWidget.buildTrayIntent(trayModelFallback, {
+            label: "Fallback delegate", iconSource: ""
+        })
+        root.check("tray empty delegate icon falls back to model icon",
+                String(trayDelegateFallbackIntent.iconSource), String(trayModelFallback.icon))
+
+        // Start asynchronous Image status checks before the hover bridge.
+        beginIdentityIconChecks()
     }
 
     function runHoverBridge() {

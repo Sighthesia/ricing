@@ -37,6 +37,17 @@ Item {
         return String(Quickshell.iconPath(normalized, true) || "")
     }
 
+    function normalizeTrayIconSource(source) {
+        var normalized = String(source || "").trim()
+        var pathSplit = normalized.indexOf("?path=")
+        if (pathSplit < 0)
+            return resolveIconSource(normalized)
+        var name = normalized.substring(0, pathSplit)
+        var dir = normalized.substring(pathSplit + 6)
+        return resolveIconSource("file://" + dir + "/"
+                + name.substring(name.lastIndexOf("/") + 1))
+    }
+
     function buildTrayIntent(modelData, delegateItem) {
         var centerX = 0
         try { centerX = delegateItem.mapToGlobal(delegateItem.width / 2, delegateItem.height / 2).x } catch (e) {
@@ -44,7 +55,7 @@ Item {
         }
         if (!isFinite(centerX)) centerX = 0
         var titleText = (delegateItem && delegateItem.label) ? delegateItem.label : (modelData.title || modelData.tooltipTitle || modelData.id || "Tray item")
-        var iconSrc = resolveIconSource((delegateItem && delegateItem.iconSource)
+        var iconSrc = normalizeTrayIconSource((delegateItem && delegateItem.iconSource)
                 ? delegateItem.iconSource : (modelData.icon || ""))
         var summaryText = modelData.tooltipTitle || modelData.tooltipSubTitle || ""
         return {
@@ -93,13 +104,7 @@ Item {
                     var icon = modelData ? (modelData.icon || "") : ""
                     // SNI icons may carry a non-theme path suffix that the
                     // image provider cannot resolve without conversion.
-                    var pathSplit = icon.indexOf("?path=")
-                    if (pathSplit < 0)
-                        return root.resolveIconSource(icon)
-                    var name = icon.substring(0, pathSplit)
-                    var dir = icon.substring(pathSplit + 6)
-                    return root.resolveIconSource("file://" + dir + "/"
-                            + name.substring(name.lastIndexOf("/") + 1))
+                    return root.normalizeTrayIconSource(icon)
                 }
 
                 width: LazerTheme.barWidgetHeight
