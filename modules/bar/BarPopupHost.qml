@@ -14,6 +14,8 @@ PanelWindow {
     property bool open: false
     property bool widgetHovered: false
     property bool popupHovered: false
+    // Keep the full-screen layer-shell surface absent until a popup owns it.
+    property bool surfaceActive: false
     property string direction: "down"
     property real anchorX: 0
     property real screenWidth: 1920
@@ -67,6 +69,7 @@ PanelWindow {
         var pos = intentObj.barPosition !== undefined ? String(intentObj.barPosition) : "top"
         root.direction = BarHoverLogic.popupDirection(pos)
         root.open = true
+        root.surfaceActive = true
         cancelClose()
         clearIntentTimer.stop()
         // Drive the two-layer reveal forward; the internal staggered
@@ -107,7 +110,9 @@ PanelWindow {
     margins { top: 0; bottom: 0; left: 0; right: 0 }
     // No input when closed; the window otherwise masks only the popup.
     mask: Region { item: root.open ? popupContainer : null }
-    visible: true
+    // Do not keep a full-screen transparent surface above the settings window
+    // when no bar popup is open or completing its reveal.
+    visible: root.surfaceActive
 
     // Close after MotionTokens.fast if both hover owners are gone.
     Timer {
@@ -129,8 +134,10 @@ PanelWindow {
         id: clearIntentTimer
         interval: popup.revealDuration + 40
         onTriggered: {
-            if (!root.open)
+            if (!root.open) {
                 root.intent = null
+                root.surfaceActive = false
+            }
         }
     }
 
@@ -178,7 +185,7 @@ PanelWindow {
             direction: root.direction === "up" ? TwoLayerPopup.Direction.Up : TwoLayerPopup.Direction.Down
             width: popupContainer.width
             height: popupContainer.height
-            revealProgress: 1
+            revealProgress: 0
             contentDelay: MotionTokens.settingsContentDelay
             visible: root.open || revealProgress > 0
 

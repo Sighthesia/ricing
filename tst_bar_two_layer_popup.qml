@@ -224,7 +224,11 @@ Item {
     property var _edgeLeftAnchor: 0
     property var _edgeRightAnchor: 0
 
-    Component.onCompleted: Qt.callLater(root.run)
+    Component.onCompleted: {
+        // Check before the deferred interaction sequence opens the host.
+        root.check("popup host is hidden while idle", host.surfaceActive, false)
+        Qt.callLater(root.run)
+    }
 
     function run() {
         // Step 1: top bar direction.
