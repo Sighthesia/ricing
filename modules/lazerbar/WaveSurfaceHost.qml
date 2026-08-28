@@ -32,7 +32,7 @@ Item {
     property alias outsideRight: outsideRight
     property alias sidebar: sidebar
     property alias contentItem: routeLoader.item
-    property alias waveRepeater: waveRepeater
+    property alias waveRepeater: waveLayers.waveRepeater
 
     signal closed()
     signal opened()
@@ -135,20 +135,10 @@ Item {
         height: root.height
         clip: true
 
-        Repeater {
-            id: waveRepeater
-            model: 4
-            delegate: FullscreenWave {
-                required property int index
-                anchors.fill: parent
-                progress: root.waveProgress
-                angle: Logic.waveAngle(index)
-                colour: index === 0 ? (root.palette.light4 || "transparent")
-                        : index === 1 ? (root.palette.light3 || "transparent")
-                        : index === 2 ? (root.palette.dark4 || "transparent")
-                        : (root.palette.dark3 || "transparent")
-                restOffset: -parent.height * ([0.72, 0.5, 0.32, 0.16][index])
-            }
+        WaveRevealLayers {
+            id: waveLayers
+            progress: root.waveProgress
+            palette: root.palette
         }
 
         // Move the continuous body inside the fixed compositor-facing owner.
