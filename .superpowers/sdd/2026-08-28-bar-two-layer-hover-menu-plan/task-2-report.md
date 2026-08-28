@@ -70,3 +70,66 @@ git diff --check
 - 关闭清理分两段：`MotionTokens.fast`（100ms）内仅 `open=false` 与 `closeRequested`，`intent` 则延后 `revealDuration+40`（约 740ms）才清零；harness 仅等待第一段即断言 `open`，若 Task 5 需观测 `intent` 是否已空，需额外等待第二段。
 - `BarHoverLogic.clampAnchor` 的 margin 取 8（与旧 popup 框架一致），而非 `floatingMargin`，若后续视觉要求与 bar 浮动边距对齐，需在 Task 5 统一定位策略时再校准。
 - `Qt.quit()` 在 Quickshell 环境不接受 exit code 参数（传参会报 Too many arguments），harness 已改为无参调用并以 `Totals` 零失败判定成功；CI 若依赖进程退出码区分失败，需外部包裹器解析 `FAIL` 行。
+
+## Fix — clearIntentTimer 竞态（review finding）
+
+**问题：** `showIntent` 未停止 `clearIntentTimer`，导致 `close` 后在 `revealDuration+40` 窗口内快速 `showIntent(newIntent)`，旧计时器仍会在到期时将新 `intent` 误清零。
+
+**最小修复：** `modules/bar/BarPopupHost.qml:43-44` 在 `showIntent` 中 `cancelClose()` 后新增 `clearIntentTimer.stop()`，其余固定几何与 hover 桥接保持不变。
+
+```qml
+function showIntent(intentObj) {
+    ...
+    root.open = true
+    cancelClose()
+    clearIntentTimer.stop()   // <-- fix: cancel pending clear from previous close
+    popup.visible = true
+    popup.revealProgress = 1
+}
+```
+
+**Harness 追加断言：** `tst_bar_popup_host.qml` 在 `closeWait` 验证关闭后，立即以 `media` intent 重开（此时旧 `clearIntentTimer` 仍有约 600ms 剩余），断言立即 `open`/`intent`/`direction` 正确，随后 `raceWait` 等待 800ms（超出旧窗口）再断言：
+- `new intent survives old clear timer`
+- `still open after old timer window`
+- `anchor updated after race`
+- `hover bridge still intact after race`（`orientation===Vertical` 不变）
+
+**复跑命令与结果：**
+
+```bash
+/usr/lib/qt6/bin/qmllint modules/bar/BarPopupHost.qml
+# exit 0
+Warning: modules/bar/BarPopupHost.qml:9:1: Type PanelWindow is not creatable. [uncreatable-type]
+Warning: modules/bar/BarPopupHost.qml:77:5: unknown grouped property scope margins. [unqualified]
+Warning: modules/bar/BarPopupHost.qml:77:5: Type margins is used but it is not resolved [unresolved-type]
+
+qs -p tst_bar_popup_host.qml
+# exit 0
+PASS: showIntent opens host (top)
+PASS: top bar direction is down
+PASS: TwoLayerPopup direction Down for top bar
+PASS: anchorX stored
+PASS: screenWidth stored
+PASS: intent preserved
+PASS: sidebarData alias exists
+PASS: contentData alias exists
+PASS: bottom bar direction is up
+PASS: TwoLayerPopup direction Up for bottom bar
+PASS: still open after intent swap
+PASS: orientation is Vertical
+PASS: requestClose while popupHovered keeps open
+PASS: close after both hovers released
+PASS: TwoLayerPopup direction Up after bottom bar
+PASS: reopen before cleanup keeps open
+PASS: reopen intent preserved immediately
+PASS: reopen direction is down
+PASS: TwoLayerPopup direction Down after race reopen
+PASS: new intent survives old clear timer
+PASS: still open after old timer window
+PASS: anchor updated after race
+PASS: hover bridge still intact after race
+Totals: 23 passed, 0 failed
+
+git diff --check
+# 无尾随空白/冲突标记（仅聚焦文件）
+```

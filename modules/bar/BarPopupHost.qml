@@ -42,6 +42,7 @@ PanelWindow {
         root.direction = BarHoverLogic.popupDirection(pos)
         root.open = true
         cancelClose()
+        clearIntentTimer.stop()
         // Drive the two-layer reveal forward; the internal staggered
         // opacity/offset contracts stay inside TwoLayerPopup.
         popup.visible = true

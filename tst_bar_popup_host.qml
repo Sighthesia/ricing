@@ -53,6 +53,38 @@ Item {
             root.check("close after both hovers released", host.open, false)
             // Direction enum stays consistent after close (last intent was bottom -> Up)
             root.check("TwoLayerPopup direction Up after bottom bar", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Up)
+            // --- Race: close followed by quick reopen before clearIntentTimer fires ---
+            // At this point clearIntentTimer (revealDuration+40 ≈740ms) is still pending
+            // because we only waited fast+40 (~140ms). Reopening now must cancel it.
+            var raceIntent = {
+                widgetId: "media",
+                instanceKey: "media:0",
+                title: "Media",
+                iconSource: "icons/media.svg",
+                summary: "Playing",
+                actionKind: "media",
+                anchorX: 300,
+                screenWidth: 1000,
+                barPosition: "top"
+            }
+            host.showIntent(raceIntent)
+            root.check("reopen before cleanup keeps open", host.open, true)
+            root.check("reopen intent preserved immediately", host.intent !== null && host.intent.widgetId === "media", true)
+            root.check("reopen direction is down", host.direction, "down")
+            root.check("TwoLayerPopup direction Down after race reopen", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Down)
+            raceWait.restart()
+        }
+    }
+
+    Timer {
+        id: raceWait
+        // Wait beyond the old clearIntent window (revealDuration+40) to prove it was cancelled
+        interval: 800
+        onTriggered: {
+            root.check("new intent survives old clear timer", host.intent !== null && host.intent.widgetId === "media", true)
+            root.check("still open after old timer window", host.open, true)
+            root.check("anchor updated after race", host.anchorX, 300)
+            root.check("hover bridge still intact after race", host.popupItem.orientation, Lazer.TwoLayerPopup.Orientation.Vertical)
             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }
