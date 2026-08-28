@@ -90,8 +90,8 @@ Item {
 
     function debugSnapshot() {
         return {
-            "rect": root._rect(root), "sidebar": { "rect": root._rect(layerPopup.sidebarLayer), "x": Number(sidebarLayer.x), "width": Number(sidebarLayer.width), "z": Number(sidebarLayer.z) },
-            "content": { "rect": root._rect(layerPopup.contentLayer), "x": Number(contentLayer.x), "width": Number(contentLayer.width), "z": Number(contentLayer.z) },
+            "rect": root._rect(root), "sidebar": { "rect": root._rect(layerPopup.sidebarLayer), "x": Number(layerPopup.sidebarLayer.x), "width": Number(layerPopup.sidebarLayer.width), "z": Number(layerPopup.sidebarLayer.z) },
+            "content": { "rect": root._rect(layerPopup.contentLayer), "x": Number(layerPopup.contentLayer.x), "width": Number(layerPopup.contentLayer.width), "z": Number(layerPopup.contentLayer.z) },
             "selectedCategory": root.selectedCategory, "currentIndex": root.selectedIndex,
             "interactive": root.interactive, "visible": root.visible, "enabled": root.enabled,
             "opacity": Number(root.opacity), "z": Number(root.z),
@@ -224,7 +224,7 @@ Item {
         sidebarData: LazerSettingsSidebar {
             id: sidebarLayer
             z: 1
-            x: root.sidebarLayerX
+            x: 0
             y: 0
             width: root.sidebarWidth
             height: root.height
@@ -242,7 +242,7 @@ Item {
         contentData: LazerSettingsContent {
             id: contentLayer
             z: 0
-            x: root.contentLayerX
+            x: 0
             y: 0
             width: root.contentWidth
             height: root.height

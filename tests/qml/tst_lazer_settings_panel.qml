@@ -146,8 +146,13 @@ Item {
         function test_usesSharedTwoLayerPopupGeometry() {
             compare(panel.sidebar.parent, panel.layerPopup.sidebarLayer)
             compare(panel.content.parent, panel.layerPopup.contentLayer)
-            compare(panel.sidebar.x, panel.sidebarLayerX)
-            compare(panel.content.x, panel.contentLayerX)
+            compare(panel.layerPopup.sidebarLayer.x, panel.sidebarLayerX)
+            compare(panel.layerPopup.contentLayer.x, panel.contentLayerX)
+            compare(panel.sidebar.x, 0)
+            compare(panel.content.x, 0)
+            verify(panel.layerPopup.sidebarLayer.z > panel.layerPopup.contentLayer.z)
+            compare(panel.sidebar.mapToItem(panel, 0, 0).x, panel.sidebarLayerX)
+            compare(panel.content.mapToItem(panel, 0, 0).x, panel.contentLayerX)
         }
 
         function test_sidebarIndicatorMovesAsOneContinuousSurface() {

@@ -47,6 +47,7 @@ Item {
     // Sidebar host stays fixed while its offset and opacity follow reveal.
     Item {
         id: sidebarSlot
+        z: 1
         width: childrenRect.width
         height: childrenRect.height
         x: root.orientation === root.horizontal ? root.horizontalSidebarX : 0
@@ -72,6 +73,7 @@ Item {
     // Content host follows with a delayed reveal and independent offset.
     Item {
         id: contentSlot
+        z: 0
         width: childrenRect.width
         height: childrenRect.height
         x: root.orientation === root.horizontal ? root.horizontalContentX : 0
