@@ -31,11 +31,13 @@ Item {
 
     HoverHandler {
         id: hoverHandler
+        objectName: "pillHoverHandler"
         enabled: root.hoverable
     }
 
     // Left click is the primary activation path for every pill.
     TapHandler {
+        objectName: "pillPrimaryTapHandler"
         acceptedButtons: Qt.LeftButton
         gesturePolicy: TapHandler.ReleaseWithinBounds
         onTapped: root.clicked()

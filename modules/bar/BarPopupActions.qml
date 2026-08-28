@@ -292,6 +292,7 @@ Item {
 
                     HoverHandler { id: prevHover }
                     TapHandler {
+                        objectName: "mediaPrevTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
                         onTapped: root.handleMediaPrevious()
                     }
@@ -320,6 +321,7 @@ Item {
 
                     HoverHandler { id: playHover }
                     TapHandler {
+                        objectName: "mediaPlayPauseTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
                         onTapped: root.handleMediaPlayPause()
                     }
@@ -348,6 +350,7 @@ Item {
 
                     HoverHandler { id: nextHover }
                     TapHandler {
+                        objectName: "mediaNextTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
                         onTapped: root.handleMediaNext()
                     }
@@ -389,6 +392,7 @@ Item {
 
                     HoverHandler { id: dndHover }
                     TapHandler {
+                        objectName: "notificationDndTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
                         onTapped: root.handleToggleDnd()
                     }
@@ -416,6 +420,7 @@ Item {
 
                     HoverHandler { id: clearHover }
                     TapHandler {
+                        objectName: "notificationClearTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
                         onTapped: root.handleClearNotifications()
                     }
@@ -457,6 +462,7 @@ Item {
 
                     HoverHandler { id: activateHover }
                     TapHandler {
+                        objectName: "trayActivateTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
                         onTapped: root.handleTrayActivate()
                     }
@@ -484,6 +490,7 @@ Item {
 
                     HoverHandler { id: secondaryHover }
                     TapHandler {
+                        objectName: "traySecondaryTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
                         onTapped: root.handleTraySecondary()
                     }

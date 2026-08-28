@@ -150,6 +150,7 @@ Item {
 
                 TapHandler {
                     id: trackTap
+                    objectName: "sliderTrackTap"
                     gesturePolicy: TapHandler.ReleaseWithinBounds
                     onTapped: function(eventPoint) {
                         var pos = eventPoint.position.x
@@ -210,6 +211,7 @@ Item {
 
                 TapHandler {
                     id: muteTap
+                    objectName: "sliderMuteTap"
                     gesturePolicy: TapHandler.ReleaseWithinBounds
                     onPressedChanged: root.mutePressed = pressed
                     onTapped: root.toggleRequested()

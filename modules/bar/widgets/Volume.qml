@@ -61,6 +61,7 @@ BarPill {
     onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
     WheelHandler {
+        objectName: "volumeWheelHandler"
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: event => {
             var step = Number(Services.SettingsService.controls.volumeStep) || 0.05

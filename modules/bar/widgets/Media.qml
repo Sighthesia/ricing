@@ -185,6 +185,7 @@ BarPill {
     }
 
     WheelHandler {
+        objectName: "mediaWheelHandler"
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: event => {
             if (event.angleDelta.y > 0) Services.MediaService.next()

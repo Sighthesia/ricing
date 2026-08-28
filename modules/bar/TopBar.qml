@@ -87,9 +87,12 @@ Variants {
                     if (!intent) return
                     var enriched = Object.assign({}, intent)
                     enriched.screenWidth = screenScope.modelData ? Number(screenScope.modelData.width) : 1920
+                    enriched.screenHeight = screenScope.modelData ? Number(screenScope.modelData.height) : 1080
                     enriched.barPosition = String(Services.SettingsService.bar.position || "top")
+                    enriched.effectiveBarHeight = screenScope.effectiveHeight
+                    enriched.floatingMargin = screenScope.floatingMargin
                     popupHost.widgetHovered = true
-                    popupHost.showIntent(enriched)
+                    popupHost.updateIntent(enriched)
                 }
                 onPopupCloseRequested: {
                     popupHost.widgetHovered = false
@@ -99,12 +102,13 @@ Variants {
                     if (!intent || !popupHost.open) return
                     var enriched = Object.assign({}, intent)
                     enriched.screenWidth = screenScope.modelData ? Number(screenScope.modelData.width) : 1920
+                    enriched.screenHeight = screenScope.modelData ? Number(screenScope.modelData.height) : 1080
                     enriched.barPosition = String(Services.SettingsService.bar.position || "top")
-                    var nextX = Number(enriched.anchorX)
-                    if (isFinite(nextX)) popupHost.anchorX = nextX
+                    enriched.effectiveBarHeight = screenScope.effectiveHeight
+                    enriched.floatingMargin = screenScope.floatingMargin
                     // Refresh all slot data in place without recreating the reveal.
                     if (popupHost.intent)
-                        popupHost.intent = enriched
+                        popupHost.updateIntent(enriched)
                     popupHost.cancelClose()
                 }
             }
@@ -115,6 +119,7 @@ Variants {
             id: popupHost
             screen: screenScope.modelData
             screenWidth: screenScope.modelData ? Number(screenScope.modelData.width) : 1920
+            screenHeight: screenScope.modelData ? Number(screenScope.modelData.height) : 1080
             effectiveBarHeight: screenScope.effectiveHeight
             floatingMargin: screenScope.floatingMargin
         }

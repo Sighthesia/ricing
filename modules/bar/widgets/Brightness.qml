@@ -61,6 +61,7 @@ Item {
     onWidthChanged: if (brightnessHover.hovered) popupAnchorUpdate(buildHoverIntent())
 
     WheelHandler {
+        objectName: "brightnessWheelHandler"
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: event => {
             var step = Number(Services.SettingsService.controls.brightnessStep) || 0.05

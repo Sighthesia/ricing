@@ -1,5 +1,7 @@
 import QtQuick
+import Quickshell
 import "modules/bar" as Bar
+import "modules/bar/widgets" as Widgets
 import "modules/lazerbar" as Lazer
 import "modules/bar/BarHoverLogic.js" as BarHoverLogic
 
@@ -34,6 +36,18 @@ Item {
         console.log("FAIL:", label, "expected true got", JSON.stringify(value))
     }
 
+    function finish() {
+        console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
+        var forcedFailure = Quickshell.env("AFLOAT_TASK5_FORCE_FAILURE") === "1"
+        if (root._failures === 0 && !forcedFailure) {
+            Qt.quit()
+            return
+        }
+        // The local Quickshell host exposes Qt.quit() without an exit code.
+        // Terminating this process makes assertion failures machine-detectable.
+        Quickshell.execDetached(["sh", "-c", "kill -TERM " + Quickshell.processId])
+    }
+
     function findByName(item, name) {
         if (!item) return null
         if (item.objectName === name) return item
@@ -65,6 +79,7 @@ Item {
     Bar.BarPopupHost {
         id: host
         screenWidth: 1000
+        screenHeight: 900
         effectiveBarHeight: 48
         floatingMargin: 4
     }
@@ -79,6 +94,12 @@ Item {
         property int clickCount: 0
         onClicked: clickCount++
     }
+
+    // Real actionable widget instances expose their production input paths.
+    Widgets.Volume { id: volumeWidget; visible: false }
+    Widgets.Brightness { id: brightnessWidget; visible: false }
+    Widgets.Media { id: mediaWidget; visible: false }
+    Widgets.Notifications { id: notificationsWidget; visible: false }
 
     // Timers for async hover-bridge waits.
     Timer {
@@ -143,6 +164,9 @@ Item {
             actionKind: "volume",
             anchorX: 400,
             screenWidth: 1000,
+            screenHeight: 900,
+            effectiveBarHeight: 48,
+            floatingMargin: 4,
             barPosition: "top",
             payload: { volume: 0.5, muted: false, volumeService: ({ setSinkVolume: function(){}, toggleSinkMute: function(){} }), onVolumeChanged: function(){}, onToggleMute: function(){} }
         }
@@ -161,6 +185,10 @@ Item {
         root.checkTrue("top: content y greater than identity y", contentY > sidebarY)
         root.check("top: sidebar y is 0", sidebarY, 0)
         root.checkTrue("top: content y is sidebar height +1", contentY === host.popupItem.sidebarLayer.height + 1)
+        root.check("top: popup absolute y below bar", host.popupContainerItem.y, 52)
+        root.checkTrue("top: popup absolute placement stays inside screen",
+                host.popupContainerItem.y >= 52
+                && host.popupContainerItem.y + host.popupContainerItem.height <= host.activeScreenHeight)
 
         // Check identity/actions binding for top intent.
         var identity = findByName(host.popupItem, "popupIdentity")
@@ -185,12 +213,19 @@ Item {
             actionKind: "tray",
             anchorX: 500,
             screenWidth: 1000,
+            screenHeight: 900,
+            effectiveBarHeight: 56,
+            floatingMargin: 10,
             barPosition: "bottom",
             payload: { trayModel: ({ activate: function(){}, secondaryActivate: function(){} }), onActivate: function(){}, onSecondaryActivate: function(){} }
         }
         host.showIntent(intentBottom)
         root.check("same popup stays open after intent swap", host.open, true)
         root.check("anchor updated after tray swap", host.anchorX, 500)
+        root.check("screen width updated in place", host.activeScreenWidth, 1000)
+        root.check("screen height updated in place", host.activeScreenHeight, 900)
+        root.check("bar height updated in place", host.activeBarHeight, 56)
+        root.check("floating margin updated in place", host.activeFloatingMargin, 10)
         // Verify intent updated in place.
         root.check("intent title updated to tray", host.intent.title, "My App")
         geometryWaitBottom.restart()
@@ -205,6 +240,13 @@ Item {
         root.check("bottom: content y is 0", contentY, 0)
         root.checkTrue("bottom: sidebar y is content height +1", sidebarY === host.popupItem.contentLayer.height + 1)
         root.check("orientation is Vertical", host.popupItem.orientation, Lazer.TwoLayerPopup.Orientation.Vertical)
+        root.check("bottom: popup absolute y above bar",
+                host.popupContainerItem.y,
+                Math.max(0, host.activeScreenHeight - host.activeBarHeight
+                    - host.activeFloatingMargin - host.popupContainerItem.height))
+        root.check("bottom: popup absolute bottom at bar gap",
+                host.popupContainerItem.y + host.popupContainerItem.height,
+                host.activeScreenHeight - host.activeBarHeight - host.activeFloatingMargin)
 
         // Edge anchor left.
         var intentLeft = {
@@ -363,6 +405,10 @@ Item {
             // Also verify slider exists.
             var volSlider = findByName(actions, "volumeSlider")
             root.checkTrue("volume slider exists", volSlider !== null)
+            root.checkTrue("volume slider real track handler exists",
+                    findByName(volSlider, "sliderTrackTap") !== null)
+            root.checkTrue("volume slider real mute handler exists",
+                    findByName(volSlider, "sliderMuteTap") !== null)
         }
 
         // Brightness
@@ -389,6 +435,8 @@ Item {
             root.checkTrue("brightness slider exists", brightSlider !== null)
             // Verify brightness hides mute control.
             if (brightSlider) root.check("brightness hides mute", brightSlider.showMute, false)
+            root.checkTrue("brightness slider real track handler exists",
+                    findByName(brightSlider, "sliderTrackTap") !== null)
         }
 
         // Media
@@ -413,12 +461,15 @@ Item {
         actions = findByName(host.popupItem, "popupActions")
         root.checkTrue("media actions found", actions !== null)
         if (actions) {
+            root.checkTrue("media previous real TapHandler exists", findByName(actions, "mediaPrevTap") !== null)
+            root.checkTrue("media playPause real TapHandler exists", findByName(actions, "mediaPlayPauseTap") !== null)
+            root.checkTrue("media next real TapHandler exists", findByName(actions, "mediaNextTap") !== null)
             actions.handleMediaPrevious()
-            root.check("media previous fires once", mediaPrev, 1)
+            root.check("media previous callback fires once", mediaPrev, 1)
             actions.handleMediaPlayPause()
-            root.check("media playPause fires once", mediaPlay, 1)
+            root.check("media playPause callback fires once", mediaPlay, 1)
             actions.handleMediaNext()
-            root.check("media next fires once", mediaNextCount, 1)
+            root.check("media next callback fires once", mediaNextCount, 1)
         }
 
         // Notifications
@@ -439,10 +490,12 @@ Item {
         actions = findByName(host.popupItem, "popupActions")
         root.checkTrue("notifications actions found", actions !== null)
         if (actions) {
+            root.checkTrue("notification DND real TapHandler exists", findByName(actions, "notificationDndTap") !== null)
+            root.checkTrue("notification clear real TapHandler exists", findByName(actions, "notificationClearTap") !== null)
             actions.handleToggleDnd()
-            root.check("notification toggle fires once", notifToggle, 1)
+            root.check("notification toggle callback fires once", notifToggle, 1)
             actions.handleClearNotifications()
-            root.check("notification clear fires once", notifClear, 1)
+            root.check("notification clear callback fires once", notifClear, 1)
         }
 
         // Tray
@@ -463,10 +516,12 @@ Item {
         actions = findByName(host.popupItem, "popupActions")
         root.checkTrue("tray actions found", actions !== null)
         if (actions) {
+            root.checkTrue("tray activate real TapHandler exists", findByName(actions, "trayActivateTap") !== null)
+            root.checkTrue("tray secondary real TapHandler exists", findByName(actions, "traySecondaryTap") !== null)
             actions.handleTrayActivate()
-            root.check("tray activate fires once", trayAct, 1)
+            root.check("tray activate callback fires once", trayAct, 1)
             actions.handleTraySecondary()
-            root.check("tray secondary fires once", traySec, 1)
+            root.check("tray secondary callback fires once", traySec, 1)
         }
 
         // Primary widget click/wheel paths remain available.
@@ -479,9 +534,11 @@ Item {
         // Verify WheelHandler still attached on widgets (static check via lint already) -
         // here we just assert that host does not block widget hover.
         root.checkTrue("host still exposes widgetHovered property", host.widgetHovered !== undefined)
+        root.checkTrue("volume real WheelHandler path exists", findByName(volumeWidget, "volumeWheelHandler") !== null)
+        root.checkTrue("brightness real WheelHandler path exists", findByName(brightnessWidget, "brightnessWheelHandler") !== null)
+        root.checkTrue("media real WheelHandler path exists", findByName(mediaWidget, "mediaWheelHandler") !== null)
+        root.checkTrue("notifications real click path exists", findByName(notificationsWidget, "pillPrimaryTapHandler") !== null)
 
-        // Final totals.
-        console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
-        Qt.quit()
+        root.finish()
     }
 }

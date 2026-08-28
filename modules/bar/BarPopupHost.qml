@@ -17,8 +17,18 @@ PanelWindow {
     property string direction: "down"
     property real anchorX: 0
     property real screenWidth: 1920
+    property real screenHeight: 1080
     property int effectiveBarHeight: 48
     property int floatingMargin: 4
+    property real intentScreenWidth: 0
+    property real intentScreenHeight: 0
+    property real intentBarHeight: 0
+    property real intentFloatingMargin: -1
+
+    readonly property real activeScreenWidth: intentScreenWidth > 0 ? intentScreenWidth : screenWidth
+    readonly property real activeScreenHeight: intentScreenHeight > 0 ? intentScreenHeight : screenHeight
+    readonly property real activeBarHeight: intentBarHeight > 0 ? intentBarHeight : effectiveBarHeight
+    readonly property real activeFloatingMargin: intentFloatingMargin >= 0 ? intentFloatingMargin : floatingMargin
 
     // Expose the two-layer slots generically; host owns only the surface.
     readonly property alias sidebarData: popup.sidebarData
@@ -29,7 +39,7 @@ PanelWindow {
     signal actionRequested(string action)
     signal closeRequested()
 
-    function showIntent(intentObj) {
+    function updateIntent(intentObj) {
         if (!intentObj)
             return
         root.intent = intentObj
@@ -38,7 +48,15 @@ PanelWindow {
             root.anchorX = 0
         var sw = Number(intentObj.screenWidth)
         if (isFinite(sw) && sw > 0)
-            root.screenWidth = sw
+            root.intentScreenWidth = sw
+        else
+            root.intentScreenWidth = 0
+        var sh = Number(intentObj.screenHeight)
+        root.intentScreenHeight = isFinite(sh) && sh > 0 ? sh : 0
+        var barHeight = Number(intentObj.effectiveBarHeight)
+        root.intentBarHeight = isFinite(barHeight) && barHeight > 0 ? barHeight : 0
+        var margin = Number(intentObj.floatingMargin)
+        root.intentFloatingMargin = isFinite(margin) && margin >= 0 ? margin : -1
         var pos = intentObj.barPosition !== undefined ? String(intentObj.barPosition) : "top"
         root.direction = BarHoverLogic.popupDirection(pos)
         root.open = true
@@ -48,6 +66,10 @@ PanelWindow {
         // opacity/offset contracts stay inside TwoLayerPopup.
         popup.visible = true
         popup.revealProgress = 1
+    }
+
+    function showIntent(intentObj) {
+        updateIntent(intentObj)
     }
 
     function requestClose() {
@@ -66,21 +88,16 @@ PanelWindow {
     // clipped content animates so per-frame resizes never cross a protocol
     // commit boundary.
     implicitWidth: screen ? screen.width : root.screenWidth
-    implicitHeight: screen ? screen.height : 600
-    // Anchor to the same edge as the bar and offset by the bar's effective
-    // height plus floating margin so the popup docks directly beneath/above it.
+    implicitHeight: screen ? screen.height : root.screenHeight
+    // Keep the host full-screen; the inner popup owns its absolute bar-adjacent
+    // placement so an upward popup can occupy the space above a bottom bar.
     anchors {
-        top: root.direction === "down"
-        bottom: root.direction === "up"
+        top: true
+        bottom: true
         left: true
         right: true
     }
-    margins {
-        top: root.direction === "down" ? root.effectiveBarHeight + root.floatingMargin : 0
-        bottom: root.direction === "up" ? root.effectiveBarHeight + root.floatingMargin : 0
-        left: 0
-        right: 0
-    }
+    margins { top: 0; bottom: 0; left: 0; right: 0 }
     // No input when closed; the window otherwise masks only the popup.
     mask: Region { item: root.open ? popupContainer : null }
     visible: true
@@ -129,13 +146,17 @@ PanelWindow {
         // Size follows both slots so clamping uses the rendered surface bounds.
         width: Math.max(popup.sidebarLayer.width, popup.contentLayer.width, 240)
         height: popup.sidebarLayer.height + popup.contentLayer.height + 1
-        x: BarHoverLogic.clampAnchor(root.anchorX, width, root.screenWidth, 8)
-        y: 0
+        x: BarHoverLogic.clampAnchor(root.anchorX, width, root.activeScreenWidth, 8)
+        y: root.direction === "down"
+            ? root.activeBarHeight + root.activeFloatingMargin
+            : Math.max(0, root.activeScreenHeight - root.activeBarHeight
+                - root.activeFloatingMargin - height)
         visible: popup.visible
 
         // Non-blocking hover bridge on the popup surface.
         HoverHandler {
             id: popupHoverHandler
+            blocking: false
             onHoveredChanged: root.popupHovered = hovered
         }
 

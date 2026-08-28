@@ -117,6 +117,7 @@ Item {
 
                 HoverHandler {
                     id: iconHover
+                    objectName: "trayHoverHandler"
                     onHoveredChanged: {
                         if (hovered) {
                             root.hoveredTrayModel = trayIcon.modelData
@@ -136,12 +137,14 @@ Item {
                 onXChanged: if (iconHover.hovered) root.popupAnchorUpdate(root.buildTrayIntent(trayIcon.modelData, trayIcon))
 
                 TapHandler {
+                    objectName: "trayActivateTap"
                     acceptedButtons: Qt.LeftButton
                     gesturePolicy: TapHandler.ReleaseWithinBounds
                     onTapped: trayIcon.modelData.activate()
                 }
 
                 TapHandler {
+                    objectName: "traySecondaryTap"
                     acceptedButtons: Qt.RightButton
                     gesturePolicy: TapHandler.ReleaseWithinBounds
                     onTapped: trayIcon.modelData.secondaryActivate()
