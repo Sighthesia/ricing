@@ -45,6 +45,27 @@ Item {
             return !!payload.notificationService.dndEnabled
         return false
     }
+    readonly property int mediaPositionMs: {
+        if (payload && payload.positionMs !== undefined && payload.positionMs !== null)
+            return Math.max(0, Number(payload.positionMs))
+        if (payload && payload.mediaService && payload.mediaService.positionMs !== undefined)
+            return Math.max(0, Number(payload.mediaService.positionMs))
+        return 0
+    }
+    readonly property int mediaLengthMs: {
+        if (payload && payload.lengthMs !== undefined && payload.lengthMs !== null)
+            return Math.max(0, Number(payload.lengthMs))
+        if (payload && payload.mediaService && payload.mediaService.lengthMs !== undefined)
+            return Math.max(0, Number(payload.mediaService.lengthMs))
+        return 0
+    }
+
+    function formatMediaTime(milliseconds) {
+        var seconds = Math.floor(Math.max(0, Number(milliseconds)) / 1000)
+        var minutes = Math.floor(seconds / 60)
+        seconds %= 60
+        return minutes + ":" + (seconds < 10 ? "0" : "") + seconds
+    }
 
     function handleVolumeValue(v) {
         var nv = Math.max(0, Math.min(1, Number(v)))
@@ -145,16 +166,8 @@ Item {
     }
 
     function handleClearNotifications() {
-        if (payload && typeof payload.onClear === "function") {
-            payload.onClear()
-            return
-        }
-        if (payload && typeof payload.onClearSticky === "function") {
-            payload.onClearSticky()
-            return
-        }
-        if (payload && payload.notificationService && typeof payload.notificationService.clearStickyNotifications === "function") {
-            payload.notificationService.clearStickyNotifications()
+        if (payload && typeof payload.onMarkAllRead === "function") {
+            payload.onMarkAllRead()
             return
         }
         if (payload && payload.notificationService && typeof payload.notificationService.markAllRead === "function") {
@@ -257,16 +270,28 @@ Item {
             }
         }
 
-        // Media content: previous / playPause / next.
+        // Media content: progress plus previous / playPause / next.
         Item {
             id: mediaContent
             objectName: "mediaContent"
             width: parent.width
-            height: 36
+            height: 56
             visible: root.actionKind === "media"
 
+            // Existing media timeline data remains visible alongside controls.
+            Text {
+                objectName: "mediaProgressText"
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.formatMediaTime(root.mediaPositionMs) + " / "
+                    + root.formatMediaTime(root.mediaLengthMs)
+                color: LazerTheme.textMuted
+                font.pixelSize: 10
+            }
+
             Row {
-                anchors.centerIn: parent
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
                 spacing: 8
 
                 // Previous button.

@@ -110,7 +110,6 @@ Item {
             // Now release both hovers and expect close.
             host.widgetHovered = false
             host.popupHovered = false
-            host.requestClose()
             closeWait.restart()
         }
     }
@@ -159,7 +158,7 @@ Item {
             widgetId: "volume",
             instanceKey: "volume:0",
             title: "Volume",
-            iconSource: "../bar/icons/volume.svg",
+            iconSource: Qt.resolvedUrl("modules/bar/icons/volume.svg"),
             summary: "45%",
             actionKind: "volume",
             anchorX: 400,
@@ -208,7 +207,7 @@ Item {
             widgetId: "tray",
             instanceKey: "tray:2",
             title: "My App",
-            iconSource: "../lazerbar/icons/apps.svg",
+            iconSource: Qt.resolvedUrl("modules/lazerbar/icons/apps.svg"),
             summary: "3 items",
             actionKind: "tray",
             anchorX: 500,
@@ -253,7 +252,7 @@ Item {
             widgetId: "volume",
             instanceKey: "volume:0",
             title: "LeftEdge",
-            iconSource: "../bar/icons/volume.svg",
+            iconSource: Qt.resolvedUrl("modules/bar/icons/volume.svg"),
             summary: "edge",
             actionKind: "volume",
             anchorX: 2,
@@ -281,7 +280,7 @@ Item {
             widgetId: "volume",
             instanceKey: "volume:0",
             title: "RightEdge",
-            iconSource: "../bar/icons/volume.svg",
+            iconSource: Qt.resolvedUrl("modules/bar/icons/volume.svg"),
             summary: "edge",
             actionKind: "volume",
             anchorX: 990,
@@ -310,7 +309,7 @@ Item {
             widgetId: "tray",
             instanceKey: "tray:0",
             title: "App A",
-            iconSource: "../lazerbar/icons/apps.svg",
+            iconSource: Qt.resolvedUrl("modules/lazerbar/icons/apps.svg"),
             summary: "A",
             actionKind: "tray",
             anchorX: 200,
@@ -324,7 +323,7 @@ Item {
             widgetId: "tray",
             instanceKey: "tray:0",
             title: "App B",
-            iconSource: "../lazerbar/icons/apps.svg",
+            iconSource: Qt.resolvedUrl("modules/lazerbar/icons/apps.svg"),
             summary: "B",
             actionKind: "tray",
             anchorX: 400,
@@ -337,7 +336,7 @@ Item {
         root.check("tray intent updated to App B without new window", host.intent.title, "App B")
         root.check("tray anchor updated in place", host.anchorX, 400)
         var trayIdentity = findByName(host.popupItem, "popupIdentity")
-        if (trayIdentity) root.check("tray identity reflects updated icon", trayIdentity.iconSource, "../lazerbar/icons/apps.svg")
+        if (trayIdentity) root.check("tray identity reflects updated icon", String(trayIdentity.iconSource), String(Qt.resolvedUrl("modules/lazerbar/icons/apps.svg")))
 
         // Start hover bridge sequence.
         Qt.callLater(root.runHoverBridge)
@@ -349,7 +348,7 @@ Item {
             widgetId: "volume",
             instanceKey: "volume:0",
             title: "Volume",
-            iconSource: "../bar/icons/volume.svg",
+            iconSource: Qt.resolvedUrl("modules/bar/icons/volume.svg"),
             summary: "bridge",
             actionKind: "volume",
             anchorX: 300,
@@ -379,7 +378,7 @@ Item {
             widgetId: "volume",
             instanceKey: "volume:0",
             title: "Volume",
-            iconSource: "../bar/icons/volume.svg",
+            iconSource: Qt.resolvedUrl("modules/bar/icons/volume.svg"),
             summary: "50%",
             actionKind: "volume",
             anchorX: 300,
@@ -417,7 +416,7 @@ Item {
             widgetId: "brightness",
             instanceKey: "brightness:0",
             title: "Brightness",
-            iconSource: "../bar/icons/brightness.svg",
+            iconSource: Qt.resolvedUrl("modules/bar/icons/brightness.svg"),
             summary: "80%",
             actionKind: "brightness",
             anchorX: 320,
@@ -445,13 +444,15 @@ Item {
             widgetId: "media",
             instanceKey: "media:0",
             title: "Media Title",
-            iconSource: "../lazerbar/icons/music.svg",
+            iconSource: Qt.resolvedUrl("modules/lazerbar/icons/music.svg"),
             summary: "Artist",
             actionKind: "media",
             anchorX: 340,
             screenWidth: 1000,
             barPosition: "top",
             payload: {
+                positionMs: 65000,
+                lengthMs: 180000,
                 onPrevious: function(){ mediaPrev++ },
                 onPlayPause: function(){ mediaPlay++ },
                 onNext: function(){ mediaNextCount++ }
@@ -461,6 +462,24 @@ Item {
         actions = findByName(host.popupItem, "popupActions")
         root.checkTrue("media actions found", actions !== null)
         if (actions) {
+            var progressText = findByName(actions, "mediaProgressText")
+            root.checkTrue("media progress text exists", progressText !== null)
+            if (progressText) {
+                root.check("media progress reflects payload", progressText.text, "1:05 / 3:00")
+                host.showIntent({
+                    widgetId: "media", instanceKey: "media:0", title: "Media Title",
+                    iconSource: Qt.resolvedUrl("modules/lazerbar/icons/music.svg"), summary: "Artist",
+                    actionKind: "media", anchorX: 340, screenWidth: 1000, barPosition: "top",
+                    payload: {
+                        positionMs: 70000, lengthMs: 180000,
+                        onPrevious: function(){ mediaPrev++ }, onPlayPause: function(){ mediaPlay++ },
+                        onNext: function(){ mediaNextCount++ }
+                    }
+                })
+                actions = findByName(host.popupItem, "popupActions")
+                progressText = findByName(actions, "mediaProgressText")
+                root.check("media progress updates from payload", progressText.text, "1:10 / 3:00")
+            }
             root.checkTrue("media previous real TapHandler exists", findByName(actions, "mediaPrevTap") !== null)
             root.checkTrue("media playPause real TapHandler exists", findByName(actions, "mediaPlayPauseTap") !== null)
             root.checkTrue("media next real TapHandler exists", findByName(actions, "mediaNextTap") !== null)
@@ -478,13 +497,13 @@ Item {
             widgetId: "notifications",
             instanceKey: "notifications:0",
             title: "Notifications",
-            iconSource: "../lazerbar/icons/bell.svg",
+            iconSource: Qt.resolvedUrl("modules/lazerbar/icons/bell.svg"),
             summary: "2 unread",
             actionKind: "notifications",
             anchorX: 360,
             screenWidth: 1000,
             barPosition: "top",
-            payload: { dndEnabled: false, onToggleDnd: function(){ notifToggle++ }, onClear: function(){ notifClear++ } }
+            payload: { dndEnabled: false, onToggleDnd: function(){ notifToggle++ }, onMarkAllRead: function(){ notifClear++ } }
         }
         host.showIntent(notifIntent)
         actions = findByName(host.popupItem, "popupActions")
@@ -504,7 +523,7 @@ Item {
             widgetId: "tray",
             instanceKey: "tray:0",
             title: "Tray App",
-            iconSource: "../lazerbar/icons/apps.svg",
+            iconSource: Qt.resolvedUrl("modules/lazerbar/icons/apps.svg"),
             summary: "Tray",
             actionKind: "tray",
             anchorX: 380,

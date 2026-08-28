@@ -82,7 +82,7 @@ Item {
             // With icon source set, icon becomes visible and 16px.
             var item2 = createTemporaryObject(identityComp, root, {
                 title: "T",
-                iconSource: "dummy.svg",
+                iconSource: Qt.resolvedUrl("../../modules/lazerbar/icons/music.svg"),
                 summary: "",
                 hostWidth: 220
             })
@@ -213,7 +213,7 @@ Item {
         }
 
         function test_mediaExposesPreviousPlayNext() {
-            var fakeM = Qt.createQmlObject('import QtQuick; QtObject { property int prev:0; property int play:0; property int nextCount:0; function previous(){ prev++ } function playPause(){ play++ } function next(){ nextCount++ } }', root, "fakeMedia")
+            var fakeM = Qt.createQmlObject('import QtQuick; QtObject { property int prev:0; property int play:0; property int nextCount:0; property int positionMs:65000; property int lengthMs:180000; function previous(){ prev++ } function playPause(){ play++ } function next(){ nextCount++ } }', root, "fakeMedia")
             var item = createTemporaryObject(actionsComp, root, { actionKind: "media", payload: { mediaService: fakeM } })
             var prevBtn = findByName(item, "mediaPrevButton")
             var playBtn = findByName(item, "mediaPlayPauseButton")
@@ -222,6 +222,11 @@ Item {
             verify(playBtn !== null, "play button should exist")
             verify(nextBtn !== null, "next button should exist")
             verify(findByName(item, "mediaContent").visible)
+            var progressText = findByName(item, "mediaProgressText")
+            verify(progressText !== null, "media progress text should exist")
+            compare(progressText.text, "1:05 / 3:00")
+            fakeM.positionMs = 70000
+            tryCompare(progressText, "text", "1:10 / 3:00", 500)
             fakeM.prev = 0; fakeM.play = 0; fakeM.nextCount = 0
             mouseClick(prevBtn, prevBtn.width/2, prevBtn.height/2, Qt.LeftButton)
             tryCompare(fakeM, "prev", 1, 500)
@@ -232,14 +237,14 @@ Item {
         }
 
         function test_notificationsExposesDndAndClear() {
-            var fakeN = Qt.createQmlObject('import QtQuick; QtObject { property bool dndEnabled:false; property int clearCalls:0; function clearStickyNotifications(){ clearCalls++ } }', root, "fakeNotif")
+            var fakeN = Qt.createQmlObject('import QtQuick; QtObject { property bool dndEnabled:false; property int readCalls:0; function markAllRead(){ readCalls++ } }', root, "fakeNotif")
             // Use onToggleDnd callback variant to avoid mutating singleton.
             var toggleCalls = 0
             var clearCallsOuter = 0
             var payload = {
                 dndEnabled: true,
                 onToggleDnd: function(){ toggleCalls++ },
-                onClear: function(){ clearCallsOuter++ },
+                onMarkAllRead: function(){ clearCallsOuter++ },
                 notificationService: fakeN
             }
             var item = createTemporaryObject(actionsComp, root, { actionKind: "notifications", payload: payload })
@@ -254,13 +259,13 @@ Item {
             verify(toggleCalls === 1, "onToggleDnd should have been called")
             mouseClick(clearBtn, clearBtn.width/2, clearBtn.height/2, Qt.LeftButton)
             wait(20)
-            verify(clearCallsOuter === 1, "onClear should have been called")
-            // Also test fake service fallback when onClear not present.
+            verify(clearCallsOuter === 1, "onMarkAllRead should have been called")
+            // Also test fake service fallback when the callback is not present.
             var item2 = createTemporaryObject(actionsComp, root, { actionKind: "notifications", payload: { notificationService: fakeN, dndEnabled: false } })
-            fakeN.clearCalls = 0
+            fakeN.readCalls = 0
             var clearBtn2 = findByName(item2, "notificationClearButton")
             mouseClick(clearBtn2, clearBtn2.width/2, clearBtn2.height/2, Qt.LeftButton)
-            tryCompare(fakeN, "clearCalls", 1, 500)
+            tryCompare(fakeN, "readCalls", 1, 500)
         }
 
         function test_trayExposesActivateSecondary() {

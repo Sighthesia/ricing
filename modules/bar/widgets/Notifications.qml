@@ -46,7 +46,7 @@ BarPill {
                 unreadCount: Services.NotificationService.unreadCount,
                 notificationService: Services.NotificationService,
                 onToggleDnd: function() { Services.NotificationService.dndEnabled = !Services.NotificationService.dndEnabled },
-                onClear: function() { Services.NotificationService.clearStickyNotifications() }
+                onMarkAllRead: function() { Services.NotificationService.markAllRead() }
             }
         }
     }

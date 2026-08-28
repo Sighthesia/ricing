@@ -24,6 +24,7 @@ PanelWindow {
     property real intentScreenHeight: 0
     property real intentBarHeight: 0
     property real intentFloatingMargin: -1
+    property bool popupHoverWasActive: false
 
     readonly property real activeScreenWidth: intentScreenWidth > 0 ? intentScreenWidth : screenWidth
     readonly property real activeScreenHeight: intentScreenHeight > 0 ? intentScreenHeight : screenHeight
@@ -38,6 +39,12 @@ PanelWindow {
 
     signal actionRequested(string action)
     signal closeRequested()
+
+    onPopupHoveredChanged: {
+        if (popupHoverWasActive && !popupHovered)
+            requestClose()
+        popupHoverWasActive = popupHovered
+    }
 
     function updateIntent(intentObj) {
         if (!intentObj)
