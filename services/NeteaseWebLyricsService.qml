@@ -50,6 +50,7 @@ Singleton {
     // switching back restores the lyric window without refetching.
     readonly property bool boundToActivePlayer:
         !Services.MediaService.hasPlayer
+            || Services.MediaService.title === ""
             || root._trackMetadataMatches(
                 root.title,
                 root.artist,

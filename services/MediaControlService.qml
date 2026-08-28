@@ -58,8 +58,10 @@ Singleton {
     readonly property string title: {
         if (root._preferLyricsMediaSource)
             return Services.NeteaseWebLyricsService.title !== "" ? Services.NeteaseWebLyricsService.title : (Services.MediaService.hasPlayer ? Services.MediaService.title : "")
-        if (root._mprisPlaying)
-            return Services.MediaService.title
+        if (root._mprisPlaying) {
+            const t = Services.MediaService.title
+            return t !== "" ? t : (Services.NeteaseWebLyricsService.title !== "" ? Services.NeteaseWebLyricsService.title : t)
+        }
         if (root._neteasePlaying && Services.NeteaseWebLyricsService.title !== "")
             return Services.NeteaseWebLyricsService.title
         return Services.MediaService.hasPlayer ? Services.MediaService.title : Services.NeteaseWebLyricsService.title
@@ -67,8 +69,10 @@ Singleton {
     readonly property string artist: {
         if (root._preferLyricsMediaSource)
             return Services.NeteaseWebLyricsService.artist !== "" ? Services.NeteaseWebLyricsService.artist : (Services.MediaService.hasPlayer ? Services.MediaService.artist : "")
-        if (root._mprisPlaying)
-            return Services.MediaService.artist
+        if (root._mprisPlaying) {
+            const a = Services.MediaService.artist
+            return a !== "" ? a : (Services.NeteaseWebLyricsService.artist !== "" ? Services.NeteaseWebLyricsService.artist : a)
+        }
         if (root._neteasePlaying && Services.NeteaseWebLyricsService.artist !== "")
             return Services.NeteaseWebLyricsService.artist
         return Services.MediaService.hasPlayer ? Services.MediaService.artist : Services.NeteaseWebLyricsService.artist
@@ -188,7 +192,7 @@ Singleton {
         ? root.compactTranslatedLyricKey : root.compactOriginalLyricKey
     readonly property bool showCompactLyric:
         root.preferLyrics
-            && (root._preferLyricsMediaSource || (!root._mprisPlaying && root._neteasePlaying))
+            && (root._preferLyricsMediaSource || Services.MediaService.title === "" || (!root._mprisPlaying && root._neteasePlaying))
             && (root.compactOriginalLyric !== "" || root.compactTranslatedLyric !== "")
     readonly property real progress:
         root.lengthMs > 0 ? Math.max(0, Math.min(1, root.positionMs / root.lengthMs)) : 0
