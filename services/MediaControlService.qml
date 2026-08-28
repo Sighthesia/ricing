@@ -34,6 +34,8 @@ Singleton {
                 || Services.NeteaseWebLyricsService.nextTranslatedLyric !== "")
     readonly property bool _preferLyricsMediaSource:
         root._lyricsSourceLatched && Services.NeteaseWebLyricsService.boundToActivePlayer
+    readonly property bool _mprisPlaying: Services.MediaService.hasPlayer && Services.MediaService.playbackState === "playing"
+    readonly property bool _neteasePlaying: Services.NeteaseWebLyricsService.playbackState === "playing"
 
     property bool _lyricsSourceLatched: false
     property string _latchedLyricsSessionKey: ""
@@ -53,42 +55,78 @@ Singleton {
 
     readonly property bool hasMedia:
         Services.MediaService.hasPlayer || Services.NeteaseWebLyricsService.active || root._preferLyricsMediaSource
-    readonly property string title: root._preferLyricsMediaSource
-        ? (Services.NeteaseWebLyricsService.title !== ""
-            ? Services.NeteaseWebLyricsService.title
-            : (Services.MediaService.hasPlayer ? Services.MediaService.title : ""))
-        : (Services.MediaService.hasPlayer ? Services.MediaService.title : Services.NeteaseWebLyricsService.title)
-    readonly property string artist: root._preferLyricsMediaSource
-        ? (Services.NeteaseWebLyricsService.artist !== ""
-            ? Services.NeteaseWebLyricsService.artist
-            : (Services.MediaService.hasPlayer ? Services.MediaService.artist : ""))
-        : (Services.MediaService.hasPlayer ? Services.MediaService.artist : Services.NeteaseWebLyricsService.artist)
-    readonly property string artUrl:
-        Services.MediaService.hasPlayer && Services.MediaService.artUrl !== ""
-            ? Services.MediaService.artUrl
-            : (Services.NeteaseWebLyricsService.artUrl !== "" ? Services.NeteaseWebLyricsService.artUrl : "")
+    readonly property string title: {
+        if (root._preferLyricsMediaSource)
+            return Services.NeteaseWebLyricsService.title !== "" ? Services.NeteaseWebLyricsService.title : (Services.MediaService.hasPlayer ? Services.MediaService.title : "")
+        if (root._mprisPlaying)
+            return Services.MediaService.title
+        if (root._neteasePlaying && Services.NeteaseWebLyricsService.title !== "")
+            return Services.NeteaseWebLyricsService.title
+        return Services.MediaService.hasPlayer ? Services.MediaService.title : Services.NeteaseWebLyricsService.title
+    }
+    readonly property string artist: {
+        if (root._preferLyricsMediaSource)
+            return Services.NeteaseWebLyricsService.artist !== "" ? Services.NeteaseWebLyricsService.artist : (Services.MediaService.hasPlayer ? Services.MediaService.artist : "")
+        if (root._mprisPlaying)
+            return Services.MediaService.artist
+        if (root._neteasePlaying && Services.NeteaseWebLyricsService.artist !== "")
+            return Services.NeteaseWebLyricsService.artist
+        return Services.MediaService.hasPlayer ? Services.MediaService.artist : Services.NeteaseWebLyricsService.artist
+    }
+    readonly property string artUrl: {
+        const mprisArt = Services.MediaService.hasPlayer ? Services.MediaService.artUrl : ""
+        const neteaseArt = Services.NeteaseWebLyricsService.artUrl
+        if (root._preferLyricsMediaSource)
+            return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
+        if (root._mprisPlaying)
+            return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
+        if (root._neteasePlaying && neteaseArt !== "")
+            return neteaseArt
+        return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
+    }
     readonly property string playerName: Services.MediaService.hasPlayer ? Services.MediaService.playerName : ""
-    readonly property string playbackState: root._preferLyricsMediaSource
-        ? ((Services.MediaService.hasPlayer && Services.MediaService.playbackState !== "playing")
-            ? Services.MediaService.playbackState
-            : ((Services.NeteaseWebLyricsService.playbackState !== "stopped" || !Services.MediaService.hasPlayer)
-                ? Services.NeteaseWebLyricsService.playbackState
-                : Services.MediaService.playbackState))
-        : (Services.MediaService.hasPlayer ? Services.MediaService.playbackState : Services.NeteaseWebLyricsService.playbackState)
-    readonly property int positionMs: root._preferLyricsMediaSource
-        ? ((Services.MediaService.hasPlayer && Services.MediaService.playbackState !== "playing")
-            ? Services.MediaService.positionMs
-            : ((Services.NeteaseWebLyricsService.durationMs > 0 || Services.NeteaseWebLyricsService.positionMs > 0 || !Services.MediaService.hasPlayer)
-                ? Services.NeteaseWebLyricsService.positionMs
-                : Services.MediaService.positionMs))
-        : (Services.MediaService.hasPlayer ? Services.MediaService.positionMs : Services.NeteaseWebLyricsService.positionMs)
-    readonly property int lengthMs: root._preferLyricsMediaSource
-        ? ((Services.MediaService.hasPlayer && Services.MediaService.playbackState !== "playing")
-            ? Services.MediaService.lengthMs
-            : ((Services.NeteaseWebLyricsService.durationMs > 0 || !Services.MediaService.hasPlayer)
-                ? Services.NeteaseWebLyricsService.durationMs
-                : Services.MediaService.lengthMs))
-        : (Services.MediaService.hasPlayer ? Services.MediaService.lengthMs : Services.NeteaseWebLyricsService.durationMs)
+    readonly property string playbackState: {
+        if (root._preferLyricsMediaSource) {
+            if (Services.MediaService.hasPlayer && Services.MediaService.playbackState !== "playing")
+                return Services.MediaService.playbackState
+            if (Services.NeteaseWebLyricsService.playbackState !== "stopped" || !Services.MediaService.hasPlayer)
+                return Services.NeteaseWebLyricsService.playbackState
+            return Services.MediaService.playbackState
+        }
+        if (root._mprisPlaying)
+            return Services.MediaService.playbackState
+        if (root._neteasePlaying)
+            return Services.NeteaseWebLyricsService.playbackState
+        return Services.MediaService.hasPlayer ? Services.MediaService.playbackState : Services.NeteaseWebLyricsService.playbackState
+    }
+    readonly property int positionMs: {
+        if (root._preferLyricsMediaSource) {
+            if (Services.MediaService.hasPlayer && Services.MediaService.playbackState !== "playing")
+                return Services.MediaService.positionMs
+            if (Services.NeteaseWebLyricsService.durationMs > 0 || Services.NeteaseWebLyricsService.positionMs > 0 || !Services.MediaService.hasPlayer)
+                return Services.NeteaseWebLyricsService.positionMs
+            return Services.MediaService.positionMs
+        }
+        if (root._mprisPlaying)
+            return Services.MediaService.positionMs
+        if (root._neteasePlaying)
+            return Services.NeteaseWebLyricsService.positionMs
+        return Services.MediaService.hasPlayer ? Services.MediaService.positionMs : Services.NeteaseWebLyricsService.positionMs
+    }
+    readonly property int lengthMs: {
+        if (root._preferLyricsMediaSource) {
+            if (Services.MediaService.hasPlayer && Services.MediaService.playbackState !== "playing")
+                return Services.MediaService.lengthMs
+            if (Services.NeteaseWebLyricsService.durationMs > 0 || !Services.MediaService.hasPlayer)
+                return Services.NeteaseWebLyricsService.durationMs
+            return Services.MediaService.lengthMs
+        }
+        if (root._mprisPlaying)
+            return Services.MediaService.lengthMs
+        if (root._neteasePlaying)
+            return Services.NeteaseWebLyricsService.durationMs
+        return Services.MediaService.hasPlayer ? Services.MediaService.lengthMs : Services.NeteaseWebLyricsService.durationMs
+    }
     readonly property bool canGoPrevious: Services.MediaService.hasPlayer ? Services.MediaService.canGoPrevious : false
     readonly property bool canTogglePlayback: Services.MediaService.hasPlayer ? Services.MediaService.canTogglePlayback : false
     readonly property bool canGoNext: Services.MediaService.hasPlayer ? Services.MediaService.canGoNext : false
@@ -147,7 +185,8 @@ Singleton {
     readonly property string compactPrimaryLyricKey: root.compactTranslatedLyric !== ""
         ? root.compactTranslatedLyricKey : root.compactOriginalLyricKey
     readonly property bool showCompactLyric:
-        root.preferLyrics && root._preferLyricsMediaSource
+        root.preferLyrics
+            && (root._preferLyricsMediaSource || (!root._mprisPlaying && root._neteasePlaying))
             && (root.compactOriginalLyric !== "" || root.compactTranslatedLyric !== "")
     readonly property real progress:
         root.lengthMs > 0 ? Math.max(0, Math.min(1, root.positionMs / root.lengthMs)) : 0
