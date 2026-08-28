@@ -175,8 +175,7 @@ BarPill {
             root.trackedSecondaryText = root.secondaryText
             return
         }
-        if (root.trackedSecondaryText === "" || root.trackedSecondaryText === root.secondaryText) {
-            root.trackedSecondaryText = root.secondaryText
+        if (root.trackedSecondaryText === root.secondaryText) {
             return
         }
         const oldSec = root.trackedSecondaryText

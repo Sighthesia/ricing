@@ -110,8 +110,7 @@ Item {
             return
         }
         var prevApp = root.trackedAppName
-        if (prevApp === "" || root.displayAppName === prevApp) {
-            root.trackedAppName = root.displayAppName
+        if (root.displayAppName === prevApp) {
             return
         }
         root.trackedAppName = root.displayAppName

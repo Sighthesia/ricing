@@ -332,8 +332,10 @@ Item {
     // never shown vanish, and the new sweep starts cleanly — wavefronts
     // never stack and nothing flashes complete before falling.
     function transitionFrom(oldText, newText) {
-        if (MotionTokens.reducedMotion || oldText === "" || oldText === newText)
+        if (MotionTokens.reducedMotion || oldText === newText)
             return
+        // Allow empty oldText to still perform enter scan (no ghosts, just reveal)
+        const hasOld = oldText !== ""
         var wasActive = root._sweepActive
         var elapsed = wasActive ? Date.now() - root._sweepStart : 0
         root._sweepActive = false
