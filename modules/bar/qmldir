@@ -5,3 +5,6 @@ BarContent 1.0 BarContent.qml
 TopBar 1.0 TopBar.qml
 DockzoneSpectrum 1.0 DockzoneSpectrum.qml
 BarPopupHost 1.0 BarPopupHost.qml
+BarPopupIdentity 1.0 BarPopupIdentity.qml
+BarPopupActions 1.0 BarPopupActions.qml
+BarPopupSlider 1.0 BarPopupSlider.qml
