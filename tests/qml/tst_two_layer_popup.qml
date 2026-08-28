@@ -67,5 +67,20 @@ Item {
             popup.revealProgress = 0.2
             verify(popup.sidebarRevealProgress > popup.contentRevealProgress)
         }
+
+        function test_reducedMotionEndRevealCollapsesBothLayers() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            popup.endReveal()
+            compare(popup.sidebarRevealProgress, 0)
+            compare(popup.contentRevealProgress, 0)
+        }
+
+        function test_reducedMotionBeginRevealRestoresBothLayers() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            popup.endReveal()
+            popup.beginReveal()
+            compare(popup.sidebarRevealProgress, 1)
+            compare(popup.contentRevealProgress, 1)
+        }
     }
 }
