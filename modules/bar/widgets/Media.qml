@@ -106,8 +106,7 @@ BarPill {
             payload: {
                 title: titleText,
                 artist: summaryText,
-                positionMs: Services.MediaControlService.positionMs,
-                lengthMs: Services.MediaControlService.lengthMs,
+                mediaControlService: Services.MediaControlService,
                 mediaService: Services.MediaService,
                 onPrevious: function() { Services.MediaService.previous() },
                 onPlayPause: function() { Services.MediaService.playPause() },

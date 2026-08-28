@@ -46,17 +46,21 @@ Item {
         return false
     }
     readonly property int mediaPositionMs: {
-        if (payload && payload.positionMs !== undefined && payload.positionMs !== null)
-            return Math.max(0, Number(payload.positionMs))
+        if (payload && payload.mediaControlService && payload.mediaControlService.positionMs !== undefined)
+            return Math.max(0, Number(payload.mediaControlService.positionMs))
         if (payload && payload.mediaService && payload.mediaService.positionMs !== undefined)
             return Math.max(0, Number(payload.mediaService.positionMs))
+        if (payload && payload.positionMs !== undefined && payload.positionMs !== null)
+            return Math.max(0, Number(payload.positionMs))
         return 0
     }
     readonly property int mediaLengthMs: {
-        if (payload && payload.lengthMs !== undefined && payload.lengthMs !== null)
-            return Math.max(0, Number(payload.lengthMs))
+        if (payload && payload.mediaControlService && payload.mediaControlService.lengthMs !== undefined)
+            return Math.max(0, Number(payload.mediaControlService.lengthMs))
         if (payload && payload.mediaService && payload.mediaService.lengthMs !== undefined)
             return Math.max(0, Number(payload.mediaService.lengthMs))
+        if (payload && payload.lengthMs !== undefined && payload.lengthMs !== null)
+            return Math.max(0, Number(payload.lengthMs))
         return 0
     }
 

@@ -15,6 +15,7 @@ Item {
 
     property int _failures: 0
     property int _checks: 0
+    property bool _mediaReactiveVerified: false
 
     function check(label, actual, expected) {
         root._checks += 1
@@ -371,10 +372,11 @@ Item {
     function runCallbacks() {
         // Representative callbacks: volume, brightness, media, notifications, tray.
 
-        // Volume
-        var volCalls = 0
-        var volMuteCalls = 0
-        var volIntent = {
+        if (!root._mediaReactiveVerified) {
+            // Volume
+            var volCalls = 0
+            var volMuteCalls = 0
+            var volIntent = {
             widgetId: "volume",
             instanceKey: "volume:0",
             title: "Volume",
@@ -390,29 +392,29 @@ Item {
                 onVolumeChanged: function(v){ volCalls++ },
                 onToggleMute: function(){ volMuteCalls++ }
             }
-        }
-        host.showIntent(volIntent)
-        host.widgetHovered = true
-        var actions = findByName(host.popupItem, "popupActions")
-        root.checkTrue("volume actions found", actions !== null)
-        if (actions) {
-            // Trigger via direct handler.
-            actions.handleVolumeValue(0.77)
-            root.check("volume callback fires once", volCalls, 1)
-            actions.handleToggleMute()
-            root.check("volume mute callback fires once", volMuteCalls, 1)
-            // Also verify slider exists.
-            var volSlider = findByName(actions, "volumeSlider")
-            root.checkTrue("volume slider exists", volSlider !== null)
-            root.checkTrue("volume slider real track handler exists",
-                    findByName(volSlider, "sliderTrackTap") !== null)
-            root.checkTrue("volume slider real mute handler exists",
-                    findByName(volSlider, "sliderMuteTap") !== null)
-        }
+            }
+            host.showIntent(volIntent)
+            host.widgetHovered = true
+            var actions = findByName(host.popupItem, "popupActions")
+            root.checkTrue("volume actions found", actions !== null)
+            if (actions) {
+                // Trigger via direct handler.
+                actions.handleVolumeValue(0.77)
+                root.check("volume callback fires once", volCalls, 1)
+                actions.handleToggleMute()
+                root.check("volume mute callback fires once", volMuteCalls, 1)
+                // Also verify slider exists.
+                var volSlider = findByName(actions, "volumeSlider")
+                root.checkTrue("volume slider exists", volSlider !== null)
+                root.checkTrue("volume slider real track handler exists",
+                        findByName(volSlider, "sliderTrackTap") !== null)
+                root.checkTrue("volume slider real mute handler exists",
+                        findByName(volSlider, "sliderMuteTap") !== null)
+            }
 
-        // Brightness
-        var brightCalls = 0
-        var brightIntent = {
+            // Brightness
+            var brightCalls = 0
+            var brightIntent = {
             widgetId: "brightness",
             instanceKey: "brightness:0",
             title: "Brightness",
@@ -423,24 +425,28 @@ Item {
             screenWidth: 1000,
             barPosition: "top",
             payload: { brightness: 0.8, onBrightnessChanged: function(v){ brightCalls++ } }
-        }
-        host.showIntent(brightIntent)
-        actions = findByName(host.popupItem, "popupActions")
-        root.checkTrue("brightness actions found", actions !== null)
-        if (actions) {
-            actions.handleBrightnessValue(0.33)
-            root.check("brightness callback fires once", brightCalls, 1)
-            var brightSlider = findByName(actions, "brightnessSlider")
-            root.checkTrue("brightness slider exists", brightSlider !== null)
-            // Verify brightness hides mute control.
-            if (brightSlider) root.check("brightness hides mute", brightSlider.showMute, false)
-            root.checkTrue("brightness slider real track handler exists",
-                    findByName(brightSlider, "sliderTrackTap") !== null)
+            }
+            host.showIntent(brightIntent)
+            actions = findByName(host.popupItem, "popupActions")
+            root.checkTrue("brightness actions found", actions !== null)
+            if (actions) {
+                actions.handleBrightnessValue(0.33)
+                root.check("brightness callback fires once", brightCalls, 1)
+                var brightSlider = findByName(actions, "brightnessSlider")
+                root.checkTrue("brightness slider exists", brightSlider !== null)
+                // Verify brightness hides mute control.
+                if (brightSlider) root.check("brightness hides mute", brightSlider.showMute, false)
+                root.checkTrue("brightness slider real track handler exists",
+                        findByName(brightSlider, "sliderTrackTap") !== null)
+            }
         }
 
-        // Media
-        var mediaPrev = 0, mediaPlay = 0, mediaNextCount = 0
-        var mediaIntent = {
+        if (!root._mediaReactiveVerified) {
+            // Media: keep a reactive source in the payload so progress changes
+            // update the existing popup content without replacing the intent.
+            var mediaPrev = 0, mediaPlay = 0, mediaNextCount = 0
+            var fakeMediaSource = Qt.createQmlObject('import QtQuick; QtObject { property int positionMs: 65000; property int lengthMs: 180000 }', root, "fakePopupMediaSource")
+            var mediaIntent = {
             widgetId: "media",
             instanceKey: "media:0",
             title: "Media Title",
@@ -451,44 +457,45 @@ Item {
             screenWidth: 1000,
             barPosition: "top",
             payload: {
-                positionMs: 65000,
-                lengthMs: 180000,
+                mediaControlService: fakeMediaSource,
                 onPrevious: function(){ mediaPrev++ },
                 onPlayPause: function(){ mediaPlay++ },
                 onNext: function(){ mediaNextCount++ }
             }
-        }
-        host.showIntent(mediaIntent)
-        actions = findByName(host.popupItem, "popupActions")
-        root.checkTrue("media actions found", actions !== null)
-        if (actions) {
-            var progressText = findByName(actions, "mediaProgressText")
-            root.checkTrue("media progress text exists", progressText !== null)
-            if (progressText) {
-                root.check("media progress reflects payload", progressText.text, "1:05 / 3:00")
-                host.showIntent({
-                    widgetId: "media", instanceKey: "media:0", title: "Media Title",
-                    iconSource: Qt.resolvedUrl("modules/lazerbar/icons/music.svg"), summary: "Artist",
-                    actionKind: "media", anchorX: 340, screenWidth: 1000, barPosition: "top",
-                    payload: {
-                        positionMs: 70000, lengthMs: 180000,
-                        onPrevious: function(){ mediaPrev++ }, onPlayPause: function(){ mediaPlay++ },
-                        onNext: function(){ mediaNextCount++ }
-                    }
-                })
-                actions = findByName(host.popupItem, "popupActions")
-                progressText = findByName(actions, "mediaProgressText")
-                root.check("media progress updates from payload", progressText.text, "1:10 / 3:00")
             }
+            host.showIntent(mediaIntent)
+            actions = findByName(host.popupItem, "popupActions")
+            root.checkTrue("media actions found", actions !== null)
+            if (actions) {
+                var progressText = findByName(actions, "mediaProgressText")
+                root.checkTrue("media progress text exists", progressText !== null)
+                if (progressText) {
+                    root.check("media progress reflects payload", progressText.text, "1:05 / 3:00")
+                    var sameActions = actions
+                    fakeMediaSource.positionMs = 70000
+                    Qt.callLater(function() {
+                        root.check("media progress updates from reactive source", progressText.text, "1:10 / 3:00")
+                        root.check("reactive media keeps same popup instance", findByName(host.popupItem, "popupActions") === sameActions, true)
+                        actions.handleMediaPrevious()
+                        root.check("media previous callback fires once", mediaPrev, 1)
+                        actions.handleMediaPlayPause()
+                        root.check("media playPause callback fires once", mediaPlay, 1)
+                        actions.handleMediaNext()
+                        root.check("media next callback fires once", mediaNextCount, 1)
+                        root._mediaReactiveVerified = true
+                        Qt.callLater(root.runCallbacks)
+                    })
+                    return
+                }
+            }
+        }
+
+        if (root._mediaReactiveVerified) {
+            root._mediaReactiveVerified = false
+            actions = findByName(host.popupItem, "popupActions")
             root.checkTrue("media previous real TapHandler exists", findByName(actions, "mediaPrevTap") !== null)
             root.checkTrue("media playPause real TapHandler exists", findByName(actions, "mediaPlayPauseTap") !== null)
             root.checkTrue("media next real TapHandler exists", findByName(actions, "mediaNextTap") !== null)
-            actions.handleMediaPrevious()
-            root.check("media previous callback fires once", mediaPrev, 1)
-            actions.handleMediaPlayPause()
-            root.check("media playPause callback fires once", mediaPlay, 1)
-            actions.handleMediaNext()
-            root.check("media next callback fires once", mediaNextCount, 1)
         }
 
         // Notifications
