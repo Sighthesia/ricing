@@ -24,6 +24,7 @@ PanelWindow {
     readonly property alias sidebarData: popup.sidebarData
     readonly property alias contentData: popup.contentData
     readonly property alias popupItem: popup
+    readonly property alias popupContainerItem: popupContainer
 
     signal actionRequested(string action)
     signal closeRequested()
@@ -124,9 +125,10 @@ PanelWindow {
     // Fixed outer host; inner popup is clamped horizontally.
     Item {
         id: popupContainer
-        // Width/height follow the TwoLayerPopup's implicit content size.
-        width: popup.implicitWidth > 0 ? popup.implicitWidth : (popup.width > 0 ? popup.width : 240)
-        height: popup.implicitHeight > 0 ? popup.implicitHeight : (popup.height > 0 ? popup.height : 80)
+        objectName: "popupContainer"
+        // Size follows both slots so clamping uses the rendered surface bounds.
+        width: Math.max(popup.sidebarLayer.width, popup.contentLayer.width, 240)
+        height: popup.sidebarLayer.height + popup.contentLayer.height + 1
         x: BarHoverLogic.clampAnchor(root.anchorX, width, root.screenWidth, 8)
         y: 0
         visible: popup.visible
@@ -143,10 +145,28 @@ PanelWindow {
             id: popup
             orientation: TwoLayerPopup.Orientation.Vertical
             direction: root.direction === "up" ? TwoLayerPopup.Direction.Up : TwoLayerPopup.Direction.Down
+            width: popupContainer.width
+            height: popupContainer.height
             revealProgress: 1
             contentDelay: MotionTokens.settingsContentDelay
             visible: root.open || revealProgress > 0
-            // Size is driven by slot content; keep empty until Task 3 adapters.
+
+            // Identity layer bound to the current intent; updates in place when
+            // the hovered tray delegate changes so no overlapping windows appear.
+            sidebarData: BarPopupIdentity {
+                objectName: "popupIdentity"
+                title: root.intent ? (root.intent.title || "") : ""
+                iconSource: root.intent ? (root.intent.iconSource || "") : ""
+                summary: root.intent ? (root.intent.summary || "") : ""
+                hostWidth: 260
+            }
+
+            // Action layer bound to the intent's kind and payload.
+            contentData: BarPopupActions {
+                objectName: "popupActions"
+                actionKind: root.intent ? (root.intent.actionKind || "") : ""
+                payload: root.intent ? root.intent.payload : null
+            }
         }
     }
 }

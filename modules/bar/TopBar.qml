@@ -5,6 +5,7 @@ import "../lazerbar"
 import "../../services" as Services
 
 // Mount the layout-driven bar plus the launcher wave owner per screen.
+// BarPopupHost is mounted per screen and bound to BarContent hover intents.
 Variants {
     model: Quickshell.screens
 
@@ -101,12 +102,9 @@ Variants {
                     enriched.barPosition = String(Services.SettingsService.bar.position || "top")
                     var nextX = Number(enriched.anchorX)
                     if (isFinite(nextX)) popupHost.anchorX = nextX
-                    // Keep intent anchor in sync without recreating the reveal.
-                    if (popupHost.intent) {
-                        var patched = Object.assign({}, popupHost.intent)
-                        patched.anchorX = popupHost.anchorX
-                        popupHost.intent = patched
-                    }
+                    // Refresh all slot data in place without recreating the reveal.
+                    if (popupHost.intent)
+                        popupHost.intent = enriched
                     popupHost.cancelClose()
                 }
             }

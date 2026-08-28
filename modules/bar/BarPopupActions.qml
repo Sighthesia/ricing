@@ -2,6 +2,7 @@ import QtQuick
 import "../lazerbar"
 
 // Content body for volume, brightness, media, notifications and tray.
+// Bound via BarPopupHost contentData; intent actionKind/payload drive visible kind.
 Item {
     id: root
 
