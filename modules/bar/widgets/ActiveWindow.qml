@@ -47,6 +47,7 @@ Item {
     property string trackedAppId: ""
     property string pendingIconSource: ""
     property string outgoingIconSource: ""
+    property bool iconPromotionPending: false
     // Coalesce a transient desktop fallback during workspace switches:
     // Niri briefly reports no active window while the workspace animates,
     // so displayTitle flicks window -> desktop -> next window. Holding
@@ -190,6 +191,7 @@ Item {
             appIconPrev.opacity = 0
             appIcon.opacity = root.hasIcon && appIcon.status === Image.Ready ? 1 : 0
             root.pendingIconSource = ""
+            root.iconPromotionPending = false
             return
         }
         const oldSrc = root.trackedIconSource
@@ -301,6 +303,19 @@ Item {
                 backer.fillMode: Image.PreserveAspectFit
                 opacity: 1
                 scale: root.hasIcon ? 1 : 0.85
+
+                onStatusChanged: {
+                    if (status !== Image.Ready || !root.iconPromotionPending
+                            || source !== root.renderedIconSource)
+                        return
+                    appIcon.opacity = 1
+                    appIcon.scale = 1
+                    appIconPrev.opacity = 0
+                    appIconPrev.scale = 0.9
+                    root.iconPromotionPending = false
+                    root.pendingIconSource = ""
+                    root.outgoingIconSource = ""
+                }
             }
 
             ParallelAnimation {
@@ -316,12 +331,14 @@ Item {
                     if (root.pendingIconSource === "")
                         return
                     root.renderedIconSource = root.pendingIconSource
-                    appIcon.opacity = 1
+                    // Keep the incoming layer visible while the main layer
+                    // reloads the promoted source. Hiding it here creates a
+                    // blank frame because source loading is asynchronous.
+                    appIcon.opacity = 0
                     appIcon.scale = 1
-                    appIconPrev.opacity = 0
-                    appIconPrev.scale = 0.9
-                    root.pendingIconSource = ""
-                    root.outgoingIconSource = ""
+                    root.iconPromotionPending = true
+                    appIconPrev.opacity = 1
+                    appIconPrev.scale = 1
                 }
             }
 
