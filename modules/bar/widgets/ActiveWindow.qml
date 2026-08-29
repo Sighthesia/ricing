@@ -43,6 +43,7 @@ Item {
     property string trackedAppName: ""
     property string trackedIconSource: ""
     property bool trackedHasIcon: false
+    property bool iconFadePending: false
     // Coalesce a transient desktop fallback during workspace switches:
     // Niri briefly reports no active window while the workspace animates,
     // so displayTitle flicks window -> desktop -> next window. Holding
@@ -171,7 +172,9 @@ Item {
         if (MotionTokens.reducedMotion) {
             root.trackedHasIcon = root.hasIcon
             root.trackedIconSource = root.iconSource
+            root.iconFadePending = false
             appIconPrev.opacity = 0
+            appIcon.opacity = root.hasIcon && appIcon.status === Image.Ready ? 1 : 0
             return
         }
         const oldSrc = root.trackedIconSource
@@ -182,6 +185,7 @@ Item {
             return
         root.trackedHasIcon = newHas
         root.trackedIconSource = newSrc
+        root.iconFadePending = false
         if (oldHas && !newHas) {
             if (oldSrc !== "") {
                 appIconPrev.source = oldSrc
@@ -207,15 +211,20 @@ Item {
             appIconPrev.scale = 1
             appIcon.opacity = 0
             appIcon.scale = 0.9
-            Qt.callLater(() => {
-                if (root.trackedIconSource !== newSrc) return
-                if (appIcon.status !== Image.Ready) return
-                appIcon.opacity = 1
-                appIcon.scale = 1
-                appIconPrev.opacity = 0
-                appIconPrev.scale = 0.9
-            })
+            root.iconFadePending = true
+            if (appIcon.status === Image.Ready)
+                root.startIconCrossfade()
         }
+    }
+
+    function startIconCrossfade() {
+        if (!root.iconFadePending || !root.hasIcon || appIcon.status !== Image.Ready)
+            return
+        root.iconFadePending = false
+        appIcon.opacity = 1
+        appIcon.scale = 1
+        appIconPrev.opacity = 0
+        appIconPrev.scale = 0.9
     }
 
     // Smooth width morph: title changes ease instead of snapping, so the
@@ -272,13 +281,9 @@ Item {
                 Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
                 onStatusChanged: {
-                    if (status === Image.Ready && root.hasIcon && root.trackedHasIcon && root.trackedIconSource === source && opacity === 0) {
-                        // New icon finished loading while hidden for crossfade, now fade in
-                        opacity = 1
-                        scale = 1
-                        appIconPrev.opacity = 0
-                        appIconPrev.scale = 0.9
-                    }
+                    if (status === Image.Ready && root.hasIcon && root.trackedHasIcon
+                            && root.trackedIconSource === source)
+                        root.startIconCrossfade()
                 }
             }
         }
