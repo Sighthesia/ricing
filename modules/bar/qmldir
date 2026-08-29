@@ -8,3 +8,4 @@ BarPopupHost 1.0 BarPopupHost.qml
 BarPopupIdentity 1.0 BarPopupIdentity.qml
 BarPopupActions 1.0 BarPopupActions.qml
 BarPopupSlider 1.0 BarPopupSlider.qml
+BarContextPopupActions 1.0 BarContextPopupActions.qml
