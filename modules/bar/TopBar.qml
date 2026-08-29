@@ -54,6 +54,26 @@ Variants {
             }
         }
 
+        // Mirror the shared island settings route into this screen's owner.
+        // SettingsService changes IslandService state before this window can
+        // animate, so both the IPC and bar-button paths stay consistent.
+        Connections {
+            target: Services.IslandService
+            function syncSettingsOverlay() {
+                var settingsOpen = Services.IslandService.expanded
+                        && Services.IslandService.panelPage === "settings-center"
+                if (settingsOpen) {
+                    popupHost.dismissImmediately()
+                    overlayCoordinator.request("settings", null, true, true)
+                } else if (settingsOverlay.interactive
+                           && overlayCoordinator.activeTarget === "settings") {
+                    settingsOverlay.closeWithoutFocusRestore()
+                }
+            }
+            function onExpandedChanged() { syncSettingsOverlay() }
+            function onPanelPageChanged() { syncSettingsOverlay() }
+        }
+
         // Open the shared settings surface for a widget context action.
         Connections {
             target: Services.BarLayoutService
