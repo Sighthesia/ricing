@@ -4,7 +4,9 @@ import QtQuick
 // Keeps sidebar and content as sibling hosts driven by revealProgress.
 Item {
     id: root
-    clip: true
+    // Horizontal settings layers must travel outside the owner while opening;
+    // vertical bar popups remain clipped to their fixed popup surface.
+    clip: root.orientation === root.vertical
 
     enum Orientation { Horizontal, Vertical }
     enum Direction { Up, Down }

@@ -79,7 +79,7 @@ Item {
             compare(popup.contentLayer.y, popup.sidebarLayer.height + 1)
         }
 
-        function test_upDirectionStacksContentBeforeSidebar() {
+    function test_upDirectionStacksContentBeforeSidebar() {
             popup.orientation = popup.vertical
             popup.direction = popup.up
             compare(popup.contentLayer.y, 0)
@@ -124,6 +124,14 @@ Item {
             compare(contentChild.parent, injectedPopup.contentLayer)
             verify(injectedPopup.sidebarData.length > 0)
             verify(injectedPopup.contentData.length > 0)
+        }
+
+        function test_horizontalRevealKeepsLayerTravelVisible() {
+            popup.orientation = popup.horizontal
+            popup.revealProgress = 0
+            compare(popup.clip, false)
+            compare(popup.sidebarLayer.x, popup.horizontalSidebarX)
+            compare(popup.contentLayer.x, popup.horizontalContentX)
         }
     }
 }
