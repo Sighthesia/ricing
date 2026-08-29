@@ -199,26 +199,39 @@ PanelWindow {
                 hostWidth: 260
             }
 
-            // Action layer bound to the intent's kind and payload.
-            contentData: BarPopupActions {
-                objectName: "popupActions"
-                actionKind: root.intent && root.intent.kind !== "context"
-                        ? (root.intent.actionKind || "") : "context"
-                payload: root.intent ? root.intent.payload : null
-            }
+            // Keep both menu bodies in one content host so only the active
+            // intent contributes to the popup height and visible surface.
+            contentData: Item {
+                objectName: "popupContentSlot"
+                width: 260
+                implicitHeight: Math.max(popupActions.implicitHeight, contextPopupActions.implicitHeight)
+                height: implicitHeight
 
-            // Context actions reuse the same content owner and vertical geometry.
-            BarContextPopupActions {
-                objectName: "contextPopupActions"
-                width: parent.width
-                widgetId: root.intent ? (root.intent.widgetId || "") : ""
-                instanceKey: root.intent ? (root.intent.instanceKey || "") : ""
-                section: root.intent ? (root.intent.section || "center") : "center"
-                hasSettings: root.intent ? root.intent.hasSettings === true : false
-                payload: root.intent ? root.intent.payload : null
-                onActionRequested: action => {
-                    if (action === "close")
-                        root.dismissImmediately()
+                // Action layer bound to the hovered widget intent.
+                BarPopupActions {
+                    id: popupActions
+                    objectName: "popupActions"
+                    anchors.fill: parent
+                    actionKind: root.intent && root.intent.kind !== "context"
+                            ? (root.intent.actionKind || "") : "context"
+                    payload: root.intent ? root.intent.payload : null
+                }
+
+                // Context actions reuse the same content owner and geometry.
+                BarContextPopupActions {
+                    id: contextPopupActions
+                    objectName: "contextPopupActions"
+                    anchors.fill: parent
+                    actionKind: root.intent && root.intent.kind === "context" ? "context" : ""
+                    widgetId: root.intent ? (root.intent.widgetId || "") : ""
+                    instanceKey: root.intent ? (root.intent.instanceKey || "") : ""
+                    section: root.intent ? (root.intent.section || "center") : "center"
+                    hasSettings: root.intent ? root.intent.hasSettings === true : false
+                    payload: root.intent ? root.intent.payload : null
+                    onActionRequested: action => {
+                        if (action === "close")
+                            root.dismissImmediately()
+                    }
                 }
             }
         }
