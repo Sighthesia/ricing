@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import "../lazerbar"
 import "./BarHoverLogic.js" as BarHoverLogic
 
@@ -8,6 +9,9 @@ import "./BarHoverLogic.js" as BarHoverLogic
 // animates via revealProgress. Hover bridge lives in open/close timers.
 PanelWindow {
     id: root
+
+    // Keep popup surfaces above the default Top-layer overlay owners.
+    WlrLayershell.layer: WlrLayer.Overlay
 
     // Intent payload from the hovered widget.
     property var intent: null

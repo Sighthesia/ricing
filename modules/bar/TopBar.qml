@@ -203,6 +203,8 @@ Variants {
         PanelWindow {
             id: settingsWindow
             screen: screenScope.modelData; color: "transparent"
+            // Settings must remain visible above the fixed popup owners.
+            WlrLayershell.layer: WlrLayer.Overlay
             implicitWidth: Math.min(LazerTheme.settingsPanelWidth, screenScope.modelData.width)
             implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
