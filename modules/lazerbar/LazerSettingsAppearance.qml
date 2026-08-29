@@ -27,6 +27,10 @@ LazerSettingsSection {
     property alias panelOpacityRow: panelOpacityRow
     property alias enableBlurRow: enableBlurRow
     property alias blurSurfaceRow: blurSurfaceRow
+    property alias overviewBackgroundRow: overviewBackgroundRow
+    property alias overviewSolidRow: overviewSolidRow
+    property alias overviewBlurRow: overviewBlurRow
+    property alias overviewTintRow: overviewTintRow
     property alias glassGlowRow: glassGlowRow
 
     function save() {
@@ -157,6 +161,72 @@ LazerSettingsSection {
             defaultValue: root.defaultOf("blurSurfaceOpacity")
             value: root.settingsObject ? root.settingsObject.blurSurfaceOpacity : 0.35
             onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.blurSurfaceOpacity = Math.max(0, Math.min(1, value)); root.save() } }
+        }
+    }
+
+    // niri overview backdrop — wallpaper blur/tint rendered inside niri's overview
+    LazerSettingsRow {
+        id: overviewBackgroundRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: "概览背景"; descriptionText: "在 niri 概览中显示壁纸背景"
+        defaultValue: root.defaultOf("overviewBackground")
+        currentValue: root.settingsObject ? root.settingsObject.overviewBackground : null
+        resetCallback: function() { root.resetKey("overviewBackground") }
+        LazerSettingsToggle {
+            id: overviewBackgroundToggleControl
+            checked: root.settingsObject ? root.settingsObject.overviewBackground : false
+            onToggled: function(value) { if (root.settingsObject) { root.settingsObject.overviewBackground = value; root.save() } }
+        }
+    }
+
+    LazerSettingsRow {
+        id: overviewSolidRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.settingsObject ? root.settingsObject.overviewBackground : false
+        labelText: "概览纯色背景"; descriptionText: "使用纯色而非壁纸"
+        defaultValue: root.defaultOf("overviewBackgroundSolid")
+        currentValue: root.settingsObject ? root.settingsObject.overviewBackgroundSolid : null
+        resetCallback: function() { root.resetKey("overviewBackgroundSolid") }
+        LazerSettingsToggle {
+            id: overviewSolidToggleControl
+            checked: root.settingsObject ? root.settingsObject.overviewBackgroundSolid : false
+            onToggled: function(value) { if (root.settingsObject) { root.settingsObject.overviewBackgroundSolid = value; root.save() } }
+        }
+    }
+
+    LazerSettingsRow {
+        id: overviewBlurRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.settingsObject ? (root.settingsObject.overviewBackground && !root.settingsObject.overviewBackgroundSolid) : false
+        labelText: "概览模糊"; descriptionText: "范围 0 到 1"
+        defaultValue: root.defaultOf("overviewBackgroundBlur")
+        currentValue: root.settingsObject ? root.settingsObject.overviewBackgroundBlur : null
+        resetCallback: function() { root.resetKey("overviewBackgroundBlur") }
+        LazerSettingsSlider {
+            id: overviewBlurSliderControl; from: 0; to: 1; stepSize: 0.05
+            defaultValue: root.defaultOf("overviewBackgroundBlur")
+            value: root.settingsObject ? root.settingsObject.overviewBackgroundBlur : 0.4
+            onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.overviewBackgroundBlur = Math.max(0, Math.min(1, value)); root.save() } }
+        }
+    }
+
+    LazerSettingsRow {
+        id: overviewTintRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.settingsObject ? root.settingsObject.overviewBackground : false
+        labelText: "概览着色"; descriptionText: "范围 0 到 1"
+        defaultValue: root.defaultOf("overviewBackgroundTint")
+        currentValue: root.settingsObject ? root.settingsObject.overviewBackgroundTint : null
+        resetCallback: function() { root.resetKey("overviewBackgroundTint") }
+        LazerSettingsSlider {
+            id: overviewTintSliderControl; from: 0; to: 1; stepSize: 0.05
+            defaultValue: root.defaultOf("overviewBackgroundTint")
+            value: root.settingsObject ? root.settingsObject.overviewBackgroundTint : 0.5
+            onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.overviewBackgroundTint = Math.max(0, Math.min(1, value)); root.save() } }
         }
     }
 

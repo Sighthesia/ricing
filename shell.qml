@@ -16,6 +16,9 @@ ShellRoot {
 
     LazerBar.WallpaperBackground {}
 
+    // Blurred/tinted wallpaper niri renders inside its overview backdrop.
+    LazerBar.OverviewBackgroundWindow {}
+
     Bar.TopBar {}
 
     LazerBar.NotificationHost {}

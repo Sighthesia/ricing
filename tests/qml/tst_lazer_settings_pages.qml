@@ -15,6 +15,10 @@ Item {
         property real glassGlowIntensity: 0.22
         property bool glassThemeAdaptive: true
         property bool ripplePulseEnabled: true
+        property bool overviewBackground: false
+        property bool overviewBackgroundSolid: false
+        property real overviewBackgroundBlur: 0.4
+        property real overviewBackgroundTint: 0.5
     }
     QtObject {
         id: barSettings
@@ -195,14 +199,15 @@ Item {
 
         function test_searchFiltersCurrentCategoryRows() {
             appearancePage.searchQuery = "模糊"
-            compare(appearancePage.visibleResultCount, 2)
+            compare(appearancePage.visibleResultCount, 3)
             verify(appearancePage.blurSurfaceRow.searchVisible)
+            verify(appearancePage.overviewBlurRow.searchVisible)
             verify(!appearancePage.wallpaperRow.visible)
             appearancePage.searchQuery = "壁纸"
             compare(appearancePage.visibleResultCount, 1)
             verify(appearancePage.wallpaperRow.visible)
             appearancePage.searchQuery = ""
-            compare(appearancePage.visibleResultCount, 9)
+            compare(appearancePage.visibleResultCount, 13)
             verify(appearancePage.wallpaperRow.visible)
         }
 
@@ -213,9 +218,10 @@ Item {
             appearanceSettings.enableBlur = false
             appearancePage.searchQuery = "模糊"
             verify(appearancePage.blurSurfaceRow.searchVisible)
+            verify(appearancePage.overviewBlurRow.searchVisible)
             verify(appearancePage.blurSurfaceRow.visible)
             verify(!appearancePage.blurSurfaceRow.enabled)
-            compare(appearancePage.visibleResultCount, 2)
+            compare(appearancePage.visibleResultCount, 3)
             appearancePage.searchQuery = "audio"
             compare(appearancePage.visibleResultCount, 0)
             appearancePage.searchQuery = ""
