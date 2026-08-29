@@ -310,7 +310,9 @@ Item {
                 NumberAnimation { target: appIconPrev; property: "opacity"; from: appIconPrev.opacity; to: 1; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
                 NumberAnimation { target: appIcon; property: "scale"; from: appIcon.scale; to: 0.9; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
                 NumberAnimation { target: appIconPrev; property: "scale"; from: appIconPrev.scale; to: 1; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
-                onStopped: {
+                // `restart()` stops an in-flight animation first; onStopped
+                // would therefore swap layers before the new fade starts.
+                onFinished: {
                     if (root.pendingIconSource === "")
                         return
                     root.renderedIconSource = root.pendingIconSource
