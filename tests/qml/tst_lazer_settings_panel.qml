@@ -146,6 +146,8 @@ Item {
         function test_usesSharedTwoLayerPopupGeometry() {
             compare(panel.sidebar.parent, panel.layerPopup.sidebarLayer)
             compare(panel.content.parent, panel.layerPopup.contentLayer)
+            compare(panel.layerPopup.width, panel.width)
+            compare(panel.layerPopup.height, panel.height)
             compare(panel.layerPopup.sidebarLayer.x, panel.sidebarLayerX)
             compare(panel.layerPopup.contentLayer.x, panel.contentLayerX)
             compare(panel.sidebar.x, 0)

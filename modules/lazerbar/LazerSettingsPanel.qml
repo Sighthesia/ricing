@@ -215,6 +215,8 @@ Item {
     // Keeps sidebar and content as sibling hosts driven by revealProgress.
     TwoLayerPopup {
         id: layerPopup
+        // Keep the shared clipping owner aligned with the fixed panel surface.
+        anchors.fill: parent
         orientation: TwoLayerPopup.Orientation.Horizontal
         revealProgress: root.progress
         horizontalSidebarX: root.sidebarLayerX
