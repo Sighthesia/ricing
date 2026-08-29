@@ -26,6 +26,29 @@ Item {
     readonly property int iconSpacing: 4
     readonly property int cellPadding: 8
 
+    function windowOrder(left, right) {
+        const leftColumn = left.colIdx == null ? 9999 : left.colIdx
+        const rightColumn = right.colIdx == null ? 9999 : right.colIdx
+        if (leftColumn !== rightColumn)
+            return leftColumn - rightColumn
+
+        const leftRow = left.rowIdx == null ? 9999 : left.rowIdx
+        const rightRow = right.rowIdx == null ? 9999 : right.rowIdx
+        if (leftRow !== rightRow)
+            return leftRow - rightRow
+
+        return String(left.winId).localeCompare(String(right.winId))
+    }
+
+    function iconPathForApp(appId) {
+        const fallback = Quickshell.iconPath("application-x-executable")
+        const normalizedAppId = String(appId || "")
+        if (!normalizedAppId)
+            return fallback
+
+        return Quickshell.iconPath(normalizedAppId, "application-x-executable") || fallback
+    }
+
     function refreshWindowMap() {
         const map = {}
         const model = Services.NiriService.windows
@@ -37,6 +60,11 @@ Item {
                 map[win.workspaceId] = []
             map[win.workspaceId].push(win)
         }
+
+        const workspaceIds = Object.keys(map)
+        for (let i = 0; i < workspaceIds.length; i++)
+            map[workspaceIds[i]].sort(root.windowOrder)
+
         root.windowsByWorkspace = map
     }
 
@@ -132,8 +160,7 @@ Item {
 
                             IconImage {
                                 anchors.fill: parent
-                                source: String(windowIcon.modelData.appId || "").length > 0
-                                        ? Quickshell.iconPath(windowIcon.modelData.appId, true) : ""
+                                source: root.iconPathForApp(windowIcon.modelData.appId)
                                 asynchronous: true
                                 backer.fillMode: Image.PreserveAspectFit
                                 smooth: true
