@@ -40,6 +40,9 @@ Item {
     property string currentAppId: ""
     readonly property string iconSource: root.currentAppId.length > 0 ? Quickshell.iconPath(root.currentAppId, true) : ""
     readonly property bool hasIcon: root.showIcon && root.hasWindow && root.currentAppId.length > 0 && root.iconSource !== ""
+    property string trackedIconSource: ""
+    property string outgoingIconSource: ""
+    property bool iconTransitioning: false
 
     // Tracks the last choreographed title so the first render never plays
     // the exit/enter transition for content that was never visible.
@@ -88,6 +91,8 @@ Item {
         root.trackedTitle = root.displayTitle
         root.trackedAppName = root.displayAppName
         root.syncFocusedWindow()
+        root.trackedIconSource = root.iconSource
+        incomingIcon.source = root.iconSource
     }
 
     function syncFocusedWindow() {
@@ -101,6 +106,42 @@ Item {
             Qt.callLater(root.syncFocusedWindow)
         }
     }
+
+    function transitionIcon(previous, next) {
+        if (MotionTokens.reducedMotion || previous === next) {
+            root.outgoingIconSource = ""
+            root.iconTransitioning = false
+            return
+        }
+        root.outgoingIconSource = previous
+        root.trackedIconSource = next
+        root.iconTransitioning = true
+        incomingIcon.source = next
+        incomingIcon.opacity = 0
+        incomingIcon.y = -incomingIcon.fallDistance
+        outgoingIcon.opacity = 1
+        outgoingIcon.y = 0
+        incomingReadyGuard.restart()
+    }
+
+    function syncIcon() {
+        var next = root.iconSource
+        var previous = root.trackedIconSource
+        if (next === previous)
+            return
+        root.trackedIconSource = next
+        if (!root.hasIcon || next === "") {
+            outgoingIcon.source = previous
+            outgoingIcon.opacity = previous !== "" ? 1 : 0
+            outgoingIcon.y = 0
+            iconExitAnimation.restart()
+            return
+        }
+        transitionIcon(previous, next)
+    }
+
+    onIconSourceChanged: syncIcon()
+    onHasIconChanged: syncIcon()
 
     onDisplayTitleChanged: {
         var previous = root.trackedTitle
@@ -207,11 +248,71 @@ Item {
             Behavior on width { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
-            Services.AnimatedIconSwitch {
-                anchors.fill: parent
-                source: root.iconSource
-                switchDuration: MotionTokens.medium
-                visible: iconContainer.width > 0
+            IconImage {
+                id: outgoingIcon
+
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
+                height: parent.height
+                source: root.outgoingIconSource
+                visible: root.outgoingIconSource !== "" && opacity > 0.01
+                opacity: 0
+
+                property real fallDistance: height * titleText.ghostFallDistanceScale
+                Behavior on y { NumberAnimation { duration: titleText.ghostFallTime; easing.type: Easing.InQuad } }
+                Behavior on opacity { NumberAnimation { duration: titleText.ghostFallTime; easing.type: Easing.InQuad } }
+            }
+
+            IconImage {
+                id: incomingIcon
+
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
+                height: parent.height
+                source: ""
+                opacity: 1
+                property real fallDistance: height * titleText.ghostFallDistanceScale
+                Behavior on y { NumberAnimation { duration: titleText.ghostFallTime; easing.type: Easing.OutQuad } }
+                Behavior on opacity { NumberAnimation { duration: titleText.scanRevealMs; easing.type: Easing.OutQuad } }
+            }
+
+            NumberAnimation {
+                id: iconEntryAnimation
+                target: incomingIcon
+                property: "y"
+                from: -incomingIcon.fallDistance
+                to: 0
+                duration: titleText.scanRevealMs
+                easing.type: Easing.OutQuad
+            }
+
+            Timer {
+                id: incomingReadyGuard
+                interval: titleText.scanGapMs
+                onTriggered: {
+                    if (incomingIcon.status !== Image.Ready || !root.iconTransitioning)
+                        return
+                    incomingIcon.opacity = 1
+                    iconEntryAnimation.restart()
+                    outgoingIcon.y = outgoingIcon.fallDistance
+                    outgoingIcon.opacity = 0
+                    finishIconTimer.restart()
+                }
+            }
+
+            Timer {
+                id: finishIconTimer
+                interval: titleText.scanRevealMs + titleText.ghostFallTime
+                onTriggered: {
+                    root.outgoingIconSource = ""
+                    root.iconTransitioning = false
+                }
+            }
+
+            ParallelAnimation {
+                id: iconExitAnimation
+                NumberAnimation { target: outgoingIcon; property: "y"; from: 0; to: outgoingIcon.fallDistance; duration: titleText.ghostFallTime; easing.type: Easing.InQuad }
+                NumberAnimation { target: outgoingIcon; property: "opacity"; from: 1; to: 0; duration: titleText.ghostFallTime; easing.type: Easing.InQuad }
             }
         }
 
