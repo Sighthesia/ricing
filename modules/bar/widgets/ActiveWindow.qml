@@ -34,8 +34,12 @@ Item {
         var dot = id.lastIndexOf(".")
         return dot >= 0 && dot < id.length - 1 ? id.substring(dot + 1) : id
     }
-    readonly property string iconSource: root.activeAppId.length > 0 ? Quickshell.iconPath(root.activeAppId, true) : ""
-    readonly property bool hasIcon: root.showIcon && root.hasWindow && root.iconSource !== ""
+    // Keep the icon input on the same complete-window snapshot used by the
+    // legacy ActiveWindow implementation; workspace activation can otherwise
+    // expose a transient empty activeAppId before windows are reloaded.
+    property string currentAppId: ""
+    readonly property string iconSource: root.currentAppId.length > 0 ? Quickshell.iconPath(root.currentAppId, true) : ""
+    readonly property bool hasIcon: root.showIcon && root.hasWindow && root.currentAppId.length > 0 && root.iconSource !== ""
 
     // Tracks the last choreographed title so the first render never plays
     // the exit/enter transition for content that was never visible.
@@ -83,6 +87,19 @@ Item {
     Component.onCompleted: {
         root.trackedTitle = root.displayTitle
         root.trackedAppName = root.displayAppName
+        root.syncFocusedWindow()
+    }
+
+    function syncFocusedWindow() {
+        root.currentAppId = root.activeAppId
+    }
+
+    Connections {
+        target: Services.NiriService
+
+        function onWindowsUpdated() {
+            Qt.callLater(root.syncFocusedWindow)
+        }
     }
 
     onDisplayTitleChanged: {
