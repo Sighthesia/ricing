@@ -188,28 +188,6 @@ BarPill {
         subtitleMarquee.transitionFrom(oldSec, root.secondaryText)
     }
 
-    onHasCoverArtChanged: {
-        if (MotionTokens.reducedMotion) {
-            coverPrevImage.opacity = 0
-            coverImage.opacity = root.hasCoverArt ? 1 : 0
-            return
-        }
-        if (root.hasCoverArt) {
-            coverImage.opacity = 0
-            Qt.callLater(() => { coverImage.opacity = 1; coverPrevImage.opacity = 0 })
-        } else {
-            if (coverImage.source !== "") {
-                coverPrevImage.source = coverImage.source
-                coverPrevImage.opacity = 1
-                coverImage.opacity = 0
-                Qt.callLater(() => { coverPrevImage.opacity = 0 })
-            } else {
-                coverPrevImage.opacity = 0
-                coverImage.opacity = 0
-            }
-        }
-    }
-
     Connections {
         target: Services.MediaControlService
         function onArtUrlChanged() {
@@ -312,7 +290,7 @@ BarPill {
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
-                visible: true
+                visible: root.hasCoverArt && status !== Image.Error && opacity > 0.01
                 opacity: 0
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
@@ -325,8 +303,8 @@ BarPill {
                 source: Services.MediaControlService.artUrl
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
-                visible: true
-                opacity: 1
+                visible: root.hasCoverArt && status !== Image.Error
+                opacity: visible ? 1 : 0
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             }

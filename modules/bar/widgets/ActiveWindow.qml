@@ -164,8 +164,8 @@ Item {
         appNameText.transitionFrom(prevApp, root.displayAppName)
     }
 
-    onHasIconChanged: Qt.callLater(handleIconTransition)
-    onIconSourceChanged: Qt.callLater(handleIconTransition)
+    onHasIconChanged: handleIconTransition()
+    onIconSourceChanged: handleIconTransition()
 
     function handleIconTransition() {
         if (MotionTokens.reducedMotion) {
@@ -264,8 +264,8 @@ Item {
                 source: root.iconSource
                 asynchronous: true
                 backer.fillMode: Image.PreserveAspectFit
-                opacity: 1
-                scale: 1
+                opacity: root.hasIcon && status === Image.Ready ? 1 : 0
+                scale: root.hasIcon ? 1 : 0.85
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
                 Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             }
