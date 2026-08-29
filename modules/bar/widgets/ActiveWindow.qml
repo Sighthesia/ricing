@@ -76,6 +76,9 @@ Item {
 
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
+    // Clip so long-window ghosts do not spill into neighboring gaps when
+    // the title shortens; neighboring widget containers can then cover.
+    clip: true
 
     Component.onCompleted: {
         root.trackedTitle = root.displayTitle

@@ -235,6 +235,10 @@ Item {
 
         spacing: BarLayoutSections.widgetSpacing
         anchors.verticalCenter: parent.verticalCenter
+        // Clip the row so a shrinking widget's falling ghosts do not spill
+        // into inter-section gaps; the row's own background (if any) and
+        // neighboring rows at higher declaration order will then cover.
+        clip: true
         onWidthChanged: root.schedulePublish()
 
         Repeater {

@@ -78,6 +78,11 @@ BarPill {
 
     visible: hasMedia
     implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12, root.outgoingHoldPillWidth) : 0
+    // Clip the pill so falling ghosts from a long title do not spill into
+    // neighboring widget gaps when the pill shrinks to a short title; the
+    // ghosts remain visible inside the pill during the width hold but are
+    // clipped at the pill edge, allowing neighboring containers to cover.
+    clip: true
     // Smooth width morph like the legacy media pill: growth/shrink eases
     // instead of snapping when lyric lengths change.
     Behavior on implicitWidth {
