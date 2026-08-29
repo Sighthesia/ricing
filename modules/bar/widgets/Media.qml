@@ -195,13 +195,21 @@ BarPill {
             return
         }
         if (root.hasCoverArt) {
-            // MPRIS can briefly report missing artwork while its metadata
-            // settles. Do not blank a cover that is already loaded.
-            if (coverImage.status === Image.Ready)
-                coverImage.opacity = 1
-        } else {
-            coverPrevImage.opacity = 0
             coverImage.opacity = 0
+            Qt.callLater(() => {
+                if (coverImage.status !== Image.Ready) return
+                coverImage.opacity = 1; coverPrevImage.opacity = 0
+            })
+        } else {
+            if (coverImage.source !== "") {
+                coverPrevImage.source = coverImage.source
+                coverPrevImage.opacity = 1
+                coverImage.opacity = 0
+                Qt.callLater(() => { coverPrevImage.opacity = 0 })
+            } else {
+                coverPrevImage.opacity = 0
+                coverImage.opacity = 0
+            }
         }
     }
 
@@ -211,7 +219,6 @@ BarPill {
             if (MotionTokens.reducedMotion) {
                 root.trackedArtUrl = Services.MediaControlService.artUrl
                 coverPrevImage.opacity = 0
-                coverImage.opacity = root.hasCoverArt ? 1 : 0
                 return
             }
             const oldUrl = root.trackedArtUrl
@@ -222,20 +229,17 @@ BarPill {
                 return
             }
             root.trackedArtUrl = newUrl
-            if (newUrl === "") {
+            const hadCover = oldUrl !== "" && root.hasCoverArt
+            const hasNewCover = newUrl !== "" && root.hasCoverArt
+            if (!hadCover || !hasNewCover) {
                 coverPrevImage.opacity = 0
-                coverImage.opacity = 0
                 return
             }
-            // The current image has already received the new source by the
-            // time this signal runs, so its status cannot describe oldUrl.
-            const hadCover = oldUrl !== ""
             coverPrevImage.source = oldUrl
-            coverPrevImage.opacity = hadCover ? 1 : 0
+            coverPrevImage.opacity = 1
             coverImage.opacity = 0
             Qt.callLater(() => {
                 if (root.trackedArtUrl !== newUrl) return
-                if (!root.hasCoverArt) return
                 if (coverImage.status !== Image.Ready) return
                 coverImage.opacity = 1
                 coverPrevImage.opacity = 0

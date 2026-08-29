@@ -167,8 +167,17 @@ Item {
         appNameText.transitionFrom(prevApp, root.displayAppName)
     }
 
-    onHasIconChanged: Qt.callLater(handleIconTransition)
-    onIconSourceChanged: Qt.callLater(handleIconTransition)
+    // hasIcon and iconSource change as separate bindings during a window
+    // switch. Coalesce them so one transition sees the complete old/new pair.
+    Timer {
+        id: iconTransitionTimer
+
+        interval: 0
+        onTriggered: root.handleIconTransition()
+    }
+
+    onHasIconChanged: iconTransitionTimer.restart()
+    onIconSourceChanged: iconTransitionTimer.restart()
 
     function handleIconTransition() {
         if (MotionTokens.reducedMotion) {
@@ -229,10 +238,7 @@ Item {
                 || appIcon.status !== Image.Ready)
             return
         root.iconFadePending = false
-        appIcon.opacity = 1
-        appIcon.scale = 1
-        appIconPrev.opacity = 0
-        appIconPrev.scale = 0.9
+        iconCrossfade.restart()
     }
 
     // Smooth width morph: title changes ease instead of snapping, so the
@@ -272,8 +278,6 @@ Item {
                 backer.fillMode: Image.PreserveAspectFit
                 opacity: 0
                 scale: 0.9
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-                Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             }
 
             IconImage {
@@ -285,14 +289,23 @@ Item {
                 backer.fillMode: Image.PreserveAspectFit
                 opacity: 1
                 scale: 1
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-                Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
                 onStatusChanged: {
                     if (status === Image.Ready && root.hasIcon && root.trackedHasIcon
                             && root.trackedIconSource === source)
                         root.startIconCrossfade()
                 }
+            }
+
+            // Explicitly owns the icon handoff so source/status updates do
+            // not collapse the two-layer fade into one frame.
+            ParallelAnimation {
+                id: iconCrossfade
+
+                NumberAnimation { target: appIcon; property: "opacity"; from: 0; to: 1; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+                NumberAnimation { target: appIconPrev; property: "opacity"; from: 1; to: 0; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+                NumberAnimation { target: appIcon; property: "scale"; from: 0.9; to: 1; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+                NumberAnimation { target: appIconPrev; property: "scale"; from: 1; to: 0.9; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
             }
         }
 
