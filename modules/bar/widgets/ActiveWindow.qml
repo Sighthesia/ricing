@@ -197,7 +197,6 @@ Item {
             appIcon.scale = 0.85
             Qt.callLater(() => {
                 if (root.trackedIconSource !== newSrc) return
-                if (appIcon.status !== Image.Ready) return
                 appIcon.opacity = 1
                 appIcon.scale = 1
             })
@@ -209,7 +208,6 @@ Item {
             appIcon.scale = 0.9
             Qt.callLater(() => {
                 if (root.trackedIconSource !== newSrc) return
-                if (appIcon.status !== Image.Ready) return
                 appIcon.opacity = 1
                 appIcon.scale = 1
                 appIconPrev.opacity = 0
@@ -270,16 +268,6 @@ Item {
                 scale: 1
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
                 Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-
-                onStatusChanged: {
-                    if (status === Image.Ready && root.hasIcon && root.trackedHasIcon && root.trackedIconSource === source && opacity === 0) {
-                        // New icon finished loading while hidden for crossfade, now fade in
-                        opacity = 1
-                        scale = 1
-                        appIconPrev.opacity = 0
-                        appIconPrev.scale = 0.9
-                    }
-                }
             }
         }
 
