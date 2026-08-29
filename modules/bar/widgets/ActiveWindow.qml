@@ -41,11 +41,6 @@ Item {
     // the exit/enter transition for content that was never visible.
     property string trackedTitle: ""
     property string trackedAppName: ""
-    property string trackedIconSource: ""
-    property bool trackedHasIcon: false
-    property string renderedIconSource: ""
-    property string pendingIconSource: ""
-    property string trackedAppId: ""
     // Coalesce a transient desktop fallback during workspace switches:
     // Niri briefly reports no active window while the workspace animates,
     // so displayTitle flicks window -> desktop -> next window. Holding
@@ -88,11 +83,6 @@ Item {
     Component.onCompleted: {
         root.trackedTitle = root.displayTitle
         root.trackedAppName = root.displayAppName
-        root.trackedIconSource = root.iconSource
-        root.trackedHasIcon = root.hasIcon
-        root.renderedIconSource = root.iconSource
-        root.trackedAppId = root.activeAppId
-        appIcon.opacity = root.hasIcon ? 1 : 0
     }
 
     onDisplayTitleChanged: {
@@ -170,76 +160,6 @@ Item {
         appNameText.transitionFrom(prevApp, root.displayAppName)
     }
 
-    // These bindings update separately during a window switch. Process them
-    // once after the binding cascade so the old and new icon states stay paired.
-    Timer {
-        id: iconTransitionTimer
-
-        interval: 0
-        onTriggered: root.handleIconTransition()
-    }
-
-    onHasIconChanged: iconTransitionTimer.restart()
-    onIconSourceChanged: iconTransitionTimer.restart()
-
-    function handleIconTransition() {
-        if (MotionTokens.reducedMotion) {
-            root.trackedHasIcon = root.hasIcon
-            root.trackedIconSource = root.iconSource
-            appIconPrev.opacity = 0
-            appIcon.opacity = root.hasIcon ? 1 : 0
-            root.pendingIconSource = ""
-            return
-        }
-        const oldSrc = root.trackedIconSource
-        const newSrc = root.iconSource
-        const oldHas = root.trackedHasIcon
-        const newHas = root.hasIcon
-        if (oldHas === newHas && oldSrc === newSrc)
-            return
-        root.trackedHasIcon = newHas
-        root.trackedIconSource = newSrc
-        const oldAppId = root.trackedAppId
-        root.trackedAppId = root.activeAppId
-        if (oldHas && !newHas) {
-            if (oldSrc !== "") {
-                appIconPrev.source = oldSrc
-                appIconPrev.opacity = 1
-                appIconPrev.scale = 1
-            }
-            appIcon.opacity = 0
-            appIcon.scale = 0.85
-            root.pendingIconSource = ""
-            Qt.callLater(() => { appIconPrev.opacity = 0; appIconPrev.scale = 0.9 })
-        } else if (!oldHas && newHas) {
-            appIconPrev.opacity = 0
-            appIcon.source = newSrc
-            appIcon.opacity = 0
-            appIcon.scale = 0.85
-            root.pendingIconSource = newSrc
-            Qt.callLater(root.revealPendingIcon)
-        } else if (oldHas && newHas && (oldSrc !== newSrc || oldAppId !== root.activeAppId)) {
-            appIconPrev.source = oldSrc
-            appIconPrev.opacity = 1
-            appIconPrev.scale = 1
-            appIcon.source = newSrc
-            appIcon.opacity = 0
-            appIcon.scale = 0.9
-            root.pendingIconSource = newSrc
-            Qt.callLater(root.revealPendingIcon)
-        }
-    }
-
-    function revealPendingIcon() {
-        if (root.pendingIconSource === ""
-                || root.pendingIconSource !== root.trackedIconSource
-                || !root.hasIcon
-                || appIcon.source !== root.pendingIconSource
-                || appIcon.status !== Image.Ready)
-            return
-        iconCrossfade.restart()
-    }
-
     // Smooth width morph: title changes ease instead of snapping, so the
     // Row layout smoothly pushes neighboring widgets aside.
     Behavior on implicitWidth {
@@ -258,53 +178,23 @@ Item {
         Behavior on spacing { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
         Behavior on y { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
-        // Tray-sized app icon so both identity glyphs share one visual weight.
+        // Tray-sized app icon using the legacy directional switch animation.
         Item {
             id: iconContainer
+
             anchors.verticalCenter: parent.verticalCenter
             width: root.hasIcon ? LazerTheme.barGlyphSize : 0
             height: LazerTheme.barGlyphSize
-            clip: false
-            visible: true
+            opacity: root.hasIcon ? 1 : 0
+
             Behavior on width { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+            Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
-            IconImage {
-                id: appIconPrev
+            Services.AnimatedIconSwitch {
                 anchors.fill: parent
-                visible: opacity > 0.01
-                source: ""
-                asynchronous: true
-                backer.fillMode: Image.PreserveAspectFit
-                opacity: 0
-                scale: 0.9
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-                Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-            }
-
-            IconImage {
-                id: appIcon
-                anchors.fill: parent
-                visible: true
-                source: ""
-                asynchronous: true
-                backer.fillMode: Image.PreserveAspectFit
-                opacity: 1
-                scale: root.hasIcon ? 1 : 0.85
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-                Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-
-                onStatusChanged: if (status === Image.Ready)
-                    root.revealPendingIcon()
-            }
-
-            ParallelAnimation {
-                id: iconCrossfade
-
-                NumberAnimation { target: appIcon; property: "opacity"; from: 0; to: 1; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
-                NumberAnimation { target: appIconPrev; property: "opacity"; from: 1; to: 0; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
-                NumberAnimation { target: appIcon; property: "scale"; from: 0.9; to: 1; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
-                NumberAnimation { target: appIconPrev; property: "scale"; from: 1; to: 0.9; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
-                onFinished: root.pendingIconSource = ""
+                source: root.iconSource
+                switchDuration: MotionTokens.medium
+                visible: iconContainer.width > 0
             }
         }
 
