@@ -10,8 +10,9 @@ import "./BarHoverLogic.js" as BarHoverLogic
 PanelWindow {
     id: root
 
-    // Keep popup surfaces above the default Top-layer overlay owners.
-    WlrLayershell.layer: WlrLayer.Overlay
+    // Keep the full-screen owner below the bar and settings owners.
+    // The mask limits input to the small active popup rectangle.
+    WlrLayershell.layer: WlrLayer.Top
 
     // Intent payload from the hovered widget.
     property var intent: null
