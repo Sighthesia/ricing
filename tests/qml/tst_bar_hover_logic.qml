@@ -101,6 +101,7 @@ Item {
 
     function test_newIntentReplacesExistingPopup() {
         verify(Logic.canReplace({ actionKind: "volume" }, { kind: "context" }))
+        verify(Logic.canReplace({ actionKind: "tray", instanceKey: "tray:0" }, { actionKind: "tray", instanceKey: "tray:1" }))
         verify(!Logic.canReplace({ actionKind: "volume" }, null))
     }
 

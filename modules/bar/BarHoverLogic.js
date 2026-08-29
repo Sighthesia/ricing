@@ -27,8 +27,12 @@ function isSettingsIntent(intent) {
 }
 
 function canReplace(current, next) {
-    return !!next && !!current && popupKind(current) !== popupKind(next)
-        || !!next && !current
+    if (!next)
+        return false
+    if (!current)
+        return true
+    return popupKind(current) !== popupKind(next)
+        || String(current.instanceKey || "") !== String(next.instanceKey || "")
 }
 
 function clampAnchor(anchorX, popupWidth, screenWidth, margin) {
