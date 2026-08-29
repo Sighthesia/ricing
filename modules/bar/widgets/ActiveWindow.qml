@@ -43,6 +43,7 @@ Item {
     property string trackedAppName: ""
     property string trackedIconSource: ""
     property bool trackedHasIcon: false
+    property string renderedIconSource: ""
     // Coalesce a transient desktop fallback during workspace switches:
     // Niri briefly reports no active window while the workspace animates,
     // so displayTitle flicks window -> desktop -> next window. Holding
@@ -87,6 +88,7 @@ Item {
         root.trackedAppName = root.displayAppName
         root.trackedIconSource = root.iconSource
         root.trackedHasIcon = root.hasIcon
+        root.renderedIconSource = root.iconSource
     }
 
     onDisplayTitleChanged: {
@@ -164,8 +166,17 @@ Item {
         appNameText.transitionFrom(prevApp, root.displayAppName)
     }
 
-    onHasIconChanged: handleIconTransition()
-    onIconSourceChanged: handleIconTransition()
+    // These bindings update separately during a window switch. Process them
+    // once after the binding cascade so the old and new icon states stay paired.
+    Timer {
+        id: iconTransitionTimer
+
+        interval: 0
+        onTriggered: root.handleIconTransition()
+    }
+
+    onHasIconChanged: iconTransitionTimer.restart()
+    onIconSourceChanged: iconTransitionTimer.restart()
 
     function handleIconTransition() {
         if (MotionTokens.reducedMotion) {
@@ -193,6 +204,7 @@ Item {
             Qt.callLater(() => { appIconPrev.opacity = 0; appIconPrev.scale = 0.9 })
         } else if (!oldHas && newHas) {
             appIconPrev.opacity = 0
+            root.renderedIconSource = newSrc
             appIcon.opacity = 0
             appIcon.scale = 0.85
             Qt.callLater(() => {
@@ -206,6 +218,7 @@ Item {
             appIconPrev.scale = 1
             appIcon.opacity = 0
             appIcon.scale = 0.9
+            root.renderedIconSource = newSrc
             Qt.callLater(() => {
                 if (root.trackedIconSource !== newSrc) return
                 appIcon.opacity = 1
@@ -261,7 +274,7 @@ Item {
                 id: appIcon
                 anchors.fill: parent
                 visible: true
-                source: root.iconSource
+                source: root.renderedIconSource
                 asynchronous: true
                 backer.fillMode: Image.PreserveAspectFit
                 opacity: root.hasIcon && status === Image.Ready ? 1 : 0
