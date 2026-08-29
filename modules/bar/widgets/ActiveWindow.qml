@@ -44,7 +44,8 @@ Item {
     property string trackedIconSource: ""
     property bool trackedHasIcon: false
     property string renderedIconSource: ""
-    property bool iconFadePending: false
+    property string pendingIconSource: ""
+    property string trackedAppId: ""
     // Coalesce a transient desktop fallback during workspace switches:
     // Niri briefly reports no active window while the workspace animates,
     // so displayTitle flicks window -> desktop -> next window. Holding
@@ -90,6 +91,8 @@ Item {
         root.trackedIconSource = root.iconSource
         root.trackedHasIcon = root.hasIcon
         root.renderedIconSource = root.iconSource
+        root.trackedAppId = root.activeAppId
+        appIcon.opacity = root.hasIcon ? 1 : 0
     }
 
     onDisplayTitleChanged: {
@@ -184,7 +187,8 @@ Item {
             root.trackedHasIcon = root.hasIcon
             root.trackedIconSource = root.iconSource
             appIconPrev.opacity = 0
-            root.iconFadePending = false
+            appIcon.opacity = root.hasIcon ? 1 : 0
+            root.pendingIconSource = ""
             return
         }
         const oldSrc = root.trackedIconSource
@@ -195,7 +199,8 @@ Item {
             return
         root.trackedHasIcon = newHas
         root.trackedIconSource = newSrc
-        root.iconFadePending = false
+        const oldAppId = root.trackedAppId
+        root.trackedAppId = root.activeAppId
         if (oldHas && !newHas) {
             if (oldSrc !== "") {
                 appIconPrev.source = oldSrc
@@ -204,39 +209,35 @@ Item {
             }
             appIcon.opacity = 0
             appIcon.scale = 0.85
+            root.pendingIconSource = ""
             Qt.callLater(() => { appIconPrev.opacity = 0; appIconPrev.scale = 0.9 })
         } else if (!oldHas && newHas) {
             appIconPrev.opacity = 0
-            root.renderedIconSource = newSrc
+            appIcon.source = newSrc
             appIcon.opacity = 0
             appIcon.scale = 0.85
-            Qt.callLater(() => {
-                if (root.trackedIconSource !== newSrc) return
-                appIcon.opacity = 1
-                appIcon.scale = 1
-            })
-        } else if (oldHas && newHas && oldSrc !== newSrc) {
+            root.pendingIconSource = newSrc
+            Qt.callLater(root.revealPendingIcon)
+        } else if (oldHas && newHas && (oldSrc !== newSrc || oldAppId !== root.activeAppId)) {
             appIconPrev.source = oldSrc
             appIconPrev.opacity = 1
             appIconPrev.scale = 1
+            appIcon.source = newSrc
             appIcon.opacity = 0
             appIcon.scale = 0.9
-            root.renderedIconSource = newSrc
-            root.iconFadePending = true
-            Qt.callLater(root.revealReadyIcon)
+            root.pendingIconSource = newSrc
+            Qt.callLater(root.revealPendingIcon)
         }
     }
 
-    function revealReadyIcon() {
-        if (!root.iconFadePending || !root.hasIcon
-                || appIcon.status !== Image.Ready
-                || appIcon.source !== root.renderedIconSource)
+    function revealPendingIcon() {
+        if (root.pendingIconSource === ""
+                || root.pendingIconSource !== root.trackedIconSource
+                || !root.hasIcon
+                || appIcon.source !== root.pendingIconSource
+                || appIcon.status !== Image.Ready)
             return
-        root.iconFadePending = false
-        appIcon.opacity = 1
-        appIcon.scale = 1
-        appIconPrev.opacity = 0
-        appIconPrev.scale = 0.9
+        iconCrossfade.restart()
     }
 
     // Smooth width morph: title changes ease instead of snapping, so the
@@ -284,7 +285,7 @@ Item {
                 id: appIcon
                 anchors.fill: parent
                 visible: true
-                source: root.renderedIconSource
+                source: ""
                 asynchronous: true
                 backer.fillMode: Image.PreserveAspectFit
                 opacity: 1
@@ -293,7 +294,17 @@ Item {
                 Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
                 onStatusChanged: if (status === Image.Ready)
-                    root.revealReadyIcon()
+                    root.revealPendingIcon()
+            }
+
+            ParallelAnimation {
+                id: iconCrossfade
+
+                NumberAnimation { target: appIcon; property: "opacity"; from: 0; to: 1; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+                NumberAnimation { target: appIconPrev; property: "opacity"; from: 1; to: 0; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+                NumberAnimation { target: appIcon; property: "scale"; from: 0.9; to: 1; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+                NumberAnimation { target: appIconPrev; property: "scale"; from: 1; to: 0.9; duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+                onFinished: root.pendingIconSource = ""
             }
         }
 
