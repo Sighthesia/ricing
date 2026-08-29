@@ -399,7 +399,8 @@ BarPill {
                 id: subtitleMarquee
 
                 text: root.secondaryText
-                visible: text.length > 0
+                visible: text.length > 0 || _sweepActive
+                height: visible ? implicitHeight : 0
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10

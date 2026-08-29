@@ -174,6 +174,9 @@ Item {
         anchors.left: parent.left
         spacing: root.hasIcon ? 6 : 0
 
+        move: Transition { NumberAnimation { properties: "x"; duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+        Behavior on spacing { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+
         // Tray-sized app icon so both identity glyphs share one visual weight.
         IconImage {
             id: appIcon
@@ -181,13 +184,16 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: root.hasIcon ? LazerTheme.barGlyphSize : 0
             height: LazerTheme.barGlyphSize
-            visible: root.hasIcon
+            visible: true
             source: root.iconSource
             asynchronous: true
             backer.fillMode: Image.PreserveAspectFit
-            opacity: visible && status === Image.Ready ? 1 : 0
+            opacity: root.hasIcon && status === Image.Ready ? 1 : 0
+            scale: root.hasIcon ? 1 : 0.85
 
+            Behavior on width { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+            Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
         }
 
         Column {
@@ -213,7 +219,8 @@ Item {
                 id: appNameText
 
                 text: root.displayAppName
-                visible: text.length > 0
+                visible: text.length > 0 || _sweepActive
+                height: visible ? implicitHeight : 0
                 maxWidth: root.maxTitleWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10
