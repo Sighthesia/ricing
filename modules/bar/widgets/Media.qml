@@ -196,7 +196,10 @@ BarPill {
         }
         if (root.hasCoverArt) {
             coverImage.opacity = 0
-            Qt.callLater(() => { coverImage.opacity = 1; coverPrevImage.opacity = 0 })
+            Qt.callLater(() => {
+                if (coverImage.status !== Image.Ready) return
+                coverImage.opacity = 1; coverPrevImage.opacity = 0
+            })
         } else {
             if (coverImage.source !== "") {
                 coverPrevImage.source = coverImage.source
@@ -237,6 +240,7 @@ BarPill {
             coverImage.opacity = 0
             Qt.callLater(() => {
                 if (root.trackedArtUrl !== newUrl) return
+                if (coverImage.status !== Image.Ready) return
                 coverImage.opacity = 1
                 coverPrevImage.opacity = 0
             })
@@ -327,8 +331,14 @@ BarPill {
                 asynchronous: true
                 visible: true
                 opacity: 1
-
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+
+                onStatusChanged: {
+                    if (status === Image.Ready && root.hasCoverArt && root.trackedArtUrl === source && opacity === 0) {
+                        opacity = 1
+                        coverPrevImage.opacity = 0
+                    }
+                }
             }
 
             // Music glyph only appears when there is no usable cover art.
