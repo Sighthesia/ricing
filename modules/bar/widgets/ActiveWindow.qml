@@ -176,6 +176,8 @@ Item {
 
         move: Transition { NumberAnimation { properties: "x"; duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
         Behavior on spacing { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+        Behavior on y { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+        Behavior on implicitHeight { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
         // Tray-sized app icon so both identity glyphs share one visual weight.
         IconImage {
@@ -192,7 +194,7 @@ Item {
             scale: root.hasIcon ? 1 : 0.85
 
             Behavior on width { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-            Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+            Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
         }
 
@@ -201,6 +203,9 @@ Item {
 
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
+            move: Transition { NumberAnimation { properties: "x,y"; duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+            Behavior on y { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+            Behavior on implicitHeight { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
             // Primary line grows with content; once past the cap it clips
             // and marquee-scrolls instead of being elided short.
@@ -224,6 +229,9 @@ Item {
                 maxWidth: root.maxTitleWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10
+
+                Behavior on height { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
         }
     }

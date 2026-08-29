@@ -404,6 +404,9 @@ BarPill {
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10
+
+                Behavior on height { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
         }
     }
