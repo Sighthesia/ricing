@@ -36,6 +36,11 @@ Item {
                 root.popupRequested(intent)
             })
         }
+        if (loaderItem.rightClicked) {
+            loaderItem.rightClicked.connect(function() {
+                root.contextPopupRequested(root.buildContextIntent(loaderRef))
+            })
+        }
         if (loaderItem.popupCloseRequested) {
             loaderItem.popupCloseRequested.connect(function() {
                 root._activeHoverIntent = null
