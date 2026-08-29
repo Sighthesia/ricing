@@ -10,10 +10,12 @@ Item {
     property string section: "center"
     property bool hasSettings: false
     property var payload: null
+    property string actionKind: "context"
     signal actionRequested(string action)
 
     implicitWidth: 260
-    implicitHeight: actionColumn.implicitHeight + 16
+    implicitHeight: root.visible ? actionColumn.implicitHeight + 16 : 0
+    visible: root.actionKind === "context"
 
     function invoke(action) {
         var callbacks = root.payload || ({})

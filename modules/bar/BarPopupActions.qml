@@ -10,10 +10,10 @@ Item {
     property var payload: null
 
     implicitWidth: 260
-    implicitHeight: contentColumn.implicitHeight + 16
+    implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
     width: implicitWidth
     height: implicitHeight
-    visible: true
+    visible: root.actionKind !== "context"
     clip: false
 
     // Helpers to resolve payload values with fallback to real services.

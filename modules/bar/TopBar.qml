@@ -54,6 +54,20 @@ Variants {
             }
         }
 
+        // Open the shared settings surface for a widget context action.
+        Connections {
+            target: Services.BarLayoutService
+            function onWidgetSettingsVisibleChanged() {
+                if (!Services.BarLayoutService.widgetSettingsVisible)
+                    return
+                popupHost.dismissImmediately()
+                settingsOverlay.prepareDebugOpen()
+                settingsOverlay.panel.selectedCategory = Services.BarLayoutService.widgetSettingsSection === "right"
+                        ? "notifications" : "bar"
+                overlayCoordinator.request("settings", null, true, true)
+            }
+        }
+
         PanelWindow {
             id: barWindow
 
@@ -111,6 +125,21 @@ Variants {
                         popupHost.updateIntent(enriched)
                     popupHost.cancelClose()
                 }
+                onContextPopupRequested: intent => {
+                    if (!intent) return
+                    var enriched = Object.assign({}, intent)
+                    enriched.screenWidth = screenScope.modelData ? Number(screenScope.modelData.width) : 1920
+                    enriched.screenHeight = screenScope.modelData ? Number(screenScope.modelData.height) : 1080
+                    enriched.barPosition = String(Services.SettingsService.bar.position || "top")
+                    enriched.effectiveBarHeight = screenScope.effectiveHeight
+                    enriched.floatingMargin = screenScope.floatingMargin
+                    popupHost.widgetHovered = true
+                    popupHost.updateIntent(enriched)
+                }
+                onContextPopupCloseRequested: {
+                    popupHost.widgetHovered = false
+                    popupHost.requestClose()
+                }
             }
         }
 
@@ -122,6 +151,11 @@ Variants {
             screenHeight: screenScope.modelData ? Number(screenScope.modelData.height) : 1080
             effectiveBarHeight: screenScope.effectiveHeight
             floatingMargin: screenScope.floatingMargin
+        }
+
+        Connections {
+            target: SettingsOverlayBridge
+            function onOpenRequested() { popupHost.dismissImmediately() }
         }
 
         // Keep the launcher wave below the bar while only its internal viewport moves.

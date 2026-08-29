@@ -202,8 +202,24 @@ PanelWindow {
             // Action layer bound to the intent's kind and payload.
             contentData: BarPopupActions {
                 objectName: "popupActions"
-                actionKind: root.intent ? (root.intent.actionKind || "") : ""
+                actionKind: root.intent && root.intent.kind !== "context"
+                        ? (root.intent.actionKind || "") : "context"
                 payload: root.intent ? root.intent.payload : null
+            }
+
+            // Context actions reuse the same content owner and vertical geometry.
+            BarContextPopupActions {
+                objectName: "contextPopupActions"
+                width: parent.width
+                widgetId: root.intent ? (root.intent.widgetId || "") : ""
+                instanceKey: root.intent ? (root.intent.instanceKey || "") : ""
+                section: root.intent ? (root.intent.section || "center") : "center"
+                hasSettings: root.intent ? root.intent.hasSettings === true : false
+                payload: root.intent ? root.intent.payload : null
+                onActionRequested: action => {
+                    if (action === "close")
+                        root.dismissImmediately()
+                }
             }
         }
     }

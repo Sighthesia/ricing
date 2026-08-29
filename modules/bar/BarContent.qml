@@ -15,6 +15,8 @@ Item {
     signal popupRequested(var intent)
     signal popupCloseRequested()
     signal popupAnchorUpdate(var intent)
+    signal contextPopupRequested(var intent)
+    signal contextPopupCloseRequested()
 
     // Track active hover intent for anchor re-emission when layout moves.
     property var _activeHoverIntent: null
@@ -100,6 +102,64 @@ Item {
             root._activeHoverIntent = patched
             root.popupAnchorUpdate(patched)
         } catch (e2) {}
+    }
+
+    // Build a context intent for the widget under the settings-mode pointer.
+    function buildContextIntent(loader) {
+        if (!loader || !loader.item)
+            return null
+        var item = loader.item
+        var point = item.mapToGlobal(item.width / 2, item.height / 2)
+        var widgetId = String(item.widgetId || "")
+        var iconSource = widgetId === "volume" ? Qt.resolvedUrl("icons/volume.svg")
+                : widgetId === "brightness" ? Qt.resolvedUrl("icons/brightness.svg")
+                : widgetId === "media" ? Qt.resolvedUrl("../lazerbar/icons/music.svg")
+                : widgetId === "notifications" ? Qt.resolvedUrl("../lazerbar/icons/bell.svg")
+                : widgetId === "tray" ? Qt.resolvedUrl("../lazerbar/icons/apps.svg") : ""
+        return {
+            kind: "context",
+            widgetId: widgetId,
+            instanceKey: String(item.instanceKey || ""),
+            title: widgetId === "active-window" ? "Active Window"
+                    : widgetId === "notifications" ? "Notifications"
+                    : widgetId === "brightness" ? "Brightness"
+                    : widgetId === "media" ? "Media"
+                    : widgetId === "volume" ? "Volume"
+                    : widgetId === "tray" ? "System Tray" : widgetId || "Widget",
+            iconSource: iconSource,
+            summary: String(item.section || "center"),
+            anchorX: Number(point.x),
+            section: String(item.section || "center"),
+            hasSettings: Services.BarLayoutService.widgetSupportsSettings(widgetId),
+            payload: {
+                moveLeft: function(key, id, section) { Services.BarLayoutService.moveWidget(key, section, 0) },
+                moveRight: function(key, id, section) { Services.BarLayoutService.moveWidget(key, section, 999) },
+                moveToSection: function(key, id, section) {
+                    Services.BarLayoutService.moveWidget(key, section === "left" ? "right" : "left", 0)
+                },
+                openSettings: function(key, id, section) {
+                    Services.BarLayoutService.openWidgetSettings(key, id, Number(point.x), root.screenName, section)
+                },
+                remove: function(key) { Services.BarLayoutService.removeWidget(key) },
+                close: function() {},
+            },
+        }
+    }
+
+    function contextIntentAt(x, y) {
+        var hit = root.widgetAt(x, y)
+        if (!hit)
+            return null
+        var rows = [leftRow, centerRow, rightRow]
+        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            var row = rows[rowIndex]
+            for (var childIndex = 0; childIndex < row.children.length; childIndex++) {
+                var loader = row.children[childIndex]
+                if (loader && loader.item && loader.item.instanceKey === hit.instanceKey)
+                    return root.buildContextIntent(loader)
+            }
+        }
+        return null
     }
 
     // Filter a section's entries down to implemented widgets; the shipped
@@ -340,18 +400,32 @@ Item {
         z: 50
         enabled: Services.BarLayoutService.settingsMode
         visible: Services.BarLayoutService.settingsMode
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Services.BarLayoutService.settingsMode ? Qt.DragMoveCursor : Qt.ArrowCursor
 
         onPressed: mouse => {
             var hit = root.widgetAt(mouse.x, mouse.y)
             if (!hit)
                 return
+            if (mouse.button === Qt.RightButton) {
+                root.contextPopupRequested(root.contextIntentAt(mouse.x, mouse.y))
+                return
+            }
             Services.BarLayoutService.beginDrag(hit.instanceKey, hit.widgetId, mouse.x)
         }
         onPositionChanged: mouse => Services.BarLayoutService.updateDrag(mouse.x)
         onReleased: Services.BarLayoutService.endDrag()
         onCanceled: Services.BarLayoutService.cancelDrag()
+    }
+
+    // Handle context menus outside layout-editing mode without consuming left clicks.
+    MouseArea {
+        anchors.fill: parent
+        z: 49
+        enabled: !Services.BarLayoutService.settingsMode
+        visible: enabled
+        acceptedButtons: Qt.RightButton
+        onPressed: mouse => root.contextPopupRequested(root.contextIntentAt(mouse.x, mouse.y))
     }
 
 
