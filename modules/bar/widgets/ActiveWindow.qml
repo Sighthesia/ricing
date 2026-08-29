@@ -44,7 +44,6 @@ Item {
     property string trackedIconSource: ""
     property bool trackedHasIcon: false
     property bool iconFadePending: false
-    property string renderedIconSource: ""
     // Coalesce a transient desktop fallback during workspace switches:
     // Niri briefly reports no active window while the workspace animates,
     // so displayTitle flicks window -> desktop -> next window. Holding
@@ -89,7 +88,6 @@ Item {
         root.trackedAppName = root.displayAppName
         root.trackedIconSource = root.iconSource
         root.trackedHasIcon = root.hasIcon
-        root.renderedIconSource = root.iconSource
     }
 
     onDisplayTitleChanged: {
@@ -199,7 +197,6 @@ Item {
             Qt.callLater(() => { appIconPrev.opacity = 0; appIconPrev.scale = 0.9 })
         } else if (!oldHas && newHas) {
             appIconPrev.opacity = 0
-            root.renderedIconSource = newSrc
             appIcon.opacity = 0
             appIcon.scale = 0.85
             Qt.callLater(() => {
@@ -215,18 +212,13 @@ Item {
             appIcon.opacity = 0
             appIcon.scale = 0.9
             root.iconFadePending = true
-            root.renderedIconSource = newSrc
             if (appIcon.status === Image.Ready)
-                Qt.callLater(root.startIconCrossfade)
-        } else {
-            root.renderedIconSource = newSrc
+                root.startIconCrossfade()
         }
     }
 
     function startIconCrossfade() {
-        if (!root.iconFadePending || !root.hasIcon
-                || appIcon.source !== root.renderedIconSource
-                || appIcon.status !== Image.Ready)
+        if (!root.iconFadePending || !root.hasIcon || appIcon.status !== Image.Ready)
             return
         root.iconFadePending = false
         appIcon.opacity = 1
@@ -280,7 +272,7 @@ Item {
                 id: appIcon
                 anchors.fill: parent
                 visible: true
-                source: root.renderedIconSource
+                source: root.iconSource
                 asynchronous: false
                 backer.fillMode: Image.PreserveAspectFit
                 opacity: 1
