@@ -44,8 +44,7 @@ Item {
     property string trackedIconSource: ""
     property bool trackedHasIcon: false
     property string renderedIconSource: ""
-    property string trackedAppId: ""
-    property string pendingIconSource: ""
+    property bool iconFadePending: false
     // Coalesce a transient desktop fallback during workspace switches:
     // Niri briefly reports no active window while the workspace animates,
     // so displayTitle flicks window -> desktop -> next window. Holding
@@ -91,7 +90,6 @@ Item {
         root.trackedIconSource = root.iconSource
         root.trackedHasIcon = root.hasIcon
         root.renderedIconSource = root.iconSource
-        root.trackedAppId = root.activeAppId
     }
 
     onDisplayTitleChanged: {
@@ -180,28 +178,24 @@ Item {
 
     onHasIconChanged: iconTransitionTimer.restart()
     onIconSourceChanged: iconTransitionTimer.restart()
-    onActiveAppIdChanged: iconTransitionTimer.restart()
 
     function handleIconTransition() {
         if (MotionTokens.reducedMotion) {
             root.trackedHasIcon = root.hasIcon
             root.trackedIconSource = root.iconSource
             appIconPrev.opacity = 0
-            appIcon.opacity = root.hasIcon && appIcon.status === Image.Ready ? 1 : 0
-            root.pendingIconSource = ""
+            root.iconFadePending = false
             return
         }
         const oldSrc = root.trackedIconSource
         const newSrc = root.iconSource
         const oldHas = root.trackedHasIcon
         const newHas = root.hasIcon
-        const oldAppId = root.trackedAppId
-        const newAppId = root.activeAppId
-        if (oldHas === newHas && oldSrc === newSrc && oldAppId === newAppId)
+        if (oldHas === newHas && oldSrc === newSrc)
             return
         root.trackedHasIcon = newHas
         root.trackedIconSource = newSrc
-        root.trackedAppId = newAppId
+        root.iconFadePending = false
         if (oldHas && !newHas) {
             if (oldSrc !== "") {
                 appIconPrev.source = oldSrc
@@ -216,28 +210,29 @@ Item {
             root.renderedIconSource = newSrc
             appIcon.opacity = 0
             appIcon.scale = 0.85
-            root.pendingIconSource = newSrc
-            root.revealPendingIcon()
-        } else if (oldHas && newHas && (oldSrc !== newSrc || oldAppId !== newAppId)) {
+            Qt.callLater(() => {
+                if (root.trackedIconSource !== newSrc) return
+                appIcon.opacity = 1
+                appIcon.scale = 1
+            })
+        } else if (oldHas && newHas && oldSrc !== newSrc) {
             appIconPrev.source = oldSrc
             appIconPrev.opacity = 1
             appIconPrev.scale = 1
             appIcon.opacity = 0
             appIcon.scale = 0.9
             root.renderedIconSource = newSrc
-            root.pendingIconSource = newSrc
-            root.revealPendingIcon()
+            root.iconFadePending = true
+            Qt.callLater(root.revealReadyIcon)
         }
     }
 
-    function revealPendingIcon() {
-        if (root.pendingIconSource === ""
-                || root.pendingIconSource !== root.renderedIconSource
-                || root.trackedIconSource !== root.pendingIconSource
-                || !root.hasIcon
-                || appIcon.status !== Image.Ready)
+    function revealReadyIcon() {
+        if (!root.iconFadePending || !root.hasIcon
+                || appIcon.status !== Image.Ready
+                || appIcon.source !== root.renderedIconSource)
             return
-        root.pendingIconSource = ""
+        root.iconFadePending = false
         appIcon.opacity = 1
         appIcon.scale = 1
         appIconPrev.opacity = 0
@@ -298,7 +293,7 @@ Item {
                 Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
                 onStatusChanged: if (status === Image.Ready)
-                    root.revealPendingIcon()
+                    root.revealReadyIcon()
             }
         }
 
