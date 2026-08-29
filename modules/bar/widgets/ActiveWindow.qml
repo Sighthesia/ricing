@@ -177,7 +177,6 @@ Item {
         move: Transition { NumberAnimation { properties: "x"; duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
         Behavior on spacing { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
         Behavior on y { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-        Behavior on implicitHeight { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
         // Tray-sized app icon so both identity glyphs share one visual weight.
         IconImage {
@@ -205,7 +204,6 @@ Item {
             spacing: 1
             move: Transition { NumberAnimation { properties: "x,y"; duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             Behavior on y { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-            Behavior on implicitHeight { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
             // Primary line grows with content; once past the cap it clips
             // and marquee-scrolls instead of being elided short.
