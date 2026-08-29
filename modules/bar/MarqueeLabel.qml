@@ -62,6 +62,7 @@ Item {
 
         anchors.fill: parent
         clip: false
+        z: 10
     }
 
     // Independent measuring context — unaffected by the label's live layout.

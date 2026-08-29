@@ -60,6 +60,20 @@ Item {
         }
     }
 
+    property string _pendingDesktopAppPrev: ""
+    Timer {
+        id: desktopAppHold
+        interval: 120
+        onTriggered: {
+            if (root.displayAppName !== "" || root._pendingDesktopAppPrev === "")
+                return
+            var prev = root._pendingDesktopAppPrev
+            root._pendingDesktopAppPrev = ""
+            root.trackedAppName = ""
+            appNameText.transitionFrom(prev, "")
+        }
+    }
+
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
 
@@ -106,11 +120,37 @@ Item {
 
     onDisplayAppNameChanged: {
         if (MotionTokens.reducedMotion) {
+            if (desktopAppHold.running) {
+                desktopAppHold.stop()
+                root._pendingDesktopAppPrev = ""
+            }
             root.trackedAppName = root.displayAppName
             return
         }
         var prevApp = root.trackedAppName
         if (root.displayAppName === prevApp) {
+            if (desktopAppHold.running) {
+                desktopAppHold.stop()
+                root._pendingDesktopAppPrev = ""
+            }
+            return
+        }
+        // App -> desktop (empty): hold briefly to see if a new window follows
+        // within the workspace switch animation, avoiding an intermediate
+        // empty flash that would clear the outgoing app's falling ghosts.
+        if (root.displayAppName === "") {
+            root._pendingDesktopAppPrev = prevApp
+            desktopAppHold.restart()
+            return
+        }
+        // Desktop was held and a new app arrived: coalesce directly from
+        // the original app to the new one, skipping the empty intermediate.
+        if (desktopAppHold.running) {
+            desktopAppHold.stop()
+            var coalescedPrev = root._pendingDesktopAppPrev !== "" ? root._pendingDesktopAppPrev : prevApp
+            root._pendingDesktopAppPrev = ""
+            root.trackedAppName = root.displayAppName
+            appNameText.transitionFrom(coalescedPrev, root.displayAppName)
             return
         }
         root.trackedAppName = root.displayAppName
