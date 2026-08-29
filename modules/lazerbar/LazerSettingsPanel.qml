@@ -218,6 +218,7 @@ Item {
         // Keep the shared clipping owner aligned with the fixed panel surface.
         anchors.fill: parent
         orientation: TwoLayerPopup.Orientation.Horizontal
+        animateLayerOpacity: false
         revealProgress: root.progress
         horizontalSidebarX: root.sidebarLayerX
         horizontalContentX: root.contentLayerX

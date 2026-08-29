@@ -40,6 +40,8 @@ Item {
         height: 100
         orientation: 1
         direction: 1
+        horizontalSidebarX: -170
+        horizontalContentX: -400
         revealProgress: 1
 
         sidebarData: Rectangle {
@@ -128,10 +130,19 @@ Item {
 
         function test_horizontalRevealKeepsLayerTravelVisible() {
             popup.orientation = popup.horizontal
+            popup.animateLayerOpacity = false
+            popup.horizontalSidebarX = -170
+            popup.horizontalContentX = -400
+            popup.revealProgress = 0.5
+            compare(popup.sidebarLayer.x, -170)
+            compare(popup.contentLayer.x, -400)
+            compare(popup.sidebarLayer.opacity, 1)
+            compare(popup.contentLayer.opacity, 1)
             popup.revealProgress = 0
             compare(popup.clip, false)
-            compare(popup.sidebarLayer.x, popup.horizontalSidebarX)
-            compare(popup.contentLayer.x, popup.horizontalContentX)
+            compare(popup.sidebarLayer.x, -170)
+            compare(popup.contentLayer.x, -400)
+            popup.animateLayerOpacity = true
         }
     }
 }

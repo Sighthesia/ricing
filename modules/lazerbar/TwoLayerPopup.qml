@@ -23,6 +23,8 @@ Item {
     property int contentDelay: MotionTokens.settingsContentDelay
     property real horizontalSidebarX: 0
     property real horizontalContentX: 0
+    // Settings owns horizontal layer opacity; vertical popups use the shared fade.
+    property bool animateLayerOpacity: true
 
     readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
     readonly property real sidebarRevealProgress: root.revealProgress
@@ -60,14 +62,14 @@ Item {
                 return 0
             return contentSlot.height + 1
         }
-        opacity: root.sidebarRevealProgress
+        opacity: root.animateLayerOpacity ? root.sidebarRevealProgress : 1
         clip: false
         transform: Translate {
             x: root.orientation === root.horizontal ? root.sidebarOffset * (1 - root.sidebarRevealProgress) : 0
             y: root.orientation === root.vertical ? root.sidebarOffset * (1 - root.sidebarRevealProgress) : 0
         }
         Behavior on opacity {
-            enabled: !MotionTokens.reducedMotion
+            enabled: root.animateLayerOpacity && !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
         }
     }
@@ -86,14 +88,14 @@ Item {
                 return sidebarSlot.height + 1
             return 0
         }
-        opacity: root.contentRevealProgress
+        opacity: root.animateLayerOpacity ? root.contentRevealProgress : 1
         clip: false
         transform: Translate {
             x: root.orientation === root.horizontal ? root.contentOffset * (1 - root.contentRevealProgress) : 0
             y: root.orientation === root.vertical ? root.contentOffset * (1 - root.contentRevealProgress) : 0
         }
         Behavior on opacity {
-            enabled: !MotionTokens.reducedMotion
+            enabled: root.animateLayerOpacity && !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
         }
     }
