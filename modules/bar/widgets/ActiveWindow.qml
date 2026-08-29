@@ -251,7 +251,7 @@ Item {
                 anchors.fill: parent
                 visible: opacity > 0.01
                 source: ""
-                asynchronous: true
+                asynchronous: false
                 backer.fillMode: Image.PreserveAspectFit
                 opacity: 0
                 scale: 0.9
@@ -264,7 +264,7 @@ Item {
                 anchors.fill: parent
                 visible: true
                 source: root.iconSource
-                asynchronous: true
+                asynchronous: false
                 backer.fillMode: Image.PreserveAspectFit
                 opacity: 1
                 scale: 1
