@@ -41,6 +41,8 @@ Item {
     // the exit/enter transition for content that was never visible.
     property string trackedTitle: ""
     property string trackedAppName: ""
+    property string trackedIconSource: ""
+    property bool trackedHasIcon: false
     // Coalesce a transient desktop fallback during workspace switches:
     // Niri briefly reports no active window while the workspace animates,
     // so displayTitle flicks window -> desktop -> next window. Holding
@@ -83,6 +85,8 @@ Item {
     Component.onCompleted: {
         root.trackedTitle = root.displayTitle
         root.trackedAppName = root.displayAppName
+        root.trackedIconSource = root.iconSource
+        root.trackedHasIcon = root.hasIcon
     }
 
     onDisplayTitleChanged: {
@@ -160,6 +164,58 @@ Item {
         appNameText.transitionFrom(prevApp, root.displayAppName)
     }
 
+    onHasIconChanged: handleIconTransition()
+    onIconSourceChanged: handleIconTransition()
+
+    function handleIconTransition() {
+        if (MotionTokens.reducedMotion) {
+            root.trackedHasIcon = root.hasIcon
+            root.trackedIconSource = root.iconSource
+            appIconPrev.opacity = 0
+            return
+        }
+        const oldSrc = root.trackedIconSource
+        const newSrc = root.iconSource
+        const oldHas = root.trackedHasIcon
+        const newHas = root.hasIcon
+        if (oldHas === newHas && oldSrc === newSrc)
+            return
+        root.trackedHasIcon = newHas
+        root.trackedIconSource = newSrc
+        if (oldHas && !newHas) {
+            if (oldSrc !== "") {
+                appIconPrev.source = oldSrc
+                appIconPrev.opacity = 1
+                appIconPrev.scale = 1
+            }
+            appIcon.opacity = 0
+            appIcon.scale = 0.85
+            Qt.callLater(() => { appIconPrev.opacity = 0; appIconPrev.scale = 0.9 })
+        } else if (!oldHas && newHas) {
+            appIconPrev.opacity = 0
+            appIcon.opacity = 0
+            appIcon.scale = 0.85
+            Qt.callLater(() => {
+                if (root.trackedIconSource !== newSrc) return
+                appIcon.opacity = 1
+                appIcon.scale = 1
+            })
+        } else if (oldHas && newHas && oldSrc !== newSrc) {
+            appIconPrev.source = oldSrc
+            appIconPrev.opacity = 1
+            appIconPrev.scale = 1
+            appIcon.opacity = 0
+            appIcon.scale = 0.9
+            Qt.callLater(() => {
+                if (root.trackedIconSource !== newSrc) return
+                appIcon.opacity = 1
+                appIcon.scale = 1
+                appIconPrev.opacity = 0
+                appIconPrev.scale = 0.9
+            })
+        }
+    }
+
     // Smooth width morph: title changes ease instead of snapping, so the
     // Row layout smoothly pushes neighboring widgets aside.
     Behavior on implicitWidth {
@@ -179,22 +235,40 @@ Item {
         Behavior on y { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
         // Tray-sized app icon so both identity glyphs share one visual weight.
-        IconImage {
-            id: appIcon
-
+        Item {
+            id: iconContainer
             anchors.verticalCenter: parent.verticalCenter
             width: root.hasIcon ? LazerTheme.barGlyphSize : 0
             height: LazerTheme.barGlyphSize
+            clip: false
             visible: true
-            source: root.iconSource
-            asynchronous: true
-            backer.fillMode: Image.PreserveAspectFit
-            opacity: root.hasIcon && status === Image.Ready ? 1 : 0
-            scale: root.hasIcon ? 1 : 0.85
-
             Behavior on width { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-            Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-            Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+
+            IconImage {
+                id: appIconPrev
+                anchors.fill: parent
+                visible: opacity > 0.01
+                source: ""
+                asynchronous: true
+                backer.fillMode: Image.PreserveAspectFit
+                opacity: 0
+                scale: 0.9
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+                Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+            }
+
+            IconImage {
+                id: appIcon
+                anchors.fill: parent
+                visible: true
+                source: root.iconSource
+                asynchronous: true
+                backer.fillMode: Image.PreserveAspectFit
+                opacity: root.hasIcon && status === Image.Ready ? 1 : 0
+                scale: root.hasIcon ? 1 : 0.85
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+                Behavior on scale { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+            }
         }
 
         Column {
