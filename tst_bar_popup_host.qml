@@ -115,9 +115,13 @@ Item {
             root.check("screenWidth stored", host.screenWidth, 1000)
             root.check("intent preserved", host.intent !== null && host.intent.widgetId === "volume", true)
             root.check("sidebarData alias exists", host.sidebarData !== undefined, true)
-            root.check("contentData alias exists", host.contentData !== undefined, true)
+             root.check("contentData alias exists", host.contentData !== undefined, true)
 
-            // Switch to bottom bar and verify direction flips without reopening window.
+             host.dismissImmediately()
+             root.check("dismissImmediately closes host", host.open, false)
+             root.check("dismissImmediately clears surface", host.surfaceActive, false)
+
+             // Switch to bottom bar and verify direction flips without reopening window.
             var intentBottom = {
                 widgetId: "tray",
                 instanceKey: "tray:2",

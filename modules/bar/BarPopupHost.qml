@@ -92,6 +92,19 @@ PanelWindow {
         closeTimer.stop()
     }
 
+    // Release the popup owner before another overlay claims the screen.
+    function dismissImmediately() {
+        closeTimer.stop()
+        clearIntentTimer.stop()
+        root.open = false
+        root.widgetHovered = false
+        root.popupHovered = false
+        root.intent = null
+        root.surfaceActive = false
+        popup.visible = false
+        popup.revealProgress = 0
+    }
+
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     // Keep the layer-shell surface fixed at screen size; only the inner
