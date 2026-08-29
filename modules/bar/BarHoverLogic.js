@@ -16,6 +16,21 @@ function popupDirection(barPosition) {
     return normalized === "bottom" ? "up" : "down"
 }
 
+function popupKind(intent) {
+    return intent && String(intent.kind || "").toLowerCase() === "context"
+        ? "context" : "hover"
+}
+
+function isSettingsIntent(intent) {
+    return !!intent && (String(intent.kind || "").toLowerCase() === "settings"
+        || String(intent.widgetId || "").toLowerCase() === "settings")
+}
+
+function canReplace(current, next) {
+    return !!next && !!current && popupKind(current) !== popupKind(next)
+        || !!next && !current
+}
+
 function clampAnchor(anchorX, popupWidth, screenWidth, margin) {
     var x = Number(anchorX)
     var w = Number(popupWidth)

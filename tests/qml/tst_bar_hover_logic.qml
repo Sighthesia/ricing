@@ -10,7 +10,7 @@ Item {
             compare(Logic.popupDirection("top"), "down")
         }
 
-        function test_bottomBarOpensUp() {
+    function test_bottomBarOpensUp() {
             compare(Logic.popupDirection("bottom"), "up")
         }
 
@@ -92,5 +92,20 @@ Item {
                 compare(p.actionKind, kinds[i])
             }
         }
+    }
+
+    function test_hoverAndContextKindsAreDistinct() {
+        compare(Logic.popupKind({ actionKind: "volume" }), "hover")
+        compare(Logic.popupKind({ kind: "context" }), "context")
+    }
+
+    function test_newIntentReplacesExistingPopup() {
+        verify(Logic.canReplace({ actionKind: "volume" }, { kind: "context" }))
+        verify(!Logic.canReplace({ actionKind: "volume" }, null))
+    }
+
+    function test_settingsIntentIsNotBarPopup() {
+        verify(Logic.isSettingsIntent({ widgetId: "settings" }))
+        verify(!Logic.isSettingsIntent({ widgetId: "volume" }))
     }
 }
