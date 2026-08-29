@@ -196,7 +196,10 @@ BarPill {
         }
         if (root.hasCoverArt) {
             coverImage.opacity = 0
-            Qt.callLater(root.revealCurrentCover)
+            Qt.callLater(() => {
+                if (coverImage.status !== Image.Ready) return
+                coverImage.opacity = 1; coverPrevImage.opacity = 0
+            })
         } else {
             if (coverImage.source !== "") {
                 coverPrevImage.source = coverImage.source
@@ -216,7 +219,6 @@ BarPill {
             if (MotionTokens.reducedMotion) {
                 root.trackedArtUrl = Services.MediaControlService.artUrl
                 coverPrevImage.opacity = 0
-                coverImage.opacity = root.hasCoverArt ? 1 : 0
                 return
             }
             const oldUrl = root.trackedArtUrl
@@ -224,10 +226,6 @@ BarPill {
             if (oldUrl === "" || oldUrl === newUrl) {
                 root.trackedArtUrl = newUrl
                 coverPrevImage.opacity = 0
-                if (newUrl !== "") {
-                    coverImage.opacity = 0
-                    Qt.callLater(root.revealCurrentCover)
-                }
                 return
             }
             root.trackedArtUrl = newUrl
@@ -247,16 +245,6 @@ BarPill {
                 coverPrevImage.opacity = 0
             })
         }
-    }
-
-    function revealCurrentCover() {
-        if (root.trackedArtUrl === ""
-                || root.trackedArtUrl !== Services.MediaControlService.artUrl
-                || !root.hasCoverArt
-                || coverImage.status !== Image.Ready)
-            return
-        coverImage.opacity = 1
-        coverPrevImage.opacity = 0
     }
 
     // Measure text with the title label's own font in an independent
