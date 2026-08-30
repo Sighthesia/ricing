@@ -27,10 +27,18 @@ Item {
     property bool widgetsReady: false
 
     // Attach popup signals from a widget item to the BarContent forwarders.
+    function debugLog(event, payload) {
+        if (!Services.SettingsService.hoverDebugEnabled)
+            return
+        console.log("[afloat:PopupDebug]", JSON.stringify(Object.assign({ "event": event }, payload || ({}))))
+    }
+
     function attachPopupForwarding(loaderItem, loaderRef) {
         if (!loaderItem) return
+        debugLog("attached", { "widgetId": String(loaderItem.widgetId || "") })
         if (loaderItem.popupRequested) {
             loaderItem.popupRequested.connect(function(intent) {
+                debugLog("widgetEmit", { "widgetId": String(loaderItem.widgetId || "") })
                 root._activeHoverIntent = intent
                 root._activeHoverLoader = loaderRef
                 root.popupRequested(intent)
@@ -38,6 +46,7 @@ Item {
         }
         if (loaderItem.rightClicked) {
             loaderItem.rightClicked.connect(function() {
+                debugLog("widgetRightClick", { "widgetId": String(loaderItem.widgetId || "") })
                 root.contextPopupRequested(root.buildContextIntent(loaderRef))
             })
         }

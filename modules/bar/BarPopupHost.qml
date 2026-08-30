@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../lazerbar"
+import "../../services" as Services
 import "./BarHoverLogic.js" as BarHoverLogic
 
 // Per-screen fixed hover popup host with stable PanelWindow geometry.
@@ -49,6 +50,70 @@ PanelWindow {
     signal actionRequested(string action)
     signal closeRequested()
 
+    // Reuse the settings-panel diagnostics channel so one IPC switch turns on
+    // both surfaces; every popup decision is logged without adding an owner.
+    readonly property bool debugEnabled: Services.SettingsService.hoverDebugEnabled
+    property string _lastDebugSignature: ""
+
+    function _debugRect(item) {
+        if (!item)
+            return { "x": 0, "y": 0, "width": 0, "height": 0 }
+        return {
+            "x": Math.round(Number(item.x) * 10) / 10, "y": Math.round(Number(item.y) * 10) / 10,
+            "width": Math.max(0, Math.round(Number(item.width) * 10) / 10),
+            "height": Math.max(0, Math.round(Number(item.height) * 10) / 10),
+        }
+    }
+
+    function debugSnapshot() {
+        return {
+            "host": {
+                "phase": root.open ? "open" : (root.surfaceActive ? "revealing" : "closed"),
+                "surfaceActive": root.surfaceActive, "widgetHovered": root.widgetHovered,
+                "popupHovered": root.popupHovered, "direction": root.direction,
+                "windowVisible": root.visible, "windowRect": root._debugRect(root),
+                "layer": Number(root.WlrLayershell.layer),
+                "closeTimer": closeTimer.running, "clearTimer": clearIntentTimer.running,
+            },
+            "intent": root.intent ? {
+                "widgetId": String(root.intent.widgetId || ""), "kind": String(root.intent.kind || ""),
+                "actionKind": String(root.intent.actionKind || ""),
+                "anchorX": Number(root.intent.anchorX),
+            } : null,
+            "container": { "rect": root._debugRect(popupContainer), "visible": popupContainer.visible },
+            "popup": {
+                "visible": popup.visible, "revealProgress": Number(popup.revealProgress),
+                "sidebar": root._debugRect(popup.sidebarLayer),
+                "content": root._debugRect(popup.contentLayer),
+                "sidebarOpacity": Number(popup.sidebarLayer.opacity),
+                "contentOpacity": Number(popup.contentLayer.opacity),
+            },
+        }
+    }
+
+    function debugLog(event, payload) {
+        if (!root.debugEnabled)
+            return
+        var entry = Object.assign({ "event": event }, payload || ({}))
+        var signature = JSON.stringify(entry)
+        if (signature === root._lastDebugSignature)
+            return
+        root._lastDebugSignature = signature
+        console.log("[afloat:PopupDebug]", signature)
+    }
+
+    function emitDebugSnapshot() {
+        root.debugLog("snapshot", root.debugSnapshot())
+    }
+
+    // Poll only while diagnostics are enabled so no extra owner or timer runs live.
+    Timer {
+        interval: 120
+        repeat: true
+        running: root.debugEnabled
+        onTriggered: root.emitDebugSnapshot()
+    }
+
     onPopupHoveredChanged: {
         if (popupHoverWasActive && !popupHovered)
             requestClose()
@@ -83,6 +148,8 @@ PanelWindow {
         // opacity/offset contracts stay inside TwoLayerPopup.
         popup.visible = true
         popup.revealProgress = 1
+        root.debugLog("open", { "windowVisible": root.visible, "surfaceActive": true,
+                                "direction": root.direction, "anchorX": root.anchorX })
     }
 
     function showIntent(intentObj) {
@@ -92,6 +159,7 @@ PanelWindow {
     function requestClose() {
         if (closeTimer.running)
             return
+        root.debugLog("closePending", { "widgetHovered": root.widgetHovered, "popupHovered": root.popupHovered })
         closeTimer.start()
     }
 
@@ -101,6 +169,7 @@ PanelWindow {
 
     // Release the popup owner before another overlay claims the screen.
     function dismissImmediately() {
+        root.debugLog("dismissed", { "open": root.open, "surfaceActive": root.surfaceActive })
         closeTimer.stop()
         clearIntentTimer.stop()
         root.open = false
@@ -140,6 +209,7 @@ PanelWindow {
         interval: MotionTokens.fast
         onTriggered: {
             if (BarHoverLogic.shouldClose(root.widgetHovered, root.popupHovered, true)) {
+                root.debugLog("closed", { "revealProgress": Number(popup.revealProgress) })
                 root.open = false
                 root.closeRequested()
                 popup.revealProgress = 0
