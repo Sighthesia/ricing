@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Wayland
 import "../lazerbar" as Lazer
 import "./LockLogic.js" as LockLogic
@@ -10,6 +11,9 @@ WlSessionLockSurface {
 
     property var lockContext: null
     property var snapshot: null
+    // This surface's slot in the shared per-screen snapshot data; the shared
+    // snapshot never decides which screen a surface belongs to.
+    readonly property int screenIndex: SurfaceLogic.screenSlot(Quickshell.screens, root.screen)
     property real waveProgress: 0
     property real authOpacity: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
@@ -69,11 +73,13 @@ WlSessionLockSurface {
         opacity: 1
     }
 
-    // Display a provider result only when it is a usable local or remote image URL.
+    // Display only this surface's own snapshot slot; an empty slot keeps the
+    // opaque fallback rather than borrowing another screen's image.
     Image {
         id: snapshotImage
         anchors.fill: parent
-        source: root.snapshot ? root.snapshot.snapshotUrl : ""
+        source: root.snapshot && root.screenIndex >= 0
+                ? root.snapshot.snapshotUrlFor(root.screenIndex) : ""
         visible: status === Image.Ready && source !== ""
         fillMode: Image.Stretch
         asynchronous: true
@@ -122,6 +128,83 @@ WlSessionLockSurface {
                 }
             }
         }
+
+        // Mirror the shared password conversation: masked input plus an
+        // outcome line, driven entirely by LockContext state.
+        Column {
+            id: authContent
+            anchors.centerIn: parent
+            spacing: 10
+            width: parent.width - 48
+
+            // Name the field so the masked line reads as a password.
+            Text {
+                width: parent.width
+                text: "PASSWORD"
+                color: Lazer.LazerTheme.textMuted
+                font.pixelSize: 11
+                font.letterSpacing: 2
+            }
+
+            // Hold the masked line at a fixed height so the layout never
+            // jumps between empty and filled buffers.
+            Item {
+                id: maskSlot
+                width: parent.width
+                height: 30
+
+                // Render bullets only; the password never becomes visible.
+                Text {
+                    id: maskText
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: SurfaceLogic.maskedPassword(
+                              root.lockContext ? root.lockContext.currentText : "")
+                    visible: text.length > 0
+                    color: Lazer.LazerTheme.textPrimary
+                    font.pixelSize: 20
+                    font.letterSpacing: 4
+                }
+
+                // Keep an empty buffer visibly alive instead of a blank slot.
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: maskText.text.length === 0
+                    text: "Enter password"
+                    color: Lazer.LazerTheme.textMuted
+                    font.pixelSize: 15
+                    font.italic: true
+                }
+            }
+
+            // Report verifying/failed outcomes, with a spoken default when
+            // PAM returns an empty message.
+            Text {
+                id: statusText
+                width: parent.width
+                text: SurfaceLogic.authStatus(
+                          root.lockContext ? root.lockContext.unlockInProgress : false,
+                          root.lockContext ? root.lockContext.showFailure : false,
+                          root.lockContext ? root.lockContext.errorMessage : "").message
+                visible: text.length > 0
+                color: SurfaceLogic.authStatus(
+                           root.lockContext ? root.lockContext.unlockInProgress : false,
+                           root.lockContext ? root.lockContext.showFailure : false,
+                           root.lockContext ? root.lockContext.errorMessage : "").tone
+                       === SurfaceLogic.authTones.failure
+                       ? Lazer.LazerTheme.osuPink : Lazer.LazerTheme.textMuted
+                font.pixelSize: 13
+                wrapMode: Text.WordWrap
+            }
+
+            // State the keys so the surface is usable without prior knowledge.
+            Text {
+                width: parent.width
+                text: "Type the password, press Enter to unlock"
+                color: Lazer.LazerTheme.textMuted
+                font.pixelSize: 11
+                opacity: 0.8
+            }
+        }
     }
 
     // Keep release ownership in the animation completion path.
@@ -151,6 +234,13 @@ WlSessionLockSurface {
         target: null
         function onUnlocked() {
             root.startExit()
+        }
+
+        // A failed conversation must hand keyboard focus straight back so
+        // the next attempt can be typed without a pointer.
+        function onShowFailureChanged() {
+            if (root.lockContext && root.lockContext.showFailure)
+                inputOwner.forceActiveFocus()
         }
     }
 }

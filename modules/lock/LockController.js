@@ -37,6 +37,19 @@ function authSuccessState(state) {
     return LockLogic.nextState(state, "auth-success")
 }
 
+// The exit failsafe may arm only on the locked -> exiting transition, which
+// only a successful PAM conversation can produce.
+function armExitFailsafe(previousState, nextState) {
+    return previousState === LockLogic.States.locked
+        && nextState === LockLogic.States.exiting
+}
+
+// A fired failsafe may force the release only while it is still armed and the
+// controller still sits in the exiting state.
+function exitFailsafeShouldRelease(state, failsafeArmed) {
+    return failsafeArmed === true && state === LockLogic.States.exiting
+}
+
 // State reached when the surfaces report their completed exit animation.
 function releaseState(state) {
     if (state !== LockLogic.States.exiting)

@@ -16,6 +16,7 @@ Scope {
     readonly property bool preparing: _state === LockLogic.States.preparing
     property string _state: LockLogic.States.idle
     property int _requestGeneration: -1
+    property bool _exitFailsafeArmed: false
 
     function lock(): bool {
         if (!Controller.canLock(_state))
@@ -72,6 +73,8 @@ Scope {
         _state = next
         sessionLock.locked = false
         _requestGeneration = -1
+        _exitFailsafe.stop()
+        _exitFailsafeArmed = false
     }
 
     // One compositor-owned lock; Quickshell creates one surface per screen.
@@ -99,9 +102,15 @@ Scope {
     Connections {
         target: lockContext
         function onUnlocked(): void {
+            const previous = root._state
             const next = Controller.authSuccessState(root._state)
-            if (next !== null)
-                root._state = next
+            if (next === null)
+                return
+            root._state = next
+            // A stalled exit animation must never hold the compositor lock
+            // forever, so successful authentication bounds it with a timer.
+            if (Controller.armExitFailsafe(previous, next))
+                root._exitFailsafe.restart()
         }
     }
 
@@ -119,6 +128,19 @@ Scope {
         interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.slow
         repeat: false
         onTriggered: root._commitLock()
+    }
+
+    // Bounded fallback so a stalled exit can never hold the lock after a
+    // successful authentication; it stays armed only in the exiting state.
+    property Timer _exitFailsafe: Timer {
+        interval: Lazer.MotionTokens.waveExit + Lazer.MotionTokens.slow
+        repeat: false
+        onTriggered: {
+            if (!Controller.exitFailsafeShouldRelease(root._state, root._exitFailsafeArmed))
+                return
+            root._exitFailsafeArmed = false
+            root._finishRelease()
+        }
     }
 
     // Compositor keybinds reach the lock through this target.

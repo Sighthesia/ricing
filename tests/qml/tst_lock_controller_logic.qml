@@ -17,6 +17,7 @@ Item {
     property string _state: LockLogic.States.idle
     property int _requestGeneration: -1
     property bool _authInProgress: false
+    property bool _exitFailsafeArmed: false
     property int authResets: 0
     property var snapshot: null
 
@@ -66,10 +67,15 @@ Item {
     }
 
     function _authSuccess(): void {
+        const previous = _state
         const next = Controller.authSuccessState(_state)
         if (next === null)
             return
         _state = next
+        if (Controller.armExitFailsafe(previous, next)) {
+            _exitFailsafeArmed = true
+            harness._exitFailsafe.restart()
+        }
     }
 
     function _finishRelease(): void {
@@ -79,6 +85,8 @@ Item {
         _state = next
         sessionLockLocked = false
         _requestGeneration = -1
+        _exitFailsafeArmed = false
+        _exitFailsafe.stop()
     }
 
     // Commit the pending request when its snapshot generation reports ready.
@@ -96,6 +104,19 @@ Item {
         interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.slow
         repeat: false
         onTriggered: harness._commitLock()
+    }
+
+    // Bounded fallback so a stalled exit can never hold the lock after a
+    // successful authentication; it stays armed only in the exiting state.
+    property Timer _exitFailsafe: Timer {
+        interval: Lazer.MotionTokens.waveExit + Lazer.MotionTokens.slow
+        repeat: false
+        onTriggered: {
+            if (!Controller.exitFailsafeShouldRelease(harness._state, harness._exitFailsafeArmed))
+                return
+            harness._exitFailsafeArmed = false
+            harness._finishRelease()
+        }
     }
 
     TestCase {
@@ -121,6 +142,7 @@ Item {
             harness._requestGeneration = -1
             harness._authInProgress = false
             harness.authResets = 0
+            harness._exitFailsafeArmed = false
         }
 
         function cleanup() {
@@ -273,6 +295,75 @@ Item {
             tryCompare(harness, "sessionLockLocked", true, 1200)
             compare(harness.locked, true)
             compare(harness.preparing, false)
+        }
+
+        function test_seamExitFailsafeArmsOnlyAfterAuthSuccess() {
+            verify(Controller.armExitFailsafe(LockLogic.States.locked,
+                                              LockLogic.States.exiting))
+            verify(!Controller.armExitFailsafe(LockLogic.States.idle,
+                                               LockLogic.States.exiting))
+            verify(!Controller.armExitFailsafe(LockLogic.States.locked,
+                                               LockLogic.States.locked))
+            verify(!Controller.armExitFailsafe(LockLogic.States.exiting,
+                                               LockLogic.States.idle))
+        }
+
+        function test_seamExitFailsafeReleasesOnlyArmedExiting() {
+            verify(Controller.exitFailsafeShouldRelease(LockLogic.States.exiting, true))
+            verify(!Controller.exitFailsafeShouldRelease(LockLogic.States.exiting, false))
+            verify(!Controller.exitFailsafeShouldRelease(LockLogic.States.locked, true))
+            verify(!Controller.exitFailsafeShouldRelease(LockLogic.States.idle, true))
+            verify(!Controller.exitFailsafeShouldRelease(LockLogic.States.preparing, true))
+        }
+
+        function test_exitFailsafeReleasesStalledExitAfterAuthSuccess() {
+            snapshot.snapshotProvider = function() { return { ready: true } }
+            verify(harness.lock())
+            compare(harness.locked, true)
+
+            // Successful authentication arms the bounded exit failsafe.
+            harness._authSuccess()
+            compare(harness._state, LockLogic.States.exiting)
+            compare(harness._exitFailsafeArmed, true)
+
+            // With no surface exit ever reported, the failsafe must still
+            // release the compositor lock within its bound.
+            tryCompare(harness, "sessionLockLocked", false, 1500)
+            compare(harness._state, LockLogic.States.idle)
+            compare(harness._exitFailsafeArmed, false)
+        }
+
+        function test_exitFailsafeDisarmsWhenSurfaceExitFinishesFirst() {
+            snapshot.snapshotProvider = function() { return { ready: true } }
+            verify(harness.lock())
+            harness._authSuccess()
+            compare(harness._exitFailsafeArmed, true)
+
+            // The normal surface path releases and disarms before the bound.
+            harness._finishRelease()
+            compare(harness._state, LockLogic.States.idle)
+            compare(harness._exitFailsafeArmed, false)
+
+            // A later failsafe firing must be a guarded no-op.
+            harness._exitFailsafe.restart()
+            tryCompare(harness, "_exitFailsafeArmed", false, 100)
+            compare(harness._state, LockLogic.States.idle)
+            compare(harness.locked, false)
+        }
+
+        function test_exitFailsafeNeverReleasesWithoutAuthSuccess() {
+            snapshot.snapshotProvider = function() { return { ready: true } }
+            verify(harness.lock())
+            compare(harness.locked, true)
+
+            // Without a successful conversation nothing may release the
+            // lock, no matter what the failsafe timer observes.
+            verify(!harness._exitFailsafeArmed)
+            harness._exitFailsafe.restart()
+            wait(Lazer.MotionTokens.waveExit + Lazer.MotionTokens.slow + 100)
+            compare(harness.locked, true)
+            compare(harness.sessionLockLocked, true)
+            compare(harness._state, LockLogic.States.locked)
         }
     }
 }

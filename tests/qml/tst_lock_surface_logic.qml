@@ -224,8 +224,130 @@ Item {
             snapshot.snapshotProvider = function() { return { ready: false } }
             snapshot.request(1)
             tryCompare(snapshot, "ready", true, 500)
-            compare(snapshot.snapshotUrl, "")
+            compare(snapshot.snapshotUrlFor(0), "")
             compare(preparedSignals, 1)
+        }
+
+        function test_perScreenUrlsFillOnlyTheirOwnSlot() {
+            var callback = null
+            snapshot.snapshotProvider = function(screen, count, generation, report) {
+                callback = report
+                return { ready: false }
+            }
+            snapshot.request(2)
+            callback(0, "left.png")
+            compare(snapshot.snapshotUrlFor(0), "left.png")
+            compare(snapshot.snapshotUrlFor(1), "")
+            callback(1, "right.png")
+            compare(snapshot.snapshotUrlFor(1), "right.png")
+        }
+
+        function test_synchronousResultOnlyDescribesScreenZero() {
+            snapshot.snapshotProvider = function() { return { ready: true, url: "only.png" } }
+            snapshot.request(2)
+            verify(snapshot.ready)
+            compare(snapshot.snapshotUrlFor(0), "only.png")
+            compare(snapshot.snapshotUrlFor(1), "")
+        }
+
+        function test_outOfRangeIndicesResolveToEmptySlot() {
+            var callback = null
+            snapshot.snapshotProvider = function(screen, count, generation, report) {
+                callback = report
+                return { ready: false }
+            }
+            snapshot.request(1)
+            callback(0, "solo.png")
+            compare(snapshot.snapshotUrlFor(-1), "")
+            compare(snapshot.snapshotUrlFor(1), "")
+            compare(snapshot.snapshotUrlFor(1.5), "")
+        }
+
+        function test_staleGenerationCannotStoreScreenUrl() {
+            var callbacksByGeneration = ({})
+            snapshot.snapshotProvider = function(screen, count, generation, callback) {
+                callbacksByGeneration[generation] = callback
+                return { ready: false }
+            }
+            snapshot.request(1)
+            var firstGeneration = snapshot.generation
+            snapshot.request(1)
+            callbacksByGeneration[firstGeneration](0, "stale.png")
+            compare(snapshot.snapshotUrlFor(0), "")
+            callbacksByGeneration[snapshot.generation](0, "fresh.png")
+            compare(snapshot.snapshotUrlFor(0), "fresh.png")
+        }
+
+        function test_newRequestClearsPreviousScreenUrls() {
+            snapshot.snapshotProvider = function() { return { ready: true, url: "first.png" } }
+            snapshot.request(1)
+            compare(snapshot.snapshotUrlFor(0), "first.png")
+            snapshot.snapshotProvider = function(screen, count, generation, callback) {
+                return { ready: false }
+            }
+            snapshot.request(1)
+            compare(snapshot.snapshotUrlFor(0), "")
+        }
+    }
+
+    // Pure presentation seam: mask, status copy, and screen-slot resolution.
+    TestCase {
+        name: "LockSurfaceLogic"
+        when: windowShown
+
+        function test_maskedPasswordRendersBulletsOnly() {
+            var masked = SurfaceLogic.maskedPassword("secret")
+            compare(masked.length, 6)
+            verify(masked.indexOf("secret") < 0)
+            compare(masked.charAt(0), "\u25CF")
+            compare(masked.charAt(5), "\u25CF")
+        }
+
+        function test_maskedPasswordHandlesEmptyAndCapsLongInput() {
+            compare(SurfaceLogic.maskedPassword(""), "")
+            compare(SurfaceLogic.maskedPassword(null), "")
+            compare(SurfaceLogic.maskedPassword(undefined), "")
+            var longInput = ""
+            for (var i = 0; i < 64; ++i)
+                longInput += "x"
+            var masked = SurfaceLogic.maskedPassword(longInput)
+            compare(masked.length, SurfaceLogic.maxMaskedCharacters)
+            verify(masked.indexOf("x") < 0)
+        }
+
+        function test_authStatusCoversProgressFailureAndIdle() {
+            var progress = SurfaceLogic.authStatus(true, false, "")
+            compare(progress.message, "Verifying...")
+            compare(progress.tone, SurfaceLogic.authTones.progress)
+
+            var failure = SurfaceLogic.authStatus(false, true, "bad password")
+            compare(failure.message, "bad password")
+            compare(failure.tone, SurfaceLogic.authTones.failure)
+
+            var idle = SurfaceLogic.authStatus(false, false, "")
+            compare(idle.message, "")
+            compare(idle.tone, SurfaceLogic.authTones.none)
+        }
+
+        function test_authStatusFallsBackToSpokenMessageWhenErrorIsEmpty() {
+            var empty = SurfaceLogic.authStatus(false, true, "")
+            verify(empty.message.length > 0)
+            compare(empty.message, "Authentication failed")
+            compare(empty.tone, SurfaceLogic.authTones.failure)
+
+            var nullish = SurfaceLogic.authStatus(false, true, null)
+            compare(nullish.message, "Authentication failed")
+        }
+
+        function test_screenSlotMapsByIdentity() {
+            // Identity comparison, so plain JS objects exercise the same seam.
+            var first = { name: "DP-1" }
+            var second = { name: "HDMI-1" }
+            compare(SurfaceLogic.screenSlot([first, second], second), 1)
+            compare(SurfaceLogic.screenSlot([first, second], first), 0)
+            compare(SurfaceLogic.screenSlot([first], { name: "DP-1" }), -1)
+            compare(SurfaceLogic.screenSlot(null, first), -1)
+            compare(SurfaceLogic.screenSlot([first], null), -1)
         }
     }
 }
