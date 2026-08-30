@@ -238,13 +238,24 @@ Item {
             id: volumeContent
             objectName: "volumeContent"
             width: parent.width
-            height: volumeSlider.implicitHeight
+            height: volumeSlider.implicitHeight + 16
             visible: root.actionKind === "volume"
+
+            // Settings-row card under the control; hover lifts the whole card.
+            Rectangle {
+                objectName: "volumeCard"
+                anchors.fill: parent
+                radius: 6
+                color: volumeCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            }
+            HoverHandler { id: volumeCardHover; blocking: false }
 
             BarPopupSlider {
                 id: volumeSlider
                 objectName: "volumeSlider"
                 anchors.fill: parent
+                anchors.margins: 8
                 value: root.volumeValue
                 muted: root.volumeMuted
                 label: "Volume"
@@ -259,13 +270,24 @@ Item {
             id: brightnessContent
             objectName: "brightnessContent"
             width: parent.width
-            height: brightnessSlider.implicitHeight
+            height: brightnessSlider.implicitHeight + 16
             visible: root.actionKind === "brightness"
+
+            // Mirror the volume card recipe so both slider rows share one skin.
+            Rectangle {
+                objectName: "brightnessCard"
+                anchors.fill: parent
+                radius: 6
+                color: brightnessCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            }
+            HoverHandler { id: brightnessCardHover; blocking: false }
 
             BarPopupSlider {
                 id: brightnessSlider
                 objectName: "brightnessSlider"
                 anchors.fill: parent
+                anchors.margins: 8
                 value: root.brightnessValue
                 muted: false
                 label: "Brightness"
@@ -279,8 +301,18 @@ Item {
             id: mediaContent
             objectName: "mediaContent"
             width: parent.width
-            height: 56
+            height: 72
             visible: root.actionKind === "media"
+
+            // Settings-row card hosts the transport controls.
+            Rectangle {
+                objectName: "mediaCard"
+                anchors.fill: parent
+                radius: 6
+                color: mediaCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            }
+            HoverHandler { id: mediaCardHover; blocking: false }
 
             // Existing media timeline data remains visible alongside controls.
             Text {
@@ -306,8 +338,6 @@ Item {
                     height: 32
                     radius: 6
                     color: prevHover.hovered ? LazerTheme.hoverFill : "transparent"
-                    border.color: LazerTheme.popupBorder
-                    border.width: 1
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -334,9 +364,7 @@ Item {
                     width: 64
                     height: 32
                     radius: 6
-                    color: playHover.hovered ? LazerTheme.hoverFill : LazerTheme.settingsControlSurface
-                    border.color: LazerTheme.popupBorder
-                    border.width: 1
+                    color: playHover.hovered ? LazerTheme.hoverFill : "transparent"
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -364,8 +392,6 @@ Item {
                     height: 32
                     radius: 6
                     color: nextHover.hovered ? LazerTheme.hoverFill : "transparent"
-                    border.color: LazerTheme.popupBorder
-                    border.width: 1
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -392,8 +418,18 @@ Item {
             id: notificationsContent
             objectName: "notificationsContent"
             width: parent.width
-            height: 36
+            height: 52
             visible: root.actionKind === "notifications"
+
+            // Settings-row card hosts both notification actions.
+            Rectangle {
+                objectName: "notificationsCard"
+                anchors.fill: parent
+                radius: 6
+                color: notificationsCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            }
+            HoverHandler { id: notificationsCardHover; blocking: false }
 
             Row {
                 anchors.centerIn: parent
@@ -405,11 +441,12 @@ Item {
                     width: 72
                     height: 32
                     radius: 6
-                    color: root.notificationDnd ? LazerTheme.activeFill : (dndHover.hovered ? LazerTheme.hoverFill : LazerTheme.settingsControlSurface)
-                    border.color: root.notificationDnd ? LazerTheme.accentColor : LazerTheme.popupBorder
-                    border.width: root.notificationDnd ? 2 : 1
+                    color: root.notificationDnd ? LazerTheme.settingsSelected : (dndHover.hovered ? LazerTheme.hoverFill : "transparent")
+                    border.width: root.notificationDnd ? 1.5 : 0
+                    border.color: root.notificationDnd ? LazerTheme.settingsAccent : "transparent"
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                    Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
 
                     Text {
                         anchors.centerIn: parent
@@ -433,9 +470,7 @@ Item {
                     width: 72
                     height: 32
                     radius: 6
-                    color: clearHover.hovered ? LazerTheme.hoverFill : LazerTheme.settingsControlSurface
-                    border.color: LazerTheme.popupBorder
-                    border.width: 1
+                    color: clearHover.hovered ? LazerTheme.hoverFill : "transparent"
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -462,8 +497,18 @@ Item {
             id: trayContent
             objectName: "trayContent"
             width: parent.width
-            height: 36
+            height: 52
             visible: root.actionKind === "tray"
+
+            // Settings-row card hosts both tray actions.
+            Rectangle {
+                objectName: "trayCard"
+                anchors.fill: parent
+                radius: 6
+                color: trayCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            }
+            HoverHandler { id: trayCardHover; blocking: false }
 
             Row {
                 anchors.centerIn: parent
@@ -475,9 +520,7 @@ Item {
                     width: 72
                     height: 32
                     radius: 6
-                    color: activateHover.hovered ? LazerTheme.hoverFill : LazerTheme.settingsControlSurface
-                    border.color: LazerTheme.popupBorder
-                    border.width: 1
+                    color: activateHover.hovered ? LazerTheme.hoverFill : "transparent"
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -504,8 +547,6 @@ Item {
                     height: 32
                     radius: 6
                     color: secondaryHover.hovered ? LazerTheme.hoverFill : "transparent"
-                    border.color: LazerTheme.popupBorder
-                    border.width: 1
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -534,7 +575,7 @@ Item {
             width: parent.width
             height: 32
             radius: 6
-            color: LazerTheme.settingsControlSurface
+            color: LazerTheme.settingsCard
             visible: root.actionKind !== "volume" && root.actionKind !== "brightness" && root.actionKind !== "media" && root.actionKind !== "notifications" && root.actionKind !== "tray" && root.actionKind !== ""
 
             Text {
