@@ -85,6 +85,24 @@ Item {
             root.check("still open after old timer window", host.open, true)
             root.check("anchor updated after race", host.anchorX, 300)
             root.check("hover bridge still intact after race", host.popupItem.orientation, Lazer.TwoLayerPopup.Orientation.Vertical)
+            // Context menus must render visible with real content height.
+            var contextIntent = {
+                widgetId: "clock",
+                instanceKey: "clock:0",
+                title: "Clock",
+                iconSource: Qt.resolvedUrl("modules/bar/icons/volume.svg"),
+                summary: "",
+                actionKind: "",
+                kind: "context",
+                section: "right",
+                hasSettings: false,
+                anchorX: 300,
+                screenWidth: 1000,
+                barPosition: "top"
+            }
+            host.showIntent(contextIntent)
+            root.check("context popup stays visible", host.popupItem.visible, true)
+            root.check("context content height positive", host.popupItem.contentLayer.height > 0, true)
             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }
@@ -114,6 +132,11 @@ Item {
             root.check("anchorX stored", host.anchorX, 100)
             root.check("screenWidth stored", host.screenWidth, 1000)
             root.check("intent preserved", host.intent !== null && host.intent.widgetId === "volume", true)
+            // Regression: a parent/child visibility cycle used to deadlock both
+            // at false even while the host reported open.
+            root.check("popup reveal visible while open", host.popupItem.visible, true)
+            root.check("popup container visible while open", host.popupContainerItem.visible, true)
+            root.check("hover content height positive", host.popupItem.contentLayer.height > 0, true)
             root.check("sidebarData alias exists", host.sidebarData !== undefined, true)
              root.check("contentData alias exists", host.contentData !== undefined, true)
 

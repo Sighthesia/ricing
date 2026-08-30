@@ -145,8 +145,9 @@ PanelWindow {
         cancelClose()
         clearIntentTimer.stop()
         // Drive the two-layer reveal forward; the internal staggered
-        // opacity/offset contracts stay inside TwoLayerPopup.
-        popup.visible = true
+        // opacity/offset contracts stay inside TwoLayerPopup. Visibility is
+        // owned by the surfaceActive binding alone so no imperative write can
+        // fight it (Item.visible reads effective visibility including parents).
         popup.revealProgress = 1
         root.debugLog("open", { "windowVisible": root.visible, "surfaceActive": true,
                                 "direction": root.direction, "anchorX": root.anchorX })
@@ -177,7 +178,6 @@ PanelWindow {
         root.popupHovered = false
         root.intent = null
         root.surfaceActive = false
-        popup.visible = false
         popup.revealProgress = 0
     }
 
@@ -238,12 +238,16 @@ PanelWindow {
             // Ensure the hover flag does not stick when the surface hides.
             // The widget side is owned externally and stays as-is.
         } else {
-            popup.visible = true
+            // Reveal is re-driven on every open; visibility itself stays on
+            // the surfaceActive binding so parents and children never read
+            // each other's effective visibility (which deadlocks at false).
             popup.revealProgress = 1
         }
     }
 
-    // Fixed outer host; inner popup is clamped horizontally.
+    // Fixed outer host; inner popup is clamped horizontally. The container is
+    // a positioning wrapper and stays visible; the reveal item below gates
+    // all painting, so no parent/child visibility chain is needed.
     Item {
         id: popupContainer
         objectName: "popupContainer"
@@ -258,7 +262,6 @@ PanelWindow {
             ? root.activeBarHeight + root.activeFloatingMargin
             : Math.max(0, root.activeScreenHeight - root.activeBarHeight
                 - root.activeFloatingMargin - height)
-        visible: popup.visible
 
         // Non-blocking hover bridge on the popup surface.
         HoverHandler {
@@ -277,7 +280,9 @@ PanelWindow {
             height: popupContainer.height
             revealProgress: 0
             contentDelay: MotionTokens.settingsContentDelay
-            visible: root.open || revealProgress > 0
+            // Single source of truth: the reveal lives while the surface is
+            // active, covering both the open state and the exit fade window.
+            visible: root.surfaceActive
 
             // Identity layer bound to the current intent; updates in place when
             // the hovered tray delegate changes so no overlapping windows appear.
