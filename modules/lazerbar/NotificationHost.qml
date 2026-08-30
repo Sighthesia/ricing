@@ -21,6 +21,7 @@ Variants {
             id: notificationWindow
             screen: screenScope.modelData
             color: "transparent"
+            WlrLayershell.namespace: "afloat-notifications"
             implicitWidth: notificationStack.implicitWidth + 560
             implicitHeight: Math.max(1, screenScope.modelData.height)
             exclusionMode: ExclusionMode.Ignore

@@ -10,6 +10,8 @@ import "./BarHoverLogic.js" as BarHoverLogic
 PanelWindow {
     id: root
 
+    // Name the surface so compositor diagnostics can identify it.
+    WlrLayershell.namespace: "afloat-popup"
     // Keep the full-screen owner below the bar and settings owners.
     // The mask limits input to the small active popup rectangle.
     WlrLayershell.layer: WlrLayer.Top

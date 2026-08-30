@@ -93,6 +93,8 @@ Variants {
 
             screen: screenScope.modelData
             color: "transparent"
+            // Name the surface so compositor diagnostics can identify it.
+            WlrLayershell.namespace: "afloat-bar"
             // Keep the physical bar above popup surfaces and normal windows.
             WlrLayershell.layer: WlrLayer.Overlay
             implicitHeight: screenScope.effectiveHeight
@@ -179,9 +181,10 @@ Variants {
         }
 
         // Keep the launcher wave below the bar while only its internal viewport moves.
-        PanelWindow {
-            id: launcherWindow
-            screen: screenScope.modelData; color: "transparent"
+            PanelWindow {
+                id: launcherWindow
+                screen: screenScope.modelData; color: "transparent"
+                WlrLayershell.namespace: "afloat-launcher"
             implicitWidth: screenScope.modelData.width; implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
             anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true }
@@ -200,11 +203,12 @@ Variants {
         }
 
         // Keep Settings in a dedicated left-side owner with no full-screen mask.
-        PanelWindow {
-            id: settingsWindow
-            screen: screenScope.modelData; color: "transparent"
-            // Settings must remain visible above the fixed popup owners.
-            WlrLayershell.layer: WlrLayer.Overlay
+            PanelWindow {
+                id: settingsWindow
+                screen: screenScope.modelData; color: "transparent"
+                WlrLayershell.namespace: "afloat-settings"
+                // Settings must remain visible above the fixed popup owners.
+                WlrLayershell.layer: WlrLayer.Overlay
             implicitWidth: Math.min(LazerTheme.settingsPanelWidth, screenScope.modelData.width)
             implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
