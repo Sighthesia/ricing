@@ -50,6 +50,25 @@ PanelWindow {
     signal actionRequested(string action)
     signal closeRequested()
 
+    // Both layers travel the full container distance so the clip edge under
+    // the bar, not a fade, performs the reveal; the content layer trails via
+    // TwoLayerPopup's shared delay.
+    readonly property real slideOffset: root.direction === "up"
+            ? popupContainer.height + 1 : -(popupContainer.height + 1)
+
+    function startReveal(target) {
+        revealMotion.stop()
+        if (Math.abs(popup.revealProgress - target) < 0.001) {
+            popup.revealProgress = target
+            return
+        }
+        revealMotion.duration = MotionTokens.reducedMotion
+                ? MotionTokens.fast : MotionTokens.settingsSidebarFade
+        revealMotion.easing.type = target >= 1 ? Easing.OutQuint : Easing.InQuad
+        revealMotion.to = target
+        revealMotion.restart()
+    }
+
     // Reuse the settings-panel diagnostics channel so one IPC switch turns on
     // both surfaces; every popup decision is logged without adding an owner.
     readonly property bool debugEnabled: Services.SettingsService.hoverDebugEnabled
@@ -144,11 +163,6 @@ PanelWindow {
         root.surfaceActive = true
         cancelClose()
         clearIntentTimer.stop()
-        // Drive the two-layer reveal forward; the internal staggered
-        // opacity/offset contracts stay inside TwoLayerPopup. Visibility is
-        // owned by the surfaceActive binding alone so no imperative write can
-        // fight it (Item.visible reads effective visibility including parents).
-        popup.revealProgress = 1
         root.debugLog("open", { "windowVisible": root.visible, "surfaceActive": true,
                                 "direction": root.direction, "anchorX": root.anchorX })
     }
@@ -173,12 +187,13 @@ PanelWindow {
         root.debugLog("dismissed", { "open": root.open, "surfaceActive": root.surfaceActive })
         closeTimer.stop()
         clearIntentTimer.stop()
+        revealMotion.stop()
+        popup.revealProgress = 0
         root.open = false
         root.widgetHovered = false
         root.popupHovered = false
         root.intent = null
         root.surfaceActive = false
-        popup.revealProgress = 0
     }
 
     color: "transparent"
@@ -212,10 +227,17 @@ PanelWindow {
                 root.debugLog("closed", { "revealProgress": Number(popup.revealProgress) })
                 root.open = false
                 root.closeRequested()
-                popup.revealProgress = 0
                 clearIntentTimer.restart()
             }
         }
+    }
+
+    // Slide the stacked layers together; geometry is the only reveal channel.
+    NumberAnimation {
+        id: revealMotion
+        target: popup
+        property: "revealProgress"
+        duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.settingsSidebarFade
     }
 
     // Clear the intent only after the exit reveal has finished so the
@@ -234,15 +256,10 @@ PanelWindow {
     // Keep popupHovered in sync via non-blocking observation; widgetHovered
     // is driven by the external owner (BarContent/widget HoverHandler).
     onOpenChanged: {
-        if (!open) {
-            // Ensure the hover flag does not stick when the surface hides.
-            // The widget side is owned externally and stays as-is.
-        } else {
-            // Reveal is re-driven on every open; visibility itself stays on
-            // the surfaceActive binding so parents and children never read
-            // each other's effective visibility (which deadlocks at false).
-            popup.revealProgress = 1
-        }
+        // Reveal is re-driven by the open state; visibility itself stays on
+        // the surfaceActive binding so parents and children never read each
+        // other's effective visibility (which deadlocks at false).
+        root.startReveal(open ? 1 : 0)
     }
 
     // Fixed outer host; inner popup is clamped horizontally. The container is
@@ -271,7 +288,9 @@ PanelWindow {
         }
 
         // Two-layer surface; vertical orientation with direction driven by
-        // the bar position (top -> Down, bottom -> Up).
+        // the bar position (top -> Down, bottom -> Up). Reveal is geometric:
+        // both layers start displaced by the full container height behind the
+        // bar's clip edge and slide into place without an opacity channel.
         TwoLayerPopup {
             id: popup
             orientation: TwoLayerPopup.Orientation.Vertical
@@ -280,8 +299,11 @@ PanelWindow {
             height: popupContainer.height
             revealProgress: 0
             contentDelay: MotionTokens.settingsContentDelay
+            animateLayerOpacity: false
+            sidebarOffset: root.slideOffset
+            contentOffset: root.slideOffset
             // Single source of truth: the reveal lives while the surface is
-            // active, covering both the open state and the exit fade window.
+            // active, covering both the open state and the exit slide window.
             visible: root.surfaceActive
 
             // Identity layer bound to the current intent; updates in place when
@@ -301,6 +323,17 @@ PanelWindow {
                 width: 260
                 implicitHeight: Math.max(popupActions.implicitHeight, contextPopupActions.implicitHeight)
                 height: implicitHeight
+
+                // Opaque settings-panel surface under the action rows; the
+                // 1px seam toward the identity rail stays covered during slide.
+                Rectangle {
+                    objectName: "popupContentSurface"
+                    x: 0
+                    y: root.direction === "down" ? -1 : 0
+                    width: parent.width
+                    height: parent.height + 1
+                    color: LazerTheme.settingsPanel
+                }
 
                 // Action layer bound to the hovered widget intent.
                 BarPopupActions {

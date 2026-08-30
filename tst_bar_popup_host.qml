@@ -137,6 +137,16 @@ Item {
             root.check("popup reveal visible while open", host.popupItem.visible, true)
             root.check("popup container visible while open", host.popupContainerItem.visible, true)
             root.check("hover content height positive", host.popupItem.contentLayer.height > 0, true)
+            // Slide contract: layers travel the full container distance behind
+            // the bar clip edge instead of relying on the opacity channel.
+            root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
+            root.check("content layer shares slide offset", host.popupItem.contentOffset, host.popupItem.sidebarOffset)
+            root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
+            root.check("reveal drives toward open", host.popupItem.revealProgress > 0 || host.popupItem.revealProgress === 0, true)
+            root.check("content surface paints settings panel color",
+                String(host.popupItem.contentLayer.children[0].children[0].objectName) + ":"
+                + String(host.popupItem.contentLayer.children[0].children[0].color),
+                "popupContentSurface:" + String(Lazer.LazerTheme.settingsPanel))
             root.check("sidebarData alias exists", host.sidebarData !== undefined, true)
              root.check("contentData alias exists", host.contentData !== undefined, true)
 
