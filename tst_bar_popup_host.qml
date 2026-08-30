@@ -143,10 +143,10 @@ Item {
             root.check("content layer shares slide offset", host.popupItem.contentOffset, host.popupItem.sidebarOffset)
             root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
             root.check("reveal drives toward open", host.popupItem.revealProgress > 0 || host.popupItem.revealProgress === 0, true)
-            root.check("content surface paints settings panel color",
+            root.check("content surface paints settings section color",
                 String(host.popupItem.contentLayer.children[0].children[0].objectName) + ":"
                 + String(host.popupItem.contentLayer.children[0].children[0].color),
-                "popupContentSurface:" + String(Lazer.LazerTheme.settingsPanel))
+                "popupContentSurface:" + String(Lazer.LazerTheme.settingsSection))
             root.check("sidebarData alias exists", host.sidebarData !== undefined, true)
              root.check("contentData alias exists", host.contentData !== undefined, true)
 

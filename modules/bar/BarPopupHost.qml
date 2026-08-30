@@ -324,15 +324,15 @@ PanelWindow {
                 implicitHeight: Math.max(popupActions.implicitHeight, contextPopupActions.implicitHeight)
                 height: implicitHeight
 
-                // Opaque settings-panel surface under the action rows; the
-                // 1px seam toward the identity rail stays covered during slide.
+                // Settings section-block surface under the action rows; the
+                // darker cards float on it exactly like the settings panel.
                 Rectangle {
                     objectName: "popupContentSurface"
                     x: 0
                     y: root.direction === "down" ? -1 : 0
                     width: parent.width
                     height: parent.height + 1
-                    color: LazerTheme.settingsPanel
+                    color: LazerTheme.settingsSection
                 }
 
                 // Action layer bound to the hovered widget intent.
