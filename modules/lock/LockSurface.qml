@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Wayland
 import "../lazerbar" as Lazer
@@ -16,10 +17,8 @@ WlSessionLockSurface {
     readonly property int screenIndex: SurfaceLogic.screenSlot(Quickshell.screens, root.screen)
     readonly property string snapshotUrl: snapshot && screenIndex >= 0
             ? snapshot.snapshotUrlFor(screenIndex) : ""
-    property string backgroundMode: SurfaceLogic.backgroundModes.wallpaper
     property string wallpaperPath: ""
     property real waveProgress: 0
-    property real bodyProgress: 0
     property real authOpacity: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
@@ -27,8 +26,8 @@ WlSessionLockSurface {
 
     signal releaseRequested()
 
-    // The surface is transparent at rest: the input-locked desktop shows
-    // through until the wave curtain covers it and the artwork body rises.
+    // The surface starts opaque with the pre-lock screenshot: the desktop
+    // appears uninterrupted until the wave mask sweeps the wallpaper over it.
     color: "transparent"
 
     function startReveal(): void {
@@ -53,8 +52,8 @@ WlSessionLockSurface {
         }
         authOpacity = 0
         SurfaceLogic.stopAll(allAnimations())
-        bodyExitAnimation.from = bodyProgress
-        bodyExitAnimation.start()
+        exitAnimation.from = waveProgress
+        exitAnimation.start()
     }
 
     function requestRelease(): void {
@@ -65,7 +64,7 @@ WlSessionLockSurface {
     }
 
     function allAnimations(): var {
-        return [enterAnimation, bodyEnterAnimation, bodyExitAnimation, exitAnimation]
+        return [enterAnimation, exitAnimation]
     }
 
     onLockContextChanged: {
@@ -75,49 +74,81 @@ WlSessionLockSurface {
 
     Component.onCompleted: startReveal()
 
-    // Wave curtain sweeps first: angled bands cover the visible desktop.
-    Lazer.WaveRevealLayers {
-        id: waves
-        z: 1
+    // Base layer, painted before anything animates: the pre-lock desktop
+    // capture over an opaque floor, so the surface never exposes the desktop.
+    Rectangle {
+        id: baseFloor
         anchors.fill: parent
-        progress: root.waveProgress
-        palette: ({
-            light4: Lazer.LazerTheme.settingsSection,
-            light3: Lazer.LazerTheme.settingsCardHover,
-            dark4: Lazer.LazerTheme.settingsRail,
-            dark3: Lazer.LazerTheme.bgDark
-        })
+        color: Lazer.LazerTheme.bgDark
     }
 
-    // Artwork body rises over the settled curtain: opaque floor plus the
-    // configured wallpaper or this screen's desktop screenshot, dimmed for
-    // password legibility. Fully opaque at rest, so the desktop stays hidden.
-    Item {
-        id: body
-        z: 2
+    Image {
+        id: baseImage
         anchors.fill: parent
-        y: root.reducedMotion ? 0 : parent.height * (1 - root.bodyProgress)
-        opacity: root.bodyProgress
+        source: SurfaceLogic.baseSource(root.snapshotUrl)
+        visible: status === Image.Ready && source !== ""
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+    }
+
+    // Wave mask: four angled bands, rendered offscreen in white. Wherever a
+    // band has swept, the mask lets the wallpaper layer through; the bands'
+    // opacity ramp gives the reveal a soft leading edge.
+    Item {
+        id: waveMask
+        anchors.fill: parent
+
+        Lazer.WaveRevealLayers {
+            anchors.fill: parent
+            progress: root.waveProgress
+            palette: ({
+                light4: "#FFFFFFFF",
+                light3: "#FFFFFFFF",
+                dark4: "#FFFFFFFF",
+                dark3: "#FFFFFFFF"
+            })
+        }
+    }
+
+    ShaderEffectSource {
+        id: waveMaskTexture
+        anchors.fill: parent
+        sourceItem: waveMask
+        hideSource: true
+        live: true
+    }
+
+    // Reveal layer: the wallpaper, masked by the sweeping wave, laid over the
+    // screenshot base. Without a configured wallpaper the settled bands still
+    // read as the themed panel surface.
+    Item {
+        id: revealLayer
+        z: 1
+        anchors.fill: parent
+        layer.enabled: true
+        layer.effect: OpacityMask {
+            maskSource: waveMaskTexture
+        }
 
         Rectangle {
-            id: bodyFloor
             anchors.fill: parent
-            color: Lazer.LazerTheme.bgDark
+            visible: revealImage.status !== Image.Ready || revealImage.source === ""
+            color: Lazer.LazerTheme.settingsPanel
         }
 
         Image {
-            id: bodyImage
+            id: revealImage
             anchors.fill: parent
-            source: SurfaceLogic.backgroundSource(root.backgroundMode, root.snapshotUrl, root.wallpaperPath)
+            source: SurfaceLogic.revealSource(root.wallpaperPath)
             visible: status === Image.Ready && source !== ""
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
         }
 
-        // Dim only over a decoded image; the bare floor is already dark.
+        // Dim the wallpaper for password legibility.
         Rectangle {
             anchors.fill: parent
-            visible: bodyImage.visible
+            visible: revealImage.visible
             color: Lazer.LazerTheme.bgDark
             opacity: 0.35
         }
@@ -233,7 +264,7 @@ WlSessionLockSurface {
     }
 
     // Keep release ownership in the animation completion path.
-    // Curtain leads, then the artwork body rises over it, then auth reveals.
+    // The wave mask sweeps the wallpaper over the screenshot, then auth fades.
     NumberAnimation {
         id: enterAnimation
         target: root
@@ -242,35 +273,10 @@ WlSessionLockSurface {
         to: 1
         duration: Lazer.MotionTokens.waveBackdropEnter
         easing.type: Easing.OutQuint
-        onFinished: bodyEnterAnimation.start()
-    }
-
-    NumberAnimation {
-        id: bodyEnterAnimation
-        target: root
-        property: "bodyProgress"
-        from: 0
-        to: 1
-        duration: Lazer.MotionTokens.waveEnter
-        easing.type: Easing.OutQuint
         onFinished: root.authOpacity = 1
     }
 
-    // Unlock reverses the stack: the body sinks away, then the curtain
-    // retracts and exposes the desktop again before the release lands.
-    NumberAnimation {
-        id: bodyExitAnimation
-        target: root
-        property: "bodyProgress"
-        to: 0
-        duration: Lazer.MotionTokens.waveExit
-        easing.type: Easing.InQuad
-        onFinished: {
-            exitAnimation.from = root.waveProgress
-            exitAnimation.start()
-        }
-    }
-
+    // Unlock un-reveals the wallpaper back to the screenshot before release.
     NumberAnimation {
         id: exitAnimation
         target: root

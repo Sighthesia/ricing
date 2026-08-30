@@ -14,7 +14,6 @@ Item {
         id: lockSurface
         anchors.fill: parent
         property real waveProgress: 0
-        property real bodyProgress: 0
         property real authOpacity: 0
         property bool reducedMotion: false
         property bool exitStarted: false
@@ -22,7 +21,7 @@ Item {
         signal releaseRequested()
 
         function allAnimations() {
-            return [enterAnimation, bodyEnterAnimation, bodyExitAnimation, exitAnimation]
+            return [enterAnimation, exitAnimation]
         }
 
         function startReveal() {
@@ -54,8 +53,8 @@ Item {
             }
             authOpacity = 0
             SurfaceLogic.stopAll(allAnimations())
-            bodyExitAnimation.from = bodyProgress
-            bodyExitAnimation.start()
+            exitAnimation.from = waveProgress
+            exitAnimation.start()
         }
 
         NumberAnimation {
@@ -66,31 +65,7 @@ Item {
             to: 1
             duration: 600
             easing.type: Easing.OutQuint
-            onFinished: bodyEnterAnimation.start()
-        }
-
-        NumberAnimation {
-            id: bodyEnterAnimation
-            target: lockSurface
-            property: "bodyProgress"
-            from: 0
-            to: 1
-            duration: 400
-            easing.type: Easing.OutQuint
             onFinished: lockSurface.authOpacity = 1
-        }
-
-        NumberAnimation {
-            id: bodyExitAnimation
-            target: lockSurface
-            property: "bodyProgress"
-            to: 0
-            duration: 300
-            easing.type: Easing.InQuad
-            onFinished: {
-                exitAnimation.from = lockSurface.waveProgress
-                exitAnimation.start()
-            }
         }
 
         NumberAnimation {
@@ -125,7 +100,6 @@ Item {
             lockSurface.stopAnimation()
             lockSurface.reducedMotion = false
             lockSurface.waveProgress = 0
-            lockSurface.bodyProgress = 0
             lockSurface.authOpacity = 0
             lockSurface.exitStarted = false
             lockSurface.releaseSent = false
@@ -136,19 +110,15 @@ Item {
             compare(lockSurface.height, harness.height)
             compare(lockSurface.waveProgress, 0)
             lockSurface.startReveal()
-            // The curtain covers first, then the body rises, then auth shows.
             tryCompare(lockSurface, "waveProgress", 1, 1200)
-            tryCompare(lockSurface, "bodyProgress", 1, 900)
             tryCompare(lockSurface, "authOpacity", 1, 100)
         }
 
         function test_releaseWaitsForExitAnimation() {
             lockSurface.startReveal()
-            tryCompare(lockSurface, "bodyProgress", 1, 1500)
+            tryCompare(lockSurface, "waveProgress", 1, 1200)
             lockSurface.startExit()
             verify(!harness.released)
-            // The body must sink before the curtain retracts and release.
-            tryCompare(lockSurface, "bodyProgress", 0, 700)
             tryCompare(harness, "released", true, 900)
             tryCompare(lockSurface, "waveProgress", 0, 100)
         }
@@ -157,11 +127,9 @@ Item {
             lockSurface.reducedMotion = true
             lockSurface.startReveal()
             compare(lockSurface.waveProgress, 1)
-            compare(lockSurface.bodyProgress, 1)
             compare(lockSurface.authOpacity, 1)
             lockSurface.startExit()
             compare(lockSurface.waveProgress, 0)
-            compare(lockSurface.bodyProgress, 0)
             compare(lockSurface.authOpacity, 0)
             verify(harness.released)
         }
@@ -173,11 +141,9 @@ Item {
             lockSurface.reducedMotion = true
             lockSurface.startReveal()
             compare(lockSurface.waveProgress, 1)
-            compare(lockSurface.bodyProgress, 1)
             compare(lockSurface.authOpacity, 1)
             lockSurface.startExit()
             compare(lockSurface.waveProgress, 0)
-            compare(lockSurface.bodyProgress, 0)
             compare(lockSurface.authOpacity, 0)
             verify(harness.released)
         }
@@ -388,18 +354,19 @@ Item {
             compare(SurfaceLogic.screenSlot([first], null), -1)
         }
 
-        function test_backgroundSourcePrefersScreenshotThenWallpaper() {
-            compare(SurfaceLogic.backgroundSource("screenshot", "shot.png", "wall.png"), "shot.png")
-            // A missing capture falls back to the configured wallpaper.
-            compare(SurfaceLogic.backgroundSource("screenshot", "", "wall.png"), "wall.png")
-            compare(SurfaceLogic.backgroundSource("wallpaper", "shot.png", "wall.png"), "wall.png")
-            // Nothing available: the opaque body floor covers the desktop.
-            compare(SurfaceLogic.backgroundSource("screenshot", "", ""), "")
-            compare(SurfaceLogic.backgroundSource("wallpaper", "", ""), "")
-            // Unknown modes normalize to wallpaper.
-            compare(SurfaceLogic.backgroundSource("bogus", "shot.png", "wall.png"), "wall.png")
-            compare(SurfaceLogic.normalizeBackgroundMode("screenshot"), "screenshot")
-            compare(SurfaceLogic.normalizeBackgroundMode("bogus"), "wallpaper")
+        function test_backgroundLayersSelectBaseAndReveal() {
+            // Base: the screen's own capture, or nothing over the opaque floor.
+            compare(SurfaceLogic.baseSource("shot.png"), "shot.png")
+            compare(SurfaceLogic.baseSource(""), "")
+            compare(SurfaceLogic.baseSource(null), "")
+            // Reveal: always the wallpaper; empty falls back to panel color.
+            compare(SurfaceLogic.revealSource("wall.png"), "wall.png")
+            compare(SurfaceLogic.revealSource(""), "")
+            compare(SurfaceLogic.revealSource(null), "")
+            // Capture is the default; only an explicit wallpaper value skips it.
+            compare(SurfaceLogic.normalizeBackgroundMode(""), SurfaceLogic.backgroundModes.screenshot)
+            compare(SurfaceLogic.normalizeBackgroundMode("wallpaper"), SurfaceLogic.backgroundModes.wallpaper)
+            compare(SurfaceLogic.normalizeBackgroundMode("bogus"), SurfaceLogic.backgroundModes.screenshot)
         }
     }
 }

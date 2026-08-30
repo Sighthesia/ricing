@@ -4,26 +4,27 @@
 var maxMaskedCharacters = 32
 var maskCharacter = "\u25CF"
 
-// Background modes the surface understands; unknown values resolve to wallpaper.
+// Background modes the surface understands. The default (and any unknown
+// value) captures the desktop before locking; "wallpaper" skips the capture
+// and reveals the wallpaper over the opaque floor instead.
 var backgroundModes = {
     wallpaper: "wallpaper",
     screenshot: "screenshot"
 }
 
 function normalizeBackgroundMode(mode) {
-    return mode === backgroundModes.screenshot ? backgroundModes.screenshot : backgroundModes.wallpaper
+    return mode === backgroundModes.wallpaper ? backgroundModes.wallpaper : backgroundModes.screenshot
 }
 
-// Pick the artwork the wave curtain reveals: a screenshot only when its own
-// capture actually produced a URL, otherwise the configured wallpaper, and
-// otherwise nothing (the body's opaque floor covers the desktop instead).
-function backgroundSource(mode, snapshotUrl, wallpaperPath) {
-    var normalized = normalizeBackgroundMode(mode)
-    if (normalized === backgroundModes.screenshot && snapshotUrl)
-        return snapshotUrl
-    if (wallpaperPath)
-        return wallpaperPath
-    return normalized === backgroundModes.screenshot ? (snapshotUrl || "") : ""
+// The base layer shows this screen's pre-lock capture immediately; without
+// one, the opaque floor covers the desktop instead.
+function baseSource(snapshotUrl) {
+    return snapshotUrl || ""
+}
+
+// The reveal layer is the wallpaper the wave mask uncovers as it sweeps.
+function revealSource(wallpaperPath) {
+    return wallpaperPath || ""
 }
 
 function stopAll(animations) {
@@ -82,13 +83,11 @@ function screenSlot(screens, screen) {
 function applyRevealImmediately(surface, animations) {
     stopAll(animations)
     surface.waveProgress = 1
-    surface.bodyProgress = 1
     surface.authOpacity = 1
 }
 
 function applyExitImmediately(surface, animations) {
     stopAll(animations)
     surface.waveProgress = 0
-    surface.bodyProgress = 0
     surface.authOpacity = 0
 }

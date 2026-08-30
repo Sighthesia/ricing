@@ -28,9 +28,10 @@ Scope {
     property int selfTestDelayMs: 5000
     property bool _selfTestArmed: false
 
-    // Lock background: the configured wallpaper by default, or a pre-lock
-    // desktop screenshot via grim (AFLOAT_LOCK_BACKGROUND=screenshot). A failed
-    // or missing capture falls back to the wallpaper, then to the opaque floor.
+    // Lock background order: a pre-lock desktop screenshot (grim) is painted
+    // as the base, then the wave mask sweeps the wallpaper over it. Setting
+    // AFLOAT_LOCK_BACKGROUND=wallpaper skips the capture and reveals the
+    // wallpaper over the opaque floor instead.
     readonly property string backgroundMode: SurfaceLogic.normalizeBackgroundMode(
         (Quickshell.env("AFLOAT_LOCK_BACKGROUND") || "").trim())
     readonly property int _screenshotTimeoutMs: 2000
@@ -148,7 +149,6 @@ Scope {
         surface: LockSurface {
             lockContext: lockContext
             snapshot: snapshot
-            backgroundMode: root.backgroundMode
             wallpaperPath: Services.SettingsService.appearance.wallpaperPath
             onReleaseRequested: root._finishRelease()
         }
