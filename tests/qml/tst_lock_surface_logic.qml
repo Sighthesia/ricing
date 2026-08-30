@@ -14,26 +14,30 @@ Item {
         id: lockSurface
         anchors.fill: parent
         property real waveProgress: 0
+        property real bodyProgress: 0
         property real authOpacity: 0
         property bool reducedMotion: false
         property bool exitStarted: false
         property bool releaseSent: false
         signal releaseRequested()
 
+        function allAnimations() {
+            return [enterAnimation, bodyEnterAnimation, bodyExitAnimation, exitAnimation]
+        }
+
         function startReveal() {
             exitStarted = false
             releaseSent = false
             if (reducedMotion) {
-                SurfaceLogic.applyRevealImmediately(lockSurface, enterAnimation, exitAnimation)
+                SurfaceLogic.applyRevealImmediately(lockSurface, allAnimations())
                 return
             }
-            SurfaceLogic.stopAnimations(enterAnimation, exitAnimation)
+            SurfaceLogic.stopAll(allAnimations())
             enterAnimation.start()
         }
 
         function stopAnimation() {
-            enterAnimation.stop()
-            exitAnimation.stop()
+            SurfaceLogic.stopAll(allAnimations())
         }
 
         function startExit() {
@@ -41,17 +45,17 @@ Item {
                 return
             exitStarted = true
             if (reducedMotion) {
-                SurfaceLogic.applyExitImmediately(lockSurface, enterAnimation, exitAnimation)
+                SurfaceLogic.applyExitImmediately(lockSurface, allAnimations())
                 if (!releaseSent) {
                     releaseSent = true
                     releaseRequested()
                 }
                 return
             }
-            enterAnimation.stop()
-            exitAnimation.stop()
-            exitAnimation.from = waveProgress
-            exitAnimation.start()
+            authOpacity = 0
+            SurfaceLogic.stopAll(allAnimations())
+            bodyExitAnimation.from = bodyProgress
+            bodyExitAnimation.start()
         }
 
         NumberAnimation {
@@ -62,7 +66,31 @@ Item {
             to: 1
             duration: 600
             easing.type: Easing.OutQuint
+            onFinished: bodyEnterAnimation.start()
+        }
+
+        NumberAnimation {
+            id: bodyEnterAnimation
+            target: lockSurface
+            property: "bodyProgress"
+            from: 0
+            to: 1
+            duration: 400
+            easing.type: Easing.OutQuint
             onFinished: lockSurface.authOpacity = 1
+        }
+
+        NumberAnimation {
+            id: bodyExitAnimation
+            target: lockSurface
+            property: "bodyProgress"
+            to: 0
+            duration: 300
+            easing.type: Easing.InQuad
+            onFinished: {
+                exitAnimation.from = lockSurface.waveProgress
+                exitAnimation.start()
+            }
         }
 
         NumberAnimation {
@@ -71,7 +99,7 @@ Item {
             property: "waveProgress"
             to: 0
             duration: 500
-            easing.type: Easing.OutQuint
+            easing.type: Easing.InQuad
             onFinished: {
                 if (!lockSurface.releaseSent) {
                     lockSurface.releaseSent = true
@@ -97,6 +125,7 @@ Item {
             lockSurface.stopAnimation()
             lockSurface.reducedMotion = false
             lockSurface.waveProgress = 0
+            lockSurface.bodyProgress = 0
             lockSurface.authOpacity = 0
             lockSurface.exitStarted = false
             lockSurface.releaseSent = false
@@ -107,15 +136,19 @@ Item {
             compare(lockSurface.height, harness.height)
             compare(lockSurface.waveProgress, 0)
             lockSurface.startReveal()
+            // The curtain covers first, then the body rises, then auth shows.
             tryCompare(lockSurface, "waveProgress", 1, 1200)
+            tryCompare(lockSurface, "bodyProgress", 1, 900)
             tryCompare(lockSurface, "authOpacity", 1, 100)
         }
 
         function test_releaseWaitsForExitAnimation() {
             lockSurface.startReveal()
-            tryCompare(lockSurface, "waveProgress", 1, 1200)
+            tryCompare(lockSurface, "bodyProgress", 1, 1500)
             lockSurface.startExit()
             verify(!harness.released)
+            // The body must sink before the curtain retracts and release.
+            tryCompare(lockSurface, "bodyProgress", 0, 700)
             tryCompare(harness, "released", true, 900)
             tryCompare(lockSurface, "waveProgress", 0, 100)
         }
@@ -124,9 +157,12 @@ Item {
             lockSurface.reducedMotion = true
             lockSurface.startReveal()
             compare(lockSurface.waveProgress, 1)
+            compare(lockSurface.bodyProgress, 1)
             compare(lockSurface.authOpacity, 1)
             lockSurface.startExit()
             compare(lockSurface.waveProgress, 0)
+            compare(lockSurface.bodyProgress, 0)
+            compare(lockSurface.authOpacity, 0)
             verify(harness.released)
         }
 
@@ -137,9 +173,11 @@ Item {
             lockSurface.reducedMotion = true
             lockSurface.startReveal()
             compare(lockSurface.waveProgress, 1)
+            compare(lockSurface.bodyProgress, 1)
             compare(lockSurface.authOpacity, 1)
             lockSurface.startExit()
             compare(lockSurface.waveProgress, 0)
+            compare(lockSurface.bodyProgress, 0)
             compare(lockSurface.authOpacity, 0)
             verify(harness.released)
         }
@@ -348,6 +386,20 @@ Item {
             compare(SurfaceLogic.screenSlot([first], { name: "DP-1" }), -1)
             compare(SurfaceLogic.screenSlot(null, first), -1)
             compare(SurfaceLogic.screenSlot([first], null), -1)
+        }
+
+        function test_backgroundSourcePrefersScreenshotThenWallpaper() {
+            compare(SurfaceLogic.backgroundSource("screenshot", "shot.png", "wall.png"), "shot.png")
+            // A missing capture falls back to the configured wallpaper.
+            compare(SurfaceLogic.backgroundSource("screenshot", "", "wall.png"), "wall.png")
+            compare(SurfaceLogic.backgroundSource("wallpaper", "shot.png", "wall.png"), "wall.png")
+            // Nothing available: the opaque body floor covers the desktop.
+            compare(SurfaceLogic.backgroundSource("screenshot", "", ""), "")
+            compare(SurfaceLogic.backgroundSource("wallpaper", "", ""), "")
+            // Unknown modes normalize to wallpaper.
+            compare(SurfaceLogic.backgroundSource("bogus", "shot.png", "wall.png"), "wall.png")
+            compare(SurfaceLogic.normalizeBackgroundMode("screenshot"), "screenshot")
+            compare(SurfaceLogic.normalizeBackgroundMode("bogus"), "wallpaper")
         }
     }
 }

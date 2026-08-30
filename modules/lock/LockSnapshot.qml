@@ -113,8 +113,11 @@ QtObject {
     }
 
     // The timeout deliberately resolves to an opaque-background-only state.
+    // Screenshot providers may widen the window so real captures still land
+    // before the lock commits.
+    property int fallbackIntervalMs: Lazer.MotionTokens.medium
     property Timer fallbackTimer: Timer {
-        interval: Lazer.MotionTokens.medium
+        interval: root.fallbackIntervalMs
         repeat: false
         onTriggered: root.finish(root.generation)
     }

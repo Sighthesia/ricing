@@ -5,8 +5,10 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "../lazerbar" as Lazer
+import "../../services" as Services
 import "./LockLogic.js" as LockLogic
 import "./LockController.js" as Controller
+import "./LockSurfaceLogic.js" as SurfaceLogic
 
 // Own the single compositor session lock: trigger, snapshot commit, release.
 Scope {
@@ -25,6 +27,14 @@ Scope {
     readonly property bool selfTestEnabled: (Quickshell.env("AFLOAT_LOCK_SELFTEST") || "").trim() === "1"
     property int selfTestDelayMs: 5000
     property bool _selfTestArmed: false
+
+    // Lock background: the configured wallpaper by default, or a pre-lock
+    // desktop screenshot via grim (AFLOAT_LOCK_BACKGROUND=screenshot). A failed
+    // or missing capture falls back to the wallpaper, then to the opaque floor.
+    readonly property string backgroundMode: SurfaceLogic.normalizeBackgroundMode(
+        (Quickshell.env("AFLOAT_LOCK_BACKGROUND") || "").trim())
+    readonly property int _screenshotTimeoutMs: 2000
+    property Component _grimCapture: LockGrimCapture {}
 
     function lock(): bool {
         if (!Controller.canLock(_state))
@@ -66,6 +76,25 @@ Scope {
         _prepareFailsafe.stop()
         _state = next
         sessionLock.locked = true
+    }
+
+    // Screenshot provider seam: one grim capture per screen index; the shared
+    // snapshot ignores late or stale reports and falls back to the wallpaper.
+    function _grimProvider(_screen, screenCount, generation, report): var {
+        const runtimeRoot = (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp").replace(/\/+$/, "")
+        const directory = runtimeRoot + "/afloat-lock"
+        for (let index = 0; index < screenCount; ++index) {
+            const target = Quickshell.screens[index]
+            if (!target)
+                continue
+            _grimCapture.createObject(root, {
+                screenIndex: index,
+                screenName: String(target.name || ""),
+                directory: directory,
+                outputPath: directory + "/afloat-lock-" + generation + "-" + index + ".png"
+            }).captured.connect(report)
+        }
+        return { ready: false }
     }
 
     function _cancelPreparation(): void {
@@ -119,6 +148,8 @@ Scope {
         surface: LockSurface {
             lockContext: lockContext
             snapshot: snapshot
+            backgroundMode: root.backgroundMode
+            wallpaperPath: Services.SettingsService.appearance.wallpaperPath
             onReleaseRequested: root._finishRelease()
         }
     }
@@ -131,6 +162,10 @@ Scope {
     // Desktop snapshot prepared before the session lock commits.
     LockSnapshot {
         id: snapshot
+        fallbackIntervalMs: root.backgroundMode === SurfaceLogic.backgroundModes.screenshot
+                ? root._screenshotTimeoutMs : Lazer.MotionTokens.medium
+        snapshotProvider: root.backgroundMode === SurfaceLogic.backgroundModes.screenshot
+                ? root._grimProvider : null
     }
 
     // PAM success only arms the exit; release waits for the surfaces.

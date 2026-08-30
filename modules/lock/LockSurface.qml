@@ -14,7 +14,12 @@ WlSessionLockSurface {
     // This surface's slot in the shared per-screen snapshot data; the shared
     // snapshot never decides which screen a surface belongs to.
     readonly property int screenIndex: SurfaceLogic.screenSlot(Quickshell.screens, root.screen)
+    readonly property string snapshotUrl: snapshot && screenIndex >= 0
+            ? snapshot.snapshotUrlFor(screenIndex) : ""
+    property string backgroundMode: SurfaceLogic.backgroundModes.wallpaper
+    property string wallpaperPath: ""
     property real waveProgress: 0
+    property real bodyProgress: 0
     property real authOpacity: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
@@ -22,16 +27,18 @@ WlSessionLockSurface {
 
     signal releaseRequested()
 
+    // The surface is transparent at rest: the input-locked desktop shows
+    // through until the wave curtain covers it and the artwork body rises.
     color: "transparent"
 
     function startReveal(): void {
         exitStarted = false
         releaseSent = false
         if (reducedMotion) {
-            SurfaceLogic.applyRevealImmediately(root, enterAnimation, exitAnimation)
+            SurfaceLogic.applyRevealImmediately(root, allAnimations())
             return
         }
-        SurfaceLogic.stopAnimations(enterAnimation, exitAnimation)
+        SurfaceLogic.stopAll(allAnimations())
         enterAnimation.start()
     }
 
@@ -40,15 +47,14 @@ WlSessionLockSurface {
             return
         exitStarted = true
         if (reducedMotion) {
-            SurfaceLogic.applyExitImmediately(root, enterAnimation, exitAnimation)
+            SurfaceLogic.applyExitImmediately(root, allAnimations())
             requestRelease()
             return
         }
         authOpacity = 0
-        enterAnimation.stop()
-        exitAnimation.stop()
-        exitAnimation.from = waveProgress
-        exitAnimation.start()
+        SurfaceLogic.stopAll(allAnimations())
+        bodyExitAnimation.from = bodyProgress
+        bodyExitAnimation.start()
     }
 
     function requestRelease(): void {
@@ -58,6 +64,10 @@ WlSessionLockSurface {
         releaseRequested()
     }
 
+    function allAnimations(): var {
+        return [enterAnimation, bodyEnterAnimation, bodyExitAnimation, exitAnimation]
+    }
+
     onLockContextChanged: {
         if (lockContext)
             contextConnections.target = lockContext
@@ -65,29 +75,10 @@ WlSessionLockSurface {
 
     Component.onCompleted: startReveal()
 
-    // Paint a solid fallback first so an unavailable snapshot can never expose the desktop.
-    Rectangle {
-        id: fallback
-        anchors.fill: parent
-        color: Lazer.LazerTheme.bgDark
-        opacity: 1
-    }
-
-    // Display only this surface's own snapshot slot; an empty slot keeps the
-    // opaque fallback rather than borrowing another screen's image.
-    Image {
-        id: snapshotImage
-        anchors.fill: parent
-        source: root.snapshot && root.screenIndex >= 0
-                ? root.snapshot.snapshotUrlFor(root.screenIndex) : ""
-        visible: status === Image.Ready && source !== ""
-        fillMode: Image.Stretch
-        asynchronous: true
-    }
-
-    // Reveal the protected surface with the shared four-layer wave renderer.
+    // Wave curtain sweeps first: angled bands cover the visible desktop.
     Lazer.WaveRevealLayers {
         id: waves
+        z: 1
         anchors.fill: parent
         progress: root.waveProgress
         palette: ({
@@ -98,6 +89,40 @@ WlSessionLockSurface {
         })
     }
 
+    // Artwork body rises over the settled curtain: opaque floor plus the
+    // configured wallpaper or this screen's desktop screenshot, dimmed for
+    // password legibility. Fully opaque at rest, so the desktop stays hidden.
+    Item {
+        id: body
+        z: 2
+        anchors.fill: parent
+        y: root.reducedMotion ? 0 : parent.height * (1 - root.bodyProgress)
+        opacity: root.bodyProgress
+
+        Rectangle {
+            id: bodyFloor
+            anchors.fill: parent
+            color: Lazer.LazerTheme.bgDark
+        }
+
+        Image {
+            id: bodyImage
+            anchors.fill: parent
+            source: SurfaceLogic.backgroundSource(root.backgroundMode, root.snapshotUrl, root.wallpaperPath)
+            visible: status === Image.Ready && source !== ""
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+        }
+
+        // Dim only over a decoded image; the bare floor is already dark.
+        Rectangle {
+            anchors.fill: parent
+            visible: bodyImage.visible
+            color: Lazer.LazerTheme.bgDark
+            opacity: 0.35
+        }
+    }
+
     // Keep authentication content rectangular and above the reveal layers.
     Rectangle {
         id: authSurface
@@ -106,7 +131,7 @@ WlSessionLockSurface {
         height: Math.min(parent.height * 0.48, 260)
         color: Lazer.LazerTheme.settingsPanel
         opacity: root.authOpacity
-        z: 2
+        z: 3
 
         // Receive keyboard input only inside the session-lock surface.
         Item {
@@ -208,6 +233,7 @@ WlSessionLockSurface {
     }
 
     // Keep release ownership in the animation completion path.
+    // Curtain leads, then the artwork body rises over it, then auth reveals.
     NumberAnimation {
         id: enterAnimation
         target: root
@@ -216,7 +242,33 @@ WlSessionLockSurface {
         to: 1
         duration: Lazer.MotionTokens.waveBackdropEnter
         easing.type: Easing.OutQuint
+        onFinished: bodyEnterAnimation.start()
+    }
+
+    NumberAnimation {
+        id: bodyEnterAnimation
+        target: root
+        property: "bodyProgress"
+        from: 0
+        to: 1
+        duration: Lazer.MotionTokens.waveEnter
+        easing.type: Easing.OutQuint
         onFinished: root.authOpacity = 1
+    }
+
+    // Unlock reverses the stack: the body sinks away, then the curtain
+    // retracts and exposes the desktop again before the release lands.
+    NumberAnimation {
+        id: bodyExitAnimation
+        target: root
+        property: "bodyProgress"
+        to: 0
+        duration: Lazer.MotionTokens.waveExit
+        easing.type: Easing.InQuad
+        onFinished: {
+            exitAnimation.from = root.waveProgress
+            exitAnimation.start()
+        }
     }
 
     NumberAnimation {
@@ -225,7 +277,7 @@ WlSessionLockSurface {
         property: "waveProgress"
         to: 0
         duration: Lazer.MotionTokens.waveExit
-        easing.type: Easing.OutQuint
+        easing.type: Easing.InQuad
         onFinished: root.requestRelease()
     }
 
