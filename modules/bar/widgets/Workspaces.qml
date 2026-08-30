@@ -20,11 +20,36 @@ Item {
 
     // Workspace id -> live window rows. Rebuilt as plain JS arrays so
     // delegates never cross-index the windows ListModel reactively.
+    // Replaced only when the window set/order/app identity actually
+    // changes; a wholesale swap destroys every icon delegate and floods
+    // the async icon provider with reloads, which on Quickshell 0.3.1 can
+    // corrupt the delegate tree (icons vanish permanently).
     property var windowsByWorkspace: ({})
+    property string _windowMapSignature: ""
+    // Observability: counts real map swaps so focus-only churn is verifiable.
+    property int mapSwaps: 0
+    // Focus lives on its own so focus-only updates never rebuild icon
+    // delegates; ticks and opacity bind to this instead.
+    property string focusedWinId: ""
 
     readonly property int iconSize: 16
     readonly property int iconSpacing: 4
     readonly property int cellPadding: 8
+
+    function mapSignature(map) {
+        const workspaceIds = Object.keys(map)
+        workspaceIds.sort()
+        let signature = ""
+        for (let i = 0; i < workspaceIds.length; i++) {
+            const windows = map[workspaceIds[i]]
+            signature += workspaceIds[i] + ":"
+            for (let j = 0; j < windows.length; j++)
+                signature += windows[j].winId + "|" + windows[j].colIdx + "|"
+                    + windows[j].rowIdx + "|" + windows[j].appId + ";"
+            signature += "#"
+        }
+        return signature
+    }
 
     function windowOrder(left, right) {
         const leftColumn = left.colIdx == null ? 9999 : left.colIdx
@@ -51,10 +76,15 @@ Item {
 
     function refreshWindowMap() {
         const map = {}
+        let focused = ""
         const model = Services.NiriService.windows
         for (let i = 0; i < model.count; i++) {
             const win = model.get(i)
-            if (!win || !win.workspaceId)
+            if (!win)
+                continue
+            if (win.isFocused)
+                focused = String(win.winId)
+            if (!win.workspaceId)
                 continue
             if (!map[win.workspaceId])
                 map[win.workspaceId] = []
@@ -65,6 +95,14 @@ Item {
         for (let i = 0; i < workspaceIds.length; i++)
             map[workspaceIds[i]].sort(root.windowOrder)
 
+        // Focus-only events (the most frequent) swap nothing: icon
+        // delegates stay alive and just rebind their tick/opacity.
+        root.focusedWinId = focused
+        const signature = root.mapSignature(map)
+        if (signature === root._windowMapSignature)
+            return
+        root._windowMapSignature = signature
+        root.mapSwaps += 1
         root.windowsByWorkspace = map
     }
 
@@ -152,7 +190,10 @@ Item {
 
                             required property var modelData
 
-                            readonly property bool isFocused: modelData.isFocused || false
+                            // Bound to the shared focus property: focus-only
+                            // events never rebuild delegates, so modelData's
+                            // snapshot would be stale here.
+                            readonly property bool isFocused: String(modelData.winId) === root.focusedWinId
                             readonly property bool hovered: iconHover.hovered
 
                             width: root.iconSize
