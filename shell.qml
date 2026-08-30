@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import "modules/lazerbar" as LazerBar
 import "modules/bar" as Bar
+import "modules/lock" as LockModule
 import "services" as Services
 
 // Mount the desktop wallpaper behind the layout-driven top bar and notifications.
@@ -22,4 +23,7 @@ ShellRoot {
     Bar.TopBar {}
 
     LazerBar.NotificationHost {}
+
+    // Compositor-enforced session lock; creates one surface per screen.
+    LockModule.Lock {}
 }

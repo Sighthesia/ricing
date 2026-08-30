@@ -1,0 +1,5 @@
+module Afloat.Lock
+Lock 1.0 Lock.qml
+LockContext 1.0 LockContext.qml
+LockSnapshot 1.0 LockSnapshot.qml
+LockSurface 1.0 LockSurface.qml
