@@ -287,6 +287,18 @@ Item {
             compare(harness.sessionLockLocked, true)
         }
 
+        function test_seamTestReleaseRequiresArmedLockedState() {
+            // The startup self-test may only release a committed lock while
+            // explicitly armed; every other state or flag combination is a
+            // no-op so the bypass cannot widen beyond the armed window.
+            compare(Controller.testReleaseState(LockLogic.States.locked, true),
+                    LockLogic.States.idle)
+            compare(Controller.testReleaseState(LockLogic.States.locked, false), null)
+            compare(Controller.testReleaseState(LockLogic.States.preparing, true), null)
+            compare(Controller.testReleaseState(LockLogic.States.exiting, true), null)
+            compare(Controller.testReleaseState(LockLogic.States.idle, true), null)
+        }
+
         function test_failsafeCommitsWhenSnapshotNeverReports() {
             snapshotConnections.enabled = false
             snapshot.snapshotProvider = function() { return { ready: false } }

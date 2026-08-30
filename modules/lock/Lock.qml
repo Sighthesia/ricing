@@ -18,6 +18,14 @@ Scope {
     property int _requestGeneration: -1
     property bool _exitFailsafeArmed: false
 
+    // Opt-in startup self-test: arm the lock on boot and force-release it on a
+    // timer so the wave surface can be verified (and torn down) unattended.
+    // The release bypasses PAM only while this test flag is armed; the normal
+    // unlock() path is untouched.
+    readonly property bool selfTestEnabled: (Quickshell.env("AFLOAT_LOCK_SELFTEST") || "").trim() === "1"
+    property int selfTestDelayMs: 5000
+    property bool _selfTestArmed: false
+
     function lock(): bool {
         if (!Controller.canLock(_state))
             return false
@@ -75,6 +83,33 @@ Scope {
         _requestGeneration = -1
         _exitFailsafe.stop()
         _exitFailsafeArmed = false
+    }
+
+    // Self-test release: bypasses PAM strictly while the startup test is
+    // armed; arming happens only in Component.onCompleted below.
+    function _selfTestRelease(): void {
+        if (!root._selfTestArmed)
+            return
+        root._selfTestArmed = false
+        const next = Controller.testReleaseState(_state, true)
+        if (next === null)
+            return
+        _prepareFailsafe.stop()
+        _exitFailsafe.stop()
+        _exitFailsafeArmed = false
+        _state = next
+        sessionLock.locked = false
+        _requestGeneration = -1
+        lockContext.reset()
+        console.log("[afloat:lock] self-test lock released")
+    }
+
+    Component.onCompleted: {
+        if (!root.selfTestEnabled)
+            return
+        root._selfTestArmed = true
+        console.log("[afloat:lock] self-test lock engaged at startup")
+        root.lock()
     }
 
     // One compositor-owned lock; Quickshell creates one surface per screen.
@@ -141,6 +176,15 @@ Scope {
             root._exitFailsafeArmed = false
             root._finishRelease()
         }
+    }
+
+    // Self-test teardown: releases and kills the lock instance after the
+    // configured delay so unattended runs never stay locked.
+    property Timer _selfTestRelease: Timer {
+        interval: root.selfTestDelayMs
+        repeat: false
+        running: root.selfTestEnabled && root._selfTestArmed
+        onTriggered: root._selfTestRelease()
     }
 
     // Compositor keybinds reach the lock through this target.

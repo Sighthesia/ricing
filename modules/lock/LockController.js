@@ -57,6 +57,16 @@ function releaseState(state) {
     return LockLogic.nextState(state, "exit-finished")
 }
 
+// The startup self-test may bypass PAM only while it is explicitly armed and
+// only from a committed lock; every other path keeps PAM as the sole release.
+function testReleaseState(state, testArmed) {
+    if (testArmed !== true)
+        return null
+    if (state !== LockLogic.States.locked)
+        return null
+    return LockLogic.States.idle
+}
+
 // Decide what an unlock request may do: reset the authentication presentation
 // while locked, or cancel a preparation that never committed. It must never
 // release the session lock itself.
