@@ -22,7 +22,8 @@ Item {
     property bool sidebarExpanded: true
     readonly property int sidebarWidth: root.sidebarExpanded
             ? LazerTheme.settingsSidebarExpandedWidth : LazerTheme.settingsSidebarContractedWidth
-    property var palette: ({})
+    // `final` keeps this intentional name from shadowing Item.palette.
+    final property var palette: ({})
     property Component contentComponent: null
     property string _pendingRoute: ""
     readonly property bool interactive: phase === "opening" || phase === "open"

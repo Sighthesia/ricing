@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import "WaveSurfaceLogic.js" as Logic
 
@@ -6,8 +8,8 @@ Item {
     id: root
 
     property real progress: 0
-    property var palette: ({})
-    property bool fullscreen: false
+    // `final` keeps this intentional name from shadowing Item.palette.
+    final property var palette: ({})
     property alias waveRepeater: waveRepeater
 
     anchors.fill: parent
