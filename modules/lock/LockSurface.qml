@@ -23,6 +23,7 @@ WlSessionLockSurface {
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
     property bool releaseSent: false
+    property int revealWaitTicks: 0
 
     signal releaseRequested()
 
@@ -38,7 +39,8 @@ WlSessionLockSurface {
             return
         }
         SurfaceLogic.stopAll(allAnimations())
-        enterAnimation.start()
+        revealWaitTicks = 0
+        revealStartTimer.restart()
     }
 
     function startExit(): void {
@@ -72,7 +74,10 @@ WlSessionLockSurface {
             contextConnections.target = lockContext
     }
 
-    Component.onCompleted: startReveal()
+    Component.onCompleted: {
+        startReveal()
+        keyboardOwner.forceActiveFocus()
+    }
 
     // Base layer, painted before anything animates: the pre-lock desktop
     // capture over an opaque floor, so the surface never exposes the desktop.
@@ -89,6 +94,28 @@ WlSessionLockSurface {
         visible: status === Image.Ready && source !== ""
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
+        onStatusChanged: {
+            if (status === Image.Ready)
+                revealStartTimer.restart()
+        }
+    }
+
+    // Keep the screenshot visible for at least one settled frame before the
+    // mask starts. If capture fails, the opaque floor still starts the reveal
+    // after a bounded wait rather than exposing the wallpaper immediately.
+    Timer {
+        id: revealStartTimer
+        interval: root.snapshotUrl !== "" && baseImage.status !== Image.Ready ? 250 : 0
+        repeat: false
+        onTriggered: {
+            if (root.snapshotUrl !== "" && baseImage.status !== Image.Ready
+                    && root.revealWaitTicks < 12) {
+                root.revealWaitTicks += 1
+                restart()
+                return
+            }
+            enterAnimation.start()
+        }
     }
 
     // Wave mask: four angled bands, rendered offscreen in white. Wherever a
@@ -107,6 +134,31 @@ WlSessionLockSurface {
                 dark4: "#FFFFFFFF",
                 dark3: "#FFFFFFFF"
             })
+        }
+    }
+
+    // Keep keyboard ownership independent of the animated auth card. The
+    // session-lock surface must accept password input even while the card is
+    // still fading in or when the background image is unavailable.
+    Item {
+        id: keyboardOwner
+        anchors.fill: parent
+        focus: true
+        z: 4
+
+        Keys.onPressed: event => {
+            if (!root.lockContext)
+                return
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                root.lockContext.submit()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Backspace) {
+                root.lockContext.currentText = root.lockContext.currentText.slice(0, -1)
+                event.accepted = true
+            } else if (event.text && event.text.length === 1) {
+                root.lockContext.currentText += event.text
+                event.accepted = true
+            }
         }
     }
 
@@ -163,27 +215,6 @@ WlSessionLockSurface {
         color: Lazer.LazerTheme.settingsPanel
         opacity: root.authOpacity
         z: 3
-
-        // Receive keyboard input only inside the session-lock surface.
-        Item {
-            id: inputOwner
-            anchors.fill: parent
-            focus: true
-            Keys.onPressed: event => {
-                if (!root.lockContext)
-                    return
-                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    root.lockContext.start()
-                    event.accepted = true
-                } else if (event.key === Qt.Key_Backspace) {
-                    root.lockContext.currentText = root.lockContext.currentText.slice(0, -1)
-                    event.accepted = true
-                } else if (event.text && event.text.length === 1) {
-                    root.lockContext.currentText += event.text
-                    event.accepted = true
-                }
-            }
-        }
 
         // Mirror the shared password conversation: masked input plus an
         // outcome line, driven entirely by LockContext state.
@@ -298,7 +329,7 @@ WlSessionLockSurface {
         // the next attempt can be typed without a pointer.
         function onShowFailureChanged() {
             if (root.lockContext && root.lockContext.showFailure)
-                inputOwner.forceActiveFocus()
+                keyboardOwner.forceActiveFocus()
         }
     }
 }

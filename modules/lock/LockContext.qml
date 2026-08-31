@@ -14,6 +14,7 @@ Scope {
     property bool showFailure: false
     property string errorMessage: ""
     property bool failureReported: false
+    property bool waitingForPassword: false
 
     signal unlocked()
     signal failed()
@@ -25,8 +26,22 @@ Scope {
         showFailure = false
         errorMessage = ""
         failureReported = false
+        waitingForPassword = false
         unlockInProgress = pam.start()
         return unlockInProgress
+    }
+
+    function submit(): bool {
+        if (unlockInProgress)
+            return false
+        if (waitingForPassword) {
+            waitingForPassword = false
+            pam.respond(currentText)
+            currentText = ""
+            unlockInProgress = true
+            return true
+        }
+        return start()
     }
 
     function reset(): void {
@@ -36,6 +51,7 @@ Scope {
         showFailure = false
         errorMessage = ""
         failureReported = false
+        waitingForPassword = false
     }
 
     function reportFailure(message): void {
@@ -58,6 +74,11 @@ Scope {
             if (!responseRequired)
                 return
 
+            if (root.currentText.length === 0) {
+                root.waitingForPassword = true
+                return
+            }
+
             respond(root.currentText)
             root.currentText = ""
         }
@@ -65,6 +86,7 @@ Scope {
         onCompleted: result => {
             root.unlockInProgress = false
             root.currentText = ""
+            root.waitingForPassword = false
 
             if (result === PamResult.Success) {
                 root.showFailure = false
@@ -79,6 +101,7 @@ Scope {
         onError: error => {
             root.unlockInProgress = false
             root.currentText = ""
+            root.waitingForPassword = false
             root.reportFailure(PamError.toString(error))
         }
     }
