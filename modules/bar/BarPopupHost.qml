@@ -74,9 +74,10 @@ PanelWindow {
     signal actionRequested(string action)
     signal closeRequested()
 
-    // Vertical popup layers use their progress opacity; the host geometry
-    // animation supplies the spatial movement without self-clipping rows.
-    readonly property real slideOffset: 0
+    // Vertical popup layers slide from the bar using a stable travel distance;
+    // the disabled internal clip keeps the full layers visible while moving.
+    readonly property real slideOffset: root.direction === "up"
+            ? root.revealDistance + 1 : -(root.revealDistance + 1)
 
     function startReveal(target) {
         revealMotion.stop()
@@ -566,8 +567,8 @@ PanelWindow {
             revealProgress: 0
             contentDelay: MotionTokens.settingsContentDelay
             animateLayerOpacity: true
-            sidebarOffset: 0
-            contentOffset: 0
+            sidebarOffset: root.slideOffset
+            contentOffset: root.slideOffset
             // Single source of truth: the reveal lives while the surface is
             // active, covering both the open state and the exit slide window.
             visible: root.surfaceActive

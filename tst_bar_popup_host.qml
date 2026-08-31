@@ -430,9 +430,9 @@ Item {
             root.check("hover content height positive", host.popupItem.contentLayer.height > 0, true)
             // Slide contract: layers travel the full container distance behind
             // the bar clip edge instead of relying on the opacity channel.
-             root.check("identity layer reveal uses opacity", host.popupItem.sidebarOffset, 0)
+             root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
              root.check("content layer shares slide offset", host.popupItem.contentOffset, host.popupItem.sidebarOffset)
-             root.check("reveal uses the layer opacity channel", host.popupItem.animateLayerOpacity, true)
+             root.check("reveal keeps the layer opacity channel", host.popupItem.animateLayerOpacity, true)
              root.check("reveal state is active while open",
                  host.surfaceActive && host.popupItem.visible, true)
              root.check("reveal viewport covers complete target",
