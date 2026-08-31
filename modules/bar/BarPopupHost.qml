@@ -234,8 +234,11 @@ PanelWindow {
     }
 
     function popupHeightForIntent(intentObj) {
-        return intentObj && String(intentObj.kind || "") === "context"
+        if (!intentObj)
+            return 1
+        var height = String(intentObj.kind || "") === "context"
                 ? contextPopupActions.implicitHeight : popupActions.implicitHeight
+        return isFinite(Number(height)) && Number(height) > 0 ? Number(height) : 1
     }
 
     function targetGeometryFor(intentObj, width, height) {
@@ -250,7 +253,8 @@ PanelWindow {
 
     function updateTargetGeometry(intentObj) {
         var width = Math.max(260, 240)
-        var height = Number(popup.sidebarLayer.implicitHeight) + popupHeightForIntent(intentObj) + 1
+        var displayedIntent = root.currentIntent || intentObj
+        var height = Number(popup.sidebarLayer.implicitHeight) + popupHeightForIntent(displayedIntent) + 1
         if (!isFinite(width) || width < 0)
             width = 260
         if (!isFinite(height) || height < 1)
@@ -405,19 +409,20 @@ PanelWindow {
             // the hovered tray delegate changes so no overlapping windows appear.
             sidebarData: BarPopupIdentity {
                 objectName: "popupIdentity"
-                title: root.intent ? (root.intent.title || "") : ""
-                iconSource: root.intent ? (root.intent.iconSource || "") : ""
-                summary: root.intent ? (root.intent.summary || "") : ""
+                title: root.currentIntent ? (root.currentIntent.title || "") : ""
+                iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
+                summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
                 hostWidth: 260
             }
 
             // Keep both menu bodies in one content host so only the active
             // intent contributes to the popup height and visible surface.
             contentData: Item {
-                objectName: "popupContentSlot"
-                width: 260
-                implicitHeight: Math.max(popupActions.implicitHeight, contextPopupActions.implicitHeight)
-                height: implicitHeight
+                 objectName: "popupContentSlot"
+                 width: 260
+                 implicitHeight: root.popupHeightForIntent(root.currentIntent)
+                 height: implicitHeight
+                 onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
 
                 // Settings section-block surface under the action rows; the
                 // darker cards float on it exactly like the settings panel.
@@ -435,9 +440,9 @@ PanelWindow {
                     id: popupActions
                     objectName: "popupActions"
                     anchors.fill: parent
-                    actionKind: root.intent && root.intent.kind !== "context"
-                            ? (root.intent.actionKind || "") : "context"
-                    payload: root.intent ? root.intent.payload : null
+                    actionKind: root.currentIntent && root.currentIntent.kind !== "context"
+                            ? (root.currentIntent.actionKind || "") : "context"
+                    payload: root.currentIntent ? root.currentIntent.payload : null
                 }
 
                 // Context actions reuse the same content owner and geometry.
@@ -445,12 +450,12 @@ PanelWindow {
                     id: contextPopupActions
                     objectName: "contextPopupActions"
                     anchors.fill: parent
-                    actionKind: root.intent && root.intent.kind === "context" ? "context" : ""
-                    widgetId: root.intent ? (root.intent.widgetId || "") : ""
-                    instanceKey: root.intent ? (root.intent.instanceKey || "") : ""
-                    section: root.intent ? (root.intent.section || "center") : "center"
-                    hasSettings: root.intent ? root.intent.hasSettings === true : false
-                    payload: root.intent ? root.intent.payload : null
+                    actionKind: root.currentIntent && root.currentIntent.kind === "context" ? "context" : ""
+                    widgetId: root.currentIntent ? (root.currentIntent.widgetId || "") : ""
+                    instanceKey: root.currentIntent ? (root.currentIntent.instanceKey || "") : ""
+                    section: root.currentIntent ? (root.currentIntent.section || "center") : "center"
+                    hasSettings: root.currentIntent ? root.currentIntent.hasSettings === true : false
+                    payload: root.currentIntent ? root.currentIntent.payload : null
                     onActionRequested: action => {
                         if (action === "close")
                             root.dismissImmediately()

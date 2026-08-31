@@ -195,3 +195,36 @@ Exact result: existing warnings only: `PanelWindow is not creatable`, unresolved
 
 - Commit: final hash recorded after this report update.
 - Message: `fix(bar): preserve popup geometry fallbacks`
+
+## Targeted Review Fixes
+
+- Visible identity and action bindings now consume `currentIntent`; `intent` remains the newest requested payload while `pendingIntent` waits for the later content transition.
+- Initial opening initializes `currentIntent`, and replacement geometry continues to use the current displayed kind.
+- The content slot selects only the hover or context menu height for `currentIntent`, with a legal minimum height of `1` when no intent is available. Geometry is refreshed when the measured slot height changes.
+- The harness now verifies initial current-intent ownership, old-current/new-pending replacement state, current-kind height retention, and context-kind height selection.
+
+## Targeted Review Verification
+
+Command:
+
+```bash
+timeout 25 qs -p tst_bar_popup_host.qml
+```
+
+Result: `55 passed, 0 failed`.
+
+The harness emitted only the existing `ProxyFloatingWindow` width/height deprecation warnings.
+
+Additional checks:
+
+```bash
+qmllint modules/bar/BarPopupHost.qml
+git diff --check
+```
+
+Both completed successfully. `qmllint` produced no output for this file.
+
+## Concerns
+
+- The existing Quickshell `ProxyFloatingWindow` width/height deprecation warnings remain outside this targeted fix.
+- `contentData` is a QML `data` alias and is not directly property-reflectable as the slot Item in the harness; height assertions use the host's height-selection contract instead.

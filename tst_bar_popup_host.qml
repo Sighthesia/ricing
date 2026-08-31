@@ -161,22 +161,22 @@ Item {
                  anchorX: 700, screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
                  barPosition: "top"
               }
-              host.updateIntent(volumeIntent)
-              root.check("hover height selects hover implicit height", host.targetHeight,
-                  host.popupItem.sidebarLayer.implicitHeight
-                  + host.popupItem.contentLayer.children[0].children[1].implicitHeight + 1)
+               host.updateIntent(volumeIntent)
+               root.check("initial open initializes current intent", host.currentIntent.widgetId, "volume")
+               var hoverSlotHeight = host.popupHeightForIntent(host.currentIntent)
+               root.check("hover height selects hover implicit height", host.targetHeight, 89)
               host.updateIntent(contextIntent)
               root.check("replacement keeps host open", host.open, true)
               root.check("replacement keeps surface active", host.surfaceActive, true)
               root.check("replacement exposes latest intent", host.intent.widgetId, "notifications")
               root.check("replacement keeps current intent", host.currentIntent.widgetId, "volume")
-              root.check("replacement keeps original popup owner", host.popupItem === originalPopupItem, true)
-              root.check("replacement records pending intent", host.pendingIntent.widgetId, "notifications")
-              root.check("replacement increments transition serial", host.transitionSerial > 0, true)
-              root.check("replacement target remains screen-clamped", host.targetX >= 8 && host.targetX <= 1000 - host.targetWidth - 8, true)
-              root.check("context height selects context implicit height", host.targetHeight,
-                  host.popupItem.sidebarLayer.implicitHeight
-                  + host.popupItem.contentLayer.children[0].children[2].implicitHeight + 1)
+               root.check("replacement keeps original popup owner", host.popupItem === originalPopupItem, true)
+               root.check("replacement records pending intent", host.pendingIntent.widgetId, "notifications")
+               root.check("replacement keeps slot height for current kind",
+                   host.popupHeightForIntent(host.currentIntent), hoverSlotHeight)
+               root.check("replacement increments transition serial", host.transitionSerial > 0, true)
+               root.check("replacement target remains screen-clamped", host.targetX >= 8 && host.targetX <= 1000 - host.targetWidth - 8, true)
+               root.check("replacement target keeps current kind height", host.targetHeight, 89)
 
               // Invalid geometry fields must retain the host's last valid values.
               var invalidIntent = {
@@ -189,12 +189,24 @@ Item {
               root.check("invalid bar position keeps host direction", host.direction, "down")
               root.check("invalid anchor geometry uses fallback", host.targetX, 570)
 
-              host.dismissImmediately()
+             host.dismissImmediately()
              root.check("dismissImmediately closes host", host.open, false)
              root.check("dismissImmediately clears surface", host.surfaceActive, false)
 
-             // Switch to bottom bar and verify direction flips without reopening window.
-            var intentBottom = {
+             host.showIntent(contextIntent)
+             Qt.callLater(function () {
+                 root.check("context open initializes current intent", host.currentIntent.kind, "context")
+                 root.check("context height selects context implicit height",
+                     host.popupHeightForIntent(host.currentIntent), 184)
+                 root.check("context target follows context height", host.targetHeight, 185)
+                 root.startBottomBarChecks()
+             })
+        })
+    }
+
+    function startBottomBarChecks() {
+        // Switch to bottom bar and verify direction flips without reopening window.
+        var intentBottom = {
                 widgetId: "tray",
                 instanceKey: "tray:2",
                 title: "Tray",
@@ -205,9 +217,9 @@ Item {
                  screenWidth: 1000, screenHeight: 1080, effectiveBarHeight: 48,
                  barPosition: "bottom"
             }
-            host.showIntent(intentBottom)
+        host.showIntent(intentBottom)
 
-             Qt.callLater(function () {
+        Qt.callLater(function () {
                 root.check("bottom bar direction is up", host.direction, "up")
                 root.check("TwoLayerPopup direction Up for bottom bar", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Up)
                 root.check("still open after intent swap", host.open, true)
@@ -223,7 +235,6 @@ Item {
 
                 // Wait the close delay; popupHovered true should keep it open.
                 remainOpenWait.restart()
-            })
         })
     }
 }
