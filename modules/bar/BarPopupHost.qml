@@ -164,22 +164,25 @@ PanelWindow {
         }
 
         root.intent = intentObj
-        root.anchorX = Number(intentObj.anchorX)
-        if (!isFinite(root.anchorX))
-            root.anchorX = 0
+        var anchor = Number(intentObj.anchorX)
+        if (isFinite(anchor) && anchor >= 0)
+            root.anchorX = anchor
         var sw = Number(intentObj.screenWidth)
         if (isFinite(sw) && sw > 0)
             root.intentScreenWidth = sw
-        else
-            root.intentScreenWidth = 0
         var sh = Number(intentObj.screenHeight)
-        root.intentScreenHeight = isFinite(sh) && sh > 0 ? sh : 0
+        if (isFinite(sh) && sh > 0)
+            root.intentScreenHeight = sh
         var barHeight = Number(intentObj.effectiveBarHeight)
-        root.intentBarHeight = isFinite(barHeight) && barHeight > 0 ? barHeight : 0
+        if (isFinite(barHeight) && barHeight >= 0)
+            root.intentBarHeight = barHeight
         var margin = Number(intentObj.floatingMargin)
-        root.intentFloatingMargin = isFinite(margin) && margin >= 0 ? margin : -1
-        var pos = intentObj.barPosition !== undefined ? String(intentObj.barPosition) : "top"
-        root.direction = BarHoverLogic.popupDirection(pos)
+        if (isFinite(margin) && margin >= 0)
+            root.intentFloatingMargin = margin
+        var pos = intentObj.barPosition !== undefined
+                ? String(intentObj.barPosition).trim().toLowerCase() : ""
+        if (pos === "top" || pos === "bottom")
+            root.direction = BarHoverLogic.popupDirection(pos)
         root.updateTargetGeometry(intentObj)
         root.open = true
         root.surfaceActive = true
@@ -246,8 +249,8 @@ PanelWindow {
     }
 
     function updateTargetGeometry(intentObj) {
-        var width = Math.max(Number(popup.sidebarLayer.width), 260, 240)
-        var height = Number(popup.sidebarLayer.height) + popupHeightForIntent(intentObj) + 1
+        var width = Math.max(260, 240)
+        var height = Number(popup.sidebarLayer.implicitHeight) + popupHeightForIntent(intentObj) + 1
         if (!isFinite(width) || width < 0)
             width = 260
         if (!isFinite(height) || height < 1)
