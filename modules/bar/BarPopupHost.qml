@@ -25,6 +25,7 @@ PanelWindow {
     property int replacementSerial: 0
     property bool replacingContent: false
     property real contentOpacity: 1
+    readonly property bool closeTimerRunning: closeTimer.running
     readonly property bool contentInteractive:
         contentOpacity > 0.99 && popup.interactable
     property bool open: false
@@ -63,6 +64,7 @@ PanelWindow {
     readonly property alias contentData: popup.contentData
     readonly property alias popupItem: popup
     readonly property alias popupContainerItem: popupContainer
+    readonly property alias contextActions: contextPopupActions
 
     signal actionRequested(string action)
     signal closeRequested()
@@ -160,6 +162,9 @@ PanelWindow {
         if (!intentObj)
             return
 
+        // A new intent revives the live host before replacement is evaluated.
+        // This prevents a pending close from racing the single popup instance.
+        cancelClose()
         var isOpen = root.open && root.currentIntent
         var isReplacement = isOpen && !root.sameIntent(root.currentIntent, intentObj)
         if (!isOpen) {
@@ -167,6 +172,11 @@ PanelWindow {
             root.currentIntent = intentObj
         } else if (isReplacement) {
             root.beginIntentReplacement(intentObj)
+        } else {
+            // Same instance updates (for example a tray delegate label or a
+            // refreshed callback payload) stay live without a crossfade.
+            root.invalidateContentTransition()
+            root.currentIntent = intentObj
         }
 
         root.intent = intentObj
@@ -192,7 +202,6 @@ PanelWindow {
         root.updateTargetGeometry(intentObj)
         root.open = true
         root.surfaceActive = true
-        cancelClose()
         clearIntentTimer.stop()
         root.debugLog("open", { "windowVisible": root.visible, "surfaceActive": true,
                                 "direction": root.direction, "anchorX": root.anchorX })
@@ -401,7 +410,6 @@ PanelWindow {
         onTriggered: {
             if (BarHoverLogic.shouldClose(root.widgetHovered, root.popupHovered, true)) {
                 root.debugLog("closed", { "revealProgress": Number(popup.revealProgress) })
-                root.invalidateContentTransition()
                 root.open = false
                 root.closeRequested()
                 clearIntentTimer.restart()
@@ -473,7 +481,9 @@ PanelWindow {
         interval: popup.revealDuration + 40
         onTriggered: {
             if (!root.open) {
+                root.invalidateContentTransition()
                 root.intent = null
+                root.currentIntent = null
                 root.surfaceActive = false
             }
         }

@@ -11,6 +11,7 @@ Item {
 
     property int _failures: 0
     property int _checks: 0
+    property var _contextCallbackArgs: []
 
     function check(label, actual, expected) {
         root._checks += 1
@@ -86,6 +87,22 @@ Item {
             root.check("still open after old timer window", host.open, true)
             root.check("anchor updated after race", host.anchorX, 300)
             root.check("hover bridge still intact after race", host.popupItem.orientation, Lazer.TwoLayerPopup.Orientation.Vertical)
+            // The exit reveal must retain the old content until cleanup.
+            host.widgetHovered = false
+            host.popupHovered = false
+            host.requestClose()
+            root.check("close request retains current intent", host.currentIntent.widgetId, "media")
+            root.check("close request retains root intent", host.intent.widgetId, "media")
+            var popupOwner = host.popupItem
+            root.check("close request keeps popup owner", host.popupItem === popupOwner, true)
+            host.updateIntent({
+                widgetId: "context-reopen", instanceKey: "context-reopen:0", kind: "context",
+                actionKind: "", section: "right", hasSettings: false,
+                anchorX: 320, screenWidth: 1000, barPosition: "top"
+            })
+            root.check("reopen cancels pending close", host.closeTimerRunning, false)
+            root.check("reopen during close keeps same popup owner", host.popupItem === popupOwner, true)
+            root.check("reopen replaces latest intent", host.intent.widgetId, "context-reopen")
             // Context menus must render visible with real content height.
             var contextIntent = {
                 widgetId: "clock",
@@ -97,6 +114,11 @@ Item {
                 kind: "context",
                 section: "right",
                 hasSettings: false,
+                payload: {
+                    moveLeft: function(key, id, section) {
+                        root._contextCallbackArgs = [key, id, section]
+                    }
+                },
                 anchorX: 300,
                 screenWidth: 1000,
                 barPosition: "top"
@@ -121,7 +143,13 @@ Item {
             host.updateIntent({
                 widgetId: "clock-latest", instanceKey: "clock-latest:0", kind: "context",
                 anchorX: 320, screenWidth: 1000, screenHeight: 800,
-                effectiveBarHeight: 48, barPosition: "top"
+                effectiveBarHeight: 48, barPosition: "top",
+                section: "left", hasSettings: true,
+                payload: {
+                    moveRight: function(key, id, section) {
+                        root._contextCallbackArgs = [key, id, section]
+                    }
+                }
             })
             root.check("rapid fade replacement keeps latest pending", host.pendingIntent.widgetId,
                 "clock-latest")
@@ -136,6 +164,14 @@ Item {
             root.check("fade-out completion applies latest pending",
                 host.currentIntent.widgetId, "clock-latest")
             root.check("pending intent clears after apply", host.pendingIntent, null)
+            root._contextCallbackArgs = []
+            host.contextActions.invoke("moveRight")
+            root.check("hover-to-context callback receives latest instance key",
+                root._contextCallbackArgs[0], "clock-latest:0")
+            root.check("hover-to-context callback receives latest widget id",
+                root._contextCallbackArgs[1], "clock-latest")
+            root.check("hover-to-context callback receives latest section",
+                root._contextCallbackArgs[2], "left")
             fadeInWait.restart()
         }
     }
@@ -148,7 +184,25 @@ Item {
             root.check("fade-in restores interaction", host.contentInteractive, true)
             root.check("contentFade completion leaves latest current intent",
                 host.currentIntent.widgetId, "clock-latest")
+            // Context-to-context replacement must keep callbacks bound to the
+            // latest payload while the popup object is reused.
+            root._contextCallbackArgs = []
+            host.contextActions.invoke("moveRight")
+            root.check("latest context callback receives instance key",
+                root._contextCallbackArgs[0], "clock-latest:0")
+            root.check("latest context callback receives widget id",
+                root._contextCallbackArgs[1], "clock-latest")
+            root.check("latest context callback receives section",
+                root._contextCallbackArgs[2], "left")
+            host.contextActions.invoke("close")
+            root.check("context close dismisses reused host", host.open, false)
+            root.check("context close clears intent immediately", host.intent, null)
 
+            host.showIntent({
+                widgetId: "dismiss-source", instanceKey: "dismiss-source:0", kind: "hover",
+                actionKind: "volume", anchorX: 420, screenWidth: 1000,
+                screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+            })
             host.updateIntent({
                 widgetId: "dismissed", instanceKey: "dismissed:0", kind: "hover",
                 actionKind: "volume", anchorX: 460, screenWidth: 1000,
