@@ -68,7 +68,8 @@ PanelWindow {
     readonly property alias sidebarData: popup.sidebarData
     readonly property alias contentData: popup.contentData
     readonly property alias popupItem: popup
-    readonly property alias popupContainerItem: popupContainer
+    readonly property alias popupContainerItem: popupGeometry
+    readonly property alias popupViewportItem: popupViewport
     readonly property alias contextActions: contextPopupActions
 
     signal actionRequested(string action)
@@ -409,7 +410,9 @@ PanelWindow {
     }
     margins { top: 0; bottom: 0; left: 0; right: 0 }
     // No input when closed; the window otherwise masks only the popup.
-    mask: Region { item: root.open ? popupContainer : null }
+    // Keep the visual/input region alive for the exit reveal after open flips
+    // false; clearing it at close start cuts the second layer off immediately.
+    mask: Region { item: root.surfaceActive ? popupContainer : null }
     // Do not keep a full-screen transparent surface above the settings window
     // when no bar popup is open or completing its reveal.
     visible: root.surfaceActive
@@ -540,34 +543,53 @@ PanelWindow {
         }
     }
 
-    // Fixed outer host; inner popup is clamped horizontally. The container is
-    // a positioning wrapper and stays visible; the reveal item below gates
-    // all painting, so no parent/child visibility chain is needed.
+    // Public geometry owner keeps screen-relative coordinates stable for
+    // diagnostics and callers; the visual owner below is clipped separately.
     Item {
-        id: popupContainer
-        objectName: "popupContainer"
-        // Size follows both slots so clamping uses the rendered surface bounds.
-        width: root.displayWidth
-        height: root.displayHeight
-        // Convert the producer's trigger center into the popup's left edge
-        // before applying the existing screen-edge clamp contract.
+        id: popupGeometry
+        objectName: "popupGeometry"
         x: root.displayX
         y: root.displayY
+        width: root.displayWidth
+        height: root.displayHeight
+    }
 
-        // Non-blocking hover bridge on the popup surface.
-        HoverHandler {
-            id: popupHoverHandler
-            blocking: false
-            onHoveredChanged: root.popupHovered = hovered
-        }
+    // Fixed outer host; the viewport ends at the bar edge so the translucent
+    // bar surface cannot reveal the popup while it retracts underneath it.
+    Item {
+        id: popupViewport
+        objectName: "popupViewport"
+        x: 0
+        y: root.direction === "down"
+                ? root.activeBarHeight + root.activeFloatingMargin : 0
+        width: root.activeScreenWidth
+        height: root.direction === "down"
+                ? root.activeScreenHeight - root.activeBarHeight - root.activeFloatingMargin
+                : root.activeScreenHeight - root.activeBarHeight - root.activeFloatingMargin
+        clip: true
+
+        // Position the rendered popup inside the bar-edge clipping viewport.
+        Item {
+            id: popupContainer
+            objectName: "popupContainer"
+            width: root.displayWidth
+            height: root.displayHeight
+            x: root.displayX
+            y: root.displayY - popupViewport.y
+
+            // Non-blocking hover bridge on the popup surface.
+            HoverHandler {
+                id: popupHoverHandler
+                blocking: false
+                onHoveredChanged: root.popupHovered = hovered
+            }
 
             // Two-layer surface; vertical orientation with direction driven by
-            // the bar position (top -> Down, bottom -> Up). The popup clip is
-            // the bar edge, while the layers provide the slide motion.
+            // the bar position (top -> Down, bottom -> Up).
             TwoLayerPopup {
                 id: popup
                 orientation: TwoLayerPopup.Orientation.Vertical
-            clipVertical: false
+                clipVertical: false
                 direction: root.direction === "up" ? TwoLayerPopup.Direction.Up : TwoLayerPopup.Direction.Down
                 opening: root.open
                 width: popupContainer.width
@@ -575,68 +597,69 @@ PanelWindow {
                 revealProgress: 0
                 contentDelay: MotionTokens.settingsContentDelay
                 animateLayerOpacity: false
-            sidebarOffset: root.slideOffset
-            contentOffset: root.slideOffset
-            // Single source of truth: the reveal lives while the surface is
-            // active, covering both the open state and the exit slide window.
-            visible: root.surfaceActive
+                sidebarOffset: root.slideOffset
+                contentOffset: root.slideOffset
+                // Single source of truth: the reveal lives while the surface is
+                // active, covering both the open state and the exit slide window.
+                visible: root.surfaceActive
 
-            // Identity layer bound to the current intent; updates in place when
-            // the hovered tray delegate changes so no overlapping windows appear.
-            sidebarData: BarPopupIdentity {
-                objectName: "popupIdentity"
-                title: root.currentIntent ? (root.currentIntent.title || "") : ""
-                iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
-                summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
-                hostWidth: 260
-            }
-
-            // Keep both menu bodies in one content host so only the active
-            // intent contributes to the popup height and visible surface.
-            contentData: Item {
-                 objectName: "popupContentSlot"
-                 width: 260
-                 implicitHeight: root.popupHeightForIntent(root.currentIntent)
-                 height: implicitHeight
-                 opacity: root.contentOpacity
-                 enabled: root.contentInteractive
-                 onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
-
-                // Settings section-block surface under the action rows; the
-                // darker cards float on it exactly like the settings panel.
-                Rectangle {
-                    objectName: "popupContentSurface"
-                    x: 0
-                    y: root.direction === "down" ? -1 : 0
-                    width: parent.width
-                    height: parent.height + 1
-                    color: LazerTheme.settingsSection
+                // Identity layer bound to the current intent; updates in place when
+                // the hovered tray delegate changes so no overlapping windows appear.
+                sidebarData: BarPopupIdentity {
+                    objectName: "popupIdentity"
+                    title: root.currentIntent ? (root.currentIntent.title || "") : ""
+                    iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
+                    summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
+                    hostWidth: 260
                 }
 
-                // Action layer bound to the hovered widget intent.
-                BarPopupActions {
-                    id: popupActions
-                    objectName: "popupActions"
-                    anchors.fill: parent
-                    actionKind: root.currentIntent && root.currentIntent.kind !== "context"
-                            ? (root.currentIntent.actionKind || "") : "context"
-                    payload: root.currentIntent ? root.currentIntent.payload : null
-                }
+                // Keep both menu bodies in one content host so only the active
+                // intent contributes to the popup height and visible surface.
+                contentData: Item {
+                     objectName: "popupContentSlot"
+                     width: 260
+                     implicitHeight: root.popupHeightForIntent(root.currentIntent)
+                     height: implicitHeight
+                     opacity: root.contentOpacity
+                     enabled: root.contentInteractive
+                     onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
 
-                // Context actions reuse the same content owner and geometry.
-                BarContextPopupActions {
-                    id: contextPopupActions
-                    objectName: "contextPopupActions"
-                    anchors.fill: parent
-                    actionKind: root.currentIntent && root.currentIntent.kind === "context" ? "context" : ""
-                    widgetId: root.currentIntent ? (root.currentIntent.widgetId || "") : ""
-                    instanceKey: root.currentIntent ? (root.currentIntent.instanceKey || "") : ""
-                    section: root.currentIntent ? (root.currentIntent.section || "center") : "center"
-                    hasSettings: root.currentIntent ? root.currentIntent.hasSettings === true : false
-                    payload: root.currentIntent ? root.currentIntent.payload : null
-                    onActionRequested: action => {
-                        if (action === "close")
-                            root.dismissImmediately()
+                    // Settings section-block surface under the action rows; the
+                    // darker cards float on it exactly like the settings panel.
+                    Rectangle {
+                        objectName: "popupContentSurface"
+                        x: 0
+                        y: root.direction === "down" ? -1 : 0
+                        width: parent.width
+                        height: parent.height + 1
+                        color: LazerTheme.settingsSection
+                    }
+
+                    // Action layer bound to the hovered widget intent.
+                    BarPopupActions {
+                        id: popupActions
+                        objectName: "popupActions"
+                        anchors.fill: parent
+                        actionKind: root.currentIntent && root.currentIntent.kind !== "context"
+                                ? (root.currentIntent.actionKind || "") : "context"
+                        payload: root.currentIntent ? root.currentIntent.payload : null
+                    }
+
+                    // Context actions reuse the same content owner and geometry.
+                    BarContextPopupActions {
+                        id: contextPopupActions
+                        objectName: "contextPopupActions"
+                        anchors.fill: parent
+                        actionKind: root.currentIntent && root.currentIntent.kind === "context" ? "context" : ""
+                        widgetId: root.currentIntent ? (root.currentIntent.widgetId || "") : ""
+                        instanceKey: root.currentIntent ? (root.currentIntent.instanceKey || "") : ""
+                        section: root.currentIntent ? (root.currentIntent.section || "center") : "center"
+                        hasSettings: root.currentIntent ? root.currentIntent.hasSettings === true : false
+                        payload: root.currentIntent ? root.currentIntent.payload : null
+                        onActionRequested: action => {
+                            if (action === "close")
+                                root.dismissImmediately()
+                        }
                     }
                 }
             }
