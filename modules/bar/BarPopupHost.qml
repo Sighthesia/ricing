@@ -526,7 +526,14 @@ PanelWindow {
         // the surfaceActive binding so parents and children never read each
         // other's effective visibility (which deadlocks at false).
         if (open) {
-            revealStartTimer.restart()
+            if (MotionTokens.reducedMotion) {
+                revealStartTimer.stop()
+                root.updateTargetGeometry(root.currentIntent, true)
+                root.revealDistance = Math.max(root.targetHeight, root.displayHeight, 1)
+                root.startReveal(1)
+            } else {
+                revealStartTimer.restart()
+            }
         } else {
             revealStartTimer.stop()
             root.startReveal(0)
@@ -555,18 +562,19 @@ PanelWindow {
         }
 
             // Two-layer surface; vertical orientation with direction driven by
-            // the bar position (top -> Down, bottom -> Up). Layer progress
-            // controls opacity so rows are never exposed through a self-clip.
-        TwoLayerPopup {
-            id: popup
-            orientation: TwoLayerPopup.Orientation.Vertical
-            clipVertical: false
-            direction: root.direction === "up" ? TwoLayerPopup.Direction.Up : TwoLayerPopup.Direction.Down
-            width: popupContainer.width
-            height: root.revealViewportHeight
-            revealProgress: 0
-            contentDelay: MotionTokens.settingsContentDelay
-            animateLayerOpacity: false
+            // the bar position (top -> Down, bottom -> Up). The popup clip is
+            // the bar edge, while the layers provide the slide motion.
+            TwoLayerPopup {
+                id: popup
+                orientation: TwoLayerPopup.Orientation.Vertical
+            clipVertical: true
+                direction: root.direction === "up" ? TwoLayerPopup.Direction.Up : TwoLayerPopup.Direction.Down
+                opening: root.open
+                width: popupContainer.width
+                height: popupContainer.height
+                revealProgress: 0
+                contentDelay: MotionTokens.settingsContentDelay
+                animateLayerOpacity: false
             sidebarOffset: root.slideOffset
             contentOffset: root.slideOffset
             // Single source of truth: the reveal lives while the surface is

@@ -22,6 +22,8 @@ Item {
     property real sidebarOffset: 0
     property real contentOffset: 0
     property int contentDelay: MotionTokens.settingsContentDelay
+    // Host sets this from its lifecycle so exit motion is not delayed twice.
+    property bool opening: true
     property real horizontalSidebarX: 0
     property real horizontalContentX: 0
     // Settings owns horizontal layer opacity; vertical popups use the shared fade.
@@ -30,7 +32,7 @@ Item {
     readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
     readonly property bool interactable: root.revealProgress > 0.99
     readonly property real sidebarRevealProgress: root.revealProgress
-    readonly property real contentRevealProgress: MotionTokens.reducedMotion
+    readonly property real contentRevealProgress: MotionTokens.reducedMotion || !root.opening
         ? root.revealProgress
         : root.contentDelay <= 0
             ? root.revealProgress
