@@ -150,6 +150,27 @@ Item {
             root.check("sidebarData alias exists", host.sidebarData !== undefined, true)
              root.check("contentData alias exists", host.contentData !== undefined, true)
 
+             var originalPopupItem = host.popupItem
+             var volumeIntent = {
+                 widgetId: "volume", instanceKey: "volume:0", kind: "hover", actionKind: "volume",
+                 anchorX: 180, screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
+                 barPosition: "top"
+             }
+             var contextIntent = {
+                 widgetId: "notifications", instanceKey: "notifications:0", kind: "context", actionKind: "",
+                 anchorX: 700, screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
+                 barPosition: "top"
+             }
+             host.updateIntent(volumeIntent)
+             host.updateIntent(contextIntent)
+             root.check("replacement keeps host open", host.open, true)
+             root.check("replacement keeps surface active", host.surfaceActive, true)
+             root.check("replacement exposes latest intent", host.intent.widgetId, "notifications")
+             root.check("replacement keeps original popup owner", host.popupItem === originalPopupItem, true)
+             root.check("replacement records pending intent", host.pendingIntent.widgetId, "notifications")
+             root.check("replacement increments transition serial", host.transitionSerial > 0, true)
+             root.check("replacement target remains screen-clamped", host.targetX >= 8 && host.targetX <= 1000 - host.targetWidth - 8, true)
+
              host.dismissImmediately()
              root.check("dismissImmediately closes host", host.open, false)
              root.check("dismissImmediately clears surface", host.surfaceActive, false)

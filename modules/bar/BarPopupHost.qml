@@ -19,6 +19,10 @@ PanelWindow {
 
     // Intent payload from the hovered widget.
     property var intent: null
+    property var currentIntent: null
+    property var pendingIntent: null
+    property int transitionSerial: 0
+    property bool replacingContent: false
     property bool open: false
     property bool widgetHovered: false
     property bool popupHovered: false
@@ -35,6 +39,11 @@ PanelWindow {
     property real intentBarHeight: 0
     property real intentFloatingMargin: -1
     property bool popupHoverWasActive: false
+
+    property real targetX: 0
+    property real targetY: 0
+    property real targetWidth: 260
+    property real targetHeight: 1
 
     readonly property real activeScreenWidth: intentScreenWidth > 0 ? intentScreenWidth : screenWidth
     readonly property real activeScreenHeight: intentScreenHeight > 0 ? intentScreenHeight : screenHeight
@@ -142,6 +151,18 @@ PanelWindow {
     function updateIntent(intentObj) {
         if (!intentObj)
             return
+
+        var isReplacement = root.open && root.currentIntent && !root.sameIntent(root.currentIntent, intentObj)
+        if (isReplacement) {
+            root.transitionSerial += 1
+            root.pendingIntent = intentObj
+            root.replacingContent = true
+        } else {
+            root.currentIntent = intentObj
+            root.pendingIntent = null
+            root.replacingContent = false
+        }
+
         root.intent = intentObj
         root.anchorX = Number(intentObj.anchorX)
         if (!isFinite(root.anchorX))
@@ -159,12 +180,83 @@ PanelWindow {
         root.intentFloatingMargin = isFinite(margin) && margin >= 0 ? margin : -1
         var pos = intentObj.barPosition !== undefined ? String(intentObj.barPosition) : "top"
         root.direction = BarHoverLogic.popupDirection(pos)
+        root.updateTargetGeometry(intentObj)
         root.open = true
         root.surfaceActive = true
         cancelClose()
         clearIntentTimer.stop()
         root.debugLog("open", { "windowVisible": root.visible, "surfaceActive": true,
                                 "direction": root.direction, "anchorX": root.anchorX })
+    }
+
+    function sameIntent(left, right) {
+        if (!left || !right)
+            return false
+        return String(left.widgetId || "") === String(right.widgetId || "")
+            && String(left.instanceKey || "") === String(right.instanceKey || "")
+            && String(left.kind || "hover") === String(right.kind || "hover")
+            && String(left.actionKind || "") === String(right.actionKind || "")
+    }
+
+    function _intentNumber(intentObj, fieldName, fallback, minimum) {
+        var value = Number(intentObj && intentObj[fieldName])
+        return isFinite(value) && value >= minimum ? value : fallback
+    }
+
+    function anchorXForIntent(intentObj) {
+        return _intentNumber(intentObj, "anchorX", root.anchorX, 0)
+    }
+
+    function activeScreenWidthForIntent(intentObj) {
+        return _intentNumber(intentObj, "screenWidth", root.activeScreenWidth, 1)
+    }
+
+    function directionForIntent(intentObj) {
+        var position = intentObj && intentObj.barPosition !== undefined
+                ? String(intentObj.barPosition).trim().toLowerCase() : ""
+        return position === "top" || position === "bottom"
+                ? BarHoverLogic.popupDirection(position) : root.direction
+    }
+
+    function barHeightForIntent(intentObj) {
+        return _intentNumber(intentObj, "effectiveBarHeight", root.activeBarHeight, 0)
+    }
+
+    function floatingMarginForIntent(intentObj) {
+        return _intentNumber(intentObj, "floatingMargin", root.activeFloatingMargin, 0)
+    }
+
+    function screenHeightForIntent(intentObj) {
+        return _intentNumber(intentObj, "screenHeight", root.activeScreenHeight, 1)
+    }
+
+    function popupHeightForIntent(intentObj) {
+        return intentObj && String(intentObj.kind || "") === "context"
+                ? contextPopupActions.implicitHeight : popupActions.implicitHeight
+    }
+
+    function targetGeometryFor(intentObj, width, height) {
+        var left = BarHoverLogic.clampAnchor(anchorXForIntent(intentObj) - width / 2,
+                width, activeScreenWidthForIntent(intentObj), 8)
+        var top = directionForIntent(intentObj) === "down"
+                ? barHeightForIntent(intentObj) + floatingMarginForIntent(intentObj)
+                : Math.max(0, screenHeightForIntent(intentObj) - barHeightForIntent(intentObj)
+                    - floatingMarginForIntent(intentObj) - height)
+        return { x: left, y: top, width: width, height: height }
+    }
+
+    function updateTargetGeometry(intentObj) {
+        var width = Math.max(Number(popup.sidebarLayer.width), 260, 240)
+        var height = Number(popup.sidebarLayer.height) + popupHeightForIntent(intentObj) + 1
+        if (!isFinite(width) || width < 0)
+            width = 260
+        if (!isFinite(height) || height < 1)
+            height = 1
+        var geometry = targetGeometryFor(intentObj, width, height)
+        root.targetX = geometry.x
+        root.targetY = geometry.y
+        root.targetWidth = geometry.width
+        root.targetHeight = geometry.height
     }
 
     function showIntent(intentObj) {
@@ -193,6 +285,10 @@ PanelWindow {
         root.widgetHovered = false
         root.popupHovered = false
         root.intent = null
+        root.currentIntent = null
+        root.pendingIntent = null
+        root.replacingContent = false
+        root.transitionSerial += 1
         root.surfaceActive = false
     }
 
@@ -269,16 +365,12 @@ PanelWindow {
         id: popupContainer
         objectName: "popupContainer"
         // Size follows both slots so clamping uses the rendered surface bounds.
-        width: Math.max(popup.sidebarLayer.width, popup.contentLayer.width, 240)
-        height: popup.sidebarLayer.height + popup.contentLayer.height + 1
+        width: root.targetWidth
+        height: root.targetHeight
         // Convert the producer's trigger center into the popup's left edge
         // before applying the existing screen-edge clamp contract.
-        x: BarHoverLogic.clampAnchor(root.anchorX - width / 2,
-                width, root.activeScreenWidth, 8)
-        y: root.direction === "down"
-            ? root.activeBarHeight + root.activeFloatingMargin
-            : Math.max(0, root.activeScreenHeight - root.activeBarHeight
-                - root.activeFloatingMargin - height)
+        x: root.targetX
+        y: root.targetY
 
         // Non-blocking hover bridge on the popup surface.
         HoverHandler {
