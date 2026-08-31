@@ -114,6 +114,9 @@ Item {
         onTriggered: {
             root.check("fade-out keeps current intent", host.currentIntent.widgetId, "media")
             root.check("fade-out keeps pending context", host.pendingIntent.kind, "context")
+            root.check("fade-out is visibly in progress", host.contentOpacity < 1, true)
+            root.check("fade-out keeps old visible content",
+                host.popupItem.contentLayer.children[0].children[1].actionKind, "media")
             root.check("fade-out disables content interaction", host.contentInteractive, false)
             host.updateIntent({
                 widgetId: "clock-latest", instanceKey: "clock-latest:0", kind: "context",
@@ -143,6 +146,50 @@ Item {
         onTriggered: {
             root.check("fade-in restores opacity", host.contentOpacity, 1)
             root.check("fade-in restores interaction", host.contentInteractive, true)
+            root.check("contentFade completion leaves latest current intent",
+                host.currentIntent.widgetId, "clock-latest")
+
+            host.updateIntent({
+                widgetId: "dismissed", instanceKey: "dismissed:0", kind: "hover",
+                actionKind: "volume", anchorX: 460, screenWidth: 1000,
+                screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+            })
+            dismissDuringFadeWait.restart()
+        }
+    }
+
+    Timer {
+        id: dismissDuringFadeWait
+        interval: Math.max(20, Lazer.MotionTokens.fast / 2)
+        onTriggered: {
+            root.check("dismiss test enters replacement fade", host.replacingContent, true)
+            root.check("dismiss test has pending intent", host.pendingIntent.widgetId, "dismissed")
+            host.dismissImmediately()
+            root.check("dismiss during fade clears pending", host.pendingIntent, null)
+            root.check("dismiss during fade clears replacing state", host.replacingContent, false)
+            root.check("dismiss during fade restores opacity", host.contentOpacity, 1)
+
+            host.showIntent({
+                widgetId: "after-dismiss", instanceKey: "after-dismiss:0", kind: "context",
+                anchorX: 540, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top"
+            })
+            root.check("new intent applies after dismiss", host.currentIntent.widgetId, "after-dismiss")
+            dismissStaleFadeWait.restart()
+        }
+    }
+
+    Timer {
+        id: dismissStaleFadeWait
+        interval: Lazer.MotionTokens.fast + 40
+        onTriggered: {
+            root.check("dismissed fade cannot overwrite new current intent",
+                host.currentIntent.widgetId, "after-dismiss")
+            root.check("dismissed fade cannot overwrite new intent",
+                host.intent.widgetId, "after-dismiss")
+            root.check("dismissed fade leaves pending clear", host.pendingIntent, null)
+            root.check("dismissed fade leaves opacity restored", host.contentOpacity, 1)
+
             Lazer.MotionTokens.reducedMotionOverride = true
             host.updateIntent({
                 widgetId: "volume", instanceKey: "volume:reduced", kind: "hover",
@@ -153,8 +200,16 @@ Item {
                 host.currentIntent.widgetId, "volume")
             root.check("reduced motion clears pending intent", host.pendingIntent, null)
             root.check("reduced motion restores content opacity", host.contentOpacity, 1)
-            Lazer.MotionTokens.reducedMotionOverride = false
+            reducedMotionSettleWait.restart()
+        }
+    }
+
+    Timer {
+        id: reducedMotionSettleWait
+        interval: host.popupItem.revealDuration + 40
+        onTriggered: {
             root.check("reduced motion replacement is interactive", host.contentInteractive, true)
+            Lazer.MotionTokens.reducedMotionOverride = false
             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }

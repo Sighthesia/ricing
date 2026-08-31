@@ -68,12 +68,15 @@ The first verification run exposed that a custom property cannot be assigned dir
 - Added asynchronous host checks for fade ordering, interaction gating,
   latest-wins replacement, fade-in completion, close/reopen opacity, and
   reduced-motion replacement.
+- Added coverage for the mid-fade opacity and old-content ordering contract,
+  plus dismissing during replacement and proving the cancelled fade cannot
+  overwrite a subsequently opened intent.
 - Kept the two content components mounted once and left geometry animation and
   unrelated workspace files unchanged.
 
 ## Review Verification
 
-The focused host harness reports `83 passed, 0 failed`. The two-layer binding
+The focused host harness reports `96 passed, 0 failed`. The two-layer binding
 and geometry harness reports `111 passed, 0 failed` with reduced motion enabled
 for deterministic non-crossfade assertions. `qmllint` reports no diagnostics
 for the modified host, popup, and focused harnesses.
