@@ -52,6 +52,12 @@ Item {
         interval: Lazer.MotionTokens.fast + 40
         onTriggered: {
             root.check("close after both hovers released", host.open, false)
+            root.check("close timer has fired", host.closeTimerRunning, false)
+            root.check("exit cleanup timer is running", host.debugSnapshot().host.clearTimer, true)
+            root.check("close intermediate state keeps current intent", host.currentIntent.widgetId, "tray")
+            root.check("close intermediate state keeps root intent", host.intent.widgetId, "tray")
+            root.check("close intermediate state keeps popup owner", host.popupItem !== null, true)
+            root.check("close intermediate state keeps surface active", host.surfaceActive, true)
             // Direction enum stays consistent after close (last intent was bottom -> Up)
             root.check("TwoLayerPopup direction Up after bottom bar", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Up)
             // --- Race: close followed by quick reopen before clearIntentTimer fires ---
@@ -98,11 +104,32 @@ Item {
             host.updateIntent({
                 widgetId: "context-reopen", instanceKey: "context-reopen:0", kind: "context",
                 actionKind: "", section: "right", hasSettings: false,
-                anchorX: 320, screenWidth: 1000, barPosition: "top"
+                anchorX: 320, screenWidth: 1000, barPosition: "top",
+                payload: {
+                    moveLeft: function(key, id, section) {
+                        root._contextCallbackArgs = [key, id, section]
+                    }
+                }
             })
             root.check("reopen cancels pending close", host.closeTimerRunning, false)
             root.check("reopen during close keeps same popup owner", host.popupItem === popupOwner, true)
             root.check("reopen replaces latest intent", host.intent.widgetId, "context-reopen")
+            contextReopenCallbackWait.restart()
+        }
+    }
+
+    Timer {
+        id: contextReopenCallbackWait
+        interval: Lazer.MotionTokens.fast + 40
+        onTriggered: {
+            root._contextCallbackArgs = []
+            host.contextActions.invoke("moveLeft")
+            root.check("hover-to-context reopen callback receives latest instance key",
+                root._contextCallbackArgs[0], "context-reopen:0")
+            root.check("hover-to-context reopen callback receives latest widget id",
+                root._contextCallbackArgs[1], "context-reopen")
+            root.check("hover-to-context reopen callback receives latest section",
+                root._contextCallbackArgs[2], "right")
             // Context menus must render visible with real content height.
             var contextIntent = {
                 widgetId: "clock",
@@ -127,18 +154,19 @@ Item {
              root.check("context popup stays visible", host.popupItem.visible, true)
              root.check("context content height positive", host.popupItem.contentLayer.height > 0, true)
              fadeMidWait.restart()
-        }
-    }
+         }
+     }
 
     Timer {
         id: fadeMidWait
         interval: Math.max(20, Lazer.MotionTokens.fast / 2)
         onTriggered: {
-            root.check("fade-out keeps current intent", host.currentIntent.widgetId, "media")
+            root.check("fade-out keeps current context-reopen intent",
+                host.currentIntent.widgetId, "context-reopen")
             root.check("fade-out keeps pending context", host.pendingIntent.kind, "context")
             root.check("fade-out is visibly in progress", host.contentOpacity < 1, true)
-            root.check("fade-out keeps old visible content",
-                host.popupItem.contentLayer.children[0].children[1].actionKind, "media")
+            root.check("fade-out keeps old visible context content",
+                host.popupItem.contentLayer.children[0].children[1].actionKind, "context")
             root.check("fade-out disables content interaction", host.contentInteractive, false)
             host.updateIntent({
                 widgetId: "clock-latest", instanceKey: "clock-latest:0", kind: "context",
@@ -194,9 +222,16 @@ Item {
                 root._contextCallbackArgs[1], "clock-latest")
             root.check("latest context callback receives section",
                 root._contextCallbackArgs[2], "left")
-            host.contextActions.invoke("close")
-            root.check("context close dismisses reused host", host.open, false)
-            root.check("context close clears intent immediately", host.intent, null)
+             host.contextActions.invoke("close")
+             root.check("context close dismisses reused host", host.open, false)
+             root.check("context close clears current intent immediately", host.currentIntent, null)
+             root.check("context close clears root intent immediately", host.intent, null)
+             root.check("context close clears pending immediately", host.pendingIntent, null)
+             root.check("context close clears surface immediately", host.surfaceActive, false)
+             root.check("context close clears replacing immediately", host.replacingContent, false)
+             root.check("context close restores opacity immediately", host.contentOpacity, 1)
+             root.check("context close stops close timer", host.closeTimerRunning, false)
+             root.check("context close stops clear timer", host.debugSnapshot().host.clearTimer, false)
 
             host.showIntent({
                 widgetId: "dismiss-source", instanceKey: "dismiss-source:0", kind: "hover",
@@ -264,6 +299,27 @@ Item {
         onTriggered: {
             root.check("reduced motion replacement is interactive", host.contentInteractive, true)
             Lazer.MotionTokens.reducedMotionOverride = false
+            host.widgetHovered = false
+            host.popupHovered = false
+            host.requestClose()
+            finalCleanupWait.restart()
+        }
+    }
+
+    Timer {
+        id: finalCleanupWait
+        interval: host.popupItem.revealDuration + Lazer.MotionTokens.fast + 120
+        onTriggered: {
+            root.check("natural close clears current intent", host.currentIntent, null)
+            root.check("natural close clears root intent", host.intent, null)
+            root.check("natural close is closed", host.open, false)
+            root.check("natural close cleanup timer is stopped", host.debugSnapshot().host.clearTimer, false)
+            root.check("natural close clears surface active", host.surfaceActive, false)
+            root.check("natural close clears pending intent", host.pendingIntent, null)
+            root.check("natural close clears replacing state", host.replacingContent, false)
+            root.check("natural close restores content opacity", host.contentOpacity, 1)
+            root.check("natural close timer is stopped", host.closeTimerRunning, false)
+            root.check("natural close leaves popup owner available", host.popupItem !== null, true)
             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }
@@ -372,9 +428,16 @@ Item {
               root.check("invalid bar position keeps host direction", host.direction, "down")
                root.check("invalid anchor geometry uses fallback", host.targetX, 390)
 
-              host.dismissImmediately()
-              root.check("dismissImmediately closes host", host.open, false)
-              root.check("dismissImmediately clears surface", host.surfaceActive, false)
+               host.dismissImmediately()
+               root.check("dismissImmediately closes host", host.open, false)
+               root.check("dismissImmediately clears surface", host.surfaceActive, false)
+               root.check("dismissImmediately clears current intent immediately", host.currentIntent, null)
+               root.check("dismissImmediately clears root intent immediately", host.intent, null)
+               root.check("dismissImmediately clears pending immediately", host.pendingIntent, null)
+               root.check("dismissImmediately stops close timer", host.closeTimerRunning, false)
+               root.check("dismissImmediately clears replacing immediately", host.replacingContent, false)
+               root.check("dismissImmediately restores opacity immediately", host.contentOpacity, 1)
+               root.check("dismissImmediately stops clear timer", host.debugSnapshot().host.clearTimer, false)
 
               host.showIntent(contextIntent)
               Qt.callLater(function () {
