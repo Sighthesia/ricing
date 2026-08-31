@@ -22,7 +22,11 @@ PanelWindow {
     property var currentIntent: null
     property var pendingIntent: null
     property int transitionSerial: 0
+    property int replacementSerial: 0
     property bool replacingContent: false
+    property real contentOpacity: 1
+    readonly property bool contentInteractive:
+        contentOpacity > 0.99 && popup.interactable
     property bool open: false
     property bool widgetHovered: false
     property bool popupHovered: false
@@ -156,15 +160,14 @@ PanelWindow {
         if (!intentObj)
             return
 
-        var isReplacement = root.open && root.currentIntent && !root.sameIntent(root.currentIntent, intentObj)
-        if (isReplacement) {
-            root.transitionSerial += 1
-            root.pendingIntent = intentObj
-            root.replacingContent = true
-        } else {
+        var isOpen = root.open && root.currentIntent
+        var isReplacement = isOpen && !root.sameIntent(root.currentIntent, intentObj)
+        if (!isOpen) {
             root.currentIntent = intentObj
             root.pendingIntent = null
             root.replacingContent = false
+        } else if (isReplacement) {
+            root.beginIntentReplacement(intentObj)
         }
 
         root.intent = intentObj
@@ -194,6 +197,39 @@ PanelWindow {
         clearIntentTimer.stop()
         root.debugLog("open", { "windowVisible": root.visible, "surfaceActive": true,
                                 "direction": root.direction, "anchorX": root.anchorX })
+    }
+
+    function beginIntentReplacement(intentObj) {
+        root.pendingIntent = intentObj
+        root.transitionSerial += 1
+        var serial = root.transitionSerial
+        contentFade.stop()
+        replacementTimer.stop()
+        root.replacementSerial = serial
+        if (MotionTokens.reducedMotion) {
+            root.applyPendingIntent(serial)
+            return
+        }
+        root.replacingContent = true
+        contentFade.to = 0
+        contentFade.restart()
+        replacementTimer.restart()
+    }
+
+    function applyPendingIntent(serial) {
+        if (serial !== root.transitionSerial || !root.pendingIntent)
+            return
+
+        var nextIntent = root.pendingIntent
+        root.currentIntent = nextIntent
+        root.pendingIntent = null
+        root.replacingContent = false
+        root.updateTargetGeometry(nextIntent)
+        contentFade.to = 1
+        if (MotionTokens.reducedMotion)
+            root.contentOpacity = 1
+        else
+            contentFade.restart()
     }
 
     function sameIntent(left, right) {
@@ -317,6 +353,9 @@ PanelWindow {
         closeTimer.stop()
         clearIntentTimer.stop()
         revealMotion.stop()
+        contentFade.stop()
+        replacementTimer.stop()
+        root.contentOpacity = 1
         popup.revealProgress = 0
         root.open = false
         root.widgetHovered = false
@@ -371,6 +410,21 @@ PanelWindow {
         target: popup
         property: "revealProgress"
         duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.settingsSidebarFade
+    }
+
+    // Serialize content replacement behind one short fade-out/fade-in channel.
+    NumberAnimation {
+        id: contentFade
+        target: root
+        property: "contentOpacity"
+        duration: MotionTokens.fast
+        easing.type: Easing.InOutQuad
+    }
+
+    Timer {
+        id: replacementTimer
+        interval: MotionTokens.fast
+        onTriggered: root.applyPendingIntent(root.replacementSerial)
     }
 
     // Animate displayed popup position independently from its retargetable goal.
@@ -488,6 +542,8 @@ PanelWindow {
                  width: 260
                  implicitHeight: root.popupHeightForIntent(root.currentIntent)
                  height: implicitHeight
+                 opacity: root.contentOpacity
+                 enabled: root.contentInteractive
                  onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
 
                 // Settings section-block surface under the action rows; the

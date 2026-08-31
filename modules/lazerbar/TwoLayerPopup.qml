@@ -27,6 +27,7 @@ Item {
     property bool animateLayerOpacity: true
 
     readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
+    readonly property bool interactable: root.revealProgress > 0.99
     readonly property real sidebarRevealProgress: root.revealProgress
     readonly property real contentRevealProgress: MotionTokens.reducedMotion
         ? root.revealProgress

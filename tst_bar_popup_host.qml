@@ -101,9 +101,20 @@ Item {
                 barPosition: "top"
             }
             host.showIntent(contextIntent)
-            root.check("context popup stays visible", host.popupItem.visible, true)
-            root.check("context content height positive", host.popupItem.contentLayer.height > 0, true)
-            console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
+             root.check("context popup stays visible", host.popupItem.visible, true)
+             root.check("context content height positive", host.popupItem.contentLayer.height > 0, true)
+             Lazer.MotionTokens.reducedMotionOverride = true
+             host.updateIntent({
+                 widgetId: "volume", instanceKey: "volume:reduced", kind: "hover",
+                 actionKind: "volume", anchorX: 300, screenWidth: 1000,
+                 screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+             })
+             root.check("reduced motion applies replacement immediately",
+                 host.currentIntent.widgetId, "volume")
+             root.check("reduced motion clears pending intent", host.pendingIntent, null)
+             root.check("reduced motion restores content opacity", host.contentOpacity, 1)
+             Lazer.MotionTokens.reducedMotionOverride = false
+             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }
     }
@@ -185,11 +196,20 @@ Item {
               root.check("replacement keeps current intent", host.currentIntent.widgetId, "volume")
                root.check("replacement keeps original popup owner", host.popupItem === originalPopupItem, true)
                root.check("replacement records pending intent", host.pendingIntent.widgetId, "notifications")
-               root.check("replacement keeps slot height for current kind",
-                   host.popupHeightForIntent(host.currentIntent), hoverSlotHeight)
-               root.check("replacement increments transition serial", host.transitionSerial > 0, true)
-               root.check("replacement target remains screen-clamped", host.targetX >= 8 && host.targetX <= 1000 - host.targetWidth - 8, true)
-               root.check("replacement target keeps current kind height", host.targetHeight, 89)
+                root.check("replacement keeps slot height for current kind",
+                    host.popupHeightForIntent(host.currentIntent), hoverSlotHeight)
+                root.check("replacement increments transition serial", host.transitionSerial > 0, true)
+                 root.check("replacement enters serialized fade", host.replacingContent, true)
+                 root.check("replacement target remains screen-clamped", host.targetX >= 8 && host.targetX <= 1000 - host.targetWidth - 8, true)
+                 root.check("replacement target keeps current kind height", host.targetHeight, 89)
+
+               host.updateIntent({
+                   widgetId: "brightness", instanceKey: "brightness:0", kind: "hover",
+                   actionKind: "brightness", anchorX: 520, screenWidth: 1000,
+                   screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+               })
+               root.check("rapid replacement keeps latest pending target",
+                   host.pendingIntent.widgetId, "brightness")
 
               // Invalid geometry fields must retain the host's last valid values.
               var invalidIntent = {
@@ -198,22 +218,22 @@ Item {
                   effectiveBarHeight: 48, barPosition: "sideways"
               }
               host.updateIntent(invalidIntent)
-              root.check("invalid anchor keeps host anchor", host.anchorX, 700)
+               root.check("invalid anchor keeps host anchor", host.anchorX, 520)
               root.check("invalid bar position keeps host direction", host.direction, "down")
-              root.check("invalid anchor geometry uses fallback", host.targetX, 570)
+               root.check("invalid anchor geometry uses fallback", host.targetX, 390)
 
-             host.dismissImmediately()
-             root.check("dismissImmediately closes host", host.open, false)
-             root.check("dismissImmediately clears surface", host.surfaceActive, false)
+              host.dismissImmediately()
+              root.check("dismissImmediately closes host", host.open, false)
+              root.check("dismissImmediately clears surface", host.surfaceActive, false)
 
-             host.showIntent(contextIntent)
-             Qt.callLater(function () {
+              host.showIntent(contextIntent)
+              Qt.callLater(function () {
                  root.check("context open initializes current intent", host.currentIntent.kind, "context")
-                 root.check("context height selects context implicit height",
-                     host.popupHeightForIntent(host.currentIntent), 184)
-                 root.check("context target follows context height", host.targetHeight, 185)
-                 root.startBottomBarChecks()
-             })
+                  root.check("context height selects context implicit height",
+                      host.popupHeightForIntent(host.currentIntent), 184)
+                  root.check("context target follows context height", host.targetHeight, 185)
+                  root.startBottomBarChecks()
+              })
         })
     }
 
