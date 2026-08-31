@@ -115,3 +115,9 @@ Exact result: no output, exit status `0`.
 
 - The existing behavior harness still reports two unrelated `ProxyFloatingWindow` deprecation warnings about `width` and `height`; `BarPopupHost.qml` already uses `implicitWidth` and `implicitHeight`, and `qmllint` reports no issues.
 - The task harness validates target geometry and fixed host behavior, but does not measure an in-progress animation frame; the implementation keeps displayed values separate so retargeting remains interruptible by construction.
+
+## Review Fix
+
+- Added real host assertions for retargeted geometry after two intents, observable display/target separation, fixed outer dimensions, and bottom-bar placement from `targetHeight`.
+- Corrected the bottom-bar regression assertion to compare against the deliberately stale `displayHeight` rather than assuming the hover slot height while a context owner remains active.
+- Reduced-motion retargeting now stops all four geometry animations before settling displayed values.

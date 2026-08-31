@@ -276,6 +276,10 @@ PanelWindow {
         root.targetX = geometry.x
         root.targetY = geometry.y
         if (MotionTokens.reducedMotion) {
+            xMotion.stop()
+            yMotion.stop()
+            widthMotion.stop()
+            heightMotion.stop()
             root.displayX = root.targetX
             root.displayY = root.targetY
             root.displayWidth = root.targetWidth

@@ -143,16 +143,18 @@ Item {
             root.check("content layer shares slide offset", host.popupItem.contentOffset, host.popupItem.sidebarOffset)
             root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
             root.check("reveal drives toward open", host.popupItem.revealProgress > 0 || host.popupItem.revealProgress === 0, true)
-            root.check("content surface paints settings section color",
-                String(host.popupItem.contentLayer.children[0].children[0].objectName) + ":"
-                + String(host.popupItem.contentLayer.children[0].children[0].color),
-                "popupContentSurface:" + String(Lazer.LazerTheme.settingsSection))
-            root.check("sidebarData alias exists", host.sidebarData !== undefined, true)
-             root.check("contentData alias exists", host.contentData !== undefined, true)
+              root.check("content surface paints settings section color",
+                 String(host.popupItem.contentLayer.children[0].children[0].objectName) + ":"
+                 + String(host.popupItem.contentLayer.children[0].children[0].color),
+                 "popupContentSurface:" + String(Lazer.LazerTheme.settingsSection))
+              root.check("sidebarData alias exists", host.sidebarData !== undefined, true)
+              root.check("contentData alias exists", host.contentData !== undefined, true)
 
-             var originalPopupItem = host.popupItem
-             var volumeIntent = {
-                 widgetId: "volume", instanceKey: "volume:0", kind: "hover", actionKind: "volume",
+              var outerWidth = host.width
+              var outerHeight = host.height
+              var originalPopupItem = host.popupItem
+              var volumeIntent = {
+                  widgetId: "volume", instanceKey: "volume:0", kind: "hover", actionKind: "volume",
                  anchorX: 180, screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
                  barPosition: "top"
              }
@@ -160,13 +162,24 @@ Item {
                  widgetId: "notifications", instanceKey: "notifications:0", kind: "context", actionKind: "",
                  anchorX: 700, screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
                  barPosition: "top"
-              }
-               host.updateIntent(volumeIntent)
-               root.check("initial open initializes current intent", host.currentIntent.widgetId, "volume")
-               var hoverSlotHeight = host.popupHeightForIntent(host.currentIntent)
-               root.check("hover height selects hover implicit height", host.targetHeight, 89)
-              host.updateIntent(contextIntent)
-              root.check("replacement keeps host open", host.open, true)
+               }
+                host.updateIntent(volumeIntent)
+                root.check("initial open initializes current intent", host.currentIntent.widgetId, "volume")
+                var firstTargetX = host.targetX
+                root.check("first intent has distinct target geometry", firstTargetX !== host.displayX, true)
+                var hoverSlotHeight = host.popupHeightForIntent(host.currentIntent)
+                root.check("hover height selects hover implicit height", host.targetHeight, 89)
+                host.updateIntent(contextIntent)
+               root.check("second intent changes target geometry", host.targetX !== firstTargetX, true)
+               root.check("second intent target follows second anchor", host.targetX,
+                   700 - host.targetWidth / 2)
+               root.check("display geometry remains separate while animating",
+                   host.displayX !== host.targetX || host.displayY !== host.targetY
+                   || host.displayWidth !== host.targetWidth || host.displayHeight !== host.targetHeight,
+                   true)
+               root.check("outer host width stays fixed", host.width, outerWidth)
+               root.check("outer host height stays fixed", host.height, outerHeight)
+               root.check("replacement keeps host open", host.open, true)
               root.check("replacement keeps surface active", host.surfaceActive, true)
               root.check("replacement exposes latest intent", host.intent.widgetId, "notifications")
               root.check("replacement keeps current intent", host.currentIntent.widgetId, "volume")
@@ -216,19 +229,51 @@ Item {
                  anchorX: 200,
                  screenWidth: 1000, screenHeight: 1080, effectiveBarHeight: 48,
                  barPosition: "bottom"
-            }
-        host.showIntent(intentBottom)
+         }
+         host.showIntent(intentBottom)
 
-        Qt.callLater(function () {
+         Qt.callLater(function () {
                 root.check("bottom bar direction is up", host.direction, "up")
                 root.check("TwoLayerPopup direction Up for bottom bar", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Up)
                 root.check("still open after intent swap", host.open, true)
                  root.check("orientation is Vertical", host.popupItem.orientation, Lazer.TwoLayerPopup.Orientation.Vertical)
                  root.check("bottom geometry stays above bar", host.targetY,
-                     Math.max(0, 1080 - 48 - 4 - host.targetHeight))
+                      Math.max(0, 1080 - 48 - 4 - host.targetHeight))
                  root.check("bottom geometry clamps at screen edge", host.targetY >= 0, true)
 
-                // Hover bridge: popup hover keeps it alive.
+                 // Make the displayed height intentionally stale to prove the
+                 // bottom placement uses the newly computed target height.
+                 host.displayHeight = 7
+                 root.check("display height is stale before bottom retarget", host.displayHeight !== host.targetHeight, true)
+                 host.updateIntent({
+                     widgetId: "tray", instanceKey: "tray:3", kind: "hover", actionKind: "tray",
+                     anchorX: 200, screenWidth: 1000, screenHeight: 1080, effectiveBarHeight: 48,
+                     barPosition: "bottom"
+                 })
+                 root.check("bottom target Y uses target height", host.targetY,
+                     1080 - 48 - 4 - host.targetHeight)
+                 root.check("bottom target Y ignores displayed height", host.targetY !==
+                     1080 - 48 - 4 - host.displayHeight, true)
+
+                 // Reduced motion must stop an in-flight retarget before
+                 // applying the new geometry, so no old animation can overwrite it.
+                 Lazer.MotionTokens.reducedMotionOverride = true
+                 host.displayX = 12
+                 host.displayY = 13
+                 host.displayWidth = 240
+                 host.displayHeight = 7
+                 host.targetWidth = 260
+                 host.targetHeight = 90
+                 host.retargetGeometry({ anchorX: 640, screenWidth: 1000,
+                     screenHeight: 1080, effectiveBarHeight: 48,
+                     floatingMargin: 4, barPosition: "bottom" })
+                 root.check("reduced motion settles display X", host.displayX, host.targetX)
+                 root.check("reduced motion settles display Y", host.displayY, host.targetY)
+                 root.check("reduced motion settles display width", host.displayWidth, host.targetWidth)
+                 root.check("reduced motion settles display height", host.displayHeight, host.targetHeight)
+                 Lazer.MotionTokens.reducedMotionOverride = false
+
+                 // Hover bridge: popup hover keeps it alive.
                 host.widgetHovered = false
                 host.popupHovered = true
                 host.requestClose()
