@@ -40,6 +40,10 @@ PanelWindow {
     property real intentFloatingMargin: -1
     property bool popupHoverWasActive: false
 
+    property real displayX: 0
+    property real displayY: 0
+    property real displayWidth: 260
+    property real displayHeight: 1
     property real targetX: 0
     property real targetY: 0
     property real targetWidth: 260
@@ -252,18 +256,40 @@ PanelWindow {
     }
 
     function updateTargetGeometry(intentObj) {
-        var width = Math.max(260, 240)
+        var width = Math.max(240, popup.sidebarLayer.implicitWidth || 260,
+                popup.contentLayer.implicitWidth || 260)
         var displayedIntent = root.currentIntent || intentObj
         var height = Number(popup.sidebarLayer.implicitHeight) + popupHeightForIntent(displayedIntent) + 1
         if (!isFinite(width) || width < 0)
-            width = 260
+            width = 240
         if (!isFinite(height) || height < 1)
             height = 1
         var geometry = targetGeometryFor(intentObj, width, height)
-        root.targetX = geometry.x
-        root.targetY = geometry.y
         root.targetWidth = geometry.width
         root.targetHeight = geometry.height
+        root.retargetGeometry(intentObj)
+    }
+
+    function retargetGeometry(intentObj) {
+        var geometry = targetGeometryFor(intentObj || root.currentIntent || root.intent,
+                root.targetWidth, root.targetHeight)
+        root.targetX = geometry.x
+        root.targetY = geometry.y
+        if (MotionTokens.reducedMotion) {
+            root.displayX = root.targetX
+            root.displayY = root.targetY
+            root.displayWidth = root.targetWidth
+            root.displayHeight = root.targetHeight
+            return
+        }
+        xMotion.to = root.targetX
+        yMotion.to = root.targetY
+        widthMotion.to = root.targetWidth
+        heightMotion.to = root.targetHeight
+        xMotion.restart()
+        yMotion.restart()
+        widthMotion.restart()
+        heightMotion.restart()
     }
 
     function showIntent(intentObj) {
@@ -343,6 +369,42 @@ PanelWindow {
         duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.settingsSidebarFade
     }
 
+    // Animate displayed popup position independently from its retargetable goal.
+    NumberAnimation {
+        id: xMotion
+        target: root
+        property: "displayX"
+        duration: MotionTokens.reducedMotion ? 0 : MotionTokens.medium
+        easing.type: Easing.OutQuint
+    }
+
+    // Animate the vertical placement without changing the fixed host surface.
+    NumberAnimation {
+        id: yMotion
+        target: root
+        property: "displayY"
+        duration: MotionTokens.reducedMotion ? 0 : MotionTokens.medium
+        easing.type: Easing.OutQuint
+    }
+
+    // Animate the popup width from its current displayed value.
+    NumberAnimation {
+        id: widthMotion
+        target: root
+        property: "displayWidth"
+        duration: MotionTokens.reducedMotion ? 0 : MotionTokens.medium
+        easing.type: Easing.OutQuint
+    }
+
+    // Animate content height while the outer PanelWindow stays screen-sized.
+    NumberAnimation {
+        id: heightMotion
+        target: root
+        property: "displayHeight"
+        duration: MotionTokens.reducedMotion ? 0 : MotionTokens.medium
+        easing.type: Easing.OutQuint
+    }
+
     // Clear the intent only after the exit reveal has finished so the
     // fading layers remain intact during the staggered fade.
     Timer {
@@ -372,12 +434,12 @@ PanelWindow {
         id: popupContainer
         objectName: "popupContainer"
         // Size follows both slots so clamping uses the rendered surface bounds.
-        width: root.targetWidth
-        height: root.targetHeight
+        width: root.displayWidth
+        height: root.displayHeight
         // Convert the producer's trigger center into the popup's left edge
         // before applying the existing screen-edge clamp contract.
-        x: root.targetX
-        y: root.targetY
+        x: root.displayX
+        y: root.displayY
 
         // Non-blocking hover bridge on the popup surface.
         HoverHandler {
