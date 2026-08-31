@@ -345,6 +345,54 @@ Item {
             root.check("natural close restores content opacity", host.contentOpacity, 1)
             root.check("natural close timer is stopped", host.closeTimerRunning, false)
             root.check("natural close leaves popup owner available", host.popupItem !== null, true)
+            // Start a replacement, then naturally close while its fade-out is
+            // active. The pending target must never be installed during exit.
+            host.showIntent({
+                widgetId: "race-a", instanceKey: "race-a:0", kind: "hover",
+                actionKind: "volume", anchorX: 260, screenWidth: 1000,
+                screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+            })
+            host.updateIntent({
+                widgetId: "race-b", instanceKey: "race-b:0", kind: "context",
+                actionKind: "", anchorX: 720, screenWidth: 1000,
+                screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+            })
+            root.check("close race starts replacement", host.replacingContent, true)
+            root.check("close race records pending B", host.pendingIntent.widgetId, "race-b")
+            host.widgetHovered = false
+            host.popupHovered = false
+            host.requestClose()
+            root.check("close race invalidates replacement immediately", host.replacingContent, false)
+            root.check("close race clears pending immediately", host.pendingIntent, null)
+            root.check("close race keeps displayed A immediately", host.currentIntent.widgetId, "race-a")
+            closeDuringReplacementWait.restart()
+        }
+    }
+
+    Timer {
+        id: closeDuringReplacementWait
+        interval: Lazer.MotionTokens.fast + 40
+        onTriggered: {
+            root.check("close race closes before replacement applies", host.open, false)
+            root.check("close race keeps displayed A after fade settles",
+                host.currentIntent.widgetId, "race-a")
+            root.check("close race retains root intent during exit", host.intent.widgetId, "race-b")
+            root.check("close race clears pending replacement", host.pendingIntent, null)
+            root.check("close race stops content fade state", host.replacingContent, false)
+            root.check("close race restores old content opacity", host.contentOpacity, 1)
+            root.check("close race starts exit cleanup", host.debugSnapshot().host.clearTimer, true)
+            closeRaceCleanupWait.restart()
+        }
+    }
+
+    Timer {
+        id: closeRaceCleanupWait
+        interval: host.popupItem.revealDuration + Lazer.MotionTokens.fast + 120
+        onTriggered: {
+            root.check("close race cleanup clears current intent", host.currentIntent, null)
+            root.check("close race cleanup clears root intent", host.intent, null)
+            root.check("close race cleanup clears surface", host.surfaceActive, false)
+            root.check("close race cleanup stops timer", host.debugSnapshot().host.clearTimer, false)
             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }
@@ -384,7 +432,8 @@ Item {
             root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
             root.check("content layer shares slide offset", host.popupItem.contentOffset, host.popupItem.sidebarOffset)
             root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
-            root.check("reveal drives toward open", host.popupItem.revealProgress > 0 || host.popupItem.revealProgress === 0, true)
+             root.check("reveal state is active while open",
+                 host.surfaceActive && host.popupItem.visible, true)
               root.check("content surface paints settings section color",
                  String(host.popupItem.contentLayer.children[0].children[0].objectName) + ":"
                  + String(host.popupItem.contentLayer.children[0].children[0].color),

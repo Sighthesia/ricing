@@ -231,7 +231,9 @@ PanelWindow {
     }
 
     function applyPendingIntent(serial) {
-        if (serial !== root.transitionSerial || !root.pendingIntent)
+        // A natural close owns the exit window; replacement completion must not
+        // resurrect content or install a target after the host starts closing.
+        if (!root.open || serial !== root.transitionSerial || !root.pendingIntent)
             return
 
         var nextIntent = root.pendingIntent
@@ -354,6 +356,11 @@ PanelWindow {
     function requestClose() {
         if (closeTimer.running)
             return
+        // A close request cancels replacement immediately. Keep current/root
+        // intent alive for the exit reveal, but never let old fade callbacks
+        // install content after the close has begun.
+        if (root.replacingContent || root.pendingIntent)
+            root.invalidateContentTransition()
         root.debugLog("closePending", { "widgetHovered": root.widgetHovered, "popupHovered": root.popupHovered })
         closeTimer.start()
     }
@@ -410,6 +417,9 @@ PanelWindow {
         onTriggered: {
             if (BarHoverLogic.shouldClose(root.widgetHovered, root.popupHovered, true)) {
                 root.debugLog("closed", { "revealProgress": Number(popup.revealProgress) })
+                // Invalidate replacement callbacks, but retain both intents until
+                // the exit reveal cleanup has completed.
+                root.invalidateContentTransition()
                 root.open = false
                 root.closeRequested()
                 clearIntentTimer.restart()
