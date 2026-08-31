@@ -53,6 +53,11 @@ PanelWindow {
     property real targetY: 0
     property real targetWidth: 260
     property real targetHeight: 1
+    // Stable travel distance for the current reveal/exit cycle.
+    property real revealDistance: 1
+    // Keep the reveal viewport large enough while displayed geometry morphs.
+    readonly property real revealViewportHeight: Math.max(root.displayHeight,
+            root.targetHeight, root.revealDistance, 1)
 
     readonly property real activeScreenWidth: intentScreenWidth > 0 ? intentScreenWidth : screenWidth
     readonly property real activeScreenHeight: intentScreenHeight > 0 ? intentScreenHeight : screenHeight
@@ -69,11 +74,9 @@ PanelWindow {
     signal actionRequested(string action)
     signal closeRequested()
 
-    // Both layers travel the full container distance so the clip edge under
-    // the bar, not a fade, performs the reveal; the content layer trails via
-    // TwoLayerPopup's shared delay.
-    readonly property real slideOffset: root.direction === "up"
-            ? root.targetHeight + 1 : -(root.targetHeight + 1)
+    // Vertical popup layers use their progress opacity; the host geometry
+    // animation supplies the spatial movement without self-clipping rows.
+    readonly property real slideOffset: 0
 
     function startReveal(target) {
         revealMotion.stop()
@@ -308,7 +311,7 @@ PanelWindow {
         return { x: left, y: top, width: width, height: height }
     }
 
-    function updateTargetGeometry(intentObj) {
+    function updateTargetGeometry(intentObj, immediate) {
         var width = Math.max(240, popup.sidebarLayer.implicitWidth || 260,
                 popup.contentLayer.implicitWidth || 260)
         var displayedIntent = root.currentIntent || intentObj
@@ -320,7 +323,7 @@ PanelWindow {
         var geometry = targetGeometryFor(intentObj, width, height)
         root.targetWidth = geometry.width
         root.targetHeight = geometry.height
-        root.retargetGeometry(intentObj, !root.open)
+        root.retargetGeometry(intentObj, immediate === true || !root.open)
     }
 
     function retargetGeometry(intentObj, immediate) {
@@ -499,13 +502,34 @@ PanelWindow {
         }
     }
 
+    // Let current-intent bindings settle before starting the reveal. Without
+    // this one event-loop turn, the first frame can use the menu's fallback
+    // height and reveal only part of the measured content.
+    Timer {
+        id: revealStartTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            if (root.open && root.surfaceActive) {
+                root.updateTargetGeometry(root.currentIntent, true)
+                root.revealDistance = Math.max(root.targetHeight, root.displayHeight, 1)
+                root.startReveal(1)
+            }
+        }
+    }
+
     // Keep popupHovered in sync via non-blocking observation; widgetHovered
     // is driven by the external owner (BarContent/widget HoverHandler).
     onOpenChanged: {
         // Reveal is re-driven by the open state; visibility itself stays on
         // the surfaceActive binding so parents and children never read each
         // other's effective visibility (which deadlocks at false).
-        root.startReveal(open ? 1 : 0)
+        if (open) {
+            revealStartTimer.restart()
+        } else {
+            revealStartTimer.stop()
+            root.startReveal(0)
+        }
     }
 
     // Fixed outer host; inner popup is clamped horizontally. The container is
@@ -529,21 +553,21 @@ PanelWindow {
             onHoveredChanged: root.popupHovered = hovered
         }
 
-        // Two-layer surface; vertical orientation with direction driven by
-        // the bar position (top -> Down, bottom -> Up). Reveal is geometric:
-        // both layers start displaced by the full container height behind the
-        // bar's clip edge and slide into place without an opacity channel.
+            // Two-layer surface; vertical orientation with direction driven by
+            // the bar position (top -> Down, bottom -> Up). Layer progress
+            // controls opacity so rows are never exposed through a self-clip.
         TwoLayerPopup {
             id: popup
             orientation: TwoLayerPopup.Orientation.Vertical
+            clipVertical: false
             direction: root.direction === "up" ? TwoLayerPopup.Direction.Up : TwoLayerPopup.Direction.Down
             width: popupContainer.width
-            height: popupContainer.height
+            height: root.revealViewportHeight
             revealProgress: 0
             contentDelay: MotionTokens.settingsContentDelay
-            animateLayerOpacity: false
-            sidebarOffset: root.slideOffset
-            contentOffset: root.slideOffset
+            animateLayerOpacity: true
+            sidebarOffset: 0
+            contentOffset: 0
             // Single source of truth: the reveal lives while the surface is
             // active, covering both the open state and the exit slide window.
             visible: root.surfaceActive

@@ -47,6 +47,7 @@ Item {
         }
     }
 
+
     Timer {
         id: openHoverContextReplacementWait
         interval: Lazer.MotionTokens.fast + 40
@@ -429,11 +430,13 @@ Item {
             root.check("hover content height positive", host.popupItem.contentLayer.height > 0, true)
             // Slide contract: layers travel the full container distance behind
             // the bar clip edge instead of relying on the opacity channel.
-            root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
-            root.check("content layer shares slide offset", host.popupItem.contentOffset, host.popupItem.sidebarOffset)
-            root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
+             root.check("identity layer reveal uses opacity", host.popupItem.sidebarOffset, 0)
+             root.check("content layer shares slide offset", host.popupItem.contentOffset, host.popupItem.sidebarOffset)
+             root.check("reveal uses the layer opacity channel", host.popupItem.animateLayerOpacity, true)
              root.check("reveal state is active while open",
                  host.surfaceActive && host.popupItem.visible, true)
+             root.check("reveal viewport covers complete target",
+                 host.popupItem.height >= host.targetHeight, true)
               root.check("content surface paints settings section color",
                  String(host.popupItem.contentLayer.children[0].children[0].objectName) + ":"
                  + String(host.popupItem.contentLayer.children[0].children[0].color),
