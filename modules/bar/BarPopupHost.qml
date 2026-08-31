@@ -566,7 +566,7 @@ PanelWindow {
             height: root.revealViewportHeight
             revealProgress: 0
             contentDelay: MotionTokens.settingsContentDelay
-            animateLayerOpacity: true
+            animateLayerOpacity: false
             sidebarOffset: root.slideOffset
             contentOffset: root.slideOffset
             // Single source of truth: the reveal lives while the surface is

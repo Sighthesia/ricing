@@ -432,7 +432,7 @@ Item {
             // the bar clip edge instead of relying on the opacity channel.
              root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
              root.check("content layer shares slide offset", host.popupItem.contentOffset, host.popupItem.sidebarOffset)
-             root.check("reveal keeps the layer opacity channel", host.popupItem.animateLayerOpacity, true)
+             root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
              root.check("reveal state is active while open",
                  host.surfaceActive && host.popupItem.visible, true)
              root.check("reveal viewport covers complete target",
