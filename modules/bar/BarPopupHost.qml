@@ -73,7 +73,7 @@ PanelWindow {
     // the bar, not a fade, performs the reveal; the content layer trails via
     // TwoLayerPopup's shared delay.
     readonly property real slideOffset: root.direction === "up"
-            ? popupContainer.height + 1 : -(popupContainer.height + 1)
+            ? root.targetHeight + 1 : -(root.targetHeight + 1)
 
     function startReveal(target) {
         revealMotion.stop()
@@ -82,7 +82,7 @@ PanelWindow {
             return
         }
         revealMotion.duration = MotionTokens.reducedMotion
-                ? MotionTokens.fast : MotionTokens.settingsSidebarFade
+                ? MotionTokens.fast : popup.revealDuration
         revealMotion.easing.type = target >= 1 ? Easing.OutQuint : Easing.InQuad
         revealMotion.to = target
         revealMotion.restart()
@@ -320,15 +320,15 @@ PanelWindow {
         var geometry = targetGeometryFor(intentObj, width, height)
         root.targetWidth = geometry.width
         root.targetHeight = geometry.height
-        root.retargetGeometry(intentObj)
+        root.retargetGeometry(intentObj, !root.open)
     }
 
-    function retargetGeometry(intentObj) {
+    function retargetGeometry(intentObj, immediate) {
         var geometry = targetGeometryFor(intentObj || root.currentIntent || root.intent,
                 root.targetWidth, root.targetHeight)
         root.targetX = geometry.x
         root.targetY = geometry.y
-        if (MotionTokens.reducedMotion) {
+        if (immediate || MotionTokens.reducedMotion) {
             xMotion.stop()
             yMotion.stop()
             widthMotion.stop()
