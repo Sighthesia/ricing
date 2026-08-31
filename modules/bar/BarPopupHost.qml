@@ -567,7 +567,7 @@ PanelWindow {
             TwoLayerPopup {
                 id: popup
                 orientation: TwoLayerPopup.Orientation.Vertical
-            clipVertical: true
+            clipVertical: false
                 direction: root.direction === "up" ? TwoLayerPopup.Direction.Up : TwoLayerPopup.Direction.Down
                 opening: root.open
                 width: popupContainer.width

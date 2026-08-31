@@ -84,6 +84,7 @@ Item {
             root.check("close intermediate state keeps root intent", host.intent.widgetId, "context-open")
             root.check("close intermediate state keeps popup owner", host.popupItem !== null, true)
             root.check("close intermediate state keeps surface active", host.surfaceActive, true)
+            exitMotionProbe.restart()
             // Direction enum stays consistent after close (last intent was bottom -> Up)
             root.check("TwoLayerPopup direction Up after bottom bar", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Up)
             // --- Race: close followed by quick reopen before clearIntentTimer fires ---
@@ -107,6 +108,16 @@ Item {
             root.check("reopen direction is down", host.direction, "down")
             root.check("TwoLayerPopup direction Down after race reopen", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Down)
             raceWait.restart()
+        }
+    }
+
+    Timer {
+        id: exitMotionProbe
+        interval: Math.max(20, Lazer.MotionTokens.fast)
+        onTriggered: {
+            root.check("exit midpoint keeps popup visible", host.popupItem.visible, true)
+            root.check("exit midpoint keeps surface active", host.surfaceActive, true)
+            root.check("exit midpoint keeps popup content", host.popupItem.contentLayer.height > 0, true)
         }
     }
 
@@ -428,6 +439,7 @@ Item {
             root.check("popup reveal visible while open", host.popupItem.visible, true)
             root.check("popup container visible while open", host.popupContainerItem.visible, true)
             root.check("hover content height positive", host.popupItem.contentLayer.height > 0, true)
+            root.check("popup exit does not self-clip vertical layers", host.popupItem.clip, false)
             // Slide contract: layers travel the full container distance behind
             // the bar clip edge instead of relying on the opacity channel.
              root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
