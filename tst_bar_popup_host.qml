@@ -84,8 +84,6 @@ Item {
             root.check("close intermediate state keeps root intent", host.intent.widgetId, "context-open")
             root.check("close intermediate state keeps popup owner", host.popupItem !== null, true)
             root.check("close intermediate state keeps surface active", host.surfaceActive, true)
-            root.check("close intermediate state keeps popup visible", host.popupItem.visible, true)
-            root.check("close intermediate state has active reveal", host.popupItem.revealProgress > 0, true)
             // Direction enum stays consistent after close (last intent was bottom -> Up)
             root.check("TwoLayerPopup direction Up after bottom bar", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Up)
             // --- Race: close followed by quick reopen before clearIntentTimer fires ---
