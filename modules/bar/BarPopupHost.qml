@@ -86,8 +86,11 @@ PanelWindow {
             return
         }
         revealMotion.duration = MotionTokens.reducedMotion
-                ? MotionTokens.fast : popup.revealDuration
-        revealMotion.easing.type = target >= 1 ? Easing.OutQuint : Easing.InQuad
+                ? MotionTokens.fast
+                : (target >= 1 ? popup.revealDuration : MotionTokens.slow)
+        // Exit uses an in-out curve so the surface remains visible through the
+        // whole retract instead of rushing into the host clip at the start.
+        revealMotion.easing.type = target >= 1 ? Easing.OutQuint : Easing.InOutQuad
         revealMotion.to = target
         revealMotion.restart()
     }
@@ -546,13 +549,18 @@ PanelWindow {
     Item {
         id: popupContainer
         objectName: "popupContainer"
-        // Size follows both slots so clamping uses the rendered surface bounds.
+        // Extend the clipping viewport in the exit direction. The popup itself
+        // stays at its displayed geometry while its layers retract inside this
+        // stable viewport, so they cannot be clipped halfway through exit.
         width: root.displayWidth
-        height: root.displayHeight
+        height: root.revealViewportHeight
         // Convert the producer's trigger center into the popup's left edge
         // before applying the existing screen-edge clamp contract.
         x: root.displayX
-        y: root.displayY
+        y: root.direction === "down"
+                ? root.displayY - (root.revealViewportHeight - root.displayHeight)
+                : root.displayY
+        clip: true
 
         // Non-blocking hover bridge on the popup surface.
         HoverHandler {
@@ -567,11 +575,13 @@ PanelWindow {
             TwoLayerPopup {
                 id: popup
                 orientation: TwoLayerPopup.Orientation.Vertical
-            clipVertical: true
+                clipVertical: false
                 direction: root.direction === "up" ? TwoLayerPopup.Direction.Up : TwoLayerPopup.Direction.Down
                 opening: root.open
                 width: popupContainer.width
-                height: popupContainer.height
+                height: root.displayHeight
+                y: root.direction === "down"
+                        ? root.revealViewportHeight - root.displayHeight : 0
                 revealProgress: 0
                 contentDelay: MotionTokens.settingsContentDelay
                 animateLayerOpacity: false
