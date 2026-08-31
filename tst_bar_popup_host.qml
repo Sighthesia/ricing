@@ -70,6 +70,7 @@ Item {
             host.showIntent(raceIntent)
             root.check("reopen before cleanup keeps open", host.open, true)
             root.check("reopen intent preserved immediately", host.intent !== null && host.intent.widgetId === "media", true)
+            root.check("reopen restores content opacity", host.contentOpacity, 1)
             root.check("reopen direction is down", host.direction, "down")
             root.check("TwoLayerPopup direction Down after race reopen", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Down)
             raceWait.restart()
@@ -103,18 +104,58 @@ Item {
             host.showIntent(contextIntent)
              root.check("context popup stays visible", host.popupItem.visible, true)
              root.check("context content height positive", host.popupItem.contentLayer.height > 0, true)
-             Lazer.MotionTokens.reducedMotionOverride = true
-             host.updateIntent({
-                 widgetId: "volume", instanceKey: "volume:reduced", kind: "hover",
-                 actionKind: "volume", anchorX: 300, screenWidth: 1000,
-                 screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
-             })
-             root.check("reduced motion applies replacement immediately",
-                 host.currentIntent.widgetId, "volume")
-             root.check("reduced motion clears pending intent", host.pendingIntent, null)
-             root.check("reduced motion restores content opacity", host.contentOpacity, 1)
-             Lazer.MotionTokens.reducedMotionOverride = false
-             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
+             fadeMidWait.restart()
+        }
+    }
+
+    Timer {
+        id: fadeMidWait
+        interval: Math.max(20, Lazer.MotionTokens.fast / 2)
+        onTriggered: {
+            root.check("fade-out keeps current intent", host.currentIntent.widgetId, "media")
+            root.check("fade-out keeps pending context", host.pendingIntent.kind, "context")
+            root.check("fade-out disables content interaction", host.contentInteractive, false)
+            host.updateIntent({
+                widgetId: "clock-latest", instanceKey: "clock-latest:0", kind: "context",
+                anchorX: 320, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top"
+            })
+            root.check("rapid fade replacement keeps latest pending", host.pendingIntent.widgetId,
+                "clock-latest")
+            fadeCompleteWait.restart()
+        }
+    }
+
+    Timer {
+        id: fadeCompleteWait
+        interval: Lazer.MotionTokens.fast + 40
+        onTriggered: {
+            root.check("fade-out completion applies latest pending",
+                host.currentIntent.widgetId, "clock-latest")
+            root.check("pending intent clears after apply", host.pendingIntent, null)
+            fadeInWait.restart()
+        }
+    }
+
+    Timer {
+        id: fadeInWait
+        interval: Lazer.MotionTokens.fast + 40
+        onTriggered: {
+            root.check("fade-in restores opacity", host.contentOpacity, 1)
+            root.check("fade-in restores interaction", host.contentInteractive, true)
+            Lazer.MotionTokens.reducedMotionOverride = true
+            host.updateIntent({
+                widgetId: "volume", instanceKey: "volume:reduced", kind: "hover",
+                actionKind: "volume", anchorX: 300, screenWidth: 1000,
+                screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+            })
+            root.check("reduced motion applies replacement immediately",
+                host.currentIntent.widgetId, "volume")
+            root.check("reduced motion clears pending intent", host.pendingIntent, null)
+            root.check("reduced motion restores content opacity", host.contentOpacity, 1)
+            Lazer.MotionTokens.reducedMotionOverride = false
+            root.check("reduced motion replacement is interactive", host.contentInteractive, true)
+            console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }
     }

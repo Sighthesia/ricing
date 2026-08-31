@@ -163,9 +163,8 @@ PanelWindow {
         var isOpen = root.open && root.currentIntent
         var isReplacement = isOpen && !root.sameIntent(root.currentIntent, intentObj)
         if (!isOpen) {
+            root.invalidateContentTransition()
             root.currentIntent = intentObj
-            root.pendingIntent = null
-            root.replacingContent = false
         } else if (isReplacement) {
             root.beginIntentReplacement(intentObj)
         }
@@ -199,12 +198,19 @@ PanelWindow {
                                 "direction": root.direction, "anchorX": root.anchorX })
     }
 
+    function invalidateContentTransition() {
+        contentFade.stop()
+        root.transitionSerial += 1
+        root.pendingIntent = null
+        root.replacingContent = false
+        root.contentOpacity = 1
+    }
+
     function beginIntentReplacement(intentObj) {
         root.pendingIntent = intentObj
         root.transitionSerial += 1
         var serial = root.transitionSerial
         contentFade.stop()
-        replacementTimer.stop()
         root.replacementSerial = serial
         if (MotionTokens.reducedMotion) {
             root.applyPendingIntent(serial)
@@ -213,7 +219,6 @@ PanelWindow {
         root.replacingContent = true
         contentFade.to = 0
         contentFade.restart()
-        replacementTimer.restart()
     }
 
     function applyPendingIntent(serial) {
@@ -222,6 +227,7 @@ PanelWindow {
 
         var nextIntent = root.pendingIntent
         root.currentIntent = nextIntent
+        root.intent = nextIntent
         root.pendingIntent = null
         root.replacingContent = false
         root.updateTargetGeometry(nextIntent)
@@ -353,9 +359,7 @@ PanelWindow {
         closeTimer.stop()
         clearIntentTimer.stop()
         revealMotion.stop()
-        contentFade.stop()
-        replacementTimer.stop()
-        root.contentOpacity = 1
+        root.invalidateContentTransition()
         popup.revealProgress = 0
         root.open = false
         root.widgetHovered = false
@@ -397,6 +401,7 @@ PanelWindow {
         onTriggered: {
             if (BarHoverLogic.shouldClose(root.widgetHovered, root.popupHovered, true)) {
                 root.debugLog("closed", { "revealProgress": Number(popup.revealProgress) })
+                root.invalidateContentTransition()
                 root.open = false
                 root.closeRequested()
                 clearIntentTimer.restart()
@@ -419,12 +424,10 @@ PanelWindow {
         property: "contentOpacity"
         duration: MotionTokens.fast
         easing.type: Easing.InOutQuad
-    }
-
-    Timer {
-        id: replacementTimer
-        interval: MotionTokens.fast
-        onTriggered: root.applyPendingIntent(root.replacementSerial)
+        onFinished: {
+            if (root.contentOpacity <= 0.001 && root.replacingContent)
+                root.applyPendingIntent(root.replacementSerial)
+        }
     }
 
     // Animate displayed popup position independently from its retargetable goal.

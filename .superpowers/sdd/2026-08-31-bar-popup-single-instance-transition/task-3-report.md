@@ -56,3 +56,28 @@ The first verification run exposed that a custom property cannot be assigned dir
 - The `qs` harness still emits the pre-existing `ProxyFloatingWindow` deprecation warnings for `width` and `height`; no new warning or error was introduced by this task.
 - `TwoLayerPopup.qml` was changed by one line to provide the required `interactable` contract; this is a supporting interface change for the host binding.
 - Existing unrelated worktree changes were left untouched and were not staged.
+
+## Review Follow-up
+
+- Removed the replacement timer; `contentFade.onFinished` is now the sole
+  fade-out completion path and applies a pending intent only after opacity
+  reaches zero.
+- Added unified transition invalidation for normal close, reopen, and
+  `dismissImmediately`, including serial invalidation, animation cancellation,
+  pending cleanup, and opacity restoration.
+- Added asynchronous host checks for fade ordering, interaction gating,
+  latest-wins replacement, fade-in completion, close/reopen opacity, and
+  reduced-motion replacement.
+- Kept the two content components mounted once and left geometry animation and
+  unrelated workspace files unchanged.
+
+## Review Verification
+
+The focused host harness reports `83 passed, 0 failed`. The two-layer binding
+and geometry harness reports `111 passed, 0 failed` with reduced motion enabled
+for deterministic non-crossfade assertions. `qmllint` reports no diagnostics
+for the modified host, popup, and focused harnesses.
+
+The only remaining warnings are the pre-existing `ProxyFloatingWindow` width
+and height deprecations, plus environment-level service/thread warnings from
+the integration harness.
