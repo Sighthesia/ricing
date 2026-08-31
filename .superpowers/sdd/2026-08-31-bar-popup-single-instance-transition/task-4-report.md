@@ -33,6 +33,8 @@ Completed. The popup host preserves the existing fixed host, replacement, and ge
 
 - Added explicit assertions for the Task 4 test-review gaps above; focused popup tests and `qmllint` were rerun after the additions.
 - Final rerun: host `143 passed, 0 failed`; two-layer `110 passed, 0 failed`; context actions `4 passed, 0 failed, 0 skipped, 0 blacklisted`; `qmllint` passed with no output.
+- Added the remaining live-open hover-to-context replacement regression: while a hover intent is open and no close was requested, `updateIntent()` now verifies that `open` and the popup owner remain stable, `currentIntent` stays on the displayed hover intent while the context intent is pending, and the completed replacement exposes the latest context callback payload.
+- Final rerun after the additional scenario: host `154 passed, 0 failed`; two-layer `110 passed, 0 failed`; context actions `4 passed, 0 failed, 0 skipped, 0 blacklisted`; `qmllint` passed with no output.
 
 ## Concerns
 

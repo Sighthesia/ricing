@@ -48,14 +48,39 @@ Item {
     }
 
     Timer {
+        id: openHoverContextReplacementWait
+        interval: Lazer.MotionTokens.fast + 40
+        onTriggered: {
+            root.check("open hover-to-context replacement applies latest current", host.currentIntent.widgetId, "context-open")
+            root.check("open hover-to-context replacement clears pending", host.pendingIntent, null)
+            root.check("open hover-to-context replacement keeps host open", host.open, true)
+            root._contextCallbackArgs = []
+            host.contextActions.invoke("moveLeft")
+            root.check("open hover-to-context callback receives latest instance key",
+                root._contextCallbackArgs[0], "context-open:4")
+            root.check("open hover-to-context callback receives latest widget id",
+                root._contextCallbackArgs[1], "context-open")
+            root.check("open hover-to-context callback receives latest section",
+                root._contextCallbackArgs[2], "center")
+
+            // Continue the existing hover bridge close scenario after the
+            // direct replacement has completed.
+            host.widgetHovered = false
+            host.popupHovered = true
+            host.requestClose()
+            remainOpenWait.restart()
+        }
+    }
+
+    Timer {
         id: closeWait
         interval: Lazer.MotionTokens.fast + 40
         onTriggered: {
             root.check("close after both hovers released", host.open, false)
             root.check("close timer has fired", host.closeTimerRunning, false)
             root.check("exit cleanup timer is running", host.debugSnapshot().host.clearTimer, true)
-            root.check("close intermediate state keeps current intent", host.currentIntent.widgetId, "tray")
-            root.check("close intermediate state keeps root intent", host.intent.widgetId, "tray")
+            root.check("close intermediate state keeps current intent", host.currentIntent.widgetId, "context-open")
+            root.check("close intermediate state keeps root intent", host.intent.widgetId, "context-open")
             root.check("close intermediate state keeps popup owner", host.popupItem !== null, true)
             root.check("close intermediate state keeps surface active", host.surfaceActive, true)
             // Direction enum stays consistent after close (last intent was bottom -> Up)
@@ -463,7 +488,9 @@ Item {
                  screenWidth: 1000, screenHeight: 1080, effectiveBarHeight: 48,
                  barPosition: "bottom"
          }
-         host.showIntent(intentBottom)
+          Lazer.MotionTokens.reducedMotionOverride = true
+          host.showIntent(intentBottom)
+          Lazer.MotionTokens.reducedMotionOverride = false
 
          Qt.callLater(function () {
                 root.check("bottom bar direction is up", host.direction, "up")
@@ -506,13 +533,30 @@ Item {
                  root.check("reduced motion settles display height", host.displayHeight, host.targetHeight)
                  Lazer.MotionTokens.reducedMotionOverride = false
 
-                 // Hover bridge: popup hover keeps it alive.
-                host.widgetHovered = false
-                host.popupHovered = true
-                host.requestClose()
-
-                // Wait the close delay; popupHovered true should keep it open.
-                remainOpenWait.restart()
-        })
+                  // A live hover intent can be replaced directly by context
+                  // without closing or replacing the popup owner.
+                  var openHoverPopupOwner = host.popupItem
+                  host.updateIntent({
+                      widgetId: "context-open", instanceKey: "context-open:4", kind: "context",
+                      actionKind: "", anchorX: 260, screenWidth: 1000, screenHeight: 1080,
+                      effectiveBarHeight: 48, barPosition: "bottom", section: "center",
+                      hasSettings: false,
+                      payload: {
+                          moveLeft: function(key, id, section) {
+                              root._contextCallbackArgs = [key, id, section]
+                          }
+                      }
+                  })
+                  root.check("open hover-to-context replacement keeps host open", host.open, true)
+                  root.check("open hover-to-context replacement keeps popup owner",
+                      host.popupItem === openHoverPopupOwner, true)
+                  root.check("open hover-to-context replacement keeps hover current",
+                      host.currentIntent.widgetId, "tray")
+                  root.check("open hover-to-context replacement records context pending",
+                      host.pendingIntent.widgetId, "context-open")
+                  root.check("open hover-to-context replacement records latest root intent",
+                      host.intent.instanceKey, "context-open:4")
+                  openHoverContextReplacementWait.restart()
+         })
     }
 }
