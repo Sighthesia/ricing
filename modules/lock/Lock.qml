@@ -27,6 +27,7 @@ Scope {
     readonly property bool selfTestEnabled: (Quickshell.env("AFLOAT_LOCK_SELFTEST") || "").trim() === "1"
     property int selfTestDelayMs: 5000
     property bool _selfTestArmed: false
+    property bool _selfTestLockStarted: false
 
     // Lock background order: a pre-lock desktop screenshot (grim) is painted
     // as the base, then the wave mask sweeps the wallpaper over it. Setting
@@ -121,6 +122,7 @@ Scope {
         if (!root._selfTestArmed)
             return
         root._selfTestArmed = false
+        root._selfTestLockStarted = false
         const next = Controller.testReleaseState(_state, true)
         if (next === null)
             return
@@ -138,8 +140,7 @@ Scope {
         if (!root.selfTestEnabled)
             return
         root._selfTestArmed = true
-        console.log("[afloat:lock] self-test lock engaged at startup")
-        root.lock()
+        startupSelfTestTimer.start()
     }
 
     // One compositor-owned lock; Quickshell creates one surface per screen.
@@ -215,11 +216,31 @@ Scope {
 
     // Self-test teardown: releases and kills the lock instance after the
     // configured delay so unattended runs never stay locked.
-    property Timer _selfTestRelease: Timer {
+    property Timer _selfTestTimer: Timer {
         interval: root.selfTestDelayMs
         repeat: false
-        running: root.selfTestEnabled && root._selfTestArmed
+        running: root.selfTestEnabled && root._selfTestArmed && root._selfTestLockStarted
         onTriggered: root._selfTestRelease()
+    }
+
+    // Screen objects may not be populated during Component.onCompleted. Wait
+    // for them before requesting captures, otherwise generation zero would
+    // lock without a screenshot and the user would only see the wallpaper.
+    property Timer startupSelfTestTimer: Timer {
+        interval: 100
+        repeat: false
+        onTriggered: {
+            if (Quickshell.screens.length <= 0) {
+                restart()
+                return
+            }
+            if (root.lock()) {
+                root._selfTestLockStarted = true
+                console.log("[afloat:lock] self-test lock engaged at startup")
+            } else if (root._selfTestArmed) {
+                restart()
+            }
+        }
     }
 
     // Compositor keybinds reach the lock through this target.

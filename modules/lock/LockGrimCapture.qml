@@ -9,6 +9,7 @@ Process {
     property string screenName: ""
     property string outputPath: ""
     property string directory: ""
+    running: true
 
     signal captured(int screenIndex, string url)
 
