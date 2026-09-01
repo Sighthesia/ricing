@@ -71,7 +71,11 @@ Item {
         if (!normalizedAppId)
             return fallback
 
-        return Quickshell.iconPath(normalizedAppId, "application-x-executable") || fallback
+        const entry = Quickshell.desktopEntries
+            ? Quickshell.desktopEntries.byId(normalizedAppId)
+            : null
+        const iconName = entry && entry.icon ? String(entry.icon) : normalizedAppId
+        return Quickshell.iconPath(iconName, "application-x-executable") || fallback
     }
 
     function refreshWindowMap() {
@@ -202,7 +206,10 @@ Item {
                             IconImage {
                                 anchors.fill: parent
                                 source: root.iconPathForApp(windowIcon.modelData.appId)
-                                asynchronous: true
+                                // These tiny, persistent delegates should not
+                                // keep feeding the long-lived async icon
+                                // provider during compositor event bursts.
+                                asynchronous: false
                                 backer.fillMode: Image.PreserveAspectFit
                                 smooth: true
                                 opacity: windowIcon.isFocused
