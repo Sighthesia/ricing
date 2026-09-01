@@ -285,6 +285,38 @@ Item {
             tryCompare(fakeT, "sec", 1, 500)
         }
 
+        function test_volumeAndBrightnessFollowLiveService() {
+            var fakeVol = Qt.createQmlObject('import QtQuick; QtObject { property real sinkVolume: 0.42; property bool sinkMuted: true; function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }', root, "fakeVolLive")
+            var volumeItem = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume",
+                payload: { volumeService: fakeVol, volume: 0.1, muted: false }
+            })
+            var volumeSlider = findByName(volumeItem, "volumeSlider")
+            compare(volumeItem.volumeValue, 0.42)
+            compare(volumeSlider.value, 0.42)
+            compare(volumeSlider.sliderControl.value, 42)
+            verify(volumeSlider.muted)
+            fakeVol.sinkVolume = 0.77
+            fakeVol.sinkMuted = false
+            compare(volumeItem.volumeValue, 0.77)
+            compare(volumeSlider.value, 0.77)
+            compare(volumeSlider.sliderControl.value, 77)
+            verify(!volumeSlider.muted)
+
+            var fakeBright = Qt.createQmlObject('import QtQuick; QtObject { property real brightness: 0.33; function setBrightness(v){ brightness=v } }', root, "fakeBrightLive")
+            var brightnessItem = createTemporaryObject(actionsComp, root, {
+                actionKind: "brightness",
+                payload: { brightnessService: fakeBright, brightness: 0.1 }
+            })
+            var brightnessSlider = findByName(brightnessItem, "brightnessSlider")
+            compare(brightnessItem.brightnessValue, 0.33)
+            compare(brightnessSlider.value, 0.33)
+            fakeBright.brightness = 0.91
+            compare(brightnessItem.brightnessValue, 0.91)
+            compare(brightnessSlider.value, 0.91)
+            compare(brightnessSlider.sliderControl.value, 91)
+        }
+
         function test_fakeInjectionDoesNotMutateRealServices() {
             // Create with null payload and verify no exception and no mutation path taken.
             var item = createTemporaryObject(actionsComp, root, { actionKind: "volume", payload: null })

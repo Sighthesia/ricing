@@ -16,26 +16,29 @@ Item {
     visible: root.actionKind !== "context"
     clip: false
 
-    // Helpers to resolve payload values with fallback to real services.
+    // Live services win over the hover-intent snapshot so the open popup
+    // keeps tracking volume and brightness without being rebuilt.
+    readonly property var volumeService: payload && payload.volumeService ? payload.volumeService : null
+    readonly property var brightnessService: payload && payload.brightnessService ? payload.brightnessService : null
     readonly property real volumeValue: {
+        if (root.volumeService && root.volumeService.sinkVolume !== undefined)
+            return Math.max(0, Math.min(1, Number(root.volumeService.sinkVolume)))
         if (payload && payload.volume !== undefined && payload.volume !== null)
             return Math.max(0, Math.min(1, Number(payload.volume)))
-        if (payload && payload.volumeService && payload.volumeService.sinkVolume !== undefined)
-            return Math.max(0, Math.min(1, Number(payload.volumeService.sinkVolume)))
         return 0.5
     }
     readonly property bool volumeMuted: {
+        if (root.volumeService && root.volumeService.sinkMuted !== undefined)
+            return !!root.volumeService.sinkMuted
         if (payload && payload.muted !== undefined)
             return !!payload.muted
-        if (payload && payload.volumeService && payload.volumeService.sinkMuted !== undefined)
-            return !!payload.volumeService.sinkMuted
         return false
     }
     readonly property real brightnessValue: {
+        if (root.brightnessService && root.brightnessService.brightness !== undefined)
+            return Math.max(0, Math.min(1, Number(root.brightnessService.brightness)))
         if (payload && payload.brightness !== undefined && payload.brightness !== null)
             return Math.max(0, Math.min(1, Number(payload.brightness)))
-        if (payload && payload.brightnessService && payload.brightnessService.brightness !== undefined)
-            return Math.max(0, Math.min(1, Number(payload.brightnessService.brightness)))
         return 0.8
     }
     readonly property bool notificationDnd: {
