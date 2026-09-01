@@ -5,17 +5,14 @@ function entryList(children) {
         return []
     if (Array.isArray(children))
         return children
-    if (children.values && typeof children.values.length === "number") {
+    var values = children.values !== undefined ? children.values : children
+    if (values && typeof values.length === "number") {
         var out = []
-        for (var i = 0; i < children.values.length; i++)
-            out.push(children.values[i])
+        for (var i = 0; i < values.length; i++) {
+            if (values[i])
+                out.push(values[i])
+        }
         return out
-    }
-    if (typeof children.length === "number") {
-        var copy = []
-        for (var j = 0; j < children.length; j++)
-            copy.push(children[j])
-        return copy
     }
     return []
 }
@@ -41,17 +38,25 @@ function shouldDismissOnTrigger(entry) {
         return false
     return true
 }
-function emptyStateVisible(handle, entries) {
-    return !handle || entryList(entries).length === 0
+function emptyStateVisible(handle, entries, loading) {
+    if (!handle)
+        return true
+    if (loading)
+        return false
+    return entryList(entries).length === 0
 }
 function menuHandleFromPayload(payload) {
     if (!payload) return null
     if (payload.menuHandle)
         return payload.menuHandle
-    if (payload.hasMenu && payload.menu)
+    if (payload.menu)
         return payload.menu
-    if (payload.trayItem && payload.trayItem.hasMenu)
-        return payload.trayItem.menu || null
+    if (payload.hasMenu === false)
+        return null
+    if (payload.trayItem && payload.trayItem.menu)
+        return payload.trayItem.menu
+    if (payload.trayModel && payload.trayModel.menu)
+        return payload.trayModel.menu
     return null
 }
 function submenuTitle(entry) { return labelOf(entry) }

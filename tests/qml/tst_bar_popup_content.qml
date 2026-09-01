@@ -272,12 +272,12 @@ Item {
 
         function test_trayRendersNativeMenuRows() {
             var open = { text: "Open", enabled: true, triggeredCalls: 0, triggered: function() { this.triggeredCalls++ } }
-            var item = createTemporaryObject(actionsComp, root, {
-                actionKind: "tray",
-                payload: { menuHandle: {}, entries: [open], useStubEntries: true }
-            })
+            var item = createTemporaryObject(actionsComp, root, { actionKind: "tray" })
             var menu = findByName(item, "trayMenuRoot")
             verify(menu !== null)
+            menu.useStubEntries = true
+            menu.menuHandle = { id: "stub" }
+            menu.entries = [open]
             verify(findByName(item, "trayContent").visible)
             verify(findByName(item, "trayActivateButton") === null)
             compare(menu.rowCount, 1)

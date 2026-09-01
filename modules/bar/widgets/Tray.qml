@@ -72,8 +72,8 @@ Item {
                 trayItem: modelData,
                 title: titleText,
                 iconSource: iconSrc,
-                hasMenu: !!(modelData && modelData.hasMenu),
-                menuHandle: (modelData && modelData.hasMenu) ? modelData.menu : null,
+                hasMenu: !!(modelData && (modelData.hasMenu || modelData.menu)),
+                menuHandle: modelData ? (modelData.menu || null) : null,
                 onActivate: function() { try { modelData.activate() } catch (e) {} },
                 onSecondaryActivate: function() { try { modelData.secondaryActivate() } catch (e) {} }
             }

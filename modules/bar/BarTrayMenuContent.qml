@@ -14,15 +14,19 @@ Item {
 
     property var menuHandle: null
     property bool useStubEntries: false
-    property var openerChildren: rootOpenerLoader.item ? rootOpenerLoader.item.children : null
+    readonly property int liveCount: rootOpenerLoader.item ? rootOpenerLoader.item.count : 0
+    readonly property var liveValues: rootOpenerLoader.item ? rootOpenerLoader.item.values : []
     property var entries: null
     readonly property bool stubEntriesActive: useStubEntries
         || (entries !== null && entries !== undefined && Logic.entryList(entries).length > 0)
     readonly property var entryModel: stubEntriesActive
-        ? (entries && typeof entries.length === "number" ? entries : Logic.entryList(entries))
-        : Logic.entryList(openerChildren)
-    readonly property bool emptyStateVisible: menuHandle == null || rowCount === 0
-    readonly property int rowCount: entryModel.length
+        ? Logic.entryList(entries)
+        : Logic.entryList(liveValues)
+    readonly property bool menuLoading: menuHandle != null && !stubEntriesActive
+        && liveCount === 0 && rootOpenerLoader.status !== Loader.Error
+    readonly property bool emptyStateVisible: menuHandle === null
+        || (stubEntriesActive ? rowCount === 0 : (liveCount === 0 && !menuLoading))
+    readonly property int rowCount: stubEntriesActive ? Logic.entryList(entries).length : liveCount
 
     property string submenuPhase: "closed"
     property real submenuProgress: 0
@@ -66,7 +70,8 @@ Item {
         if (!Logic.shouldOpenSubmenu(entry))
             return
         submenuEntry = entry
-        submenuAnchorRow = row
+        if (row)
+            submenuAnchorRow = row
         submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.medium
         submenuAnimation.easing.type = Easing.BezierSpline
         submenuAnimation.easing.bezierCurve = Lazer.MotionTokens.outSoft
@@ -106,23 +111,34 @@ Item {
         heldHeight = Logic.heldHeight(Math.min(Number(value), maxMenuHeight), heldHeight)
     }
 
-    // Load Quickshell only when production is using the native menu path.
+    // Native DBus menus only populate after QsMenuOpener is attached.
     Loader {
         id: rootOpenerLoader
-        active: root.menuHandle !== null && !root.stubEntriesActive
+        active: !root.stubEntriesActive && root.menuHandle != null
         source: "QsMenuOpenerBridge.qml"
-        onLoaded: item.menu = root.menuHandle
+        onLoaded: if (item) item.menu = root.menuHandle
     }
 
-    // Rebind the second opener whenever the hovered native entry changes.
+    Binding {
+        target: rootOpenerLoader.item
+        property: "menu"
+        value: root.menuHandle
+        when: rootOpenerLoader.item != null
+    }
+
     Loader {
         id: submenuOpenerLoader
-        active: root.submenuEntry !== null && !root.stubEntriesActive
+        active: !root.stubEntriesActive && root.submenuEntry != null
         source: "QsMenuOpenerBridge.qml"
-        onLoaded: item.menu = root.submenuEntry
+        onLoaded: if (item) item.menu = root.submenuEntry
     }
 
-    onSubmenuEntryChanged: if (submenuOpenerLoader.item) submenuOpenerLoader.item.menu = submenuEntry
+    Binding {
+        target: submenuOpenerLoader.item
+        property: "menu"
+        value: root.submenuEntry
+        when: submenuOpenerLoader.item != null
+    }
 
     // Opaque root face hides the scaled submenu until it has slid clear.
     Rectangle {
@@ -169,7 +185,7 @@ Item {
             spacing: 4
 
             Repeater {
-                model: entryModel
+                model: stubEntriesActive ? entryModel : liveValues
 
                 delegate: Item {
                     id: rootRow
@@ -303,8 +319,8 @@ Item {
             anchors.topMargin: 32
             spacing: 4
             Repeater {
-                model: Logic.entryList(root.stubEntriesActive ? submenuEntries
-                    : (submenuOpenerLoader.item ? submenuOpenerLoader.item.children : []))
+                model: root.stubEntriesActive ? Logic.entryList(root.submenuEntries)
+                    : (submenuOpenerLoader.item ? submenuOpenerLoader.item.values : [])
                 delegate: Item {
                     required property var modelData
                     property int level: 2

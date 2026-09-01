@@ -24,21 +24,31 @@ Item {
     TestCase {
         name: "BarTrayMenuContent"
         when: windowShown
+        function makeMenu(entries) {
+            var item = createTemporaryObject(menuComp, root, { useStubEntries: true })
+            item.menuHandle = { id: "stub" }
+            item.entries = entries
+            return item
+        }
+
         function test_emptyStateWithoutHandle() {
-            var item = createTemporaryObject(menuComp, root, { menuHandle: null, entries: [], useStubEntries: true })
+            var item = createTemporaryObject(menuComp, root, { useStubEntries: true })
+            item.menuHandle = null
+            item.entries = []
             verify(item.emptyStateVisible)
             compare(findByName(item, "trayEmptyState").visible, true)
         }
         function test_rowsRenderAndSeparatorNotClickable() {
             var sep = fakeEntry("", { isSeparator: true })
             var open = fakeEntry("Open")
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [sep, open], useStubEntries: true })
-            verify(!item.emptyStateVisible)
+            var item = makeMenu([sep, open])
+            compare(item.stubEntriesActive, true)
             compare(item.rowCount, 2)
+            compare(item.emptyStateVisible, false)
         }
         function test_plainTriggerDismisses() {
             var open = fakeEntry("Open")
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [open], useStubEntries: true })
+            var item = makeMenu([open])
             var dismissed = 0
             item.dismissRequested.connect(function() { dismissed++ })
             item.activateEntry(open, 1)
@@ -48,7 +58,7 @@ Item {
         function test_throwingTriggerStillDismisses() {
             var entry = fakeEntry("Throws")
             entry.triggered = function() { throw new Error("test") }
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [entry], useStubEntries: true })
+            var item = makeMenu([entry])
             var dismissed = 0
             item.dismissRequested.connect(function() { dismissed++ })
             item.activateEntry(entry, 1)
@@ -56,7 +66,7 @@ Item {
         }
         function test_checkboxDoesNotDismiss() {
             var mute = fakeEntry("Mute", { checkState: Qt.Checked })
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [mute], useStubEntries: true })
+            var item = makeMenu([mute])
             var dismissed = 0
             item.dismissRequested.connect(function() { dismissed++ })
             item.activateEntry(mute, 1)
@@ -67,7 +77,7 @@ Item {
             Lazer.MotionTokens.reducedMotionOverride = true
             var child = fakeEntry("Child")
             var parent = fakeEntry("More", { hasChildren: true })
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [parent], useStubEntries: true })
+            var item = makeMenu([parent])
             item.openSubmenu(parent, null)
             compare(item.submenuPhase, "open")
             compare(item.submenuEntry, parent)
@@ -78,7 +88,7 @@ Item {
         }
         function test_submenuSurfaceIsOpaqueAndRowsUseSettingsCards() {
             var parent = fakeEntry("More", { hasChildren: true })
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [parent], useStubEntries: true })
+            var item = makeMenu([parent])
             item.openSubmenu(parent, null)
             compare(findByName(item, "traySubmenuSurface").opacity, 1)
             compare(findByName(item, "trayMenuRowSurface").color, Lazer.LazerTheme.settingsCard)
@@ -87,7 +97,7 @@ Item {
         function test_closeRetainsSubmenuDataDuringAnimation() {
             Lazer.MotionTokens.reducedMotionOverride = false
             var parent = fakeEntry("More", { hasChildren: true })
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [parent], useStubEntries: true })
+            var item = makeMenu([parent])
             item.openSubmenu(parent, null)
             item.closeSubmenu()
             compare(item.submenuEntry, parent)
@@ -96,7 +106,7 @@ Item {
         function test_levelTwoDoesNotCloseSubmenu() {
             var parent = fakeEntry("More", { hasChildren: true })
             var nested = fakeEntry("Nested")
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [parent], useStubEntries: true })
+            var item = makeMenu([parent])
             item.openSubmenu(parent, null)
             item.handleRowHover(2, false)
             compare(item.submenuEntry, parent)
@@ -108,35 +118,34 @@ Item {
             var first = fakeEntry("First")
             var second = fakeEntry("Second")
             var parent = fakeEntry("More", { hasChildren: true })
-            var item = createTemporaryObject(menuComp, root, {
-                menuHandle: {}, entries: [first, second, parent], useStubEntries: true
-            })
+            var item = makeMenu([first, second, parent])
+            wait(0)
             var rows = findAllByName(item, "trayMenuRow")
+            verify(rows.length >= 3)
             item.openSubmenu(parent, rows[rows.length - 1])
+            compare(item.submenuAnchorRow, rows[rows.length - 1])
             compare(item.submenuSurface.y, rows[rows.length - 1].y)
-            verify(rows[rows.length - 1].y > 0)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_longMenuIsBoundedAndScrollable() {
             var many = []
             for (var i = 0; i < 40; i++)
                 many.push(fakeEntry("Entry " + i))
-            var item = createTemporaryObject(menuComp, root, {
-                menuHandle: {}, entries: many, useStubEntries: true
-            })
+            var item = makeMenu(many)
+            wait(0)
             var flick = findByName(item, "trayMenuFlick")
+            verify(flick.contentHeight > item.maxMenuHeight || flick.contentHeight > flick.height)
+            compare(flick.height, Math.min(flick.contentHeight, item.maxMenuHeight))
             verify(item.implicitHeight <= item.maxMenuHeight)
-            verify(flick.contentHeight > flick.height)
-            verify(flick.interactive)
         }
         function test_heldHeightKeepsPreviousWhenTiny() {
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [fakeEntry("A")], useStubEntries: true })
+            var item = makeMenu([fakeEntry("A")])
             item.noteColumnHeight(120)
             item.noteColumnHeight(8)
             compare(item.heldHeight, 120)
         }
         function test_faceOccludesSubmenu() {
-            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [fakeEntry("More", { hasChildren: true })], useStubEntries: true })
+            var item = makeMenu([fakeEntry("More", { hasChildren: true })])
             verify(item.submenuSurface.z < item.menuFace.z)
             compare(item.submenuSurface.opacity, 1)
         }

@@ -10,6 +10,13 @@ Item {
             compare(Logic.entryList(null).length, 0)
             compare(Logic.entryList({ values: [{ text: "A" }] }).length, 1)
             compare(Logic.entryList([{ text: "B" }]).length, 1)
+            compare(Logic.entryList({ values: [{ text: "A" }, { text: "B" }] }).length, 2)
+            // ObjectModel-like: values is list-like without being a JS array.
+            var modelLike = { values: { 0: { text: "A" }, 1: { text: "B" }, length: 2 } }
+            compare(Logic.entryList(modelLike).length, 2)
+            compare(Logic.entryList(modelLike)[1].text, "B")
+            // count-only models still yield an empty list; opener children use values.
+            compare(Logic.entryList({ count: 2 }).length, 0)
         }
         function test_separatorAndChildrenFlags() {
             verify(Logic.isSeparator({ isSeparator: true }))
@@ -32,8 +39,12 @@ Item {
             verify(Logic.emptyStateVisible(null, []))
             verify(Logic.emptyStateVisible({}, []))
             verify(!Logic.emptyStateVisible({ id: 1 }, [{ text: "A" }]))
+            verify(!Logic.emptyStateVisible({ id: 1 }, [], true))
+            verify(Logic.emptyStateVisible({ id: 1 }, [], false))
             compare(Logic.menuHandleFromPayload({ hasMenu: true, menu: "h" }), "h")
-            compare(Logic.menuHandleFromPayload({ hasMenu: false, menu: "h" }), null)
+            compare(Logic.menuHandleFromPayload({ menu: "h" }), "h")
+            compare(Logic.menuHandleFromPayload({ hasMenu: false }), null)
+            compare(Logic.menuHandleFromPayload({ trayItem: { menu: "nested" } }), "nested")
             compare(Logic.menuHandleFromPayload({ menuHandle: "x" }), "x")
         }
         function test_heightHoldAndRelease() {
