@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Shapes
+import QtQuick.Window
 import "./BarTrayMenuLogic.js" as Logic
 import "../lazerbar" as Lazer
 
@@ -9,7 +10,7 @@ Item {
     id: root
     objectName: "trayMenuRoot"
     implicitWidth: 244
-    implicitHeight: Math.max(heldHeight, 32)
+    implicitHeight: Math.max(heldHeight, emptyStateVisible ? 32 : menuFlick.height)
 
     property var menuHandle: null
     property bool useStubEntries: false
@@ -37,6 +38,8 @@ Item {
     readonly property real extraWidth: submenuProgress > 0 ? submenuSurface.width + 4 : 0
     readonly property alias submenuSurface: submenuSurface
     readonly property alias menuFace: menuFace
+    readonly property real maxMenuHeight: Screen.desktopAvailableHeight > 0
+        ? Math.max(180, Screen.desktopAvailableHeight * 0.7) : 420
     signal dismissRequested()
 
     function activateEntry(entry, level) {
@@ -46,8 +49,10 @@ Item {
             openSubmenu(entry, null)
             return
         }
-        if (typeof entry.triggered === "function")
-            entry.triggered()
+        try {
+            if (typeof entry.triggered === "function")
+                entry.triggered()
+        } catch (err) {}
         if (Logic.shouldDismissOnTrigger(entry))
             dismissRequested()
     }
@@ -95,10 +100,10 @@ Item {
     }
 
     // Keep a stable panel while opener data is still arriving asynchronously.
-    onRawColumnHeightChanged: heldHeight = Logic.heldHeight(rawColumnHeight, heldHeight)
+    onRawColumnHeightChanged: noteColumnHeight(rawColumnHeight)
 
     function noteColumnHeight(value) {
-        heldHeight = Logic.heldHeight(value, heldHeight)
+        heldHeight = Logic.heldHeight(Math.min(Number(value), maxMenuHeight), heldHeight)
     }
 
     // Load Quickshell only when production is using the native menu path.
@@ -125,7 +130,7 @@ Item {
         objectName: "trayMenuFace"
         z: 2
         width: parent.width
-        height: menuColumn.implicitHeight
+        height: menuFlick.height
         color: "#24242d"
     }
 
@@ -143,37 +148,48 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
     }
 
-    // Root-level entries are kept in a compact, scan-friendly column.
-    Column {
-        id: menuColumn
-        objectName: "trayMenuColumn"
+    // Root entries scroll inside the bounded visible menu surface.
+    Flickable {
+        id: menuFlick
+        objectName: "trayMenuFlick"
         anchors.left: parent.left
         anchors.top: parent.top
         width: parent.width
-        spacing: 4
+        height: Math.min(menuColumn.implicitHeight, maxMenuHeight)
+        contentHeight: menuColumn.implicitHeight
+        clip: true
+        interactive: contentHeight > height
         z: 3
 
-        Repeater {
-            model: entryModel
+        // Root-level entries are kept in a compact, scan-friendly column.
+        Column {
+            id: menuColumn
+            objectName: "trayMenuColumn"
+            width: menuFlick.width
+            spacing: 4
 
-            delegate: Item {
-                required property var modelData
-                property int level: 1
-                width: menuColumn.width
-                height: Logic.isSeparator(modelData) ? 9 : 32
-                objectName: Logic.isSeparator(modelData) ? "trayMenuSeparator" : "trayMenuRow"
+            Repeater {
+                model: entryModel
 
-                Rectangle {
-                    visible: Logic.isSeparator(modelData)
-                    width: parent.width - 24
-                    height: 1
-                    x: 12
-                    y: 4
-                    color: "#4b4b57"
-                }
+                delegate: Item {
+                    id: rootRow
+                    required property var modelData
+                    property int level: 1
+                    width: menuColumn.width
+                    height: Logic.isSeparator(modelData) ? 9 : 32
+                    objectName: Logic.isSeparator(modelData) ? "trayMenuSeparator" : "trayMenuRow"
 
-                // Interactive root menu row.
-                Rectangle {
+                    Rectangle {
+                        visible: Logic.isSeparator(modelData)
+                        width: parent.width - 24
+                        height: 1
+                        x: 12
+                        y: 4
+                        color: "#4b4b57"
+                    }
+
+                    // Interactive root menu row.
+                    Rectangle {
                     id: rowSurface
                     objectName: "trayMenuRowSurface"
                     visible: !Logic.isSeparator(modelData)
@@ -228,7 +244,7 @@ Item {
                                 return
                             handleRowHover(level, Logic.hasChildren(modelData))
                             if (Logic.shouldOpenSubmenu(modelData))
-                                openSubmenu(modelData, parent)
+                                openSubmenu(modelData, rootRow)
                         }
                     }
 
@@ -247,6 +263,7 @@ Item {
                         to: 0
                         duration: Lazer.MotionTokens.clickFlashDuration
                         easing.type: Lazer.MotionTokens.clickFlashEasing
+                    }
                     }
                 }
             }

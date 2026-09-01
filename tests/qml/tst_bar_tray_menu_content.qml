@@ -45,6 +45,15 @@ Item {
             compare(open.triggeredCalls, 1)
             compare(dismissed, 1)
         }
+        function test_throwingTriggerStillDismisses() {
+            var entry = fakeEntry("Throws")
+            entry.triggered = function() { throw new Error("test") }
+            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [entry], useStubEntries: true })
+            var dismissed = 0
+            item.dismissRequested.connect(function() { dismissed++ })
+            item.activateEntry(entry, 1)
+            compare(dismissed, 1)
+        }
         function test_checkboxDoesNotDismiss() {
             var mute = fakeEntry("Mute", { checkState: Qt.Checked })
             var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [mute], useStubEntries: true })
@@ -92,7 +101,33 @@ Item {
             item.handleRowHover(2, false)
             compare(item.submenuEntry, parent)
             item.handleRowHover(1, false)
-            verify(item.submenuPhase === "closing" || item.submenuProgress === 0 || item.submenuEntry === parent)
+            compare(item.submenuEntry, parent)
+        }
+        function test_submenuAnchorsToRootRow() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var first = fakeEntry("First")
+            var second = fakeEntry("Second")
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = createTemporaryObject(menuComp, root, {
+                menuHandle: {}, entries: [first, second, parent], useStubEntries: true
+            })
+            var rows = findAllByName(item, "trayMenuRow")
+            item.openSubmenu(parent, rows[rows.length - 1])
+            compare(item.submenuSurface.y, rows[rows.length - 1].y)
+            verify(rows[rows.length - 1].y > 0)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
+        function test_longMenuIsBoundedAndScrollable() {
+            var many = []
+            for (var i = 0; i < 40; i++)
+                many.push(fakeEntry("Entry " + i))
+            var item = createTemporaryObject(menuComp, root, {
+                menuHandle: {}, entries: many, useStubEntries: true
+            })
+            var flick = findByName(item, "trayMenuFlick")
+            verify(item.implicitHeight <= item.maxMenuHeight)
+            verify(flick.contentHeight > flick.height)
+            verify(flick.interactive)
         }
         function test_heldHeightKeepsPreviousWhenTiny() {
             var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [fakeEntry("A")], useStubEntries: true })
@@ -118,5 +153,18 @@ Item {
             }
         }
         return null
+    }
+
+    function findAllByName(item, name, result) {
+        var found = result || []
+        if (!item) return found
+        if (item.objectName === name)
+            found.push(item)
+        var kids = item.children
+        if (kids) {
+            for (var i = 0; i < kids.length; i++)
+                findAllByName(kids[i], name, found)
+        }
+        return found
     }
 }
