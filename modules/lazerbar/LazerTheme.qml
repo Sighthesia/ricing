@@ -109,9 +109,9 @@ QtObject {
     readonly property int settingsChoiceHeight: 52
     readonly property int settingsChoiceRadius: 6
     readonly property int settingsControlPadding: 9
-    readonly property int settingsRangePadding: 0
+    readonly property int settingsRangePadding: 8
     readonly property color settingsTrack: adapt && colorService ? colorService.mSurfaceContainerHighest : "#2E2A3A"
-    readonly property color settingsSliderThumb: adapt && colorService ? colorService.mPrimary : "#9A86FF"
+    readonly property color settingsSliderThumb: adapt && colorService ? colorService.mOnPrimary : "#EBE5FF"
     readonly property color settingsSliderThumbLight: "#EBE5FF"
     readonly property color settingsResetSurface: adapt && colorService ? colorService.mPrimaryContainer : "#302A42"
     readonly property color settingsResetSurfaceHover: adapt && colorService ? Qt.lighter(colorService.mPrimaryContainer, 1.25) : "#403653"

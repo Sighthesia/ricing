@@ -385,7 +385,7 @@ Item {
         y: root.choicePresentation || root.inlinePresentation || root.splitPresentation ? 0 : 10
         width: Math.max(0, root.width - (root.choicePresentation
                                         ? root.reservedResetWidth
-                                        : contentPadding + root.reservedResetGap + root.reservedResetWidth))
+                                        : contentPadding * 2 + root.reservedResetGap + root.reservedResetWidth))
         height: root.inlinePresentation ? 44
                 : (root.choicePresentation ? root.safeControlHeight
                    : (root.splitPresentation ? 52

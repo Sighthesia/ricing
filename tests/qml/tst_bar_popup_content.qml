@@ -144,6 +144,10 @@ Item {
             verify(fillNode !== null)
             verify(item.sliderControl.displayValue >= 0)
             verify(fillNode.width >= 0)
+            compare(item.sliderControl.nubItem.height, item.sliderControl.trackItem.height)
+            verify(item.sliderControl.nubItem.color !== item.sliderControl.trackFillItem.color)
+            verify(item.sliderRow.contentItem.x + item.sliderRow.contentItem.width
+                    <= item.sliderRow.width - item.sliderRow.contentPadding + 0.5)
         }
     }
 

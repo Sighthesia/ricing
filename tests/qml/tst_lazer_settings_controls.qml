@@ -562,6 +562,7 @@ Item {
             compare(revertRowSlider.nubItem.height, revertRowSlider.trackItem.height)
             compare(revertRowSlider.nubItem.radius, 5)
             compare(revertRowSlider.nubItem.color, Lazer.LazerTheme.settingsSliderThumb)
+            verify(revertRowSlider.nubItem.color !== Lazer.LazerTheme.settingsAccent)
             verify(revertRowSlider.nubItem !== null)
             compare(revertRowSlider.height, 30)
             verify(revertRow.valueTextItem.visible)
