@@ -318,7 +318,9 @@ PanelWindow {
         var width = Math.max(240, popup.sidebarLayer.implicitWidth || 260,
                 popup.contentLayer.implicitWidth || 260)
         var displayedIntent = root.currentIntent || intentObj
-        var height = Number(popup.sidebarLayer.implicitHeight) + popupHeightForIntent(displayedIntent) + 1
+        var sidebarHeight = Math.max(Number(popup.sidebarLayer.implicitHeight),
+                Number(popup.sidebarLayer.height), 48)
+        var height = sidebarHeight + popupHeightForIntent(displayedIntent) + 1
         if (!isFinite(width) || width < 0)
             width = 240
         if (!isFinite(height) || height < 1)
@@ -326,7 +328,16 @@ PanelWindow {
         var geometry = targetGeometryFor(intentObj, width, height)
         root.targetWidth = geometry.width
         root.targetHeight = geometry.height
+        root.commitRevealDistance()
         root.retargetGeometry(intentObj, immediate === true || !root.open)
+    }
+
+    function commitRevealDistance() {
+        var needed = Math.max(root.targetHeight, root.displayHeight, 1)
+        if (popup.revealProgress < 0.01)
+            root.revealDistance = needed
+        else if (popup.revealProgress > 0.99)
+            root.revealDistance = Math.max(root.revealDistance, needed)
     }
 
     function retargetGeometry(intentObj, immediate) {
@@ -580,7 +591,7 @@ PanelWindow {
             id: popupContainer
             objectName: "popupContainer"
             width: root.displayWidth
-            height: root.displayHeight
+            height: root.revealViewportHeight
             x: root.displayX
             y: root.displayY - popupViewport.y
 
@@ -602,7 +613,7 @@ PanelWindow {
                 width: popupContainer.width
                 height: popupContainer.height
                 revealProgress: 0
-                contentDelay: MotionTokens.settingsContentDelay
+                contentDelay: 0
                 animateLayerOpacity: false
                 sidebarOffset: root.slideOffset
                 contentOffset: root.slideOffset

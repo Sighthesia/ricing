@@ -74,8 +74,10 @@ Item {
     Item {
         id: sidebarSlot
         z: 1
-        width: childrenRect.width
-        height: childrenRect.height
+        implicitWidth: childrenRect.width
+        implicitHeight: childrenRect.height
+        width: implicitWidth
+        height: implicitHeight
         x: root.orientation === root.horizontal ? root.horizontalSidebarX : 0
         y: {
             if (root.orientation !== root.vertical)
@@ -103,8 +105,10 @@ Item {
     Item {
         id: contentSlot
         z: 0
-        width: childrenRect.width
-        height: childrenRect.height
+        implicitWidth: childrenRect.width
+        implicitHeight: childrenRect.height
+        width: implicitWidth
+        height: implicitHeight
         x: root.orientation === root.horizontal ? root.horizontalContentX : 0
         y: {
             if (root.orientation !== root.vertical)

@@ -81,6 +81,13 @@ Item {
             compare(popup.contentLayer.y, popup.sidebarLayer.height + 1)
         }
 
+        function test_layersReportImplicitSizeFromChildren() {
+            compare(popup.sidebarLayer.implicitHeight, 48)
+            compare(popup.contentLayer.implicitHeight, 96)
+            compare(popup.sidebarLayer.implicitWidth, 320)
+            compare(popup.contentLayer.implicitWidth, 320)
+        }
+
     function test_upDirectionStacksContentBeforeSidebar() {
             popup.orientation = popup.vertical
             popup.direction = popup.up

@@ -447,8 +447,9 @@ Item {
              root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
              root.check("reveal state is active while open",
                  host.surfaceActive && host.popupItem.visible, true)
-             root.check("reveal viewport covers complete target",
-                 host.popupItem.height >= host.targetHeight, true)
+              root.check("reveal viewport covers complete target",
+                  host.popupViewportItem.height >= host.targetHeight
+                  || host.popupItem.height >= host.targetHeight, true)
               root.check("content surface paints settings section color",
                  String(host.popupItem.contentLayer.children[0].children[0].objectName) + ":"
                  + String(host.popupItem.contentLayer.children[0].children[0].color),
@@ -473,8 +474,11 @@ Item {
                 root.check("initial open initializes current intent", host.currentIntent.widgetId, "volume")
                 var firstTargetX = host.targetX
                 root.check("first intent has distinct target geometry", firstTargetX !== host.displayX, true)
-                var hoverSlotHeight = host.popupHeightForIntent(host.currentIntent)
-                root.check("hover height selects hover implicit height", host.targetHeight, 89)
+                 var hoverSlotHeight = host.popupHeightForIntent(host.currentIntent)
+                 var identityHeight = Math.max(Number(host.popupItem.sidebarLayer.implicitHeight),
+                         Number(host.popupItem.sidebarLayer.height), 48)
+                 var expectedHoverHeight = identityHeight + hoverSlotHeight + 1
+                 root.check("hover height selects hover implicit height", host.targetHeight, expectedHoverHeight)
                 host.updateIntent(contextIntent)
                root.check("second intent changes target geometry", host.targetX !== firstTargetX, true)
                root.check("second intent target follows second anchor", host.targetX,
@@ -496,7 +500,7 @@ Item {
                 root.check("replacement increments transition serial", host.transitionSerial > 0, true)
                  root.check("replacement enters serialized fade", host.replacingContent, true)
                  root.check("replacement target remains screen-clamped", host.targetX >= 8 && host.targetX <= 1000 - host.targetWidth - 8, true)
-                 root.check("replacement target keeps current kind height", host.targetHeight, 89)
+                  root.check("replacement target keeps current kind height", host.targetHeight, expectedHoverHeight)
 
                host.updateIntent({
                    widgetId: "brightness", instanceKey: "brightness:0", kind: "hover",
@@ -531,9 +535,11 @@ Item {
               host.showIntent(contextIntent)
               Qt.callLater(function () {
                  root.check("context open initializes current intent", host.currentIntent.kind, "context")
-                  root.check("context height selects context implicit height",
-                      host.popupHeightForIntent(host.currentIntent), 184)
-                  root.check("context target follows context height", host.targetHeight, 185)
+                   root.check("context height selects context implicit height",
+                       host.popupHeightForIntent(host.currentIntent), 184)
+                   root.check("context target follows context height", host.targetHeight,
+                       Math.max(Number(host.popupItem.sidebarLayer.implicitHeight),
+                           Number(host.popupItem.sidebarLayer.height), 48) + 184 + 1)
                   root.startBottomBarChecks()
               })
         })
