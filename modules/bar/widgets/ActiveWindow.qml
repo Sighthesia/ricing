@@ -255,6 +255,9 @@ Item {
                 width: parent.width
                 height: parent.height
                 source: root.outgoingIconSource
+                // Keep the short-lived transition layer off the long-lived
+                // async pixmap reader, which can lose icons after churn.
+                asynchronous: false
                 visible: root.outgoingIconSource !== "" && opacity > 0.01
                 opacity: 0
 
@@ -270,6 +273,9 @@ Item {
                 width: parent.width
                 height: parent.height
                 source: ""
+                // Synchronous loading preserves the existing ready-guarded
+                // animation while avoiding async provider degradation.
+                asynchronous: false
                 opacity: 1
                 property real fallDistance: height * titleText.ghostFallDistanceScale
                 Behavior on y { NumberAnimation { duration: titleText.ghostFallTime; easing.type: Easing.OutQuad } }
