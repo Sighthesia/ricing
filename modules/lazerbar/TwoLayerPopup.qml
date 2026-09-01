@@ -29,6 +29,24 @@ Item {
     // Settings owns horizontal layer opacity; vertical popups use the shared fade.
     property bool animateLayerOpacity: true
 
+    // Stable stacking heights to avoid mid-reveal jumps when content switches.
+    // Updated only when the popup is settled (near 0/1); during flight the
+    // previous heights are held so the second layer does not teleport.
+    property real stableSidebarHeight: 0
+    property real stableContentHeight: 0
+
+    function syncStableHeights() {
+        if (root.revealProgress < 0.01 || root.revealProgress > 0.99) {
+            if (sidebarSlot.height > 0)
+                stableSidebarHeight = sidebarSlot.height
+            if (contentSlot.height > 0)
+                stableContentHeight = contentSlot.height
+        }
+    }
+
+    onRevealProgressChanged: syncStableHeights()
+    Component.onCompleted: syncStableHeights()
+
     readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
     readonly property bool interactable: root.revealProgress > 0.99
     readonly property real sidebarRevealProgress: root.revealProgress
@@ -64,8 +82,11 @@ Item {
                 return 0
             if (root.direction === root.down)
                 return 0
-            return contentSlot.height + 1
+            var h = (root.revealProgress > 0.01 && root.revealProgress < 0.99 && root.stableContentHeight > 0)
+                ? root.stableContentHeight : contentSlot.height
+            return h + 1
         }
+        onHeightChanged: root.syncStableHeights()
         opacity: root.animateLayerOpacity ? root.sidebarRevealProgress : 1
         clip: false
         transform: Translate {
@@ -88,10 +109,14 @@ Item {
         y: {
             if (root.orientation !== root.vertical)
                 return 0
-            if (root.direction === root.down)
-                return sidebarSlot.height + 1
+            if (root.direction === root.down) {
+                var sh = (root.revealProgress > 0.01 && root.revealProgress < 0.99 && root.stableSidebarHeight > 0)
+                    ? root.stableSidebarHeight : sidebarSlot.height
+                return sh + 1
+            }
             return 0
         }
+        onHeightChanged: root.syncStableHeights()
         opacity: root.animateLayerOpacity ? root.contentRevealProgress : 1
         clip: false
         transform: Translate {

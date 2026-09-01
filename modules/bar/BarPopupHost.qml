@@ -44,6 +44,7 @@ PanelWindow {
     property real intentBarHeight: 0
     property real intentFloatingMargin: -1
     property bool popupHoverWasActive: false
+    function setReducedMotionOverride(v) { MotionTokens.reducedMotionOverride = v }
 
     property real displayX: 0
     property real displayY: 0
@@ -325,9 +326,6 @@ PanelWindow {
         var geometry = targetGeometryFor(intentObj, width, height)
         root.targetWidth = geometry.width
         root.targetHeight = geometry.height
-        // A replacement may grow the menu after the reveal cycle starts.
-        // Keep the exit endpoint large enough to hide the newest full surface.
-        root.revealDistance = Math.max(root.revealDistance, root.targetHeight, 1)
         root.retargetGeometry(intentObj, immediate === true || !root.open)
     }
 
@@ -542,6 +540,12 @@ PanelWindow {
             }
         } else {
             revealStartTimer.stop()
+            // Expand the exit travel only when the popup is fully revealed
+            // (progress ~1) so the offset change is invisible (Y=0 at 1).
+            // Mid-reveal closes keep the current distance to avoid a backward jump.
+            if (popup.revealProgress > 0.99) {
+                root.revealDistance = Math.max(root.targetHeight, root.displayHeight, root.revealDistance, 1)
+            }
             root.startReveal(0)
         }
     }

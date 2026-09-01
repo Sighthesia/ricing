@@ -225,6 +225,8 @@ Item {
     property var _edgeRightAnchor: 0
 
     Component.onCompleted: {
+        // Ensure host and test share the same reduced-motion singleton.
+        host.setReducedMotionOverride(true)
         // Check before the deferred interaction sequence opens the host.
         root.check("popup host is hidden while idle", host.surfaceActive, false)
         Qt.callLater(root.run)
