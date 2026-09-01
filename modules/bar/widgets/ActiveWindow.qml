@@ -42,7 +42,6 @@ Item {
     readonly property bool hasIcon: root.showIcon && root.hasWindow && root.currentAppId.length > 0 && root.iconSource !== ""
     property string trackedIconSource: ""
     property string outgoingIconSource: ""
-    property bool iconTransitioning: false
 
     // Tracks the last choreographed title so the first render never plays
     // the exit/enter transition for content that was never visible.
@@ -107,37 +106,34 @@ Item {
         }
     }
 
-    function transitionIcon(previous, next) {
-        if (MotionTokens.reducedMotion || previous === next) {
-            root.outgoingIconSource = ""
-            root.iconTransitioning = false
-            return
-        }
-        root.outgoingIconSource = previous
-        root.trackedIconSource = next
-        root.iconTransitioning = true
-        incomingIcon.source = next
-        incomingIcon.opacity = 0
-        incomingIcon.y = -incomingIcon.fallDistance
-        outgoingIcon.opacity = 1
-        outgoingIcon.y = 0
-        incomingReadyGuard.restart()
-    }
-
     function syncIcon() {
-        var next = root.iconSource
-        var previous = root.trackedIconSource
-        if (next === previous)
+        const oldSource = root.trackedIconSource
+        const newSource = root.iconSource
+        if (oldSource === newSource)
             return
-        root.trackedIconSource = next
-        if (!root.hasIcon || next === "") {
-            outgoingIcon.source = previous
-            outgoingIcon.opacity = previous !== "" ? 1 : 0
-            outgoingIcon.y = 0
-            iconExitAnimation.restart()
+        root.trackedIconSource = newSource
+
+        if (MotionTokens.reducedMotion || oldSource === "" || newSource === "") {
+            root.outgoingIconSource = ""
+            outgoingIcon.opacity = 0
+            incomingIcon.source = newSource
+            incomingIcon.opacity = newSource === "" ? 0 : 1
             return
         }
-        transitionIcon(previous, next)
+
+        // Match Media's cover transition: retain the old layer while the new
+        // layer is prepared, then crossfade both layers on the next turn.
+        root.outgoingIconSource = oldSource
+        outgoingIcon.opacity = 1
+        incomingIcon.source = newSource
+        incomingIcon.opacity = 0
+        Qt.callLater(() => {
+            if (root.trackedIconSource !== newSource)
+                return
+            incomingIcon.opacity = 1
+            outgoingIcon.opacity = 0
+            root.outgoingIconSource = ""
+        })
     }
 
     onIconSourceChanged: syncIcon()
@@ -260,10 +256,7 @@ Item {
                 asynchronous: false
                 visible: root.outgoingIconSource !== "" && opacity > 0.01
                 opacity: 0
-
-                property real fallDistance: height * titleText.ghostFallDistanceScale
-                Behavior on y { NumberAnimation { duration: titleText.ghostFallTime; easing.type: Easing.InQuad } }
-                Behavior on opacity { NumberAnimation { duration: titleText.ghostFallTime; easing.type: Easing.InQuad } }
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             }
 
             IconImage {
@@ -273,52 +266,11 @@ Item {
                 width: parent.width
                 height: parent.height
                 source: ""
-                // Synchronous loading preserves the existing ready-guarded
-                // animation while avoiding async provider degradation.
+                // Synchronous loading keeps both crossfade layers stable
+                // during long-running window churn.
                 asynchronous: false
                 opacity: 1
-                property real fallDistance: height * titleText.ghostFallDistanceScale
-                Behavior on y { NumberAnimation { duration: titleText.ghostFallTime; easing.type: Easing.OutQuad } }
-                Behavior on opacity { NumberAnimation { duration: titleText.scanRevealMs; easing.type: Easing.OutQuad } }
-            }
-
-            NumberAnimation {
-                id: iconEntryAnimation
-                target: incomingIcon
-                property: "y"
-                from: -incomingIcon.fallDistance
-                to: 0
-                duration: titleText.scanRevealMs
-                easing.type: Easing.OutQuad
-            }
-
-            Timer {
-                id: incomingReadyGuard
-                interval: titleText.scanGapMs
-                onTriggered: {
-                    if (incomingIcon.status !== Image.Ready || !root.iconTransitioning)
-                        return
-                    incomingIcon.opacity = 1
-                    iconEntryAnimation.restart()
-                    outgoingIcon.y = outgoingIcon.fallDistance
-                    outgoingIcon.opacity = 0
-                    finishIconTimer.restart()
-                }
-            }
-
-            Timer {
-                id: finishIconTimer
-                interval: titleText.scanRevealMs + titleText.ghostFallTime
-                onTriggered: {
-                    root.outgoingIconSource = ""
-                    root.iconTransitioning = false
-                }
-            }
-
-            ParallelAnimation {
-                id: iconExitAnimation
-                NumberAnimation { target: outgoingIcon; property: "y"; from: 0; to: outgoingIcon.fallDistance; duration: titleText.ghostFallTime; easing.type: Easing.InQuad }
-                NumberAnimation { target: outgoingIcon; property: "opacity"; from: 1; to: 0; duration: titleText.ghostFallTime; easing.type: Easing.InQuad }
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             }
         }
 
