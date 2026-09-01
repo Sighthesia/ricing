@@ -319,8 +319,12 @@ PanelWindow {
     }
 
     function updateTargetGeometry(intentObj, immediate) {
+        var trayExtraWidth = popupActions && popupActions.trayMenuContent
+                ? Number(popupActions.trayMenuContent.extraWidth) : 0
         var width = Math.max(240, popup.sidebarLayer.implicitWidth || 260,
                 popup.contentLayer.implicitWidth || 260)
+        if (isFinite(trayExtraWidth) && trayExtraWidth > 0)
+            width = Math.max(width, (popup.contentLayer.implicitWidth || 260) + trayExtraWidth)
         var displayedIntent = root.currentIntent || intentObj
         var sidebarHeight = Math.max(Number(popup.sidebarLayer.implicitHeight),
                 Number(popup.sidebarLayer.height), 48)

@@ -69,6 +69,7 @@ Item {
         return 0
     }
     readonly property var trayMenuHandle: Logic.menuHandleFromPayload(payload)
+    readonly property var trayMenuContent: trayMenu
 
     function formatMediaTime(milliseconds) {
         var seconds = Math.floor(Math.max(0, Number(milliseconds)) / 1000)
@@ -496,6 +497,7 @@ Item {
                 width: parent.width
                 menuHandle: root.trayMenuHandle
                 entries: root.payload && root.payload.entries ? root.payload.entries : []
+                useStubEntries: !!(root.payload && root.payload.entries)
                 onDismissRequested: root.handleTrayMenuDismiss()
             }
         }

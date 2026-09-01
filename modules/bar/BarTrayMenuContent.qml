@@ -12,13 +12,15 @@ Item {
     implicitHeight: Math.max(heldHeight, 32)
 
     property var menuHandle: null
-    property var openerChildren: null
-    property var entries: openerChildren !== null ? openerChildren : []
-    readonly property var entryModel: entries && typeof entries.length === "number"
-        ? entries : Logic.entryList(entries)
+    property bool useStubEntries: false
+    property var openerChildren: rootOpenerLoader.item ? rootOpenerLoader.item.children : null
+    property var entries: null
+    readonly property bool stubEntriesActive: useStubEntries || entries !== null
+    readonly property var entryModel: stubEntriesActive
+        ? (entries && typeof entries.length === "number" ? entries : Logic.entryList(entries))
+        : Logic.entryList(openerChildren)
     readonly property bool emptyStateVisible: menuHandle == null || rowCount === 0
-    readonly property int rowCount: entries && typeof entries.length === "number"
-        ? entries.length : entryModel.length
+    readonly property int rowCount: entryModel.length
 
     property string submenuPhase: "closed"
     property real submenuProgress: 0
@@ -27,7 +29,13 @@ Item {
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
     property var submenuEntries: []
     property real heldHeight: 0
+    property real rawColumnHeight: menuColumn.implicitHeight
     property real submenuAnimationTarget: 0
+    property bool popsRight: true
+    readonly property real enterTravel: 4 + width * Lazer.MotionTokens.popupFromScale + 4
+    readonly property real extraWidth: submenuProgress > 0 ? submenuSurface.width + 4 : 0
+    readonly property alias submenuSurface: submenuSurface
+    readonly property alias menuFace: menuFace
     signal dismissRequested()
 
     function activateEntry(entry, level) {
@@ -53,8 +61,9 @@ Item {
             return
         submenuEntry = entry
         submenuAnchorRow = row
-        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.slow
-        submenuAnimation.easing.type = Easing.OutQuint
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.medium
+        submenuAnimation.easing.type = Easing.BezierSpline
+        submenuAnimation.easing.bezierCurve = Lazer.MotionTokens.outSoft
         submenuAnimationTarget = 1
         if (Lazer.MotionTokens.reducedMotion) {
             submenuProgress = 1
@@ -71,7 +80,8 @@ Item {
         if (submenuEntry === null && submenuProgress === 0)
             return
         submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.slow
-        submenuAnimation.easing.type = Easing.OutQuint
+        submenuAnimation.easing.type = Easing.BezierSpline
+        submenuAnimation.easing.bezierCurve = Lazer.MotionTokens.inOut
         submenuAnimationTarget = 0
         if (Lazer.MotionTokens.reducedMotion) {
             submenuPhase = "closing"
@@ -84,7 +94,39 @@ Item {
     }
 
     // Keep a stable panel while opener data is still arriving asynchronously.
-    onEntryModelChanged: heldHeight = Logic.heldHeight(menuColumn.implicitHeight, heldHeight)
+    onRawColumnHeightChanged: heldHeight = Logic.heldHeight(rawColumnHeight, heldHeight)
+
+    function noteColumnHeight(value) {
+        heldHeight = Logic.heldHeight(value, heldHeight)
+    }
+
+    // Load Quickshell only when production is using the native menu path.
+    Loader {
+        id: rootOpenerLoader
+        active: root.menuHandle !== null && !root.stubEntriesActive
+        source: "QsMenuOpenerBridge.qml"
+        onLoaded: item.menu = root.menuHandle
+    }
+
+    // Rebind the second opener whenever the hovered native entry changes.
+    Loader {
+        id: submenuOpenerLoader
+        active: root.submenuEntry !== null && !root.stubEntriesActive
+        source: "QsMenuOpenerBridge.qml"
+        onLoaded: item.menu = root.submenuEntry
+    }
+
+    onSubmenuEntryChanged: if (submenuOpenerLoader.item) submenuOpenerLoader.item.menu = submenuEntry
+
+    // Opaque root face hides the scaled submenu until it has slid clear.
+    Rectangle {
+        id: menuFace
+        objectName: "trayMenuFace"
+        z: 2
+        width: parent.width
+        height: menuColumn.implicitHeight
+        color: "#24242d"
+    }
 
     // Empty-state label for an unavailable or empty tray menu.
     Text {
@@ -107,6 +149,7 @@ Item {
         anchors.top: parent.top
         width: parent.width
         spacing: 4
+        z: 3
 
         Repeater {
             model: entryModel
@@ -232,7 +275,7 @@ Item {
             font.pixelSize: 13
         }
 
-        // Child entries are assignable until the live opener is wired in Task 4.
+        // Child entries remain held during closing and update from the live opener.
         Column {
             id: submenuColumn
             anchors.left: parent.left
@@ -241,7 +284,8 @@ Item {
             anchors.topMargin: 32
             spacing: 4
             Repeater {
-                model: Logic.entryList(submenuEntries)
+                model: Logic.entryList(root.stubEntriesActive ? submenuEntries
+                    : (submenuOpenerLoader.item ? submenuOpenerLoader.item.children : []))
                 delegate: Item {
                     required property var modelData
                     property int level: 2
@@ -258,6 +302,7 @@ Item {
                         color: "#4b4b57"
                     }
                     Rectangle {
+                        objectName: "trayMenuRowSurface"
                         visible: !Logic.isSeparator(modelData)
                         anchors.fill: parent
                         radius: 4
@@ -277,12 +322,17 @@ Item {
             }
         }
 
-        transform: Scale {
-            origin.x: 0
-            origin.y: 0
-            xScale: Lazer.MotionTokens.popupFromScale
-            yScale: Lazer.MotionTokens.popupFromScale
-        }
+        transform: [
+            Scale {
+                origin.x: 0
+                origin.y: 0
+                xScale: Lazer.MotionTokens.popupFromScale
+                yScale: Lazer.MotionTokens.popupFromScale
+            },
+            Translate {
+                x: (root.popsRight ? 1 : -1) * root.enterTravel * (1 - root.submenuProgress)
+            }
+        ]
     }
 
     // Keep pointer traversal alive across the small root/submenu gap.
@@ -300,8 +350,9 @@ Item {
         target: root
         property: "submenuProgress"
         to: root.submenuAnimationTarget
-        duration: Lazer.MotionTokens.slow
-        easing.type: Easing.OutQuint
+        duration: Lazer.MotionTokens.medium
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: Lazer.MotionTokens.outSoft
         onFinished: {
             if (submenuProgress === 0) {
                 submenuEntry = null
