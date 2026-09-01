@@ -40,6 +40,8 @@ Item {
             compare(Logic.heldHeight(8, 120), 120)
             compare(Logic.heldHeight(80, 120), 80)
             verify(!Logic.releaseSubmenuData(0.4, "closing"))
+            verify(!Logic.releaseSubmenuData(0, "closing"))
+            verify(!Logic.releaseSubmenuData(0, "opening"))
             verify(Logic.releaseSubmenuData(0, "closed"))
         }
     }

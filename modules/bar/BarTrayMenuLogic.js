@@ -63,5 +63,5 @@ function heldHeight(rawHeight, previousHeld) {
     return raw
 }
 function releaseSubmenuData(progress, phase) {
-    return Number(progress) === 0 && String(phase || "") !== "opening"
+    return Number(progress) === 0 && String(phase || "") === "closed"
 }
