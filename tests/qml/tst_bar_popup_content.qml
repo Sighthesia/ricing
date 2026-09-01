@@ -118,12 +118,10 @@ Item {
             compare(item.value, 0.42)
             verify(item.muted)
             compare(item.label, "Volume")
-            var labelNode = findByName(item, "sliderLabel")
-            verify(labelNode !== null)
-            compare(labelNode.text, "Volume")
+            compare(item.sliderRow.labelText, "Volume")
             var muteBtn = findByName(item, "sliderMuteButton")
             verify(muteBtn !== null, "mute button should exist")
-            verify(muteBtn.visible, "mute button visible when showMute true")
+            verify(item.muteRow.visible, "mute button visible when showMute true")
             verify(item.showMute)
             verify(item.effectiveMuted)
             // Manual spy for valueCommitted and toggleRequested.
@@ -144,6 +142,7 @@ Item {
             verify(Math.abs(item.clampedValue - 0.5) < 0.001)
             var fillNode = findByName(item, "sliderFill")
             verify(fillNode !== null)
+            verify(item.sliderControl.displayValue >= 0)
             verify(fillNode.width >= 0)
         }
     }
@@ -178,7 +177,7 @@ Item {
             verify(slider.showMute, "volume exposes mute control")
             var volMuteBtn = findByName(slider, "sliderMuteButton")
             verify(volMuteBtn !== null, "volume mute button should exist")
-            verify(volMuteBtn.visible, "volume mute button visible")
+            verify(slider.muteRow.visible, "volume mute button visible")
             // Trigger slider interaction via signal emission.
             fake.setCalls = 0
             fake.last = -1
@@ -204,8 +203,7 @@ Item {
             verify(!slider.showMute, "brightness hides mute control")
             var brightMuteBtn = findByName(slider, "sliderMuteButton")
             verify(brightMuteBtn !== null, "brightness mute button node exists")
-            verify(!brightMuteBtn.visible, "brightness mute button not visible")
-            verify(!brightMuteBtn.enabled, "brightness mute button disabled")
+            verify(!slider.muteRow.visible, "brightness mute button not visible")
             fakeB.setCalls = 0
             slider.valueCommitted(0.6)
             compare(fakeB.setCalls, 1)

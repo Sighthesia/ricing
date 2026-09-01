@@ -203,6 +203,7 @@ Item {
     // Fill the travelled portion of the trough.
     Rectangle {
         id: fillRect
+        objectName: "sliderFill"
         z: 1
         anchors.left: trackRect.left
         anchors.top: trackRect.top
@@ -310,6 +311,7 @@ Item {
     // Map taps anywhere on the track to the value under the pointer.
     TapHandler {
         id: trackTapHandler
+        objectName: "sliderTrackTap"
         enabled: root.effectiveEnabled
         onTapped: eventPoint => {
             root.forceActiveFocus()

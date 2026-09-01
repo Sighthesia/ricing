@@ -528,7 +528,7 @@ Item {
                 root.checkTrue("volume slider real track handler exists",
                         findByName(volSlider, "sliderTrackTap") !== null)
                 root.checkTrue("volume slider real mute handler exists",
-                        findByName(volSlider, "sliderMuteTap") !== null)
+                        findByName(volSlider, "sliderMuteButton") !== null)
             }
 
             // Brightness

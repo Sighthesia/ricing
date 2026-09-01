@@ -233,29 +233,18 @@ Item {
         spacing: 8
         visible: true
 
-        // Volume content.
+        // Volume content uses the settings slider and mute rows directly.
         Item {
             id: volumeContent
             objectName: "volumeContent"
             width: parent.width
-            height: volumeSlider.implicitHeight + 16
+            height: volumeSlider.height
             visible: root.actionKind === "volume"
-
-            // Settings-row card under the control; hover lifts the whole card.
-            Rectangle {
-                objectName: "volumeCard"
-                anchors.fill: parent
-                radius: 6
-                color: volumeCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            }
-            HoverHandler { id: volumeCardHover; blocking: false }
 
             BarPopupSlider {
                 id: volumeSlider
                 objectName: "volumeSlider"
-                anchors.fill: parent
-                anchors.margins: 8
+                width: parent.width
                 value: root.volumeValue
                 muted: root.volumeMuted
                 label: "Volume"
@@ -265,29 +254,18 @@ Item {
             }
         }
 
-        // Brightness content.
+        // Brightness content reuses the same settings slider card without mute.
         Item {
             id: brightnessContent
             objectName: "brightnessContent"
             width: parent.width
-            height: brightnessSlider.implicitHeight + 16
+            height: brightnessSlider.height
             visible: root.actionKind === "brightness"
-
-            // Mirror the volume card recipe so both slider rows share one skin.
-            Rectangle {
-                objectName: "brightnessCard"
-                anchors.fill: parent
-                radius: 6
-                color: brightnessCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            }
-            HoverHandler { id: brightnessCardHover; blocking: false }
 
             BarPopupSlider {
                 id: brightnessSlider
                 objectName: "brightnessSlider"
-                anchors.fill: parent
-                anchors.margins: 8
+                width: parent.width
                 value: root.brightnessValue
                 muted: false
                 label: "Brightness"
