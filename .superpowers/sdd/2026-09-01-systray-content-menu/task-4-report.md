@@ -34,3 +34,15 @@ The live opener path requires the production Quickshell runtime; qmltestrunner
 cannot instantiate that plugin in this environment, so live DBus menu population
 was verified structurally and through the guarded fallback path. Existing host
 harnesses emit unrelated deprecated `ProxyFloatingWindow` size warnings.
+
+## Follow-up Evidence
+
+- Fixed the important live-path regression: an omitted `entries` payload now
+  leaves `BarTrayMenuContent` on the native `QsMenuOpener` path; only
+  `useStubEntries: true` or a non-empty explicit entries list activates stubs.
+- Connected `extraWidthChanged` and `submenuProgressChanged` to
+  `BarPopupHost.updateTargetGeometry(currentIntent)` so the popup mask and
+  target width follow submenu motion.
+- Raised the empty-state label above the opaque menu face (`z: 4`).
+- Focused verification after the fixes: tray content 12 passed, popup content
+  19 passed, popup host 176 passed, two-layer popup 112 passed.

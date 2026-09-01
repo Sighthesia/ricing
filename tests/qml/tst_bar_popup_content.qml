@@ -274,7 +274,7 @@ Item {
             var open = { text: "Open", enabled: true, triggeredCalls: 0, triggered: function() { this.triggeredCalls++ } }
             var item = createTemporaryObject(actionsComp, root, {
                 actionKind: "tray",
-                payload: { menuHandle: {}, entries: [open] }
+                payload: { menuHandle: {}, entries: [open], useStubEntries: true }
             })
             var menu = findByName(item, "trayMenuRoot")
             verify(menu !== null)

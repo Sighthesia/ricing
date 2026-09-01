@@ -15,7 +15,8 @@ Item {
     property bool useStubEntries: false
     property var openerChildren: rootOpenerLoader.item ? rootOpenerLoader.item.children : null
     property var entries: null
-    readonly property bool stubEntriesActive: useStubEntries || entries !== null
+    readonly property bool stubEntriesActive: useStubEntries
+        || (entries !== null && entries !== undefined && Logic.entryList(entries).length > 0)
     readonly property var entryModel: stubEntriesActive
         ? (entries && typeof entries.length === "number" ? entries : Logic.entryList(entries))
         : Logic.entryList(openerChildren)
@@ -133,6 +134,7 @@ Item {
         id: emptyState
         objectName: "trayEmptyState"
         visible: emptyStateVisible
+        z: 4
         text: "No menu items"
         color: "#b8b8c8"
         font.pixelSize: 13

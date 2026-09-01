@@ -672,6 +672,17 @@ PanelWindow {
                         onDismissRequested: root.dismissImmediately()
                     }
 
+                    // Retarget the layer-shell mask when a tray submenu grows or retracts.
+                    Connections {
+                        target: popupActions.trayMenuContent
+                        function onExtraWidthChanged() {
+                            root.updateTargetGeometry(root.currentIntent)
+                        }
+                        function onSubmenuProgressChanged() {
+                            root.updateTargetGeometry(root.currentIntent)
+                        }
+                    }
+
                     // Context actions reuse the same content owner and geometry.
                     BarContextPopupActions {
                         id: contextPopupActions
