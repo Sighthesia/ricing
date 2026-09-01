@@ -38,15 +38,7 @@ Item {
     // legacy ActiveWindow implementation; workspace activation can otherwise
     // expose a transient empty activeAppId before windows are reloaded.
     property string currentAppId: ""
-    // Resolve desktop-entry ids through their declared icon name. Niri's app_id
-    // is often not itself an icon name; always keep a usable fallback source.
-    readonly property string iconSource: {
-        if (root.currentAppId.length === 0)
-            return ""
-        var entry = Quickshell.desktopEntries ? Quickshell.desktopEntries.byId(root.currentAppId) : null
-        var iconName = entry && entry.icon ? String(entry.icon) : root.currentAppId
-        return String(Quickshell.iconPath(iconName, "application-x-executable") || "")
-    }
+    readonly property string iconSource: root.currentAppId.length > 0 ? Quickshell.iconPath(root.currentAppId, true) : ""
     readonly property bool hasIcon: root.showIcon && root.hasWindow && root.currentAppId.length > 0 && root.iconSource !== ""
     property string trackedIconSource: ""
     property string outgoingIconSource: ""
