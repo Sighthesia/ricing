@@ -42,6 +42,7 @@ Item {
     readonly property bool hasIcon: root.showIcon && root.hasWindow && root.currentAppId.length > 0 && root.iconSource !== ""
     property string trackedIconSource: ""
     property string outgoingIconSource: ""
+    property int iconTransitionRevision: 0
 
     // Tracks the last choreographed title so the first render never plays
     // the exit/enter transition for content that was never visible.
@@ -112,8 +113,10 @@ Item {
         if (oldSource === newSource)
             return
         root.trackedIconSource = newSource
+        const transitionRevision = ++root.iconTransitionRevision
 
         if (MotionTokens.reducedMotion || oldSource === "" || newSource === "") {
+            iconCrossfade.stop()
             root.outgoingIconSource = ""
             outgoingIcon.opacity = 0
             incomingIcon.source = newSource
@@ -128,11 +131,10 @@ Item {
         incomingIcon.source = newSource
         incomingIcon.opacity = 0
         Qt.callLater(() => {
-            if (root.trackedIconSource !== newSource)
+            if (root.trackedIconSource !== newSource
+                    || root.iconTransitionRevision !== transitionRevision)
                 return
-            incomingIcon.opacity = 1
-            outgoingIcon.opacity = 0
-            root.outgoingIconSource = ""
+            iconCrossfade.restart()
         })
     }
 
@@ -256,7 +258,6 @@ Item {
                 asynchronous: false
                 visible: root.outgoingIconSource !== "" && opacity > 0.01
                 opacity: 0
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             }
 
             IconImage {
@@ -270,7 +271,29 @@ Item {
                 // during long-running window churn.
                 asynchronous: false
                 opacity: 1
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+            }
+
+            // Explicitly run the same two-layer opacity crossfade as Media.
+            ParallelAnimation {
+                id: iconCrossfade
+
+                NumberAnimation {
+                    target: outgoingIcon
+                    property: "opacity"
+                    from: 1
+                    to: 0
+                    duration: MotionTokens.medium
+                    easing.type: Easing.OutQuad
+                }
+                NumberAnimation {
+                    target: incomingIcon
+                    property: "opacity"
+                    from: 0
+                    to: 1
+                    duration: MotionTokens.medium
+                    easing.type: Easing.OutQuad
+                }
+                onFinished: root.outgoingIconSource = ""
             }
         }
 
