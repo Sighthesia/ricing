@@ -443,7 +443,10 @@ Item {
             // Slide contract: layers travel the full container distance behind
             // the bar clip edge instead of relying on the opacity channel.
              root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
-             root.check("content layer shares slide offset", host.popupItem.contentOffset, host.popupItem.sidebarOffset)
+             root.check("content delay matches settings panel", host.popupItem.contentDelay,
+                     Lazer.MotionTokens.settingsContentDelay)
+             root.check("content layer travels farther than identity",
+                     Math.abs(host.popupItem.contentOffset) > Math.abs(host.popupItem.sidebarOffset), true)
              root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
              root.check("reveal state is active while open",
                  host.surfaceActive && host.popupItem.visible, true)

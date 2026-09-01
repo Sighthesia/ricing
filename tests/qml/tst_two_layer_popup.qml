@@ -101,6 +101,19 @@ Item {
             verify(popup.sidebarRevealProgress > popup.contentRevealProgress)
         }
 
+        function test_contentTravelsFartherThanSidebar() {
+            popup.orientation = popup.vertical
+            popup.direction = popup.down
+            popup.opening = true
+            popup.contentDelay = Lazer.MotionTokens.settingsContentDelay
+            popup.sidebarOffset = -(popup.sidebarLayer.height + 1)
+            popup.contentOffset = -(popup.sidebarLayer.height + popup.contentLayer.height + 2)
+            popup.revealProgress = 0.5
+            compare(popup.contentLayer.transform[0].y, popup.contentOffset * (1 - popup.contentRevealProgress))
+            compare(popup.sidebarLayer.transform[0].y, popup.sidebarOffset * (1 - popup.sidebarRevealProgress))
+            verify(Math.abs(popup.contentLayer.transform[0].y) > Math.abs(popup.sidebarLayer.transform[0].y))
+        }
+
         function test_reducedMotionEndRevealCollapsesBothLayers() {
             Lazer.MotionTokens.reducedMotionOverride = true
             popup.endReveal()

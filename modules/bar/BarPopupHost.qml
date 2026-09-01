@@ -76,10 +76,14 @@ PanelWindow {
     signal actionRequested(string action)
     signal closeRequested()
 
-    // Vertical popup layers slide from the bar using a stable travel distance;
-    // the disabled internal clip keeps the full layers visible while moving.
-    readonly property real slideOffset: root.direction === "up"
-            ? root.revealDistance + 1 : -(root.revealDistance + 1)
+    // Identity travels its own height; content starts further away, matching
+    // the settings panel's shorter-rail / longer-content stagger.
+    readonly property real travelSign: root.direction === "up" ? 1 : -1
+    readonly property real identityTravel: Math.max(Number(popup.sidebarLayer.height),
+            Number(popup.sidebarLayer.implicitHeight), 48) + 1
+    readonly property real contentTravel: root.revealDistance + 1
+    readonly property real identityOffset: root.travelSign * root.identityTravel
+    readonly property real slideOffset: root.travelSign * root.contentTravel
 
     function startReveal(target) {
         revealMotion.stop()
@@ -613,9 +617,9 @@ PanelWindow {
                 width: popupContainer.width
                 height: popupContainer.height
                 revealProgress: 0
-                contentDelay: 0
+                contentDelay: MotionTokens.settingsContentDelay
                 animateLayerOpacity: false
-                sidebarOffset: root.slideOffset
+                sidebarOffset: root.identityOffset
                 contentOffset: root.slideOffset
                 // Single source of truth: the reveal lives while the surface is
                 // active, covering both the open state and the exit slide window.
