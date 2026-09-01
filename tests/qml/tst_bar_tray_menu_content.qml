@@ -67,6 +67,23 @@ Item {
             compare(item.submenuEntry, null)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
+        function test_submenuSurfaceIsOpaqueAndRowsUseSettingsCards() {
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [parent] })
+            item.openSubmenu(parent, null)
+            compare(findByName(item, "traySubmenuSurface").opacity, 1)
+            compare(findByName(item, "trayMenuRowSurface").color, Lazer.LazerTheme.settingsCard)
+            compare(Lazer.LazerTheme.settingsCardHover !== Lazer.LazerTheme.settingsCard, true)
+        }
+        function test_closeRetainsSubmenuDataDuringAnimation() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = createTemporaryObject(menuComp, root, { menuHandle: {}, entries: [parent] })
+            item.openSubmenu(parent, null)
+            item.closeSubmenu()
+            compare(item.submenuEntry, parent)
+            tryCompare(item, "submenuEntry", null, Lazer.MotionTokens.slow + 100)
+        }
         function test_levelTwoDoesNotCloseSubmenu() {
             var parent = fakeEntry("More", { hasChildren: true })
             var nested = fakeEntry("Nested")

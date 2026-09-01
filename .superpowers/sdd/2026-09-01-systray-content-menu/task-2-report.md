@@ -42,3 +42,22 @@ The final run emitted no QML warnings or errors.
 ## Scope Note
 
 No Quickshell import or live `QsMenuOpener` was added, as required by Task 2.
+
+## Fix Evidence
+
+Open and close now configure the `MotionTokens.slow` duration and
+`Easing.OutQuint`, then restart `submenuAnimation`. Closing retains
+`submenuEntry` and `submenuAnchorRow` until the animation completion handler
+observes progress `0`; reduced-motion closing uses a zero-duration animation
+and the same cleanup path. Root and level-two rows use
+`LazerTheme.settingsCard` / `settingsCardHover`; tests also assert submenu
+opacity, card colors, and post-close data cleanup.
+
+The final run reported `10 passed, 0 failed, 0 skipped, 0 blacklisted` with no
+QML warnings or errors.
+
+Command:
+
+```text
+QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_tray_menu_content.qml -o -,txt
+```

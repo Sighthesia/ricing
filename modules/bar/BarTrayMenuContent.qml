@@ -27,6 +27,7 @@ Item {
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
     property var submenuEntries: []
     property real heldHeight: 0
+    property real submenuAnimationTarget: 0
     signal dismissRequested()
 
     function activateEntry(entry, level) {
@@ -52,28 +53,34 @@ Item {
             return
         submenuEntry = entry
         submenuAnchorRow = row
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.slow
+        submenuAnimation.easing.type = Easing.OutQuint
+        submenuAnimationTarget = 1
         if (Lazer.MotionTokens.reducedMotion) {
             submenuProgress = 1
             submenuPhase = "open"
+            submenuAnimation.restart()
             return
         }
         if (submenuPhase !== "opening" && submenuPhase !== "open")
             submenuPhase = "opening"
-        submenuProgress = 1
+        submenuAnimation.restart()
     }
 
     function closeSubmenu() {
         if (submenuEntry === null && submenuProgress === 0)
             return
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.slow
+        submenuAnimation.easing.type = Easing.OutQuint
+        submenuAnimationTarget = 0
         if (Lazer.MotionTokens.reducedMotion) {
+            submenuPhase = "closing"
             submenuProgress = 0
-            submenuEntry = null
-            submenuAnchorRow = null
-            submenuPhase = "closed"
+            submenuAnimation.restart()
             return
         }
         submenuPhase = "closing"
-        submenuProgress = 0
+        submenuAnimation.restart()
     }
 
     // Keep a stable panel while opener data is still arriving asynchronously.
@@ -123,10 +130,11 @@ Item {
                 // Interactive root menu row.
                 Rectangle {
                     id: rowSurface
+                    objectName: "trayMenuRowSurface"
                     visible: !Logic.isSeparator(modelData)
                     anchors.fill: parent
                     radius: 4
-                    color: rowHover.hovered ? "#353542" : "#24242d"
+                    color: rowHover.hovered ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
                     opacity: Logic.isEnabled(modelData) ? 1 : Lazer.MotionTokens.disabledOpacity
 
                     Text {
@@ -253,7 +261,7 @@ Item {
                         visible: !Logic.isSeparator(modelData)
                         anchors.fill: parent
                         radius: 4
-                        color: "#2e2e39"
+                        color: submenuRowHover.hovered ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
                         Text {
                             anchors.left: parent.left
                             anchors.leftMargin: 12
@@ -262,6 +270,7 @@ Item {
                             color: "#eeeeF2"
                             font.pixelSize: 13
                         }
+                        HoverHandler { id: submenuRowHover }
                         TapHandler { onTapped: activateEntry(modelData, 2) }
                     }
                 }
@@ -290,8 +299,9 @@ Item {
         id: submenuAnimation
         target: root
         property: "submenuProgress"
+        to: root.submenuAnimationTarget
         duration: Lazer.MotionTokens.slow
-        easing.type: Easing.InOutQuad
+        easing.type: Easing.OutQuint
         onFinished: {
             if (submenuProgress === 0) {
                 submenuEntry = null
