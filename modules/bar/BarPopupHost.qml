@@ -665,6 +665,7 @@ PanelWindow {
                         actionKind: root.currentIntent && root.currentIntent.kind !== "context"
                                 ? (root.currentIntent.actionKind || "") : "context"
                         payload: root.currentIntent ? root.currentIntent.payload : null
+                        onDismissRequested: root.dismissImmediately()
                     }
 
                     // Context actions reuse the same content owner and geometry.

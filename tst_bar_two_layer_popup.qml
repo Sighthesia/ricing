@@ -644,7 +644,6 @@ Item {
         }
 
         // Tray
-        var trayAct = 0, traySec = 0
         var trayIntent = {
             widgetId: "tray",
             instanceKey: "tray:0",
@@ -655,18 +654,14 @@ Item {
             anchorX: 380,
             screenWidth: 1000,
             barPosition: "top",
-            payload: { onActivate: function(){ trayAct++ }, onSecondaryActivate: function(){ traySec++ } }
+            payload: { menuHandle: {}, entries: [] }
         }
         host.showIntent(trayIntent)
         actions = findByName(host.popupItem, "popupActions")
         root.checkTrue("tray actions found", actions !== null)
         if (actions) {
-            root.checkTrue("tray activate real TapHandler exists", findByName(actions, "trayActivateTap") !== null)
-            root.checkTrue("tray secondary real TapHandler exists", findByName(actions, "traySecondaryTap") !== null)
-            actions.handleTrayActivate()
-            root.check("tray activate callback fires once", trayAct, 1)
-            actions.handleTraySecondary()
-            root.check("tray secondary callback fires once", traySec, 1)
+            root.checkTrue("tray menu content exists", findByName(actions, "trayMenuRoot") !== null)
+            root.checkTrue("tray open/menu buttons removed", findByName(actions, "trayActivateTap") === null)
         }
 
         // Primary widget click/wheel paths remain available.

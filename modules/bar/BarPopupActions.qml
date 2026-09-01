@@ -1,5 +1,6 @@
 import QtQuick
 import "../lazerbar"
+import "./BarTrayMenuLogic.js" as Logic
 
 // Content body for volume, brightness, media, notifications and tray.
 // Bound via BarPopupHost contentData; intent actionKind/payload drive visible kind.
@@ -8,6 +9,7 @@ Item {
 
     property string actionKind: ""
     property var payload: null
+    signal dismissRequested()
 
     implicitWidth: 260
     implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
@@ -66,6 +68,7 @@ Item {
             return Math.max(0, Number(payload.lengthMs))
         return 0
     }
+    readonly property var trayMenuHandle: Logic.menuHandleFromPayload(payload)
 
     function formatMediaTime(milliseconds) {
         var seconds = Math.floor(Math.max(0, Number(milliseconds)) / 1000)
@@ -223,6 +226,12 @@ Item {
             if (payload && payload.trayItem && typeof payload.trayItem.secondaryActivate === "function")
                 payload.trayItem.secondaryActivate()
         } catch (e) {}
+    }
+
+    function handleTrayMenuDismiss() {
+        if (payload && typeof payload.onDismiss === "function")
+            payload.onDismiss()
+        root.dismissRequested()
     }
 
     // Root content container; always visible when actionKind is known.
@@ -473,79 +482,21 @@ Item {
             }
         }
 
-        // Tray content: activate / secondary activate.
+        // Tray content renders the native menu supplied by the tray item.
         Item {
             id: trayContent
             objectName: "trayContent"
             width: parent.width
-            height: 52
+            height: visible ? trayMenu.implicitHeight : 0
             visible: root.actionKind === "tray"
 
-            // Settings-row card hosts both tray actions.
-            Rectangle {
-                objectName: "trayCard"
-                anchors.fill: parent
-                radius: 6
-                color: trayCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            }
-            HoverHandler { id: trayCardHover; blocking: false }
-
-            Row {
-                anchors.centerIn: parent
-                spacing: 8
-
-                Rectangle {
-                    id: trayActivateButton
-                    objectName: "trayActivateButton"
-                    width: 72
-                    height: 32
-                    radius: 6
-                    color: activateHover.hovered ? LazerTheme.hoverFill : "transparent"
-
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Open"
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 11
-                        font.bold: true
-                    }
-
-                    HoverHandler { id: activateHover }
-                    TapHandler {
-                        objectName: "trayActivateTap"
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.handleTrayActivate()
-                    }
-                }
-
-                Rectangle {
-                    id: traySecondaryButton
-                    objectName: "traySecondaryButton"
-                    width: 72
-                    height: 32
-                    radius: 6
-                    color: secondaryHover.hovered ? LazerTheme.hoverFill : "transparent"
-
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Menu"
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 11
-                        font.bold: true
-                    }
-
-                    HoverHandler { id: secondaryHover }
-                    TapHandler {
-                        objectName: "traySecondaryTap"
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.handleTraySecondary()
-                    }
-                }
+            // Native menu rows own their own hover and activation behavior.
+            BarTrayMenuContent {
+                id: trayMenu
+                width: parent.width
+                menuHandle: root.trayMenuHandle
+                entries: root.payload && root.payload.entries ? root.payload.entries : []
+                onDismissRequested: root.handleTrayMenuDismiss()
             }
         }
 

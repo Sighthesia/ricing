@@ -270,19 +270,22 @@ Item {
             tryCompare(fakeN, "readCalls", 1, 500)
         }
 
-        function test_trayExposesActivateSecondary() {
-            var fakeT = Qt.createQmlObject('import QtQuick; QtObject { property int act:0; property int sec:0; function activate(){ act++ } function secondaryActivate(){ sec++ } }', root, "fakeTray")
-            var item = createTemporaryObject(actionsComp, root, { actionKind: "tray", payload: { trayModel: fakeT } })
-            var actBtn = findByName(item, "trayActivateButton")
-            var secBtn = findByName(item, "traySecondaryButton")
-            verify(actBtn !== null, "activate button should exist")
-            verify(secBtn !== null, "secondary button should exist")
+        function test_trayRendersNativeMenuRows() {
+            var open = { text: "Open", enabled: true, triggeredCalls: 0, triggered: function() { this.triggeredCalls++ } }
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "tray",
+                payload: { menuHandle: {}, entries: [open] }
+            })
+            var menu = findByName(item, "trayMenuRoot")
+            verify(menu !== null)
             verify(findByName(item, "trayContent").visible)
-            fakeT.act = 0; fakeT.sec = 0
-            mouseClick(actBtn, actBtn.width/2, actBtn.height/2, Qt.LeftButton)
-            tryCompare(fakeT, "act", 1, 500)
-            mouseClick(secBtn, secBtn.width/2, secBtn.height/2, Qt.LeftButton)
-            tryCompare(fakeT, "sec", 1, 500)
+            verify(findByName(item, "trayActivateButton") === null)
+            compare(menu.rowCount, 1)
+        }
+
+        function test_trayEmptyStateWithoutHandle() {
+            var item = createTemporaryObject(actionsComp, root, { actionKind: "tray", payload: {} })
+            verify(findByName(item, "trayEmptyState").visible)
         }
 
         function test_volumeAndBrightnessFollowLiveService() {
