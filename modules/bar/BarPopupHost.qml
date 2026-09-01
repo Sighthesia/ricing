@@ -325,6 +325,9 @@ PanelWindow {
         var geometry = targetGeometryFor(intentObj, width, height)
         root.targetWidth = geometry.width
         root.targetHeight = geometry.height
+        // A replacement may grow the menu after the reveal cycle starts.
+        // Keep the exit endpoint large enough to hide the newest full surface.
+        root.revealDistance = Math.max(root.revealDistance, root.targetHeight, 1)
         root.retargetGeometry(intentObj, immediate === true || !root.open)
     }
 
