@@ -159,7 +159,7 @@ Item {
         z: 2
         width: parent.width
         height: menuFlick.height
-        color: "#24242d"
+        color: Lazer.LazerTheme.settingsSection
     }
 
     // Empty-state label for an unavailable or empty tray menu.
@@ -312,7 +312,7 @@ Item {
         height: menuFlick.height
         x: parent.width + 4
         y: 0
-        color: "#24242d"
+        color: Lazer.LazerTheme.settingsSection
         clip: true
 
         Text {

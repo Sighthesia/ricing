@@ -498,7 +498,7 @@ Item {
                 objectName: "trayContentBackground"
                 anchors.fill: parent
                 anchors.margins: -8
-                color: "#24242d"
+                color: LazerTheme.settingsSection
                 visible: root.actionKind === "tray"
             }
 
