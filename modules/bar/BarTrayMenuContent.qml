@@ -17,9 +17,8 @@ Item {
     property var trayItem: null
     readonly property var resolvedMenuHandle: menuHandle !== null && menuHandle !== undefined
         ? menuHandle : (trayItem ? trayItem.menu : null)
-    readonly property var liveModel: rootOpenerLoader.item ? rootOpenerLoader.item.childrenModel : null
-    readonly property int liveCount: liveModel ? liveModel.values.length : 0
-    readonly property var liveValues: liveModel ? liveModel.values : []
+    readonly property int liveCount: rootOpenerLoader.item ? rootOpenerLoader.item.count : 0
+    readonly property var liveValues: rootOpenerLoader.item ? rootOpenerLoader.item.values : []
     property var entries: null
     readonly property bool stubEntriesActive: useStubEntries
         || (entries !== null && entries !== undefined && Logic.entryList(entries).length > 0)
@@ -190,7 +189,8 @@ Item {
             spacing: 4
 
             Repeater {
-                model: stubEntriesActive ? entryModel : liveModel
+                model: stubEntriesActive ? entryModel
+                    : (rootOpenerLoader.item ? rootOpenerLoader.item.values : [])
 
                 delegate: Item {
                     id: rootRow
@@ -325,7 +325,7 @@ Item {
             spacing: 4
             Repeater {
                 model: root.stubEntriesActive ? Logic.entryList(root.submenuEntries)
-                    : (submenuOpenerLoader.item ? submenuOpenerLoader.item.childrenModel : null)
+                    : (submenuOpenerLoader.item ? submenuOpenerLoader.item.values : [])
                 delegate: Item {
                     required property var modelData
                     property int level: 2

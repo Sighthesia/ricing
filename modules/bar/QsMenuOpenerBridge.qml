@@ -4,14 +4,29 @@ import Quickshell
 QtObject {
     id: root
     property QsMenuHandle menu: null
-    readonly property var childrenModel: opener.children
-    readonly property var children: opener.children
-    readonly property var values: {
-        var _n = opener.children ? opener.children.values.length : 0
-        return opener.children ? opener.children.values : []
+    property alias children: opener.children
+    property var values: []
+    property int count: 0
+
+    function refreshValues() {
+        var model = opener.children
+        var next = model ? model.values : []
+        root.values = next || []
+        root.count = root.values.length
     }
-    readonly property int count: opener.children && opener.children.values
-        ? opener.children.values.length : 0
+
+    Component.onCompleted: refreshValues()
+
+    Connections {
+        target: opener
+        function onChildrenChanged() { root.refreshValues() }
+    }
+
+    Connections {
+        target: opener.children
+        function onObjectInsertedPost() { root.refreshValues() }
+        function onObjectRemovedPost() { root.refreshValues() }
+    }
 
     QsMenuOpener {
         id: opener
