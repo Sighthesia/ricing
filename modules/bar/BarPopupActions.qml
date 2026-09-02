@@ -484,12 +484,23 @@ Item {
         }
 
         // Tray content renders the native menu supplied by the tray item.
+        // Cover the contentColumn's 8px outer margin so the primary menu's
+        // dark face has no blue surround, while the second level still
+        // reveals over the blue section behind the popup.
         Item {
             id: trayContent
             objectName: "trayContent"
             width: parent.width
             height: visible ? trayMenu.implicitHeight : 0
             visible: root.actionKind === "tray"
+
+            Rectangle {
+                objectName: "trayContentBackground"
+                anchors.fill: parent
+                anchors.margins: -8
+                color: "#24242d"
+                visible: root.actionKind === "tray"
+            }
 
             // Native menu rows own their own hover and activation behavior.
             BarTrayMenuContent {

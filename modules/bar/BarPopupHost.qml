@@ -668,8 +668,7 @@ PanelWindow {
                         y: root.direction === "down" ? -1 : 0
                         width: parent.width
                         height: parent.height + 1
-                        color: popupActions.actionKind === "tray" ? "#24242d" : LazerTheme.settingsSection
-                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                        color: LazerTheme.settingsSection
                     }
 
                     // Action layer bound to the hovered widget intent.
