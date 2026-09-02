@@ -80,6 +80,18 @@ Item {
     function openSubmenu(entry, row) {
         if (!Logic.shouldOpenSubmenu(entry))
             return
+        // Redirect without replaying reveal when already visible.
+        if ((submenuPhase === "open" || submenuPhase === "opening") && submenuEntry === entry) {
+            if (row)
+                submenuAnchorRow = row
+            return
+        }
+        if (submenuPhase === "open" || submenuPhase === "opening") {
+            submenuEntry = entry
+            if (row)
+                submenuAnchorRow = row
+            return
+        }
         submenuEntry = entry
         if (row)
             submenuAnchorRow = row
@@ -93,8 +105,7 @@ Item {
             submenuAnimation.restart()
             return
         }
-        if (submenuPhase !== "opening" && submenuPhase !== "open")
-            submenuPhase = "opening"
+        submenuPhase = "opening"
         submenuAnimation.restart()
     }
 
@@ -307,7 +318,7 @@ Item {
         objectName: "traySubmenuSurface"
         z: 1
         opacity: 1
-        visible: submenuProgress > 0
+        visible: submenuProgress > 0.01 || submenuPhase === "opening" || submenuPhase === "open"
         width: parent.width
         height: menuFlick.height
         x: parent.width + 4
