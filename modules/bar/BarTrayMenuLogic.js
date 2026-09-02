@@ -47,15 +47,15 @@ function emptyStateVisible(handle, entries, loading) {
 }
 function menuHandleFromPayload(payload) {
     if (!payload) return null
-    if (payload.menuHandle)
+    if (payload.menuHandle !== null && payload.menuHandle !== undefined)
         return payload.menuHandle
-    if (payload.menu)
+    if (payload.menu !== null && payload.menu !== undefined)
         return payload.menu
     if (payload.hasMenu === false)
         return null
-    if (payload.trayItem && payload.trayItem.menu)
+    if (payload.trayItem && payload.trayItem.menu !== null && payload.trayItem.menu !== undefined)
         return payload.trayItem.menu
-    if (payload.trayModel && payload.trayModel.menu)
+    if (payload.trayModel && payload.trayModel.menu !== null && payload.trayModel.menu !== undefined)
         return payload.trayModel.menu
     return null
 }

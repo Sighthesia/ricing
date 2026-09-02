@@ -73,7 +73,7 @@ Item {
                 title: titleText,
                 iconSource: iconSrc,
                 hasMenu: !!(modelData && (modelData.hasMenu || modelData.menu)),
-                menuHandle: modelData ? (modelData.menu || null) : null,
+                menuHandle: modelData ? modelData.menu : null,
                 onActivate: function() { try { modelData.activate() } catch (e) {} },
                 onSecondaryActivate: function() { try { modelData.secondaryActivate() } catch (e) {} }
             }
@@ -97,7 +97,7 @@ Item {
             delegate: Item {
                 id: trayIcon
 
-                required property var modelData
+                required property SystemTrayItem modelData
 
                 readonly property bool hovered: iconHover.hovered
                 readonly property string label:

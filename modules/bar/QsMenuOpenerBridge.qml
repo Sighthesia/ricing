@@ -3,7 +3,7 @@ import Quickshell
 // Expose native menu children through a lazily loaded Quickshell boundary.
 QtObject {
     id: root
-    property var menu: null
+    property QsMenuHandle menu: null
     readonly property var childrenModel: opener.children
     readonly property var children: opener.children
     readonly property var values: {

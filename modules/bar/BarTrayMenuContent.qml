@@ -15,7 +15,8 @@ Item {
     property var menuHandle: null
     property bool useStubEntries: false
     property var trayItem: null
-    readonly property var resolvedMenuHandle: menuHandle || (trayItem ? trayItem.menu : null)
+    readonly property var resolvedMenuHandle: menuHandle !== null && menuHandle !== undefined
+        ? menuHandle : (trayItem ? trayItem.menu : null)
     readonly property var liveModel: rootOpenerLoader.item ? rootOpenerLoader.item.childrenModel : null
     readonly property int liveCount: liveModel ? liveModel.values.length : 0
     readonly property var liveValues: liveModel ? liveModel.values : []
@@ -26,7 +27,7 @@ Item {
         ? Logic.entryList(entries)
         : Logic.entryList(liveValues)
     readonly property bool menuLoading: resolvedMenuHandle != null && !stubEntriesActive
-        && liveCount === 0 && rootOpenerLoader.status !== Loader.Error
+        && liveCount === 0
     readonly property bool emptyStateVisible: resolvedMenuHandle === null
         || (stubEntriesActive ? rowCount === 0 : (liveCount === 0 && !menuLoading))
     readonly property int rowCount: stubEntriesActive ? Logic.entryList(entries).length : liveCount
@@ -114,7 +115,7 @@ Item {
         heldHeight = Logic.heldHeight(Math.min(Number(value), maxMenuHeight), heldHeight)
     }
 
-    // Native DBus menus only populate after QsMenuOpener is attached.
+    // Native DBus menus are loaded only when a real menu handle is present.
     Loader {
         id: rootOpenerLoader
         active: !root.stubEntriesActive && root.resolvedMenuHandle != null
@@ -129,6 +130,7 @@ Item {
         when: rootOpenerLoader.item != null
     }
 
+    // Submenus use a second opener because each QsMenuEntry owns its own handle.
     Loader {
         id: submenuOpenerLoader
         active: !root.stubEntriesActive && root.submenuEntry != null
