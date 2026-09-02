@@ -10,7 +10,15 @@ Item {
     id: root
     objectName: "trayMenuRoot"
     implicitWidth: 244
-    implicitHeight: Math.max(heldHeight, emptyStateVisible ? 32 : menuFlick.height)
+    implicitHeight: {
+        if (emptyStateVisible) return 32
+        if (menuLoading) return Math.max(heldHeight, 72)
+        return Math.max(heldHeight, menuFlick.height)
+    }
+
+    Behavior on implicitHeight {
+        NumberAnimation { duration: Lazer.MotionTokens.fast; easing.type: Easing.OutQuad }
+    }
 
     property var menuHandle: null
     property bool useStubEntries: false
@@ -292,6 +300,8 @@ Item {
     }
 
     // Preserve the second-level surface during its closing transition.
+    // Keep submenu the same bounded size as the primary flick so the
+    // root list never shifts when the second level appears.
     Rectangle {
         id: submenuSurface
         objectName: "traySubmenuSurface"
@@ -299,10 +309,11 @@ Item {
         opacity: 1
         visible: submenuProgress > 0
         width: parent.width
-        height: Math.max(32, submenuColumn.implicitHeight)
+        height: menuFlick.height
         x: parent.width + 4
-        y: submenuAnchorRow ? submenuAnchorRow.y : 0
+        y: 0
         color: "#24242d"
+        clip: true
 
         Text {
             objectName: "traySubmenuTitle"
@@ -316,14 +327,23 @@ Item {
         }
 
         // Child entries remain held during closing and update from the live opener.
-        Column {
-            id: submenuColumn
+        Flickable {
+            id: submenuFlick
+            objectName: "traySubmenuFlick"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.topMargin: 32
-            spacing: 4
-            Repeater {
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 4
+            contentHeight: submenuColumn.implicitHeight
+            clip: true
+            interactive: contentHeight > height
+            Column {
+                id: submenuColumn
+                width: parent.width
+                spacing: 4
+                Repeater {
                 model: root.stubEntriesActive ? Logic.entryList(root.submenuEntries)
                     : (submenuOpenerLoader.item ? submenuOpenerLoader.item.values : [])
                 delegate: Item {
@@ -358,6 +378,7 @@ Item {
                         HoverHandler { id: submenuRowHover }
                         TapHandler { onTapped: activateEntry(modelData, 2) }
                     }
+                }
                 }
             }
         }

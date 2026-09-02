@@ -321,10 +321,11 @@ PanelWindow {
     function updateTargetGeometry(intentObj, immediate) {
         var trayExtraWidth = popupActions && popupActions.trayMenuContent
                 ? Number(popupActions.trayMenuContent.extraWidth) : 0
-        var width = Math.max(240, popup.sidebarLayer.implicitWidth || 260,
+        var baseWidth = Math.max(240, popup.sidebarLayer.implicitWidth || 260,
                 popup.contentLayer.implicitWidth || 260)
+        var width = baseWidth
         if (isFinite(trayExtraWidth) && trayExtraWidth > 0)
-            width = Math.max(width, (popup.contentLayer.implicitWidth || 260) + trayExtraWidth)
+            width = baseWidth + trayExtraWidth
         var displayedIntent = root.currentIntent || intentObj
         var sidebarHeight = Math.max(Number(popup.sidebarLayer.implicitHeight),
                 Number(popup.sidebarLayer.height), 48)
@@ -333,7 +334,16 @@ PanelWindow {
             width = 240
         if (!isFinite(height) || height < 1)
             height = 1
+        // Keep the primary column anchored; expand only to the right so the
+        // root list never shifts when the second level appears.
+        var baseGeometry = targetGeometryFor(intentObj, baseWidth, height)
         var geometry = targetGeometryFor(intentObj, width, height)
+        if (isFinite(trayExtraWidth) && trayExtraWidth > 0) {
+            var maxLeft = root.activeScreenWidth - width - 8
+            if (maxLeft < 8) maxLeft = 8
+            geometry.x = Math.min(baseGeometry.x, maxLeft)
+            if (geometry.x < 8) geometry.x = 8
+        }
         root.targetWidth = geometry.width
         root.targetHeight = geometry.height
         root.commitRevealDistance()
@@ -658,7 +668,8 @@ PanelWindow {
                         y: root.direction === "down" ? -1 : 0
                         width: parent.width
                         height: parent.height + 1
-                        color: LazerTheme.settingsSection
+                        color: popupActions.actionKind === "tray" ? "#24242d" : LazerTheme.settingsSection
+                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                     }
 
                     // Action layer bound to the hovered widget intent.

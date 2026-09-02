@@ -134,7 +134,11 @@ Item {
             verify(rows.length >= 3)
             item.openSubmenu(parent, rows[rows.length - 1])
             compare(item.submenuAnchorRow, rows[rows.length - 1])
-            compare(item.submenuSurface.y, rows[rows.length - 1].y)
+            // Second level is full-height and aligned to the primary's top so
+            // the root list never shifts when the submenu appears.
+            compare(item.submenuSurface.y, 0)
+            compare(item.submenuSurface.width, item.width)
+            compare(item.submenuSurface.height, findByName(item, "trayMenuFlick").height)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_longMenuIsBoundedAndScrollable() {
