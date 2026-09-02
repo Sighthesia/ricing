@@ -38,6 +38,16 @@ Item {
             verify(item.emptyStateVisible)
             compare(findByName(item, "trayEmptyState").visible, true)
         }
+
+        function test_delayedTrayMenuHandleActivatesOpener() {
+            var item = Qt.createQmlObject('import QtQuick; QtObject { property var menu: null }', root, "fakeTrayItem")
+            var menu = makeMenu([])
+            menu.menuHandle = null
+            menu.trayItem = item
+            verify(menu.emptyStateVisible)
+            item.menu = Qt.createQmlObject('import QtQuick; QtObject {}', root, "fakeMenuHandle")
+            compare(menu.resolvedMenuHandle, item.menu)
+        }
         function test_rowsRenderAndSeparatorNotClickable() {
             var sep = fakeEntry("", { isSeparator: true })
             var open = fakeEntry("Open")

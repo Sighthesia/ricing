@@ -14,17 +14,20 @@ Item {
 
     property var menuHandle: null
     property bool useStubEntries: false
-    readonly property int liveCount: rootOpenerLoader.item ? rootOpenerLoader.item.count : 0
-    readonly property var liveValues: rootOpenerLoader.item ? rootOpenerLoader.item.values : []
+    property var trayItem: null
+    readonly property var resolvedMenuHandle: menuHandle || (trayItem ? trayItem.menu : null)
+    readonly property var liveModel: rootOpenerLoader.item ? rootOpenerLoader.item.childrenModel : null
+    readonly property int liveCount: liveModel ? liveModel.values.length : 0
+    readonly property var liveValues: liveModel ? liveModel.values : []
     property var entries: null
     readonly property bool stubEntriesActive: useStubEntries
         || (entries !== null && entries !== undefined && Logic.entryList(entries).length > 0)
     readonly property var entryModel: stubEntriesActive
         ? Logic.entryList(entries)
         : Logic.entryList(liveValues)
-    readonly property bool menuLoading: menuHandle != null && !stubEntriesActive
+    readonly property bool menuLoading: resolvedMenuHandle != null && !stubEntriesActive
         && liveCount === 0 && rootOpenerLoader.status !== Loader.Error
-    readonly property bool emptyStateVisible: menuHandle === null
+    readonly property bool emptyStateVisible: resolvedMenuHandle === null
         || (stubEntriesActive ? rowCount === 0 : (liveCount === 0 && !menuLoading))
     readonly property int rowCount: stubEntriesActive ? Logic.entryList(entries).length : liveCount
 
@@ -114,15 +117,15 @@ Item {
     // Native DBus menus only populate after QsMenuOpener is attached.
     Loader {
         id: rootOpenerLoader
-        active: !root.stubEntriesActive && root.menuHandle != null
+        active: !root.stubEntriesActive && root.resolvedMenuHandle != null
         source: "QsMenuOpenerBridge.qml"
-        onLoaded: if (item) item.menu = root.menuHandle
+        onLoaded: if (item) item.menu = root.resolvedMenuHandle
     }
 
     Binding {
         target: rootOpenerLoader.item
         property: "menu"
-        value: root.menuHandle
+        value: root.resolvedMenuHandle
         when: rootOpenerLoader.item != null
     }
 
@@ -185,7 +188,7 @@ Item {
             spacing: 4
 
             Repeater {
-                model: stubEntriesActive ? entryModel : liveValues
+                model: stubEntriesActive ? entryModel : liveModel
 
                 delegate: Item {
                     id: rootRow
@@ -320,7 +323,7 @@ Item {
             spacing: 4
             Repeater {
                 model: root.stubEntriesActive ? Logic.entryList(root.submenuEntries)
-                    : (submenuOpenerLoader.item ? submenuOpenerLoader.item.values : [])
+                    : (submenuOpenerLoader.item ? submenuOpenerLoader.item.childrenModel : null)
                 delegate: Item {
                     required property var modelData
                     property int level: 2

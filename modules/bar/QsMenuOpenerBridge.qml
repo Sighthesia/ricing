@@ -4,6 +4,7 @@ import Quickshell
 QtObject {
     id: root
     property var menu: null
+    readonly property var childrenModel: opener.children
     readonly property var children: opener.children
     readonly property var values: {
         var _n = opener.children ? opener.children.values.length : 0

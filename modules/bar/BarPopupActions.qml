@@ -496,6 +496,7 @@ Item {
                 id: trayMenu
                 width: parent.width
                 menuHandle: root.trayMenuHandle
+                trayItem: root.payload && root.payload.trayItem ? root.payload.trayItem : null
                 entries: root.payload && root.payload.entries !== undefined
                         ? root.payload.entries : null
                 useStubEntries: !!(root.payload && root.payload.useStubEntries)
