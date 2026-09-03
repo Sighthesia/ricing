@@ -310,6 +310,12 @@ Item {
         }
     }
 
+    // Second level only renders when it actually has rows. Hovering a row
+    // whose handle reports children but fetches none must not pop a blank
+    // panel; closing keeps its last frame until progress hits zero.
+    readonly property bool hasSubmenuContent: stubEntriesActive
+        ? Logic.entryList(submenuEntries).length > 0
+        : (submenuOpenerLoader.item ? submenuOpenerLoader.item.count > 0 : false)
     // Preserve the second-level surface during its closing transition.
     // Keep submenu the same bounded size as the primary flick so the
     // root list never shifts when the second level appears.
@@ -318,7 +324,7 @@ Item {
         objectName: "traySubmenuSurface"
         z: 1
         opacity: 1
-        visible: submenuProgress > 0.01 || submenuPhase === "opening" || submenuPhase === "open"
+        visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: parent.width
         height: menuFlick.height
         x: parent.width + 4

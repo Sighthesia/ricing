@@ -377,6 +377,14 @@ PanelWindow {
                 root.targetWidth, root.targetHeight)
         root.targetX = geometry.x
         root.targetY = geometry.y
+        // Late DBus batches must not retarget the display mid-slide: that
+        // restarts the size motions under a running reveal and reads as a
+        // bounce (shrink then regrow). Hold the display; the reveal-finish
+        // handler syncs any deferred target once settled.
+        if (!immediate && !MotionTokens.reducedMotion
+                && popup.revealProgress > 0.01 && popup.revealProgress < 0.99) {
+            return
+        }
         if (immediate || MotionTokens.reducedMotion) {
             xMotion.stop()
             yMotion.stop()
@@ -484,6 +492,12 @@ PanelWindow {
         target: popup
         property: "revealProgress"
         duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.settingsSidebarFade
+        onFinished: {
+            // Pick up any geometry deferred mid-slide so the final size
+            // settles with one gentle motion after the reveal, not a bounce.
+            if (popup.revealProgress > 0.99 && root.open)
+                root.retargetGeometry(root.currentIntent)
+        }
     }
 
     // Serialize content replacement behind one short fade-out/fade-in channel.
@@ -595,7 +609,7 @@ PanelWindow {
                             trayLastHeight = -1
                         }
                     }
-                    var settled = !loading && count > 0 && trayStableTicks >= 5
+                    var settled = !loading && count > 0 && trayStableTicks >= 8
                     if (!settled && trayAttempts < 90) {
                         trayAttempts++
                         restart()
