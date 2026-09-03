@@ -94,7 +94,11 @@ PanelWindow {
         }
         // Scale duration by travelled distance so an interrupted reveal
         // resumes at proportional speed instead of jumping or lingering.
+        // Tray has no content delay (contentDelay 0), so its enter only needs
+        // the sidebar span instead of the full two-layer total.
         var base = MotionTokens.reducedMotion ? MotionTokens.fast : popup.revealDuration
+        if (target >= 1 && root.currentIntent && root.currentIntent.actionKind === "tray")
+            base = MotionTokens.settingsSidebarFade
         revealMotion.duration = Math.max(MotionTokens.fast, Math.round(base * dist))
         // OutQuint front-loads most travel into the first frames (looks like
         // an instant pop); OutCubic stays smooth. Exit uses InOutQuad so it
@@ -609,8 +613,8 @@ PanelWindow {
                             trayLastHeight = -1
                         }
                     }
-                    var settled = !loading && count > 0 && trayStableTicks >= 8
-                    if (!settled && trayAttempts < 90) {
+                    var settled = !loading && count > 0 && trayStableTicks >= 4
+                    if (!settled && trayAttempts < 60) {
                         trayAttempts++
                         restart()
                         return
