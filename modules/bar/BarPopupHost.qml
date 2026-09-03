@@ -303,6 +303,14 @@ PanelWindow {
     function popupHeightForIntent(intentObj) {
         if (!intentObj)
             return 1
+        // Hold stable height while the two-layer reveal is in flight so a
+        // late DBus menu fetch does not retarget geometry mid-slide.
+        if (popup.revealProgress > 0.01 && popup.revealProgress < 0.99) {
+            if (popup.stableContentHeight > 0)
+                return popup.stableContentHeight
+            if (popup.stableSidebarHeight > 0)
+                return popup.stableSidebarHeight
+        }
         var height = String(intentObj.kind || "") === "context"
                 ? contextPopupActions.implicitHeight : popupActions.implicitHeight
         return isFinite(Number(height)) && Number(height) > 0 ? Number(height) : 1
