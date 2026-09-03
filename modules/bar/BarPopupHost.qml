@@ -651,7 +651,7 @@ PanelWindow {
                 width: popupContainer.width
                 height: popupContainer.height
                 revealProgress: 0
-                contentDelay: MotionTokens.settingsContentDelay
+                contentDelay: root.currentIntent && root.currentIntent.actionKind === "tray" ? 0 : MotionTokens.settingsContentDelay
                 animateLayerOpacity: false
                 sidebarOffset: root.identityOffset
                 contentOffset: root.slideOffset
