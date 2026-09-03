@@ -56,6 +56,13 @@ PanelWindow {
     property real targetHeight: 1
     // Stable travel distance for the current reveal/exit cycle.
     property real revealDistance: 1
+    // Left-flip state for edge tray submenus: the container expands left
+    // while both layers glide right by the same delta (contentShiftX), so
+    // the primary column never moves on screen. flipBaseX is the primary's
+    // pinned left edge; the flip releases once the container glides home.
+    property bool submenuFlipped: false
+    property real flipBaseX: 0
+    property real contentShiftX: submenuFlipped ? flipBaseX - displayX : 0
     // Keep the reveal viewport large enough while displayed geometry morphs.
     readonly property real revealViewportHeight: Math.max(root.displayHeight,
             root.targetHeight, root.revealDistance, 1)
@@ -353,14 +360,34 @@ PanelWindow {
         if (!isFinite(height) || height < 1)
             height = 1
         // Keep the primary column anchored; expand only to the right so the
-        // root list never shifts when the second level appears.
+        // root list never shifts when the second level appears. At the
+        // screen edge right-expansion would shove the primary left, so flip
+        // the submenu left and expand the container left instead.
         var baseGeometry = targetGeometryFor(intentObj, baseWidth, height)
         var geometry = targetGeometryFor(intentObj, width, height)
-        if (isFinite(trayExtraWidth) && trayExtraWidth > 0) {
+        var trayContent = popupActions ? popupActions.trayMenuContent : null
+        var isTrayIntent = displayedIntent && String(displayedIntent.actionKind || "") === "tray"
+        if (isFinite(trayExtraWidth) && trayExtraWidth > 0 && isTrayIntent) {
             var maxLeft = root.activeScreenWidth - width - 8
             if (maxLeft < 8) maxLeft = 8
-            geometry.x = Math.min(baseGeometry.x, maxLeft)
+            var rightX = Math.min(baseGeometry.x, maxLeft)
+            if (rightX < baseGeometry.x - 0.5) {
+                root.submenuFlipped = true
+                root.flipBaseX = baseGeometry.x
+                if (trayContent) trayContent.submenuFlipped = true
+                geometry.x = Math.max(baseGeometry.x - trayExtraWidth, 8)
+            } else {
+                root.submenuFlipped = false
+                if (trayContent) trayContent.submenuFlipped = false
+                geometry.x = rightX
+            }
             if (geometry.x < 8) geometry.x = 8
+        } else if (!isTrayIntent) {
+            root.submenuFlipped = false
+            if (trayContent) trayContent.submenuFlipped = false
+        } else if (root.submenuFlipped && Math.abs(root.displayX - root.flipBaseX) < 1) {
+            root.submenuFlipped = false
+            if (trayContent) trayContent.submenuFlipped = false
         }
         root.targetWidth = geometry.width
         root.targetHeight = geometry.height
@@ -666,6 +693,18 @@ PanelWindow {
         }
     }
 
+    // Release the flip once the container glides home after the submenu
+    // closes; the shift binding keeps the primary static until then.
+    onDisplayXChanged: {
+        if (root.submenuFlipped && Math.abs(root.displayX - root.flipBaseX) < 1) {
+            var tc = popupActions ? popupActions.trayMenuContent : null
+            if (tc && Number(tc.extraWidth) > 0)
+                return
+            root.submenuFlipped = false
+            if (tc) tc.submenuFlipped = false
+        }
+    }
+
     // Public geometry owner keeps screen-relative coordinates stable for
     // diagnostics and callers; the visual owner below is clipped separately.
     Item {
@@ -706,6 +745,12 @@ PanelWindow {
                 blocking: false
                 onHoveredChanged: root.popupHovered = hovered
             }
+
+            // Flip compensation: both layers glide right by the container's
+            // leftward expansion delta, so the primary column is pixel-static
+            // on screen for the whole flip engage/settle cycle.
+            Binding { target: popup.sidebarLayer; property: "x"; value: root.contentShiftX }
+            Binding { target: popup.contentLayer; property: "x"; value: root.contentShiftX }
 
             // Two-layer surface; vertical orientation with direction driven by
             // the bar position (top -> Down, bottom -> Up).

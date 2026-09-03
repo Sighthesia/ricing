@@ -141,6 +141,23 @@ Item {
             compare(item.submenuSurface.height, findByName(item, "trayMenuFlick").height)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
+        function test_submenuFlipRendersLeftWithoutMovingPrimary() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([parent])
+            item.openSubmenu(parent, null)
+            compare(item.submenuProgress, 1)
+            // Flipped: second level renders left of the primary, primary untouched.
+            item.submenuFlipped = true
+            compare(item.popsRight, false)
+            compare(item.submenuSurface.x, -item.submenuSurface.width - 4)
+            compare(item.extraWidth, item.submenuSurface.width + 4)
+            // Default: second level renders right of the primary.
+            item.submenuFlipped = false
+            compare(item.popsRight, true)
+            compare(item.submenuSurface.x, item.width + 4)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
         function test_longMenuIsBoundedAndScrollable() {
             var many = []
             for (var i = 0; i < 40; i++)

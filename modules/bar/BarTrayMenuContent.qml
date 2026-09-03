@@ -49,7 +49,11 @@ Item {
     property real heldHeight: 420
     property real rawColumnHeight: menuColumn.implicitHeight
     property real submenuAnimationTarget: 0
+    // Flip the second level to the left when the tray icon sits at the
+    // screen edge: expanding right would shove the primary column left.
+    property bool submenuFlipped: false
     property bool popsRight: true
+    onSubmenuFlippedChanged: popsRight = !submenuFlipped
     readonly property real enterTravel: 4 + width * Lazer.MotionTokens.popupFromScale + 4
     readonly property real extraWidth: submenuProgress > 0 ? submenuSurface.width + 4 : 0
     readonly property alias submenuSurface: submenuSurface
@@ -328,7 +332,7 @@ Item {
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: parent.width
         height: menuFlick.height
-        x: parent.width + 4
+        x: submenuFlipped ? -width - 4 : parent.width + 4
         y: 0
         color: Lazer.LazerTheme.settingsSection
         clip: true
@@ -418,7 +422,7 @@ Item {
     Item {
         objectName: "traySubmenuBridge"
         z: 0
-        x: parent.width
+        x: submenuFlipped ? -4 : parent.width
         y: submenuSurface.y
         width: submenuProgress > 0 ? 4 : 0
         height: submenuProgress > 0 ? submenuSurface.height : 0
