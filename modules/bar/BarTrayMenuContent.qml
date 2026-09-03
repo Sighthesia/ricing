@@ -45,7 +45,7 @@ Item {
     property Item submenuAnchorRow: null
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
     property var submenuEntries: []
-    property real heldHeight: 380
+    property real heldHeight: 420
     property real rawColumnHeight: menuColumn.implicitHeight
     property real submenuAnimationTarget: 0
     property bool popsRight: true
@@ -206,6 +206,8 @@ Item {
             objectName: "trayMenuColumn"
             width: menuFlick.width
             spacing: 4
+            opacity: liveCount > 0 || stubEntriesActive ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: Lazer.MotionTokens.fast; easing.type: Easing.OutQuad } }
 
             Repeater {
                 model: stubEntriesActive ? entryModel
