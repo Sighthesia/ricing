@@ -547,12 +547,24 @@ PanelWindow {
     // Let current-intent bindings settle before starting the reveal. Without
     // this one event-loop turn, the first frame can use the menu's fallback
     // height and reveal only part of the measured content.
+    // For tray menus the DBus fetch is async; hold the reveal briefly so
+    // the first frame already contains rows and the content layer does not
+    // pop in mid-slide.
     Timer {
         id: revealStartTimer
-        interval: 0
+        interval: 16
         repeat: false
+        property int trayAttempts: 0
         onTriggered: {
             if (root.open && root.surfaceActive) {
+                var isTrayLoading = root.currentIntent && root.currentIntent.actionKind === "tray"
+                    && popupActions.trayMenuContent && popupActions.trayMenuContent.menuLoading
+                if (isTrayLoading && trayAttempts < 18) {
+                    trayAttempts++
+                    restart()
+                    return
+                }
+                trayAttempts = 0
                 root.updateTargetGeometry(root.currentIntent, true)
                 root.revealDistance = Math.max(root.targetHeight, root.displayHeight, 1)
                 root.startReveal(1)
