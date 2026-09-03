@@ -16,9 +16,10 @@ Item {
         return Math.max(heldHeight, menuFlick.height)
     }
 
-    Behavior on implicitHeight {
-        NumberAnimation { duration: Lazer.MotionTokens.fast; easing.type: Easing.OutQuad }
-    }
+    // No Behavior here: batch arrivals settle while the host reveal is held
+    // at progress 0 (invisible), and late batches are smoothed by the host's
+    // own height motion. An animated implicitHeight under a running reveal
+    // stretches the content mid-slide and reads as bounce.
 
     property var menuHandle: null
     property bool useStubEntries: false

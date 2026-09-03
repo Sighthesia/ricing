@@ -619,6 +619,9 @@ PanelWindow {
                 revealStartTimer.resetTrayWait()
                 root.updateTargetGeometry(root.currentIntent, true)
                 root.revealDistance = Math.max(root.targetHeight, root.displayHeight, 1)
+                root.debugLog("reveal-start", { "h": Math.round(root.targetHeight),
+                    "progress": Number(popup.revealProgress),
+                    "kind": root.currentIntent ? String(root.currentIntent.actionKind || "") : "" })
                 root.startReveal(1)
             }
         }
@@ -634,6 +637,7 @@ PanelWindow {
             // Fresh opens always slide from the start. Without this snap a
             // reopen during an unfinished exit resumes mid-travel and the
             // content appears instantly at partial height.
+            root.debugLog("reveal-snap", { "progressBefore": Number(popup.revealProgress) })
             revealMotion.stop()
             popup.revealProgress = 0
             revealStartTimer.resetTrayWait()
@@ -647,6 +651,7 @@ PanelWindow {
             }
         } else {
             revealStartTimer.stop()
+            root.debugLog("reveal-exit-start", { "progress": Number(popup.revealProgress) })
             // Expand the exit travel only when the popup is fully revealed
             // (progress ~1) so the offset change is invisible (Y=0 at 1).
             // Mid-reveal closes keep the current distance to avoid a backward jump.
