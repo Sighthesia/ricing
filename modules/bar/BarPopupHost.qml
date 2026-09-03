@@ -561,16 +561,48 @@ PanelWindow {
         interval: 16
         repeat: false
         property int trayAttempts: 0
+        property int trayStableTicks: 0
+        property int trayLastCount: -1
+        property real trayLastHeight: -1
+        function resetTrayWait() {
+            trayAttempts = 0
+            trayStableTicks = 0
+            trayLastCount = -1
+            trayLastHeight = -1
+        }
         onTriggered: {
             if (root.open && root.surfaceActive) {
-                var isTrayLoading = root.currentIntent && root.currentIntent.actionKind === "tray"
-                    && popupActions.trayMenuContent && (popupActions.trayMenuContent.menuLoading || popupActions.trayMenuContent.resolvedMenuHandle == null)
-                if (isTrayLoading && trayAttempts < 60) {
-                    trayAttempts++
-                    restart()
-                    return
+                var trayContent = popupActions.trayMenuContent
+                var isTray = root.currentIntent && root.currentIntent.actionKind === "tray" && trayContent
+                if (isTray) {
+                    // Long DBus menus (clash-verge/fcitx) arrive in batches:
+                    // liveCount climbs 0→N→M while delegates measure. Starting
+                    // at the first batch makes later batches jump mid-slide,
+                    // so wait until count AND column height are stable.
+                    var loading = trayContent.menuLoading || trayContent.resolvedMenuHandle == null
+                    var count = Number(trayContent.liveCount)
+                    var colH = Math.round(Number(trayContent.rawColumnHeight))
+                    if (!loading && count > 0 && count === trayLastCount && colH === Math.round(trayLastHeight)) {
+                        trayStableTicks++
+                    } else {
+                        trayStableTicks = 0
+                        trayLastCount = (!loading && count > 0) ? count : trayLastCount
+                        trayLastHeight = (!loading && count > 0) ? colH : trayLastHeight
+                        // Fresh handle/count resets the baseline without counting
+                        // this tick as stable.
+                        if (loading || count <= 0) {
+                            trayLastCount = -1
+                            trayLastHeight = -1
+                        }
+                    }
+                    var settled = !loading && count > 0 && trayStableTicks >= 5
+                    if (!settled && trayAttempts < 90) {
+                        trayAttempts++
+                        restart()
+                        return
+                    }
                 }
-                trayAttempts = 0
+                revealStartTimer.resetTrayWait()
                 root.updateTargetGeometry(root.currentIntent, true)
                 root.revealDistance = Math.max(root.targetHeight, root.displayHeight, 1)
                 root.startReveal(1)
@@ -590,6 +622,7 @@ PanelWindow {
             // content appears instantly at partial height.
             revealMotion.stop()
             popup.revealProgress = 0
+            revealStartTimer.resetTrayWait()
             if (MotionTokens.reducedMotion) {
                 revealStartTimer.stop()
                 root.updateTargetGeometry(root.currentIntent, true)
