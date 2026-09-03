@@ -406,11 +406,16 @@ Item {
         }
 
         transform: [
+            // Grow to full size with the slide so the seam sits flush at
+            // rest in both directions; a static from-scale would leave a
+            // permanent gap on the flipped (left) side.
             Scale {
                 origin.x: 0
                 origin.y: 0
                 xScale: Lazer.MotionTokens.popupFromScale
+                    + (1 - Lazer.MotionTokens.popupFromScale) * root.submenuProgress
                 yScale: Lazer.MotionTokens.popupFromScale
+                    + (1 - Lazer.MotionTokens.popupFromScale) * root.submenuProgress
             },
             Translate {
                 x: (root.popsRight ? 1 : -1) * root.enterTravel * (1 - root.submenuProgress)

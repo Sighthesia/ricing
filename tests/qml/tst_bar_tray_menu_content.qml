@@ -156,6 +156,9 @@ Item {
             item.submenuFlipped = false
             compare(item.popsRight, true)
             compare(item.submenuSurface.x, item.width + 4)
+            // Opened submenu renders at full size so the seam sits flush.
+            compare(item.submenuSurface.transform[0].xScale, 1)
+            compare(item.submenuSurface.transform[0].yScale, 1)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_longMenuIsBoundedAndScrollable() {
