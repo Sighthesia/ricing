@@ -206,8 +206,6 @@ Item {
             objectName: "trayMenuColumn"
             width: menuFlick.width
             spacing: 4
-            opacity: liveCount > 0 || stubEntriesActive ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: Lazer.MotionTokens.fast; easing.type: Easing.OutQuad } }
 
             Repeater {
                 model: stubEntriesActive ? entryModel
