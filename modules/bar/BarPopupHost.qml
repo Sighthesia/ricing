@@ -391,6 +391,11 @@ PanelWindow {
         }
         root.targetWidth = geometry.width
         root.targetHeight = geometry.height
+        // Target X/Y are owned here: geometry.x already carries the tray
+        // flip/right-expansion pinning. retargetGeometry must not recompute
+        // them from the full width (that re-centers and undoes the pin).
+        root.targetX = geometry.x
+        root.targetY = geometry.y
         root.commitRevealDistance()
         root.retargetGeometry(intentObj, immediate === true || !root.open)
     }
@@ -404,10 +409,8 @@ PanelWindow {
     }
 
     function retargetGeometry(intentObj, immediate) {
-        var geometry = targetGeometryFor(intentObj || root.currentIntent || root.intent,
-                root.targetWidth, root.targetHeight)
-        root.targetX = geometry.x
-        root.targetY = geometry.y
+        // Display motions only: target X/Y/width/height are owned by
+        // updateTargetGeometry (tray flip/right-expansion pinning included).
         // Late DBus batches must not retarget the display mid-slide: that
         // restarts the size motions under a running reveal and reads as a
         // bounce (shrink then regrow). Hold the display; the reveal-finish
