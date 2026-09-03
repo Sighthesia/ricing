@@ -559,7 +559,7 @@ PanelWindow {
             if (root.open && root.surfaceActive) {
                 var isTrayLoading = root.currentIntent && root.currentIntent.actionKind === "tray"
                     && popupActions.trayMenuContent && popupActions.trayMenuContent.menuLoading
-                if (isTrayLoading && trayAttempts < 18) {
+                if (isTrayLoading && trayAttempts < 30) {
                     trayAttempts++
                     restart()
                     return
