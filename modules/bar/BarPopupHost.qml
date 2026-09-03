@@ -87,13 +87,19 @@ PanelWindow {
 
     function startReveal(target) {
         revealMotion.stop()
-        if (Math.abs(popup.revealProgress - target) < 0.001) {
+        var dist = Math.abs(target - popup.revealProgress)
+        if (dist < 0.001) {
             popup.revealProgress = target
             return
         }
-        revealMotion.duration = MotionTokens.reducedMotion
-                ? MotionTokens.fast : popup.revealDuration
-        revealMotion.easing.type = target >= 1 ? Easing.OutQuint : Easing.InQuad
+        // Scale duration by travelled distance so an interrupted reveal
+        // resumes at proportional speed instead of jumping or lingering.
+        var base = MotionTokens.reducedMotion ? MotionTokens.fast : popup.revealDuration
+        revealMotion.duration = Math.max(MotionTokens.fast, Math.round(base * dist))
+        // OutQuint front-loads most travel into the first frames (looks like
+        // an instant pop); OutCubic stays smooth. Exit uses InOutQuad so it
+        // slides out visibly instead of lingering then vanishing (InQuad).
+        revealMotion.easing.type = target >= 1 ? Easing.OutCubic : Easing.InOutQuad
         revealMotion.to = target
         revealMotion.restart()
     }
@@ -558,8 +564,8 @@ PanelWindow {
         onTriggered: {
             if (root.open && root.surfaceActive) {
                 var isTrayLoading = root.currentIntent && root.currentIntent.actionKind === "tray"
-                    && popupActions.trayMenuContent && popupActions.trayMenuContent.menuLoading
-                if (isTrayLoading && trayAttempts < 300) {
+                    && popupActions.trayMenuContent && (popupActions.trayMenuContent.menuLoading || popupActions.trayMenuContent.resolvedMenuHandle == null)
+                if (isTrayLoading && trayAttempts < 60) {
                     trayAttempts++
                     restart()
                     return
@@ -579,6 +585,11 @@ PanelWindow {
         // the surfaceActive binding so parents and children never read each
         // other's effective visibility (which deadlocks at false).
         if (open) {
+            // Fresh opens always slide from the start. Without this snap a
+            // reopen during an unfinished exit resumes mid-travel and the
+            // content appears instantly at partial height.
+            revealMotion.stop()
+            popup.revealProgress = 0
             if (MotionTokens.reducedMotion) {
                 revealStartTimer.stop()
                 root.updateTargetGeometry(root.currentIntent, true)
@@ -651,7 +662,10 @@ PanelWindow {
                 width: popupContainer.width
                 height: popupContainer.height
                 revealProgress: 0
-                contentDelay: root.currentIntent && root.currentIntent.actionKind === "tray" ? 0 : MotionTokens.settingsContentDelay
+                // Content and identity slide together from frame one. The old
+                // 200ms contentDelay held the content layer behind the bar for
+                // the first ~1/3 of travel, so it popped in around 3/4.
+                contentDelay: 0
                 animateLayerOpacity: false
                 sidebarOffset: root.identityOffset
                 contentOffset: root.slideOffset
