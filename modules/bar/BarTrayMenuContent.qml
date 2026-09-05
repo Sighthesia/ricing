@@ -99,7 +99,7 @@ Item {
         submenuEntry = entry
         if (row)
             submenuAnchorRow = row
-        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.medium
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.slow
         submenuAnimation.easing.type = Easing.BezierSpline
         submenuAnimation.easing.bezierCurve = Lazer.MotionTokens.outSoft
         submenuAnimationTarget = 1
