@@ -216,9 +216,10 @@ Item {
             item.openSubmenu(parent, null)
             var block = findByName(item, "traySubmenuTitleBlock")
             verify(block)
-            compare(block.color, Lazer.LazerTheme.settingsPanel)
-            compare(block.height, 32)
+            compare(block.color, Lazer.LazerTheme.settingsRail)
+            compare(block.height, 48)
             compare(findByName(item, "traySubmenuTitle").text, "More")
+            compare(findByName(item, "traySubmenuTitle").font.bold, true)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_faceOccludesSubmenu() {

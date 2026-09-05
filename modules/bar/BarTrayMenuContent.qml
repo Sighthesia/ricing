@@ -381,15 +381,15 @@ Item {
         color: Lazer.LazerTheme.settingsSection
         clip: true
 
-        // Submenu title uses the same block language as the content rows:
-        // full-width settingsPanel block, label metrics matching row text.
+        // Submenu title mirrors the popup identity header: full-width
+        // settingsRail block, 48 high, bold 13px label on 12px margins.
         Rectangle {
             objectName: "traySubmenuTitleBlock"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: 32
-            color: Lazer.LazerTheme.settingsPanel
+            height: 48
+            color: Lazer.LazerTheme.settingsRail
             Text {
                 objectName: "traySubmenuTitle"
                 anchors.left: parent.left
@@ -398,6 +398,7 @@ Item {
                 text: Logic.submenuTitle(submenuEntry)
                 color: "#eeeeF2"
                 font.pixelSize: 13
+                font.bold: true
             }
         }
 
@@ -408,7 +409,7 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.topMargin: 36
+            anchors.topMargin: 52
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 4
             contentHeight: submenuColumn.implicitHeight
