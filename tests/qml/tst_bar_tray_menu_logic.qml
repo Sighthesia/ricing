@@ -47,6 +47,19 @@ Item {
             compare(Logic.menuHandleFromPayload({ trayItem: { menu: "nested" } }), "nested")
             compare(Logic.menuHandleFromPayload({ menuHandle: "x" }), "x")
         }
+        function test_sectionListSplitsAtSeparators() {
+            var a = { text: "A" }, b = { text: "B" }, c = { text: "C" }
+            var sep = { isSeparator: true }
+            compare(Logic.sectionList([]).length, 0)
+            compare(Logic.sectionList([a, b]).length, 1)
+            var split = Logic.sectionList([a, sep, b, c])
+            compare(split.length, 2)
+            compare(split[0].length, 1)
+            compare(split[1].length, 2)
+            // Leading/trailing/consecutive separators yield no empty blocks.
+            compare(Logic.sectionList([sep, a, sep, sep, b, sep]).length, 2)
+            compare(Logic.sectionList([sep, sep]).length, 0)
+        }
         function test_heightHoldAndRelease() {
             compare(Logic.heldHeight(8, 120), 120)
             compare(Logic.heldHeight(80, 120), 80)

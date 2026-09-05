@@ -34,6 +34,14 @@ Item {
     readonly property var entryModel: stubEntriesActive
         ? Logic.entryList(entries)
         : Logic.entryList(liveValues)
+    // Settings-style section blocks split at separators; gaps between
+    // blocks (not divider lines) carry the grouping.
+    readonly property var menuSections: Logic.sectionList(stubEntriesActive
+        ? entryModel
+        : (rootOpenerLoader.item ? rootOpenerLoader.item.values : []))
+    readonly property var submenuSections: Logic.sectionList(stubEntriesActive
+        ? submenuEntries
+        : (submenuOpenerLoader.item ? submenuOpenerLoader.item.values : []))
     readonly property bool menuLoading: resolvedMenuHandle != null && !stubEntriesActive
         && liveCount === 0
     readonly property bool emptyStateVisible: resolvedMenuHandle === null
@@ -210,7 +218,8 @@ Item {
         interactive: contentHeight > height
         z: 3
 
-        // Root-level entries are kept in a compact, scan-friendly column.
+        // Root-level entries are grouped into settings-style section blocks
+        // split at separators; the gaps between blocks separate groups.
         Column {
             id: menuColumn
             objectName: "trayMenuColumn"
@@ -218,35 +227,39 @@ Item {
             spacing: 4
 
             Repeater {
-                model: stubEntriesActive ? entryModel
-                    : (rootOpenerLoader.item ? rootOpenerLoader.item.values : [])
+                model: root.menuSections
 
-                delegate: Item {
-                    id: rootRow
+                delegate: Rectangle {
                     required property var modelData
-                    property int level: 1
+                    objectName: "trayMenuSection"
                     width: menuColumn.width
-                    height: Logic.isSeparator(modelData) ? 9 : 32
-                    objectName: Logic.isSeparator(modelData) ? "trayMenuSeparator" : "trayMenuRow"
+                    height: sectionColumn.implicitHeight
+                    color: Lazer.LazerTheme.settingsPanel
 
-                    Rectangle {
-                        visible: Logic.isSeparator(modelData)
-                        width: parent.width - 24
-                        height: 1
-                        x: 12
-                        y: 4
-                        color: "#4b4b57"
-                    }
+                    Column {
+                        id: sectionColumn
+                        width: parent.width
+                        spacing: 4
 
-                    // Interactive root menu row.
-                    Rectangle {
-                    id: rowSurface
-                    objectName: "trayMenuRowSurface"
-                    visible: !Logic.isSeparator(modelData)
-                    anchors.fill: parent
-                    radius: 4
-                    color: rowHover.hovered ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
-                    opacity: Logic.isEnabled(modelData) ? 1 : Lazer.MotionTokens.disabledOpacity
+                        Repeater {
+                            model: modelData
+
+                            delegate: Item {
+                                id: rootRow
+                                required property var modelData
+                                property int level: 1
+                                width: sectionColumn.width
+                                height: 32
+                                objectName: "trayMenuRow"
+
+                                // Interactive root menu row.
+                                Rectangle {
+                                id: rowSurface
+                                objectName: "trayMenuRowSurface"
+                                anchors.fill: parent
+                                radius: 4
+                                color: rowHover.hovered ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
+                                opacity: Logic.isEnabled(modelData) ? 1 : Lazer.MotionTokens.disabledOpacity
 
                     Text {
                         anchors.left: parent.left
@@ -314,6 +327,9 @@ Item {
                         duration: Lazer.MotionTokens.clickFlashDuration
                         easing.type: Lazer.MotionTokens.clickFlashEasing
                     }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -370,41 +386,45 @@ Item {
                 width: parent.width
                 spacing: 4
                 Repeater {
-                model: root.stubEntriesActive ? Logic.entryList(root.submenuEntries)
-                    : (submenuOpenerLoader.item ? submenuOpenerLoader.item.values : [])
-                delegate: Item {
-                    required property var modelData
-                    property int level: 2
-                    width: submenuColumn.width
-                    height: Logic.isSeparator(modelData) ? 9 : 32
-                    objectName: Logic.isSeparator(modelData) ? "traySubmenuSeparator" : "trayMenuRow"
-
-                    Rectangle {
-                        visible: Logic.isSeparator(modelData)
-                        width: parent.width - 24
-                        height: 1
-                        x: 12
-                        y: 4
-                        color: "#4b4b57"
-                    }
-                    Rectangle {
-                        objectName: "trayMenuRowSurface"
-                        visible: !Logic.isSeparator(modelData)
-                        anchors.fill: parent
-                        radius: 4
-                        color: submenuRowHover.hovered ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
-                        Text {
-                            anchors.left: parent.left
-                            anchors.leftMargin: 12
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: Logic.labelOf(modelData)
-                            color: "#eeeeF2"
-                            font.pixelSize: 13
+                    model: root.submenuSections
+                    delegate: Rectangle {
+                        required property var modelData
+                        objectName: "traySubmenuSection"
+                        width: submenuColumn.width
+                        height: submenuSectionColumn.implicitHeight
+                        color: Lazer.LazerTheme.settingsPanel
+                        Column {
+                            id: submenuSectionColumn
+                            width: parent.width
+                            spacing: 4
+                            Repeater {
+                                model: modelData
+                                delegate: Item {
+                                    required property var modelData
+                                    property int level: 2
+                                    width: submenuSectionColumn.width
+                                    height: 32
+                                    objectName: "trayMenuRow"
+                                    Rectangle {
+                                        objectName: "trayMenuRowSurface"
+                                        anchors.fill: parent
+                                        radius: 4
+                                        color: submenuRowHover.hovered ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
+                                        Text {
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: 12
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: Logic.labelOf(modelData)
+                                            color: "#eeeeF2"
+                                            font.pixelSize: 13
+                                        }
+                                        HoverHandler { id: submenuRowHover }
+                                        TapHandler { onTapped: activateEntry(modelData, 2) }
+                                    }
+                                }
+                            }
                         }
-                        HoverHandler { id: submenuRowHover }
-                        TapHandler { onTapped: activateEntry(modelData, 2) }
                     }
-                }
                 }
             }
         }

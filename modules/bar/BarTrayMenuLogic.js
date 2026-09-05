@@ -18,6 +18,26 @@ function entryList(children) {
 }
 
 function isSeparator(entry) { return !!(entry && entry.isSeparator) }
+// Split entries into settings-style section blocks at separators, dropping
+// empty blocks from leading/trailing/consecutive separators. Blocks (not
+// divider lines) plus the gaps between them carry the grouping.
+function sectionList(entries) {
+    var sections = []
+    var current = null
+    var list = entryList(entries)
+    for (var i = 0; i < list.length; i++) {
+        if (isSeparator(list[i])) {
+            current = null
+            continue
+        }
+        if (!current) {
+            current = []
+            sections.push(current)
+        }
+        current.push(list[i])
+    }
+    return sections
+}
 function isEnabled(entry) { return !!(entry && entry.enabled !== false) && !isSeparator(entry) }
 function hasChildren(entry) { return !!(entry && entry.hasChildren) }
 function isChecked(entry) { return !!(entry && entry.checkState === Qt.Checked) }

@@ -56,6 +56,20 @@ Item {
             compare(item.rowCount, 2)
             compare(item.emptyStateVisible, false)
         }
+        function test_separatorsBecomeSectionBlocks() {
+            var a = fakeEntry("A")
+            var b = fakeEntry("B")
+            var c = fakeEntry("C")
+            var sep = fakeEntry("", { isSeparator: true })
+            var item = makeMenu([a, sep, b, c])
+            wait(0)
+            // Two blocks, three rows, no separator lines rendered.
+            compare(findAllByName(item, "trayMenuSection").length, 2)
+            compare(findAllByName(item, "trayMenuRow").length, 3)
+            compare(findAllByName(item, "trayMenuSeparator").length, 0)
+            compare(findAllByName(item, "trayMenuSection")[0].color,
+                Lazer.LazerTheme.settingsPanel)
+        }
         function test_plainTriggerDismisses() {
             var open = fakeEntry("Open")
             var item = makeMenu([open])
