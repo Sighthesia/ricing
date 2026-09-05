@@ -224,6 +224,7 @@ Item {
             compare(block.width, item.submenuSurface.width)
             compare(findByName(item, "traySubmenuTitle").text, "More")
             compare(findByName(item, "traySubmenuTitle").font.bold, true)
+            compare(findByName(item, "traySubmenuFlick").anchors.topMargin, 56)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_faceOccludesSubmenu() {

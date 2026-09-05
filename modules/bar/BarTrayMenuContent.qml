@@ -414,8 +414,10 @@ Item {
             anchors.leftMargin: root.submenuPad
             anchors.right: parent.right
             anchors.rightMargin: root.submenuPad
+            // 8 blue above the first row, mirroring the primary content's
+            // top padding (not the 4 section gap).
             anchors.top: parent.top
-            anchors.topMargin: 48 + submenuColumn.spacing
+            anchors.topMargin: 48 + root.submenuPad
             anchors.bottom: parent.bottom
             anchors.bottomMargin: root.submenuPad
             contentHeight: submenuColumn.implicitHeight
