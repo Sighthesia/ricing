@@ -381,15 +381,24 @@ Item {
         color: Lazer.LazerTheme.settingsSection
         clip: true
 
-        Text {
-            objectName: "traySubmenuTitle"
+        // Submenu title uses the same block language as the content rows:
+        // full-width settingsPanel block, label metrics matching row text.
+        Rectangle {
+            objectName: "traySubmenuTitleBlock"
             anchors.left: parent.left
-            anchors.leftMargin: 12
+            anchors.right: parent.right
             anchors.top: parent.top
-            anchors.topMargin: 8
-            text: Logic.submenuTitle(submenuEntry)
-            color: "#eeeeF2"
-            font.pixelSize: 13
+            height: 32
+            color: Lazer.LazerTheme.settingsPanel
+            Text {
+                objectName: "traySubmenuTitle"
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                text: Logic.submenuTitle(submenuEntry)
+                color: "#eeeeF2"
+                font.pixelSize: 13
+            }
         }
 
         // Child entries remain held during closing and update from the live opener.
@@ -399,7 +408,7 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.topMargin: 32
+            anchors.topMargin: 36
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 4
             contentHeight: submenuColumn.implicitHeight

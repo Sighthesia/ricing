@@ -209,6 +209,18 @@ Item {
             item.noteColumnHeight(8)
             compare(item.heldHeight, 120)
         }
+        function test_submenuTitleUsesRowBlockLanguage() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([parent])
+            item.openSubmenu(parent, null)
+            var block = findByName(item, "traySubmenuTitleBlock")
+            verify(block)
+            compare(block.color, Lazer.LazerTheme.settingsPanel)
+            compare(block.height, 32)
+            compare(findByName(item, "traySubmenuTitle").text, "More")
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
         function test_faceOccludesSubmenu() {
             var item = makeMenu([fakeEntry("More", { hasChildren: true })])
             verify(item.submenuSurface.z < item.menuFace.z)
