@@ -35,11 +35,35 @@ Item {
         ? Logic.entryList(entries)
         : Logic.entryList(liveValues)
     // Settings-style section blocks split at separators; gaps between
-    // blocks (not divider lines) carry the grouping.
-    readonly property var menuSections: Logic.sectionList(stubEntriesActive
+    // blocks (not divider lines) carry the grouping. NOTE: native opener
+    // lists are QML sequences, not JS arrays, and .pragma library code
+    // cannot index them (every lookup yields undefined). Group them here
+    // in QML context where [i] works; plain arrays still go through Logic.
+    function sectionize(source) {
+        if (Array.isArray(source))
+            return Logic.sectionList(source)
+        var sections = []
+        var current = null
+        if (!source || typeof source.length !== "number")
+            return sections
+        for (var i = 0; i < source.length; i++) {
+            var entry = source[i]
+            if (!entry || Logic.isSeparator(entry)) {
+                current = null
+                continue
+            }
+            if (!current) {
+                current = []
+                sections.push(current)
+            }
+            current.push(entry)
+        }
+        return sections
+    }
+    readonly property var menuSections: sectionize(stubEntriesActive
         ? entryModel
         : (rootOpenerLoader.item ? rootOpenerLoader.item.values : []))
-    readonly property var submenuSections: Logic.sectionList(stubEntriesActive
+    readonly property var submenuSections: sectionize(stubEntriesActive
         ? submenuEntries
         : (submenuOpenerLoader.item ? submenuOpenerLoader.item.values : []))
     readonly property bool menuLoading: resolvedMenuHandle != null && !stubEntriesActive
