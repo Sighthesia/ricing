@@ -204,16 +204,17 @@ Item {
         when: submenuOpenerLoader.item != null
     }
 
-    // Opaque root face hides the submenu until it has slid clear. It spans
-    // the background width plus one gap strip on the submenu side (same
-    // settingsSection color as the blue background, so the panel joint
-    // reads as a blue seam like the gaps between blocks, never a hole).
+    // Opaque root face hides the submenu until it has slid clear. The seam
+    // strip exists only while the submenu is out or moving, so the panel
+    // joint reads as a blue seam like the gaps between blocks; when closed
+    // the face sits flush with the card and nothing overflows past it.
+    readonly property bool submenuSeam: root.submenuProgress > 0
     Rectangle {
         id: menuFace
         objectName: "trayMenuFace"
         z: 2
-        x: root.submenuFlipped ? -(root.submenuPad + root.submenuGap) : -root.submenuPad
-        width: parent.width + root.submenuPad * 2 + root.submenuGap
+        x: submenuSeam && root.submenuFlipped ? -(root.submenuPad + root.submenuGap) : -root.submenuPad
+        width: parent.width + root.submenuPad * 2 + (submenuSeam ? root.submenuGap : 0)
         height: menuFlick.height
         color: Lazer.LazerTheme.settingsSection
     }

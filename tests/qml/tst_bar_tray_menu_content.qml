@@ -232,14 +232,23 @@ Item {
             verify(item.submenuSurface.z < item.menuFace.z)
             // No fade: the opaque surface slides out from under the root face.
             compare(item.submenuSurface.opacity, 1)
-            // The face spans the background plus one gap strip on the submenu
-            // side, so the panel joint reads as a blue seam, never a hole.
-            item.submenuFlipped = true
-            compare(item.menuFace.x, -12)
-            compare(item.menuFace.width, item.width + 20)
-            item.submenuFlipped = false
-            compare(item.menuFace.x, -8)
-            compare(item.menuFace.width, item.width + 20)
+            // The seam strip exists only while the submenu is out; closed,
+            // the face sits flush with the card and nothing overflows.
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var sub = fakeEntry("Sub", { hasChildren: true })
+            var holder = makeMenu([sub])
+            compare(holder.menuFace.x, -8)
+            compare(holder.menuFace.width, holder.width + 16)
+            holder.openSubmenu(sub, null)
+            holder.submenuFlipped = true
+            compare(holder.menuFace.x, -12)
+            compare(holder.menuFace.width, holder.width + 20)
+            holder.submenuFlipped = false
+            compare(holder.menuFace.x, -8)
+            compare(holder.menuFace.width, holder.width + 20)
+            holder.closeSubmenu()
+            compare(holder.menuFace.width, holder.width + 16)
+            Lazer.MotionTokens.reducedMotionOverride = false
         }
     }
 
