@@ -513,6 +513,11 @@ PanelWindow {
                 // Invalidate replacement callbacks, but retain both intents until
                 // the exit reveal cleanup has completed.
                 root.invalidateContentTransition()
+                // Retract any open tray submenu with the popup; otherwise it
+                // stays open and greets the user stale on the next reveal.
+                var tc = popupActions ? popupActions.trayMenuContent : null
+                if (tc)
+                    tc.closeSubmenu()
                 root.open = false
                 root.closeRequested()
                 clearIntentTimer.restart()

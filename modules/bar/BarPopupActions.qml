@@ -493,6 +493,12 @@ Item {
             width: parent.width
             height: visible ? trayMenu.implicitHeight : 0
             visible: root.actionKind === "tray"
+            // The submenu belongs to this menu instance: retract it when
+            // the intent moves on instead of leaving it stale.
+            onVisibleChanged: {
+                if (!visible)
+                    trayMenu.closeSubmenu()
+            }
 
             Rectangle {
                 objectName: "trayContentBackground"
