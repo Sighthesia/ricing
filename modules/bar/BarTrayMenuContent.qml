@@ -54,7 +54,6 @@ Item {
     property bool submenuFlipped: false
     property bool popsRight: true
     onSubmenuFlippedChanged: popsRight = !submenuFlipped
-    readonly property real enterTravel: 4 + width * Lazer.MotionTokens.popupFromScale + 4
     readonly property real extraWidth: submenuProgress > 0 ? submenuSurface.width + 4 : 0
     readonly property alias submenuSurface: submenuSurface
     readonly property alias menuFace: menuFace
@@ -328,7 +327,6 @@ Item {
         id: submenuSurface
         objectName: "traySubmenuSurface"
         z: 1
-        opacity: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: parent.width
         height: menuFlick.height
@@ -405,22 +403,13 @@ Item {
             }
         }
 
-        transform: [
-            // Grow to full size with the slide so the seam sits flush at
-            // rest in both directions; a static from-scale would leave a
-            // permanent gap on the flipped (left) side.
-            Scale {
-                origin.x: 0
-                origin.y: 0
-                xScale: Lazer.MotionTokens.popupFromScale
-                    + (1 - Lazer.MotionTokens.popupFromScale) * root.submenuProgress
-                yScale: Lazer.MotionTokens.popupFromScale
-                    + (1 - Lazer.MotionTokens.popupFromScale) * root.submenuProgress
-            },
-            Translate {
-                x: (root.popsRight ? 1 : -1) * root.enterTravel * (1 - root.submenuProgress)
-            }
-        ]
+        // Drawer from under the primary: same slide-plus-fade as the content
+        // layer, but horizontal. Rest position is beside the root; start
+        // position is stacked underneath it, hidden by the opaque root face.
+        opacity: root.submenuProgress
+        transform: Translate {
+            x: (root.popsRight ? 1 : -1) * (parent.width + 4) * (1 - root.submenuProgress)
+        }
     }
 
     // Keep pointer traversal alive across the small root/submenu gap.
