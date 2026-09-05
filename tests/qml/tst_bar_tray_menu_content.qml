@@ -162,6 +162,15 @@ Item {
             compare(item.submenuSurface.transform.length, 1)
             compare(item.submenuSurface.transform[0].x, 0)
             compare(item.submenuSurface.opacity, 1)
+            // Mid-travel the surface is halfway out from under the primary,
+            // never parked outside of it. The travel spans exactly the rest
+            // offset (surface width plus gap) toward the root.
+            item.submenuFlipped = true
+            item.submenuProgress = 0.5
+            compare(item.submenuSurface.transform[0].x, (item.submenuSurface.width + 4) * 0.5)
+            item.submenuFlipped = false
+            compare(item.submenuSurface.transform[0].x, -(item.submenuSurface.width + 4) * 0.5)
+            item.submenuProgress = 1
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_longMenuIsBoundedAndScrollable() {
@@ -169,9 +178,16 @@ Item {
             for (var i = 0; i < 40; i++)
                 many.push(fakeEntry("Entry " + i))
             var item = makeMenu(many)
-            wait(0)
             var flick = findByName(item, "trayMenuFlick")
-            verify(flick.contentHeight > item.maxMenuHeight || flick.contentHeight > flick.height)
+            // Forty delegates may need more than one frame under load; poll
+            // briefly instead of assuming a single wait(0) suffices.
+            var settled = false
+            for (var i = 0; i < 50 && !settled; i++) {
+                wait(10)
+                settled = flick.contentHeight > item.maxMenuHeight
+                    || flick.contentHeight > flick.height
+            }
+            verify(settled)
             compare(flick.height, Math.min(flick.contentHeight, item.maxMenuHeight))
             verify(item.implicitHeight <= item.maxMenuHeight)
         }

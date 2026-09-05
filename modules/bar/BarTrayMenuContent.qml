@@ -404,11 +404,14 @@ Item {
         }
 
         // Drawer from under the primary: same slide-plus-fade as the content
-        // layer, but horizontal. Rest position is beside the root; start
-        // position is stacked underneath it, hidden by the opaque root face.
+        // layer, but horizontal. Rest position is beside the root; the
+        // travel points back toward the root so the start position stacks
+        // underneath it, hidden by the opaque root face.
         opacity: root.submenuProgress
         transform: Translate {
-            x: (root.popsRight ? 1 : -1) * (parent.width + 4) * (1 - root.submenuProgress)
+            // NOTE: `parent` does not resolve to the menu root inside a
+            // transform scope, so use the surface width explicitly.
+            x: (root.popsRight ? -1 : 1) * (submenuSurface.width + 4) * (1 - root.submenuProgress)
         }
     }
 
