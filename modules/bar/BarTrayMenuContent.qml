@@ -86,7 +86,12 @@ Item {
     property bool submenuFlipped: false
     property bool popsRight: true
     onSubmenuFlippedChanged: popsRight = !submenuFlipped
-    readonly property real extraWidth: submenuProgress > 0 ? submenuSurface.width + 4 : 0
+    // Submenu panel mirrors the primary panel: same outer width, same
+    // button width, same 8 padding from buttons to edges, 4 gap between
+    // the panels.
+    readonly property real submenuPad: 8
+    readonly property real submenuGap: 4
+    readonly property real extraWidth: submenuProgress > 0 ? submenuSurface.width + root.submenuGap : 0
     readonly property alias submenuSurface: submenuSurface
     readonly property alias menuFace: menuFace
     readonly property real maxMenuHeight: Screen.desktopAvailableHeight > 0
@@ -200,17 +205,15 @@ Item {
     }
 
     // Opaque root face hides the submenu until it has slid clear. It spans
-    // the content padding on the submenu side (same settingsSection color
-    // as the blue background, so seamless) so the drawer emerges from the
-    // background edge, not the button edge. The 8 mirrors the
-    // contentColumn margins in BarPopupActions, which the blue background
-    // spans with its -8 fill margins.
+    // the full background width (buttons plus padding, same settingsSection
+    // color as the blue background so seamless) so the drawer hides
+    // pixel-exactly at travel start and emerges from the background edge.
     Rectangle {
         id: menuFace
         objectName: "trayMenuFace"
         z: 2
-        x: root.submenuFlipped ? -8 : 0
-        width: parent.width + 8
+        x: -root.submenuPad
+        width: parent.width + root.submenuPad * 2
         height: menuFlick.height
         color: Lazer.LazerTheme.settingsSection
     }
@@ -374,9 +377,10 @@ Item {
         objectName: "traySubmenuSurface"
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
-        width: parent.width
+        width: parent.width + root.submenuPad * 2
         height: menuFlick.height
-        x: submenuFlipped ? -width - 4 : parent.width + 4
+        x: submenuFlipped ? -(width + root.submenuPad + root.submenuGap)
+            : parent.width + root.submenuPad + root.submenuGap
         y: 0
         color: Lazer.LazerTheme.settingsSection
         clip: true
@@ -386,8 +390,11 @@ Item {
         Rectangle {
             objectName: "traySubmenuTitleBlock"
             anchors.left: parent.left
+            anchors.leftMargin: root.submenuPad
             anchors.right: parent.right
+            anchors.rightMargin: root.submenuPad
             anchors.top: parent.top
+            anchors.topMargin: root.submenuPad
             height: 48
             color: Lazer.LazerTheme.settingsRail
             Text {
@@ -407,11 +414,13 @@ Item {
             id: submenuFlick
             objectName: "traySubmenuFlick"
             anchors.left: parent.left
+            anchors.leftMargin: root.submenuPad
             anchors.right: parent.right
+            anchors.rightMargin: root.submenuPad
             anchors.top: parent.top
-            anchors.topMargin: 52
+            anchors.topMargin: root.submenuPad + 48 + submenuColumn.spacing
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 4
+            anchors.bottomMargin: root.submenuPad
             contentHeight: submenuColumn.implicitHeight
             clip: true
             interactive: contentHeight > height
@@ -471,7 +480,7 @@ Item {
         transform: Translate {
             // NOTE: `parent` does not resolve to the menu root inside a
             // transform scope, so use the surface width explicitly.
-            x: (root.popsRight ? -1 : 1) * (submenuSurface.width + 4) * (1 - root.submenuProgress)
+            x: (root.popsRight ? -1 : 1) * (submenuSurface.width + root.submenuGap) * (1 - root.submenuProgress)
         }
     }
 
@@ -479,9 +488,9 @@ Item {
     Item {
         objectName: "traySubmenuBridge"
         z: 0
-        x: submenuFlipped ? -4 : parent.width
+        x: submenuFlipped ? -(root.submenuPad + root.submenuGap) : parent.width
         y: submenuSurface.y
-        width: submenuProgress > 0 ? 4 : 0
+        width: submenuProgress > 0 ? root.submenuPad + root.submenuGap : 0
         height: submenuProgress > 0 ? submenuSurface.height : 0
     }
 

@@ -149,9 +149,10 @@ Item {
             item.openSubmenu(parent, rows[rows.length - 1])
             compare(item.submenuAnchorRow, rows[rows.length - 1])
             // Second level is full-height and aligned to the primary's top so
-            // the root list never shifts when the submenu appears.
+            // the root list never shifts when the submenu appears. The panel
+            // mirrors the primary panel width plus padding on both sides.
             compare(item.submenuSurface.y, 0)
-            compare(item.submenuSurface.width, item.width)
+            compare(item.submenuSurface.width, item.width + 16)
             compare(item.submenuSurface.height, findByName(item, "trayMenuFlick").height)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
@@ -164,12 +165,12 @@ Item {
             // Flipped: second level renders left of the primary, primary untouched.
             item.submenuFlipped = true
             compare(item.popsRight, false)
-            compare(item.submenuSurface.x, -item.submenuSurface.width - 4)
+            compare(item.submenuSurface.x, -(item.submenuSurface.width + 12))
             compare(item.extraWidth, item.submenuSurface.width + 4)
             // Default: second level renders right of the primary.
             item.submenuFlipped = false
             compare(item.popsRight, true)
-            compare(item.submenuSurface.x, item.width + 4)
+            compare(item.submenuSurface.x, item.width + 12)
             // Opened submenu rests beside the root with no scale drift.
             compare(item.submenuSurface.transform.length, 1)
             compare(item.submenuSurface.transform[0].x, 0)
@@ -218,6 +219,8 @@ Item {
             verify(block)
             compare(block.color, Lazer.LazerTheme.settingsRail)
             compare(block.height, 48)
+            // Title and rows share the primary's 8 padding to the panel edge.
+            compare(block.width, item.submenuSurface.width - 16)
             compare(findByName(item, "traySubmenuTitle").text, "More")
             compare(findByName(item, "traySubmenuTitle").font.bold, true)
             Lazer.MotionTokens.reducedMotionOverride = false
@@ -227,14 +230,14 @@ Item {
             verify(item.submenuSurface.z < item.menuFace.z)
             // No fade: the opaque surface slides out from under the root face.
             compare(item.submenuSurface.opacity, 1)
-            // The face spans the content padding on the submenu side so the
-            // drawer emerges from the background edge, not the button edge.
+            // The face spans the full background width (buttons plus padding)
+            // so the drawer hides pixel-exactly and emerges at its edge.
             item.submenuFlipped = true
             compare(item.menuFace.x, -8)
-            compare(item.menuFace.width, item.width + 8)
+            compare(item.menuFace.width, item.width + 16)
             item.submenuFlipped = false
-            compare(item.menuFace.x, 0)
-            compare(item.menuFace.width, item.width + 8)
+            compare(item.menuFace.x, -8)
+            compare(item.menuFace.width, item.width + 16)
         }
     }
 
