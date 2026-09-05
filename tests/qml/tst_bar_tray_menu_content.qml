@@ -200,6 +200,14 @@ Item {
             verify(item.submenuSurface.z < item.menuFace.z)
             // No fade: the opaque surface slides out from under the root face.
             compare(item.submenuSurface.opacity, 1)
+            // The face spans the content padding on the submenu side so the
+            // drawer emerges from the background edge, not the button edge.
+            item.submenuFlipped = true
+            compare(item.menuFace.x, -8)
+            compare(item.menuFace.width, item.width + 8)
+            item.submenuFlipped = false
+            compare(item.menuFace.x, 0)
+            compare(item.menuFace.width, item.width + 8)
         }
     }
 

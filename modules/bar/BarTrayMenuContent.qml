@@ -167,12 +167,18 @@ Item {
         when: submenuOpenerLoader.item != null
     }
 
-    // Opaque root face hides the scaled submenu until it has slid clear.
+    // Opaque root face hides the submenu until it has slid clear. It spans
+    // the content padding on the submenu side (same settingsSection color
+    // as the blue background, so seamless) so the drawer emerges from the
+    // background edge, not the button edge. The 8 mirrors the
+    // contentColumn margins in BarPopupActions, which the blue background
+    // spans with its -8 fill margins.
     Rectangle {
         id: menuFace
         objectName: "trayMenuFace"
         z: 2
-        width: parent.width
+        x: root.submenuFlipped ? -8 : 0
+        width: parent.width + 8
         height: menuFlick.height
         color: Lazer.LazerTheme.settingsSection
     }
