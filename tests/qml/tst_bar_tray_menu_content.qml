@@ -111,7 +111,7 @@ Item {
             item.openSubmenu(parent, null)
             item.closeSubmenu()
             compare(item.submenuEntry, parent)
-            tryCompare(item, "submenuEntry", null, Lazer.MotionTokens.slow + 100)
+            tryCompare(item, "submenuEntry", null, Lazer.MotionTokens.settingsSidebarFade + 200)
         }
         function test_levelTwoDoesNotCloseSubmenu() {
             var parent = fakeEntry("More", { hasChildren: true })

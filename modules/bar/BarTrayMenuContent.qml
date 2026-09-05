@@ -99,9 +99,9 @@ Item {
         submenuEntry = entry
         if (row)
             submenuAnchorRow = row
-        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.slow
-        submenuAnimation.easing.type = Easing.BezierSpline
-        submenuAnimation.easing.bezierCurve = Lazer.MotionTokens.outSoft
+        // Match the primary content layer: 500ms, OutCubic in.
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.settingsSidebarFade
+        submenuAnimation.easing.type = Easing.OutCubic
         submenuAnimationTarget = 1
         if (Lazer.MotionTokens.reducedMotion) {
             submenuProgress = 1
@@ -116,9 +116,9 @@ Item {
     function closeSubmenu() {
         if (submenuEntry === null && submenuProgress === 0)
             return
-        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.slow
-        submenuAnimation.easing.type = Easing.BezierSpline
-        submenuAnimation.easing.bezierCurve = Lazer.MotionTokens.inOut
+        // Match the primary content layer: 500ms, InOutQuad out.
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.settingsSidebarFade
+        submenuAnimation.easing.type = Easing.InOutQuad
         submenuAnimationTarget = 0
         if (Lazer.MotionTokens.reducedMotion) {
             submenuPhase = "closing"
