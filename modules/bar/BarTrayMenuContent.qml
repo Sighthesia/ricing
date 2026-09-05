@@ -205,15 +205,15 @@ Item {
     }
 
     // Opaque root face hides the submenu until it has slid clear. It spans
-    // the full background width (buttons plus padding, same settingsSection
-    // color as the blue background so seamless) so the drawer hides
-    // pixel-exactly at travel start and emerges from the background edge.
+    // the background width plus one gap strip on the submenu side (same
+    // settingsSection color as the blue background, so the panel joint
+    // reads as a blue seam like the gaps between blocks, never a hole).
     Rectangle {
         id: menuFace
         objectName: "trayMenuFace"
         z: 2
-        x: -root.submenuPad
-        width: parent.width + root.submenuPad * 2
+        x: root.submenuFlipped ? -(root.submenuPad + root.submenuGap) : -root.submenuPad
+        width: parent.width + root.submenuPad * 2 + root.submenuGap
         height: menuFlick.height
         color: Lazer.LazerTheme.settingsSection
     }
@@ -390,11 +390,8 @@ Item {
         Rectangle {
             objectName: "traySubmenuTitleBlock"
             anchors.left: parent.left
-            anchors.leftMargin: root.submenuPad
             anchors.right: parent.right
-            anchors.rightMargin: root.submenuPad
             anchors.top: parent.top
-            anchors.topMargin: root.submenuPad
             height: 48
             color: Lazer.LazerTheme.settingsRail
             Text {
@@ -418,7 +415,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: root.submenuPad
             anchors.top: parent.top
-            anchors.topMargin: root.submenuPad + 48 + submenuColumn.spacing
+            anchors.topMargin: 48 + submenuColumn.spacing
             anchors.bottom: parent.bottom
             anchors.bottomMargin: root.submenuPad
             contentHeight: submenuColumn.implicitHeight

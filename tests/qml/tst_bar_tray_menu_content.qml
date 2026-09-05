@@ -219,8 +219,9 @@ Item {
             verify(block)
             compare(block.color, Lazer.LazerTheme.settingsRail)
             compare(block.height, 48)
-            // Title and rows share the primary's 8 padding to the panel edge.
-            compare(block.width, item.submenuSurface.width - 16)
+            // Title layer is full-bleed like the identity header; only the
+            // rows keep the 8 padding to the panel edge.
+            compare(block.width, item.submenuSurface.width)
             compare(findByName(item, "traySubmenuTitle").text, "More")
             compare(findByName(item, "traySubmenuTitle").font.bold, true)
             Lazer.MotionTokens.reducedMotionOverride = false
@@ -230,14 +231,14 @@ Item {
             verify(item.submenuSurface.z < item.menuFace.z)
             // No fade: the opaque surface slides out from under the root face.
             compare(item.submenuSurface.opacity, 1)
-            // The face spans the full background width (buttons plus padding)
-            // so the drawer hides pixel-exactly and emerges at its edge.
+            // The face spans the background plus one gap strip on the submenu
+            // side, so the panel joint reads as a blue seam, never a hole.
             item.submenuFlipped = true
-            compare(item.menuFace.x, -8)
-            compare(item.menuFace.width, item.width + 16)
+            compare(item.menuFace.x, -12)
+            compare(item.menuFace.width, item.width + 20)
             item.submenuFlipped = false
             compare(item.menuFace.x, -8)
-            compare(item.menuFace.width, item.width + 16)
+            compare(item.menuFace.width, item.width + 20)
         }
     }
 
