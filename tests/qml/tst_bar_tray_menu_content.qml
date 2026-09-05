@@ -97,12 +97,10 @@ Item {
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuSurfaceIsOpaqueAndRowsUseSettingsCards() {
-            Lazer.MotionTokens.reducedMotionOverride = true
             var parent = fakeEntry("More", { hasChildren: true })
             var item = makeMenu([parent])
             item.openSubmenu(parent, null)
             compare(findByName(item, "traySubmenuSurface").opacity, 1)
-            Lazer.MotionTokens.reducedMotionOverride = false
             compare(findByName(item, "trayMenuRowSurface").color, Lazer.LazerTheme.settingsCard)
             compare(Lazer.LazerTheme.settingsCardHover !== Lazer.LazerTheme.settingsCard, true)
         }
@@ -200,9 +198,8 @@ Item {
         function test_faceOccludesSubmenu() {
             var item = makeMenu([fakeEntry("More", { hasChildren: true })])
             verify(item.submenuSurface.z < item.menuFace.z)
-            // Closed submenu is fully faded; it slides out from under the
-            // opaque root face as progress rises.
-            compare(item.submenuSurface.opacity, 0)
+            // No fade: the opaque surface slides out from under the root face.
+            compare(item.submenuSurface.opacity, 1)
         }
     }
 
