@@ -152,7 +152,7 @@ Item {
             // the root list never shifts when the submenu appears. The panel
             // mirrors the primary panel width plus padding on both sides.
             compare(item.submenuSurface.y, 0)
-            compare(item.submenuSurface.width, item.width + 16)
+            compare(item.submenuSurface.width, item.width + 8)
             compare(item.submenuSurface.height, findByName(item, "trayMenuFlick").height)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
@@ -166,7 +166,7 @@ Item {
             item.submenuFlipped = true
             compare(item.popsRight, false)
             compare(item.submenuSurface.x, -(item.submenuSurface.width + 12))
-            compare(item.extraWidth, item.submenuSurface.width + 4)
+            compare(item.extraWidth, item.submenuSurface.width + 12)
             // Default: second level renders right of the primary.
             item.submenuFlipped = false
             compare(item.popsRight, true)
@@ -180,9 +180,14 @@ Item {
             // offset (surface width plus gap) toward the root.
             item.submenuFlipped = true
             item.submenuProgress = 0.5
-            compare(item.submenuSurface.transform[0].x, (item.submenuSurface.width + 4) * 0.5)
+            compare(item.submenuSurface.transform[0].x, (item.submenuSurface.width + 12) * 0.5)
+            // Padding lives only on the outer edge; the meeting edge is flush.
+            compare(findByName(item, "traySubmenuFlick").anchors.leftMargin, 8)
+            compare(findByName(item, "traySubmenuFlick").anchors.rightMargin, 0)
             item.submenuFlipped = false
-            compare(item.submenuSurface.transform[0].x, -(item.submenuSurface.width + 4) * 0.5)
+            compare(item.submenuSurface.transform[0].x, -(item.submenuSurface.width + 12) * 0.5)
+            compare(findByName(item, "traySubmenuFlick").anchors.leftMargin, 0)
+            compare(findByName(item, "traySubmenuFlick").anchors.rightMargin, 8)
             item.submenuProgress = 1
             Lazer.MotionTokens.reducedMotionOverride = false
         }

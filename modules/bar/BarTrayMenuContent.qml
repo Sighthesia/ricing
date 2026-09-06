@@ -86,12 +86,13 @@ Item {
     property bool submenuFlipped: false
     property bool popsRight: true
     onSubmenuFlippedChanged: popsRight = !submenuFlipped
-    // Submenu panel mirrors the primary panel: same outer width, same
-    // button width, same 8 padding from buttons to edges, 4 gap between
-    // the panels.
+    // Submenu panel mirrors the primary panel: same button width, same 8
+    // padding on the outer edges, 4 gap between the panels. The meeting
+    // edge carries no padding so the two paddings never stack into a band.
     readonly property real submenuPad: 8
     readonly property real submenuGap: 4
-    readonly property real extraWidth: submenuProgress > 0 ? submenuSurface.width + root.submenuGap : 0
+    readonly property real extraWidth: submenuProgress > 0
+        ? submenuSurface.width + root.submenuPad + root.submenuGap : 0
     readonly property alias submenuSurface: submenuSurface
     readonly property alias menuFace: menuFace
     readonly property real maxMenuHeight: Screen.desktopAvailableHeight > 0
@@ -378,7 +379,7 @@ Item {
         objectName: "traySubmenuSurface"
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
-        width: parent.width + root.submenuPad * 2
+        width: parent.width + root.submenuPad
         height: menuFlick.height
         x: submenuFlipped ? -(width + root.submenuPad + root.submenuGap)
             : parent.width + root.submenuPad + root.submenuGap
@@ -411,12 +412,12 @@ Item {
         Flickable {
             id: submenuFlick
             objectName: "traySubmenuFlick"
+            // Padding lives only on the outer edge; the meeting edge is
+            // flush so paddings never stack into a band at the joint.
             anchors.left: parent.left
-            anchors.leftMargin: root.submenuPad
+            anchors.leftMargin: root.submenuFlipped ? root.submenuPad : 0
             anchors.right: parent.right
-            anchors.rightMargin: root.submenuPad
-            // 8 blue above the first row, mirroring the primary content's
-            // top padding (not the 4 section gap).
+            anchors.rightMargin: root.submenuFlipped ? 0 : root.submenuPad
             anchors.top: parent.top
             anchors.topMargin: 48 + root.submenuPad
             anchors.bottom: parent.bottom
@@ -480,7 +481,7 @@ Item {
         transform: Translate {
             // NOTE: `parent` does not resolve to the menu root inside a
             // transform scope, so use the surface width explicitly.
-            x: (root.popsRight ? -1 : 1) * (submenuSurface.width + root.submenuGap) * (1 - root.submenuProgress)
+            x: (root.popsRight ? -1 : 1) * (submenuSurface.width + root.submenuPad + root.submenuGap) * (1 - root.submenuProgress)
         }
     }
 
