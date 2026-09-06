@@ -95,7 +95,28 @@ Item {
                 root.openSubmenu(entry, row)
         }
     }
+    // Symmetric close grace: a plain-row hover only schedules the close;
+    // returning to the parent or reaching the submenu cancels it. Sweeps
+    // never start an animation in either direction.
+    Timer {
+        id: submenuCloseTimer
+        interval: Lazer.MotionTokens.settingsContentDelay
+        onTriggered: root.closeSubmenu()
+    }
+    function handleRowHover(level, rowHasChildren) {
+        if (Number(level) !== 1) {
+            submenuCloseTimer.stop()
+            return
+        }
+        if (!Logic.shouldCloseSubmenuOnRow(level, rowHasChildren))
+            return
+        if (submenuPhase === "open" || submenuPhase === "opening")
+            submenuCloseTimer.restart()
+        else
+            closeSubmenu()
+    }
     function requestSubmenu(entry, row) {
+        submenuCloseTimer.stop()
         if (submenuPhase === "open" || submenuPhase === "opening") {
             openSubmenu(entry, row)
             return
@@ -151,15 +172,11 @@ Item {
             dismissRequested()
     }
 
-    function handleRowHover(level, rowHasChildren) {
-        if (Logic.shouldCloseSubmenuOnRow(level, rowHasChildren))
-            closeSubmenu()
-    }
-
     function openSubmenu(entry, row) {
         if (!Logic.shouldOpenSubmenu(entry))
             return
         cancelSubmenuRequest()
+        submenuCloseTimer.stop()
         // Redirect without replaying reveal when already visible.
         if ((submenuPhase === "open" || submenuPhase === "opening") && submenuEntry === entry) {
             if (row)
@@ -191,6 +208,7 @@ Item {
 
     function closeSubmenu() {
         cancelSubmenuRequest()
+        submenuCloseTimer.stop()
         if (submenuEntry === null && submenuProgress === 0)
             return
         // Match the primary content layer: 500ms, InOutQuad out.

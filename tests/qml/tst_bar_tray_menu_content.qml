@@ -250,6 +250,24 @@ Item {
             compare(item.submenuEntry, null)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
+        function test_submenuCloseGraceCancelsOnReturn() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([parent])
+            item.openSubmenu(parent, null)
+            compare(item.submenuPhase, "open")
+            // Plain-row hover only schedules; still open inside the grace.
+            item.handleRowHover(1, false)
+            compare(item.submenuPhase, "open")
+            // Returning to the parent cancels the scheduled close.
+            item.requestSubmenu(parent, null)
+            wait(350)
+            compare(item.submenuPhase, "open")
+            // Dwelling on the plain row lets the close through.
+            item.handleRowHover(1, false)
+            tryCompare(item, "submenuPhase", "closed", 600)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
         function test_submenuRowsInteractableOnlyWhenOpen() {
             Lazer.MotionTokens.reducedMotionOverride = true
             var parent = fakeEntry("More", { hasChildren: true })
