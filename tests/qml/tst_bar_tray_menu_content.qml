@@ -127,15 +127,24 @@ Item {
             compare(item.submenuEntry, parent)
             tryCompare(item, "submenuEntry", null, Lazer.MotionTokens.settingsSidebarFade + 200)
         }
-        function test_levelTwoDoesNotCloseSubmenu() {
+        function test_hoverCatcherMapsEveryPixelToARow() {
+            Lazer.MotionTokens.reducedMotionOverride = true
             var parent = fakeEntry("More", { hasChildren: true })
-            var nested = fakeEntry("Nested")
-            var item = makeMenu([parent])
-            item.openSubmenu(parent, null)
-            item.handleRowHover(2, false)
-            compare(item.submenuEntry, parent)
-            item.handleRowHover(1, false)
-            compare(item.submenuEntry, parent)
+            var plain = fakeEntry("Plain")
+            var item = makeMenu([parent, plain])
+            wait(0)
+            // Rows are 32 high with 4 gaps; gaps belong to the row above.
+            compare(item.entryAtContentY(10).entry, parent)
+            compare(item.entryAtContentY(34).entry, parent)
+            compare(item.entryAtContentY(40).entry, plain)
+            // Acting follows the mapping: parent opens, plain closes.
+            item.actOnMappedRow(item.entryAtContentY(10))
+            compare(item.submenuPhase, "open")
+            item.actOnMappedRow(item.entryAtContentY(34))
+            compare(item.submenuPhase, "open")
+            item.actOnMappedRow(item.entryAtContentY(40))
+            compare(item.submenuPhase, "closed")
+            Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuAnchorsToRootRow() {
             Lazer.MotionTokens.reducedMotionOverride = true

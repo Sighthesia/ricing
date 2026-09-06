@@ -77,9 +77,57 @@ Item {
     // Rows take hover/taps only once fully revealed; while sliding under
     // the opaque face they must never highlight beneath the primary rows.
     readonly property bool submenuInteractable: submenuPhase === "open"
-    // Plain-row hover retracts an open submenu at once.
-    function handleRowHover(level, rowHasChildren) {
-        if (Logic.shouldCloseSubmenuOnRow(level, rowHasChildren))
+    // Maps a content Y to its row for the hover catcher. Gaps (including
+    // the blue strips between blocks) belong to the row above, so no pixel
+    // is dead. Returns { entry, row } with nulls past the very top.
+    function entryAtContentY(y) {
+        var foundEntry = null
+        var foundRow = null
+        var kids = menuColumn.children
+        for (var i = 0; i < kids.length; i++) {
+            var sec = kids[i]
+            if (!sec || sec.objectName !== "trayMenuSection")
+                continue
+            if (y < sec.y)
+                break
+            var inner = null
+            var skids = sec.children
+            for (var k = 0; k < skids.length; k++) {
+                if (skids[k] && skids[k].objectName === "trayMenuSectionColumn") {
+                    inner = skids[k]
+                    break
+                }
+            }
+            if (!inner)
+                continue
+            var rkids = inner.children
+            for (var r = 0; r < rkids.length; r++) {
+                var row = rkids[r]
+                if (!row || row.objectName !== "trayMenuRow")
+                    continue
+                var top = sec.y + row.y
+                if (y < top + row.height + 4) {
+                    foundEntry = row.modelData
+                    foundRow = row
+                    return { entry: foundEntry, row: foundRow }
+                }
+                foundEntry = row.modelData
+                foundRow = row
+            }
+        }
+        return { entry: foundEntry, row: foundRow }
+    }
+    property var hoverMappedEntry: null
+    // Sole logic owner for primary hover: acts only when the mapped row
+    // changes, so sweeps cost one act per row crossed, never per pixel.
+    function actOnMappedRow(mapped) {
+        var entry = mapped ? mapped.entry : null
+        if (entry === hoverMappedEntry)
+            return
+        hoverMappedEntry = entry
+        if (entry && Logic.shouldOpenSubmenu(entry))
+            openSubmenu(entry, mapped.row)
+        else
             closeSubmenu()
     }
     property var submenuEntry: null
@@ -237,6 +285,20 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
     }
 
+    // Gap-free hover intent: rows own their highlight, but the logic owner
+    // is this viewport-wide catcher. It maps every pixel to its row (gaps
+    // belong to the row above), so parking in a gap behaves exactly like
+    // the row itself. Clicks pass through (NoButton); horizontal travel to
+    // the submenu changes no row, so arrivals stay safe.
+    MouseArea {
+        objectName: "trayMenuHoverCatcher"
+        anchors.fill: menuFlick
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        onEntered: root.actOnMappedRow(root.entryAtContentY(mouse.y + menuFlick.contentY))
+        onPositionChanged: root.actOnMappedRow(root.entryAtContentY(mouse.y + menuFlick.contentY))
+    }
+
     // Root entries scroll inside the bounded visible menu surface.
     Flickable {
         id: menuFlick
@@ -270,6 +332,7 @@ Item {
 
                     Column {
                         id: sectionColumn
+                        objectName: "trayMenuSectionColumn"
                         width: parent.width
                         spacing: 4
 
@@ -332,15 +395,10 @@ Item {
                         opacity: 0
                     }
 
+                    // Highlight only; hover intent belongs to the catcher so
+                    // gaps and rows share one mapping with no dead pixels.
                     HoverHandler {
                         id: rowHover
-                        onHoveredChanged: {
-                            if (!hovered)
-                                return
-                            handleRowHover(level, Logic.hasChildren(modelData))
-                            if (Logic.shouldOpenSubmenu(modelData))
-                                openSubmenu(modelData, rootRow)
-                        }
                     }
 
                     TapHandler {
