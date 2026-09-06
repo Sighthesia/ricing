@@ -77,6 +77,38 @@ Item {
     // Rows take hover/taps only once fully revealed; while sliding under
     // the opaque face they must never highlight beneath the primary rows.
     readonly property bool submenuInteractable: submenuPhase === "open"
+    // Hover-intent: sweeping across rows must not yank the submenu open
+    // and shut. A parent row arms the timer; dwelling past it opens.
+    // Leaving rows alone never cancels (fast arrivals still land); any
+    // plain-row hover or close cancels via closeSubmenu/requestSubmenu.
+    property var pendingSubmenuEntry: null
+    property Item pendingSubmenuRow: null
+    Timer {
+        id: submenuOpenTimer
+        interval: Lazer.MotionTokens.settingsContentDelay
+        onTriggered: {
+            var entry = root.pendingSubmenuEntry
+            var row = root.pendingSubmenuRow
+            root.pendingSubmenuEntry = null
+            root.pendingSubmenuRow = null
+            if (entry)
+                root.openSubmenu(entry, row)
+        }
+    }
+    function requestSubmenu(entry, row) {
+        if (submenuPhase === "open" || submenuPhase === "opening") {
+            openSubmenu(entry, row)
+            return
+        }
+        pendingSubmenuEntry = entry
+        pendingSubmenuRow = row
+        submenuOpenTimer.restart()
+    }
+    function cancelSubmenuRequest() {
+        submenuOpenTimer.stop()
+        pendingSubmenuEntry = null
+        pendingSubmenuRow = null
+    }
     property var submenuEntry: null
     property Item submenuAnchorRow: null
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
@@ -127,6 +159,7 @@ Item {
     function openSubmenu(entry, row) {
         if (!Logic.shouldOpenSubmenu(entry))
             return
+        cancelSubmenuRequest()
         // Redirect without replaying reveal when already visible.
         if ((submenuPhase === "open" || submenuPhase === "opening") && submenuEntry === entry) {
             if (row)
@@ -157,6 +190,7 @@ Item {
     }
 
     function closeSubmenu() {
+        cancelSubmenuRequest()
         if (submenuEntry === null && submenuProgress === 0)
             return
         // Match the primary content layer: 500ms, InOutQuad out.
@@ -339,7 +373,9 @@ Item {
                                 return
                             handleRowHover(level, Logic.hasChildren(modelData))
                             if (Logic.shouldOpenSubmenu(modelData))
-                                openSubmenu(modelData, rootRow)
+                                requestSubmenu(modelData, rootRow)
+                            else
+                                closeSubmenu()
                         }
                     }
 

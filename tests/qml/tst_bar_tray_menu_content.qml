@@ -232,6 +232,24 @@ Item {
             compare(findByName(item, "traySubmenuFlick").anchors.topMargin, 56)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
+        function test_submenuHoverDwellOpensAndSweepCancels() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var parent = fakeEntry("More", { hasChildren: true })
+            var plain = fakeEntry("Plain")
+            var item = makeMenu([parent, plain])
+            // Arming alone opens nothing; dwelling past the delay opens.
+            item.requestSubmenu(parent, null)
+            compare(item.submenuPhase, "closed")
+            tryCompare(item, "submenuPhase", "open", 600)
+            // Sweeping onto a plain row retracts and cancels any pending open.
+            item.closeSubmenu()
+            item.requestSubmenu(parent, null)
+            item.closeSubmenu()
+            wait(350)
+            compare(item.submenuPhase, "closed")
+            compare(item.submenuEntry, null)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
         function test_submenuRowsInteractableOnlyWhenOpen() {
             Lazer.MotionTokens.reducedMotionOverride = true
             var parent = fakeEntry("More", { hasChildren: true })
