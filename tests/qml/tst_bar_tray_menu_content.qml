@@ -165,12 +165,12 @@ Item {
             // Flipped: second level renders left of the primary, primary untouched.
             item.submenuFlipped = true
             compare(item.popsRight, false)
-            compare(item.submenuSurface.x, -(item.submenuSurface.width + 12))
-            compare(item.extraWidth, item.submenuSurface.width + 4)
+            compare(item.submenuSurface.x, -(item.submenuSurface.width + 8))
+            compare(item.extraWidth, item.submenuSurface.width)
             // Default: second level renders right of the primary.
             item.submenuFlipped = false
             compare(item.popsRight, true)
-            compare(item.submenuSurface.x, item.width + 12)
+            compare(item.submenuSurface.x, item.width + 8)
             // Opened submenu rests beside the root with no scale drift.
             compare(item.submenuSurface.transform.length, 1)
             compare(item.submenuSurface.transform[0].x, 0)
@@ -180,12 +180,12 @@ Item {
             // offset (surface width plus gap) toward the root.
             item.submenuFlipped = true
             item.submenuProgress = 0.5
-            compare(item.submenuSurface.transform[0].x, (item.submenuSurface.width + 12) * 0.5)
+            compare(item.submenuSurface.transform[0].x, (item.submenuSurface.width + 8) * 0.5)
             // Padding lives only on the outer edge; the meeting edge is flush.
             compare(findByName(item, "traySubmenuFlick").anchors.leftMargin, 8)
             compare(findByName(item, "traySubmenuFlick").anchors.rightMargin, 0)
             item.submenuFlipped = false
-            compare(item.submenuSurface.transform[0].x, -(item.submenuSurface.width + 12) * 0.5)
+            compare(item.submenuSurface.transform[0].x, -(item.submenuSurface.width + 8) * 0.5)
             compare(findByName(item, "traySubmenuFlick").anchors.leftMargin, 0)
             compare(findByName(item, "traySubmenuFlick").anchors.rightMargin, 8)
             item.submenuProgress = 1
@@ -237,8 +237,8 @@ Item {
             verify(item.submenuSurface.z < item.menuFace.z)
             // No fade: the opaque surface slides out from under the root face.
             compare(item.submenuSurface.opacity, 1)
-            // The seam strip exists only while the submenu is out; closed,
-            // the face sits flush with the card and nothing overflows.
+            // Panels butt flush with no seam strip: the face always spans
+            // exactly the card, open or closed, flipped or not.
             Lazer.MotionTokens.reducedMotionOverride = true
             var sub = fakeEntry("Sub", { hasChildren: true })
             var holder = makeMenu([sub])
@@ -246,11 +246,11 @@ Item {
             compare(holder.menuFace.width, holder.width + 16)
             holder.openSubmenu(sub, null)
             holder.submenuFlipped = true
-            compare(holder.menuFace.x, -12)
-            compare(holder.menuFace.width, holder.width + 20)
+            compare(holder.menuFace.x, -8)
+            compare(holder.menuFace.width, holder.width + 16)
             holder.submenuFlipped = false
             compare(holder.menuFace.x, -8)
-            compare(holder.menuFace.width, holder.width + 20)
+            compare(holder.menuFace.width, holder.width + 16)
             holder.closeSubmenu()
             compare(holder.menuFace.width, holder.width + 16)
             Lazer.MotionTokens.reducedMotionOverride = false

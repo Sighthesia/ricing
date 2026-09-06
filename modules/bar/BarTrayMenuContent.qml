@@ -87,16 +87,14 @@ Item {
     property bool popsRight: true
     onSubmenuFlippedChanged: popsRight = !submenuFlipped
     // Submenu panel mirrors the primary panel: same button width, same 8
-    // padding on the outer edges, 4 gap between the panels. The meeting
-    // edge carries no padding so the two paddings never stack into a band.
+    // padding on the outer edges. The meeting edge butts flush against the
+    // primary panel so paddings never stack into a band at the joint.
     readonly property real submenuPad: 8
-    readonly property real submenuGap: 4
-    // Container growth covers the surface plus the gap only: the outer pad
-    // already lives inside the surface width, counting it again leaves a
-    // transparent slack past the panel edge. (Travel still spans pad+gap
-    // because the hidden position tucks the surface one pad deeper.)
-    readonly property real extraWidth: submenuProgress > 0
-        ? submenuSurface.width + root.submenuGap : 0
+    // Container growth covers the surface exactly: it butts flush against
+    // the primary panel, so growth equals the surface width. (Travel spans
+    // one pad more because the hidden position tucks the surface that pad
+    // deeper under the face.)
+    readonly property real extraWidth: submenuProgress > 0 ? submenuSurface.width : 0
     readonly property alias submenuSurface: submenuSurface
     readonly property alias menuFace: menuFace
     readonly property real maxMenuHeight: Screen.desktopAvailableHeight > 0
@@ -209,17 +207,15 @@ Item {
         when: submenuOpenerLoader.item != null
     }
 
-    // Opaque root face hides the submenu until it has slid clear. The seam
-    // strip exists only while the submenu is out or moving, so the panel
-    // joint reads as a blue seam like the gaps between blocks; when closed
-    // the face sits flush with the card and nothing overflows past it.
-    readonly property bool submenuSeam: root.submenuProgress > 0
+    // Opaque root face hides the submenu until it has slid clear. It sits
+    // flush with the card (same span as the blue background) since the
+    // panels butt directly with no seam strip between them.
     Rectangle {
         id: menuFace
         objectName: "trayMenuFace"
         z: 2
-        x: submenuSeam && root.submenuFlipped ? -(root.submenuPad + root.submenuGap) : -root.submenuPad
-        width: parent.width + root.submenuPad * 2 + (submenuSeam ? root.submenuGap : 0)
+        x: -root.submenuPad
+        width: parent.width + root.submenuPad * 2
         height: menuFlick.height
         color: Lazer.LazerTheme.settingsSection
     }
@@ -385,8 +381,7 @@ Item {
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: parent.width + root.submenuPad
         height: menuFlick.height
-        x: submenuFlipped ? -(width + root.submenuPad + root.submenuGap)
-            : parent.width + root.submenuPad + root.submenuGap
+        x: submenuFlipped ? -(width + root.submenuPad) : parent.width + root.submenuPad
         y: 0
         color: Lazer.LazerTheme.settingsSection
         clip: true
@@ -485,7 +480,7 @@ Item {
         transform: Translate {
             // NOTE: `parent` does not resolve to the menu root inside a
             // transform scope, so use the surface width explicitly.
-            x: (root.popsRight ? -1 : 1) * (submenuSurface.width + root.submenuPad + root.submenuGap) * (1 - root.submenuProgress)
+            x: (root.popsRight ? -1 : 1) * (submenuSurface.width + root.submenuPad) * (1 - root.submenuProgress)
         }
     }
 
@@ -493,9 +488,9 @@ Item {
     Item {
         objectName: "traySubmenuBridge"
         z: 0
-        x: submenuFlipped ? -(root.submenuPad + root.submenuGap) : parent.width
+        x: submenuFlipped ? -root.submenuPad : parent.width
         y: submenuSurface.y
-        width: submenuProgress > 0 ? root.submenuPad + root.submenuGap : 0
+        width: submenuProgress > 0 ? root.submenuPad : 0
         height: submenuProgress > 0 ? submenuSurface.height : 0
     }
 
