@@ -132,9 +132,14 @@ Item {
                     || mapped.offset > mapped.row.height - submenuEdgeTolerance))
             return
         hoverMappedEntry = entry
-        if (entry && Logic.shouldOpenSubmenu(entry))
+        if (entry && Logic.shouldOpenSubmenu(entry)) {
             openSubmenu(entry, mapped.row)
-        else
+            return
+        }
+        // Retract only a settled submenu: gaps/plains crossed while it is
+        // still opening are travel paths toward it, never abort signals.
+        // (Popup close still retracts via closeSubmenu directly.)
+        if (submenuPhase === "open")
             closeSubmenu()
     }
     property var submenuEntry: null

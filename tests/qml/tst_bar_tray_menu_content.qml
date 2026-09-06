@@ -231,11 +231,16 @@ Item {
             verify(item.entryAtContentY(34).entry === null)
             verify(item.entryAtContentY(34).row === null)
             compare(item.entryAtContentY(40).entry, plain)
-            // Acting follows the mapping: parent opens, gap retracts.
+            // Acting follows the mapping: parent opens, gap retracts an
+            // open submenu but never aborts one still opening (travel).
             item.actOnMappedRow(item.entryAtContentY(10))
             compare(item.submenuPhase, "open")
             item.actOnMappedRow(item.entryAtContentY(34))
             compare(item.submenuPhase, "closed")
+            item.openSubmenu(parent, null)
+            item.submenuPhase = "opening"
+            item.actOnMappedRow(item.entryAtContentY(34))
+            compare(item.submenuPhase, "opening")
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuAnchorsToRootRow() {
