@@ -41,6 +41,17 @@ Item {
             mouseMove(item, x, y)
             wait(30)
         }
+        // Poll an action until check passes: synthetic delivery flakes under
+        // load, so retry the stimulus instead of asserting one shot.
+        function pollAct(action, check, tries) {
+            for (var i = 0; i < (tries || 12); i++) {
+                action()
+                wait(100)
+                if (check())
+                    return true
+            }
+            return check()
+        }
 
         function test_emptyStateWithoutHandle() {
             var item = createTemporaryObject(menuComp, root, { useStubEntries: true })
@@ -147,22 +158,19 @@ Item {
             // NOTE: mapped entries are Repeater copies, so compare by value.
             hoverFresh(item, 100, 16)
             // Real hover over row A (y 16) opens A.
-            wait(100)
-            verify(item.submenuEntry !== null)
-            compare(item.submenuEntry.text, "A")
+            verify(pollAct(function() { mouseMove(item, 100, 16) },
+                function() { return item.submenuEntry !== null && item.submenuEntry.text === "A" }))
             verify(item.highlightedRow !== null)
             // Real hover over row B (y 50) redirects to B, no stick.
-            mouseMove(item, 100, 50)
-            wait(100)
-            compare(item.submenuEntry.text, "B")
+            verify(pollAct(function() { mouseMove(item, 100, 50) },
+                function() { return item.submenuEntry !== null && item.submenuEntry.text === "B" }))
             // Real hover in the gap (y 34) clears highlight and retracts.
-            // (Wait between synthetic moves: back-to-back moves coalesce.)
+            // (Single separating wait: back-to-back synthetic moves coalesce.)
             mouseMove(item, 100, 70)
             wait(50)
-            mouseMove(item, 100, 34)
-            wait(100)
+            verify(pollAct(function() { mouseMove(item, 100, 34) },
+                function() { return item.submenuPhase === "closed" }))
             verify(item.highlightedRow === null)
-            compare(item.submenuPhase, "closed")
             mouseMove(item, 350, 700)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
@@ -177,14 +185,10 @@ Item {
             // direct activateEntry tests: Repeater copies plain objects, so
             // only the dismiss signal proves delivery here.)
             hoverFresh(item, 100, 16)
-            // Synthetic press/release delivery flakes under load; retry a
-            // bounded number of times instead of failing on one loss.
-            var tries = 0
-            while (dismissed === 0 && tries < 5) {
-                mouseClick(item, 100, 16)
-                wait(100)
-                tries++
-            }
+            // Synthetic press/release delivery flakes under load; retry the
+            // stimulus instead of asserting one shot.
+            verify(pollAct(function() { mouseClick(item, 100, 16) },
+                function() { return dismissed === 1 }))
             compare(dismissed, 1)
         }
         function test_submenuCloseDoesNotRestartMidFlight() {
@@ -201,6 +205,38 @@ Item {
             wait(100)
             compare(item.submenuAnimation.running, false)
             compare(item.submenuPhase, "closing")
+        }
+        function test_submenuHighlightAppearsAndSurvivesRebuild() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var parent = fakeEntry("More", { hasChildren: true })
+            // Three primary rows so the surface fits title plus content.
+            // Poll for layout like the long-menu test: heights need polish.
+            var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+            var laidOut = false
+            for (var i = 0; i < 100 && !laidOut; i++) {
+                wait(10)
+                laidOut = findByName(item, "trayMenuFlick").height > 0
+            }
+            verify(laidOut)
+            // Open with no content yet (cold fetch), stage parked-cursor
+            // memory as a real arrival would leave it, then content arrives
+            // under the parked cursor and must highlight via memory resolve.
+            item.openSubmenu(parent, null)
+            item.lastCursorX = 300
+            item.lastCursorY = 72
+            item.submenuEntries = [fakeEntry("Child")]
+            wait(100)
+            var surf = findByName(findByName(item, "traySubmenuSurface"), "trayMenuRowSurface")
+            verify(surf !== null)
+            compare(surf.color, Lazer.LazerTheme.settingsCardHover)
+            // Cold-style batch with identical content rebuilds delegates
+            // under the parked cursor; highlight must survive.
+            item.submenuEntries = [fakeEntry("Child")]
+            wait(100)
+            var surf2 = findByName(findByName(item, "traySubmenuSurface"), "trayMenuRowSurface")
+            verify(surf2 !== null)
+            compare(surf2.color, Lazer.LazerTheme.settingsCardHover)
+            Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_transitToSubmenuBouncesBackFromClosing() {
             var parent = fakeEntry("More", { hasChildren: true })

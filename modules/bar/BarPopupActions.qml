@@ -496,8 +496,10 @@ Item {
             // The submenu belongs to this menu instance: retract it when
             // the intent moves on instead of leaving it stale.
             onVisibleChanged: {
-                if (!visible)
+                if (!visible) {
                     trayMenu.closeSubmenu()
+                    trayMenu.forgetCursor()
+                }
             }
 
             Rectangle {

@@ -66,6 +66,7 @@ Item {
     readonly property var submenuSections: sectionize(stubEntriesActive
         ? submenuEntries
         : (submenuOpenerLoader.item ? submenuOpenerLoader.item.values : []))
+    onSubmenuSectionsChanged: resolveSubHoverFromMemory()
     readonly property bool menuLoading: resolvedMenuHandle != null && !stubEntriesActive
         && liveCount === 0
     readonly property bool emptyStateVisible: resolvedMenuHandle === null
@@ -77,23 +78,22 @@ Item {
     // Rows take hover/taps only once fully revealed; while sliding under
     // the opaque face they must never highlight beneath the primary rows.
     readonly property bool submenuInteractable: submenuPhase === "open"
-    // Maps a content Y to its row for the hover catcher, with strict row
-    // bounds: gaps (including the blue strips between blocks) map to
-    // nothing, so they neither highlight nor summon; parking in one counts
-    // as off the buttons and retracts. Returns { entry, row, offset } with
-    // the offset measured from the row top for edge tolerance.
-    function entryAtContentY(y) {
-        var kids = menuColumn.children
+    // Maps a content Y to its row within a section column, with strict row
+    // bounds: gaps map to nothing. Returns { entry, row, offset } with the
+    // offset measured from the row top for edge tolerance.
+    function rowAtContentY(column, sectionName, y) {
+        var rowsSeen = 0
+        var kids = column.children
         for (var i = 0; i < kids.length; i++) {
             var sec = kids[i]
-            if (!sec || sec.objectName !== "trayMenuSection")
+            if (!sec || sec.objectName !== sectionName)
                 continue
             if (y < sec.y)
                 break
             var inner = null
             var skids = sec.children
             for (var k = 0; k < skids.length; k++) {
-                if (skids[k] && skids[k].objectName === "trayMenuSectionColumn") {
+                if (skids[k] && skids[k].objectName === sectionName + "Column") {
                     inner = skids[k]
                     break
                 }
@@ -105,14 +105,18 @@ Item {
                 var row = rkids[r]
                 if (!row || row.objectName !== "trayMenuRow")
                     continue
+                rowsSeen++
                 var top = sec.y + row.y
                 if (y < top)
                     break
                 if (y < top + row.height)
-                    return { entry: row.modelData, row: row, offset: y - top }
+                    return { entry: row.modelData, row: row, offset: y - top, rowsSeen: rowsSeen }
             }
         }
-        return { entry: null, row: null, offset: -1 }
+        return { entry: null, row: null, offset: -1, rowsSeen: rowsSeen }
+    }
+    function entryAtContentY(y) {
+        return rowAtContentY(menuColumn, "trayMenuSection", y)
     }
     property var hoverMappedEntry: null
     // Sole logic owner for primary hover: acts only when the mapped row
@@ -317,8 +321,8 @@ Item {
         acceptedButtons: Qt.NoButton
         // NOTE: onEntered carries no mouse parameter; use the mouseX/mouseY
         // item properties instead (valid in any handler).
-        onEntered: root.hoverAtCatcher(mouseY + menuFlick.contentY)
-        onPositionChanged: root.hoverAtCatcher(mouseY + menuFlick.contentY)
+        onEntered: { root.rememberCursor(mouseX, mouseY); root.hoverAtCatcher(mouseY + menuFlick.contentY) }
+        onPositionChanged: { root.rememberCursor(mouseX, mouseY); root.hoverAtCatcher(mouseY + menuFlick.contentY) }
         onExited: root.hoverLeaveCatcher()
     }
     // Transit strip: the bridge zone toward the submenu, side-aware so the
@@ -326,6 +330,7 @@ Item {
     // mid-retract bounces back open (slow arrivals killed just short);
     // otherwise it is a deliberate no-op.
     MouseArea {
+        id: transitCatcher
         objectName: "traySubmenuTransitCatcher"
         x: root.submenuFlipped ? -root.submenuPad : menuFlick.width
         y: menuFlick.y
@@ -334,12 +339,79 @@ Item {
         z: 4
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
-        onEntered: root.transitToSubmenu()
+        onEntered: { root.rememberCursor(mouseX + transitCatcher.x, mouseY + transitCatcher.y); root.transitToSubmenu() }
+        onExited: root.forgetCursor()
     }
     function transitToSubmenu() {
         if (submenuEntry && submenuPhase !== "open")
             openSubmenu(submenuEntry, submenuAnchorRow)
     }
+    // Submenu hover state lives here at root level: functions nested inside
+    // the surface are unreachable via root.* and fail silently.
+    property Item highlightedSubmenuRow: null
+        function hoverAtSubCatcher(contentY) {
+            root.rememberCursor(subHoverCatcher.mouseX + submenuSurface.x,
+                subHoverCatcher.mouseY + submenuSurface.y)
+            highlightedSubmenuRow = rowAtContentY(submenuColumn, "traySubmenuSection", contentY).row
+        }
+    // Re-resolve under a stationary cursor from memory (root coords): the
+    // reveal sliding under it and data rebuilds generate no hover events.
+    // 12px tolerance toward the primary side covers arrivals parked on the
+    // bridge strip.
+    // Re-resolve under a stationary cursor from memory. Delegates may not
+    // exist yet when this runs (model changes precede instantiation), so a
+    // miss with no rows seen retries briefly; a miss with rows present is a
+    // genuine gap and clears.
+    function resolveSubHoverFromMemory(retry) {
+        retry = retry || 0
+        if (lastCursorX < 0)
+            return
+        var sx = lastCursorX - submenuSurface.x
+        var sy = lastCursorY - submenuSurface.y
+        var inX = submenuFlipped ? (sx >= 0 && sx <= submenuSurface.width + 12)
+            : (sx >= -12 && sx <= submenuSurface.width)
+        var fx = sx - submenuFlick.x
+        var fy = sy - submenuFlick.y
+        if (!inX || fy < 0 || fy >= submenuFlick.height) {
+            highlightedSubmenuRow = null
+            return
+        }
+        var m = rowAtContentY(submenuColumn, "traySubmenuSection", fy + submenuFlick.contentY)
+        if (m.row) {
+            highlightedSubmenuRow = m.row
+            return
+        }
+        if (m.rowsSeen === 0 && retry < 5)
+            Qt.callLater(function() { root.resolveSubHoverFromMemory(retry + 1) })
+        else
+            highlightedSubmenuRow = null
+    }
+    function resolveHoverFromMemory(retry) {
+        retry = retry || 0
+        if (lastCursorX < 0)
+            return
+        if (lastCursorX < 0 || lastCursorX >= menuFlick.width
+                || lastCursorY < 0 || lastCursorY >= menuFlick.height) {
+            highlightedRow = null
+            return
+        }
+        var pm = rowAtContentY(menuColumn, "trayMenuSection", lastCursorY + menuFlick.contentY)
+        if (pm.row) {
+            highlightedRow = pm.row
+            return
+        }
+        if (pm.rowsSeen === 0 && retry < 5)
+            Qt.callLater(function() { root.resolveHoverFromMemory(retry + 1) })
+        else
+            highlightedRow = null
+    }
+    // Last cursor position in root coords, refreshed by every catcher event.
+    // Item motion/appearance generates no hover events, so open-finish and
+    // data rebuilds re-resolve from memory instead of losing the cursor.
+    property real lastCursorX: -1
+    property real lastCursorY: -1
+    function rememberCursor(x, y) { lastCursorX = x; lastCursorY = y }
+    function forgetCursor() { lastCursorX = -1; lastCursorY = -1 }
     // Row currently under the cursor, owned by the catcher for highlight.
     property Item highlightedRow: null
     function hoverAtCatcher(contentY) {
@@ -351,7 +423,10 @@ Item {
         // Clear highlight only: leaving toward the submenu must not act
         // (arrivals would die). Stale intent resets in closeSubmenu.
         highlightedRow = null
+        forgetCursor()
     }
+    // Primary rebuilds (cold batches) under a stationary cursor.
+    onMenuSectionsChanged: resolveHoverFromMemory()
 
     // Root entries scroll inside the bounded visible menu surface.
     Flickable {
@@ -373,9 +448,12 @@ Item {
             objectName: "trayMenuColumn"
             width: menuFlick.width
             spacing: 4
+            onHeightChanged: Qt.callLater(root.resolveHoverFromMemory)
 
             Repeater {
                 model: root.menuSections
+                onItemAdded: Qt.callLater(root.resolveHoverFromMemory)
+                onItemRemoved: Qt.callLater(root.resolveHoverFromMemory)
 
                 delegate: Rectangle {
                     required property var modelData
@@ -520,6 +598,27 @@ Item {
             }
         }
 
+        // Submenu hover owner, mirroring the primary catcher: rows are pure
+        // display, highlight follows the mapped row. Ungated by phase (hidden
+        // rows paint under the opaque face anyway); taps stay gated.
+        MouseArea {
+            id: subHoverCatcher
+            objectName: "traySubmenuHoverCatcher"
+            anchors.fill: submenuFlick
+            z: 4
+            hoverEnabled: true
+            acceptedButtons: Qt.NoButton
+        onEntered: root.hoverAtSubCatcher(mouseY + submenuFlick.contentY)
+        onPositionChanged: root.hoverAtSubCatcher(mouseY + submenuFlick.contentY)
+        onExited: {
+            root.highlightedSubmenuRow = null
+            root.forgetCursor()
+        }
+    }
+        // Cold batches rebuild delegates under a stationary cursor: recompute
+        // from remembered position instead of losing the highlight. (Handled
+        // at root level; a nested Connections here proved unreliable.)
+
         // Child entries remain held during closing and update from the live opener.
         Flickable {
             id: submenuFlick
@@ -541,8 +640,16 @@ Item {
                 id: submenuColumn
                 width: parent.width
                 spacing: 4
+                // Height settles once laid-out delegates are positioned;
+                // re-resolve then (existence alone leaves y unassigned).
+                onHeightChanged: Qt.callLater(root.resolveSubHoverFromMemory)
                 Repeater {
                     model: root.submenuSections
+                    // Delegates materialize asynchronously after the model
+                    // changes; re-resolve here (not on model change, which
+                    // fires before any delegate exists).
+                    onItemAdded: Qt.callLater(root.resolveSubHoverFromMemory)
+                    onItemRemoved: Qt.callLater(root.resolveSubHoverFromMemory)
                     delegate: Rectangle {
                         required property var modelData
                         objectName: "traySubmenuSection"
@@ -551,11 +658,13 @@ Item {
                         color: Lazer.LazerTheme.settingsPanel
                         Column {
                             id: submenuSectionColumn
+                            objectName: "traySubmenuSectionColumn"
                             width: parent.width
                             spacing: 4
                             Repeater {
                                 model: modelData
                                 delegate: Item {
+                                    id: subRow
                                     required property var modelData
                                     property int level: 2
                                     width: submenuSectionColumn.width
@@ -565,7 +674,7 @@ Item {
                                         objectName: "trayMenuRowSurface"
                                         anchors.fill: parent
                                         radius: 4
-                                        color: submenuRowHover.hovered ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
+                                        color: root.highlightedSubmenuRow === subRow ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
                                         Text {
                                             anchors.left: parent.left
                                             anchors.leftMargin: 12
@@ -573,13 +682,6 @@ Item {
                                             text: Logic.labelOf(modelData)
                                             color: "#eeeeF2"
                                             font.pixelSize: 13
-                                        }
-                                        HoverHandler {
-                                            id: submenuRowHover
-                                            enabled: root.submenuInteractable
-                                            // TEMP-PROBE [DEBUG-hi1]
-                                            onHoveredChanged: console.log("[DEBUG-hi1] l2hover=" + hovered
-                                                + " phase=" + root.submenuPhase)
                                         }
                                         TapHandler {
                                             enabled: root.submenuInteractable
@@ -626,14 +728,13 @@ Item {
         easing.type: Easing.BezierSpline
         easing.bezierCurve: Lazer.MotionTokens.outSoft
         onFinished: {
-            // TEMP-PROBE [DEBUG-hi1]
-            console.log("[DEBUG-hi1] animFinished progress=" + submenuProgress)
             if (submenuProgress === 0) {
                 submenuEntry = null
                 submenuAnchorRow = null
                 submenuPhase = "closed"
             } else if (submenuProgress === 1) {
                 submenuPhase = "open"
+                root.resolveSubHoverFromMemory()
             }
         }
     }

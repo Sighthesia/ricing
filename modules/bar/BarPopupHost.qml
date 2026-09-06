@@ -516,8 +516,10 @@ PanelWindow {
                 // Retract any open tray submenu with the popup; otherwise it
                 // stays open and greets the user stale on the next reveal.
                 var tc = popupActions ? popupActions.trayMenuContent : null
-                if (tc)
+                if (tc) {
                     tc.closeSubmenu()
+                    tc.forgetCursor()
+                }
                 root.open = false
                 root.closeRequested()
                 clearIntentTimer.restart()
@@ -655,12 +657,15 @@ PanelWindow {
                         return
                     }
                 }
+                var coldWaitedMs = revealStartTimer.trayAttempts * 16
                 revealStartTimer.resetTrayWait()
                 root.updateTargetGeometry(root.currentIntent, true)
                 root.revealDistance = Math.max(root.targetHeight, root.displayHeight, 1)
+                // TEMP-PROBE [DEBUG-cold1]: coldWaitedMs added to the log.
                 root.debugLog("reveal-start", { "h": Math.round(root.targetHeight),
                     "progress": Number(popup.revealProgress),
-                    "kind": root.currentIntent ? String(root.currentIntent.actionKind || "") : "" })
+                    "kind": root.currentIntent ? String(root.currentIntent.actionKind || "") : "",
+                    "coldWaitedMs": coldWaitedMs })
                 root.startReveal(1)
             }
         }
