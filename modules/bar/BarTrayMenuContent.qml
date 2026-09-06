@@ -159,6 +159,7 @@ Item {
     // deeper under the face.)
     readonly property real extraWidth: submenuProgress > 0 ? submenuSurface.width : 0
     readonly property alias submenuSurface: submenuSurface
+    readonly property alias submenuAnimation: submenuAnimation
     readonly property alias menuFace: menuFace
     readonly property real maxMenuHeight: Screen.desktopAvailableHeight > 0
         ? Math.max(180, Screen.desktopAvailableHeight * 0.7) : 420
@@ -214,6 +215,10 @@ Item {
     function closeSubmenu() {
         hoverMappedEntry = null
         if (submenuEntry === null && submenuProgress === 0)
+            return
+        // Already retracting: restarting per row would stall the animation
+        // forever under a moving cursor, reading as stuck half-out.
+        if (submenuPhase === "closing")
             return
         // Match the primary content layer: 500ms, InOutQuad out.
         submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.settingsSidebarFade

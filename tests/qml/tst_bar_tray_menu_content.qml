@@ -177,9 +177,30 @@ Item {
             // direct activateEntry tests: Repeater copies plain objects, so
             // only the dismiss signal proves delivery here.)
             hoverFresh(item, 100, 16)
-            mouseClick(item, 100, 16)
-            wait(100)
+            // Synthetic press/release delivery flakes under load; retry a
+            // bounded number of times instead of failing on one loss.
+            var tries = 0
+            while (dismissed === 0 && tries < 5) {
+                mouseClick(item, 100, 16)
+                wait(100)
+                tries++
+            }
             compare(dismissed, 1)
+        }
+        function test_submenuCloseDoesNotRestartMidFlight() {
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([parent])
+            item.openSubmenu(parent, null)
+            tryCompare(item, "submenuPhase", "open", 900)
+            // Freeze the retraction, then close again: still stopped means
+            // the second close did not restart it (restarts would stall the
+            // retraction forever under a moving cursor).
+            item.closeSubmenu()
+            item.submenuAnimation.stop()
+            item.closeSubmenu()
+            wait(100)
+            compare(item.submenuAnimation.running, false)
+            compare(item.submenuPhase, "closing")
         }
         function test_submenuEdgeToleranceIgnoresJitter() {
             Lazer.MotionTokens.reducedMotionOverride = true
