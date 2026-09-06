@@ -232,6 +232,17 @@ Item {
             compare(findByName(item, "traySubmenuFlick").anchors.topMargin, 56)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
+        function test_submenuRowsInteractableOnlyWhenOpen() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([parent])
+            compare(item.submenuInteractable, false)
+            item.openSubmenu(parent, null)
+            compare(item.submenuInteractable, true)
+            item.closeSubmenu()
+            compare(item.submenuInteractable, false)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
         function test_faceOccludesSubmenu() {
             var item = makeMenu([fakeEntry("More", { hasChildren: true })])
             verify(item.submenuSurface.z < item.menuFace.z)

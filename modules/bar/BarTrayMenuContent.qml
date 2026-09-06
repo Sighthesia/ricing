@@ -74,6 +74,9 @@ Item {
 
     property string submenuPhase: "closed"
     property real submenuProgress: 0
+    // Rows take hover/taps only once fully revealed; while sliding under
+    // the opaque face they must never highlight beneath the primary rows.
+    readonly property bool submenuInteractable: submenuPhase === "open"
     property var submenuEntry: null
     property Item submenuAnchorRow: null
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
@@ -461,8 +464,14 @@ Item {
                                             color: "#eeeeF2"
                                             font.pixelSize: 13
                                         }
-                                        HoverHandler { id: submenuRowHover }
-                                        TapHandler { onTapped: activateEntry(modelData, 2) }
+                                        HoverHandler {
+                                            id: submenuRowHover
+                                            enabled: root.submenuInteractable
+                                        }
+                                        TapHandler {
+                                            enabled: root.submenuInteractable
+                                            onTapped: activateEntry(modelData, 2)
+                                        }
                                     }
                                 }
                             }
