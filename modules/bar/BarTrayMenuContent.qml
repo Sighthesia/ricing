@@ -321,6 +321,25 @@ Item {
         onPositionChanged: root.hoverAtCatcher(mouseY + menuFlick.contentY)
         onExited: root.hoverLeaveCatcher()
     }
+    // Transit strip: the bridge zone toward the submenu, side-aware so the
+    // outer margin never resurrects. Entering it while a submenu is
+    // mid-retract bounces back open (slow arrivals killed just short);
+    // otherwise it is a deliberate no-op.
+    MouseArea {
+        objectName: "traySubmenuTransitCatcher"
+        x: root.submenuFlipped ? -root.submenuPad : menuFlick.width
+        y: menuFlick.y
+        width: root.submenuPad
+        height: menuFlick.height
+        z: 4
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        onEntered: root.transitToSubmenu()
+    }
+    function transitToSubmenu() {
+        if (submenuEntry && submenuPhase !== "open")
+            openSubmenu(submenuEntry, submenuAnchorRow)
+    }
     // Row currently under the cursor, owned by the catcher for highlight.
     property Item highlightedRow: null
     function hoverAtCatcher(contentY) {
@@ -558,6 +577,9 @@ Item {
                                         HoverHandler {
                                             id: submenuRowHover
                                             enabled: root.submenuInteractable
+                                            // TEMP-PROBE [DEBUG-hi1]
+                                            onHoveredChanged: console.log("[DEBUG-hi1] l2hover=" + hovered
+                                                + " phase=" + root.submenuPhase)
                                         }
                                         TapHandler {
                                             enabled: root.submenuInteractable
@@ -604,6 +626,8 @@ Item {
         easing.type: Easing.BezierSpline
         easing.bezierCurve: Lazer.MotionTokens.outSoft
         onFinished: {
+            // TEMP-PROBE [DEBUG-hi1]
+            console.log("[DEBUG-hi1] animFinished progress=" + submenuProgress)
             if (submenuProgress === 0) {
                 submenuEntry = null
                 submenuAnchorRow = null

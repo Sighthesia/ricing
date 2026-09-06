@@ -202,6 +202,27 @@ Item {
             compare(item.submenuAnimation.running, false)
             compare(item.submenuPhase, "closing")
         }
+        function test_transitToSubmenuBouncesBackFromClosing() {
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([parent])
+            // Side-aware transit strip geometry (right side by default).
+            compare(findByName(item, "traySubmenuTransitCatcher").x, findByName(item, "trayMenuFlick").width)
+            item.submenuFlipped = true
+            compare(findByName(item, "traySubmenuTransitCatcher").x, -8)
+            item.submenuFlipped = false
+            // Fully closed with no entry: deliberate no-op.
+            item.transitToSubmenu()
+            compare(item.submenuPhase, "closed")
+            // Mid-retract arrival bounces back at once (phase assignments
+            // are synchronous, so no waits needed for the direction).
+            item.openSubmenu(parent, null)
+            tryCompare(item, "submenuPhase", "open", 900)
+            item.closeSubmenu()
+            compare(item.submenuPhase, "closing")
+            item.transitToSubmenu()
+            compare(item.submenuPhase, "opening")
+            compare(item.submenuEntry, parent)
+        }
         function test_submenuEdgeToleranceIgnoresJitter() {
             Lazer.MotionTokens.reducedMotionOverride = true
             var parent = fakeEntry("More", { hasChildren: true })
