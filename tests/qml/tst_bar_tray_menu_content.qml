@@ -30,6 +30,17 @@ Item {
             item.entries = entries
             return item
         }
+        function hoverFresh(item, x, y) {
+            // Two unconditional hops: the cursor cannot coincide with both,
+            // so the final leg is always a real movement with real events.
+            // (Reported containsMouse can lag the physical position.)
+            mouseMove(item.parent, 350, 700)
+            wait(20)
+            mouseMove(item.parent, 10, 600)
+            wait(20)
+            mouseMove(item, x, y)
+            wait(30)
+        }
 
         function test_emptyStateWithoutHandle() {
             var item = createTemporaryObject(menuComp, root, { useStubEntries: true })
@@ -126,6 +137,49 @@ Item {
             item.closeSubmenu()
             compare(item.submenuEntry, parent)
             tryCompare(item, "submenuEntry", null, Lazer.MotionTokens.settingsSidebarFade + 200)
+        }
+        function test_hoverCatcherLiveSwitchesParents() {
+            var parentA = fakeEntry("A", { hasChildren: true })
+            var parentB = fakeEntry("B", { hasChildren: true })
+            var item = makeMenu([parentA, parentB])
+            wait(0)
+            // Guarantee real movement: hop to a neutral spot until the
+            // catcher reports the cursor gone, then go to the target.
+            // NOTE: mapped entries are Repeater copies, so compare by value.
+            hoverFresh(item, 100, 16)
+            // Real hover over row A (y 16) opens A.
+            wait(150)
+            verify(item.submenuEntry !== null)
+            compare(item.submenuEntry.text, "A")
+            // Real hover over row B (y 50) redirects to B, no stick.
+            mouseMove(item, 100, 50)
+            wait(150)
+            compare(item.submenuEntry.text, "B")
+            // Real hover in the gap (y 34) belongs to the row above.
+            mouseMove(item, 100, 70)
+            mouseMove(item, 100, 34)
+            wait(150)
+            compare(item.submenuEntry.text, "A")
+            // Highlight follows the catcher-owned row; leaving clears it.
+            verify(item.highlightedRow !== null)
+            mouseMove(item, 350, 700)
+            wait(150)
+            verify(item.highlightedRow === null)
+        }
+        function test_hoverCatcherLetsClicksThrough() {
+            var plain = fakeEntry("Plain")
+            var item = makeMenu([plain])
+            wait(0)
+            var dismissed = 0
+            item.dismissRequested.connect(function() { dismissed++ })
+            // Real click through the overlay catcher still activates the
+            // row. (Triggered-call counting on the stub is covered by the
+            // direct activateEntry tests: Repeater copies plain objects, so
+            // only the dismiss signal proves delivery here.)
+            hoverFresh(item, 100, 16)
+            mouseClick(item, 100, 16)
+            wait(100)
+            compare(dismissed, 1)
         }
         function test_hoverCatcherMapsEveryPixelToARow() {
             Lazer.MotionTokens.reducedMotionOverride = true

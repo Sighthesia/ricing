@@ -285,18 +285,34 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
     }
 
-    // Gap-free hover intent: rows own their highlight, but the logic owner
-    // is this viewport-wide catcher. It maps every pixel to its row (gaps
-    // belong to the row above), so parking in a gap behaves exactly like
-    // the row itself. Clicks pass through (NoButton); horizontal travel to
-    // the submenu changes no row, so arrivals stay safe.
+    // Sole hover owner for the primary list, stacked above the rows: only
+    // the topmost chain receives hover, so a catcher below would stay deaf
+    // (proven by probe). It maps every pixel to its row (gaps belong to
+    // the row above) and drives both highlight and logic; clicks pass
+    // through (NoButton). Horizontal travel to the submenu changes no row,
+    // so arrivals stay safe.
     MouseArea {
         objectName: "trayMenuHoverCatcher"
         anchors.fill: menuFlick
+        z: 4
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
-        onEntered: root.actOnMappedRow(root.entryAtContentY(mouse.y + menuFlick.contentY))
-        onPositionChanged: root.actOnMappedRow(root.entryAtContentY(mouse.y + menuFlick.contentY))
+        // NOTE: onEntered carries no mouse parameter; use the mouseX/mouseY
+        // item properties instead (valid in any handler).
+        onEntered: root.hoverAtCatcher(mouseY + menuFlick.contentY)
+        onPositionChanged: root.hoverAtCatcher(mouseY + menuFlick.contentY)
+        onExited: root.hoverLeaveCatcher()
+    }
+    // Row currently under the cursor, owned by the catcher for highlight.
+    property Item highlightedRow: null
+    function hoverAtCatcher(contentY) {
+        var mapped = entryAtContentY(contentY)
+        highlightedRow = mapped.row
+        actOnMappedRow(mapped)
+    }
+    function hoverLeaveCatcher() {
+        highlightedRow = null
+        hoverMappedEntry = null
     }
 
     // Root entries scroll inside the bounded visible menu surface.
@@ -347,13 +363,15 @@ Item {
                                 height: 32
                                 objectName: "trayMenuRow"
 
-                                // Interactive root menu row.
+                                // Interactive root menu row; highlight follows
+                                // the catcher-owned row, rows carry no hover
+                                // handlers of their own.
                                 Rectangle {
                                 id: rowSurface
                                 objectName: "trayMenuRowSurface"
                                 anchors.fill: parent
                                 radius: 4
-                                color: rowHover.hovered ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
+                                color: root.highlightedRow === rootRow ? Lazer.LazerTheme.settingsCardHover : Lazer.LazerTheme.settingsCard
                                 opacity: Logic.isEnabled(modelData) ? 1 : Lazer.MotionTokens.disabledOpacity
 
                     Text {
@@ -395,11 +413,7 @@ Item {
                         opacity: 0
                     }
 
-                    // Highlight only; hover intent belongs to the catcher so
-                    // gaps and rows share one mapping with no dead pixels.
-                    HoverHandler {
-                        id: rowHover
-                    }
+
 
                     TapHandler {
                         onTapped: {
