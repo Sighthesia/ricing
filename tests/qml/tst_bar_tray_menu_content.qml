@@ -181,6 +181,23 @@ Item {
             wait(100)
             compare(dismissed, 1)
         }
+        function test_submenuEdgeToleranceIgnoresJitter() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([parent])
+            wait(0)
+            // 2px inside the row edge: boundary jitter must not summon.
+            item.actOnMappedRow(item.entryAtContentY(2))
+            compare(item.submenuPhase, "closed")
+            compare(item.submenuEntry, null)
+            // 2px above the bottom edge: same.
+            item.actOnMappedRow(item.entryAtContentY(30))
+            compare(item.submenuPhase, "closed")
+            // 16px deep: deliberate entry opens at once.
+            item.actOnMappedRow(item.entryAtContentY(16))
+            compare(item.submenuPhase, "open")
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
         function test_hoverCatcherMapsEveryPixelToARow() {
             Lazer.MotionTokens.reducedMotionOverride = true
             var parent = fakeEntry("More", { hasChildren: true })

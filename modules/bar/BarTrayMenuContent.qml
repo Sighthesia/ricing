@@ -80,7 +80,8 @@ Item {
     // Maps a content Y to its row for the hover catcher, with strict row
     // bounds: gaps (including the blue strips between blocks) map to
     // nothing, so they neither highlight nor summon; parking in one counts
-    // as off the buttons and retracts. Returns { entry, row }.
+    // as off the buttons and retracts. Returns { entry, row, offset } with
+    // the offset measured from the row top for edge tolerance.
     function entryAtContentY(y) {
         var kids = menuColumn.children
         for (var i = 0; i < kids.length; i++) {
@@ -108,17 +109,27 @@ Item {
                 if (y < top)
                     break
                 if (y < top + row.height)
-                    return { entry: row.modelData, row: row }
+                    return { entry: row.modelData, row: row, offset: y - top }
             }
         }
-        return { entry: null, row: null }
+        return { entry: null, row: null, offset: -1 }
     }
     property var hoverMappedEntry: null
     // Sole logic owner for primary hover: acts only when the mapped row
     // changes, so sweeps cost one act per row crossed, never per pixel.
+    // Edge tolerance against boundary jitter (proven 1px oscillation in
+    // production logs): summoning needs the cursor 8px deep inside the row
+    // while closed/closing. Retracting stays instant at any offset, and an
+    // already-open submenu keeps redirecting without tolerance.
+    readonly property real submenuEdgeTolerance: 8
     function actOnMappedRow(mapped) {
         var entry = mapped ? mapped.entry : null
         if (entry === hoverMappedEntry)
+            return
+        if (entry && Logic.shouldOpenSubmenu(entry)
+                && (submenuPhase === "closed" || submenuPhase === "closing")
+                && mapped.row && (mapped.offset < submenuEdgeTolerance
+                    || mapped.offset > mapped.row.height - submenuEdgeTolerance))
             return
         hoverMappedEntry = entry
         if (entry && Logic.shouldOpenSubmenu(entry))
