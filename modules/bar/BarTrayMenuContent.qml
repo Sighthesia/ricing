@@ -77,58 +77,48 @@ Item {
     // Rows take hover/taps only once fully revealed; while sliding under
     // the opaque face they must never highlight beneath the primary rows.
     readonly property bool submenuInteractable: submenuPhase === "open"
-    // Hover-intent: sweeping across rows must not yank the submenu open
-    // and shut. A parent row arms the timer; dwelling past it opens.
-    // Leaving rows alone never cancels (fast arrivals still land); any
-    // plain-row hover or close cancels via closeSubmenu/requestSubmenu.
-    property var pendingSubmenuEntry: null
-    property Item pendingSubmenuRow: null
+    // Hover quiescence: every hover change restarts one settle timer, and
+    // only a settled (stopped) cursor acts. Motion itself never starts an
+    // animation in either direction, so sweeps stay silent at any speed.
+    property var hoveredEntry: null
+    property Item hoveredRow: null
+    property bool submenuHover: false
+    property var pendingEntry: null
     Timer {
-        id: submenuOpenTimer
+        id: hoverSettleTimer
         interval: Lazer.MotionTokens.settingsContentDelay
-        onTriggered: {
-            var entry = root.pendingSubmenuEntry
-            var row = root.pendingSubmenuRow
-            root.pendingSubmenuEntry = null
-            root.pendingSubmenuRow = null
-            if (entry)
-                root.openSubmenu(entry, row)
-        }
+        onTriggered: root.settleHover()
     }
-    // Symmetric close grace: a plain-row hover only schedules the close;
-    // returning to the parent or reaching the submenu cancels it. Sweeps
-    // never start an animation in either direction.
-    Timer {
-        id: submenuCloseTimer
-        interval: Lazer.MotionTokens.settingsContentDelay
-        onTriggered: root.closeSubmenu()
-    }
-    function handleRowHover(level, rowHasChildren) {
-        if (Number(level) !== 1) {
-            submenuCloseTimer.stop()
-            return
+    function pokeHoverSettle() { hoverSettleTimer.restart() }
+    function onPrimaryRowHover(row, entry, isHovered) {
+        if (isHovered) {
+            hoveredEntry = entry
+            hoveredRow = row
+            pendingEntry = (entry && Logic.hasChildren(entry)) ? entry : null
+        } else if (hoveredRow === row) {
+            hoveredEntry = null
+            hoveredRow = null
         }
-        if (!Logic.shouldCloseSubmenuOnRow(level, rowHasChildren))
-            return
-        if (submenuPhase === "open" || submenuPhase === "opening")
-            submenuCloseTimer.restart()
+        pokeHoverSettle()
+    }
+    function onSubmenuHover(isHovered) {
+        submenuHover = isHovered
+        // Fast arrival: the cursor reached the submenu before any settle
+        // could open it. The pending entry is always fresh (plain rows and
+        // closes clear it), so open at once instead of stranding the cursor
+        // on a dead surface.
+        if (isHovered && pendingEntry && submenuPhase === "closed")
+            openSubmenu(pendingEntry, hoveredRow)
         else
-            closeSubmenu()
+            pokeHoverSettle()
     }
-    function requestSubmenu(entry, row) {
-        submenuCloseTimer.stop()
-        if (submenuPhase === "open" || submenuPhase === "opening") {
-            openSubmenu(entry, row)
+    function settleHover() {
+        if (hoveredEntry && Logic.shouldOpenSubmenu(hoveredEntry)) {
+            openSubmenu(hoveredEntry, hoveredRow)
             return
         }
-        pendingSubmenuEntry = entry
-        pendingSubmenuRow = row
-        submenuOpenTimer.restart()
-    }
-    function cancelSubmenuRequest() {
-        submenuOpenTimer.stop()
-        pendingSubmenuEntry = null
-        pendingSubmenuRow = null
+        if (!submenuHover && (submenuPhase === "open" || submenuPhase === "opening"))
+            closeSubmenu()
     }
     property var submenuEntry: null
     property Item submenuAnchorRow: null
@@ -175,8 +165,8 @@ Item {
     function openSubmenu(entry, row) {
         if (!Logic.shouldOpenSubmenu(entry))
             return
-        cancelSubmenuRequest()
-        submenuCloseTimer.stop()
+        pendingEntry = null
+        hoverSettleTimer.stop()
         // Redirect without replaying reveal when already visible.
         if ((submenuPhase === "open" || submenuPhase === "opening") && submenuEntry === entry) {
             if (row)
@@ -207,8 +197,8 @@ Item {
     }
 
     function closeSubmenu() {
-        cancelSubmenuRequest()
-        submenuCloseTimer.stop()
+        pendingEntry = null
+        hoverSettleTimer.stop()
         if (submenuEntry === null && submenuProgress === 0)
             return
         // Match the primary content layer: 500ms, InOutQuad out.
@@ -386,15 +376,7 @@ Item {
 
                     HoverHandler {
                         id: rowHover
-                        onHoveredChanged: {
-                            if (!hovered)
-                                return
-                            handleRowHover(level, Logic.hasChildren(modelData))
-                            if (Logic.shouldOpenSubmenu(modelData))
-                                requestSubmenu(modelData, rootRow)
-                            else
-                                closeSubmenu()
-                        }
+                        onHoveredChanged: root.onPrimaryRowHover(rootRow, modelData, hovered)
                     }
 
                     TapHandler {
@@ -544,6 +526,13 @@ Item {
             // NOTE: `parent` does not resolve to the menu root inside a
             // transform scope, so use the surface width explicitly.
             x: (root.popsRight ? -1 : 1) * (submenuSurface.width + root.submenuPad) * (1 - root.submenuProgress)
+        }
+
+        // Single presence tracker for the whole second level: per-row
+        // tracking would flap on every row boundary, this stays stable
+        // while the cursor is anywhere inside.
+        HoverHandler {
+            onHoveredChanged: root.onSubmenuHover(hovered)
         }
     }
 
