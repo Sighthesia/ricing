@@ -166,7 +166,7 @@ Item {
             item.submenuFlipped = true
             compare(item.popsRight, false)
             compare(item.submenuSurface.x, -(item.submenuSurface.width + 12))
-            compare(item.extraWidth, item.submenuSurface.width + 12)
+            compare(item.extraWidth, item.submenuSurface.width + 4)
             // Default: second level renders right of the primary.
             item.submenuFlipped = false
             compare(item.popsRight, true)

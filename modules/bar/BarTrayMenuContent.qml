@@ -91,8 +91,12 @@ Item {
     // edge carries no padding so the two paddings never stack into a band.
     readonly property real submenuPad: 8
     readonly property real submenuGap: 4
+    // Container growth covers the surface plus the gap only: the outer pad
+    // already lives inside the surface width, counting it again leaves a
+    // transparent slack past the panel edge. (Travel still spans pad+gap
+    // because the hidden position tucks the surface one pad deeper.)
     readonly property real extraWidth: submenuProgress > 0
-        ? submenuSurface.width + root.submenuPad + root.submenuGap : 0
+        ? submenuSurface.width + root.submenuGap : 0
     readonly property alias submenuSurface: submenuSurface
     readonly property alias menuFace: menuFace
     readonly property real maxMenuHeight: Screen.desktopAvailableHeight > 0
