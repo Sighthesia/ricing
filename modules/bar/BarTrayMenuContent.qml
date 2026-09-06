@@ -77,12 +77,11 @@ Item {
     // Rows take hover/taps only once fully revealed; while sliding under
     // the opaque face they must never highlight beneath the primary rows.
     readonly property bool submenuInteractable: submenuPhase === "open"
-    // Maps a content Y to its row for the hover catcher. Gaps (including
-    // the blue strips between blocks) belong to the row above, so no pixel
-    // is dead. Returns { entry, row } with nulls past the very top.
+    // Maps a content Y to its row for the hover catcher, with strict row
+    // bounds: gaps (including the blue strips between blocks) map to
+    // nothing, so they neither highlight nor summon; parking in one counts
+    // as off the buttons and retracts. Returns { entry, row }.
     function entryAtContentY(y) {
-        var foundEntry = null
-        var foundRow = null
         var kids = menuColumn.children
         for (var i = 0; i < kids.length; i++) {
             var sec = kids[i]
@@ -106,16 +105,13 @@ Item {
                 if (!row || row.objectName !== "trayMenuRow")
                     continue
                 var top = sec.y + row.y
-                if (y < top + row.height + 4) {
-                    foundEntry = row.modelData
-                    foundRow = row
-                    return { entry: foundEntry, row: foundRow }
-                }
-                foundEntry = row.modelData
-                foundRow = row
+                if (y < top)
+                    break
+                if (y < top + row.height)
+                    return { entry: row.modelData, row: row }
             }
         }
-        return { entry: foundEntry, row: foundRow }
+        return { entry: null, row: null }
     }
     property var hoverMappedEntry: null
     // Sole logic owner for primary hover: acts only when the mapped row
@@ -205,6 +201,7 @@ Item {
     }
 
     function closeSubmenu() {
+        hoverMappedEntry = null
         if (submenuEntry === null && submenuProgress === 0)
             return
         // Match the primary content layer: 500ms, InOutQuad out.
@@ -311,8 +308,9 @@ Item {
         actOnMappedRow(mapped)
     }
     function hoverLeaveCatcher() {
+        // Clear highlight only: leaving toward the submenu must not act
+        // (arrivals would die). Stale intent resets in closeSubmenu.
         highlightedRow = null
-        hoverMappedEntry = null
     }
 
     // Root entries scroll inside the bounded visible menu surface.

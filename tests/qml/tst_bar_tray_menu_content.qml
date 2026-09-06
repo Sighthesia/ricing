@@ -139,32 +139,32 @@ Item {
             tryCompare(item, "submenuEntry", null, Lazer.MotionTokens.settingsSidebarFade + 200)
         }
         function test_hoverCatcherLiveSwitchesParents() {
+            Lazer.MotionTokens.reducedMotionOverride = true
             var parentA = fakeEntry("A", { hasChildren: true })
             var parentB = fakeEntry("B", { hasChildren: true })
             var item = makeMenu([parentA, parentB])
             wait(0)
-            // Guarantee real movement: hop to a neutral spot until the
-            // catcher reports the cursor gone, then go to the target.
             // NOTE: mapped entries are Repeater copies, so compare by value.
             hoverFresh(item, 100, 16)
             // Real hover over row A (y 16) opens A.
-            wait(150)
+            wait(100)
             verify(item.submenuEntry !== null)
             compare(item.submenuEntry.text, "A")
+            verify(item.highlightedRow !== null)
             // Real hover over row B (y 50) redirects to B, no stick.
             mouseMove(item, 100, 50)
-            wait(150)
+            wait(100)
             compare(item.submenuEntry.text, "B")
-            // Real hover in the gap (y 34) belongs to the row above.
+            // Real hover in the gap (y 34) clears highlight and retracts.
+            // (Wait between synthetic moves: back-to-back moves coalesce.)
             mouseMove(item, 100, 70)
+            wait(50)
             mouseMove(item, 100, 34)
-            wait(150)
-            compare(item.submenuEntry.text, "A")
-            // Highlight follows the catcher-owned row; leaving clears it.
-            verify(item.highlightedRow !== null)
-            mouseMove(item, 350, 700)
-            wait(150)
+            wait(100)
             verify(item.highlightedRow === null)
+            compare(item.submenuPhase, "closed")
+            mouseMove(item, 350, 700)
+            Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_hoverCatcherLetsClicksThrough() {
             var plain = fakeEntry("Plain")
@@ -187,16 +187,16 @@ Item {
             var plain = fakeEntry("Plain")
             var item = makeMenu([parent, plain])
             wait(0)
-            // Rows are 32 high with 4 gaps; gaps belong to the row above.
+            // Rows are 32 high with 4 gaps; gaps map to nothing: no summon,
+            // no highlight, parking in one counts as off the buttons.
             compare(item.entryAtContentY(10).entry, parent)
-            compare(item.entryAtContentY(34).entry, parent)
+            verify(item.entryAtContentY(34).entry === null)
+            verify(item.entryAtContentY(34).row === null)
             compare(item.entryAtContentY(40).entry, plain)
-            // Acting follows the mapping: parent opens, plain closes.
+            // Acting follows the mapping: parent opens, gap retracts.
             item.actOnMappedRow(item.entryAtContentY(10))
             compare(item.submenuPhase, "open")
             item.actOnMappedRow(item.entryAtContentY(34))
-            compare(item.submenuPhase, "open")
-            item.actOnMappedRow(item.entryAtContentY(40))
             compare(item.submenuPhase, "closed")
             Lazer.MotionTokens.reducedMotionOverride = false
         }
@@ -263,7 +263,7 @@ Item {
             // Forty delegates may need more than one frame under load; poll
             // briefly instead of assuming a single wait(0) suffices.
             var settled = false
-            for (var i = 0; i < 50 && !settled; i++) {
+            for (var i = 0; i < 100 && !settled; i++) {
                 wait(10)
                 settled = flick.contentHeight > item.maxMenuHeight
                     || flick.contentHeight > flick.height
