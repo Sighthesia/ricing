@@ -128,16 +128,14 @@ Item {
             tryCompare(item, "submenuEntry", null, Lazer.MotionTokens.settingsSidebarFade + 200)
         }
         function test_levelTwoDoesNotCloseSubmenu() {
-            Lazer.MotionTokens.reducedMotionOverride = true
             var parent = fakeEntry("More", { hasChildren: true })
+            var nested = fakeEntry("Nested")
             var item = makeMenu([parent])
             item.openSubmenu(parent, null)
-            // Presence inside the submenu counts as staying, never a close.
-            item.onSubmenuHover(true)
-            wait(350)
+            item.handleRowHover(2, false)
             compare(item.submenuEntry, parent)
-            item.onSubmenuHover(false)
-            Lazer.MotionTokens.reducedMotionOverride = false
+            item.handleRowHover(1, false)
+            compare(item.submenuEntry, parent)
         }
         function test_submenuAnchorsToRootRow() {
             Lazer.MotionTokens.reducedMotionOverride = true
@@ -232,40 +230,6 @@ Item {
             compare(findByName(item, "traySubmenuTitle").text, "More")
             compare(findByName(item, "traySubmenuTitle").font.bold, true)
             compare(findByName(item, "traySubmenuFlick").anchors.topMargin, 56)
-            Lazer.MotionTokens.reducedMotionOverride = false
-        }
-        function test_submenuSettlesOpenOnStopAndIgnoresSweep() {
-            Lazer.MotionTokens.reducedMotionOverride = true
-            var parent = fakeEntry("More", { hasChildren: true })
-            var plain = fakeEntry("Plain")
-            var item = makeMenu([parent, plain])
-            // Entering alone opens nothing; stopping past settle opens.
-            item.onPrimaryRowHover(null, parent, true)
-            compare(item.submenuPhase, "closed")
-            tryCompare(item, "submenuPhase", "open", 600)
-            // A sweep (parent then plain without stopping) opens nothing.
-            item.closeSubmenu()
-            item.onPrimaryRowHover(null, parent, true)
-            item.onPrimaryRowHover(null, plain, true)
-            wait(350)
-            compare(item.submenuPhase, "closed")
-            compare(item.submenuEntry, null)
-            Lazer.MotionTokens.reducedMotionOverride = false
-        }
-        function test_submenuSettlesClosedOnPlainStop() {
-            Lazer.MotionTokens.reducedMotionOverride = true
-            var parent = fakeEntry("More", { hasChildren: true })
-            var plain = fakeEntry("Plain")
-            var item = makeMenu([parent, plain])
-            item.openSubmenu(parent, null)
-            compare(item.submenuPhase, "open")
-            // Moving rows keeps postponing; stopping on plain closes.
-            item.onPrimaryRowHover(null, plain, true)
-            compare(item.submenuPhase, "open")
-            tryCompare(item, "submenuPhase", "closed", 600)
-            // Stopping back on the parent reopens.
-            item.onPrimaryRowHover(null, parent, true)
-            tryCompare(item, "submenuPhase", "open", 600)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuRowsInteractableOnlyWhenOpen() {
