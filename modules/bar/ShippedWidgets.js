@@ -6,6 +6,7 @@
 var ids = [
     "clock", "tray", "active-window", "workspaces", "brightness",
     "volume", "media", "notifications", "settings", "launcher",
+    "battery", "bluetooth", "network",
 ]
 
 function ships(widgetId) {

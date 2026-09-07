@@ -50,6 +50,162 @@ Item {
             return !!payload.notificationService.dndEnabled
         return false
     }
+    // Battery keeps tracking the live service so the open popup follows
+    // charge changes without being rebuilt; snapshots cover test fakes.
+    readonly property var batteryService: payload && payload.batteryService ? payload.batteryService : null
+    readonly property bool batteryReady: {
+        if (root.batteryService && root.batteryService.ready !== undefined)
+            return !!root.batteryService.ready
+        if (payload && payload.ready !== undefined)
+            return !!payload.ready
+        return false
+    }
+    readonly property int batteryPct: {
+        var raw = -1
+        if (root.batteryService && root.batteryService.percentage !== undefined)
+            raw = Number(root.batteryService.percentage)
+        else if (payload && payload.percentage !== undefined && payload.percentage !== null)
+            raw = Number(payload.percentage)
+        if (!isFinite(raw) || raw < 0)
+            return 0
+        return Math.max(0, Math.min(100, Math.round(raw)))
+    }
+    readonly property real batteryLevel: root.batteryPct / 100
+    readonly property bool batteryCharging: {
+        if (root.batteryService && root.batteryService.charging !== undefined)
+            return !!root.batteryService.charging
+        if (payload && payload.charging !== undefined)
+            return !!payload.charging
+        return false
+    }
+    readonly property bool batteryPluggedIn: {
+        if (root.batteryService && root.batteryService.pluggedIn !== undefined)
+            return !!root.batteryService.pluggedIn
+        if (payload && payload.pluggedIn !== undefined)
+            return !!payload.pluggedIn
+        return false
+    }
+    readonly property bool batteryAttention: {
+        if (root.batteryService && (root.batteryService.low !== undefined || root.batteryService.critical !== undefined))
+            return !!root.batteryService.low || !!root.batteryService.critical
+        if (payload && (payload.low !== undefined || payload.critical !== undefined))
+            return !!payload.low || !!payload.critical
+        return false
+    }
+    readonly property string batteryStateText: {
+        if (!root.batteryReady)
+            return "Unknown"
+        if (root.batteryCharging)
+            return "Charging"
+        if (root.batteryPluggedIn)
+            return "Full"
+        if (root.batteryAttention)
+            return "Low"
+        return "Discharging"
+    }
+    // Bluetooth/network popups bind the live service through the payload so
+    // power, scan, and list state stay fresh while the popup is open.
+    readonly property var bluetoothService: payload && payload.bluetoothService ? payload.bluetoothService : null
+    readonly property bool btAvailable: {
+        if (root.bluetoothService && root.bluetoothService.bluetoothAvailable !== undefined)
+            return !!root.bluetoothService.bluetoothAvailable
+        if (payload && payload.bluetoothAvailable !== undefined)
+            return !!payload.bluetoothAvailable
+        return true
+    }
+    readonly property bool btEnabled: {
+        if (root.bluetoothService && root.bluetoothService.enabled !== undefined)
+            return !!root.bluetoothService.enabled
+        if (payload && payload.enabled !== undefined)
+            return !!payload.enabled
+        return false
+    }
+    readonly property bool btScanning: {
+        if (root.bluetoothService && root.bluetoothService.scanningActive !== undefined)
+            return !!root.bluetoothService.scanningActive
+        if (payload && payload.scanningActive !== undefined)
+            return !!payload.scanningActive
+        return false
+    }
+    readonly property var btDeviceList: {
+        if (!root.bluetoothService || !root.bluetoothService.devices)
+            return []
+        var vals = root.bluetoothService.devices.values
+        if (!vals || !vals.length)
+            return []
+        var arr = vals.slice()
+        arr.sort(function (a, b) {
+            var aConn = a && a.connected ? 1 : 0
+            var bConn = b && b.connected ? 1 : 0
+            if (aConn !== bConn)
+                return bConn - aConn
+            var aPair = a && (a.paired || a.trusted) ? 1 : 0
+            var bPair = b && (b.paired || b.trusted) ? 1 : 0
+            if (aPair !== bPair)
+                return bPair - aPair
+            return String(root.btDeviceName(a)).localeCompare(String(root.btDeviceName(b)))
+        })
+        return arr.slice(0, 6)
+    }
+    readonly property var networkService: payload && payload.networkService ? payload.networkService : null
+    readonly property bool wifiEnabled: {
+        if (root.networkService && root.networkService.wifiEnabled !== undefined)
+            return !!root.networkService.wifiEnabled
+        if (payload && payload.wifiEnabled !== undefined)
+            return !!payload.wifiEnabled
+        return false
+    }
+    readonly property bool wifiConnected: {
+        if (root.networkService && root.networkService.wifiConnected !== undefined)
+            return !!root.networkService.wifiConnected
+        if (payload && payload.wifiConnected !== undefined)
+            return !!payload.wifiConnected
+        return false
+    }
+    readonly property bool wifiScanning: {
+        if (root.networkService && root.networkService.scanningActive !== undefined)
+            return !!root.networkService.scanningActive
+        if (payload && payload.scanningActive !== undefined)
+            return !!payload.scanningActive
+        return false
+    }
+    readonly property bool wifiConnecting: {
+        if (root.networkService && root.networkService.connecting !== undefined)
+            return !!root.networkService.connecting
+        if (payload && payload.connecting !== undefined)
+            return !!payload.connecting
+        return false
+    }
+    readonly property string wifiStatusText: {
+        if (root.networkService && typeof root.networkService.getStatusText === "function") {
+            try { return String(root.networkService.getStatusText() || "") } catch (e) { return "" }
+        }
+        if (payload && payload.statusText !== undefined)
+            return String(payload.statusText || "")
+        return ""
+    }
+    readonly property string wifiError: {
+        if (root.networkService && root.networkService.lastError !== undefined)
+            return String(root.networkService.lastError || "")
+        if (payload && payload.lastError !== undefined)
+            return String(payload.lastError || "")
+        return ""
+    }
+    readonly property var wifiList: {
+        var nets = root.networkService ? root.networkService.networks
+            : (payload && payload.networks ? payload.networks : null)
+        if (!nets)
+            return []
+        var arr = Object.keys(nets).map(function (key) { return nets[key] })
+        arr.sort(function (a, b) {
+            var aConn = a && a.connected ? 1 : 0
+            var bConn = b && b.connected ? 1 : 0
+            if (aConn !== bConn)
+                return bConn - aConn
+            return (Number(b && b.signal) || 0) - (Number(a && a.signal) || 0)
+        })
+        return arr.slice(0, 6)
+    }
     readonly property int mediaPositionMs: {
         if (payload && payload.mediaControlService && payload.mediaControlService.positionMs !== undefined)
             return Math.max(0, Number(payload.mediaControlService.positionMs))
@@ -185,6 +341,125 @@ Item {
             payload.notificationService.markAllRead()
             return
         }
+    }
+
+    function handleBluetoothPower(enabled) {
+        if (payload && typeof payload.onBluetoothPower === "function") {
+            payload.onBluetoothPower(!!enabled)
+            return
+        }
+        if (root.bluetoothService && typeof root.bluetoothService.setBluetoothEnabled === "function") {
+            try { root.bluetoothService.setBluetoothEnabled(!!enabled) } catch (e) {}
+        }
+    }
+
+    function handleBluetoothScan(active) {
+        if (payload && typeof payload.onBluetoothScan === "function") {
+            payload.onBluetoothScan(!!active)
+            return
+        }
+        if (root.bluetoothService && typeof root.bluetoothService.setScanActive === "function") {
+            try { root.bluetoothService.setScanActive(!!active) } catch (e) {}
+        }
+    }
+
+    // Stable display name for a bluetooth device object.
+    function btDeviceName(device) {
+        if (!device)
+            return "Unknown device"
+        var name = device.name || device.deviceName || ""
+        if (name !== "")
+            return String(name)
+        return String(device.address || "Unknown device")
+    }
+
+    function btDeviceStatus(device) {
+        if (!device)
+            return ""
+        if (device.connected)
+            return "Connected"
+        if (device.paired || device.trusted)
+            return "Paired"
+        return "Available"
+    }
+
+    // Tap a device row: disconnect when connected, otherwise connect or pair.
+    function handleBluetoothDeviceTap(device) {
+        if (!device)
+            return
+        if (payload && typeof payload.onDeviceTap === "function") {
+            payload.onDeviceTap(device)
+            return
+        }
+        var service = root.bluetoothService
+        if (!service)
+            return
+        try {
+            if (service.canDisconnect && service.canDisconnect(device)) {
+                service.disconnectDevice(device)
+                return
+            }
+            if (service.canConnect && service.canConnect(device)) {
+                service.connectDeviceWithTrust(device)
+                return
+            }
+            if (service.canPair && service.canPair(device))
+                service.pairDevice(device)
+        } catch (e) {}
+    }
+
+    function handleWifiPower(enabled) {
+        if (payload && typeof payload.onWifiPower === "function") {
+            payload.onWifiPower(!!enabled)
+            return
+        }
+        if (root.networkService && typeof root.networkService.setWifiEnabled === "function") {
+            try { root.networkService.setWifiEnabled(!!enabled) } catch (e) {}
+        }
+    }
+
+    function handleWifiRescan() {
+        if (payload && typeof payload.onRescan === "function") {
+            payload.onRescan()
+            return
+        }
+        if (root.networkService && typeof root.networkService.scan === "function") {
+            try { root.networkService.scan() } catch (e) {}
+        }
+    }
+
+    // Label a wi-fi network's signal strength.
+    function wifiSignalLabel(signal) {
+        if (root.networkService && typeof root.networkService.getSignalLabel === "function") {
+            try { return String(root.networkService.getSignalLabel(Number(signal) || 0) || "") } catch (e) {}
+        }
+        var s = Number(signal) || 0
+        if (s >= 80) return "Excellent"
+        if (s >= 60) return "Good"
+        if (s >= 35) return "Fair"
+        if (s >= 15) return "Poor"
+        return "Weak"
+    }
+
+    // Tap a network row: disconnect the active one, otherwise connect.
+    // Saved and open networks connect directly; secured unknowns report
+    // through the service's lastError line below the list.
+    function handleNetworkTap(network) {
+        if (!network || !network.ssid)
+            return
+        if (payload && typeof payload.onConnect === "function") {
+            payload.onConnect(String(network.ssid))
+            return
+        }
+        var service = root.networkService
+        if (!service)
+            return
+        try {
+            if (network.connected && typeof service.disconnect === "function")
+                service.disconnect(String(network.ssid))
+            else if (typeof service.connect === "function")
+                service.connect(String(network.ssid))
+        } catch (e) {}
     }
 
     function handleTrayActivate() {
@@ -483,6 +758,332 @@ Item {
             }
         }
 
+        // Battery content: percentage readout plus state and level bar.
+        Item {
+            id: batteryContent
+            objectName: "batteryContent"
+            width: parent.width
+            height: batteryCard.height
+            visible: root.actionKind === "battery"
+
+            // Settings-row card hosts the battery readout.
+            Rectangle {
+                id: batteryCard
+                objectName: "batteryCard"
+                width: parent.width
+                height: 64
+                radius: 6
+                color: batteryCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            }
+            HoverHandler { id: batteryCardHover; blocking: false }
+
+            Text {
+                objectName: "batteryPctText"
+                anchors.top: parent.top
+                anchors.topMargin: 8
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.batteryReady ? root.batteryPct + "%" : "—"
+                color: LazerTheme.textPrimary
+                font.pixelSize: 18
+                font.bold: true
+            }
+
+            Text {
+                objectName: "batteryStateText"
+                anchors.top: parent.top
+                anchors.topMargin: 32
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.batteryStateText
+                color: root.batteryCharging ? LazerTheme.osuGreen
+                    : (root.batteryAttention ? LazerTheme.osuPink : LazerTheme.textMuted)
+                font.pixelSize: 10
+            }
+
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 8
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width - 32
+                height: 3
+                radius: 1.5
+                color: Qt.rgba(1, 1, 1, 0.14)
+                clip: true
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: parent.width * root.batteryLevel
+                    radius: 1.5
+                    color: root.batteryCharging ? LazerTheme.osuGreen
+                        : (root.batteryAttention ? LazerTheme.osuPink : LazerTheme.accentColor)
+
+                    Behavior on width {
+                        enabled: !MotionTokens.reducedMotion
+                        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+                    }
+                }
+            }
+        }
+
+        // Bluetooth content: power/scan toggles plus the device list.
+        Item {
+            id: bluetoothContent
+            objectName: "bluetoothContent"
+            width: parent.width
+            height: btColumn.height
+            visible: root.actionKind === "bluetooth"
+
+            Column {
+                id: btColumn
+                width: parent.width
+                spacing: 8
+
+                LazerSettingsRow {
+                    id: btPowerRow
+                    objectName: "btPowerRow"
+                    width: parent.width
+                    labelText: "Bluetooth"
+                    currentValue: root.btEnabled
+
+                    LazerSettingsToggle {
+                        id: btPowerToggle
+                        objectName: "btPowerToggle"
+                        checked: root.btEnabled
+                        onToggled: function(next) { root.handleBluetoothPower(next) }
+                    }
+                }
+
+                LazerSettingsRow {
+                    id: btScanRow
+                    objectName: "btScanRow"
+                    width: parent.width
+                    visible: root.btEnabled && root.btAvailable
+                    height: visible ? implicitHeight + listGap : 0
+                    labelText: root.btScanning ? "Scanning…" : "Scan"
+                    currentValue: root.btScanning
+
+                    LazerSettingsToggle {
+                        id: btScanToggle
+                        objectName: "btScanToggle"
+                        checked: root.btScanning
+                        onToggled: function(next) { root.handleBluetoothScan(next) }
+                    }
+                }
+
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: !root.btAvailable
+                    text: "No adapter"
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 11
+                }
+
+                Text {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: root.btAvailable && root.btEnabled && root.btDeviceList.length === 0
+                    text: root.btScanning ? "Scanning…" : "No devices found"
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 11
+                }
+
+                Repeater {
+                    id: btRepeater
+                    model: root.btAvailable && root.btEnabled ? root.btDeviceList : []
+
+                    delegate: Rectangle {
+                        id: btDeviceRow
+
+                        required property var modelData
+                        required property int index
+
+                        objectName: "btDeviceRow" + index
+                        width: btColumn.width
+                        height: 36
+                        radius: 6
+                        color: btRowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+
+                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+
+                        HoverHandler { id: btRowHover }
+                        TapHandler {
+                            objectName: "btDeviceTap" + btDeviceRow.index
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: root.handleBluetoothDeviceTap(btDeviceRow.modelData)
+                        }
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - 110
+                            text: root.btDeviceName(btDeviceRow.modelData)
+                            color: LazerTheme.textPrimary
+                            font.pixelSize: 11
+                            font.bold: true
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                        }
+
+                        Text {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.btDeviceStatus(btDeviceRow.modelData)
+                            color: btDeviceRow.modelData && btDeviceRow.modelData.connected
+                                ? LazerTheme.osuGreen : LazerTheme.textMuted
+                            font.pixelSize: 10
+                        }
+                    }
+                }
+            }
+        }
+
+        // Wi-Fi content: power toggle, status, rescan, plus the network list.
+        Item {
+            id: networkContent
+            objectName: "networkContent"
+            width: parent.width
+            height: wifiColumn.height
+            visible: root.actionKind === "network"
+
+            Column {
+                id: wifiColumn
+                width: parent.width
+                spacing: 8
+
+                LazerSettingsRow {
+                    id: wifiPowerRow
+                    objectName: "wifiPowerRow"
+                    width: parent.width
+                    labelText: "Wi-Fi"
+                    currentValue: root.wifiEnabled
+
+                    LazerSettingsToggle {
+                        id: wifiPowerToggle
+                        objectName: "wifiPowerToggle"
+                        checked: root.wifiEnabled
+                        onToggled: function(next) { root.handleWifiPower(next) }
+                    }
+                }
+
+                Text {
+                    objectName: "wifiStatusText"
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: root.wifiEnabled
+                    text: {
+                        if (root.wifiConnecting) return "Connecting…"
+                        if (root.wifiStatusText !== "") return root.wifiStatusText
+                        if (root.wifiScanning) return "Scanning…"
+                        return "Not connected"
+                    }
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                }
+
+                Text {
+                    objectName: "wifiErrorText"
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: root.wifiError !== ""
+                    text: root.wifiError
+                    color: LazerTheme.osuPink
+                    font.pixelSize: 10
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                }
+
+                Rectangle {
+                    id: wifiRescanButton
+                    objectName: "wifiRescanButton"
+                    width: parent.width
+                    height: 32
+                    radius: 6
+                    visible: root.wifiEnabled
+                    color: rescanHover.hovered ? LazerTheme.hoverFill : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.wifiScanning ? "Scanning…" : "Rescan"
+                        color: LazerTheme.textPrimary
+                        font.pixelSize: 11
+                        font.bold: true
+                    }
+
+                    HoverHandler { id: rescanHover }
+                    TapHandler {
+                        objectName: "wifiRescanTap"
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        onTapped: root.handleWifiRescan()
+                    }
+                }
+
+                Repeater {
+                    id: wifiRepeater
+                    model: root.wifiEnabled ? root.wifiList : []
+
+                    delegate: Rectangle {
+                        id: wifiNetRow
+
+                        required property var modelData
+                        required property int index
+
+                        objectName: "wifiNetRow" + index
+                        width: wifiColumn.width
+                        height: 36
+                        radius: 6
+                        color: wifiRowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                        border.width: wifiNetRow.modelData && wifiNetRow.modelData.connected ? 1.5 : 0
+                        border.color: wifiNetRow.modelData && wifiNetRow.modelData.connected
+                            ? LazerTheme.settingsAccent : "transparent"
+
+                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                        Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
+
+                        HoverHandler { id: wifiRowHover }
+                        TapHandler {
+                            objectName: "wifiNetTap" + wifiNetRow.index
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: root.handleNetworkTap(wifiNetRow.modelData)
+                        }
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - 110
+                            text: wifiNetRow.modelData ? String(wifiNetRow.modelData.ssid || "") : ""
+                            color: LazerTheme.textPrimary
+                            font.pixelSize: 11
+                            font.bold: true
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                        }
+
+                        Text {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: wifiNetRow.modelData && wifiNetRow.modelData.connected
+                                ? "Connected" : root.wifiSignalLabel(wifiNetRow.modelData ? wifiNetRow.modelData.signal : 0)
+                            color: wifiNetRow.modelData && wifiNetRow.modelData.connected
+                                ? LazerTheme.osuGreen : LazerTheme.textMuted
+                            font.pixelSize: 10
+                        }
+                    }
+                }
+            }
+        }
+
         // Tray content renders the native menu supplied by the tray item.
         // Cover the contentColumn's 8px outer margin so the primary menu's
         // dark face has no blue surround, while the second level still
@@ -531,7 +1132,7 @@ Item {
             height: 32
             radius: 6
             color: LazerTheme.settingsCard
-            visible: root.actionKind !== "volume" && root.actionKind !== "brightness" && root.actionKind !== "media" && root.actionKind !== "notifications" && root.actionKind !== "tray" && root.actionKind !== ""
+            visible: root.actionKind !== "volume" && root.actionKind !== "brightness" && root.actionKind !== "media" && root.actionKind !== "notifications" && root.actionKind !== "tray" && root.actionKind !== "battery" && root.actionKind !== "bluetooth" && root.actionKind !== "network" && root.actionKind !== ""
 
             Text {
                 anchors.centerIn: parent

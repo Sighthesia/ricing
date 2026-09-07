@@ -127,6 +127,9 @@ Item {
         var widgetId = String(item.widgetId || "")
         var iconSource = widgetId === "volume" ? Qt.resolvedUrl("icons/volume.svg")
                 : widgetId === "brightness" ? Qt.resolvedUrl("icons/brightness.svg")
+                : widgetId === "battery" ? Qt.resolvedUrl("icons/battery.svg")
+                : widgetId === "bluetooth" ? Qt.resolvedUrl("icons/bluetooth.svg")
+                : widgetId === "network" ? Qt.resolvedUrl("icons/wifi.svg")
                 : widgetId === "media" ? Qt.resolvedUrl("../lazerbar/icons/music.svg")
                 : widgetId === "notifications" ? Qt.resolvedUrl("../lazerbar/icons/bell.svg")
                 : widgetId === "tray" ? Qt.resolvedUrl("../lazerbar/icons/apps.svg") : ""
@@ -137,6 +140,9 @@ Item {
             title: widgetId === "active-window" ? "Active Window"
                     : widgetId === "notifications" ? "Notifications"
                     : widgetId === "brightness" ? "Brightness"
+                    : widgetId === "battery" ? "Battery"
+                    : widgetId === "bluetooth" ? "Bluetooth"
+                    : widgetId === "network" ? "Wi-Fi"
                     : widgetId === "media" ? "Media"
                     : widgetId === "volume" ? "Volume"
                     : widgetId === "tray" ? "System Tray" : widgetId || "Widget",
