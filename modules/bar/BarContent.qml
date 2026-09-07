@@ -118,6 +118,36 @@ Item {
         } catch (e2) {}
     }
 
+    // Shared context payload so widget and empty-area menus stay in sync.
+    function contextPayload(anchorX) {
+        return {
+            moveLeft: function(key, id, section) { Services.BarLayoutService.moveWidget(key, section, 0) },
+            moveRight: function(key, id, section) { Services.BarLayoutService.moveWidget(key, section, 999) },
+            moveToSection: function(key, id, section) {
+                Services.BarLayoutService.moveWidget(key, section === "left" ? "right" : "left", 0)
+            },
+            openSettings: function(key, id, section) {
+                Services.BarLayoutService.openWidgetSettings(key, id, Number(anchorX), root.screenName, section)
+            },
+            remove: function(key) { Services.BarLayoutService.removeWidget(key) },
+            toggleLayoutMode: function() { Services.BarLayoutService.toggleSettingsMode() },
+            addWidget: function(widgetId, section) {
+                Services.BarLayoutService.addWidgetToSection(widgetId, section)
+            },
+            close: function() {},
+        }
+    }
+
+    // Section under a bar-local X coordinate for empty-area menus.
+    function sectionForX(x) {
+        var bounds = Services.BarLayoutService.sectionBounds
+        for (var index = 0; index < bounds.length; index++) {
+            if (x >= bounds[index].left && x <= bounds[index].right)
+                return bounds[index].name
+        }
+        return "center"
+    }
+
     // Build a context intent for the widget under the settings-mode pointer.
     function buildContextIntent(loader) {
         if (!loader || !loader.item)
@@ -151,25 +181,36 @@ Item {
             anchorX: Number(point.x),
             section: String(item.section || "center"),
             hasSettings: Services.BarLayoutService.widgetSupportsSettings(widgetId),
-            payload: {
-                moveLeft: function(key, id, section) { Services.BarLayoutService.moveWidget(key, section, 0) },
-                moveRight: function(key, id, section) { Services.BarLayoutService.moveWidget(key, section, 999) },
-                moveToSection: function(key, id, section) {
-                    Services.BarLayoutService.moveWidget(key, section === "left" ? "right" : "left", 0)
-                },
-                openSettings: function(key, id, section) {
-                    Services.BarLayoutService.openWidgetSettings(key, id, Number(point.x), root.screenName, section)
-                },
-                remove: function(key) { Services.BarLayoutService.removeWidget(key) },
-                close: function() {},
-            },
+            layoutMode: Services.BarLayoutService.settingsMode === true,
+            availableWidgets: Services.BarLayoutService.availableWidgets,
+            payload: root.contextPayload(Number(point.x)),
+        }
+    }
+
+    // Bar-level intent for empty gaps so right-click always opens the menu.
+    function buildBarIntent(x) {
+        var sectionName = root.sectionForX(x)
+        var anchorPoint = root.mapToGlobal(x, root.height / 2)
+        return {
+            kind: "context",
+            widgetId: "",
+            instanceKey: "",
+            title: "Bar",
+            iconSource: "",
+            summary: sectionName,
+            anchorX: Number(anchorPoint.x),
+            section: sectionName,
+            hasSettings: false,
+            layoutMode: Services.BarLayoutService.settingsMode === true,
+            availableWidgets: Services.BarLayoutService.availableWidgets,
+            payload: root.contextPayload(Number(anchorPoint.x)),
         }
     }
 
     function contextIntentAt(x, y) {
         var hit = root.widgetAt(x, y)
         if (!hit)
-            return null
+            return root.buildBarIntent(x)
         var rows = [leftRow, centerRow, rightRow]
         for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
             var row = rows[rowIndex]
@@ -179,7 +220,7 @@ Item {
                     return root.buildContextIntent(loader)
             }
         }
-        return null
+        return root.buildBarIntent(x)
     }
 
     // Filter a section's entries down to implemented widgets; the shipped

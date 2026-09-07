@@ -851,9 +851,11 @@ PanelWindow {
                         instanceKey: root.currentIntent ? (root.currentIntent.instanceKey || "") : ""
                         section: root.currentIntent ? (root.currentIntent.section || "center") : "center"
                         hasSettings: root.currentIntent ? root.currentIntent.hasSettings === true : false
+                        layoutMode: root.currentIntent ? root.currentIntent.layoutMode === true : false
+                        availableWidgets: root.currentIntent ? (root.currentIntent.availableWidgets || []) : []
                         payload: root.currentIntent ? root.currentIntent.payload : null
                         onActionRequested: action => {
-                            if (action === "close")
+                            if (action === "close" || action === "toggleLayoutMode")
                                 root.dismissImmediately()
                         }
                     }
