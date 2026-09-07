@@ -456,6 +456,8 @@ Item {
 
     // Layout-mode drag surface: grabs left-button presses over any widget
     // and feeds the pointer's bar-local X to the layout drag state machine.
+    // Right-click always opens the context menu (even on empty gaps) so
+    // layout mode can be exited from anywhere on the bar.
     MouseArea {
         anchors.fill: parent
         z: 50
@@ -465,13 +467,13 @@ Item {
         cursorShape: Services.BarLayoutService.settingsMode ? Qt.DragMoveCursor : Qt.ArrowCursor
 
         onPressed: mouse => {
-            var hit = root.widgetAt(mouse.x, mouse.y)
-            if (!hit)
-                return
             if (mouse.button === Qt.RightButton) {
                 root.contextPopupRequested(root.contextIntentAt(mouse.x, mouse.y))
                 return
             }
+            var hit = root.widgetAt(mouse.x, mouse.y)
+            if (!hit)
+                return
             Services.BarLayoutService.beginDrag(hit.instanceKey, hit.widgetId, mouse.x)
         }
         onPositionChanged: mouse => Services.BarLayoutService.updateDrag(mouse.x)
