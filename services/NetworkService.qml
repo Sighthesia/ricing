@@ -4,7 +4,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Networking
 
-// Wi-Fi state: power toggle, scan, connect/disconnect/forget via nmcli.
+// Network state: wired link plus Wi-Fi power toggle, scan,
+// connect/disconnect/forget via nmcli.
 Singleton {
     id: root
 
@@ -12,11 +13,21 @@ Singleton {
     readonly property bool wifiAvailable: _wifiAvailable
     readonly property bool wifiEnabled: Networking.wifiEnabled
     readonly property bool wifiConnected: _wifiConnected
+    readonly property bool ethernetAvailable: _ethernetAvailable
+    readonly property bool ethernetConnected: _ethernetConnected
+    readonly property string activeEthernetIf: _activeEthernetIf
+    readonly property string activeEthernetConnection: _activeEthernetConnection
+    readonly property var ethernetInterfaces: _ethernetInterfaces
     readonly property bool internetConnectivity: _internetConnectivity
     readonly property string networkConnectivity: _networkConnectivity
 
     property bool _wifiAvailable: false
     property bool _wifiConnected: false
+    property bool _ethernetAvailable: false
+    property bool _ethernetConnected: false
+    property string _activeEthernetIf: ""
+    property string _activeEthernetConnection: ""
+    property var _ethernetInterfaces: []
     property bool _internetConnectivity: false
     property string _networkConnectivity: "unknown"
 
@@ -70,9 +81,27 @@ Singleton {
     Timer {
         id: connectivityCheckTimer
         interval: 15000
-        running: root.nmcliAvailable && root.wifiConnected
+        running: root.nmcliAvailable && (root.wifiConnected || root.ethernetConnected)
         repeat: true
-        onTriggered: connectivityCheckProcess.running = true
+        onTriggered: {
+            connectivityCheckProcess.running = true
+            // Wired links come and go outside our own actions; re-read the
+            // device table on the same cadence while any link is up.
+            if (!deviceStatusProcess.running)
+                deviceStatusProcess.running = true
+        }
+    }
+
+    // Slow device poll so cable plug/unplug converges while offline too.
+    Timer {
+        id: devicePollTimer
+        interval: 30000
+        running: root.nmcliAvailable
+        repeat: true
+        onTriggered: {
+            if (!deviceStatusProcess.running)
+                deviceStatusProcess.running = true
+        }
     }
 
     // --- Core functions ---
@@ -196,6 +225,8 @@ Singleton {
     }
 
     function getStatusText() {
+        if (root.ethernetConnected)
+            return root.activeEthernetConnection !== "" ? root.activeEthernetConnection : "Wired"
         if (root.connecting) return root.connectingTo ? "Connecting " + root.connectingTo : "Connecting"
         if (!root.wifiEnabled) return ""
         if (root.wifiConnected) {
@@ -265,26 +296,44 @@ Singleton {
 
                 var wifiAvailable = false
                 var activeWifiIf = ""
+                var ethAvailable = false
+                var activeEthIf = ""
+                var activeEthConn = ""
+                var ethList = []
 
                 for (var b = 0; b < blocks.length; b++) {
-                    var name = "", type = "", stateStr = ""
+                    var name = "", type = "", stateStr = "", conn = ""
                     for (var l = 0; l < blocks[b].length; l++) {
                         var bl = blocks[b][l]
                         if (bl.startsWith("GENERAL.DEVICE:")) name = bl.substring(15).trim()
                         else if (bl.startsWith("GENERAL.TYPE:")) type = bl.substring(13).trim()
                         else if (bl.startsWith("GENERAL.STATE:")) stateStr = bl.substring(14).trim()
+                        else if (bl.startsWith("GENERAL.CONNECTION:")) conn = bl.substring(19).trim()
                     }
                     if (stateStr.indexOf("(unmanaged)") !== -1) continue
                     var isConnected = stateStr.indexOf("(connected)") !== -1
                     if (type === "wifi") {
                         wifiAvailable = true
                         if (isConnected && !activeWifiIf) activeWifiIf = name
+                    } else if (type === "ethernet") {
+                        ethAvailable = true
+                        if (conn === "--") conn = ""
+                        ethList.push({ name: name, connection: conn, connected: isConnected })
+                        if (isConnected && !activeEthIf) {
+                            activeEthIf = name
+                            activeEthConn = conn
+                        }
                     }
                 }
 
                 root._wifiAvailable = wifiAvailable
                 root._wifiConnected = activeWifiIf !== ""
                 root.activeWifiIf = activeWifiIf
+                root._ethernetAvailable = ethAvailable
+                root._ethernetConnected = activeEthIf !== ""
+                root._activeEthernetIf = activeEthIf
+                root._activeEthernetConnection = activeEthConn
+                root._ethernetInterfaces = ethList
             }
         }
         stderr: StdioCollector {
@@ -455,6 +504,8 @@ Singleton {
                 console.info("[Network] connected to '" + connectProcess.ssid + "'")
                 delayedScanTimer.interval = 5000
                 delayedScanTimer.restart()
+                if (!deviceStatusProcess.running)
+                    deviceStatusProcess.running = true
             }
         }
         stderr: StdioCollector {
@@ -492,6 +543,8 @@ Singleton {
                 root.disconnectingFrom = ""
                 delayedScanTimer.interval = 3000
                 delayedScanTimer.restart()
+                if (!deviceStatusProcess.running)
+                    deviceStatusProcess.running = true
             }
         }
         stderr: StdioCollector {

@@ -98,6 +98,9 @@ Item {
             + ' property bool wifiConnected: true;'
             + ' property bool scanningActive: false;'
             + ' property bool connecting: false;'
+            + ' property bool ethernetAvailable: false;'
+            + ' property bool ethernetConnected: false;'
+            + ' property string activeEthernetConnection: "";'
             + ' property string lastError: "";'
             + ' property var networks;'
             + ' property int powerCalls: 0;'
@@ -233,6 +236,32 @@ Item {
             var err = findByName(item, "wifiErrorText")
             verify(err.visible, "error line visible")
             compare(err.text, "Incorrect password")
+        }
+
+        function test_networkEthernetRow() {
+            var svc = makeNetworkService()
+            svc.ethernetAvailable = true
+            svc.ethernetConnected = true
+            svc.activeEthernetConnection = "Office LAN"
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            verify(item.ethAvailable, "ethernet available reflects service")
+            verify(item.ethConnected, "ethernet connected reflects service")
+            compare(item.ethName, "Office LAN")
+            var row = findByName(item, "ethernetRow")
+            verify(row !== null, "ethernet row should exist")
+            verify(row.visible, "ethernet row visible when adapter present")
+            compare(findByName(item, "ethernetStatusText").text, "Connected")
+            // Wired link wins the header line.
+            compare(findByName(item, "wifiStatusText").text, "Office LAN")
+        }
+
+        function test_networkEthernetHiddenWithoutAdapter() {
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: makeNetworkService() }
+            })
+            verify(!findByName(item, "ethernetRow").visible, "ethernet row hidden without adapter")
         }
 
         function test_networkNullPayloadDoesNotThrow() {

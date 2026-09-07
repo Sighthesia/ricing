@@ -93,12 +93,12 @@ BarPill {
     onXChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
     onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
-    // Icon plus optional percentage readout.
+    // Icon plus optional percentage readout, centered as a unit so the
+    // level bar below shares volume's exact geometry.
     Row {
         id: contentRow
 
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: -3
         spacing: 5
 
         Image {
@@ -142,8 +142,8 @@ BarPill {
         id: batteryTrack
 
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 6
+        anchors.top: contentRow.bottom
+        anchors.topMargin: 4
         width: Math.max(contentRow.width, LazerTheme.barWidgetHeight - 16)
         height: 3
         radius: 1.5

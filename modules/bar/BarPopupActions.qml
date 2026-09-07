@@ -206,6 +206,27 @@ Item {
         })
         return arr.slice(0, 6)
     }
+    readonly property bool ethAvailable: {
+        if (root.networkService && root.networkService.ethernetAvailable !== undefined)
+            return !!root.networkService.ethernetAvailable
+        if (payload && payload.ethAvailable !== undefined)
+            return !!payload.ethAvailable
+        return false
+    }
+    readonly property bool ethConnected: {
+        if (root.networkService && root.networkService.ethernetConnected !== undefined)
+            return !!root.networkService.ethernetConnected
+        if (payload && payload.ethConnected !== undefined)
+            return !!payload.ethConnected
+        return false
+    }
+    readonly property string ethName: {
+        if (root.networkService && root.networkService.activeEthernetConnection !== undefined)
+            return String(root.networkService.activeEthernetConnection || "")
+        if (payload && payload.ethName !== undefined)
+            return String(payload.ethName || "")
+        return ""
+    }
     readonly property int mediaPositionMs: {
         if (payload && payload.mediaControlService && payload.mediaControlService.positionMs !== undefined)
             return Math.max(0, Number(payload.mediaControlService.positionMs))
@@ -942,7 +963,8 @@ Item {
             }
         }
 
-        // Wi-Fi content: power toggle, status, rescan, plus the network list.
+        // Network content: wired link, wi-fi power, status, rescan, plus
+        // the wireless network list.
         Item {
             id: networkContent
             objectName: "networkContent"
@@ -954,6 +976,40 @@ Item {
                 id: wifiColumn
                 width: parent.width
                 spacing: 8
+
+                // Wired link reads as a static card: no tap action exists.
+                Rectangle {
+                    id: ethernetRow
+                    objectName: "ethernetRow"
+                    width: parent.width
+                    height: 36
+                    radius: 6
+                    visible: root.ethAvailable
+                    color: LazerTheme.settingsCard
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 120
+                        text: root.ethName !== "" ? root.ethName : "Wired"
+                        color: LazerTheme.textPrimary
+                        font.pixelSize: 11
+                        font.bold: true
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    Text {
+                        objectName: "ethernetStatusText"
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.ethConnected ? "Connected" : "Not connected"
+                        color: root.ethConnected ? LazerTheme.osuGreen : LazerTheme.textMuted
+                        font.pixelSize: 10
+                    }
+                }
 
                 LazerSettingsRow {
                     id: wifiPowerRow
@@ -974,8 +1030,9 @@ Item {
                     objectName: "wifiStatusText"
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
-                    visible: root.wifiEnabled
+                    visible: root.wifiEnabled || root.ethConnected
                     text: {
+                        if (root.ethConnected) return root.ethName !== "" ? root.ethName : "Wired"
                         if (root.wifiConnecting) return "Connecting…"
                         if (root.wifiStatusText !== "") return root.wifiStatusText
                         if (root.wifiScanning) return "Scanning…"

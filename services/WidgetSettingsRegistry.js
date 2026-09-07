@@ -64,7 +64,7 @@ var _definitions = {
         defaults: {},
     },
     "network": {
-        title: "Wi-Fi Settings",
+        title: "Network Settings",
         panelKey: "network",
         instanceScoped: true,
         defaults: {},

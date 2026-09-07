@@ -3,7 +3,8 @@ import ".."
 import "../../lazerbar"
 import "../../../services" as Services
 
-// Square wi-fi: click toggles power, signal of the connected network fills the bar below.
+// Square network: wired link preferred, then wi-fi; click toggles wi-fi
+// power. The level bar below the icon shares volume's exact geometry.
 BarPill {
     id: root
 
@@ -15,12 +16,18 @@ BarPill {
 
     readonly property bool wifiEnabled: Services.NetworkService.wifiEnabled
     readonly property bool wifiConnected: Services.NetworkService.wifiConnected
+    readonly property bool ethernetConnected: Services.NetworkService.ethernetConnected
+    readonly property string ethernetName: Services.NetworkService.activeEthernetConnection
     readonly property bool connecting: Services.NetworkService.connecting
     readonly property string connectingTo: Services.NetworkService.connectingTo
     readonly property bool scanning: Services.NetworkService.scanningActive
     readonly property var networks: Services.NetworkService.networks
     readonly property string statusText: Services.NetworkService.getStatusText()
-    // Signal of the connected network drives the level bar; 0 while offline.
+    // Wired icon wins while the cable link is up, mirroring noctalia.
+    readonly property bool showWired: root.ethernetConnected
+    readonly property string iconFile: root.showWired ? "../icons/network-wired.svg" : "../icons/wifi.svg"
+    // Signal of the connected network drives the level bar; a wired link
+    // always reads full.
     readonly property int signal: {
         if (!root.wifiConnected || !root.networks) return 0
         var values = Object.values(root.networks)
@@ -29,7 +36,9 @@ BarPill {
         }
         return 0
     }
-    readonly property real level: root.wifiConnected ? Math.max(0, Math.min(1, root.signal / 100)) : 0
+    readonly property real level: root.ethernetConnected ? 1
+        : (root.wifiConnected ? Math.max(0, Math.min(1, root.signal / 100)) : 0)
+    readonly property bool linkUp: root.ethernetConnected || root.wifiConnected
 
     // Opt-in hover intent for BarPopupHost.
     hoverIntentEnabled: true
@@ -46,8 +55,10 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var summaryText = "Wi-Fi off"
-        if (root.wifiEnabled) {
+        var summaryText = "Off"
+        if (root.ethernetConnected) {
+            summaryText = root.ethernetName !== "" ? root.ethernetName : "Wired"
+        } else if (root.wifiEnabled) {
             if (root.connecting) summaryText = root.connectingTo !== "" ? "Connecting " + root.connectingTo : "Connecting"
             else if (root.statusText !== "") summaryText = root.statusText
             else if (root.scanning) summaryText = "Scanning…"
@@ -57,8 +68,8 @@ BarPill {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
             screenName: root.screenName,
-            title: "Wi-Fi",
-            iconSource: Qt.resolvedUrl("../icons/wifi.svg"),
+            title: "Network",
+            iconSource: Qt.resolvedUrl(root.iconFile),
             summary: summaryText,
             actionKind: "network",
             anchorX: centerX,
@@ -79,25 +90,24 @@ BarPill {
 
     // Icon stays vertically centered; signal sits directly below it.
     Image {
-        id: wifiIcon
+        id: networkIcon
 
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: -2
         width: LazerTheme.barGlyphSize - 4
         height: LazerTheme.barGlyphSize - 4
-        source: Qt.resolvedUrl("../icons/wifi.svg")
-        opacity: !root.wifiEnabled ? 0.35 : (root.wifiConnected ? 0.9 : 0.6)
+        source: Qt.resolvedUrl(root.iconFile)
+        opacity: !root.wifiEnabled && !root.ethernetConnected ? 0.35 : (root.linkUp ? 0.9 : 0.6)
 
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
     }
 
     // Rounded horizontal signal bar below the icon, mirroring volume.
     Rectangle {
-        id: wifiTrack
+        id: networkTrack
 
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 6
+        anchors.top: networkIcon.bottom
+        anchors.topMargin: 4
         width: LazerTheme.barWidgetHeight - 16
         height: 3
         radius: 1.5
@@ -108,9 +118,9 @@ BarPill {
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: root.connecting ? parent.width : parent.width * root.level
+            width: root.connecting && !root.ethernetConnected ? parent.width : parent.width * root.level
             radius: 1.5
-            color: root.connecting ? LazerTheme.textMuted : LazerTheme.accentColor
+            color: root.connecting && !root.ethernetConnected ? LazerTheme.textMuted : LazerTheme.accentColor
 
             Behavior on width {
                 enabled: !MotionTokens.reducedMotion

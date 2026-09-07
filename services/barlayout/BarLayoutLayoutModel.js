@@ -132,8 +132,8 @@ var AVAILABLE_WIDGETS = [
     },
     {
         id: "network",
-        label: "Wi-Fi",
-        description: "Wi-Fi power, scan, and network list.",
+        label: "Network",
+        description: "Wired and Wi-Fi status, scan, and network list.",
         section: "right",
         source: "../../modules/bar/widgets/Network.qml",
     },
