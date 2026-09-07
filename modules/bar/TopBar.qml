@@ -80,7 +80,7 @@ Variants {
             function onWidgetSettingsVisibleChanged() {
                 if (!Services.BarLayoutService.widgetSettingsVisible)
                     return
-                popupHost.dismissImmediately()
+                popupHost.requestAnimatedClose()
                 settingsOverlay.prepareDebugOpen()
                 settingsOverlay.panel.selectedCategory = Services.BarLayoutService.widgetSettingsSection === "right"
                         ? "notifications" : "bar"
@@ -177,7 +177,7 @@ Variants {
 
         Connections {
             target: SettingsOverlayBridge
-            function onOpenRequested() { popupHost.dismissImmediately() }
+            function onOpenRequested() { popupHost.requestAnimatedClose() }
         }
 
         // Keep the launcher wave below the bar while only its internal viewport moves.
