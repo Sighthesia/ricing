@@ -130,6 +130,7 @@ Item {
                 Services.BarLayoutService.openWidgetSettings(key, id, Number(anchorX), root.screenName, section)
             },
             remove: function(key) { Services.BarLayoutService.removeWidget(key) },
+            openShellSettings: function() { SettingsOverlayBridge.requestOpen() },
             toggleLayoutMode: function() { Services.BarLayoutService.toggleSettingsMode() },
             addWidget: function(widgetId, section) {
                 Services.BarLayoutService.addWidgetToSection(widgetId, section)

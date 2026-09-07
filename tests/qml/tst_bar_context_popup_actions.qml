@@ -16,6 +16,7 @@ Item {
         moveToSection: function() { calls.push("moveToSection") },
         openSettings: function() { calls.push("openSettings") },
         remove: function() { calls.push("remove") },
+        openShellSettings: function() { calls.push("openShellSettings") },
         toggleLayoutMode: function() { calls.push("toggleLayoutMode") },
         addWidget: function(widgetId, section) { addCalls.push(widgetId + "@" + section) },
         close: function() { calls.push("close") },
@@ -66,6 +67,12 @@ Item {
         function test_layoutModeToggleInvokesPayload() {
             actions.invoke("toggleLayoutMode")
             compare(root.calls.join(","), "toggleLayoutMode")
+        }
+
+        function test_shellSettingsInvokesPayload() {
+            actions.invoke("openShellSettings")
+            compare(root.calls.join(","), "openShellSettings")
+            verify(findWidgetRow("Shell settings") !== null)
         }
 
         function test_addWidgetByIdPassesSection() {

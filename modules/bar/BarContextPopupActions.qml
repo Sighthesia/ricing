@@ -91,6 +91,35 @@ Item {
             }
         }
 
+        // Shell settings entry opens the settings center through the bridge.
+        Item {
+            width: actionColumn.width
+            height: 32
+
+            Rectangle {
+                anchors.fill: parent
+                radius: 6
+                color: shellHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            }
+
+            Text {
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                verticalAlignment: Text.AlignVCenter
+                text: "Shell settings"
+                color: LazerTheme.textPrimary
+                font.pixelSize: 13
+                elide: Text.ElideRight
+            }
+
+            HoverHandler { id: shellHover; blocking: false }
+            TapHandler {
+                gesturePolicy: TapHandler.ReleaseWithinBounds
+                onTapped: root.invoke("openShellSettings")
+            }
+        }
+
         Repeater {
             model: root.hasWidgetTarget ? [
                 { action: "moveLeft", label: "Move left" },
