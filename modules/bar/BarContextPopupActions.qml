@@ -249,32 +249,5 @@ Item {
             }
         }
 
-        // Dismiss row stays last so catalog growth pushes content, not the exit.
-        Item {
-            width: actionColumn.width
-            height: 32
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 6
-                color: closeHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            }
-
-            Text {
-                anchors.fill: parent
-                anchors.leftMargin: 10
-                verticalAlignment: Text.AlignVCenter
-                text: "Close"
-                color: LazerTheme.textPrimary
-                font.pixelSize: 13
-            }
-
-            HoverHandler { id: closeHover; blocking: false }
-            TapHandler {
-                gesturePolicy: TapHandler.ReleaseWithinBounds
-                onTapped: root.invoke("close")
-            }
-        }
     }
 }

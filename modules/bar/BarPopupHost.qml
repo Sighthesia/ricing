@@ -460,6 +460,15 @@ PanelWindow {
         closeTimer.stop()
     }
 
+    // Explicit user close with the shared exit reveal. Clears both hover
+    // owners first so the close timer can actually fire for persistent
+    // menus that hold widgetHovered while open.
+    function requestAnimatedClose() {
+        root.widgetHovered = false
+        root.popupHovered = false
+        root.requestClose()
+    }
+
     // Release the popup owner before another overlay claims the screen.
     function dismissImmediately() {
         root.debugLog("dismissed", { "open": root.open, "surfaceActive": root.surfaceActive })
@@ -789,12 +798,15 @@ PanelWindow {
 
                 // Identity layer bound to the current intent; updates in place when
                 // the hovered tray delegate changes so no overlapping windows appear.
+                // Persistent context menus expose the header close affordance.
                 sidebarData: BarPopupIdentity {
                     objectName: "popupIdentity"
                     title: root.currentIntent ? (root.currentIntent.title || "") : ""
                     iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
                     summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
                     hostWidth: 260
+                    showClose: root.currentIntent ? String(root.currentIntent.kind || "") === "context" : false
+                    onCloseRequested: root.requestAnimatedClose()
                 }
 
                 // Keep both menu bodies in one content host so only the active
@@ -856,7 +868,7 @@ PanelWindow {
                         payload: root.currentIntent ? root.currentIntent.payload : null
                         onActionRequested: action => {
                             if (action === "close" || action === "toggleLayoutMode")
-                                root.dismissImmediately()
+                                root.requestAnimatedClose()
                         }
                     }
                 }

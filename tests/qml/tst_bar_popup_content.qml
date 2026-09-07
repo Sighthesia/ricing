@@ -101,6 +101,26 @@ Item {
             compare(b.implicitHeight, 48)
             verify(b.width !== a.width, "explicit hostWidth should drive width")
         }
+
+        function test_identityCloseHiddenByDefault() {
+            var item = createTemporaryObject(identityComp, root, { title: "Bar", summary: "center", hostWidth: 260 })
+            var closeBtn = findByName(item, "identityCloseButton")
+            verify(closeBtn !== null, "close button should exist")
+            verify(!closeBtn.visible, "hover menus must not show the header close button")
+        }
+
+        function test_identityCloseShownForPersistentMenu() {
+            var item = createTemporaryObject(identityComp, root, {
+                title: "Bar", summary: "center", hostWidth: 260, showClose: true
+            })
+            var closeBtn = findByName(item, "identityCloseButton")
+            verify(closeBtn.visible, "persistent menus must show the header close button")
+            compare(closeBtn.height, 32)
+            var calls = 0
+            item.closeRequested.connect(function() { calls++ })
+            item.closeRequested()
+            compare(calls, 1)
+        }
     }
 
     TestCase {

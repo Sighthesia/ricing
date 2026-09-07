@@ -9,6 +9,8 @@ Rectangle {
     property string iconSource
     property string summary
     property real hostWidth: 260
+    property bool showClose: false
+    signal closeRequested()
 
     implicitWidth: hostWidth
     implicitHeight: 48
@@ -25,7 +27,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         anchors.leftMargin: 12
-        anchors.rightMargin: 12
+        anchors.rightMargin: root.showClose ? 52 : 12
         spacing: 8
 
         // Optional 16px icon; hidden when iconSource is empty.
@@ -75,5 +77,37 @@ Rectangle {
                 opacity: visible ? 0.92 : 0
             }
         }
+    }
+
+    // Persistent-menu close affordance pinned to the header's right edge.
+    Rectangle {
+        id: closeButton
+        objectName: "identityCloseButton"
+        width: 32
+        height: 32
+        anchors.right: parent.right
+        anchors.rightMargin: 8
+        anchors.verticalCenter: parent.verticalCenter
+        radius: 0
+        visible: root.showClose
+        enabled: root.showClose
+        color: closeHover.hovered ? LazerTheme.hoverFill : "transparent"
+        scale: closePress.pressed ? MotionTokens.pressScale : 1
+        Behavior on scale {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        }
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+
+        Text {
+            anchors.centerIn: parent
+            text: "✕"
+            color: closeHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
+            font.pixelSize: 14
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+
+        HoverHandler { id: closeHover; blocking: false }
+        TapHandler { id: closePress; gesturePolicy: TapHandler.ReleaseWithinBounds; onTapped: root.closeRequested() }
     }
 }
