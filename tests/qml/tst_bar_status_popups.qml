@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import "../../modules/bar" as Bar
+import "../../modules/bar/widgets/BatteryLevel.js" as BatteryLevel
 
 // Content contract for the battery/bluetooth/network popup kinds.
 // Uses fake/injected services so real singletons are never mutated.
@@ -121,6 +122,33 @@ Item {
             Cafe: { ssid: "Cafe", security: "--", signal: 55, connected: false, existing: false },
         }
         return svc
+    }
+
+    TestCase {
+        name: "BarBatteryIcons"
+        when: windowShown
+
+        function test_buckets() {
+            compare(BatteryLevel.bucketFor(0), 0)
+            compare(BatteryLevel.bucketFor(12), 0)
+            compare(BatteryLevel.bucketFor(13), 25)
+            compare(BatteryLevel.bucketFor(37), 25)
+            compare(BatteryLevel.bucketFor(38), 50)
+            compare(BatteryLevel.bucketFor(62), 50)
+            compare(BatteryLevel.bucketFor(63), 75)
+            compare(BatteryLevel.bucketFor(87), 75)
+            compare(BatteryLevel.bucketFor(88), 100)
+            compare(BatteryLevel.bucketFor(100), 100)
+            compare(BatteryLevel.bucketFor(-5), 0)
+            compare(BatteryLevel.bucketFor("oops"), 0)
+        }
+
+        function test_iconFiles() {
+            compare(BatteryLevel.iconFileFor(82, true), "../icons/battery-75.svg")
+            compare(BatteryLevel.iconFileFor(100, true), "../icons/battery-100.svg")
+            compare(BatteryLevel.iconFileFor(5, true), "../icons/battery-0.svg")
+            compare(BatteryLevel.iconFileFor(82, false), "../icons/battery-0.svg")
+        }
     }
 
     TestCase {

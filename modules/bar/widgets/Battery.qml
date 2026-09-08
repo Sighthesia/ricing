@@ -2,8 +2,9 @@ import QtQuick
 import ".."
 import "../../lazerbar"
 import "../../../services" as Services
+import "BatteryLevel.js" as BatteryLevel
 
-// Square battery: icon plus percentage, charge level shown as rounded horizontal bar below.
+// Square battery: a single icon whose fill bucket shows the charge level.
 BarPill {
     id: root
 
@@ -14,21 +15,16 @@ BarPill {
     property string screenName: ""
 
     readonly property var widgetSettings: Services.SettingsService.widgetSettingsObject("battery", root.instanceKey)
-    readonly property bool showPercentage: widgetSettings ? widgetSettings.showPercentage !== false : true
     readonly property bool showStateLabel: widgetSettings ? widgetSettings.showStateLabel !== false : true
 
     readonly property bool available: Services.BatteryService.available
     readonly property bool ready: Services.BatteryService.ready
     readonly property int percentage: Services.BatteryService.percentage
-    readonly property real level: root.ready ? Math.max(0, Math.min(1, root.percentage / 100)) : 0
     readonly property bool charging: Services.BatteryService.charging
     readonly property bool pluggedIn: Services.BatteryService.pluggedIn
     readonly property bool low: Services.BatteryService.low
     readonly property bool critical: Services.BatteryService.critical
-    readonly property bool showPctText: root.showPercentage && root.ready
-    // Charging reads green, low/critical read pink, otherwise the accent fill.
-    readonly property color stateColor: root.charging || root.pluggedIn ? LazerTheme.osuGreen
-        : (root.low || root.critical ? LazerTheme.osuPink : LazerTheme.accentColor)
+    readonly property string iconFile: BatteryLevel.iconFileFor(root.percentage, root.ready && root.available)
     readonly property string stateLabel: {
         if (!root.ready) return ""
         if (root.charging) return "Charging"
@@ -41,7 +37,7 @@ BarPill {
     // Opt-in hover intent for BarPopupHost.
     hoverIntentEnabled: true
 
-    implicitWidth: root.showPctText ? contentRow.implicitWidth + 16 : LazerTheme.barWidgetHeight
+    implicitWidth: LazerTheme.barWidgetHeight
     implicitHeight: LazerTheme.barWidgetHeight
 
     Component.onCompleted: {
@@ -68,7 +64,7 @@ BarPill {
             instanceKey: root.instanceKey,
             screenName: root.screenName,
             title: "Battery",
-            iconSource: Qt.resolvedUrl("../icons/battery.svg"),
+            iconSource: Qt.resolvedUrl(root.iconFile),
             summary: summaryText,
             actionKind: "battery",
             anchorX: centerX,
@@ -93,34 +89,17 @@ BarPill {
     onXChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
     onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
-    // Icon plus optional percentage readout, centered as a unit so the
-    // level bar below shares volume's exact geometry.
-    Row {
-        id: contentRow
+    // Single level icon centered on the pill.
+    Image {
+        id: batteryIcon
 
         anchors.centerIn: parent
-        spacing: 5
+        width: LazerTheme.barGlyphSize
+        height: LazerTheme.barGlyphSize
+        source: Qt.resolvedUrl(root.iconFile)
+        opacity: !root.available || !root.ready ? 0.35 : 0.9
 
-        Image {
-            id: batteryIcon
-
-            anchors.verticalCenter: parent.verticalCenter
-            width: LazerTheme.barGlyphSize - 4
-            height: LazerTheme.barGlyphSize - 4
-            source: Qt.resolvedUrl("../icons/battery.svg")
-            opacity: !root.available || !root.ready ? 0.35 : 0.9
-
-            Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
-        }
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            visible: root.showPctText
-            text: root.percentage + "%"
-            color: LazerTheme.textPrimary
-            font.pixelSize: 12
-            font.bold: true
-        }
+        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
     }
 
     // State diamond: green while charging/full, pink while low/critical.
@@ -135,34 +114,5 @@ BarPill {
         rotation: 45
         color: (root.charging || root.pluggedIn) ? LazerTheme.osuGreen : LazerTheme.osuPink
         visible: root.showStateLabel && root.ready && (root.charging || root.pluggedIn || root.low || root.critical)
-    }
-
-    // Rounded horizontal charge bar below the icon, mirroring volume.
-    Rectangle {
-        id: batteryTrack
-
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: contentRow.bottom
-        anchors.topMargin: 4
-        width: Math.max(contentRow.width, LazerTheme.barWidgetHeight - 16)
-        height: 3
-        radius: 1.5
-        color: Qt.rgba(1, 1, 1, 0.14)
-        clip: true
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: parent.width * root.level
-            radius: 1.5
-            color: root.ready ? root.stateColor : "transparent"
-
-            Behavior on width {
-                enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
-            }
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-        }
     }
 }
