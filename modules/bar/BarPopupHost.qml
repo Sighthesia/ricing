@@ -253,11 +253,11 @@ PanelWindow {
             return
         }
         root.replacingContent = true
-        // Fade out on the instant channel so the blank gap stays shorter
-        // than the position glide: the move remains visible instead of
-        // happening behind an emptied popup. Size morphs after the swap.
+        // Dip instead of vanishing: old content dims on the instant channel
+        // while the position glide to the next anchor stays visible; the
+        // content swap lands dimmed and fades back in, like tray-to-tray.
         contentFade.duration = MotionTokens.instant
-        contentFade.to = 0
+        contentFade.to = MotionTokens.popupReplacementDip
         contentFade.restart()
     }
 
@@ -274,7 +274,7 @@ PanelWindow {
         root.replacingContent = false
         root.updateTargetGeometry(nextIntent)
         // Fade back in on the fast channel while the geometry motions
-        // (x/y/width/height, medium OutQuint) morph to the new size, so
+        // (x/y/width/height, medium OutQuint) settle on the new size, so
         // the new content transitions in over the glide, not after it.
         contentFade.duration = MotionTokens.fast
         contentFade.to = 1
@@ -566,7 +566,9 @@ PanelWindow {
         duration: MotionTokens.fast
         easing.type: Easing.InOutQuad
         onFinished: {
-            if (root.contentOpacity <= 0.001 && root.replacingContent)
+            // Replacement lands dimmed (dip), not empty, so completion is
+            // owned by the replacing flag; the fade-in already cleared it.
+            if (root.replacingContent)
                 root.applyPendingIntent(root.replacementSerial)
         }
     }
