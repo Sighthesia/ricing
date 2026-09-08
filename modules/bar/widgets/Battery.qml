@@ -20,11 +20,15 @@ BarPill {
     readonly property bool available: Services.BatteryService.available
     readonly property bool ready: Services.BatteryService.ready
     readonly property int percentage: Services.BatteryService.percentage
+    readonly property real level: root.ready ? Math.max(0, Math.min(1, root.percentage / 100)) : 0
     readonly property bool charging: Services.BatteryService.charging
     readonly property bool pluggedIn: Services.BatteryService.pluggedIn
     readonly property bool low: Services.BatteryService.low
     readonly property bool critical: Services.BatteryService.critical
     readonly property string iconFile: BatteryLevel.iconFileFor(root.percentage, root.ready && root.available)
+    // Charging reads green, low/critical read pink, otherwise the accent fill.
+    readonly property color stateColor: root.charging || root.pluggedIn ? LazerTheme.osuGreen
+        : (root.low || root.critical ? LazerTheme.osuPink : LazerTheme.accentColor)
     readonly property string stateLabel: {
         if (!root.ready) return ""
         if (root.charging) return "Charging"
@@ -94,12 +98,41 @@ BarPill {
         id: batteryIcon
 
         anchors.centerIn: parent
-        width: LazerTheme.barGlyphSize
-        height: LazerTheme.barGlyphSize
+        width: LazerTheme.barGlyphSize - 4
+        height: LazerTheme.barGlyphSize - 4
         source: Qt.resolvedUrl(root.iconFile)
         opacity: !root.available || !root.ready ? 0.35 : 0.9
 
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+    }
+
+    // Rounded horizontal charge bar below the icon, mirroring volume.
+    Rectangle {
+        id: batteryTrack
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: batteryIcon.bottom
+        anchors.topMargin: 4
+        width: LazerTheme.barWidgetHeight - 16
+        height: 3
+        radius: 1.5
+        color: Qt.rgba(1, 1, 1, 0.14)
+        clip: true
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: parent.width * root.level
+            radius: 1.5
+            color: root.ready ? root.stateColor : "transparent"
+
+            Behavior on width {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+            }
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
     }
 
     // State diamond: green while charging/full, pink while low/critical.
