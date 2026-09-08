@@ -22,12 +22,8 @@ PanelWindow {
     property var currentIntent: null
     property var pendingIntent: null
     property int transitionSerial: 0
-    property int replacementSerial: 0
-    property bool replacingContent: false
-    property real contentOpacity: 1
     readonly property bool closeTimerRunning: closeTimer.running
-    readonly property bool contentInteractive:
-        contentOpacity > 0.99 && popup.interactable
+    readonly property bool contentInteractive: popup.interactable
     property bool open: false
     property bool widgetHovered: false
     property bool popupHovered: false
@@ -235,30 +231,23 @@ PanelWindow {
     }
 
     function invalidateContentTransition() {
-        contentFade.stop()
         root.transitionSerial += 1
         root.pendingIntent = null
-        root.replacingContent = false
-        root.contentOpacity = 1
     }
 
     function beginIntentReplacement(intentObj) {
         root.pendingIntent = intentObj
         root.transitionSerial += 1
         var serial = root.transitionSerial
-        contentFade.stop()
-        root.replacementSerial = serial
         if (MotionTokens.reducedMotion) {
             root.applyPendingIntent(serial)
             return
         }
-        root.replacingContent = true
-        // Dip instead of vanishing: old content dims on the instant channel
-        // while the position glide to the next anchor stays visible; the
-        // content swap lands dimmed and fades back in, like tray-to-tray.
-        contentFade.duration = MotionTokens.instant
-        contentFade.to = MotionTokens.popupReplacementDip
-        contentFade.restart()
+        // No opacity transition: content stays fully visible while the
+        // position glides to the next anchor. The swap lands one tick
+        // later so the new content bindings settle before the size
+        // morph measures them.
+        Qt.callLater(function() { root.applyPendingIntent(serial) })
     }
 
     function applyPendingIntent(serial) {
@@ -271,17 +260,7 @@ PanelWindow {
         root.currentIntent = nextIntent
         root.intent = nextIntent
         root.pendingIntent = null
-        root.replacingContent = false
         root.updateTargetGeometry(nextIntent)
-        // Fade back in on the fast channel while the geometry motions
-        // (x/y/width/height, medium OutQuint) settle on the new size, so
-        // the new content transitions in over the glide, not after it.
-        contentFade.duration = MotionTokens.fast
-        contentFade.to = 1
-        if (MotionTokens.reducedMotion)
-            root.contentOpacity = 1
-        else
-            contentFade.restart()
     }
 
     function sameIntent(left, right) {
@@ -456,9 +435,9 @@ PanelWindow {
         if (closeTimer.running)
             return
         // A close request cancels replacement immediately. Keep current/root
-        // intent alive for the exit reveal, but never let old fade callbacks
+        // intent alive for the exit reveal, but never let a deferred swap
         // install content after the close has begun.
-        if (root.replacingContent || root.pendingIntent)
+        if (root.pendingIntent)
             root.invalidateContentTransition()
         root.debugLog("closePending", { "widgetHovered": root.widgetHovered, "popupHovered": root.popupHovered })
         closeTimer.start()
@@ -491,7 +470,6 @@ PanelWindow {
         root.intent = null
         root.currentIntent = null
         root.pendingIntent = null
-        root.replacingContent = false
         root.transitionSerial += 1
         root.surfaceActive = false
     }
@@ -555,21 +533,6 @@ PanelWindow {
             // settles with one gentle motion after the reveal, not a bounce.
             if (popup.revealProgress > 0.99 && root.open)
                 root.retargetGeometry(root.currentIntent)
-        }
-    }
-
-    // Serialize content replacement behind one short fade-out/fade-in channel.
-    NumberAnimation {
-        id: contentFade
-        target: root
-        property: "contentOpacity"
-        duration: MotionTokens.fast
-        easing.type: Easing.InOutQuad
-        onFinished: {
-            // Replacement lands dimmed (dip), not empty, so completion is
-            // owned by the replacing flag; the fade-in already cleared it.
-            if (root.replacingContent)
-                root.applyPendingIntent(root.replacementSerial)
         }
     }
 
@@ -783,10 +746,6 @@ PanelWindow {
             // on screen for the whole flip engage/settle cycle.
             Binding { target: popup.sidebarLayer; property: "x"; value: root.contentShiftX }
             Binding { target: popup.contentLayer; property: "x"; value: root.contentShiftX }
-            // Identity fades with the content on hover switches so the
-            // header title/icon/summary cross over instead of jumping
-            // while the geometry glides to the next anchor.
-            Binding { target: popup.sidebarLayer; property: "opacity"; value: root.contentOpacity }
 
             // Two-layer surface; vertical orientation with direction driven by
             // the bar position (top -> Down, bottom -> Up).
@@ -830,7 +789,6 @@ PanelWindow {
                      width: 260
                      implicitHeight: root.popupHeightForIntent(root.currentIntent)
                      height: implicitHeight
-                     opacity: root.contentOpacity
                      enabled: root.contentInteractive
                      onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
 

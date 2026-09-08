@@ -62,10 +62,6 @@ QtObject {
     // Popup surfaces deform (scale+slide) from/to this factor while the bar
     // occludes them; opacity stays constant.
     readonly property real popupFromScale: 0.7
-    // Hover switching dips to this opacity instead of vanishing: the old
-    // content dims, the popup glides to the next anchor, then the new
-    // content fades back in. Same single-fade channel as tray-to-tray.
-    readonly property real popupReplacementDip: 0.3
     readonly property real popupFromY: -4
     readonly property real overlayFromY: 8
     readonly property real buttonNudge: 1
