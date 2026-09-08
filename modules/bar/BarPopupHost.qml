@@ -50,6 +50,20 @@ PanelWindow {
     property real targetY: 0
     property real targetWidth: 260
     property real targetHeight: 1
+    // Shared replacement glide progress: 0→1 per replacement, 1 = settled.
+    // intent = newest accepted (diagnostics); currentIntent = rendered.
+    property real transitionProgress: 1
+    readonly property real exchangeThreshold: 0.45
+    property real _startX: 0
+    property real _startY: 0
+    property real _startW: 260
+    property real _startH: 1
+    property real _targetSnapX: 0
+    property real _targetSnapY: 0
+    property real _targetSnapW: 260
+    property real _targetSnapH: 1
+    property bool _exchangeCommitted: false
+    property int _deferredRebaseSerial: -1
     // Stable travel distance for the current reveal/exit cycle.
     property real revealDistance: 1
     // Left-flip state for edge tray submenus: the container expands left
@@ -193,15 +207,30 @@ PanelWindow {
         if (!isOpen) {
             root.invalidateContentTransition()
             root.currentIntent = intentObj
+            root.applyIntentFields(intentObj)
+            root.updateTargetGeometry(intentObj)
         } else if (isReplacement) {
+            // intent = newest accepted for diagnostics; content stays on A
+            // until the shared progress crosses the exchange threshold.
+            root.applyIntentFields(intentObj)
             root.beginIntentReplacement(intentObj)
         } else {
             // Same instance updates (for example a tray delegate label or a
             // refreshed callback payload) stay live without a crossfade.
             root.invalidateContentTransition()
             root.currentIntent = intentObj
+            root.applyIntentFields(intentObj)
+            root.updateTargetGeometry(intentObj)
         }
 
+        root.open = true
+        root.surfaceActive = true
+        clearIntentTimer.stop()
+        root.debugLog("open", { "windowVisible": root.visible, "surfaceActive": true,
+                                "direction": root.direction, "anchorX": root.anchorX })
+    }
+
+    function applyIntentFields(intentObj) {
         root.intent = intentObj
         var anchor = Number(intentObj.anchorX)
         if (isFinite(anchor) && anchor >= 0)
@@ -222,45 +251,164 @@ PanelWindow {
                 ? String(intentObj.barPosition).trim().toLowerCase() : ""
         if (pos === "top" || pos === "bottom")
             root.direction = BarHoverLogic.popupDirection(pos)
-        root.updateTargetGeometry(intentObj)
-        root.open = true
-        root.surfaceActive = true
-        clearIntentTimer.stop()
-        root.debugLog("open", { "windowVisible": root.visible, "surfaceActive": true,
-                                "direction": root.direction, "anchorX": root.anchorX })
     }
 
     function invalidateContentTransition() {
         root.transitionSerial += 1
         root.pendingIntent = null
+        root._exchangeCommitted = false
+        root._deferredRebaseSerial = -1
+    }
+
+    // Displayed geometry is a pure function of the shared eased progress.
+    // Every channel reads the same clock so X/Y/W/H never disagree on phase.
+    function _snapshotStart() {
+        root._startX = root.displayX
+        root._startY = root.displayY
+        root._startW = root.displayWidth
+        root._startH = root.displayHeight
+    }
+
+    function _snapshotTarget() {
+        root._targetSnapX = root.targetX
+        root._targetSnapY = root.targetY
+        root._targetSnapW = root.targetWidth
+        root._targetSnapH = root.targetHeight
+    }
+
+    function _applyProgress() {
+        root.displayX = root._startX + (root._targetSnapX - root._startX) * root.transitionProgress
+        root.displayY = root._startY + (root._targetSnapY - root._startY) * root.transitionProgress
+        root.displayWidth = root._startW + (root._targetSnapW - root._startW) * root.transitionProgress
+        root.displayHeight = root._startH + (root._targetSnapH - root._startH) * root.transitionProgress
+    }
+
+    function startGlide() {
+        root._snapshotStart()
+        root._snapshotTarget()
+        transitionMotion.stop()
+        root.transitionProgress = 0
+        root._applyProgress()
+        transitionMotion.restart()
+    }
+
+    // Rebase without resetting progress: start = live display, target = new
+    // goals, progress untouched. Continuity holds by construction.
+    function rebaseGlide() {
+        root._snapshotStart()
+        root._snapshotTarget()
+        root._applyProgress()
+        if (root.transitionProgress >= 0.999) {
+            var dx = Math.abs(root.displayX - root.targetX)
+            var dy = Math.abs(root.displayY - root.targetY)
+            var dw = Math.abs(root.displayWidth - root.targetWidth)
+            var dh = Math.abs(root.displayHeight - root.targetHeight)
+            if (dx > 0.5 || dy > 0.5 || dw > 0.5 || dh > 0.5) {
+                transitionMotion.stop()
+                root.transitionProgress = 0
+                root._snapshotStart()
+                root._snapshotTarget()
+                root._applyProgress()
+                transitionMotion.restart()
+            }
+        } else if (!transitionMotion.running) {
+            transitionMotion.restart()
+        }
+    }
+
+    function commitExchange(serial) {
+        if (serial !== root.transitionSerial || !root.pendingIntent || !root.open)
+            return
+        if (root._exchangeCommitted)
+            return
+        root._exchangeCommitted = true
+        root.currentIntent = root.pendingIntent
+        root.pendingIntent = null
+        var captured = serial
+        Qt.callLater(function() { root.remeasureAndRebase(captured) })
+    }
+
+    function remeasureAndRebase(serial) {
+        if (serial !== root.transitionSerial || !root.open)
+            return
+        if (!root.currentIntent)
+            return
+        // Replacement during a fresh-open reveal flight must not fight the
+        // reveal: position glide already runs, height rebase waits for settle.
+        if (popup.revealProgress > 0.01 && popup.revealProgress < 0.99) {
+            root._deferredRebaseSerial = serial
+            return
+        }
+        root._deferredRebaseSerial = -1
+        root.computeAndCommitTargets(root.currentIntent)
+        root.rebaseGlide()
+    }
+
+    function handleTransitionProgress() {
+        root._applyProgress()
+        if (!root._exchangeCommitted && root.pendingIntent
+                && root.transitionProgress >= root.exchangeThreshold) {
+            root.commitExchange(root.transitionSerial)
+        }
     }
 
     function beginIntentReplacement(intentObj) {
         root.pendingIntent = intentObj
         root.transitionSerial += 1
-        var serial = root.transitionSerial
+        root._exchangeCommitted = false
+        root._deferredRebaseSerial = -1
         if (MotionTokens.reducedMotion) {
-            root.applyPendingIntent(serial)
+            // Reduced motion: commit newest immediately, assign final geometry.
+            root.currentIntent = root.pendingIntent
+            root.pendingIntent = null
+            root._exchangeCommitted = true
+            root.computeAndCommitTargets(root.currentIntent)
+            transitionMotion.stop()
+            root.displayX = root.targetX
+            root.displayY = root.targetY
+            root.displayWidth = root.targetWidth
+            root.displayHeight = root.targetHeight
+            root._snapshotStart()
+            root._snapshotTarget()
+            root.transitionProgress = 1
             return
         }
-        // No opacity transition: content stays fully visible while the
-        // position glides to the next anchor. The swap lands one tick
-        // later so the new content bindings settle before the size
-        // morph measures them.
-        Qt.callLater(function() { root.applyPendingIntent(serial) })
+        // Start the position glide on the same frame using A's committed
+        // size (targetWidth/Height), not the transient display value: with
+        // rapid A->B->C cascades the display may still carry an older intent's
+        // mid-glide value, while target* is A's measured size. currentIntent
+        // stays on A. Continuity holds because startGlide snapshots the live
+        // display as the glide start.
+        var posGeom = targetGeometryFor(intentObj, root.targetWidth, root.targetHeight)
+        root.targetX = posGeom.x
+        root.targetY = posGeom.y
+        root.commitRevealDistance()
+        root.startGlide()
     }
 
     function applyPendingIntent(serial) {
-        // A natural close owns the exit window; replacement completion must not
-        // resurrect content or install a target after the host starts closing.
-        if (!root.open || serial !== root.transitionSerial || !root.pendingIntent)
+        // Legacy next-tick entry kept for harness compatibility: route stale
+        // serials through the serial guard, live ones through the exchange.
+        if (serial !== root.transitionSerial || !root.pendingIntent)
             return
-
-        var nextIntent = root.pendingIntent
-        root.currentIntent = nextIntent
-        root.intent = nextIntent
-        root.pendingIntent = null
-        root.updateTargetGeometry(nextIntent)
+        if (!root.open)
+            return
+        if (MotionTokens.reducedMotion) {
+            root.currentIntent = root.pendingIntent
+            root.pendingIntent = null
+            root._exchangeCommitted = true
+            root.computeAndCommitTargets(root.currentIntent)
+            transitionMotion.stop()
+            root.displayX = root.targetX
+            root.displayY = root.targetY
+            root.displayWidth = root.targetWidth
+            root.displayHeight = root.targetHeight
+            root._snapshotStart()
+            root._snapshotTarget()
+            root.transitionProgress = 1
+            return
+        }
+        root.commitExchange(serial)
     }
 
     function sameIntent(left, right) {
@@ -330,7 +478,7 @@ PanelWindow {
         return { x: left, y: top, width: width, height: height }
     }
 
-    function updateTargetGeometry(intentObj, immediate) {
+    function computeAndCommitTargets(intentObj) {
         var trayExtraWidth = popupActions && popupActions.trayMenuContent
                 ? Number(popupActions.trayMenuContent.extraWidth) : 0
         var baseWidth = Math.max(240, popup.sidebarLayer.implicitWidth || 260,
@@ -384,6 +532,10 @@ PanelWindow {
         root.targetX = geometry.x
         root.targetY = geometry.y
         root.commitRevealDistance()
+    }
+
+    function updateTargetGeometry(intentObj, immediate) {
+        root.computeAndCommitTargets(intentObj)
         root.retargetGeometry(intentObj, immediate === true || !root.open)
     }
 
@@ -396,35 +548,34 @@ PanelWindow {
     }
 
     function retargetGeometry(intentObj, immediate) {
-        // Display motions only: target X/Y/width/height are owned by
-        // updateTargetGeometry (tray flip/right-expansion pinning included).
-        // Late DBus batches must not retarget the display mid-slide: that
-        // restarts the size motions under a running reveal and reads as a
-        // bounce (shrink then regrow). Hold the display; the reveal-finish
-        // handler syncs any deferred target once settled.
+        // Single shared progress driver: display* is only written by the
+        // progress function (or the immediate/reduced-motion direct assign).
+        // Late DBus batches must not restart the glide mid-slide: rebase
+        // keeps the current progress so the remaining curve covers the
+        // corrected distance without a bounce.
         if (!immediate && !MotionTokens.reducedMotion
-                && popup.revealProgress > 0.01 && popup.revealProgress < 0.99) {
+                && popup.revealProgress > 0.01 && popup.revealProgress < 0.99
+                && !root.pendingIntent && root.transitionProgress >= 0.999) {
             return
         }
         if (immediate || MotionTokens.reducedMotion) {
-            xMotion.stop()
-            yMotion.stop()
-            widthMotion.stop()
-            heightMotion.stop()
+            transitionMotion.stop()
             root.displayX = root.targetX
             root.displayY = root.targetY
             root.displayWidth = root.targetWidth
             root.displayHeight = root.targetHeight
+            root._snapshotStart()
+            root._snapshotTarget()
+            root.transitionProgress = 1
             return
         }
-        xMotion.to = root.targetX
-        yMotion.to = root.targetY
-        widthMotion.to = root.targetWidth
-        heightMotion.to = root.targetHeight
-        xMotion.restart()
-        yMotion.restart()
-        widthMotion.restart()
-        heightMotion.restart()
+        // Replacement glide active (pending pre-exchange, or post-exchange
+        // still travelling): rebase from live display, keep progress.
+        if (root.pendingIntent || (root._exchangeCommitted && root.transitionProgress < 0.999)) {
+            root.rebaseGlide()
+            return
+        }
+        root.startGlide()
     }
 
     function showIntent(intentObj) {
@@ -437,8 +588,14 @@ PanelWindow {
         // A close request cancels replacement immediately. Keep current/root
         // intent alive for the exit reveal, but never let a deferred swap
         // install content after the close has begun.
+        transitionMotion.stop()
         if (root.pendingIntent)
             root.invalidateContentTransition()
+        else {
+            root.transitionSerial += 1
+            root._exchangeCommitted = false
+            root._deferredRebaseSerial = -1
+        }
         root.debugLog("closePending", { "widgetHovered": root.widgetHovered, "popupHovered": root.popupHovered })
         closeTimer.start()
     }
@@ -462,6 +619,7 @@ PanelWindow {
         closeTimer.stop()
         clearIntentTimer.stop()
         revealMotion.stop()
+        transitionMotion.stop()
         root.invalidateContentTransition()
         popup.revealProgress = 0
         root.open = false
@@ -471,6 +629,7 @@ PanelWindow {
         root.currentIntent = null
         root.pendingIntent = null
         root.transitionSerial += 1
+        root.transitionProgress = 1
         root.surfaceActive = false
     }
 
@@ -507,6 +666,7 @@ PanelWindow {
                 root.debugLog("closed", { "revealProgress": Number(popup.revealProgress) })
                 // Invalidate replacement callbacks, but retain both intents until
                 // the exit reveal cleanup has completed.
+                transitionMotion.stop()
                 root.invalidateContentTransition()
                 // Retract any open tray submenu with the popup; otherwise it
                 // stays open and greets the user stale on the next reveal.
@@ -531,46 +691,35 @@ PanelWindow {
         onFinished: {
             // Pick up any geometry deferred mid-slide so the final size
             // settles with one gentle motion after the reveal, not a bounce.
-            if (popup.revealProgress > 0.99 && root.open)
-                root.retargetGeometry(root.currentIntent)
+            // Flush a deferred post-exchange rebase first so B measures with
+            // settled slots instead of reveal-held heights.
+            if (popup.revealProgress > 0.99 && root.open) {
+                if (root._deferredRebaseSerial >= 0) {
+                    var serial = root._deferredRebaseSerial
+                    root._deferredRebaseSerial = -1
+                    root.remeasureAndRebase(serial)
+                } else {
+                    root.retargetGeometry(root.currentIntent)
+                }
+            }
         }
     }
 
-    // Animate displayed popup position independently from its retargetable goal.
+    // Single shared progress clock for replacement glides. Displayed geometry
+    // is a pure function of transitionProgress (see onTransitionProgressChanged);
+    // position and size use MotionTokens.medium + Easing.OutQuint, content stays
+    // fully opaque, exchange fires at exchangeThreshold.
     NumberAnimation {
-        id: xMotion
+        id: transitionMotion
         target: root
-        property: "displayX"
+        property: "transitionProgress"
+        from: 0
+        to: 1
         duration: MotionTokens.reducedMotion ? 0 : MotionTokens.medium
         easing.type: Easing.OutQuint
     }
 
-    // Animate the vertical placement without changing the fixed host surface.
-    NumberAnimation {
-        id: yMotion
-        target: root
-        property: "displayY"
-        duration: MotionTokens.reducedMotion ? 0 : MotionTokens.medium
-        easing.type: Easing.OutQuint
-    }
-
-    // Animate the popup width from its current displayed value.
-    NumberAnimation {
-        id: widthMotion
-        target: root
-        property: "displayWidth"
-        duration: MotionTokens.reducedMotion ? 0 : MotionTokens.medium
-        easing.type: Easing.OutQuint
-    }
-
-    // Animate content height while the outer PanelWindow stays screen-sized.
-    NumberAnimation {
-        id: heightMotion
-        target: root
-        property: "displayHeight"
-        duration: MotionTokens.reducedMotion ? 0 : MotionTokens.medium
-        easing.type: Easing.OutQuint
-    }
+    onTransitionProgressChanged: root.handleTransitionProgress()
 
     // Clear the intent only after the exit reveal has finished so the
     // fading layers remain intact during the staggered fade.

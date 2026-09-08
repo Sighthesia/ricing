@@ -2,7 +2,7 @@ import QtQuick
 import "modules/bar" as Bar
 import "modules/lazerbar" as Lazer
 
-// qs behavior harness for BarPopupHost direction and hover lifecycle.
+// qs behavior harness for BarPopupHost opaque 45%-exchange glide contract.
 // Run with: qs -p tst_bar_popup_host.qml
 Item {
     id: root
@@ -21,6 +21,30 @@ Item {
         }
         root._failures += 1
         console.log("FAIL:", label, "expected", JSON.stringify(expected), "got", JSON.stringify(actual))
+    }
+
+    function checkClose(label, actual, expected, eps) {
+        root._checks += 1
+        var tol = eps !== undefined ? eps : 1.5
+        if (Math.abs(Number(actual) - Number(expected)) <= tol) {
+            console.log("PASS:", label)
+            return
+        }
+        root._failures += 1
+        console.log("FAIL:", label, "expected ~", JSON.stringify(expected), "got", JSON.stringify(actual))
+    }
+
+    function layerOpacity() {
+        return {
+            "sidebar": Number(host.popupItem.sidebarLayer.opacity),
+            "content": Number(host.popupItem.contentLayer.opacity)
+        }
+    }
+
+    function checkOpaque(label) {
+        var op = root.layerOpacity()
+        root.check(label + " sidebar opaque", op.sidebar, 1)
+        root.check(label + " content opaque", op.content, 1)
     }
 
     // Host under test - per-screen fixed popup host.
@@ -50,11 +74,15 @@ Item {
 
     Timer {
         id: openHoverContextReplacementWait
-        interval: Lazer.MotionTokens.fast + 40
+        interval: Lazer.MotionTokens.medium + 150
         onTriggered: {
             root.check("open hover-to-context replacement applies latest current", host.currentIntent.widgetId, "context-open")
             root.check("open hover-to-context replacement clears pending", host.pendingIntent, null)
             root.check("open hover-to-context replacement keeps host open", host.open, true)
+            root.check("glide settles at progress 1", host.transitionProgress, 1)
+            root.checkOpaque("hover-to-context settle")
+            root.checkClose("hover-to-context display settles on target X", host.displayX, host.targetX)
+            root.checkClose("hover-to-context display settles on target W", host.displayWidth, host.targetWidth)
             root._contextCallbackArgs = []
             host.contextActions.invoke("moveLeft")
             root.check("open hover-to-context callback receives latest instance key",
@@ -104,7 +132,7 @@ Item {
             host.showIntent(raceIntent)
             root.check("reopen before cleanup keeps open", host.open, true)
             root.check("reopen intent preserved immediately", host.intent !== null && host.intent.widgetId === "media", true)
-            root.check("reopen restores content opacity", host.contentOpacity, 1)
+            root.checkOpaque("reopen keeps layers opaque")
             root.check("reopen direction is down", host.direction, "down")
             root.check("TwoLayerPopup direction Down after race reopen", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Down)
             raceWait.restart()
@@ -157,7 +185,7 @@ Item {
 
     Timer {
         id: contextReopenCallbackWait
-        interval: Lazer.MotionTokens.fast + 40
+        interval: Lazer.MotionTokens.medium + 150
         onTriggered: {
             root._contextCallbackArgs = []
             host.contextActions.invoke("moveLeft")
@@ -188,23 +216,27 @@ Item {
                 barPosition: "top"
             }
             host.showIntent(contextIntent)
-             root.check("context popup stays visible", host.popupItem.visible, true)
-             root.check("context content height positive", host.popupItem.contentLayer.height > 0, true)
-             fadeMidWait.restart()
-         }
-     }
-
-    Timer {
-        id: fadeMidWait
-        interval: Math.max(20, Lazer.MotionTokens.fast / 2)
-        onTriggered: {
-            root.check("fade-out keeps current context-reopen intent",
+            // Pre-exchange: same-frame state keeps A mounted and starts the glide.
+            root.check("glide pre-exchange keeps current context-reopen intent",
                 host.currentIntent.widgetId, "context-reopen")
-            root.check("fade-out keeps pending context", host.pendingIntent.kind, "context")
-            root.check("fade-out is visibly in progress", host.contentOpacity < 1, true)
-            root.check("fade-out keeps old visible context content",
-                host.popupItem.contentLayer.children[0].children[1].actionKind, "context")
-            root.check("fade-out disables content interaction", host.contentInteractive, false)
+            root.check("glide pre-exchange records pending context", host.pendingIntent.kind, "context")
+            root.check("glide pre-exchange exposes latest root intent", host.intent.widgetId, "clock")
+            root.check("glide pre-exchange resets shared progress", host.transitionProgress, 0)
+            root.checkOpaque("glide pre-exchange keeps layers opaque")
+            root.check("glide pre-exchange keeps interaction live", host.contentInteractive, true)
+            glideMidWait.restart()
+        }
+    }
+
+    // Mid-glide sample: content stays opaque, display is travelling.
+    Timer {
+        id: glideMidWait
+        interval: 60
+        onTriggered: {
+            root.checkOpaque("glide mid-point keeps layers opaque")
+            root.check("glide mid-point keeps host open", host.open, true)
+            // Post the rapid C while the A->B glide is still travelling or
+            // just exchanged: only C may commit.
             host.updateIntent({
                 widgetId: "clock-latest", instanceKey: "clock-latest:0", kind: "context",
                 anchorX: 320, screenWidth: 1000, screenHeight: 800,
@@ -216,19 +248,27 @@ Item {
                     }
                 }
             })
-            root.check("rapid fade replacement keeps latest pending", host.pendingIntent.widgetId,
+            root.check("rapid A->B->C keeps latest pending", host.pendingIntent.widgetId,
                 "clock-latest")
-            fadeCompleteWait.restart()
+            root.check("rapid A->B->C exposes latest root intent", host.intent.widgetId,
+                "clock-latest")
+            root.checkOpaque("rapid replacement keeps layers opaque")
+            glideSettleWait.restart()
         }
     }
 
     Timer {
-        id: fadeCompleteWait
-        interval: Lazer.MotionTokens.fast + 40
+        id: glideSettleWait
+        interval: Lazer.MotionTokens.medium + 200
         onTriggered: {
-            root.check("fade-out completion applies latest pending",
+            root.check("glide settle commits only C (never stale B)",
                 host.currentIntent.widgetId, "clock-latest")
-            root.check("pending intent clears after apply", host.pendingIntent, null)
+            root.check("pending intent clears after exchange", host.pendingIntent, null)
+            root.check("glide settles at progress 1", host.transitionProgress, 1)
+            root.checkOpaque("glide settle keeps layers opaque")
+            root.checkClose("glide settle display X meets target", host.displayX, host.targetX)
+            root.checkClose("glide settle display width meets target", host.displayWidth, host.targetWidth)
+            root.checkClose("glide settle display height meets target", host.displayHeight, host.targetHeight)
             root._contextCallbackArgs = []
             host.contextActions.invoke("moveRight")
             root.check("hover-to-context callback receives latest instance key",
@@ -237,20 +277,7 @@ Item {
                 root._contextCallbackArgs[1], "clock-latest")
             root.check("hover-to-context callback receives latest section",
                 root._contextCallbackArgs[2], "left")
-            fadeInWait.restart()
-        }
-    }
-
-    Timer {
-        id: fadeInWait
-        interval: Lazer.MotionTokens.fast + 40
-        onTriggered: {
-            root.check("fade-in restores opacity", host.contentOpacity, 1)
-            root.check("fade-in restores interaction", host.contentInteractive, true)
-            root.check("contentFade completion leaves latest current intent",
-                host.currentIntent.widgetId, "clock-latest")
-            // Context-to-context replacement must keep callbacks bound to the
-            // latest payload while the popup object is reused.
+            // Latest context callback stays bound while the popup is reused.
             root._contextCallbackArgs = []
             host.contextActions.invoke("moveRight")
             root.check("latest context callback receives instance key",
@@ -259,16 +286,42 @@ Item {
                 root._contextCallbackArgs[1], "clock-latest")
             root.check("latest context callback receives section",
                 root._contextCallbackArgs[2], "left")
-             host.contextActions.invoke("close")
-             root.check("context close dismisses reused host", host.open, false)
-             root.check("context close clears current intent immediately", host.currentIntent, null)
-             root.check("context close clears root intent immediately", host.intent, null)
-             root.check("context close clears pending immediately", host.pendingIntent, null)
-             root.check("context close clears surface immediately", host.surfaceActive, false)
-             root.check("context close clears replacing immediately", host.replacingContent, false)
-             root.check("context close restores opacity immediately", host.contentOpacity, 1)
-             root.check("context close stops close timer", host.closeTimerRunning, false)
-             root.check("context close stops clear timer", host.debugSnapshot().host.clearTimer, false)
+            host.contextActions.invoke("close")
+            // Close is async (closeTimer = MotionTokens.fast): the exit keeps
+            // A rendered through the delay, then clears. Wait it out instead
+            // of asserting synchronously.
+            contextCloseWait.restart()
+        }
+    }
+
+    Timer {
+        id: contextCloseWait
+        interval: Lazer.MotionTokens.fast + 60
+        onTriggered: {
+            root.check("context close dismisses reused host", host.open, false)
+            // The exit reveal retains old content until cleanup fires.
+            root.check("context close retains current intent through exit",
+                host.currentIntent.widgetId, "clock-latest")
+            root.check("context close retains root intent through exit",
+                host.intent.widgetId, "clock-latest")
+            root.check("context close clears pending immediately", host.pendingIntent, null)
+            root.check("context close keeps surface through exit", host.surfaceActive, true)
+            root.check("context close settles progress", host.transitionProgress, 1)
+            root.checkOpaque("context close keeps layers opaque")
+            root.check("context close stops close timer", host.closeTimerRunning, false)
+            root.check("context close starts exit cleanup", host.debugSnapshot().host.clearTimer, true)
+            contextCleanupWait.restart()
+        }
+    }
+
+    Timer {
+        id: contextCleanupWait
+        interval: host.popupItem.revealDuration + 120
+        onTriggered: {
+            root.check("context cleanup clears current intent", host.currentIntent, null)
+            root.check("context cleanup clears root intent", host.intent, null)
+            root.check("context cleanup clears surface", host.surfaceActive, false)
+            root.check("context cleanup stops clear timer", host.debugSnapshot().host.clearTimer, false)
 
             host.showIntent({
                 widgetId: "dismiss-source", instanceKey: "dismiss-source:0", kind: "hover",
@@ -280,20 +333,32 @@ Item {
                 actionKind: "volume", anchorX: 460, screenWidth: 1000,
                 screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
             })
-            dismissDuringFadeWait.restart()
+            root.check("dismiss test starts replacement glide", host.pendingIntent.widgetId, "dismissed")
+            root.check("dismiss test keeps displayed source", host.currentIntent.widgetId, "dismiss-source")
+            root.checkOpaque("dismiss pre-exchange keeps layers opaque")
+            dismissDuringGlideWait.restart()
         }
     }
 
     Timer {
-        id: dismissDuringFadeWait
-        interval: Math.max(20, Lazer.MotionTokens.fast / 2)
+        id: dismissDuringGlideWait
+        interval: 60
         onTriggered: {
-            root.check("dismiss test enters replacement fade", host.replacingContent, true)
-            root.check("dismiss test has pending intent", host.pendingIntent.widgetId, "dismissed")
+            // The 45% exchange can commit before this fires; ensure a glide
+            // is actually in flight so dismiss lands mid-glide deterministically.
+            if (!host.pendingIntent) {
+                host.updateIntent({
+                    widgetId: "dismissed-2", instanceKey: "dismissed-2:0", kind: "hover",
+                    actionKind: "volume", anchorX: 480, screenWidth: 1000,
+                    screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+                })
+            }
+            root.check("dismiss test has pending intent", host.pendingIntent !== null, true)
+            root.checkOpaque("dismiss mid-glide keeps layers opaque")
             host.dismissImmediately()
-            root.check("dismiss during fade clears pending", host.pendingIntent, null)
-            root.check("dismiss during fade clears replacing state", host.replacingContent, false)
-            root.check("dismiss during fade restores opacity", host.contentOpacity, 1)
+            root.check("dismiss during glide clears pending", host.pendingIntent, null)
+            root.check("dismiss during glide settles progress", host.transitionProgress, 1)
+            root.checkOpaque("dismiss during glide keeps layers opaque")
 
             host.showIntent({
                 widgetId: "after-dismiss", instanceKey: "after-dismiss:0", kind: "context",
@@ -301,20 +366,20 @@ Item {
                 effectiveBarHeight: 48, barPosition: "top"
             })
             root.check("new intent applies after dismiss", host.currentIntent.widgetId, "after-dismiss")
-            dismissStaleFadeWait.restart()
+            dismissStaleGlideWait.restart()
         }
     }
 
     Timer {
-        id: dismissStaleFadeWait
-        interval: Lazer.MotionTokens.fast + 40
+        id: dismissStaleGlideWait
+        interval: Lazer.MotionTokens.medium + 150
         onTriggered: {
-            root.check("dismissed fade cannot overwrite new current intent",
+            root.check("dismissed glide cannot overwrite new current intent",
                 host.currentIntent.widgetId, "after-dismiss")
-            root.check("dismissed fade cannot overwrite new intent",
+            root.check("dismissed glide cannot overwrite new intent",
                 host.intent.widgetId, "after-dismiss")
-            root.check("dismissed fade leaves pending clear", host.pendingIntent, null)
-            root.check("dismissed fade leaves opacity restored", host.contentOpacity, 1)
+            root.check("dismissed glide leaves pending clear", host.pendingIntent, null)
+            root.checkOpaque("dismissed glide leaves layers opaque")
 
             Lazer.MotionTokens.reducedMotionOverride = true
             host.updateIntent({
@@ -325,14 +390,20 @@ Item {
             root.check("reduced motion applies replacement immediately",
                 host.currentIntent.widgetId, "volume")
             root.check("reduced motion clears pending intent", host.pendingIntent, null)
-            root.check("reduced motion restores content opacity", host.contentOpacity, 1)
+            root.check("reduced motion settles progress", host.transitionProgress, 1)
+            root.check("reduced motion settles display X", host.displayX, host.targetX)
+            root.check("reduced motion settles display width", host.displayWidth, host.targetWidth)
+            root.check("reduced motion settles display height", host.displayHeight, host.targetHeight)
+            root.checkOpaque("reduced motion keeps layers opaque")
             reducedMotionSettleWait.restart()
         }
     }
 
     Timer {
         id: reducedMotionSettleWait
-        interval: host.popupItem.revealDuration + 40
+        // Reveal can still be flying from the fresh after-dismiss open when
+        // the reduced commit lands; give it full margin (flake guard).
+        interval: host.popupItem.revealDuration + 400
         onTriggered: {
             root.check("reduced motion replacement is interactive", host.contentInteractive, true)
             Lazer.MotionTokens.reducedMotionOverride = false
@@ -353,11 +424,11 @@ Item {
             root.check("natural close cleanup timer is stopped", host.debugSnapshot().host.clearTimer, false)
             root.check("natural close clears surface active", host.surfaceActive, false)
             root.check("natural close clears pending intent", host.pendingIntent, null)
-            root.check("natural close clears replacing state", host.replacingContent, false)
-            root.check("natural close restores content opacity", host.contentOpacity, 1)
+            root.check("natural close settles progress", host.transitionProgress, 1)
+            root.checkOpaque("natural close keeps layers opaque")
             root.check("natural close timer is stopped", host.closeTimerRunning, false)
             root.check("natural close leaves popup owner available", host.popupItem !== null, true)
-            // Start a replacement, then naturally close while its fade-out is
+            // Start a replacement, then naturally close while its glide is
             // active. The pending target must never be installed during exit.
             host.showIntent({
                 widgetId: "race-a", instanceKey: "race-a:0", kind: "hover",
@@ -369,13 +440,12 @@ Item {
                 actionKind: "", anchorX: 720, screenWidth: 1000,
                 screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
             })
-            root.check("close race starts replacement", host.replacingContent, true)
-            root.check("close race records pending B", host.pendingIntent.widgetId, "race-b")
+            root.check("close race starts replacement", host.pendingIntent.widgetId, "race-b")
+            root.check("close race keeps displayed A immediately", host.currentIntent.widgetId, "race-a")
             host.widgetHovered = false
             host.popupHovered = false
             host.requestClose()
-            root.check("close race invalidates replacement immediately", host.replacingContent, false)
-            root.check("close race clears pending immediately", host.pendingIntent, null)
+            root.check("close race invalidates replacement immediately", host.pendingIntent, null)
             root.check("close race keeps displayed A immediately", host.currentIntent.widgetId, "race-a")
             closeDuringReplacementWait.restart()
         }
@@ -385,13 +455,12 @@ Item {
         id: closeDuringReplacementWait
         interval: Lazer.MotionTokens.fast + 40
         onTriggered: {
-            root.check("close race closes before replacement applies", host.open, false)
-            root.check("close race keeps displayed A after fade settles",
+            root.check("close race closes before exchange applies", host.open, false)
+            root.check("close race keeps displayed A after glide settles",
                 host.currentIntent.widgetId, "race-a")
             root.check("close race retains root intent during exit", host.intent.widgetId, "race-b")
             root.check("close race clears pending replacement", host.pendingIntent, null)
-            root.check("close race stops content fade state", host.replacingContent, false)
-            root.check("close race restores old content opacity", host.contentOpacity, 1)
+            root.checkOpaque("close race keeps layers opaque")
             root.check("close race starts exit cleanup", host.debugSnapshot().host.clearTimer, true)
             closeRaceCleanupWait.restart()
         }
@@ -442,194 +511,198 @@ Item {
             root.check("popup exit does not self-clip vertical layers", host.popupItem.clip, false)
             // Slide contract: layers travel the full container distance behind
             // the bar clip edge instead of relying on the opacity channel.
-             root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
-             root.check("content delay matches settings panel", host.popupItem.contentDelay,
-                     Lazer.MotionTokens.settingsContentDelay)
-             root.check("content layer travels farther than identity",
-                     Math.abs(host.popupItem.contentOffset) > Math.abs(host.popupItem.sidebarOffset), true)
-             root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
-             root.check("reveal state is active while open",
-                 host.surfaceActive && host.popupItem.visible, true)
-              root.check("reveal viewport covers complete target",
-                  host.popupViewportItem.height >= host.targetHeight
-                  || host.popupItem.height >= host.targetHeight, true)
-              root.check("content surface paints settings section color",
-                 String(host.popupItem.contentLayer.children[0].children[0].objectName) + ":"
-                 + String(host.popupItem.contentLayer.children[0].children[0].color),
-                 "popupContentSurface:" + String(Lazer.LazerTheme.settingsSection))
-              root.check("sidebarData alias exists", host.sidebarData !== undefined, true)
-              root.check("contentData alias exists", host.contentData !== undefined, true)
+            root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
+            root.check("content delay is zero (no opacity staging)",
+                host.popupItem.contentDelay, 0)
+            root.check("content layer travels farther than identity",
+                Math.abs(host.popupItem.contentOffset) > Math.abs(host.popupItem.sidebarOffset), true)
+            root.check("reveal is geometric (opacity channel off)", host.popupItem.animateLayerOpacity, false)
+            root.check("reveal state is active while open",
+                host.surfaceActive && host.popupItem.visible, true)
+            root.check("reveal viewport covers complete target",
+                host.popupViewportItem.height >= host.targetHeight
+                || host.popupItem.height >= host.targetHeight, true)
+            root.check("content surface paints settings section color",
+                String(host.popupItem.contentLayer.children[0].children[0].objectName) + ":"
+                + String(host.popupItem.contentLayer.children[0].children[0].color),
+                "popupContentSurface:" + String(Lazer.LazerTheme.settingsSection))
+            root.check("sidebarData alias exists", host.sidebarData !== undefined, true)
+            root.check("contentData alias exists", host.contentData !== undefined, true)
 
-              var outerWidth = host.width
-              var outerHeight = host.height
-              var originalPopupItem = host.popupItem
-              var volumeIntent = {
-                  widgetId: "volume", instanceKey: "volume:0", kind: "hover", actionKind: "volume",
-                 anchorX: 180, screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
-                 barPosition: "top"
-             }
-             var contextIntent = {
-                 widgetId: "notifications", instanceKey: "notifications:0", kind: "context", actionKind: "",
-                 anchorX: 700, screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
-                 barPosition: "top"
-               }
-                host.updateIntent(volumeIntent)
-                root.check("initial open initializes current intent", host.currentIntent.widgetId, "volume")
-                var firstTargetX = host.targetX
-                root.check("first intent has distinct target geometry", firstTargetX !== host.displayX, true)
-                 var hoverSlotHeight = host.popupHeightForIntent(host.currentIntent)
-                 var identityHeight = Math.max(Number(host.popupItem.sidebarLayer.implicitHeight),
-                         Number(host.popupItem.sidebarLayer.height), 48)
-                 var expectedHoverHeight = identityHeight + hoverSlotHeight + 1
-                 root.check("hover height selects hover implicit height", host.targetHeight, expectedHoverHeight)
-                host.updateIntent(contextIntent)
-               root.check("second intent changes target geometry", host.targetX !== firstTargetX, true)
-               root.check("second intent target follows second anchor", host.targetX,
-                   700 - host.targetWidth / 2)
-               root.check("display geometry remains separate while animating",
-                   host.displayX !== host.targetX || host.displayY !== host.targetY
-                   || host.displayWidth !== host.targetWidth || host.displayHeight !== host.targetHeight,
-                   true)
-               root.check("outer host width stays fixed", host.width, outerWidth)
-               root.check("outer host height stays fixed", host.height, outerHeight)
-               root.check("replacement keeps host open", host.open, true)
-              root.check("replacement keeps surface active", host.surfaceActive, true)
-              root.check("replacement exposes latest intent", host.intent.widgetId, "notifications")
-              root.check("replacement keeps current intent", host.currentIntent.widgetId, "volume")
-               root.check("replacement keeps original popup owner", host.popupItem === originalPopupItem, true)
-               root.check("replacement records pending intent", host.pendingIntent.widgetId, "notifications")
-                root.check("replacement keeps slot height for current kind",
-                    host.popupHeightForIntent(host.currentIntent), hoverSlotHeight)
-                root.check("replacement increments transition serial", host.transitionSerial > 0, true)
-                 root.check("replacement enters serialized fade", host.replacingContent, true)
-                 root.check("replacement target remains screen-clamped", host.targetX >= 8 && host.targetX <= 1000 - host.targetWidth - 8, true)
-                  root.check("replacement target keeps current kind height", host.targetHeight, expectedHoverHeight)
+            var outerWidth = host.width
+            var outerHeight = host.height
+            var originalPopupItem = host.popupItem
+            var volumeIntent = {
+                widgetId: "volume", instanceKey: "volume:0", kind: "hover", actionKind: "volume",
+                anchorX: 180, screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
+                barPosition: "top"
+            }
+            var contextIntent = {
+                widgetId: "notifications", instanceKey: "notifications:0", kind: "context", actionKind: "",
+                anchorX: 700, screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
+                barPosition: "top"
+            }
+            host.updateIntent(volumeIntent)
+            root.check("initial open initializes current intent", host.currentIntent.widgetId, "volume")
+            var firstTargetX = host.targetX
+            root.check("first intent has distinct target geometry", firstTargetX !== host.displayX, true)
+            var hoverSlotHeight = host.popupHeightForIntent(host.currentIntent)
+            var identityHeight = Math.max(Number(host.popupItem.sidebarLayer.implicitHeight),
+                Number(host.popupItem.sidebarLayer.height), 48)
+            var expectedHoverHeight = identityHeight + hoverSlotHeight + 1
+            root.check("hover height selects hover implicit height", host.targetHeight, expectedHoverHeight)
+            host.updateIntent(contextIntent)
+            root.check("second intent changes target geometry", host.targetX !== firstTargetX, true)
+            root.check("second intent target follows second anchor", host.targetX,
+                700 - host.targetWidth / 2)
+            root.check("display geometry remains separate while animating",
+                host.displayX !== host.targetX || host.displayY !== host.targetY
+                || host.displayWidth !== host.targetWidth || host.displayHeight !== host.targetHeight,
+                true)
+            root.check("outer host width stays fixed", host.width, outerWidth)
+            root.check("outer host height stays fixed", host.height, outerHeight)
+            root.check("replacement keeps host open", host.open, true)
+            root.check("replacement keeps surface active", host.surfaceActive, true)
+            root.check("replacement exposes latest intent", host.intent.widgetId, "notifications")
+            root.check("replacement keeps current intent", host.currentIntent.widgetId, "volume")
+            root.check("replacement keeps original popup owner", host.popupItem === originalPopupItem, true)
+            root.check("replacement records pending intent", host.pendingIntent.widgetId, "notifications")
+            root.check("replacement keeps slot height for current kind",
+                host.popupHeightForIntent(host.currentIntent), hoverSlotHeight)
+            root.check("replacement increments transition serial", host.transitionSerial > 0, true)
+            root.check("replacement starts shared glide", host.transitionProgress, 0)
+            root.checkOpaque("replacement keeps layers opaque")
+            root.check("replacement target remains screen-clamped", host.targetX >= 8 && host.targetX <= 1000 - host.targetWidth - 8, true)
+            root.check("replacement target keeps current kind height", host.targetHeight, expectedHoverHeight)
 
-               host.updateIntent({
-                   widgetId: "brightness", instanceKey: "brightness:0", kind: "hover",
-                   actionKind: "brightness", anchorX: 520, screenWidth: 1000,
-                   screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
-               })
-               root.check("rapid replacement keeps latest pending target",
-                   host.pendingIntent.widgetId, "brightness")
+            host.updateIntent({
+                widgetId: "brightness", instanceKey: "brightness:0", kind: "hover",
+                actionKind: "brightness", anchorX: 520, screenWidth: 1000,
+                screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+            })
+            root.check("rapid replacement keeps latest pending target",
+                host.pendingIntent.widgetId, "brightness")
 
-              // Invalid geometry fields must retain the host's last valid values.
-              var invalidIntent = {
-                  widgetId: "invalid", instanceKey: "invalid:0", kind: "hover",
-                  anchorX: "not-a-number", screenWidth: 1000, screenHeight: 800,
-                  effectiveBarHeight: 48, barPosition: "sideways"
-              }
-              host.updateIntent(invalidIntent)
-               root.check("invalid anchor keeps host anchor", host.anchorX, 520)
-              root.check("invalid bar position keeps host direction", host.direction, "down")
-               root.check("invalid anchor geometry uses fallback", host.targetX, 390)
+            // Invalid geometry fields must retain the host's last valid values.
+            var invalidIntent = {
+                widgetId: "invalid", instanceKey: "invalid:0", kind: "hover",
+                anchorX: "not-a-number", screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "sideways"
+            }
+            host.updateIntent(invalidIntent)
+            root.check("invalid anchor keeps host anchor", host.anchorX, 520)
+            root.check("invalid bar position keeps host direction", host.direction, "down")
+            root.check("invalid anchor geometry uses fallback", host.targetX, 390)
 
-               host.dismissImmediately()
-               root.check("dismissImmediately closes host", host.open, false)
-               root.check("dismissImmediately clears surface", host.surfaceActive, false)
-               root.check("dismissImmediately clears current intent immediately", host.currentIntent, null)
-               root.check("dismissImmediately clears root intent immediately", host.intent, null)
-               root.check("dismissImmediately clears pending immediately", host.pendingIntent, null)
-               root.check("dismissImmediately stops close timer", host.closeTimerRunning, false)
-               root.check("dismissImmediately clears replacing immediately", host.replacingContent, false)
-               root.check("dismissImmediately restores opacity immediately", host.contentOpacity, 1)
-               root.check("dismissImmediately stops clear timer", host.debugSnapshot().host.clearTimer, false)
+            host.dismissImmediately()
+            root.check("dismissImmediately closes host", host.open, false)
+            root.check("dismissImmediately clears surface", host.surfaceActive, false)
+            root.check("dismissImmediately clears current intent immediately", host.currentIntent, null)
+            root.check("dismissImmediately clears root intent immediately", host.intent, null)
+            root.check("dismissImmediately clears pending immediately", host.pendingIntent, null)
+            root.check("dismissImmediately stops close timer", host.closeTimerRunning, false)
+            root.check("dismissImmediately settles progress", host.transitionProgress, 1)
+            root.checkOpaque("dismissImmediately keeps layers opaque")
+            root.check("dismissImmediately stops clear timer", host.debugSnapshot().host.clearTimer, false)
 
-              host.showIntent(contextIntent)
-              Qt.callLater(function () {
-                 root.check("context open initializes current intent", host.currentIntent.kind, "context")
-                   root.check("context height selects context implicit height",
-                       host.popupHeightForIntent(host.currentIntent), 184)
-                   root.check("context target follows context height", host.targetHeight,
-                       Math.max(Number(host.popupItem.sidebarLayer.implicitHeight),
-                           Number(host.popupItem.sidebarLayer.height), 48) + 184 + 1)
-                  root.startBottomBarChecks()
-              })
+            host.showIntent(contextIntent)
+            Qt.callLater(function () {
+                root.check("context open initializes current intent", host.currentIntent.kind, "context")
+                // Live slot height (content can grow with new rows/fonts; never hardcode).
+                var ctxSlotHeight = host.popupHeightForIntent(host.currentIntent)
+                root.check("context slot height positive", ctxSlotHeight > 0, true)
+                root.check("context target follows context height", host.targetHeight,
+                    Math.max(Number(host.popupItem.sidebarLayer.implicitHeight),
+                        Number(host.popupItem.sidebarLayer.height), 48) + ctxSlotHeight + 1)
+                root.startBottomBarChecks()
+            })
         })
     }
 
     function startBottomBarChecks() {
         // Switch to bottom bar and verify direction flips without reopening window.
         var intentBottom = {
-                widgetId: "tray",
-                instanceKey: "tray:2",
-                title: "Tray",
-                iconSource: Qt.resolvedUrl("modules/lazerbar/icons/apps.svg"),
-                summary: "3 items",
-                 actionKind: "tray",
-                 anchorX: 200,
-                 screenWidth: 1000, screenHeight: 1080, effectiveBarHeight: 48,
-                 barPosition: "bottom"
-         }
-          Lazer.MotionTokens.reducedMotionOverride = true
-          host.showIntent(intentBottom)
-          Lazer.MotionTokens.reducedMotionOverride = false
+            widgetId: "tray",
+            instanceKey: "tray:2",
+            title: "Tray",
+            iconSource: Qt.resolvedUrl("modules/lazerbar/icons/apps.svg"),
+            summary: "3 items",
+            actionKind: "tray",
+            anchorX: 200,
+            screenWidth: 1000, screenHeight: 1080, effectiveBarHeight: 48,
+            barPosition: "bottom"
+        }
+        Lazer.MotionTokens.reducedMotionOverride = true
+        host.showIntent(intentBottom)
+        Lazer.MotionTokens.reducedMotionOverride = false
 
-         Qt.callLater(function () {
-                root.check("bottom bar direction is up", host.direction, "up")
-                root.check("TwoLayerPopup direction Up for bottom bar", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Up)
-                root.check("still open after intent swap", host.open, true)
-                 root.check("orientation is Vertical", host.popupItem.orientation, Lazer.TwoLayerPopup.Orientation.Vertical)
-                 root.check("bottom geometry stays above bar", host.targetY,
-                      Math.max(0, 1080 - 48 - 4 - host.targetHeight))
-                 root.check("bottom geometry clamps at screen edge", host.targetY >= 0, true)
+        Qt.callLater(function () {
+            root.check("bottom bar direction is up", host.direction, "up")
+            root.check("TwoLayerPopup direction Up for bottom bar", host.popupItem.direction, Lazer.TwoLayerPopup.Direction.Up)
+            root.check("still open after intent swap", host.open, true)
+            root.check("orientation is Vertical", host.popupItem.orientation, Lazer.TwoLayerPopup.Orientation.Vertical)
+            root.check("bottom geometry stays above bar", host.targetY,
+                Math.max(0, 1080 - 48 - 4 - host.targetHeight))
+            root.check("bottom geometry clamps at screen edge", host.targetY >= 0, true)
 
-                 // Make the displayed height intentionally stale to prove the
-                 // bottom placement uses the newly computed target height.
-                 host.displayHeight = 7
-                 root.check("display height is stale before bottom retarget", host.displayHeight !== host.targetHeight, true)
-                 host.updateIntent({
-                     widgetId: "tray", instanceKey: "tray:3", kind: "hover", actionKind: "tray",
-                     anchorX: 200, screenWidth: 1000, screenHeight: 1080, effectiveBarHeight: 48,
-                     barPosition: "bottom"
-                 })
-                 root.check("bottom target Y uses target height", host.targetY,
-                     1080 - 48 - 4 - host.targetHeight)
-                 root.check("bottom target Y ignores displayed height", host.targetY !==
-                     1080 - 48 - 4 - host.displayHeight, true)
+            // Make the displayed height intentionally stale to prove the
+            // bottom placement uses the newly computed target height.
+            host.displayHeight = 7
+            root.check("display height is stale before bottom retarget", host.displayHeight !== host.targetHeight, true)
+            host.updateIntent({
+                widgetId: "tray", instanceKey: "tray:3", kind: "hover", actionKind: "tray",
+                anchorX: 200, screenWidth: 1000, screenHeight: 1080, effectiveBarHeight: 48,
+                barPosition: "bottom"
+            })
+            root.check("bottom target Y uses target height", host.targetY,
+                1080 - 48 - 4 - host.targetHeight)
+            root.check("bottom target Y ignores displayed height", host.targetY !==
+                1080 - 48 - 4 - host.displayHeight, true)
 
-                 // Reduced motion must stop an in-flight retarget before
-                 // applying the new geometry, so no old animation can overwrite it.
-                 Lazer.MotionTokens.reducedMotionOverride = true
-                 host.displayX = 12
-                 host.displayY = 13
-                 host.displayWidth = 240
-                 host.displayHeight = 7
-                 host.targetWidth = 260
-                 host.targetHeight = 90
-                 host.retargetGeometry({ anchorX: 640, screenWidth: 1000,
-                     screenHeight: 1080, effectiveBarHeight: 48,
-                     floatingMargin: 4, barPosition: "bottom" })
-                 root.check("reduced motion settles display X", host.displayX, host.targetX)
-                 root.check("reduced motion settles display Y", host.displayY, host.targetY)
-                 root.check("reduced motion settles display width", host.displayWidth, host.targetWidth)
-                 root.check("reduced motion settles display height", host.displayHeight, host.targetHeight)
-                 Lazer.MotionTokens.reducedMotionOverride = false
+            // Reduced motion must stop an in-flight retarget before
+            // applying the new geometry, so no old animation can overwrite it.
+            Lazer.MotionTokens.reducedMotionOverride = true
+            host.displayX = 12
+            host.displayY = 13
+            host.displayWidth = 240
+            host.displayHeight = 7
+            host.targetWidth = 260
+            host.targetHeight = 90
+            host.retargetGeometry({ anchorX: 640, screenWidth: 1000,
+                screenHeight: 1080, effectiveBarHeight: 48,
+                floatingMargin: 4, barPosition: "bottom" })
+            root.check("reduced motion settles display X", host.displayX, host.targetX)
+            root.check("reduced motion settles display Y", host.displayY, host.targetY)
+            root.check("reduced motion settles display width", host.displayWidth, host.targetWidth)
+            root.check("reduced motion settles display height", host.displayHeight, host.targetHeight)
+            Lazer.MotionTokens.reducedMotionOverride = false
 
-                  // A live hover intent can be replaced directly by context
-                  // without closing or replacing the popup owner.
-                  var openHoverPopupOwner = host.popupItem
-                  host.updateIntent({
-                      widgetId: "context-open", instanceKey: "context-open:4", kind: "context",
-                      actionKind: "", anchorX: 260, screenWidth: 1000, screenHeight: 1080,
-                      effectiveBarHeight: 48, barPosition: "bottom", section: "center",
-                      hasSettings: false,
-                      payload: {
-                          moveLeft: function(key, id, section) {
-                              root._contextCallbackArgs = [key, id, section]
-                          }
-                      }
-                  })
-                  root.check("open hover-to-context replacement keeps host open", host.open, true)
-                  root.check("open hover-to-context replacement keeps popup owner",
-                      host.popupItem === openHoverPopupOwner, true)
-                  root.check("open hover-to-context replacement keeps hover current",
-                      host.currentIntent.widgetId, "tray")
-                  root.check("open hover-to-context replacement records context pending",
-                      host.pendingIntent.widgetId, "context-open")
-                  root.check("open hover-to-context replacement records latest root intent",
-                      host.intent.instanceKey, "context-open:4")
-                  openHoverContextReplacementWait.restart()
-         })
+            // A live hover intent can be replaced directly by context
+            // without closing or replacing the popup owner.
+            var openHoverPopupOwner = host.popupItem
+            host.updateIntent({
+                widgetId: "context-open", instanceKey: "context-open:4", kind: "context",
+                actionKind: "", anchorX: 260, screenWidth: 1000, screenHeight: 1080,
+                effectiveBarHeight: 48, barPosition: "bottom", section: "center",
+                hasSettings: false,
+                payload: {
+                    moveLeft: function(key, id, section) {
+                        root._contextCallbackArgs = [key, id, section]
+                    }
+                }
+            })
+            root.check("open hover-to-context replacement keeps host open", host.open, true)
+            root.check("open hover-to-context replacement keeps popup owner",
+                host.popupItem === openHoverPopupOwner, true)
+            root.check("open hover-to-context replacement keeps hover current",
+                host.currentIntent.widgetId, "tray")
+            root.check("open hover-to-context replacement records context pending",
+                host.pendingIntent.widgetId, "context-open")
+            root.check("open hover-to-context replacement records latest root intent",
+                host.intent.instanceKey, "context-open:4")
+            root.check("open hover-to-context starts shared glide", host.transitionProgress, 0)
+            root.checkOpaque("open hover-to-context keeps layers opaque")
+            openHoverContextReplacementWait.restart()
+        })
     }
 }

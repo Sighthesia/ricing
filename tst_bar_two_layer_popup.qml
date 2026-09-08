@@ -267,8 +267,9 @@ Item {
         root.check("top: target height includes identity and content", host.targetHeight,
                 host.popupItem.sidebarLayer.height + host.popupItem.contentLayer.height + 1)
         root.check("top: travel distance matches full popup height", host.revealDistance, host.targetHeight)
-        root.check("top: content delay matches settings panel", host.popupItem.contentDelay,
-                Lazer.MotionTokens.settingsContentDelay)
+        // The host pins contentDelay 0: reveal is purely geometric, both
+        // layers slide together from frame one (no opacity staging).
+        root.check("top: content delay is zero (geometric reveal)", host.popupItem.contentDelay, 0)
         root.checkTrue("top: content starts farther than identity",
                 Math.abs(host.popupItem.contentOffset) > Math.abs(host.popupItem.sidebarOffset))
         root.check("top: popup absolute y below bar", host.popupContainerItem.y, 52)
