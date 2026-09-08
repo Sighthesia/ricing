@@ -253,6 +253,10 @@ PanelWindow {
             return
         }
         root.replacingContent = true
+        // Fade out on the instant channel so the blank gap stays shorter
+        // than the position glide: the move remains visible instead of
+        // happening behind an emptied popup. Size morphs after the swap.
+        contentFade.duration = MotionTokens.instant
         contentFade.to = 0
         contentFade.restart()
     }
@@ -269,6 +273,10 @@ PanelWindow {
         root.pendingIntent = null
         root.replacingContent = false
         root.updateTargetGeometry(nextIntent)
+        // Fade back in on the fast channel while the geometry motions
+        // (x/y/width/height, medium OutQuint) morph to the new size, so
+        // the new content transitions in over the glide, not after it.
+        contentFade.duration = MotionTokens.fast
         contentFade.to = 1
         if (MotionTokens.reducedMotion)
             root.contentOpacity = 1
@@ -773,6 +781,10 @@ PanelWindow {
             // on screen for the whole flip engage/settle cycle.
             Binding { target: popup.sidebarLayer; property: "x"; value: root.contentShiftX }
             Binding { target: popup.contentLayer; property: "x"; value: root.contentShiftX }
+            // Identity fades with the content on hover switches so the
+            // header title/icon/summary cross over instead of jumping
+            // while the geometry glides to the next anchor.
+            Binding { target: popup.sidebarLayer; property: "opacity"; value: root.contentOpacity }
 
             // Two-layer surface; vertical orientation with direction driven by
             // the bar position (top -> Down, bottom -> Up).
