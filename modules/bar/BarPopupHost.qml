@@ -766,7 +766,7 @@ PanelWindow {
         from: 0
         to: 1
         duration: MotionTokens.reducedMotion ? 0 : MotionTokens.slow
-        easing.type: Easing.OutQuint
+        easing.type: Easing.OutCubic
         onFinished: root.settleContentSlide()
     }
 
@@ -1016,6 +1016,13 @@ PanelWindow {
                      implicitWidth: 260
                      implicitHeight: root.popupHeightForIntent(root.currentIntent)
                      height: implicitHeight
+                     // Visible height channel: animate toward the new content's
+                     // natural height so the exchange grows/shrinks smoothly
+                     // instead of snapping while the slide travels.
+                     Behavior on height {
+                         enabled: root._exchangeCommitted && !MotionTokens.reducedMotion
+                         NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutCubic }
+                     }
                      clip: true
                      enabled: root.contentInteractive
                      onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)

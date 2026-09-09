@@ -565,6 +565,7 @@ Item {
                 Number(host.popupItem.sidebarLayer.height), 48)
             var expectedHoverHeight = identityHeight + hoverSlotHeight + 1
             root.check("hover height selects hover implicit height", host.targetHeight, expectedHoverHeight)
+            var beforeSlideSlotHeight = Number(root.findByName(host.popupItem, "popupContentSlot").height)
             host.updateIntent(contextIntent)
             root.check("second intent changes target geometry", host.targetX !== firstTargetX, true)
             root.check("second intent target follows second anchor", host.targetX,
@@ -593,6 +594,9 @@ Item {
             // exits along the pointer trail while the incoming enters from
             // the travel direction, both on the dedicated slide clock.
             host.transitionProgress = 0.5
+            var slideSlot = root.findByName(host.popupItem, "popupContentSlot")
+            root.check("exchange retargets slot natural height", slideSlot.implicitHeight !== beforeSlideSlotHeight, true)
+            root.check("exchange animates slot height instead of snapping", slideSlot.height, beforeSlideSlotHeight)
             var incomingIdentity = root.findByName(host.popupItem, "popupIdentity")
             var outgoingIdentity = root.findByName(host.popupItem, "popupIdentityOutgoing")
             var incomingActions = root.findByName(host.popupItem, "popupActions")
