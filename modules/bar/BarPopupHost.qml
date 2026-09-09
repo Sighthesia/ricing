@@ -63,6 +63,7 @@ PanelWindow {
     property real _targetSnapW: 260
     property real _targetSnapH: 1
     property bool _exchangeCommitted: false
+    property var _transitionOutgoingIntent: null
     property int _deferredRebaseSerial: -1
     // Stable travel distance for the current reveal/exit cycle.
     property real revealDistance: 1
@@ -101,6 +102,10 @@ PanelWindow {
     readonly property real contentTravel: root.revealDistance + 1
     readonly property real identityOffset: root.travelSign * root.identityTravel
     readonly property real slideOffset: root.travelSign * root.contentTravel
+    readonly property real contentSlideProgress: root._exchangeCommitted
+        ? Math.max(0, Math.min(1, (root.transitionProgress - root.exchangeThreshold)
+            / (1 - root.exchangeThreshold))) : 0
+    readonly property real contentSlideDistance: Math.max(root.displayWidth, root.targetWidth, 260)
 
     function startReveal(target) {
         revealMotion.stop()
@@ -257,6 +262,7 @@ PanelWindow {
         root.transitionSerial += 1
         root.pendingIntent = null
         root._exchangeCommitted = false
+        root._transitionOutgoingIntent = null
         root._deferredRebaseSerial = -1
     }
 
@@ -322,6 +328,7 @@ PanelWindow {
         if (root._exchangeCommitted)
             return
         root._exchangeCommitted = true
+        root._transitionOutgoingIntent = root.currentIntent
         root.currentIntent = root.pendingIntent
         root.pendingIntent = null
         var captured = serial
@@ -350,6 +357,9 @@ PanelWindow {
                 && root.transitionProgress >= root.exchangeThreshold) {
             root.commitExchange(root.transitionSerial)
         }
+        if (root._exchangeCommitted && root.transitionProgress >= 0.999
+                && !root.pendingIntent)
+            root._transitionOutgoingIntent = null
     }
 
     function beginIntentReplacement(intentObj) {
@@ -362,6 +372,7 @@ PanelWindow {
             root.currentIntent = root.pendingIntent
             root.pendingIntent = null
             root._exchangeCommitted = true
+            root._transitionOutgoingIntent = null
             root.computeAndCommitTargets(root.currentIntent)
             transitionMotion.stop()
             root.displayX = root.targetX
@@ -628,6 +639,7 @@ PanelWindow {
         root.intent = null
         root.currentIntent = null
         root.pendingIntent = null
+        root._transitionOutgoingIntent = null
         root.transitionSerial += 1
         root.transitionProgress = 1
         root.surfaceActive = false
@@ -921,14 +933,42 @@ PanelWindow {
                 // Identity layer bound to the current intent; updates in place when
                 // the hovered tray delegate changes so no overlapping windows appear.
                 // Persistent context menus expose the header close affordance.
-                sidebarData: BarPopupIdentity {
-                    objectName: "popupIdentity"
-                    title: root.currentIntent ? (root.currentIntent.title || "") : ""
-                    iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
-                    summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
-                    hostWidth: 260
-                    showClose: root.currentIntent ? String(root.currentIntent.kind || "") === "context" : false
-                    onCloseRequested: root.requestAnimatedClose()
+                sidebarData: Item {
+                    objectName: "popupIdentityTransition"
+                    width: 260
+                    implicitWidth: 260
+                    height: 48
+                    implicitHeight: 48
+                    clip: true
+
+                    // Incoming identity enters from the right and settles in
+                    // the same slot as the outgoing header.
+                    BarPopupIdentity {
+                        objectName: "popupIdentity"
+                        z: 1
+                        x: root._exchangeCommitted
+                                ? root.contentSlideDistance * (1 - root.contentSlideProgress) : 0
+                        title: root.currentIntent ? (root.currentIntent.title || "") : ""
+                        iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
+                        summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
+                        hostWidth: 260
+                        showClose: root.currentIntent ? String(root.currentIntent.kind || "") === "context" : false
+                        onCloseRequested: root.requestAnimatedClose()
+                    }
+
+                    // Outgoing identity leaves to the left during replacement.
+                    BarPopupIdentity {
+                        objectName: "popupIdentityOutgoing"
+                        z: 0
+                        visible: root._transitionOutgoingIntent !== null
+                        x: root._exchangeCommitted
+                                ? -root.contentSlideDistance * root.contentSlideProgress : 0
+                        title: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.title || "") : ""
+                        iconSource: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.iconSource || "") : ""
+                        summary: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.summary || "") : ""
+                        hostWidth: 260
+                        showClose: false
+                    }
                 }
 
                 // Keep both menu bodies in one content host so only the active
@@ -936,8 +976,10 @@ PanelWindow {
                 contentData: Item {
                      objectName: "popupContentSlot"
                      width: 260
+                     implicitWidth: 260
                      implicitHeight: root.popupHeightForIntent(root.currentIntent)
                      height: implicitHeight
+                     clip: true
                      enabled: root.contentInteractive
                      onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
 
@@ -953,15 +995,38 @@ PanelWindow {
                     }
 
                     // Action layer bound to the hovered widget intent.
-                    BarPopupActions {
-                        id: popupActions
-                        objectName: "popupActions"
-                        anchors.fill: parent
-                        actionKind: root.currentIntent && root.currentIntent.kind !== "context"
-                                ? (root.currentIntent.actionKind || "") : "context"
-                        payload: root.currentIntent ? root.currentIntent.payload : null
-                        onDismissRequested: root.dismissImmediately()
-                    }
+                     // Incoming body enters from the right with the header.
+                     BarPopupActions {
+                         id: popupActions
+                         objectName: "popupActions"
+                         z: 1
+                         x: root._exchangeCommitted
+                                 ? root.contentSlideDistance * (1 - root.contentSlideProgress) : 0
+                         width: parent.width
+                         height: implicitHeight
+                         actionKind: root.currentIntent && root.currentIntent.kind !== "context"
+                                 ? (root.currentIntent.actionKind || "") : "context"
+                         payload: root.currentIntent ? root.currentIntent.payload : null
+                         onDismissRequested: root.dismissImmediately()
+                     }
+
+                     // Outgoing body leaves to the left while its replacement
+                     // is measured and morphs the host width/height.
+                     BarPopupActions {
+                         objectName: "popupActionsOutgoing"
+                         z: 0
+                         visible: root._transitionOutgoingIntent !== null
+                         enabled: false
+                         x: root._exchangeCommitted
+                                 ? -root.contentSlideDistance * root.contentSlideProgress : 0
+                         width: parent.width
+                         height: implicitHeight
+                         actionKind: root._transitionOutgoingIntent
+                                 && root._transitionOutgoingIntent.kind !== "context"
+                                 ? (root._transitionOutgoingIntent.actionKind || "") : "context"
+                         payload: root._transitionOutgoingIntent
+                                 ? root._transitionOutgoingIntent.payload : null
+                     }
 
                     // Retarget the layer-shell mask when a tray submenu grows or retracts.
                     Connections {
@@ -975,10 +1040,16 @@ PanelWindow {
                     }
 
                     // Context actions reuse the same content owner and geometry.
-                    BarContextPopupActions {
-                        id: contextPopupActions
-                        objectName: "contextPopupActions"
-                        anchors.fill: parent
+                     // Incoming context body follows the same right-to-left
+                     // content track as ordinary popup actions.
+                     BarContextPopupActions {
+                         id: contextPopupActions
+                         objectName: "contextPopupActions"
+                         z: 1
+                         x: root._exchangeCommitted
+                                 ? root.contentSlideDistance * (1 - root.contentSlideProgress) : 0
+                         width: parent.width
+                         height: implicitHeight
                         actionKind: root.currentIntent && root.currentIntent.kind === "context" ? "context" : ""
                         widgetId: root.currentIntent ? (root.currentIntent.widgetId || "") : ""
                         instanceKey: root.currentIntent ? (root.currentIntent.instanceKey || "") : ""
@@ -990,8 +1061,37 @@ PanelWindow {
                         onActionRequested: action => {
                             if (action === "close" || action === "toggleLayoutMode")
                                 root.requestAnimatedClose()
-                        }
-                    }
+                         }
+                     }
+
+                     // Outgoing context actions remain mounted until the
+                     // shared transition reaches its settled state.
+                     BarContextPopupActions {
+                         objectName: "contextPopupActionsOutgoing"
+                         z: 0
+                         visible: root._transitionOutgoingIntent !== null
+                         enabled: false
+                         x: root._exchangeCommitted
+                                 ? -root.contentSlideDistance * root.contentSlideProgress : 0
+                         width: parent.width
+                         height: implicitHeight
+                         actionKind: root._transitionOutgoingIntent
+                                 && root._transitionOutgoingIntent.kind === "context" ? "context" : ""
+                         widgetId: root._transitionOutgoingIntent
+                                 ? (root._transitionOutgoingIntent.widgetId || "") : ""
+                         instanceKey: root._transitionOutgoingIntent
+                                 ? (root._transitionOutgoingIntent.instanceKey || "") : ""
+                         section: root._transitionOutgoingIntent
+                                 ? (root._transitionOutgoingIntent.section || "center") : "center"
+                         hasSettings: root._transitionOutgoingIntent
+                                 ? root._transitionOutgoingIntent.hasSettings === true : false
+                         layoutMode: root._transitionOutgoingIntent
+                                 ? root._transitionOutgoingIntent.layoutMode === true : false
+                         availableWidgets: root._transitionOutgoingIntent
+                                 ? (root._transitionOutgoingIntent.availableWidgets || []) : []
+                         payload: root._transitionOutgoingIntent
+                                 ? root._transitionOutgoingIntent.payload : null
+                     }
                 }
             }
         }
