@@ -102,10 +102,12 @@ PanelWindow {
     readonly property real contentTravel: root.revealDistance + 1
     readonly property real identityOffset: root.travelSign * root.identityTravel
     readonly property real slideOffset: root.travelSign * root.contentTravel
-    readonly property real contentSlideProgress: root._exchangeCommitted
-        ? Math.max(0, Math.min(1, (root.transitionProgress - root.exchangeThreshold)
-            / (1 - root.exchangeThreshold))) : 0
-    readonly property real contentSlideDistance: Math.max(root.displayWidth, root.targetWidth, 260)
+    // Content slide runs on its own clock after the exchange (the geometry
+    // glide's eased tail is too abrupt) and freezes its travel distance at
+    // commit so the morphing shell width cannot jitter the sliding layers.
+    property real contentSlideProgress: 0
+    property int contentSlideSign: 1
+    property real _contentSlideDistance: 260
 
     function startReveal(target) {
         revealMotion.stop()
@@ -259,6 +261,7 @@ PanelWindow {
     }
 
     function invalidateContentTransition() {
+        contentSlideMotion.stop()
         root.transitionSerial += 1
         root.pendingIntent = null
         root._exchangeCommitted = false
@@ -329,10 +332,28 @@ PanelWindow {
             return
         root._exchangeCommitted = true
         root._transitionOutgoingIntent = root.currentIntent
+        // Slide direction follows the pointer: moving right brings the new
+        // content in from the right edge; moving left mirrors the track.
+        var fromX = root.currentIntent ? Number(root.currentIntent.anchorX) : 0
+        var toX = Number(root.pendingIntent.anchorX)
+        root.contentSlideSign = isFinite(fromX) && isFinite(toX) && toX < fromX ? -1 : 1
+        root._contentSlideDistance = Math.max(root.popupItem.contentLayer.width, 260)
+        root.contentSlideProgress = 0
         root.currentIntent = root.pendingIntent
         root.pendingIntent = null
+        if (MotionTokens.reducedMotion)
+            root.contentSlideProgress = 1
+        else
+            contentSlideMotion.restart()
         var captured = serial
         Qt.callLater(function() { root.remeasureAndRebase(captured) })
+    }
+
+    // Exchange cleanup lives here so the slide animation and tests share one
+    // settle path; stale guards keep a cancelled transition from clearing.
+    function settleContentSlide() {
+        if (root._exchangeCommitted && !root.pendingIntent)
+            root._transitionOutgoingIntent = null
     }
 
     function remeasureAndRebase(serial) {
@@ -357,9 +378,6 @@ PanelWindow {
                 && root.transitionProgress >= root.exchangeThreshold) {
             root.commitExchange(root.transitionSerial)
         }
-        if (root._exchangeCommitted && root.transitionProgress >= 0.999
-                && !root.pendingIntent)
-            root._transitionOutgoingIntent = null
     }
 
     function beginIntentReplacement(intentObj) {
@@ -373,6 +391,8 @@ PanelWindow {
             root.pendingIntent = null
             root._exchangeCommitted = true
             root._transitionOutgoingIntent = null
+            contentSlideMotion.stop()
+            root.contentSlideProgress = 1
             root.computeAndCommitTargets(root.currentIntent)
             transitionMotion.stop()
             root.displayX = root.targetX
@@ -408,6 +428,9 @@ PanelWindow {
             root.currentIntent = root.pendingIntent
             root.pendingIntent = null
             root._exchangeCommitted = true
+            root._transitionOutgoingIntent = null
+            contentSlideMotion.stop()
+            root.contentSlideProgress = 1
             root.computeAndCommitTargets(root.currentIntent)
             transitionMotion.stop()
             root.displayX = root.targetX
@@ -631,6 +654,7 @@ PanelWindow {
         clearIntentTimer.stop()
         revealMotion.stop()
         transitionMotion.stop()
+        contentSlideMotion.stop()
         root.invalidateContentTransition()
         popup.revealProgress = 0
         root.open = false
@@ -732,6 +756,19 @@ PanelWindow {
     }
 
     onTransitionProgressChanged: root.handleTransitionProgress()
+
+    // Dedicated content slide clock: slow enough to read as a deliberate
+    // stagger after the shell glide; reduced motion settles instantly.
+    NumberAnimation {
+        id: contentSlideMotion
+        target: root
+        property: "contentSlideProgress"
+        from: 0
+        to: 1
+        duration: MotionTokens.reducedMotion ? 0 : MotionTokens.slow
+        easing.type: Easing.OutQuint
+        onFinished: root.settleContentSlide()
+    }
 
     // Clear the intent only after the exit reveal has finished so the
     // fading layers remain intact during the staggered fade.
@@ -947,7 +984,7 @@ PanelWindow {
                         objectName: "popupIdentity"
                         z: 1
                         x: root._exchangeCommitted
-                                ? root.contentSlideDistance * (1 - root.contentSlideProgress) : 0
+                                ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
                         title: root.currentIntent ? (root.currentIntent.title || "") : ""
                         iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
                         summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
@@ -962,7 +999,7 @@ PanelWindow {
                         z: 0
                         visible: root._transitionOutgoingIntent !== null
                         x: root._exchangeCommitted
-                                ? -root.contentSlideDistance * root.contentSlideProgress : 0
+                                ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
                         title: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.title || "") : ""
                         iconSource: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.iconSource || "") : ""
                         summary: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.summary || "") : ""
@@ -1001,7 +1038,7 @@ PanelWindow {
                          objectName: "popupActions"
                          z: 1
                          x: root._exchangeCommitted
-                                 ? root.contentSlideDistance * (1 - root.contentSlideProgress) : 0
+                                 ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
                          width: parent.width
                          height: implicitHeight
                          actionKind: root.currentIntent && root.currentIntent.kind !== "context"
@@ -1018,7 +1055,7 @@ PanelWindow {
                          visible: root._transitionOutgoingIntent !== null
                          enabled: false
                          x: root._exchangeCommitted
-                                 ? -root.contentSlideDistance * root.contentSlideProgress : 0
+                                 ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
                          width: parent.width
                          height: implicitHeight
                          actionKind: root._transitionOutgoingIntent
@@ -1047,7 +1084,7 @@ PanelWindow {
                          objectName: "contextPopupActions"
                          z: 1
                          x: root._exchangeCommitted
-                                 ? root.contentSlideDistance * (1 - root.contentSlideProgress) : 0
+                                 ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
                          width: parent.width
                          height: implicitHeight
                         actionKind: root.currentIntent && root.currentIntent.kind === "context" ? "context" : ""
@@ -1072,7 +1109,7 @@ PanelWindow {
                          visible: root._transitionOutgoingIntent !== null
                          enabled: false
                          x: root._exchangeCommitted
-                                 ? -root.contentSlideDistance * root.contentSlideProgress : 0
+                                 ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
                          width: parent.width
                          height: implicitHeight
                          actionKind: root._transitionOutgoingIntent

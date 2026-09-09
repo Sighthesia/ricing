@@ -589,8 +589,9 @@ Item {
             root.check("replacement target remains screen-clamped", host.targetX >= 8 && host.targetX <= 1000 - host.targetWidth - 8, true)
             root.check("replacement target keeps current kind height", host.targetHeight, expectedHoverHeight)
 
-            // The exchange point keeps both content identities mounted: the
-            // old layer exits left while the new layer enters from the right.
+            // The exchange keeps both contents mounted: the outgoing layer
+            // exits along the pointer trail while the incoming enters from
+            // the travel direction, both on the dedicated slide clock.
             host.transitionProgress = 0.5
             var incomingIdentity = root.findByName(host.popupItem, "popupIdentity")
             var outgoingIdentity = root.findByName(host.popupItem, "popupIdentityOutgoing")
@@ -598,13 +599,15 @@ Item {
             var outgoingActions = root.findByName(host.popupItem, "popupActionsOutgoing")
             root.check("content exchange creates outgoing identity", outgoingIdentity !== null, true)
             root.check("content exchange keeps outgoing identity visible", outgoingIdentity.visible, true)
+            host.contentSlideProgress = 0.5
             root.check("content exchange moves identity in from right", incomingIdentity.x > 0, true)
             root.check("content exchange moves identity out to left", outgoingIdentity.x < 0, true)
             root.check("content exchange moves body in from right", incomingActions.x > 0, true)
             root.check("content exchange moves body out to left", outgoingActions.x < 0, true)
             root.check("content exchange keeps incoming body opaque", incomingActions.opacity, 1)
             root.check("content exchange keeps outgoing body opaque", outgoingActions.opacity, 1)
-            host.transitionProgress = 1
+            host.contentSlideProgress = 1
+            host.settleContentSlide()
             root.check("settled exchange clears outgoing identity", outgoingIdentity.visible, false)
             root.check("settled exchange clears outgoing body", outgoingActions.visible, false)
 
@@ -615,6 +618,17 @@ Item {
             })
             root.check("rapid replacement keeps latest pending target",
                 host.pendingIntent.widgetId, "brightness")
+
+            // Leftward travel mirrors the track: the incoming layer enters
+            // from the left edge and the outgoing exits right.
+            host.transitionProgress = 0.5
+            root.check("leftward exchange flips slide sign", host.contentSlideSign, -1)
+            host.contentSlideProgress = 0.5
+            root.check("leftward exchange enters identity from left", incomingIdentity.x < 0, true)
+            root.check("leftward exchange exits identity right", outgoingIdentity.x > 0, true)
+            host.contentSlideProgress = 1
+            host.settleContentSlide()
+            root.check("leftward settle clears outgoing identity", outgoingIdentity.visible, false)
 
             // Invalid geometry fields must retain the host's last valid values.
             var invalidIntent = {
