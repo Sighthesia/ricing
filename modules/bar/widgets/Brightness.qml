@@ -73,7 +73,8 @@ Item {
     }
 
     // Icon stays vertically centered; progress sits directly below it.
-    Image {
+    // Scheme-aware glyph (dark in light mode, white in dark mode).
+    BarIcon {
         id: brightnessIcon
 
         anchors.centerIn: parent

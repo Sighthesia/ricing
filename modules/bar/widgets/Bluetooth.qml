@@ -74,7 +74,8 @@ BarPill {
     onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
     // Icon stays vertically centered; status sits directly below it.
-    Image {
+    // Scheme-aware glyph (dark in light mode, white in dark mode).
+    BarIcon {
         id: bluetoothIcon
 
         anchors.centerIn: parent

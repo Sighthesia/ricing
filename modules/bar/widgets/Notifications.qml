@@ -67,7 +67,8 @@ BarPill {
         width: LazerTheme.barWidgetHeight - 6
         height: LazerTheme.barWidgetHeight - 6
 
-        Image {
+        // Scheme-aware bell (dark in light mode, white in dark mode).
+        BarIcon {
             anchors.centerIn: parent
             width: LazerTheme.barGlyphSize
             height: LazerTheme.barGlyphSize

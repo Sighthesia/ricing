@@ -94,7 +94,8 @@ BarPill {
     onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
     // Single level icon centered on the pill.
-    Image {
+    // Scheme-aware glyph (dark in light mode, white in dark mode).
+    BarIcon {
         id: batteryIcon
 
         anchors.centerIn: parent

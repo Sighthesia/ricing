@@ -310,7 +310,8 @@ BarPill {
             }
 
             // Music glyph only appears when there is no usable cover art.
-            Image {
+            // Scheme-aware (dark in light mode, white in dark mode).
+            BarIcon {
                 anchors.centerIn: parent
                 width: LazerTheme.barGlyphSize - 6
                 height: LazerTheme.barGlyphSize - 6

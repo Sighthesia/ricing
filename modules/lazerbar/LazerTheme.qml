@@ -43,6 +43,12 @@ QtObject {
     readonly property color hoverForeground: "#FFFFFF"
     readonly property color hoverFill: "#18FFFFFF"
     readonly property color pressedFill: "#0FFFFFFF"
+    // Bar glyph tint follows the painted bar background (TopBar paints
+    // #F2F0F5 in the light scheme, bgDark otherwise), independent of the
+    // wallpaper-adaptation opt-out, so the shared white-stroke glyph set
+    // stays legible in both schemes.
+    readonly property bool lightScheme: settingsService ? settingsService.effectiveColorScheme === "light" : false
+    readonly property color barIcon: lightScheme ? "#1D1B20" : "#FFFFFF"
     readonly property color activeFill: adapt && colorService ? shade(colorService.mTertiary, 0x24 / 255) : "#2400FFA2"
     readonly property color focusRing: adapt && colorService ? colorService.mPrimary : "#FFF2F8"
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"

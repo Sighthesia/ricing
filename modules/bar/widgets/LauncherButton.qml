@@ -18,11 +18,13 @@ BarPill {
 
     implicitWidth: 32
 
-    Image {
+    // Scheme-aware search glyph (dark in light mode, white in dark mode);
+    // resolved here because BarIcon resolves relative paths against its file.
+    BarIcon {
         anchors.centerIn: parent
         width: 16
         height: 16
-        source: "../../lazerbar/icons/search.svg"
+        source: Qt.resolvedUrl("../../lazerbar/icons/search.svg")
         opacity: root.hovered ? 1 : 0.85
 
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }

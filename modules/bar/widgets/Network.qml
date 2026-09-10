@@ -89,7 +89,8 @@ BarPill {
     onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
     // Icon stays vertically centered; signal sits directly below it.
-    Image {
+    // Scheme-aware glyph (dark in light mode, white in dark mode).
+    BarIcon {
         id: networkIcon
 
         anchors.centerIn: parent

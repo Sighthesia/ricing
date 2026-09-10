@@ -21,11 +21,13 @@ BarPill {
     implicitWidth: LazerTheme.barWidgetHeight
 
 
-    Image {
+    // Scheme-aware gear (dark in light mode, white in dark mode); resolved
+    // here because BarIcon resolves relative paths against its own file.
+    BarIcon {
         anchors.centerIn: parent
         width: LazerTheme.barGlyphSize
         height: LazerTheme.barGlyphSize
-        source: "../../lazerbar/icons/settings.svg"
+        source: Qt.resolvedUrl("../../lazerbar/icons/settings.svg")
         opacity: root.hovered ? 1 : 0.85
 
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
