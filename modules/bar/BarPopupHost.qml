@@ -108,6 +108,8 @@ PanelWindow {
     // Content slide runs on its own clock after the exchange (the geometry
     // glide's eased tail is too abrupt) and freezes its travel distance at
     // commit so the morphing shell width cannot jitter the sliding layers.
+    // The same clock drives the layer fade: incoming fades 0->1 while the
+    // outgoing fades 1->0, so asymmetric hops never read as a rigid shift.
     property real contentSlideProgress: 0
     property int contentSlideSign: 1
     property real _contentSlideDistance: 260
@@ -1020,6 +1022,7 @@ PanelWindow {
                     BarPopupIdentity {
                         objectName: "popupIdentity"
                         z: 1
+                        opacity: root._exchangeCommitted ? root.contentSlideProgress : 1
                         x: root._exchangeCommitted
                                 ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
                         title: root.currentIntent ? (root.currentIntent.title || "") : ""
@@ -1034,6 +1037,7 @@ PanelWindow {
                     BarPopupIdentity {
                         objectName: "popupIdentityOutgoing"
                         z: 0
+                        opacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
                         visible: root._transitionOutgoingIntent !== null
                         x: root._exchangeCommitted
                                 ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
@@ -1081,6 +1085,7 @@ PanelWindow {
                          id: popupActions
                          objectName: "popupActions"
                          z: 1
+                         opacity: root._exchangeCommitted ? root.contentSlideProgress : 1
                          x: root._exchangeCommitted
                                  ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
                          width: parent.width
@@ -1096,6 +1101,7 @@ PanelWindow {
                      BarPopupActions {
                          objectName: "popupActionsOutgoing"
                          z: 0
+                         opacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
                          visible: root._transitionOutgoingIntent !== null
                          enabled: false
                          x: root._exchangeCommitted
@@ -1127,6 +1133,7 @@ PanelWindow {
                          id: contextPopupActions
                          objectName: "contextPopupActions"
                          z: 1
+                         opacity: root._exchangeCommitted ? root.contentSlideProgress : 1
                          x: root._exchangeCommitted
                                  ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
                          width: parent.width
@@ -1150,6 +1157,7 @@ PanelWindow {
                      BarContextPopupActions {
                          objectName: "contextPopupActionsOutgoing"
                          z: 0
+                         opacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
                          visible: root._transitionOutgoingIntent !== null
                          enabled: false
                          x: root._exchangeCommitted

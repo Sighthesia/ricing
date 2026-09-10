@@ -539,28 +539,27 @@ Item {
             root.check("close race cleanup clears root intent", host.intent, null)
             root.check("close race cleanup clears surface", host.surfaceActive, false)
             root.check("close race cleanup stops timer", host.debugSnapshot().host.clearTimer, false)
-            // Revive phase: open a popup, let its close fire, then interrupt
-            // the exit reveal with a new intent.
+            // Revive phase: open a popup and settle its reveal, then simulate
+            // a freshly-fired close (exit starts from full reveal with zero
+            // frames elapsed) before interrupting it with a new intent.
             host.showIntent({
                 widgetId: "revive-a", instanceKey: "revive-a:0", kind: "hover",
                 title: "Revive A", actionKind: "volume",
                 anchorX: 300, screenWidth: 1000, screenHeight: 800,
                 effectiveBarHeight: 48, barPosition: "top", payload: {}
             })
-            host.widgetHovered = false
-            host.popupHovered = false
-            host.requestClose()
-            reviveCloseWait.restart()
+            reviveOpenSettleWait.restart()
         }
     }
 
     Timer {
-        id: reviveCloseWait
-        interval: Lazer.MotionTokens.fast + 40
+        id: reviveOpenSettleWait
+        interval: host.popupItem.revealDuration + 400
         onTriggered: {
-            root.check("revive close fires before new hover", host.open, false)
-            root.check("revive keeps surface through exit", host.surfaceActive, true)
-            root.check("revive retains current through exit", host.currentIntent.widgetId, "revive-a")
+            root.check("revive setup opens host", host.open, true)
+            root.check("revive setup settles reveal", host.popupItem.revealProgress > 0.99, true)
+            host.open = false
+            root.check("revive setup retains surface through exit", host.surfaceActive, true)
             // A new widget arriving mid-exit must revive the live popup:
             // glide + slide continue instead of snapping open.
             host.updateIntent({
@@ -572,7 +571,7 @@ Item {
             root.check("revive reopens host", host.open, true)
             root.check("revive starts replacement", host.pendingIntent.widgetId, "network")
             root.check("revive keeps displayed A", host.currentIntent.widgetId, "revive-a")
-            root.check("revive does not snap reveal", host.popupItem.revealProgress > 0, true)
+            root.check("revive does not snap reveal", host.popupItem.revealProgress, 1)
             host.transitionProgress = 0.5
             root.check("revive commits B at exchange", host.currentIntent.widgetId, "network")
             host.contentSlideProgress = 0.5
@@ -786,15 +785,20 @@ Item {
             var outgoingActions = root.findByName(host.popupItem, "popupActionsOutgoing")
             root.check("content exchange creates outgoing identity", outgoingIdentity !== null, true)
             root.check("content exchange keeps outgoing identity visible", outgoingIdentity.visible, true)
+            root.check("exchange starts incoming transparent", incomingActions.opacity, 0)
+            root.check("exchange starts outgoing opaque", outgoingActions.opacity, 1)
             host.contentSlideProgress = 0.5
             root.check("content exchange moves identity in from right", incomingIdentity.x > 0, true)
             root.check("content exchange moves identity out to left", outgoingIdentity.x < 0, true)
             root.check("content exchange moves body in from right", incomingActions.x > 0, true)
             root.check("content exchange moves body out to left", outgoingActions.x < 0, true)
-            root.check("content exchange keeps incoming body opaque", incomingActions.opacity, 1)
-            root.check("content exchange keeps outgoing body opaque", outgoingActions.opacity, 1)
+            root.checkClose("content exchange fades incoming body in", incomingActions.opacity, 0.5, 0.05)
+            root.checkClose("content exchange fades outgoing body out", outgoingActions.opacity, 0.5, 0.05)
+            root.checkClose("content exchange fades identity in", incomingIdentity.opacity, 0.5, 0.05)
+            root.checkClose("content exchange fades identity out", outgoingIdentity.opacity, 0.5, 0.05)
             host.contentSlideProgress = 1
             host.settleContentSlide()
+            root.check("settled exchange restores incoming opacity", incomingActions.opacity, 1)
             root.check("settled exchange clears outgoing identity", outgoingIdentity.visible, false)
             root.check("settled exchange clears outgoing body", outgoingActions.visible, false)
 
