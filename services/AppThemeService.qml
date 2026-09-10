@@ -90,6 +90,9 @@ Singleton {
         path: Quickshell.cacheDir + "/colors.json"
         watchChanges: true
         printErrors: false
+        // The initial load can land after the startup apply attempt: treat
+        // it like a change so the first apply is never lost to the race.
+        onLoaded: root._reloadTimer.restart()
         onFileChanged: root._reloadTimer.restart()
     }
 
