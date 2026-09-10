@@ -57,6 +57,51 @@ def ensure_line(path: Path, line: str) -> bool:
     return True
 
 
+def _which(name: str) -> str | None:
+    from shutil import which
+    return which(name)
+
+
+def _theme_exists(name: str) -> bool:
+    """Check a GTK theme exists in the standard lookup locations."""
+    import os
+    bases = [
+        Path.home() / ".themes",
+        Path.home() / ".local/share/themes",
+        Path("/usr/share/themes"),
+        Path("/usr/local/share/themes"),
+    ]
+    for path in os.environ.get("XDG_DATA_DIRS", "").split(":"):
+        if path:
+            bases.append(Path(path) / "themes")
+    return any((base / name).is_dir() for base in bases)
+
+
+def _sync_gtk_theme(gsettings: str, mode: str) -> None:
+    """Pair gtk-theme with the mode (adw-gtk3 <-> adw-gtk3-dark style).
+
+    Derives the base name from the current value so any -dark-suffixed
+    family works, and only sets when the counterpart actually exists.
+    """
+    try:
+        current = subprocess.run(
+            [gsettings, "get", "org.gnome.desktop.interface", "gtk-theme"],
+            capture_output=True, text=True, timeout=5).stdout.strip().strip("'")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"Warning: gtk-theme read failed: {e}", file=sys.stderr)
+        return
+    base = current[:-5] if current.endswith("-dark") else current
+    target = base + ("" if mode == "light" else "-dark")
+    if target == current or not _theme_exists(target):
+        return
+    try:
+        subprocess.run(
+            [gsettings, "set", "org.gnome.desktop.interface", "gtk-theme", target],
+            capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"Warning: gtk-theme set failed: {e}", file=sys.stderr)
+
+
 def run_hooks(mode: str) -> None:
     """System-level application hooks (never run under --home-prefix)."""
     # System light/dark preference (GTK3 apps, libadwaita, portals).
@@ -74,6 +119,8 @@ def run_hooks(mode: str) -> None:
                     capture_output=True, text=True, timeout=5)
         except (OSError, subprocess.TimeoutExpired) as e:
             print(f"Warning: gsettings sync failed: {e}", file=sys.stderr)
+        # GTK3 visual theme pairs with the scheme (adw-gtk3 family).
+        _sync_gtk_theme(gsettings, mode)
 
     # Live kitty reload: the config include is ensured below in main().
     if _which("pkill"):
@@ -82,11 +129,6 @@ def run_hooks(mode: str) -> None:
                            capture_output=True, timeout=5)
         except (OSError, subprocess.TimeoutExpired) as e:
             print(f"Warning: kitty reload failed: {e}", file=sys.stderr)
-
-
-def _which(name: str) -> str | None:
-    from shutil import which
-    return which(name)
 
 
 def main() -> int:
