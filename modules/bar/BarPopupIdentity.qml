@@ -10,6 +10,9 @@ Rectangle {
     property string summary
     property real hostWidth: 260
     property bool showClose: false
+    // Foreground fade for replacement slides: icon, texts and close fade
+    // while the rail background stays opaque.
+    property real foregroundOpacity: 1
     signal closeRequested()
 
     implicitWidth: hostWidth
@@ -23,6 +26,7 @@ Rectangle {
     // Left-aligned row: optional 16px icon plus title/summary column.
     Row {
         id: layoutRow
+        opacity: root.foregroundOpacity
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -85,6 +89,7 @@ Rectangle {
         objectName: "identityCloseButton"
         width: 32
         height: 32
+        opacity: root.foregroundOpacity
         anchors.right: parent.right
         anchors.rightMargin: 8
         anchors.verticalCenter: parent.verticalCenter

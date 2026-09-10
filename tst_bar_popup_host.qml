@@ -794,11 +794,13 @@ Item {
             root.check("content exchange moves body out to left", outgoingActions.x < 0, true)
             root.checkClose("content exchange fades incoming body in", incomingActions.opacity, 0.5, 0.05)
             root.checkClose("content exchange fades outgoing body out", outgoingActions.opacity, 0.5, 0.05)
-            root.checkClose("content exchange fades identity in", incomingIdentity.opacity, 0.5, 0.05)
-            root.checkClose("content exchange fades identity out", outgoingIdentity.opacity, 0.5, 0.05)
+            root.checkClose("content exchange fades identity in", incomingIdentity.foregroundOpacity, 0.5, 0.05)
+            root.checkClose("content exchange fades identity out", outgoingIdentity.foregroundOpacity, 0.5, 0.05)
+            root.check("content exchange keeps identity rail opaque", incomingIdentity.opacity, 1)
             host.contentSlideProgress = 1
             host.settleContentSlide()
             root.check("settled exchange restores incoming opacity", incomingActions.opacity, 1)
+            root.check("settled exchange restores identity foreground", incomingIdentity.foregroundOpacity, 1)
             root.check("settled exchange clears outgoing identity", outgoingIdentity.visible, false)
             root.check("settled exchange clears outgoing body", outgoingActions.visible, false)
 
