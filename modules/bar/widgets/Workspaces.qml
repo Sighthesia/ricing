@@ -489,6 +489,12 @@ Item {
     // toward travel direction and contracts on arrival. Hosted on the Item
     // itself because Behaviors do not intercept plain QtObject properties.
     property string _edgeTargetKey: ""
+    // Logical left-edge anchor: the committed target, never animated. All
+    // dedupe/drift decisions read this instead of _edgeX, whose value is the
+    // Behavior's in-flight animation frame (identical to _edgeShadowX until
+    // the first animation tick, which made same-frame events look "settled"
+    // and teleported the bar).
+    property real _edgeAnchorX: 0
     property real _edgeX: 0
     property real _edgeShadowX: 0
     property bool _edgeSnapping: false
@@ -513,11 +519,11 @@ Item {
 
     Behavior on _edgeX {
         enabled: root._indicatorPlaced && !MotionTokens.reducedMotion && !root._edgeSnapping
-        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+        NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
     }
     Behavior on _edgeShadowX {
         enabled: root._indicatorPlaced && !MotionTokens.reducedMotion && !root._edgeSnapping
-        NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutSine }
+        NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutSine }
     }
 
     // Commit bar and shadow together with the Behaviors suppressed. Both
@@ -527,6 +533,7 @@ Item {
         var target = centerX - indicatorBarWidth / 2
         _edgeSnapping = true
         _edgeTargetKey = key
+        _edgeAnchorX = target
         _edgeX = target
         _edgeShadowX = target
         _edgeSnapping = false
@@ -534,24 +541,26 @@ Item {
 
     // Route every indicator re-anchor through here. A genuine target switch
     // (key change after placement) desyncs bar and shadow into the trail;
-    // duplicate updates of the same anchor are ignored so an in-flight trail
-    // survives; same-target layout drift snaps both so content churn never
-    // stretches the bar; the first placement snaps so it never slides in
-    // from zero.
+    // duplicate updates are deduped against the logical anchor so an
+    // in-flight trail survives even in the same frame as the switch (x and
+    // shadow are numerically equal until the first animation tick); real
+    // same-target layout drift snaps both so content churn never stretches
+    // the bar; the first placement snaps so it never slides in from zero.
     function retargetEdges(centerX, key) {
         if (!isFinite(centerX))
             return
+        var target = centerX - indicatorBarWidth / 2
         if (key !== _edgeTargetKey && _indicatorPlaced) {
-            var target = centerX - indicatorBarWidth / 2
             _edgePendingCenterX = -1
             _edgeTargetKey = key
+            _edgeAnchorX = target
             _edgeX = target
             _edgeShadowX = target
             return
         }
-        if (Math.abs(centerX - _edgeX - indicatorBarWidth / 2) < 3)
+        if (Math.abs(target - _edgeAnchorX) < 3)
             return
-        if (_edgeX !== _edgeShadowX) {
+        if (Math.abs(_edgeX - _edgeShadowX) > 0.5) {
             _edgePendingCenterX = centerX
             return
         }
