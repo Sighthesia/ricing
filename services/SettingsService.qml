@@ -24,6 +24,7 @@ QtObject {
         autoSunrise: "06:30",
         autoSunset: "18:30",
         themeScheme: "tonal-spot",
+        presetScheme: "",
         panelOpacity: 0.9,
         cornerRadius: 12,
         enableBlur: true,
@@ -387,6 +388,10 @@ QtObject {
                 property string autoSunset: "18:30"
                 // Wallpaper palette scheme template (Material scheme type).
                 property string themeScheme: "tonal-spot"
+                // Color scheme preset name used when wallpaper adaptation is
+                // off (see ColorSchemeService); empty falls back to the
+                // built-in violet palette.
+                property string presetScheme: ""
    property real panelOpacity: 0.9
              property int cornerRadius: 12
                 property bool enableBlur: true

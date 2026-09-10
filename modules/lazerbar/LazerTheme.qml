@@ -19,8 +19,13 @@ QtObject {
     property var settingsService: null
     property var colorService: null
 
-    // Recolor from the wallpaper palette unless the user opts out.
-    readonly property bool adapt: settingsService ? settingsService.appearance.themeAdaptation !== false : false
+    // Recolor from the ColorService palette (wallpaper extraction OR a
+    // selected color scheme preset) unless the user is on the legacy
+    // built-in palette: adaptation on, or adaptation off with a preset.
+    readonly property bool adapt: settingsService
+        ? (settingsService.appearance.themeAdaptation !== false
+           || String(settingsService.appearance.presetScheme || "") !== "")
+        : false
 
     // Wrap a palette color with an explicit alpha so translucent overlays
     // keep their original compositing while adopting the extracted hue.

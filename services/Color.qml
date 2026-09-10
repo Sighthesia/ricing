@@ -5,8 +5,56 @@ import Quickshell.Io
 import "./" as Services
 
 // Expose Material You color tokens loaded from colors.json with animated transitions.
+// Two interchangeable sources share one schema (snake_case matugen format):
+// the wallpaper-extracted colors.json and bundled/user color scheme presets
+// (noctalia model, see ColorSchemeService). applyColors() picks the source
+// and the light/dark variant, so both flow through the same animated tokens.
 QtObject {
     id: root
+
+    // Shared palette schema for both sources; property names match JSON keys.
+    component PaletteJsonAdapter: JsonAdapter {
+        property JsonObject dark: JsonObject {
+            property color primary
+            property color on_primary
+            property color secondary
+            property color on_secondary
+            property color tertiary
+            property color on_tertiary
+            property color error
+            property color on_error
+            property color surface
+            property color on_surface
+            property color surface_variant
+            property color on_surface_variant
+            property color primary_container
+            property color surface_container_low
+            property color surface_container_high
+            property color surface_container_highest
+            property color outline
+            property color shadow
+        }
+        property JsonObject light: JsonObject {
+            property color primary
+            property color on_primary
+            property color secondary
+            property color on_secondary
+            property color tertiary
+            property color on_tertiary
+            property color error
+            property color on_error
+            property color surface
+            property color on_surface
+            property color surface_variant
+            property color on_surface_variant
+            property color primary_container
+            property color surface_container_low
+            property color surface_container_high
+            property color surface_container_highest
+            property color outline
+            property color shadow
+        }
+    }
 
     // Suppress transition animations until first load completes
     property bool skipTransition: true
@@ -55,8 +103,9 @@ QtObject {
     // Use Qt.colorEqual guard: unset color properties default to transparent (#00000000),
     // so we fall back to defaults only when the adapter value is fully transparent.
     function applyColors() {
+        var src = presetActive ? presetAdapter : adapter
         var d = Services.SettingsService.effectiveColorScheme === "light"
-                ? adapter.light : adapter.dark
+                ? src.light : src.dark
         root.mPrimary = Qt.colorEqual(d.primary, "transparent") ? defaults.mPrimary : d.primary
         root.mOnPrimary = Qt.colorEqual(d.on_primary, "transparent") ? defaults.mOnPrimary : d.on_primary
         root.mSecondary = Qt.colorEqual(d.secondary, "transparent") ? defaults.mSecondary : d.secondary
@@ -81,6 +130,8 @@ QtObject {
     property Connections _schemeConnection: Connections {
         target: Services.SettingsService.appearance
         function onColorSchemeChanged() { root.applyColors() }
+        function onPresetSchemeChanged() { root._updatePresetTarget() }
+        function onThemeAdaptationChanged() { root._updatePresetTarget() }
     }
 
     // Automatic sunrise/sunset and OS-scheme flips repaint without re-extraction:
@@ -94,6 +145,49 @@ QtObject {
     property Timer _reloadTimer: Timer {
         interval: 200
         onTriggered: colorsFile.reload()
+    }
+
+    // --- Preset scheme source (noctalia model) ---
+    // Active when wallpaper adaptation is off and a preset is selected;
+    // the preset carries the same schema as colors.json, picked variant by
+    // effectiveColorScheme exactly like the wallpaper palettes.
+    readonly property bool presetActive: {
+        const appearance = Services.SettingsService.appearance
+        return appearance.themeAdaptation === false
+            && String(appearance.presetScheme || "") !== ""
+    }
+
+    function _updatePresetTarget() {
+        const name = String(Services.SettingsService.appearance.presetScheme || "")
+        const path = name !== "" ? Services.ColorSchemeService.pathFor(name) : ""
+        if (presetFile.path !== path)
+            presetFile.path = path
+        applyColors()
+    }
+
+    property Connections _schemesConnection: Connections {
+        target: Services.ColorSchemeService
+        function onSchemesChanged() { root._updatePresetTarget() }
+    }
+
+    // Late-instantiation sync: this singleton may be created after the
+    // scheme registry's only schemesChanged emission, so resolve the preset
+    // target once at startup instead of relying on change signals alone.
+    Component.onCompleted: root._updatePresetTarget()
+
+    property FileView _presetFile: FileView {
+        id: presetFile
+        path: ""
+        watchChanges: true
+        printErrors: false
+
+        onFileChanged: root.applyColors()
+        onLoaded: root.applyColors()
+        onLoadFailed: root.applyColors()
+
+        adapter: PaletteJsonAdapter {
+            id: presetAdapter
+        }
     }
 
     // --- Default dark palette ---
@@ -141,50 +235,8 @@ QtObject {
             }
         }
 
-        JsonAdapter {
+        adapter: PaletteJsonAdapter {
             id: adapter
-            // Read the nested "dark" object from colors.json via JsonObject.
-            // Property names must match JSON keys exactly (snake_case).
-            property JsonObject dark: JsonObject {
-                property color primary
-                property color on_primary
-                property color secondary
-                property color on_secondary
-                property color tertiary
-                property color on_tertiary
-                property color error
-                property color on_error
-                property color surface
-                property color on_surface
-                property color surface_variant
-                property color on_surface_variant
-                property color primary_container
-                property color surface_container_low
-                property color surface_container_high
-                property color surface_container_highest
-                property color outline
-                property color shadow
-            }
-            property JsonObject light: JsonObject {
-                property color primary
-                property color on_primary
-                property color secondary
-                property color on_secondary
-                property color tertiary
-                property color on_tertiary
-                property color error
-                property color on_error
-                property color surface
-                property color on_surface
-                property color surface_variant
-                property color on_surface_variant
-                property color primary_container
-                property color surface_container_low
-                property color surface_container_high
-                property color surface_container_highest
-                property color outline
-                property color shadow
-            }
         }
     }
 }
