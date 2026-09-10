@@ -27,22 +27,6 @@ Rectangle {
     clip: true
     radius: 0
 
-    // Left accent tab (the settings sidebar selection-strip motif) anchors
-    // the header with theme color instead of a full-width rule that reads
-    // as a seam between title and content layers.
-    Rectangle {
-        anchors.left: parent.left
-        anchors.leftMargin: 0
-        anchors.verticalCenter: parent.verticalCenter
-        width: 4
-        height: 24
-        radius: 2
-        color: LazerTheme.settingsAccent
-        opacity: root.foregroundOpacity
-
-        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-    }
-
     // Left-aligned row: optional 16px icon plus title/summary column.
     Row {
         id: layoutRow

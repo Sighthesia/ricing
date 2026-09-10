@@ -85,8 +85,10 @@ Item {
             if (root.direction === root.down)
                 return 0
             var h = (root.revealProgress > 0.01 && root.revealProgress < 0.99 && root.stableContentHeight > 0)
-                ? root.stableContentHeight : contentSlot.height
-            return h + 1
+                ? stableContentHeight : contentSlot.height
+            // Overlap the boundary by 1px (sidebar paints above content) so
+            // no dark background bleeds through as a seam line.
+            return Math.max(0, h - 1)
         }
         onHeightChanged: root.syncStableHeights()
         opacity: root.animateLayerOpacity ? root.sidebarRevealProgress : 1
@@ -115,8 +117,10 @@ Item {
                 return 0
             if (root.direction === root.down) {
                 var sh = (root.revealProgress > 0.01 && root.revealProgress < 0.99 && root.stableSidebarHeight > 0)
-                    ? root.stableSidebarHeight : sidebarSlot.height
-                return sh + 1
+                    ? stableSidebarHeight : sidebarSlot.height
+                // Tuck 1px under the opaque header instead of leaving a 1px
+                // gap that reads as a dark seam between the layers.
+                return Math.max(0, sh - 1)
             }
             return 0
         }

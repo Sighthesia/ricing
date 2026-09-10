@@ -578,8 +578,7 @@ Item {
         clip: true
 
         // Submenu title mirrors the popup identity header: full-width
-        // settingsRail block, 48 high, bold 13px label on 12px margins,
-        // anchored by the same left accent tab.
+        // settingsRail block, 48 high, bold 13px label on 12px margins.
         Rectangle {
             objectName: "traySubmenuTitleBlock"
             anchors.left: parent.left
@@ -587,17 +586,6 @@ Item {
             anchors.top: parent.top
             height: 48
             color: Lazer.LazerTheme.settingsRail
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: 4
-                height: 24
-                radius: 2
-                color: Lazer.LazerTheme.settingsAccent
-
-                Behavior on color { ColorAnimation { duration: Lazer.MotionTokens.fast } }
-            }
 
             Text {
                 objectName: "traySubmenuTitle"
