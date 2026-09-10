@@ -671,7 +671,9 @@ Item {
             clip: true
             interactive: false
             contentWidth: width
-            contentHeight: paneColumn.height
+            // Footer height rides along as bottom clearance so the last
+            // line can scroll clear above the pinned metadata strip.
+            contentHeight: paneColumn.height + 10 + metaCaption.height
             boundsBehavior: Flickable.StopAtBounds
             onContentHeightChanged: contentY = Math.max(0, Math.min(contentY, Math.max(0, contentHeight - height)))
             onVisibleChanged: if (visible) contentY = 0
@@ -696,7 +698,7 @@ Item {
             Column {
                 id: paneColumn
                 x: (paneScroll.width - width) / 2
-                y: Math.max(0, (paneScroll.height - height) / 2)
+                y: 10
                 width: paneScroll.width - 20
                 spacing: 8
 
@@ -740,14 +742,14 @@ Item {
                 }
 
                 // Large decoded image for image entries: the frame fills the
-                // viewport above the caption and PreserveAspectFit scales
-                // the image up or down to use all of it.
+                // viewport above the footer strip and PreserveAspectFit
+                // scales the image up or down to use all of it.
                 Rectangle {
                     id: paneImageFrame
                     visible: !!previewPane.selectedResult
                              && previewPane.selectedResult.isImage === true
                     width: parent.width
-                    height: Math.max(120, paneScroll.height - 20 - 8 - metaCaption.height)
+                    height: Math.max(120, paneScroll.height - 20 - metaCaption.height)
                     radius: 4
                     color: LazerTheme.settingsCardHover
 
@@ -766,13 +768,29 @@ Item {
                         source: ""
                     }
                 }
+            }
 
-                // Metadata caption under the preview; the full text already
-                // renders above, so this never repeats the content itself.
+            // Metadata footer pinned to the pane bottom with an opaque rail
+            // background: scrolled content slides underneath it. Declared
+            // after the Flickable so it paints on top; the full text already
+            // renders above, so this never repeats the content itself.
+            Rectangle {
+                id: metaCaption
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: metaText.implicitHeight + 12
+                visible: previewPane.shown && metaText.text.length > 0
+                color: LazerTheme.settingsRail
+                radius: 6
+
                 Text {
-                    id: metaCaption
-                    visible: previewPane.shown && text.length > 0
-                    width: parent.width
+                    id: metaText
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
                     text: previewPane.selectedResult
                           ? (previewPane.selectedResult.description || "") : ""
                     textFormat: Text.PlainText
