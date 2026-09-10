@@ -126,6 +126,19 @@ Item {
             return { values: values }
         }
 
+        // Local command fixture: the builtin command list is an empty placeholder
+        // since the lock screen was removed, so command merge/filter/execute
+        // coverage injects a representative entry instead.
+        function makeLockCommand() {
+            return {
+                id: "cmd-lock",
+                label: "锁定屏幕",
+                description: "Lock the session",
+                keywords: "lock 锁屏",
+                actionId: "shell.lock.activate"
+            }
+        }
+
         function makeRunner(outcome) {
             var runner = { calls: [], outcome: outcome }
             runner.run = function(argv, done) {
@@ -352,7 +365,7 @@ Item {
         function test_appsAdapterSurfacesBuiltinCommands() {
             var adapters = LauncherAdapters.createAdapters({
                 appsSource: makeAppsSource([makeAppEntry("alpha", "Alpha", "")]),
-                commands: LauncherAdapters.builtinCommands()
+                commands: [makeLockCommand()]
             })
 
             var outcome = "pending"
@@ -360,7 +373,7 @@ Item {
 
             compare(outcome.length, 2)
             var lock = outcome[1]
-            compare(lock.id, "builtin-lock")
+            compare(lock.id, "cmd-lock")
             compare(lock.kind, "command")
             compare(lock.displayName, "锁定屏幕")
             compare(lock.actionId, "shell.lock.activate")
@@ -370,13 +383,13 @@ Item {
         function test_appsAdapterFiltersCommandsByQuery() {
             var adapters = LauncherAdapters.createAdapters({
                 appsSource: makeAppsSource([]),
-                commands: LauncherAdapters.builtinCommands()
+                commands: [makeLockCommand()]
             })
 
             var hit = "pending"
             adapters.apps.refresh("锁屏", "apps", function(result) { hit = result })
             compare(hit.length, 1)
-            compare(hit[0].id, "builtin-lock")
+            compare(hit[0].id, "cmd-lock")
 
             var english = "pending"
             adapters.apps.refresh("lock", "apps", function(result) { english = result })
@@ -391,7 +404,7 @@ Item {
             var ran = []
             var adapters = LauncherAdapters.createAdapters({
                 appsSource: makeAppsSource([]),
-                commands: LauncherAdapters.builtinCommands(),
+                commands: [makeLockCommand()],
                 ipcHelperPath: "/opt/afloat-ipc",
                 actionRunner: function(argv, done) { ran.push(argv); done({ ok: true }) }
             })
@@ -412,7 +425,7 @@ Item {
         function test_appsAdapterCommandWithoutRunnerErrors() {
             var adapters = LauncherAdapters.createAdapters({
                 appsSource: makeAppsSource([]),
-                commands: LauncherAdapters.builtinCommands()
+                commands: [makeLockCommand()]
             })
 
             var outcome = null
