@@ -76,6 +76,34 @@ Item {
         return null
     }
 
+    function accentStripOf(item) {
+        if (!item)
+            return null
+        var kids = []
+        try {
+            kids = item.children || []
+        } catch (e5) {
+            return null
+        }
+        for (var i = 0; i < kids.length; i++) {
+            var c = kids[i]
+            if (!c)
+                continue
+            var isStrip = false
+            try {
+                isStrip = c.height === 2 && c.color !== undefined
+                    && String(c.color) === String(Lazer.LazerTheme.settingsAccent)
+            } catch (e6) {
+            }
+            if (isStrip)
+                return c
+            var nested = root.accentStripOf(c)
+            if (nested)
+                return nested
+        }
+        return null
+    }
+
     function finish() {
         try {
             if (root.savedScheme !== "")
@@ -174,6 +202,10 @@ Item {
             if (String(colorizer.colorizationColor) !== wantDark)
                 return
             root.check("identity colorizer follows barIcon (dark)", true)
+            var strip = root.accentStripOf(root.identityInstance)
+            if (!strip || Math.abs(strip.height - 2) > 0.5)
+                return
+            root.check("identity header carries accent hairline", true)
             try {
                 Services.SettingsService.appearance.colorScheme = "dark"
             } catch (e3) {

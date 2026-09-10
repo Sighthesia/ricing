@@ -27,6 +27,19 @@ Rectangle {
     clip: true
     radius: 0
 
+    // Accent hairline anchoring the header with theme color and giving the
+    // title layer a hard edge against the panel body.
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: 2
+        color: LazerTheme.settingsAccent
+        opacity: root.foregroundOpacity
+
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+    }
+
     // Left-aligned row: optional 16px icon plus title/summary column.
     Row {
         id: layoutRow

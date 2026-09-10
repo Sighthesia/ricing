@@ -44,9 +44,13 @@ QtObject {
     // textPrimary (white/mOnSurface) at 0.82 alpha so 10px subtitles
     // stay readable on bgDark/mSurface without collapsing hierarchy.
     readonly property color barSubtitle: shade(textPrimary, 0.82)
-    readonly property color hoverForeground: "#FFFFFF"
-    readonly property color hoverFill: "#18FFFFFF"
-    readonly property color pressedFill: "#0FFFFFFF"
+    readonly property color hoverForeground: lightScheme ? barIcon : "#FFFFFF"
+    // Interactive feedback inverts with the scheme: light surfaces take a
+    // low-alpha ink wash (white washes are invisible there); pressed stays
+    // fainter than hover. Active highlight reads as a container tint in
+    // light mode instead of a translucent mid-tone patch.
+    readonly property color hoverFill: lightScheme ? shade(barIcon, 0x14 / 255) : "#18FFFFFF"
+    readonly property color pressedFill: lightScheme ? shade(barIcon, 0x0A / 255) : "#0FFFFFFF"
     // Bar glyph tint follows the painted bar surface: light scheme tints
     // with the palette's on-surface ink (fallback near-black), dark scheme
     // keeps white, independent of the wallpaper-adaptation opt-out so the
@@ -55,7 +59,10 @@ QtObject {
     readonly property color barIcon: lightScheme
         ? (adapt && colorService ? colorService.mOnSurface : "#1D1B20")
         : "#FFFFFF"
-    readonly property color activeFill: adapt && colorService ? shade(colorService.mTertiary, 0x24 / 255) : "#2400FFA2"
+    readonly property color activeFill: adapt && colorService
+        ? (lightScheme ? shade(colorService.mPrimaryContainer, 0x99 / 255)
+                       : shade(colorService.mTertiary, 0x24 / 255))
+        : "#2400FFA2"
     readonly property color focusRing: adapt && colorService ? colorService.mPrimary : "#FFF2F8"
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
