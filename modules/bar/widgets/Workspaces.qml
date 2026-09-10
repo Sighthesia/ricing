@@ -8,7 +8,9 @@ import "../../../services" as Services
 // Workspace overview squares that expand to show each workspace's app icons
 // (noctalia-shell grouped mode): click a square to focus the workspace, click
 // an app icon to focus that exact window. Empty workspaces stay compact
-// numbered squares.
+// numbered squares. A single accent bar slides between the active workspace
+// and the focused app icon, reusing the volume level bar geometry so its
+// baseline aligns with the volume/battery/brightness bars.
 Item {
     id: root
 
@@ -31,6 +33,12 @@ Item {
     // Focus lives on its own so focus-only updates never rebuild icon
     // delegates; ticks and opacity bind to this instead.
     property string focusedWinId: ""
+    // Single indicator state: center X in root coordinates. The bar itself
+    // is one Rectangle below; only this value moves when the active
+    // workspace or the focused app changes.
+    property real indicatorCenterX: 0
+    property bool indicatorVisible: false
+    property bool _indicatorPlaced: false
 
     readonly property int iconSize: 16
     readonly property int iconSpacing: 4
@@ -100,7 +108,7 @@ Item {
             map[workspaceIds[i]].sort(root.windowOrder)
 
         // Focus-only events (the most frequent) swap nothing: icon
-        // delegates stay alive and just rebind their tick/opacity.
+        // delegates stay alive and just rebind their opacity.
         root.focusedWinId = focused
         const signature = root.mapSignature(map)
         if (signature === root._windowMapSignature)
@@ -115,10 +123,92 @@ Item {
         target: Services.NiriService
         function onWindowsUpdated() {
             Qt.callLater(root.refreshWindowMap)
+            Qt.callLater(root.updateIndicator)
+        }
+        function onWorkspacesUpdated() {
+            Qt.callLater(root.updateIndicator)
+        }
+        function onWorkspaceActivated() {
+            Qt.callLater(root.updateIndicator)
         }
     }
 
-    Component.onCompleted: root.refreshWindowMap()
+    // Slide the single indicator to the focused app icon when there is one,
+    // otherwise to the active workspace center. Prefers the focused window's
+    // own workspace so one bar tracks both workspace and app switches.
+    function updateIndicator() {
+        if (!workspaceRepeater || workspaceRepeater.count === 0) {
+            root.indicatorVisible = false
+            return
+        }
+        const wsModel = Services.NiriService.workspaces
+        let activeIndex = -1
+        for (let i = 0; i < wsModel.count; i++) {
+            const ws = wsModel.get(i)
+            if (ws && ws.isActive)
+                activeIndex = i
+        }
+        let focusedIndex = -1
+        if (root.focusedWinId !== "") {
+            for (let w = 0; w < workspaceRepeater.count; w++) {
+                const wItem = workspaceRepeater.itemAt(w)
+                if (!wItem || !wItem.wins)
+                    continue
+                const wins = wItem.wins
+                for (let k = 0; k < wins.length; k++) {
+                    if (wins[k] && String(wins[k].winId) === root.focusedWinId) {
+                        focusedIndex = w
+                        break
+                    }
+                }
+                if (focusedIndex >= 0)
+                    break
+            }
+        }
+        const targetIndex = focusedIndex >= 0 ? focusedIndex : activeIndex
+        if (targetIndex < 0 || targetIndex >= workspaceRepeater.count) {
+            root.indicatorVisible = false
+            return
+        }
+        const targetItem = workspaceRepeater.itemAt(targetIndex)
+        if (!targetItem) {
+            root.indicatorVisible = false
+            return
+        }
+        let centerX = NaN
+        if (focusedIndex >= 0) {
+            try {
+                centerX = targetItem.iconCenterXInRoot(root.focusedWinId)
+            } catch (e) {
+                centerX = NaN
+            }
+        }
+        if (!isFinite(centerX)) {
+            try {
+                centerX = targetItem.centerXInRoot()
+            } catch (e2) {
+                centerX = NaN
+            }
+        }
+        if (!isFinite(centerX))
+            return
+        // Assign while unplaced so the first show never slides in from zero.
+        root.indicatorCenterX = centerX
+        if (!root.indicatorVisible)
+            root.indicatorVisible = true
+        if (!root._indicatorPlaced)
+            root._indicatorPlaced = true
+    }
+
+    onFocusedWinIdChanged: Qt.callLater(root.updateIndicator)
+    onWindowsByWorkspaceChanged: Qt.callLater(root.updateIndicator)
+    onWidthChanged: Qt.callLater(root.updateIndicator)
+    onHeightChanged: Qt.callLater(root.updateIndicator)
+
+    Component.onCompleted: {
+        root.refreshWindowMap()
+        Qt.callLater(root.updateIndicator)
+    }
 
     implicitWidth: workspaceRow.implicitWidth
     implicitHeight: LazerTheme.barWidgetHeight
@@ -129,7 +219,11 @@ Item {
         anchors.centerIn: parent
         spacing: LazerTheme.inlineGap
 
+        onXChanged: Qt.callLater(root.updateIndicator)
+        onWidthChanged: Qt.callLater(root.updateIndicator)
+
         Repeater {
+            id: workspaceRepeater
             model: Services.NiriService.workspaces
 
             // One sharp square per workspace; occupied ones widen into an
@@ -149,6 +243,32 @@ Item {
                 width: hasWindows ? contentRow.implicitWidth + root.cellPadding * 2
                                   : LazerTheme.barWidgetHeight
                 height: LazerTheme.barWidgetHeight
+
+                onXChanged: Qt.callLater(root.updateIndicator)
+                onWidthChanged: Qt.callLater(root.updateIndicator)
+
+                // Center of this square in Workspaces coordinates: fallback
+                // target when the focused app icon cannot be resolved.
+                function centerXInRoot() {
+                    const p = workspaceSquare.mapToItem(root, workspaceSquare.width / 2, 0)
+                    return p.x
+                }
+
+                // Center of one app icon in Workspaces coordinates; NaN when
+                // the window is not on this workspace (icons rebuilt).
+                function iconCenterXInRoot(winId) {
+                    const target = String(winId)
+                    for (let i = 0; i < windowRepeater.count; i++) {
+                        const item = windowRepeater.itemAt(i)
+                        if (!item || !item.modelData)
+                            continue
+                        if (String(item.modelData.winId) === target) {
+                            const p = item.mapToItem(root, item.width / 2, 0)
+                            return p.x
+                        }
+                    }
+                    return NaN
+                }
 
                 Behavior on width {
                     enabled: !MotionTokens.reducedMotion
@@ -185,8 +305,10 @@ Item {
                     }
 
                     // One icon per window on this workspace; the focused
-                    // window's icon stays bright with an accent tick below.
+                    // window's icon stays bright while the single indicator
+                    // below slides underneath it.
                     Repeater {
+                        id: windowRepeater
                         model: workspaceSquare.wins
 
                         delegate: Item {
@@ -219,18 +341,6 @@ Item {
                                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
                             }
 
-                            // Focused-window tick echoes the active
-                            // workspace strip in miniature.
-                            Rectangle {
-                                anchors.bottom: parent.bottom
-                                anchors.bottomMargin: -3
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                width: parent.width - 6
-                                height: 2
-                                color: LazerTheme.osuGreen
-                                visible: windowIcon.isFocused
-                            }
-
                             HoverHandler {
                                 id: iconHover
                             }
@@ -246,17 +356,6 @@ Item {
                     }
                 }
 
-                // Active workspaces keep a thin accent strip along the bottom.
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: workspaceSquare.isActive ? parent.width - 8 : 0
-                    height: 2
-                    color: LazerTheme.osuGreen
-
-                    Behavior on width { NumberAnimation { duration: MotionTokens.fast } }
-                }
-
                 HoverHandler {
                     id: hoverHandler
                 }
@@ -268,6 +367,29 @@ Item {
                         String(workspaceSquare.idx)
                     ])
                 }
+            }
+        }
+    }
+
+    // Single workspace indicator: same width/height/radius as the volume
+    // level bar, workspace green kept, top edge derived from the centered
+    // bar glyph so it aligns with the volume/battery/brightness bars.
+    Rectangle {
+        id: activeIndicator
+
+        width: LazerTheme.barWidgetHeight - 16
+        height: 3
+        radius: 1.5
+        color: LazerTheme.osuGreen
+        visible: root.indicatorVisible
+        x: Math.round(root.indicatorCenterX - width / 2)
+        y: Math.round(root.height / 2 + (LazerTheme.barGlyphSize - 4) / 2 + 4)
+
+        Behavior on x {
+            enabled: root._indicatorPlaced && !MotionTokens.reducedMotion
+            NumberAnimation {
+                duration: MotionTokens.fast
+                easing.type: Easing.OutQuad
             }
         }
     }
