@@ -183,7 +183,7 @@ def main() -> int:
                     # Multi-mode format
                     result[mode] = expand_predefined_scheme(scheme_data[mode], mode)
                     inject_terminal_colors(result[mode], scheme_data[mode])
-                elif "mPrimary" in scheme_data:
+                elif "mPrimary" in scheme_data or "primary" in scheme_data:
                     # Single-mode format - use same colors for requested mode
                     result[mode] = expand_predefined_scheme(scheme_data, mode)
                     inject_terminal_colors(result[mode], scheme_data)

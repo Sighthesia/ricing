@@ -175,6 +175,10 @@ QtObject {
     // target once at startup instead of relying on change signals alone.
     Component.onCompleted: root._updatePresetTarget()
 
+    // Resolved preset file path (empty when no preset selected/known) —
+    // exposed for consumers that must not re-resolve through the registry.
+    readonly property string presetSchemePath: presetFile.path
+
     property FileView _presetFile: FileView {
         id: presetFile
         path: ""

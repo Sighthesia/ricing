@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""
+Apply Afloat's palette to system apps (noctalia/DymicShell model).
+
+Renders the app template targets (kitty, GTK 3/4, qt5ct/qt6ct) from the
+active palette for the effective light/dark mode, then applies them:
+
+- gsettings org.gnome.desktop.interface color-scheme  -> system light/dark
+- kitty.conf include line + SIGUSR1 reload            -> live kitty colors
+- gtk-3.0/gtk-4.0 gtk.css @import                     -> GTK css pickup
+
+Usage:
+    python3 apply_app_themes.py --palette PATH --mode dark|light
+        [--config app-themes.toml] [--home-prefix PATH]
+
+--home-prefix redirects ~ expansion to a sandbox root and disables the
+system hooks (gsettings/kitty signals); it exists for tests.
+"""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+PROCESSOR = Path(__file__).resolve().parent / "template-processor.py"
+DEFAULT_CONFIG = Path(__file__).resolve().parent / "templates" / "app-themes.toml"
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog='apply-app-themes',
+        description='Render Afloat app theme templates and apply them',
+    )
+    parser.add_argument('--palette', type=Path, default=None,
+                        help='Palette JSON: {"dark": {...}, "light": {...}} (matugen schema)')
+    parser.add_argument('--scheme-name', type=str, default=None,
+                        help='Resolve a color scheme preset by name (user dir, then bundled)')
+    parser.add_argument('--mode', choices=['dark', 'light'], required=True)
+    parser.add_argument('--config', type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument('--home-prefix', type=Path, default=None,
+                        help='Redirect ~ to this root for testing (disables system hooks)')
+    return parser.parse_args()
+
+
+def ensure_line(path: Path, line: str) -> bool:
+    """Append line to path when missing. Returns True when file changed."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = path.read_text() if path.exists() else ""
+    if line in existing:
+        return False
+    with open(path, "a") as f:
+        if existing and not existing.endswith("\n"):
+            f.write("\n")
+        f.write(line + "\n")
+    return True
+
+
+def run_hooks(mode: str) -> None:
+    """System-level application hooks (never run under --home-prefix)."""
+    # System light/dark preference (GTK3 apps, libadwaita, portals).
+    gsettings = _which("gsettings")
+    if gsettings:
+        value = "prefer-dark" if mode == "dark" else "prefer-light"
+        try:
+            current = subprocess.run(
+                [gsettings, "get", "org.gnome.desktop.interface", "color-scheme"],
+                capture_output=True, text=True, timeout=5).stdout.strip()
+            if current != f"'{value}'":
+                subprocess.run(
+                    [gsettings, "set", "org.gnome.desktop.interface",
+                     "color-scheme", value],
+                    capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            print(f"Warning: gsettings sync failed: {e}", file=sys.stderr)
+
+    # Live kitty reload: the config include is ensured below in main().
+    if _which("pkill"):
+        try:
+            subprocess.run(["pkill", "-USR1", "-x", "kitty"],
+                           capture_output=True, timeout=5)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            print(f"Warning: kitty reload failed: {e}", file=sys.stderr)
+
+
+def _which(name: str) -> str | None:
+    from shutil import which
+    return which(name)
+
+
+def main() -> int:
+    args = parse_args()
+
+    if args.scheme_name:
+        home = Path.home()
+        candidates = [
+            home / ".config/afloat/colorschemes" / args.scheme_name / f"{args.scheme_name}.json",
+            Path(__file__).resolve().parents[2] / "Assets/ColorScheme"
+                / args.scheme_name / f"{args.scheme_name}.json",
+        ]
+        args.palette = next((c for c in candidates if c.exists()), None)
+        if args.palette is None:
+            print(f"Error: scheme not found: {args.scheme_name}", file=sys.stderr)
+            return 1
+    if args.palette is None or not args.palette.exists():
+        print(f"Error: palette not found: {args.palette}", file=sys.stderr)
+        return 1
+    if not args.config.exists():
+        print(f"Error: config not found: {args.config}", file=sys.stderr)
+        return 1
+
+    if args.home_prefix is not None:
+        # Sandbox ~ for both the renderer and the include-ensure step.
+        args.home_prefix.mkdir(parents=True, exist_ok=True)
+        import os
+        os.environ["HOME"] = str(args.home_prefix)
+
+    render = subprocess.run(
+        [sys.executable, str(PROCESSOR),
+         "--scheme", str(args.palette),
+         "--mode", args.mode,
+         "--config", str(args.config)],
+        capture_output=True, text=True,
+        # Matugen semantics: template input_path is relative to the config.
+        cwd=args.config.parent)
+    if render.returncode != 0:
+        sys.stderr.write(render.stderr)
+        return render.returncode
+
+    home = Path.home()
+    ensure_line(home / ".config/kitty/kitty.conf", "include kitty-colors.conf")
+    ensure_line(home / ".config/gtk-3.0/gtk.css", "@import 'colors.css';")
+    ensure_line(home / ".config/gtk-4.0/gtk.css", "@import 'colors.css';")
+
+    if args.home_prefix is None:
+        run_hooks(args.mode)
+
+    print(f"App themes applied: palette={args.palette} mode={args.mode}")
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

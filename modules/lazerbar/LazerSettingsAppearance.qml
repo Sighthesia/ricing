@@ -384,6 +384,17 @@ LazerSettingsSection {
         settingsObject: root.settingsObject
         saveCallback: root.saveCallback
     }
+
+    LazerSettingsRow {
+        id: syncAppThemesRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: "同步应用主题"; descriptionText: "亮暗或配色变化时同步 GTK/Qt/kitty 与系统色"
+        defaultValue: root.defaultOf("syncAppThemes")
+        currentValue: root.settingsObject ? root.settingsObject.syncAppThemes : null
+        resetCallback: function() { root.resetKey("syncAppThemes") }
+        LazerSettingsToggle { id: syncAppThemesToggleControl; checked: root.settingsObject ? root.settingsObject.syncAppThemes === true : false; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.syncAppThemes = value; root.save() } } }
+    }
     LazerSettingsRow {
         id: rippleRow
         width: parent.width - 16; x: 8

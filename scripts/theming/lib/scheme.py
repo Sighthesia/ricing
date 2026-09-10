@@ -78,21 +78,30 @@ def expand_predefined_scheme(scheme_data: dict[str, str], mode: ThemeMode) -> di
     """
     is_dark = mode == "dark"
 
+    def _pick(camel: str, snake: str) -> str:
+        """Accept both noctalia m-camelCase and matugen snake_case keys."""
+        if camel in scheme_data:
+            return scheme_data[camel]
+        if snake in scheme_data:
+            return scheme_data[snake]
+        raise KeyError(f"scheme data missing {camel}/{snake}")
+
     # Parse input colors
-    primary = _hex_to_color(scheme_data["mPrimary"])
-    on_primary = _hex_to_color(scheme_data["mOnPrimary"])
-    secondary = _hex_to_color(scheme_data["mSecondary"])
-    on_secondary = _hex_to_color(scheme_data["mOnSecondary"])
-    tertiary = _hex_to_color(scheme_data["mTertiary"])
-    on_tertiary = _hex_to_color(scheme_data["mOnTertiary"])
-    error = _hex_to_color(scheme_data["mError"])
-    on_error = _hex_to_color(scheme_data["mOnError"])
-    surface = _hex_to_color(scheme_data["mSurface"])
-    on_surface = _hex_to_color(scheme_data["mOnSurface"])
-    surface_variant = _hex_to_color(scheme_data["mSurfaceVariant"])
-    on_surface_variant = _hex_to_color(scheme_data["mOnSurfaceVariant"])
-    outline_raw = _hex_to_color(scheme_data["mOutline"])
-    shadow = _hex_to_color(scheme_data.get("mShadow", scheme_data["mSurface"]))
+    primary = _hex_to_color(_pick("mPrimary", "primary"))
+    on_primary = _hex_to_color(_pick("mOnPrimary", "on_primary"))
+    secondary = _hex_to_color(_pick("mSecondary", "secondary"))
+    on_secondary = _hex_to_color(_pick("mOnSecondary", "on_secondary"))
+    tertiary = _hex_to_color(_pick("mTertiary", "tertiary"))
+    on_tertiary = _hex_to_color(_pick("mOnTertiary", "on_tertiary"))
+    error = _hex_to_color(_pick("mError", "error"))
+    on_error = _hex_to_color(_pick("mOnError", "on_error"))
+    surface = _hex_to_color(_pick("mSurface", "surface"))
+    on_surface = _hex_to_color(_pick("mOnSurface", "on_surface"))
+    surface_variant = _hex_to_color(_pick("mSurfaceVariant", "surface_variant"))
+    on_surface_variant = _hex_to_color(_pick("mOnSurfaceVariant", "on_surface_variant"))
+    outline_raw = _hex_to_color(_pick("mOutline", "outline"))
+    shadow = _hex_to_color(scheme_data.get(
+        "mShadow", scheme_data.get("shadow", _pick("mSurface", "surface"))))
 
     # Generate container colors
     if is_dark:

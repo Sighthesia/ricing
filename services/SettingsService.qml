@@ -25,6 +25,7 @@ QtObject {
         autoSunset: "18:30",
         themeScheme: "tonal-spot",
         presetScheme: "",
+        syncAppThemes: false,
         panelOpacity: 0.9,
         cornerRadius: 12,
         enableBlur: true,
@@ -392,6 +393,9 @@ QtObject {
                 // off (see ColorSchemeService); empty falls back to the
                 // built-in violet palette.
                 property string presetScheme: ""
+                // Sync GTK/Qt/kitty app themes and the system color scheme
+                // when the shell's light/dark or palette changes.
+                property bool syncAppThemes: false
    property real panelOpacity: 0.9
              property int cornerRadius: 12
                 property bool enableBlur: true
