@@ -55,12 +55,18 @@ Item {
         }
         if (!isFinite(centerX)) centerX = 0
         var titleText = (delegateItem && delegateItem.label) ? delegateItem.label : (modelData.title || modelData.tooltipTitle || modelData.id || "Tray item")
+        // Stable per-icon identity: tray delegates share widgetId/instanceKey,
+        // so the host tells icons apart via this key. The same icon refreshing
+        // its label keeps the popup live; a different icon gets the full
+        // glide/slide replacement.
+        var delegateKey = String((modelData && modelData.id) || titleText || "tray")
         var iconSrc = normalizeTrayIconSource((delegateItem && delegateItem.iconSource)
                 ? delegateItem.iconSource : (modelData.icon || ""))
         var summaryText = modelData.tooltipTitle || modelData.tooltipSubTitle || ""
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
+            delegateKey: delegateKey,
             screenName: root.screenName,
             title: titleText,
             iconSource: iconSrc,

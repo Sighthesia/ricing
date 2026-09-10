@@ -442,6 +442,57 @@ Item {
             root.checkOpaque("natural close keeps layers opaque")
             root.check("natural close timer is stopped", host.closeTimerRunning, false)
             root.check("natural close leaves popup owner available", host.popupItem !== null, true)
+            // Tray delegates share one widget identity: a different icon id
+            // must glide and slide like a cross-widget switch, while the same
+            // icon refreshing its label stays live in place.
+            host.showIntent({
+                widgetId: "tray", instanceKey: "tray:0", kind: "hover",
+                title: "App A", actionKind: "tray", delegateKey: "sni-a",
+                anchorX: 600, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.updateIntent({
+                widgetId: "tray", instanceKey: "tray:0", kind: "hover",
+                title: "App B", actionKind: "tray", delegateKey: "sni-b",
+                anchorX: 660, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            root.check("tray icon switch starts replacement", host.pendingIntent.delegateKey, "sni-b")
+            root.check("tray icon switch keeps current icon", host.currentIntent.delegateKey, "sni-a")
+            host.transitionProgress = 0.5
+            root.check("tray switch slides new icon in from right", host.contentSlideSign, 1)
+            host.contentSlideProgress = 0.5
+            var trayInIdentity = root.findByName(host.popupItem, "popupIdentity")
+            var trayOutIdentity = root.findByName(host.popupItem, "popupIdentityOutgoing")
+            root.check("tray switch moves identity in from right", trayInIdentity.x > 0, true)
+            root.check("tray switch moves identity out to left", trayOutIdentity.x < 0, true)
+            host.contentSlideProgress = 1
+            host.settleContentSlide()
+            // Moving back left mirrors the track.
+            host.updateIntent({
+                widgetId: "tray", instanceKey: "tray:0", kind: "hover",
+                title: "App A", actionKind: "tray", delegateKey: "sni-a",
+                anchorX: 600, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.transitionProgress = 0.5
+            root.check("tray switch back flips slide sign", host.contentSlideSign, -1)
+            host.contentSlideProgress = 1
+            host.settleContentSlide()
+            // Same icon refreshing its label stays live without a transition.
+            host.updateIntent({
+                widgetId: "tray", instanceKey: "tray:0", kind: "hover",
+                title: "App A (2)", actionKind: "tray", delegateKey: "sni-a",
+                anchorX: 600, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            root.check("tray label refresh clears pending", host.pendingIntent, null)
+            root.check("tray label refresh updates live", host.currentIntent.title, "App A (2)")
+            root.check("tray label refresh keeps no outgoing layer", host._transitionOutgoingIntent, null)
+            // Restore the closed state the close-race block below expects.
+            host.dismissImmediately()
+            root.check("tray phase dismiss closes host", host.open, false)
+            root.check("tray phase dismiss clears current", host.currentIntent, null)
             // Start a replacement, then naturally close while its glide is
             // active. The pending target must never be installed during exit.
             host.showIntent({

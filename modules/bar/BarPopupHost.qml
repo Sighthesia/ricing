@@ -452,6 +452,9 @@ PanelWindow {
             && String(left.instanceKey || "") === String(right.instanceKey || "")
             && String(left.kind || "hover") === String(right.kind || "hover")
             && String(left.actionKind || "") === String(right.actionKind || "")
+            // Tray delegates share the widget identity; the per-icon key
+            // decides whether the popup glides or stays live in place.
+            && String(left.delegateKey || "") === String(right.delegateKey || "")
     }
 
     function _intentNumber(intentObj, fieldName, fallback, minimum) {
