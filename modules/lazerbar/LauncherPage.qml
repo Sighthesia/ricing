@@ -562,6 +562,47 @@ Item {
         return ""
     }
 
+    // Full decoded text per entry id: `cliphist list` previews are a single
+    // truncated line, so the preview pane pulls the real content through the
+    // service decode seam and swaps it in when it lands. Until then the
+    // single-line preview shows; a decode superseded by a newer request is
+    // retried the next time the entry is previewed.
+    readonly property var _previewTexts: ({})
+    readonly property var _requestedTextIds: ({})
+    property int _previewTextRev: 0
+    function clipFullText(item) {
+        if (!item || item.isImage)
+            return ""
+        var id = String(item.id == null ? "" : item.id)
+        if (!/^[0-9]+$/.test(id))
+            return item.previewText == null ? "" : String(item.previewText)
+        if (!(id in root._previewTexts)) {
+            if (!(id in root._requestedTextIds)) {
+                root._requestedTextIds[id] = true
+                var service = root.session ? root.session.clipboardService : null
+                if (service && typeof service.requestPreview === "function")
+                    service.requestPreview(id, false)
+            }
+            return item.previewText == null ? "" : String(item.previewText)
+        }
+        return root._previewTexts[id]
+    }
+
+    // Decoded content lands here for the newest request; image decodes
+    // report file:// URLs and are owned by the thumbnail path instead.
+    Connections {
+        target: root.session && root.session.clipboardService
+                ? root.session.clipboardService : null
+        ignoreUnknownSignals: true
+        function onPreviewDecoded(id, contentOrPath) {
+            var content = String(contentOrPath == null ? "" : contentOrPath)
+            if (content.indexOf("file://") === 0)
+                return
+            root._previewTexts[String(id)] = content
+            root._previewTextRev++
+        }
+    }
+
     // Hover tracking for the preview pane; leaving a row hands preview
     // back to the keyboard selection, destruction never leaves a stale ref.
     property var _hoveredResult: null
@@ -675,8 +716,16 @@ Item {
                     visible: !!previewPane.selectedResult
                              && previewPane.selectedResult.isImage !== true
                     width: parent.width
-                    text: previewPane.selectedResult && previewPane.selectedResult.previewText != null
-                          ? String(previewPane.selectedResult.previewText) : ""
+                    text: {
+                        var r = previewPane.selectedResult
+                        if (!r || r.isImage === true)
+                            return ""
+                        // Load-bearing revision read: the qs engine drops
+                        // bare expressions, so the async decode landing must
+                        // be referenced or this binding never re-runs.
+                        var rev = root._previewTextRev
+                        return rev >= 0 ? root.clipFullText(r) : ""
+                    }
                     textFormat: TextEdit.PlainText
                     wrapMode: TextEdit.WrapAnywhere
                     readOnly: true
