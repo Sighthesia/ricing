@@ -291,6 +291,9 @@ Item {
         if (!isFinite(centerX))
             return
         // Assign while unplaced so the first show never slides in from zero.
+        // Key lands first so the tracker's change handler sees both values.
+        root.indicatorTargetKey = focusedIndex >= 0 ? "w" + root.focusedWinId
+                                                    : "s" + targetIndex
         root.indicatorCenterX = centerX
         if (!root.indicatorVisible)
             root.indicatorVisible = true
@@ -303,6 +306,7 @@ Item {
     onHeightChanged: Qt.callLater(root.updateIndicator)
 
     Component.onCompleted: {
+        snapEdgesTo(indicatorCenterX, indicatorTargetKey)
         root.refreshWindowMap()
         Qt.callLater(root.updateIndicator)
     }
@@ -471,24 +475,98 @@ Item {
 
     // Single workspace indicator: same width/height/radius as the volume
     // level bar, workspace green kept, top edge derived from the centered
-    // bar glyph so it aligns with the volume/battery/brightness bars.
+    // bar glyph so it aligns with the volume/battery/brightness bars. Its
+    // width is owned by the dual-speed edge tracker below.
+    readonly property int indicatorBarWidth: LazerTheme.barWidgetHeight - 16
+    // Identity of the current indicator target (focused window or active
+    // workspace); lets the edge tracker tell genuine switches from re-anchors.
+    property string indicatorTargetKey: ""
+    onIndicatorCenterXChanged: root.retargetEdges(root.indicatorCenterX,
+                                                  root.indicatorTargetKey)
+
+    // Dual-speed tracker (旧分支 capsule 遗留): the bar edge x converges
+    // fast while a shadow copy trails slowly, so the rendered span stretches
+    // toward travel direction and contracts on arrival. Hosted on the Item
+    // itself because Behaviors do not intercept plain QtObject properties.
+    property string _edgeTargetKey: ""
+    property real _edgeX: 0
+    property real _edgeShadowX: 0
+    property bool _edgeSnapping: false
+    // Same-anchor drift that arrives while a trail is in flight; applied as
+    // one snap once the shadow catches up so the trail is never cut short.
+    property real _edgePendingCenterX: -1
+    readonly property real _edgeRectLeft: Math.min(_edgeX, _edgeShadowX)
+    readonly property real _edgeSpan: indicatorBarWidth + Math.abs(_edgeX - _edgeShadowX)
+
+    Timer {
+        interval: 16
+        repeat: true
+        running: root._edgePendingCenterX >= 0
+        onTriggered: {
+            if (Math.abs(root._edgeX - root._edgeShadowX) >= 0.5)
+                return
+            var pending = root._edgePendingCenterX
+            root._edgePendingCenterX = -1
+            root.snapEdgesTo(pending, root._edgeTargetKey)
+        }
+    }
+
+    Behavior on _edgeX {
+        enabled: root._indicatorPlaced && !MotionTokens.reducedMotion && !root._edgeSnapping
+        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+    }
+    Behavior on _edgeShadowX {
+        enabled: root._indicatorPlaced && !MotionTokens.reducedMotion && !root._edgeSnapping
+        NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutSine }
+    }
+
+    // Commit bar and shadow together with the Behaviors suppressed. Both
+    // writes use a precomputed target: reading _edgeX back would return the
+    // Behavior's in-flight animation frame, not the committed value.
+    function snapEdgesTo(centerX, key) {
+        var target = centerX - indicatorBarWidth / 2
+        _edgeSnapping = true
+        _edgeTargetKey = key
+        _edgeX = target
+        _edgeShadowX = target
+        _edgeSnapping = false
+    }
+
+    // Route every indicator re-anchor through here. A genuine target switch
+    // (key change after placement) desyncs bar and shadow into the trail;
+    // duplicate updates of the same anchor are ignored so an in-flight trail
+    // survives; same-target layout drift snaps both so content churn never
+    // stretches the bar; the first placement snaps so it never slides in
+    // from zero.
+    function retargetEdges(centerX, key) {
+        if (!isFinite(centerX))
+            return
+        if (key !== _edgeTargetKey && _indicatorPlaced) {
+            var target = centerX - indicatorBarWidth / 2
+            _edgePendingCenterX = -1
+            _edgeTargetKey = key
+            _edgeX = target
+            _edgeShadowX = target
+            return
+        }
+        if (Math.abs(centerX - _edgeX - indicatorBarWidth / 2) < 3)
+            return
+        if (_edgeX !== _edgeShadowX) {
+            _edgePendingCenterX = centerX
+            return
+        }
+        snapEdgesTo(centerX, key)
+    }
+
     Rectangle {
         id: activeIndicator
 
-        width: LazerTheme.barWidgetHeight - 16
+        width: root._edgeSpan
         height: 3
         radius: 1.5
         color: LazerTheme.osuGreen
         visible: root.indicatorVisible
-        x: Math.round(root.indicatorCenterX - width / 2)
+        x: root._edgeRectLeft
         y: Math.round(root.height / 2 + (LazerTheme.barGlyphSize - 4) / 2 + 4)
-
-        Behavior on x {
-            enabled: root._indicatorPlaced && !MotionTokens.reducedMotion
-            NumberAnimation {
-                duration: MotionTokens.fast
-                easing.type: Easing.OutQuad
-            }
-        }
     }
 }
