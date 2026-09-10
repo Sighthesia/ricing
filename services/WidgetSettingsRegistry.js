@@ -48,6 +48,7 @@ var _definitions = {
         instanceScoped: true,
         defaults: {
             lyricsDisplayMode: "Original",
+            minWidth: 140,
             maxWidth: 240,
             spectrumHeight: 100,
             spectrumMaxHeight: 100,

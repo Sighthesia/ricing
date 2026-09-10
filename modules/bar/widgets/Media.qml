@@ -65,8 +65,18 @@ BarPill {
     // close instead of tearing down with playback state.
     readonly property bool needsSpectrum: !MotionTokens.reducedMotion
         && (root.mediaSettings ? root.mediaSettings.showAudioSpectrum !== false : true)
-    // Floors for pill so a short title cannot collapse the widget.
-    readonly property int minPillWidth: 140
+    // Floors for pill so a short title cannot collapse the widget. Tunable
+    // per instance via the media widget's minWidth setting; clamped so a
+    // bad config value cannot explode or invert the floor.
+    readonly property int minPillWidth: {
+        var raw = root.mediaSettings ? root.mediaSettings.minWidth : 140
+        if (raw === null || raw === undefined || raw === "")
+            raw = 140
+        var value = Number(raw)
+        if (!isFinite(value))
+            value = 140
+        return Math.max(0, Math.min(600, Math.round(value)))
+    }
     // Width floor held by the outgoing primary line while its scan
     // transition retires: the island-media morph contract — the surface
     // grows to fit the wider of old/new first, and only settles to the
@@ -413,15 +423,17 @@ BarPill {
         }
     }
 
-    // Spectrum backdrop — confined to the lyrics range: left edge aligns
-    // exactly with the text column, width tracks it, so the bar field can
-    // never reach outside the words it visualizes. Fades out when cava
-    // reports idle so the resting pill stays clean.
+    // Spectrum backdrop — left edge aligns exactly with the text column and
+    // width tracks it while the words are wider than the pill floor, but it
+    // never drops below what the minimum-width floor leaves of the pill's
+    // text region (right inner padding 6), so a short title cannot starve
+    // the bar field. Fades out when cava reports idle so the resting pill
+    // stays clean.
     Item {
         id: spectrumBand
 
         x: contentRow.x + textColumn.x
-        width: textColumn.width
+        width: Math.max(textColumn.width, root.minPillWidth - x - 6)
         anchors.top: parent.top
         anchors.topMargin: 3
         anchors.bottom: parent.bottom
