@@ -309,9 +309,6 @@ Item {
             root.check("single indicator exists", !!bar)
             if (!bar)
                 return
-            var expectedW = Lazer.LazerTheme.barWidgetHeight - 16
-            root.check("indicator reuses volume bar width", Math.abs(bar.width - expectedW) < 1,
-                       "width=" + bar.width + " expected=" + expectedW)
             root.check("indicator keeps workspace green", String(bar.color) === String(Lazer.LazerTheme.osuGreen),
                        "color=" + bar.color)
             if (!root.wsInstance.indicatorVisible)
@@ -320,8 +317,14 @@ Item {
             if (!isFinite(target))
                 return
             var dx = Math.abs(root.indicatorCenterX() - target)
-            if (dx >= 3)
+            // The trail stretches the bar toward travel direction; wait for
+            // the edges to converge before asserting the resting width.
+            var expectedW = Lazer.LazerTheme.barWidgetHeight - 16
+            if (dx >= 3 || Math.abs(bar.width - expectedW) >= 1)
                 return
+            root.check("indicator reuses volume bar width at rest",
+                       Math.abs(bar.width - expectedW) < 1,
+                       "width=" + bar.width + " expected=" + expectedW)
             root.check("indicator settled under focused app 901", true)
             root.swapsBeforeChurn = root.wsInstance.mapSwaps
             root.wantedFocus = "902"
@@ -413,9 +416,11 @@ Item {
             var t1 = root.expectedCenterXFor(901)
             if (!isFinite(t1))
                 return
-            root.check("indicator back on 901 after churn",
-                       Math.abs(root.indicatorCenterX() - t1) < 3,
-                       "dx=" + Math.abs(root.indicatorCenterX() - t1))
+            // The trail tail is deliberately long (3x slow token); wait for
+            // it to settle instead of judging mid-flight.
+            if (Math.abs(root.indicatorCenterX() - t1) >= 3)
+                return
+            root.check("indicator back on 901 after churn", true)
             // Hand control back to the live service path: a real refresh must
             // still leave the truly focused window bright with a visible bar.
             root.wsInstance.refreshWindowMap()

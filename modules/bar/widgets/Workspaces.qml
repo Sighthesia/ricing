@@ -523,7 +523,9 @@ Item {
     }
     Behavior on _edgeShadowX {
         enabled: root._indicatorPlaced && !MotionTokens.reducedMotion && !root._edgeSnapping
-        NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutSine }
+        // 3x the bar's own flight: the tail lingers long after the head
+        // lands, which is what keeps the stretch readable.
+        NumberAnimation { duration: MotionTokens.slow * 3; easing.type: Easing.OutSine }
     }
 
     // Commit bar and shadow together with the Behaviors suppressed. Both
