@@ -637,7 +637,11 @@ Item {
             onContentHeightChanged: contentY = Math.max(0, Math.min(contentY, Math.max(0, contentHeight - height)))
             onVisibleChanged: if (visible) contentY = 0
 
+            // target must stay null: a Flickable target refuses to be
+            // driven while interactive is false, so the wheel is consumed
+            // here and contentY is driven manually instead.
             WheelHandler {
+                target: null
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: wheel => {
                     var delta = wheel.pixelDelta.y
@@ -688,27 +692,27 @@ Item {
                     Keys.onEnterPressed: event => { root.executeSelected(); event.accepted = true }
                 }
 
-                // Large decoded image for image entries.
+                // Large decoded image for image entries: the frame fills the
+                // viewport above the caption and PreserveAspectFit scales
+                // the image up or down to use all of it.
                 Rectangle {
                     id: paneImageFrame
                     visible: !!previewPane.selectedResult
                              && previewPane.selectedResult.isImage === true
                     width: parent.width
-                    height: Math.min(220, paneScroll.height - 60)
+                    height: Math.max(120, paneScroll.height - 20 - 8 - metaCaption.height)
                     radius: 4
                     color: LazerTheme.settingsCardHover
 
                     Image {
                         id: paneImage
                         anchors.centerIn: parent
-                        // String-coerced fallbacks: an undefined transient value
-                        // would error this binding once and disable it for good.
-                        width: Math.min(parent.width - 8,
-                                        (sourceSize.width || 0) * Math.max(1, parent.height) / Math.max(1, sourceSize.height || 1))
-                        height: Math.min(Math.max(1, parent.height - 8), sourceSize.height || 0)
+                        width: parent.width - 8
+                        height: parent.height - 8
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         cache: false
+                        mipmap: true
                         // Assigned imperatively from paneThumbSource below: the
                         // qs engine does not re-run this binding on property
                         // change notifications here.
@@ -719,7 +723,8 @@ Item {
                 // Metadata caption under the preview; the full text already
                 // renders above, so this never repeats the content itself.
                 Text {
-                    visible: previewPane.shown
+                    id: metaCaption
+                    visible: previewPane.shown && text.length > 0
                     width: parent.width
                     text: previewPane.selectedResult
                           ? (previewPane.selectedResult.description || "") : ""
