@@ -239,6 +239,10 @@ PanelWindow {
             root.currentIntent = intentObj
             root.applyIntentFields(intentObj)
             root.updateTargetGeometry(intentObj)
+            // Reviving with the same intent: the retarget above stays parked
+            // while closed, so home a frozen display directly.
+            if (isExiting)
+                root.rebaseGlide()
         }
 
         root.open = true
@@ -596,6 +600,10 @@ PanelWindow {
     }
 
     function retargetGeometry(intentObj, immediate) {
+        // Closed host owns no motion: targets may refresh, but starting or
+        // resuming a glide while exiting would fight the exit reveal.
+        if (!root.open && !immediate)
+            return
         // Single shared progress driver: display* is only written by the
         // progress function (or the immediate/reduced-motion direct assign).
         // Late DBus batches must not restart the glide mid-slide: rebase
@@ -633,15 +641,16 @@ PanelWindow {
     function requestClose() {
         if (closeTimer.running)
             return
-        // A close request cancels replacement immediately. Keep current/root
-        // intent alive for the exit reveal, but never let a deferred swap
-        // install content after the close has begun.
+        // A pre-exchange close cancels the replacement outright. A
+        // post-exchange close freezes the shell glide but lets the content
+        // slide and height finish under the exit reveal instead of snapping
+        // them to their end state. The serial bump drops deferred swaps so
+        // nothing installs content after the close has begun.
         transitionMotion.stop()
         if (root.pendingIntent)
             root.invalidateContentTransition()
         else {
             root.transitionSerial += 1
-            root._exchangeCommitted = false
             root._deferredRebaseSerial = -1
         }
         root.debugLog("closePending", { "widgetHovered": root.widgetHovered, "popupHovered": root.popupHovered })
@@ -715,10 +724,13 @@ PanelWindow {
         onTriggered: {
             if (BarHoverLogic.shouldClose(root.widgetHovered, root.popupHovered, true)) {
                 root.debugLog("closed", { "revealProgress": Number(popup.revealProgress) })
-                // Invalidate replacement callbacks, but retain both intents until
-                // the exit reveal cleanup has completed.
+                // Freeze geometry but keep an in-flight content slide/height
+                // alive under the exit reveal; retain both intents until the
+                // exit reveal cleanup has completed.
                 transitionMotion.stop()
-                root.invalidateContentTransition()
+                root.transitionSerial += 1
+                root.pendingIntent = null
+                root._deferredRebaseSerial = -1
                 // Retract any open tray submenu with the popup; otherwise it
                 // stays open and greets the user stale on the next reveal.
                 var tc = popupActions ? popupActions.trayMenuContent : null

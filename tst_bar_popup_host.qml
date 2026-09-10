@@ -627,6 +627,50 @@ Item {
         onTriggered: {
             root.check("same-widget revive stays open", host.open, true)
             root.check("same-widget revive restores reveal", host.popupItem.revealProgress > 0.99, true)
+            // Mid-transition close: exchange commits, then the pointer leaves
+            // before the slide finishes. The exit must not snap content to
+            // its end state.
+            host.updateIntent({
+                widgetId: "volume", instanceKey: "volume:0", kind: "hover",
+                title: "Volume", actionKind: "volume",
+                anchorX: 200, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.transitionProgress = 0.5
+            host.widgetHovered = false
+            host.popupHovered = false
+            host.requestClose()
+            root.check("mid-transition close keeps exchange committed", host._exchangeCommitted, true)
+            root.check("mid-transition close retains outgoing layer",
+                host._transitionOutgoingIntent.widgetId, "network")
+            host.contentSlideProgress = 0.5
+            var midIn = root.findByName(host.popupItem, "popupIdentity")
+            var midOut = root.findByName(host.popupItem, "popupIdentityOutgoing")
+            root.check("mid-transition close keeps incoming sliding", midIn.x < 0, true)
+            root.check("mid-transition close keeps outgoing sliding", midOut.x > 0, true)
+            midCloseFiredWait.restart()
+        }
+    }
+
+    Timer {
+        id: midCloseFiredWait
+        interval: Lazer.MotionTokens.fast + 40
+        onTriggered: {
+            root.check("mid-transition close fires", host.open, false)
+            root.check("mid-transition close retains new content", host.currentIntent.widgetId, "volume")
+            root.check("mid-transition exit keeps outgoing layer",
+                host._transitionOutgoingIntent !== null, true)
+            root.check("mid-transition exit keeps slide running", host.contentSlideProgress < 1, true)
+            midCloseCleanupWait.restart()
+        }
+    }
+
+    Timer {
+        id: midCloseCleanupWait
+        interval: host.popupItem.revealDuration + Lazer.MotionTokens.slow + 400
+        onTriggered: {
+            root.check("mid-transition cleanup clears current", host.currentIntent, null)
+            root.check("mid-transition cleanup clears surface", host.surfaceActive, false)
             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }
