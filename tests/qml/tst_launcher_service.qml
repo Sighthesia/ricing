@@ -268,7 +268,11 @@ Item {
 
             compare(svc().visible, false)
             compare(svc().query, "")
-            compare(svc().results.length, 0)
+            // Results freeze at the pool-derived set instead of emptying:
+            // keeping the row delegates alive means the next open never
+            // rebuilds the list on its first frame.
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "firefox")
             compare(svc().loading, false)
         }
 
@@ -425,7 +429,11 @@ Item {
             resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0), makeItem("n", "New app", 0, 0)])
 
             compare(svc().visible, false)
-            compare(svc().results.length, 0)
+            // Results freeze at the pre-close set while closed; background
+            // pool swaps must not disturb them. The frozen rows keep their
+            // delegates alive so the next open never rebuilds the list.
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "a")
             verify(svc().displayPool !== firstPool)
             compare(svc().displayPool.length, 2)
             compare(svc().displayPool[1].id, "n")

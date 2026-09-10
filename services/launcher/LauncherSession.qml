@@ -106,7 +106,14 @@ QtObject {
         // re-fetch on their next open.
         root._pooledMode = LauncherLogic.parseQuery(root.query).mode === "apps" ? "apps" : ""
         root.query = ""
-        root.results = []
+        // Freeze the last visible set instead of zeroing results: an empty
+        // array tears down every live row delegate, and the next open would
+        // rebuild the whole list on its first frame — the idle-cold reopen
+        // stall. Deriving the frozen set from the pool keeps the exact item
+        // objects (and their delegates) alive while hidden; a pooled reopen
+        // then commits the same ordered ids, the previous array identity
+        // wins, and nothing is rebuilt at all.
+        root.results = LauncherLogic.filterResults(root.displayPool, "")
         root.loading = false
         root.error = ""
         root.selectedIndex = -1
