@@ -300,7 +300,7 @@ Item {
         visible: emptyStateVisible
         z: 4
         text: "No menu items"
-        color: "#b8b8c8"
+        color: Lazer.LazerTheme.textMuted
         font.pixelSize: 13
         anchors.left: parent.left
         anchors.margins: 16
@@ -497,7 +497,7 @@ Item {
                         width: parent.width - 48
                         elide: Text.ElideRight
                         text: Logic.labelOf(modelData)
-                        color: "#eeeeF2"
+                        color: Lazer.LazerTheme.textPrimary
                         font.pixelSize: 13
                     }
 
@@ -507,7 +507,7 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: Logic.hasChildren(modelData) ? 30 : 12
                         anchors.verticalCenter: parent.verticalCenter
-                        color: "#8bd5ca"
+                        color: Lazer.LazerTheme.settingsAccent
                         font.pixelSize: 14
                     }
 
@@ -517,7 +517,7 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: 12
                         anchors.verticalCenter: parent.verticalCenter
-                        color: "#b8b8c8"
+                        color: Lazer.LazerTheme.textMuted
                         font.pixelSize: 14
                     }
 
@@ -525,7 +525,7 @@ Item {
                         id: clickFlash
                         anchors.fill: parent
                         radius: parent.radius
-                        color: "#ffffff"
+                        color: Lazer.LazerTheme.textPrimary
                         opacity: 0
                     }
 
@@ -592,7 +592,7 @@ Item {
                 anchors.leftMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 text: Logic.submenuTitle(submenuEntry)
-                color: "#eeeeF2"
+                color: Lazer.LazerTheme.textPrimary
                 font.pixelSize: 13
                 font.bold: true
             }
@@ -680,7 +680,7 @@ Item {
                                             anchors.leftMargin: 12
                                             anchors.verticalCenter: parent.verticalCenter
                                             text: Logic.labelOf(modelData)
-                                            color: "#eeeeF2"
+                                            color: Lazer.LazerTheme.textPrimary
                                             font.pixelSize: 13
                                         }
                                         TapHandler {
