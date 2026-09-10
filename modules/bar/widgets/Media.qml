@@ -4,6 +4,7 @@ import Quickshell
 import ".."
 import "../../lazerbar"
 import "../../../services" as Services
+import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 
 // Compact now-playing pill; lyrics take priority over raw titles. The pill
 // grows with its content up to a cap, the translucent album cover sits in a
@@ -66,15 +67,19 @@ BarPill {
     readonly property bool needsSpectrum: !MotionTokens.reducedMotion
         && (root.mediaSettings ? root.mediaSettings.showAudioSpectrum !== false : true)
     // Floors for pill so a short title cannot collapse the widget. Tunable
-    // per instance via the media widget's minWidth setting; clamped so a
-    // bad config value cannot explode or invert the floor.
+    // per instance via the media widget's minWidth setting; falls back to
+    // the registry default and clamps so a bad config value cannot explode
+    // or invert the floor.
     readonly property int minPillWidth: {
-        var raw = root.mediaSettings ? root.mediaSettings.minWidth : 140
+        var fallback = WidgetSettingsRegistry.defaults("media").minWidth
+        if (typeof fallback !== "number" || !isFinite(fallback))
+            fallback = 140
+        var raw = root.mediaSettings ? root.mediaSettings.minWidth : fallback
         if (raw === null || raw === undefined || raw === "")
-            raw = 140
+            raw = fallback
         var value = Number(raw)
         if (!isFinite(value))
-            value = 140
+            value = fallback
         return Math.max(0, Math.min(600, Math.round(value)))
     }
     // Width floor held by the outgoing primary line while its scan
