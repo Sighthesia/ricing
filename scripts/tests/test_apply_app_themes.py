@@ -55,7 +55,8 @@ def test_dark_render_and_includes(sandbox):
     home = tmp / "home"
     kitty_colors = home / ".config/kitty/kitty-colors.conf"
     assert kitty_colors.exists()
-    content = kitty_colors.read_text()
+    # Normalize the template's column alignment before matching.
+    content = " ".join(kitty_colors.read_text().split())
     # Dark surface mapped to background.
     assert "background #1e1e2e" in content
     assert "foreground #cdd6f4" in content
@@ -84,7 +85,7 @@ def test_light_variant_switch(sandbox):
     home = tmp / "home"
     assert run_apply(palette, "dark", home).returncode == 0
     assert run_apply(palette, "light", home).returncode == 0
-    content = (home / ".config/kitty/kitty-colors.conf").read_text()
+    content = " ".join((home / ".config/kitty/kitty-colors.conf").read_text().split())
     assert "background #eff1f5" in content
     assert "background #1e1e2e" not in content
 

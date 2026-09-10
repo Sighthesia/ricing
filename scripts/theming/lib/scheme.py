@@ -122,32 +122,42 @@ def expand_predefined_scheme(scheme_data: dict[str, str], mode: ThemeMode) -> di
     error_h, error_s, _ = error.to_hsl()
 
     if is_dark:
-        # Light text on dark containers
+        # Light text on dark containers. prefer_light is pinned: saturated
+        # accent containers can register as "light" to the auto heuristic,
+        # which used to push the ink to near-black (unreadable in dark).
         on_primary_container = ensure_contrast(
-            Color.from_hsl(primary_h, primary_s, 0.90), primary_container, 4.5
+            Color.from_hsl(primary_h, primary_s, 0.90), primary_container, 4.5,
+            prefer_light=True
         )
         on_secondary_container = ensure_contrast(
-            Color.from_hsl(secondary_h, secondary_s, 0.90), secondary_container, 4.5
+            Color.from_hsl(secondary_h, secondary_s, 0.90), secondary_container, 4.5,
+            prefer_light=True
         )
         on_tertiary_container = ensure_contrast(
-            Color.from_hsl(tertiary_h, tertiary_s, 0.90), tertiary_container, 4.5
+            Color.from_hsl(tertiary_h, tertiary_s, 0.90), tertiary_container, 4.5,
+            prefer_light=True
         )
         on_error_container = ensure_contrast(
-            Color.from_hsl(error_h, error_s, 0.90), error_container, 4.5
+            Color.from_hsl(error_h, error_s, 0.90), error_container, 4.5,
+            prefer_light=True
         )
     else:
-        # Dark text on light containers
+        # Dark text on light containers (pinned to the darkening direction).
         on_primary_container = ensure_contrast(
-            Color.from_hsl(primary_h, primary_s, 0.15), primary_container, 4.5
+            Color.from_hsl(primary_h, primary_s, 0.15), primary_container, 4.5,
+            prefer_light=False
         )
         on_secondary_container = ensure_contrast(
-            Color.from_hsl(secondary_h, secondary_s, 0.15), secondary_container, 4.5
+            Color.from_hsl(secondary_h, secondary_s, 0.15), secondary_container, 4.5,
+            prefer_light=False
         )
         on_tertiary_container = ensure_contrast(
-            Color.from_hsl(tertiary_h, tertiary_s, 0.15), tertiary_container, 4.5
+            Color.from_hsl(tertiary_h, tertiary_s, 0.15), tertiary_container, 4.5,
+            prefer_light=False
         )
         on_error_container = ensure_contrast(
-            Color.from_hsl(error_h, error_s, 0.15), error_container, 4.5
+            Color.from_hsl(error_h, error_s, 0.15), error_container, 4.5,
+            prefer_light=False
         )
 
     # Generate fixed colors
