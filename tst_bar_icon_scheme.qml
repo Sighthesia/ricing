@@ -91,7 +91,8 @@ Item {
                 continue
             var isStrip = false
             try {
-                isStrip = c.height === 2 && c.color !== undefined
+                isStrip = c.width === 4 && c.height === 24
+                    && c.color !== undefined
                     && String(c.color) === String(Lazer.LazerTheme.settingsAccent)
             } catch (e6) {
             }
@@ -203,9 +204,9 @@ Item {
                 return
             root.check("identity colorizer follows barIcon (dark)", true)
             var strip = root.accentStripOf(root.identityInstance)
-            if (!strip || Math.abs(strip.height - 2) > 0.5)
+            if (!strip || Math.abs(strip.height - 24) > 0.5 || Math.abs(strip.width - 4) > 0.5)
                 return
-            root.check("identity header carries accent hairline", true)
+            root.check("identity header carries accent tab", true)
             try {
                 Services.SettingsService.appearance.colorScheme = "dark"
             } catch (e3) {

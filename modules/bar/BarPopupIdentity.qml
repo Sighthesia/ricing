@@ -27,13 +27,16 @@ Rectangle {
     clip: true
     radius: 0
 
-    // Accent hairline anchoring the header with theme color and giving the
-    // title layer a hard edge against the panel body.
+    // Left accent tab (the settings sidebar selection-strip motif) anchors
+    // the header with theme color instead of a full-width rule that reads
+    // as a seam between title and content layers.
     Rectangle {
         anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: 2
+        anchors.leftMargin: 0
+        anchors.verticalCenter: parent.verticalCenter
+        width: 4
+        height: 24
+        radius: 2
         color: LazerTheme.settingsAccent
         opacity: root.foregroundOpacity
 
