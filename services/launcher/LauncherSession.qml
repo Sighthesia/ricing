@@ -41,6 +41,17 @@ QtObject {
             callback("")
     }
 
+    // Full-content preview decode for the clipboard preview pane: routes a
+    // text decode request through the clipboard service and relays the
+    // decoded content back as a session signal, so surfaces never need the
+    // concrete service (tests and embedded sessions stay null-safe).
+    signal textPreviewDecoded(string id, string content)
+
+    function requestTextPreview(id) {
+        if (clipboardService && typeof clipboardService.requestPreview === "function")
+            clipboardService.requestPreview(id, false)
+    }
+
     // Stable per-mode pool of every sorted item; text filtering runs locally
     // over this so result rows keep their identity across keystrokes and the
     // surface can fold/reveal instead of reloading the whole list.
@@ -60,7 +71,8 @@ QtObject {
 
     // Clipboard history lands asynchronously (5s polling); while a
     // clipboard session is open, fresh data must reach the open list
-    // without the user reopening the panel.
+    // without the user reopening the panel. Preview decodes relay to the
+    // session signal so consumers never bind the concrete service.
     property Connections _clipboardConn: Connections {
         target: root.clipboardService
         ignoreUnknownSignals: true
@@ -68,6 +80,10 @@ QtObject {
             if (root.visible && !root.loading
                     && LauncherLogic.parseQuery(root.query).mode === "clipboard")
                 root.refresh(true)
+        }
+        function onPreviewDecoded(id, contentOrPath) {
+            root.textPreviewDecoded(String(id == null ? "" : id),
+                                    String(contentOrPath == null ? "" : contentOrPath))
         }
     }
 

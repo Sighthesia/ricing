@@ -16,6 +16,21 @@ Item {
         source: "../../services/launcher/LauncherSession.qml"
     }
 
+    // Clipboard-service stub: records decode requests and can emit the
+    // previewDecoded completion the session relays to its consumers.
+    Component {
+        id: clipboardStubComponent
+        QtObject {
+            property var requests: []
+            signal previewDecoded(string id, string contentOrPath)
+            function requestPreview(id, isImage) {
+                requests.push({ id: id, isImage: isImage })
+            }
+        }
+    }
+
+    property var _clipboardStub: null
+
     TestCase {
         name: "LauncherService"
 
@@ -70,6 +85,42 @@ Item {
             svc()._adapters = ({})
             svc()._pooledMode = ""
             svc().displayPool = []
+            if (_clipboardStub) {
+                _clipboardStub.destroy()
+                _clipboardStub = null
+            }
+            svc().clipboardService = null
+        }
+
+        // --- clipboard preview decode relay ---
+
+        function test_textPreviewRelayForwardsRequestsAndDecodes() {
+            _clipboardStub = clipboardStubComponent.createObject(null)
+            svc().clipboardService = _clipboardStub
+
+            svc().requestTextPreview("42")
+            compare(_clipboardStub.requests.length, 1)
+            compare(_clipboardStub.requests[0].id, "42")
+            compare(_clipboardStub.requests[0].isImage, false)
+
+            var got = []
+            svc().textPreviewDecoded.connect(function(id, content) { got.push([id, content]) })
+
+            // Both text and image completions ride the same relay; the
+            // consumer (preview pane) filters file:// URLs itself.
+            _clipboardStub.previewDecoded("42", "full\ntext body")
+            _clipboardStub.previewDecoded("9", "file:///tmp/x.img?rev=2")
+
+            compare(got.length, 2)
+            compare(got[0][0], "42")
+            compare(got[0][1], "full\ntext body")
+            compare(got[1][0], "9")
+        }
+
+        function test_requestTextPreviewWithoutServiceIsInert() {
+            svc().requestTextPreview("7")
+            compare(svc().visible, false)
+            compare(svc().results.length, 0)
         }
 
         // --- open / close defaults ---

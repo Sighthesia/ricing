@@ -88,6 +88,13 @@ Singleton {
     readonly property alias visible: session.visible
     // Clipboard thumbnail decoding passthrough for result rows.
     function decodeThumbnail(id, mime, callback) { return session.decodeThumbnail(id, mime, callback) }
+    // Full-content clipboard preview decode passthrough for the preview pane.
+    signal textPreviewDecoded(string id, string content)
+    function requestTextPreview(id) { return session.requestTextPreview(id) }
+    Connections {
+        target: session
+        function onTextPreviewDecoded(id, content) { root.textPreviewDecoded(id, content) }
+    }
     property alias query: session.query
     readonly property alias mode: session.mode
     property alias results: session.results

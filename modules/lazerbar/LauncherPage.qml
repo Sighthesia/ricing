@@ -579,26 +579,24 @@ Item {
         if (!(id in root._previewTexts)) {
             if (!(id in root._requestedTextIds)) {
                 root._requestedTextIds[id] = true
-                var service = root.session ? root.session.clipboardService : null
-                if (service && typeof service.requestPreview === "function")
-                    service.requestPreview(id, false)
+                if (root.session && typeof root.session.requestTextPreview === "function")
+                    root.session.requestTextPreview(id)
             }
             return item.previewText == null ? "" : String(item.previewText)
         }
         return root._previewTexts[id]
     }
 
-    // Decoded content lands here for the newest request; image decodes
-    // report file:// URLs and are owned by the thumbnail path instead.
+    // Decoded content arrives via the session relay; image decodes report
+    // file:// URLs and are owned by the thumbnail path instead.
     Connections {
-        target: root.session && root.session.clipboardService
-                ? root.session.clipboardService : null
+        target: root.session
         ignoreUnknownSignals: true
-        function onPreviewDecoded(id, contentOrPath) {
-            var content = String(contentOrPath == null ? "" : contentOrPath)
-            if (content.indexOf("file://") === 0)
+        function onTextPreviewDecoded(id, content) {
+            var text = String(content == null ? "" : content)
+            if (text.indexOf("file://") === 0)
                 return
-            root._previewTexts[String(id)] = content
+            root._previewTexts[String(id)] = text
             root._previewTextRev++
         }
     }
