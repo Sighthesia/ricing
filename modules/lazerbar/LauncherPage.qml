@@ -562,13 +562,9 @@ Item {
         return ""
     }
 
-    // Clipboard preview pane: the selected entry rendered large — decoded
-    // image or full multi-line text — beside a narrowed results list.
-    // Pointing at any row previews it ahead of the keyboard selection.
-    property var _hoveredResult: null
-
     // Hover tracking for the preview pane; leaving a row hands preview
     // back to the keyboard selection, destruction never leaves a stale ref.
+    property var _hoveredResult: null
     function trackHover(item, entered) {
         if (entered)
             _hoveredResult = item
@@ -580,6 +576,12 @@ Item {
             _hoveredResult = null
     }
 
+    // Clipboard preview pane: the selected entry rendered large — decoded
+    // image or full multi-line text — beside a narrowed results list.
+    // Pointing at any row previews it ahead of the keyboard selection. The
+    // pane takes half the page width; content centers in the viewport and
+    // wheel-scrolls when it outgrows it, while drag always stays with the
+    // text so long excerpts remain mouse-selectable.
     Rectangle {
         id: previewPane
         readonly property var selectedResult: {
@@ -616,77 +618,116 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: 8
         anchors.bottom: parent.bottom
-        width: 240
+        width: parent.width / 2
         visible: shown
         color: LazerTheme.settingsCard
         radius: 6
-        // Full-length previews may outgrow the pane; clip instead of elide
-        // so the selectable text stays honest about where content ends.
         clip: true
 
-        Column {
+        // Wheel-driven viewport: interactive stays off so a mouse drag is
+        // always a text selection, never a scroll grab.
+        Flickable {
+            id: paneScroll
             anchors.fill: parent
-            anchors.margins: 10
-            spacing: 8
+            clip: true
+            interactive: false
+            contentWidth: width
+            contentHeight: paneColumn.height
+            boundsBehavior: Flickable.StopAtBounds
+            onContentHeightChanged: contentY = Math.max(0, Math.min(contentY, Math.max(0, contentHeight - height)))
+            onVisibleChanged: if (visible) contentY = 0
 
-            // Full text preview for text entries; on Qt >= 6.7 Text
-            // selections are mouse-enabled out of the box, so a partial
-            // copy never requires re-copying the whole clipboard entry.
-            Text {
-                id: paneText
-                // Strict checks: a plain `&&` chain yields undefined for
-                // entries without isImage, erroring and disabling the
-                // binding on the first non-image selection.
-                visible: !!previewPane.selectedResult
-                         && previewPane.selectedResult.isImage !== true
-                width: parent.width
-                text: previewPane.selectedResult && previewPane.selectedResult.previewText != null
-                      ? String(previewPane.selectedResult.previewText) : ""
-                textFormat: Text.PlainText
-                wrapMode: Text.WrapAnywhere
-                color: LazerTheme.textPrimary
-                font.pixelSize: 12
-            }
-
-            // Large decoded image for image entries.
-            Rectangle {
-                id: paneImageFrame
-                visible: !!previewPane.selectedResult
-                         && previewPane.selectedResult.isImage === true
-                width: parent.width
-                height: Math.min(220, parent.height - 60)
-                radius: 4
-                color: LazerTheme.settingsCardHover
-
-                Image {
-                    id: paneImage
-                    anchors.centerIn: parent
-                    // String-coerced fallbacks: an undefined transient value
-                    // would error this binding once and disable it for good.
-                    width: Math.min(parent.width - 8,
-                                    (sourceSize.width || 0) * Math.max(1, parent.height) / Math.max(1, sourceSize.height || 1))
-                    height: Math.min(Math.max(1, parent.height - 8), sourceSize.height || 0)
-                    fillMode: Image.PreserveAspectFit
-                    asynchronous: true
-                    cache: false
-                    // Assigned imperatively from paneThumbSource below: the
-                    // qs engine does not re-run this binding on property
-                    // change notifications here.
-                    source: ""
+            WheelHandler {
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                onWheel: wheel => {
+                    var delta = wheel.pixelDelta.y
+                    if (delta === 0)
+                        delta = wheel.angleDelta.y / 120 * 40
+                    if (delta === 0)
+                        return
+                    var maximumY = Math.max(0, paneScroll.contentHeight - paneScroll.height)
+                    paneScroll.contentY = Math.max(0, Math.min(maximumY, paneScroll.contentY - delta))
                 }
             }
 
-            // Metadata caption under the preview; the full text already
-            // renders above, so this never repeats the content itself.
-            Text {
-                visible: previewPane.shown
-                width: parent.width
-                text: previewPane.selectedResult
-                      ? (previewPane.selectedResult.description || "") : ""
-                textFormat: Text.PlainText
-                elide: Text.ElideRight
-                color: LazerTheme.textMuted
-                font.pixelSize: 11
+            Column {
+                id: paneColumn
+                x: (paneScroll.width - width) / 2
+                y: Math.max(0, (paneScroll.height - height) / 2)
+                width: paneScroll.width - 20
+                spacing: 8
+
+                // Full text preview for text entries. Read-only TextEdit is
+                // the only mouse-selectable text primitive (plain Text
+                // carries no selection support in Qt Quick), so a partial
+                // copy never requires re-copying the whole clipboard entry.
+                // Arrow/Return keys route back to the launcher list; Escape
+                // bubbles to the page handler untouched.
+                TextEdit {
+                    id: paneText
+                    // Strict checks: a plain `&&` chain yields undefined for
+                    // entries without isImage, erroring and disabling the
+                    // binding on the first non-image selection.
+                    visible: !!previewPane.selectedResult
+                             && previewPane.selectedResult.isImage !== true
+                    width: parent.width
+                    text: previewPane.selectedResult && previewPane.selectedResult.previewText != null
+                          ? String(previewPane.selectedResult.previewText) : ""
+                    textFormat: TextEdit.PlainText
+                    wrapMode: TextEdit.WrapAnywhere
+                    readOnly: true
+                    selectByMouse: true
+                    persistentSelection: true
+                    selectionColor: LazerTheme.osuPink
+                    selectedTextColor: LazerTheme.textPrimary
+                    color: LazerTheme.textPrimary
+                    font.pixelSize: 12
+                    Keys.onUpPressed: event => { event.accepted = root.navigateSelection(-1) }
+                    Keys.onDownPressed: event => { event.accepted = root.navigateSelection(1) }
+                    Keys.onReturnPressed: event => { root.executeSelected(); event.accepted = true }
+                    Keys.onEnterPressed: event => { root.executeSelected(); event.accepted = true }
+                }
+
+                // Large decoded image for image entries.
+                Rectangle {
+                    id: paneImageFrame
+                    visible: !!previewPane.selectedResult
+                             && previewPane.selectedResult.isImage === true
+                    width: parent.width
+                    height: Math.min(220, paneScroll.height - 60)
+                    radius: 4
+                    color: LazerTheme.settingsCardHover
+
+                    Image {
+                        id: paneImage
+                        anchors.centerIn: parent
+                        // String-coerced fallbacks: an undefined transient value
+                        // would error this binding once and disable it for good.
+                        width: Math.min(parent.width - 8,
+                                        (sourceSize.width || 0) * Math.max(1, parent.height) / Math.max(1, sourceSize.height || 1))
+                        height: Math.min(Math.max(1, parent.height - 8), sourceSize.height || 0)
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
+                        cache: false
+                        // Assigned imperatively from paneThumbSource below: the
+                        // qs engine does not re-run this binding on property
+                        // change notifications here.
+                        source: ""
+                    }
+                }
+
+                // Metadata caption under the preview; the full text already
+                // renders above, so this never repeats the content itself.
+                Text {
+                    visible: previewPane.shown
+                    width: parent.width
+                    text: previewPane.selectedResult
+                          ? (previewPane.selectedResult.description || "") : ""
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 11
+                }
             }
         }
     }
