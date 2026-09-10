@@ -38,35 +38,41 @@ Rectangle {
         anchors.rightMargin: root.showClose ? 52 : 12
         spacing: 8
 
-        // Optional 16px icon; hidden when iconSource is empty.
-        Image {
-            id: iconImage
-            objectName: "identityIcon"
+        // Icon slot: 16px glyph plus its optional scheme-aware tint. The
+        // wrapper keeps anchored effect children out of the Row — one
+        // anchored child makes the whole positioner refuse to lay out,
+        // which piled the texts on top of the icon.
+        Item {
+            id: iconSlot
+
             width: 16
             height: 16
             anchors.verticalCenter: parent.verticalCenter
-            source: root.iconSource
             visible: root.iconSource !== ""
-            asynchronous: true
-            fillMode: Image.PreserveAspectFit
-            opacity: visible ? 1 : 0
-        }
 
-        // Scheme-aware tint over monochrome module glyphs (white strokes
-        // would vanish on the light rail); colored icons skip this.
-        MultiEffect {
-            anchors.fill: iconImage
-            source: iconImage
-            visible: iconImage.visible && root.tintIcon
-            colorization: 1
-            colorizationColor: LazerTheme.barIcon
+            Image {
+                id: iconImage
+                objectName: "identityIcon"
+                anchors.fill: parent
+                source: root.iconSource
+                asynchronous: true
+                fillMode: Image.PreserveAspectFit
+            }
 
-            Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
+            MultiEffect {
+                anchors.fill: parent
+                source: iconImage
+                visible: iconSlot.visible && root.tintIcon
+                colorization: 1
+                colorizationColor: LazerTheme.barIcon
+
+                Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
+            }
         }
 
         Column {
             id: textColumn
-            width: parent.width - (iconImage.visible ? iconImage.width + layoutRow.spacing : 0)
+            width: parent.width - (iconSlot.visible ? iconSlot.width + layoutRow.spacing : 0)
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
 

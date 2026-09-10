@@ -147,6 +147,40 @@ Item {
             break
         }
         case 1: {
+            // Guard the identity geometry first: an anchored child inside
+            // the header's Row once made the positioner refuse to lay out,
+            // piling the text on top of the icon (all children at x=0).
+            var rowItem = null
+            var ikids = []
+            try {
+                ikids = root.identityInstance.children || []
+            } catch (e7) {
+            }
+            for (var ri = 0; ri < ikids.length; ri++) {
+                var rc = ikids[ri]
+                if (rc && rc.spacing !== undefined) {
+                    rowItem = rc
+                    break
+                }
+            }
+            if (!rowItem)
+                return
+            var textX = -1
+            try {
+                for (var ti = 0; ti < rowItem.children.length; ti++) {
+                    var tc = rowItem.children[ti]
+                    // The text column is the wide child; the icon slot is 16.
+                    if (tc && tc.width > 40) {
+                        textX = tc.x
+                        break
+                    }
+                }
+            } catch (e8) {
+            }
+            if (textX < 0)
+                return
+            root.check("identity text column sits right of icon", textX >= 20,
+                       "textX=" + textX)
             // Light scheme: token and live overlay must read dark; bar
             // surface and rail take their scheme branches (palette-free
             // fallbacks here since colorService is not injected).
