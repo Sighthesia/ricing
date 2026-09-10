@@ -20,18 +20,23 @@ Item {
     property string section: ""
     property string screenName: ""
 
-    // Workspace id -> live window rows. Rebuilt as plain JS arrays so
-    // delegates never cross-index the windows ListModel reactively.
-    // Replaced only when the window set/order/app identity actually
-    // changes; a wholesale swap destroys every icon delegate and floods
-    // the async icon provider with reloads, which on Quickshell 0.3.1 can
-    // corrupt the delegate tree (icons vanish permanently).
-    property var windowsByWorkspace: ({})
+    // Workspace id -> stable icon ListModel. Each model's identity never
+    // changes while its workspace is known, so icon Repeaters apply
+    // incremental insert/remove/move instead of destroying the whole strip:
+    // a wholesale JS-array swap rebuilds every delegate and floods the async
+    // icon provider, which on Quickshell 0.3.1 can corrupt the delegate tree
+    // (delegates survive with unreadable modelData, icons vanish permanently
+    // while the data layer stays correct).
+    property var workspaceModels: ({})
+    // Bumped whenever workspaceModels gains or loses a key so the per-square
+    // wins bindings re-resolve; row-level changes flow through the models'
+    // own signals without touching this.
+    property int _modelsRevision: 0
     property string _windowMapSignature: ""
-    // Observability: counts real map swaps so focus-only churn is verifiable.
+    // Observability: counts real content syncs so focus-only churn is verifiable.
     property int mapSwaps: 0
     // Focus lives on its own so focus-only updates never rebuild icon
-    // delegates; ticks and opacity bind to this instead.
+    // delegates; icon opacity and the single indicator bind to this instead.
     property string focusedWinId: ""
     // Single indicator state: center X in root coordinates. The bar itself
     // is one Rectangle below; only this value moves when the active
@@ -43,6 +48,28 @@ Item {
     readonly property int iconSize: 16
     readonly property int iconSpacing: 4
     readonly property int cellPadding: 8
+
+    // Factory for stable per-workspace icon models (ListModel keeps row
+    // delegates and their loaded images alive across syncs).
+    Component {
+        id: iconModelFactory
+
+        ListModel {
+        }
+    }
+
+    // Icon model for one workspace, or undefined when unknown. Reads
+    // _modelsRevision so the binding re-resolves exactly when model keys
+    // appear or disappear; row edits arrive via the model's own signals.
+    function winsFor(wsId) {
+        root._modelsRevision
+        return root.workspaceModels[String(wsId)]
+    }
+
+    function hasWindowsFor(wsId) {
+        const model = root.winsFor(wsId)
+        return !!model && model.count > 0
+    }
 
     function mapSignature(map) {
         const workspaceIds = Object.keys(map)
@@ -107,7 +134,7 @@ Item {
         for (let i = 0; i < workspaceIds.length; i++)
             map[workspaceIds[i]].sort(root.windowOrder)
 
-        // Focus-only events (the most frequent) swap nothing: icon
+        // Focus-only events (the most frequent) sync nothing: icon
         // delegates stay alive and just rebind their opacity.
         root.focusedWinId = focused
         const signature = root.mapSignature(map)
@@ -115,7 +142,77 @@ Item {
             return
         root._windowMapSignature = signature
         root.mapSwaps += 1
-        root.windowsByWorkspace = map
+        root.syncWorkspaceModels(map)
+    }
+
+    // Bring the stable per-workspace models to the freshly built map without
+    // ever replacing a model object: vanished workspaces drop their model,
+    // surviving ones diff-sync row by row so untouched windows keep their
+    // delegates and loaded icons.
+    function syncWorkspaceModels(map) {
+        const models = root.workspaceModels
+        const wanted = {}
+        const ids = Object.keys(map)
+        for (let i = 0; i < ids.length; i++) {
+            const wsId = String(ids[i])
+            wanted[wsId] = true
+            let model = models[wsId]
+            if (!model) {
+                model = iconModelFactory.createObject(root)
+                models[wsId] = model
+                root._modelsRevision++
+            }
+            root.syncIconModel(model, map[ids[i]])
+        }
+        const known = Object.keys(models)
+        for (let k = 0; k < known.length; k++) {
+            if (!wanted[known[k]]) {
+                models[known[k]].destroy()
+                delete models[known[k]]
+                root._modelsRevision++
+            }
+        }
+    }
+
+    // Reconcile one stable model with the desired ordered rows, keyed by
+    // winId: remove gone rows, insert new ones in place, move drifted rows,
+    // refresh changed app identities. Untouched rows (and their delegates
+    // and images) are never modified.
+    function syncIconModel(model, rows) {
+        for (let i = model.count - 1; i >= 0; i--) {
+            const id = String(model.get(i).winId)
+            let keep = false
+            for (let k = 0; k < rows.length; k++) {
+                if (String(rows[k].winId) === id) {
+                    keep = true
+                    break
+                }
+            }
+            if (!keep)
+                model.remove(i, 1)
+        }
+        for (let j = 0; j < rows.length; j++) {
+            const want = String(rows[j].winId)
+            const appId = String(rows[j].appId || "")
+            let at = -1
+            for (let m = 0; m < model.count; m++) {
+                if (String(model.get(m).winId) === want) {
+                    at = m
+                    break
+                }
+            }
+            if (at < 0) {
+                model.insert(j, {
+                    winId: want,
+                    appId: appId
+                })
+            } else {
+                if (at !== j)
+                    model.move(at, j, 1)
+                if (String(model.get(j).appId) !== appId)
+                    model.setProperty(j, "appId", appId)
+            }
+        }
     }
 
     // Event-stream bursts coalesce into one rebuild per frame.
@@ -152,11 +249,12 @@ Item {
         if (root.focusedWinId !== "") {
             for (let w = 0; w < workspaceRepeater.count; w++) {
                 const wItem = workspaceRepeater.itemAt(w)
-                if (!wItem || !wItem.wins)
+                if (!wItem || !wItem.wins || !wItem.wins.count)
                     continue
                 const wins = wItem.wins
-                for (let k = 0; k < wins.length; k++) {
-                    if (wins[k] && String(wins[k].winId) === root.focusedWinId) {
+                for (let k = 0; k < wins.count; k++) {
+                    const row = wins.get(k)
+                    if (row && String(row.winId) === root.focusedWinId) {
                         focusedIndex = w
                         break
                     }
@@ -201,7 +299,6 @@ Item {
     }
 
     onFocusedWinIdChanged: Qt.callLater(root.updateIndicator)
-    onWindowsByWorkspaceChanged: Qt.callLater(root.updateIndicator)
     onWidthChanged: Qt.callLater(root.updateIndicator)
     onHeightChanged: Qt.callLater(root.updateIndicator)
 
@@ -236,8 +333,8 @@ Item {
                 required property bool isActive
                 required property string name
 
-                readonly property var wins: root.windowsByWorkspace[wsId] || []
-                readonly property bool hasWindows: wins.length > 0
+                readonly property var wins: root.winsFor(wsId)
+                readonly property bool hasWindows: root.hasWindowsFor(wsId)
                 readonly property bool hovered: hoverHandler.hovered
 
                 width: hasWindows ? contentRow.implicitWidth + root.cellPadding * 2
@@ -260,9 +357,9 @@ Item {
                     const target = String(winId)
                     for (let i = 0; i < windowRepeater.count; i++) {
                         const item = windowRepeater.itemAt(i)
-                        if (!item || !item.modelData)
+                        if (!item || item.winId === undefined)
                             continue
-                        if (String(item.modelData.winId) === target) {
+                        if (String(item.winId) === target) {
                             const p = item.mapToItem(root, item.width / 2, 0)
                             return p.x
                         }
@@ -314,12 +411,13 @@ Item {
                         delegate: Item {
                             id: windowIcon
 
-                            required property var modelData
+                            required property string winId
+                            required property string appId
 
                             // Bound to the shared focus property: focus-only
-                            // events never rebuild delegates, so modelData's
-                            // snapshot would be stale here.
-                            readonly property bool isFocused: String(modelData.winId) === root.focusedWinId
+                            // events never rebuild delegates, and the role
+                            // props always reflect the model's live row.
+                            readonly property bool isFocused: windowIcon.winId === root.focusedWinId
                             readonly property bool hovered: iconHover.hovered
 
                             width: root.iconSize
@@ -327,7 +425,7 @@ Item {
 
                             IconImage {
                                 anchors.fill: parent
-                                source: root.iconPathForApp(windowIcon.modelData.appId)
+                                source: root.iconPathForApp(windowIcon.appId)
                                 // These tiny, persistent delegates should not
                                 // keep feeding the long-lived async icon
                                 // provider during compositor event bursts.
@@ -349,7 +447,7 @@ Item {
                                 gesturePolicy: TapHandler.ReleaseWithinBounds
                                 onTapped: Quickshell.execDetached([
                                     "niri", "msg", "action", "focus-window",
-                                    "--id", String(windowIcon.modelData.winId)
+                                    "--id", String(windowIcon.winId)
                                 ])
                             }
                         }

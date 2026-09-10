@@ -23,6 +23,11 @@ that is in a different thread ... QQuickPixmapReader`）后 delegate/绑定树�
    它；绝不放进 model 行对象（行对象快照会在跳过重建时变陈旧）。
 3. **可观测性**：暴露 `mapSwaps` 计数器；用探针（如 `tst_ws_probe.qml`）断言
    "聚焦切换时 swaps 不变、focusedWinId 变化、inMap==mapped"。
+4. **手术式同步**：内容变化时也不替换整个 model。用按 workspace 稳定身份的
+   `ListModel`，按 winId diff（删除消失行、原位插入新行、移动变序行、
+   `setProperty` 更新 appId），存活窗口的 delegate 与已加载图标零重建。
+   delegate 用 `required` role 属性（`winId`/`appId`），禁用 JS 对象快照式
+   `modelData`。
 
 ## 禁止
 
