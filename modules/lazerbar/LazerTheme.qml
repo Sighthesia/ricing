@@ -29,6 +29,10 @@ QtObject {
     }
 
     readonly property color bgDark: adapt && colorService ? colorService.mSurface : "#18171C"
+    // Light-scheme bar surface follows the extracted palette the same way
+    // bgDark does (Color switches palettes by effective scheme); the fixed
+    // value only serves the wallpaper-adaptation opt-out.
+    readonly property color bgLight: adapt && colorService ? colorService.mSurface : "#F2F0F5"
     readonly property color modeContainer: adapt && colorService ? shade(colorService.mSurface, 0x24 / 255) : "#241F272B"
     readonly property color modeContainerBorder: "#0FFFFFFF"
     readonly property color osuPink: adapt && colorService ? colorService.mPrimary : "#FF66AA"
@@ -43,12 +47,14 @@ QtObject {
     readonly property color hoverForeground: "#FFFFFF"
     readonly property color hoverFill: "#18FFFFFF"
     readonly property color pressedFill: "#0FFFFFFF"
-    // Bar glyph tint follows the painted bar background (TopBar paints
-    // #F2F0F5 in the light scheme, bgDark otherwise), independent of the
-    // wallpaper-adaptation opt-out, so the shared white-stroke glyph set
-    // stays legible in both schemes.
+    // Bar glyph tint follows the painted bar surface: light scheme tints
+    // with the palette's on-surface ink (fallback near-black), dark scheme
+    // keeps white, independent of the wallpaper-adaptation opt-out so the
+    // shared white-stroke glyph set stays legible on both schemes.
     readonly property bool lightScheme: settingsService ? settingsService.effectiveColorScheme === "light" : false
-    readonly property color barIcon: lightScheme ? "#1D1B20" : "#FFFFFF"
+    readonly property color barIcon: lightScheme
+        ? (adapt && colorService ? colorService.mOnSurface : "#1D1B20")
+        : "#FFFFFF"
     readonly property color activeFill: adapt && colorService ? shade(colorService.mTertiary, 0x24 / 255) : "#2400FFA2"
     readonly property color focusRing: adapt && colorService ? colorService.mPrimary : "#FFF2F8"
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
@@ -71,7 +77,12 @@ QtObject {
     readonly property color settingsPanel: adapt && colorService ? colorService.mSurface : "#18161D"
     readonly property color settingsSection: adapt && colorService ? colorService.mSurfaceContainerHigh : "#282532"
     readonly property color settingsPanelBorder: "transparent"
-    readonly property color settingsRail: adapt && colorService ? Qt.darker(colorService.mSurface, 1.15) : "#131217"
+    // Title/rail layers: dark scheme darkens the surface 15%; light scheme
+    // takes the palette's clean container step instead (darker() on a light
+    // surface reads muddy). Fixed fallback serves the adaptation opt-out.
+    readonly property color settingsRail: !adapt || !colorService ? "#131217"
+        : lightScheme ? colorService.mSurfaceContainerHighest
+        : Qt.darker(colorService.mSurface, 1.15)
     readonly property color settingsNavInactive: adapt && colorService ? shade(colorService.mOnSurfaceVariant, 0.62) : "#8A8795"
     readonly property color settingsSearchSurface: adapt && colorService ? colorService.mSurfaceContainerLow : "#201E27"
     readonly property color settingsToggleOff: adapt && colorService ? colorService.mSurfaceContainerHighest : "#322E3F"

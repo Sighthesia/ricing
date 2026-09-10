@@ -46,6 +46,7 @@ Item {
             screenName: root.screenName,
             title: "Brightness",
             iconSource: Qt.resolvedUrl("../icons/brightness.svg"),
+            tintIcon: true,
             summary: summaryText,
             actionKind: "brightness",
             anchorX: centerX,

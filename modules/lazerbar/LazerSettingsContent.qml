@@ -228,6 +228,16 @@ Item {
             visible: searchEditor.text.length === 0
             Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
         }
+
+        // Scheme-aware glyph tint, matching the panel's other icons.
+        MultiEffect {
+            anchors.fill: searchIcon
+            source: searchIcon
+            visible: searchIcon.visible
+            colorization: 1
+            colorizationColor: LazerTheme.textMuted
+            Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
+        }
         MultiEffect {
             anchors.fill: searchIcon
             source: searchIcon

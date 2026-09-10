@@ -112,6 +112,7 @@ BarPill {
             screenName: root.screenName,
             title: titleText,
             iconSource: Qt.resolvedUrl("../../lazerbar/icons/music.svg"),
+            tintIcon: true,
             summary: summaryText,
             actionKind: "media",
             anchorX: centerX,

@@ -1027,6 +1027,7 @@ PanelWindow {
                                 ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
                         title: root.currentIntent ? (root.currentIntent.title || "") : ""
                         iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
+                        tintIcon: root.currentIntent ? root.currentIntent.tintIcon === true : false
                         summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
                         hostWidth: 260
                         showClose: root.currentIntent ? String(root.currentIntent.kind || "") === "context" : false
@@ -1043,6 +1044,7 @@ PanelWindow {
                                 ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
                         title: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.title || "") : ""
                         iconSource: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.iconSource || "") : ""
+                        tintIcon: root._transitionOutgoingIntent ? root._transitionOutgoingIntent.tintIcon === true : false
                         summary: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.summary || "") : ""
                         hostWidth: 260
                         showClose: false

@@ -106,7 +106,7 @@ Variants {
             Rectangle {
                 anchors.fill: parent
                 radius: 0
-                color: Services.SettingsService.effectiveColorScheme === "light" ? "#F2F0F5" : LazerTheme.bgDark
+                color: Services.SettingsService.effectiveColorScheme === "light" ? LazerTheme.bgLight : LazerTheme.bgDark
                 opacity: Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity))
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }

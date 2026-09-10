@@ -179,6 +179,7 @@ Item {
                     : widgetId === "volume" ? "Volume"
                     : widgetId === "tray" ? "System Tray" : widgetId || "Widget",
             iconSource: iconSource,
+            tintIcon: iconSource !== "",
             summary: String(item.section || "center"),
             anchorX: Number(point.x),
             section: String(item.section || "center"),

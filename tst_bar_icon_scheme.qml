@@ -2,9 +2,10 @@ import QtQuick
 import "./services" as Services
 import "./modules/lazerbar" as Lazer
 
-// Regression harness for scheme-aware bar glyphs: flips the color scheme and
-// verifies LazerTheme.barIcon plus a real BarIcon instance follow it (dark
-// glyphs on the light bar, white glyphs on the dark bar).
+// Regression harness for scheme-aware bar theming: flips the color scheme
+// and verifies LazerTheme.barIcon/bgLight plus real BarIcon and
+// BarPopupIdentity instances follow it (dark glyphs on the light bar, white
+// glyphs on the dark bar; tinted identity icons; scheme-tinted bar surface).
 Item {
     id: root
 
@@ -13,6 +14,7 @@ Item {
     property int ticks: 0
     property string savedScheme: ""
     property var iconInstance: null
+    property var identityInstance: null
 
     function check(label, cond, extra) {
         if (cond) {
@@ -43,6 +45,33 @@ Item {
             }
             if (hasColor)
                 return c
+        }
+        return null
+    }
+
+    function colorizerOf(item) {
+        if (!item)
+            return null
+        var kids = []
+        try {
+            kids = item.children || []
+        } catch (e3) {
+            return null
+        }
+        for (var i = 0; i < kids.length; i++) {
+            var c = kids[i]
+            if (!c)
+                continue
+            var isColorizer = false
+            try {
+                isColorizer = c.colorizationColor !== undefined
+            } catch (e4) {
+            }
+            if (isColorizer)
+                return c
+            var nested = root.colorizerOf(c)
+            if (nested)
+                return nested
         }
         return null
     }
@@ -93,6 +122,20 @@ Item {
             root.check("BarIcon instance created", !!root.iconInstance)
             if (!root.iconInstance)
                 return
+            var idComp = Qt.createComponent("modules/bar/BarPopupIdentity.qml")
+            if (idComp.status !== Component.Ready) {
+                root.check("BarPopupIdentity component loads", false, String(idComp.errorString()))
+                root.finish()
+                return
+            }
+            root.identityInstance = idComp.createObject(root, {
+                title: "Volume",
+                iconSource: Qt.resolvedUrl("modules/lazerbar/icons/bell.svg"),
+                tintIcon: true
+            })
+            root.check("BarPopupIdentity instance created", !!root.identityInstance)
+            if (!root.identityInstance)
+                return
             try {
                 Services.SettingsService.appearance.colorScheme = "light"
             } catch (e2) {
@@ -104,7 +147,9 @@ Item {
             break
         }
         case 1: {
-            // Light scheme: token and live overlay must read dark.
+            // Light scheme: token and live overlay must read dark; bar
+            // surface and rail take their scheme branches (palette-free
+            // fallbacks here since colorService is not injected).
             if (!Lazer.LazerTheme.lightScheme)
                 return
             var wantDark = "#1d1b20"
@@ -118,6 +163,17 @@ Item {
                 return
             root.check("light scheme flips barIcon dark", true)
             root.check("BarIcon overlay follows to dark", true)
+            if (String(Lazer.LazerTheme.bgLight) !== "#f2f0f5")
+                return
+            root.check("light bar surface falls back to #F2F0F5", true)
+            if (String(Lazer.LazerTheme.settingsRail) !== "#131217")
+                return
+            var colorizer = root.colorizerOf(root.identityInstance)
+            if (!colorizer)
+                return
+            if (String(colorizer.colorizationColor) !== wantDark)
+                return
+            root.check("identity colorizer follows barIcon (dark)", true)
             try {
                 Services.SettingsService.appearance.colorScheme = "dark"
             } catch (e3) {
@@ -137,6 +193,13 @@ Item {
                 return
             root.check("dark scheme restores barIcon white", true)
             root.check("BarIcon overlay follows to white", true)
+            if (String(Lazer.LazerTheme.bgDark) !== "#18171c")
+                return
+            root.check("dark bar surface falls back to bgDark", true)
+            var colorizer2 = root.colorizerOf(root.identityInstance)
+            if (!colorizer2 || String(colorizer2.colorizationColor) !== wantWhite)
+                return
+            root.check("identity colorizer follows barIcon (white)", true)
             root.finish()
             break
         }

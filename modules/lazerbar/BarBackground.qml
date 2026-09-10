@@ -17,7 +17,7 @@ PanelWindow {
 
     Rectangle {
         anchors.fill: parent
-        color: Services.SettingsService.effectiveColorScheme === "light" ? "#F2F0F5" : LazerTheme.bgDark
+        color: Services.SettingsService.effectiveColorScheme === "light" ? LazerTheme.bgLight : LazerTheme.bgDark
         opacity: Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity))
         radius: 0
 

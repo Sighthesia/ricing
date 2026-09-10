@@ -69,6 +69,7 @@ BarPill {
             screenName: root.screenName,
             title: "Battery",
             iconSource: Qt.resolvedUrl(root.iconFile),
+            tintIcon: true,
             summary: summaryText,
             actionKind: "battery",
             anchorX: centerX,

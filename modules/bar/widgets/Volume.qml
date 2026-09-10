@@ -38,6 +38,7 @@ BarPill {
             screenName: root.screenName,
             title: "Volume",
             iconSource: Qt.resolvedUrl("../icons/volume.svg"),
+            tintIcon: true,
             summary: summaryText,
             actionKind: "volume",
             anchorX: centerX,

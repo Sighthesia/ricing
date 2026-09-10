@@ -38,6 +38,7 @@ BarPill {
             screenName: root.screenName,
             title: "Notifications",
             iconSource: Qt.resolvedUrl("../../lazerbar/icons/bell.svg"),
+            tintIcon: true,
             summary: summaryText,
             actionKind: "notifications",
             anchorX: centerX,

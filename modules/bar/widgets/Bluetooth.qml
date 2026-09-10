@@ -55,6 +55,7 @@ BarPill {
             screenName: root.screenName,
             title: "Bluetooth",
             iconSource: Qt.resolvedUrl("../icons/bluetooth.svg"),
+            tintIcon: true,
             summary: summaryText,
             actionKind: "bluetooth",
             anchorX: centerX,

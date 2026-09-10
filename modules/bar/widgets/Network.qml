@@ -70,6 +70,7 @@ BarPill {
             screenName: root.screenName,
             title: "Network",
             iconSource: Qt.resolvedUrl(root.iconFile),
+            tintIcon: true,
             summary: summaryText,
             actionKind: "network",
             anchorX: centerX,

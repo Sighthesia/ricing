@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import "../lazerbar"
 
 // Straight header identity layer with settings rail, optional icon, title and summary.
@@ -7,6 +8,9 @@ Rectangle {
 
     property string title
     property string iconSource
+    // Monochrome module glyphs opt in to the scheme-aware barIcon tint;
+    // colored intents (tray icons) leave this off.
+    property bool tintIcon: false
     property string summary
     property real hostWidth: 260
     property bool showClose: false
@@ -46,6 +50,18 @@ Rectangle {
             asynchronous: true
             fillMode: Image.PreserveAspectFit
             opacity: visible ? 1 : 0
+        }
+
+        // Scheme-aware tint over monochrome module glyphs (white strokes
+        // would vanish on the light rail); colored icons skip this.
+        MultiEffect {
+            anchors.fill: iconImage
+            source: iconImage
+            visible: iconImage.visible && root.tintIcon
+            colorization: 1
+            colorizationColor: LazerTheme.barIcon
+
+            Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         Column {
