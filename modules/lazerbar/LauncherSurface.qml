@@ -163,6 +163,14 @@ Item {
         }
     }
 
+    // The pool fills asynchronously (desktop-entry scan, 5s clipboard poll),
+    // usually well after arm time — releasing before the first data landed
+    // would tear the hidden page down with zero rows built and the first
+    // open would pay the delegate cold path anyway. Start the release
+    // countdown only once the pool can actually materialize rows.
+    readonly property bool prewarmPoolReady: !!root.session
+            && root.session.displayPool != null && root.session.displayPool.length > 0
+
     Timer {
         id: prewarmArmTimer
         interval: 2500
@@ -175,7 +183,17 @@ Item {
         id: prewarmReleaseTimer
         interval: 4000
         repeat: false
-        running: prewarmLoader.active
+        running: prewarmLoader.active && root.prewarmPoolReady
+        onTriggered: prewarmLoader.active = false
+    }
+
+    // Hard cap: a session that never yields data has nothing to warm, so
+    // the hidden page must not outlive the startup window indefinitely.
+    Timer {
+        id: prewarmCapTimer
+        interval: 30000
+        repeat: false
+        running: prewarmLoader.active && !root.prewarmPoolReady
         onTriggered: prewarmLoader.active = false
     }
 
