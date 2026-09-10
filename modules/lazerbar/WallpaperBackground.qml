@@ -30,7 +30,7 @@ Variants {
             // decoding or when no wallpaper is configured.
             Rectangle {
                 anchors.fill: parent
-                color: Services.SettingsService.appearance.colorScheme === "light" ? "#F2F0F5" : LazerTheme.bgDark
+                color: Services.SettingsService.effectiveColorScheme === "light" ? "#F2F0F5" : LazerTheme.bgDark
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }

@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "./" as Services
 import "WidgetSettingsRegistry.js" as WidgetSettingsRegistry
+import "ColorSchemeLogic.js" as ColorSchemeLogic
 
 // Persist user-facing shell settings (bar, appearance, notifications) to settings.json.
 QtObject {
@@ -19,6 +20,9 @@ QtObject {
     readonly property var appearanceDefaults: ({
         wallpaperPath: "",
         colorScheme: "auto",
+        colorSchemeAutoMode: "time",
+        autoSunrise: "06:30",
+        autoSunset: "18:30",
         themeScheme: "tonal-spot",
         panelOpacity: 0.9,
         cornerRadius: 12,
@@ -68,6 +72,25 @@ QtObject {
     // Zero so the hard-edged wl_region reaches the painted arc/edge and the
     // acrylic covers the fill completely, with no un-blurred transparent rim.
     readonly property int blurRegionInset: 0
+
+    // OS-reported color scheme ("dark"/"light"/"unknown"); unknown when the
+    // desktop portal offers no preference, in which case auto falls back to
+    // the sunrise/sunset timetable.
+    readonly property string systemColorScheme: Qt.styleHints.colorScheme === Qt.Dark
+        ? "dark" : (Qt.styleHints.colorScheme === Qt.Light ? "light" : "unknown")
+    // Slow tick re-evaluating effectiveColorScheme so sunrise/sunset flips
+    // apply while the shell runs; settings edits re-evaluate immediately
+    // through the binding dependencies below.
+    property int themeClockTick: 0
+    // The mode the shell should actually paint. Manual intents pass through;
+    // "auto" resolves via the timetable or the OS scheme (see ColorSchemeLogic).
+    readonly property string effectiveColorScheme: {
+        root.themeClockTick
+        var now = new Date()
+        return ColorSchemeLogic.effectiveMode(appearance.colorScheme,
+            appearance.colorSchemeAutoMode, appearance.autoSunrise, appearance.autoSunset,
+            now.getHours() * 60 + now.getMinutes(), root.systemColorScheme)
+    }
 
     // Panel visibility state (driven by bar widget, consumed by SettingsWindow)
     property bool panelVisible: false
@@ -312,6 +335,13 @@ QtObject {
         onTriggered: settingsFile.writeAdapter()
     }
 
+    property Timer themeClock: Timer {
+        interval: 30000
+        repeat: true
+        running: true
+        onTriggered: root.themeClockTick += 1
+    }
+
     property FileView settingsFile: FileView {
         path: Quickshell.statePath("settings.json")
         watchChanges: true
@@ -349,6 +379,12 @@ QtObject {
             property JsonObject appearance: JsonObject {
                 property string wallpaperPath: ""
                 property string colorScheme: "auto"
+                // Auto-mode source: "time" follows autoSunrise/autoSunset,
+                // "system" follows the OS color scheme with a time fallback.
+                property string colorSchemeAutoMode: "time"
+                // Timetable for automatic light/dark switching (HH:MM).
+                property string autoSunrise: "06:30"
+                property string autoSunset: "18:30"
                 // Wallpaper palette scheme template (Material scheme type).
                 property string themeScheme: "tonal-spot"
    property real panelOpacity: 0.9

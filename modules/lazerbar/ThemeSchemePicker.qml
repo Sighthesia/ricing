@@ -39,7 +39,7 @@ Item {
 
     // Same dark/light resolution as Color.applyColors so previews match
     // what the shell will actually apply.
-    readonly property bool useLight: Services.SettingsService.appearance.colorScheme === "light"
+    readonly property bool useLight: Services.SettingsService.effectiveColorScheme === "light"
     function paletteFor(scheme) {
         const entry = previews ? previews[scheme] : null
         if (!entry) return null

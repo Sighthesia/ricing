@@ -1,4 +1,5 @@
 import QtQuick
+import "../../services/ColorSchemeLogic.js" as ColorLogic
 
 // Present the supported appearance settings as one flat section block.
 LazerSettingsSection {
@@ -12,6 +13,9 @@ LazerSettingsSection {
 
     property alias wallpaperField: wallpaperFieldControl
     property alias colorSchemeChoice: colorSchemeChoiceControl
+    property alias autoModeChoice: autoModeChoiceControl
+    property alias sunriseField: sunriseFieldControl
+    property alias sunsetField: sunsetFieldControl
     property alias panelOpacitySlider: panelOpacitySliderControl
     property alias enableBlurToggle: enableBlurToggleControl
     property alias blurSurfaceOpacitySlider: blurSurfaceOpacitySliderControl
@@ -23,6 +27,9 @@ LazerSettingsSection {
     property alias ripplePulseToggle: ripplePulseToggleControl
     property alias wallpaperRow: wallpaperRow
     property alias colorSchemeRow: colorSchemeRow
+    property alias autoModeRow: autoModeRow
+    property alias sunriseRow: sunriseRow
+    property alias sunsetRow: sunsetRow
     property alias themeSchemePicker: themeSchemePicker
     property alias panelOpacityRow: panelOpacityRow
     property alias enableBlurRow: enableBlurRow
@@ -50,6 +57,35 @@ LazerSettingsSection {
 
     function normalizeColorScheme(value) {
         return value === "dark" || value === "light" || value === "auto" ? value : "auto"
+    }
+
+    function normalizeAutoMode(value) {
+        return value === "system" ? "system" : "time"
+    }
+
+    function isAutoTimeMode() {
+        var intent = normalizeColorScheme(root.settingsObject ? root.settingsObject.colorScheme : "auto")
+        var mode = normalizeAutoMode(root.settingsObject ? root.settingsObject.colorSchemeAutoMode : "time")
+        return intent === "auto" && mode === "time"
+    }
+
+    function isAutoMode() {
+        return normalizeColorScheme(root.settingsObject ? root.settingsObject.colorScheme : "auto") === "auto"
+    }
+
+    // Commit an HH:MM time edit: normalize liberal input ("6:5" -> "06:05"),
+    // persist valid values, and snap rejected input back to the stored value.
+    // The snap reuses the field's own sync so the text binding stays intact.
+    function commitTime(field, key, text, fallback) {
+        if (!root.settingsObject || !field)
+            return
+        var current = root.settingsObject[key] != null ? String(root.settingsObject[key]) : ""
+        var normalized = ColorLogic.normalizeTimeString(text, current || fallback)
+        if (normalized !== current) {
+            root.settingsObject[key] = normalized
+            root.save()
+        }
+        field.syncEditorFromText()
     }
 
     LazerSettingsRow {
@@ -103,6 +139,63 @@ LazerSettingsSection {
                     root.save()
                 }
             }
+        }
+    }
+
+    // Automatic switching timetable: only editable while the scheme is auto.
+    LazerSettingsRow {
+        id: autoModeRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.isAutoMode()
+        labelText: "自动模式"; descriptionText: "跟随时间或跟随系统"
+        defaultValue: root.defaultOf("colorSchemeAutoMode")
+        currentValue: autoModeChoiceControl.currentValue
+        resetCallback: function() { root.resetKey("colorSchemeAutoMode") }
+        LazerSettingsChoice {
+            id: autoModeChoiceControl
+            model: [{ value: "time", label: "跟随时间" }, { value: "system", label: "跟随系统" }]
+            currentValue: root.normalizeAutoMode(root.settingsObject ? root.settingsObject.colorSchemeAutoMode : "time")
+            onValueSelected: function(value) {
+                if (root.settingsObject && (value === "time" || value === "system")) {
+                    root.settingsObject.colorSchemeAutoMode = value
+                    root.save()
+                }
+            }
+        }
+    }
+
+    LazerSettingsRow {
+        id: sunriseRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.isAutoTimeMode()
+        labelText: "日出时间"; descriptionText: "自动模式按此切到浅色（HH:MM）"
+        defaultValue: root.defaultOf("autoSunrise")
+        currentValue: root.settingsObject ? root.settingsObject.autoSunrise : ""
+        resetCallback: function() { root.resetKey("autoSunrise") }
+        LazerSettingsTextField {
+            id: sunriseFieldControl
+            text: root.settingsObject ? root.settingsObject.autoSunrise : ""
+            placeholderText: "06:30"
+            onTextCommitted: function(text) { root.commitTime(sunriseFieldControl, "autoSunrise", text, "06:30") }
+        }
+    }
+
+    LazerSettingsRow {
+        id: sunsetRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.isAutoTimeMode()
+        labelText: "日落时间"; descriptionText: "自动模式按此切到深色（HH:MM）"
+        defaultValue: root.defaultOf("autoSunset")
+        currentValue: root.settingsObject ? root.settingsObject.autoSunset : ""
+        resetCallback: function() { root.resetKey("autoSunset") }
+        LazerSettingsTextField {
+            id: sunsetFieldControl
+            text: root.settingsObject ? root.settingsObject.autoSunset : ""
+            placeholderText: "18:30"
+            onTextCommitted: function(text) { root.commitTime(sunsetFieldControl, "autoSunset", text, "18:30") }
         }
     }
 

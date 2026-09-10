@@ -7,7 +7,7 @@ Item {
     width: 960
     height: 640
 
-    QtObject { id: appearanceSettings; property string wallpaperPath: ""; property string colorScheme: "auto"; property real panelOpacity: 0.9; property bool enableBlur: true; property real blurSurfaceOpacity: 0.35; property real glassHighlightIntensity: 0.56; property real glassGlowIntensity: 0.22; property bool glassThemeAdaptive: true; property bool ripplePulseEnabled: true }
+    QtObject { id: appearanceSettings; property string wallpaperPath: ""; property string colorScheme: "auto"; property string colorSchemeAutoMode: "time"; property string autoSunrise: "06:30"; property string autoSunset: "18:30"; property real panelOpacity: 0.9; property bool enableBlur: true; property real blurSurfaceOpacity: 0.35; property real glassHighlightIntensity: 0.56; property real glassGlowIntensity: 0.22; property bool glassThemeAdaptive: true; property bool ripplePulseEnabled: true }
     QtObject { id: barSettings; property int height: 48; property string position: "top"; property bool floating: false; property int floatingMargin: 4; property int cornerRadius: 12 }
     QtObject { id: notificationSettings; property int maxVisible: 3; property int timeout: 5000; property string position: "top-right"; property bool dnd: false }
     QtObject { id: wallpaperService; function changeWallpaper(path) {} }
@@ -365,7 +365,7 @@ Item {
             tryVerify(function() {
                 return panel.notificationPage.visible && panel.notificationPage.height > 0
             }, 1500)
-            compare(panel.appearancePage.visibleResultCount, 9)
+            compare(panel.appearancePage.visibleResultCount, 18)
         }
 
         function test_openSessionReducedMotionSkipsWave() {
@@ -419,7 +419,7 @@ Item {
 
         function test_searchFiltersAllSectionsAndShowsEmptyState() {
             panel.searchQuery = "模糊"
-            compare(panel.appearancePage.visibleResultCount, 2)
+            compare(panel.appearancePage.visibleResultCount, 3)
             compare(panel.barPage.visibleResultCount, 0)
             tryCompare(panel.appearancePage.wallpaperRow, "visible", false, 500)
             tryCompare(panel.barPage, "visible", false, 500)
@@ -429,7 +429,8 @@ Item {
             tryCompare(panel.appearancePage, "visible", false, 500)
             verify(panel.content.emptyStateVisible)
             panel.searchQuery = ""
-            compare(panel.appearancePage.visibleResultCount, 9)
+            // 17 rows + theme picker = 18 (the old 9 predates several rows).
+            compare(panel.appearancePage.visibleResultCount, 18)
             tryVerify(function() { return panel.appearancePage.wallpaperRow.height > 0 }, 500)
             tryVerify(function() { return panel.appearancePage.visible }, 500)
             verify(!panel.content.emptyStateVisible)
@@ -443,7 +444,7 @@ Item {
 
             tryVerify(function() { return panel.appearancePage.height > 0 }, 500)
             tryVerify(function() { return panel.barPage.height > 0 }, 500)
-            compare(panel.appearancePage.visibleResultCount, 9)
+            compare(panel.appearancePage.visibleResultCount, 18)
             verify(panel.barPage.visibleResultCount > 0)
             verify(!panel.content.emptyStateVisible)
         }

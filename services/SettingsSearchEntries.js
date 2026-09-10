@@ -19,6 +19,9 @@ var settingsEntries = [
     // ── Appearance ──
     { label: "Wallpaper Path", category: "Appearance", description: "Custom wallpaper image path", targetCategory: "appearance" },
     { label: "Color Scheme", category: "Appearance", description: "Auto, dark, or light mode", targetCategory: "appearance" },
+    { label: "Auto Mode", category: "Appearance", description: "Follow time or system theme in auto mode", targetCategory: "appearance" },
+    { label: "Auto Sunrise", category: "Appearance", description: "Time to switch to light mode (HH:MM)", targetCategory: "appearance" },
+    { label: "Auto Sunset", category: "Appearance", description: "Time to switch to dark mode (HH:MM)", targetCategory: "appearance" },
     { label: "Theme Template", category: "Appearance", description: "Wallpaper palette scheme type per template preview", targetCategory: "appearance" },
     { label: "Panel Opacity", category: "Appearance", description: "Panel transparency setting", targetCategory: "appearance" },
     { label: "Enable Blur", category: "Appearance", description: "Toggle background blur effects", targetCategory: "appearance" },

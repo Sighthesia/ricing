@@ -8,6 +8,9 @@ Item {
         id: appearanceSettings
         property string wallpaperPath: "/tmp/old.png"
         property string colorScheme: "auto"
+        property string colorSchemeAutoMode: "time"
+        property string autoSunrise: "06:30"
+        property string autoSunset: "18:30"
         property real panelOpacity: 0.9
         property bool enableBlur: true
         property real blurSurfaceOpacity: 0.35
@@ -58,6 +61,9 @@ Item {
             saveState.count = 0
             appearanceSettings.wallpaperPath = "/tmp/old.png"
             appearanceSettings.colorScheme = "auto"
+            appearanceSettings.colorSchemeAutoMode = "time"
+            appearanceSettings.autoSunrise = "06:30"
+            appearanceSettings.autoSunset = "18:30"
             appearanceSettings.panelOpacity = 0.9
             appearanceSettings.enableBlur = true
             appearanceSettings.blurSurfaceOpacity = 0.35
@@ -207,7 +213,9 @@ Item {
             compare(appearancePage.visibleResultCount, 1)
             verify(appearancePage.wallpaperRow.visible)
             appearancePage.searchQuery = ""
-            compare(appearancePage.visibleResultCount, 13)
+            // True total is 17 rows + theme picker = 18 (the old 13 predates
+            // the theme-adaptation row and the picker, which were never recounted).
+            compare(appearancePage.visibleResultCount, 18)
             verify(appearancePage.wallpaperRow.visible)
         }
 
@@ -226,6 +234,29 @@ Item {
             compare(appearancePage.visibleResultCount, 0)
             appearancePage.searchQuery = ""
             appearanceSettings.enableBlur = true
+        }
+
+        function test_autoScheduleWritesValidTimesAndRejectsGarbage() {
+            verify(appearancePage.autoModeRow.enabled)
+            verify(appearancePage.sunriseRow.enabled)
+            verify(appearancePage.sunsetRow.enabled)
+            appearancePage.autoModeChoice.selectValue("system")
+            compare(appearanceSettings.colorSchemeAutoMode, "system")
+            verify(!appearancePage.sunriseRow.enabled)
+            verify(!appearancePage.sunsetRow.enabled)
+            appearancePage.autoModeChoice.selectValue("time")
+            compare(appearanceSettings.colorSchemeAutoMode, "time")
+            appearancePage.sunriseField.editorItem.text = "6:5"
+            appearancePage.sunriseField.commit()
+            compare(appearanceSettings.autoSunrise, "06:05")
+            appearancePage.sunsetField.editorItem.text = "not-a-time"
+            appearancePage.sunsetField.commit()
+            compare(appearanceSettings.autoSunset, "18:30")
+            compare(appearancePage.sunsetField.editorItem.text, "18:30")
+            appearancePage.colorSchemeChoice.selectValue("dark")
+            verify(!appearancePage.autoModeRow.enabled)
+            verify(!appearancePage.sunriseRow.enabled)
+            verify(saveState.count >= 4)
         }
 
         function test_searchDoesNotTriggerSave() {

@@ -55,7 +55,7 @@ QtObject {
     // Use Qt.colorEqual guard: unset color properties default to transparent (#00000000),
     // so we fall back to defaults only when the adapter value is fully transparent.
     function applyColors() {
-        var d = Services.SettingsService.appearance.colorScheme === "light"
+        var d = Services.SettingsService.effectiveColorScheme === "light"
                 ? adapter.light : adapter.dark
         root.mPrimary = Qt.colorEqual(d.primary, "transparent") ? defaults.mPrimary : d.primary
         root.mOnPrimary = Qt.colorEqual(d.on_primary, "transparent") ? defaults.mOnPrimary : d.on_primary
@@ -81,6 +81,13 @@ QtObject {
     property Connections _schemeConnection: Connections {
         target: Services.SettingsService.appearance
         function onColorSchemeChanged() { root.applyColors() }
+    }
+
+    // Automatic sunrise/sunset and OS-scheme flips repaint without re-extraction:
+    // colors.json already carries both palettes in auto mode.
+    property Connections _effectiveConnection: Connections {
+        target: Services.SettingsService
+        function onEffectiveColorSchemeChanged() { root.applyColors() }
     }
 
     // Debounce reload for atomic file replacements

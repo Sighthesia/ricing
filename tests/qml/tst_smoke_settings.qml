@@ -5,7 +5,7 @@ import "../../modules/lazerbar" as Lazer
 Item {
     width: 960
     height: 640
-    QtObject { id: appearanceSettings; property string wallpaperPath: ""; property string colorScheme: "auto"; property real panelOpacity: 0.9; property bool enableBlur: true; property real blurSurfaceOpacity: 0.35; property real glassHighlightIntensity: 0.56; property real glassGlowIntensity: 0.22; property bool glassThemeAdaptive: true; property bool ripplePulseEnabled: true }
+    QtObject { id: appearanceSettings; property string wallpaperPath: ""; property string colorScheme: "auto"; property string colorSchemeAutoMode: "time"; property string autoSunrise: "06:30"; property string autoSunset: "18:30"; property real panelOpacity: 0.9; property bool enableBlur: true; property real blurSurfaceOpacity: 0.35; property real glassHighlightIntensity: 0.56; property real glassGlowIntensity: 0.22; property bool glassThemeAdaptive: true; property bool ripplePulseEnabled: true }
     QtObject { id: barSettings; property int height: 48; property string position: "top"; property bool floating: false; property int floatingMargin: 4; property int cornerRadius: 12 }
     QtObject { id: notificationSettings; property int maxVisible: 3; property int timeout: 5000; property string position: "top-right"; property bool dnd: false }
     QtObject { id: saveService; property int count: 0; function save() { count++ } }
