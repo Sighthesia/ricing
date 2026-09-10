@@ -65,6 +65,9 @@ PanelWindow {
     property bool _exchangeCommitted: false
     property var _transitionOutgoingIntent: null
     property int _deferredRebaseSerial: -1
+    // Set when a new intent arrives while the exit reveal still owns the
+    // surface: onOpenChanged then reverses the reveal instead of snapping.
+    property bool _reviving: false
     // Stable travel distance for the current reveal/exit cycle.
     property real revealDistance: 1
     // Left-flip state for edge tray submenus: the container expands left
@@ -210,8 +213,14 @@ PanelWindow {
         // This prevents a pending close from racing the single popup instance.
         cancelClose()
         var isOpen = root.open && root.currentIntent
-        var isReplacement = isOpen && !root.sameIntent(root.currentIntent, intentObj)
-        if (!isOpen) {
+        // A close that already flipped open keeps the surface and both intents
+        // alive until the exit cleanup runs: a new intent in that window must
+        // revive the live popup (glide + slide) instead of reopening it.
+        var isExiting = !root.open && root.surfaceActive && root.currentIntent !== null
+        var isLive = isOpen || isExiting
+        var isReplacement = isLive && !root.sameIntent(root.currentIntent, intentObj)
+        if (!isLive) {
+            root._reviving = false
             root.invalidateContentTransition()
             root.currentIntent = intentObj
             root.applyIntentFields(intentObj)
@@ -219,11 +228,13 @@ PanelWindow {
         } else if (isReplacement) {
             // intent = newest accepted for diagnostics; content stays on A
             // until the shared progress crosses the exchange threshold.
+            root._reviving = isExiting
             root.applyIntentFields(intentObj)
             root.beginIntentReplacement(intentObj)
         } else {
             // Same instance updates (for example a tray delegate label or a
             // refreshed callback payload) stay live without a crossfade.
+            root._reviving = isExiting
             root.invalidateContentTransition()
             root.currentIntent = intentObj
             root.applyIntentFields(intentObj)
@@ -667,6 +678,7 @@ PanelWindow {
         root.currentIntent = null
         root.pendingIntent = null
         root._transitionOutgoingIntent = null
+        root._reviving = false
         root.transitionSerial += 1
         root.transitionProgress = 1
         root.surfaceActive = false
@@ -861,9 +873,19 @@ PanelWindow {
         // the surfaceActive binding so parents and children never read each
         // other's effective visibility (which deadlocks at false).
         if (open) {
+            // A revive interrupts the exit reveal: keep the current reveal
+            // position and slide it back open so geometry, height and content
+            // keep their continuous transition instead of snapping.
+            var revived = root._reviving
+            root._reviving = false
+            if (revived) {
+                revealStartTimer.stop()
+                root.startReveal(1)
+                return
+            }
             // Fresh opens always slide from the start. Without this snap a
-            // reopen during an unfinished exit resumes mid-travel and the
-            // content appears instantly at partial height.
+            // reopen after cleanup resumes mid-travel and the content appears
+            // instantly at partial height.
             root.debugLog("reveal-snap", { "progressBefore": Number(popup.revealProgress) })
             revealMotion.stop()
             popup.revealProgress = 0

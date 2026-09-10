@@ -539,6 +539,94 @@ Item {
             root.check("close race cleanup clears root intent", host.intent, null)
             root.check("close race cleanup clears surface", host.surfaceActive, false)
             root.check("close race cleanup stops timer", host.debugSnapshot().host.clearTimer, false)
+            // Revive phase: open a popup, let its close fire, then interrupt
+            // the exit reveal with a new intent.
+            host.showIntent({
+                widgetId: "revive-a", instanceKey: "revive-a:0", kind: "hover",
+                title: "Revive A", actionKind: "volume",
+                anchorX: 300, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.widgetHovered = false
+            host.popupHovered = false
+            host.requestClose()
+            reviveCloseWait.restart()
+        }
+    }
+
+    Timer {
+        id: reviveCloseWait
+        interval: Lazer.MotionTokens.fast + 40
+        onTriggered: {
+            root.check("revive close fires before new hover", host.open, false)
+            root.check("revive keeps surface through exit", host.surfaceActive, true)
+            root.check("revive retains current through exit", host.currentIntent.widgetId, "revive-a")
+            // A new widget arriving mid-exit must revive the live popup:
+            // glide + slide continue instead of snapping open.
+            host.updateIntent({
+                widgetId: "network", instanceKey: "network:0", kind: "hover",
+                title: "Network", actionKind: "network",
+                anchorX: 700, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            root.check("revive reopens host", host.open, true)
+            root.check("revive starts replacement", host.pendingIntent.widgetId, "network")
+            root.check("revive keeps displayed A", host.currentIntent.widgetId, "revive-a")
+            root.check("revive does not snap reveal", host.popupItem.revealProgress > 0, true)
+            host.transitionProgress = 0.5
+            root.check("revive commits B at exchange", host.currentIntent.widgetId, "network")
+            host.contentSlideProgress = 0.5
+            var reviveIn = root.findByName(host.popupItem, "popupIdentity")
+            var reviveOut = root.findByName(host.popupItem, "popupIdentityOutgoing")
+            root.check("revive slides new content in from right", reviveIn.x > 0, true)
+            root.check("revive slides old content out to left", reviveOut.x < 0, true)
+            host.contentSlideProgress = 1
+            host.settleContentSlide()
+            reviveGlideWait.restart()
+        }
+    }
+
+    Timer {
+        id: reviveGlideWait
+        interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.slow + 300
+        onTriggered: {
+            root.check("revive settles on B", host.currentIntent.widgetId, "network")
+            root.check("revive clears pending", host.pendingIntent, null)
+            root.check("revive restores full reveal", host.popupItem.revealProgress > 0.99, true)
+            root.checkClose("revive display X meets target", host.displayX, host.targetX)
+            root.check("revive clears outgoing layer", host._transitionOutgoingIntent, null)
+            // Same widget re-hovered mid-exit revives live without a swap.
+            host.widgetHovered = false
+            host.popupHovered = false
+            host.requestClose()
+            reviveSameCloseWait.restart()
+        }
+    }
+
+    Timer {
+        id: reviveSameCloseWait
+        interval: Lazer.MotionTokens.fast + 40
+        onTriggered: {
+            host.updateIntent({
+                widgetId: "network", instanceKey: "network:0", kind: "hover",
+                title: "Network (2)", actionKind: "network",
+                anchorX: 700, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            root.check("same-widget revive reopens host", host.open, true)
+            root.check("same-widget revive clears pending", host.pendingIntent, null)
+            root.check("same-widget revive updates live", host.currentIntent.title, "Network (2)")
+            root.check("same-widget revive keeps no outgoing layer", host._transitionOutgoingIntent, null)
+            reviveSameSettleWait.restart()
+        }
+    }
+
+    Timer {
+        id: reviveSameSettleWait
+        interval: host.popupItem.revealDuration + 400
+        onTriggered: {
+            root.check("same-widget revive stays open", host.open, true)
+            root.check("same-widget revive restores reveal", host.popupItem.revealProgress > 0.99, true)
             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }
