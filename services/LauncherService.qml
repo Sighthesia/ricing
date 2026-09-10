@@ -35,16 +35,14 @@ Singleton {
     // so an early open cannot strand the user on an empty result set. The
     // scan reports every entry individually; coalesce the storm into one
     // refresh instead of committing a growing pool per entry.
+    // Re-pool apps when entries arrive: an open launcher sees the newer set
+    // through the force-pull commit, and a closed one refreshes its kept
+    // pool in the background so the next open never re-pulls on the spot.
     Timer {
         id: entryScanRefreshTimer
         interval: 400
         repeat: false
-        onTriggered: {
-            if (session.visible && session.mode === "apps")
-                // Force a pull: the pooled fast path would otherwise keep
-                // filtering the pre-scan pool forever.
-                session.refresh(true)
-        }
+        onTriggered: session.revalidatePool()
     }
 
     // True while the desktop-entry scan is still adding entries (quiet for
@@ -61,17 +59,22 @@ Singleton {
         entryScanSettleTimer.restart()
     }
 
-    // The launch-count file can finish loading after the first launcher pull.
-    // Rebuild the app pool once so the initial list is ranked with persisted
-    // usage data instead of the empty defaults.
+    // Launch-count changes - a just-recorded launch or the persisted maps
+    // landing - must re-rank the pooled apps list. recordLaunch runs before
+    // the post-launch close, so refreshing directly on the signal would
+    // supersede the close completion and strand the surface open; a short
+    // coalescing timer fires strictly after that synchronous settle.
+    Timer {
+        id: rankingRevalidateTimer
+        interval: 300
+        repeat: false
+        onTriggered: session.revalidatePool()
+    }
     Connections {
         target: Services.LaunchCountService
-        function onPersistenceReady() {
-            // refresh(true) intentionally supersedes an in-flight first pull;
-            // LauncherSession drops the older completion by refresh token.
-            if (session.visible && session.mode === "apps")
-                session.refresh(true)
-        }
+        function onCountsChanged() { rankingRevalidateTimer.restart() }
+        function onLastAtChanged() { rankingRevalidateTimer.restart() }
+        function onPersistenceReady() { rankingRevalidateTimer.restart() }
     }
 
     // Quickshell-free session core (unit tested directly under qmltestrunner).

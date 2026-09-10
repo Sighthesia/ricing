@@ -337,18 +337,117 @@ Item {
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
             var stablePool = svc().displayPool
 
-            // Close and reopen: the invalidated mode re-pulls, and identical
-            // ordered contents must reuse the existing array so delegates
-            // never rebuild.
+            // Close and reopen: the apps pool survives the close, so the
+            // open must serve results locally without re-pulling the source
+            // and without rebuilding the pooled array.
             svc().close()
-            svc()._adapters = ({ apps: apps })
             svc().open()
-            compare(apps.pendingRefreshes.length, 2)
-            resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
-
+            compare(apps.queries.length, 1, "reopen re-pulled the source")
             verify(svc().displayPool === stablePool)
             compare(svc().results.length, 2)
             compare(svc().selectedIndex, 0)
+
+            // Keystrokes after the pooled reopen stay local as well.
+            svc().query = "al"
+            compare(apps.queries.length, 1)
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "a")
+        }
+
+        // --- background pool revalidation ---
+
+        function test_revalidatePoolSwapsClosedSessionPool() {
+            var apps = makeManualAdapter()
+            svc()._adapters = ({ apps: apps })
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+            var firstPool = svc().displayPool
+            svc().close()
+
+            // A change announcer fires while closed: the pool updates in
+            // the background without touching visibility or results. The
+            // incoming set must already be in sorted order (Alpha ranks
+            // before New app on the name tiebreak).
+            svc().revalidatePool()
+            compare(apps.queries.length, 2)
+            resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0), makeItem("n", "New app", 0, 0)])
+
+            compare(svc().visible, false)
+            compare(svc().results.length, 0)
+            verify(svc().displayPool !== firstPool)
+            compare(svc().displayPool.length, 2)
+            compare(svc().displayPool[1].id, "n")
+
+            // The next open serves the fresh pool without re-pulling.
+            svc().open()
+            compare(apps.queries.length, 2, "reopen after revalidation re-pulled the source")
+            compare(svc().results.length, 2)
+            compare(svc().results[1].id, "n")
+        }
+
+        function test_revalidatePoolKeepsIdenticalPoolIdentity() {
+            var apps = makeManualAdapter()
+            svc()._adapters = ({ apps: apps })
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+            var stablePool = svc().displayPool
+            svc().close()
+
+            svc().revalidatePool()
+            resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0)])
+
+            verify(svc().displayPool === stablePool)
+        }
+
+        function test_revalidatePoolKeepsPoolOnSourceError() {
+            var apps = makeManualAdapter()
+            svc()._adapters = ({ apps: apps })
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+            var stablePool = svc().displayPool
+            svc().close()
+
+            // A closed session has no error surface; a transient source
+            // failure must keep the stale pool instead of emptying it.
+            svc().revalidatePool()
+            resolveRefresh(apps, 1, { error: "source failed" })
+
+            verify(svc().displayPool === stablePool)
+            compare(svc().error, "")
+        }
+
+        function test_revalidatePoolNoopWithoutAppsPool() {
+            // No pooled apps data (never opened, or closed from another
+            // mode): there is nothing to revalidate and no adapter hit.
+            var apps = makeManualAdapter()
+            svc()._adapters = ({ apps: apps })
+            svc()._pooledMode = ""
+
+            svc().revalidatePool()
+            compare(apps.queries.length, 0)
+
+            // Also inert when the pool is empty (first-open not pulled yet).
+            svc()._pooledMode = "apps"
+            svc().revalidatePool()
+            compare(apps.queries.length, 0)
+        }
+
+        function test_revalidatePoolWhileVisibleForcePulls() {
+            var apps = makeManualAdapter()
+            svc()._adapters = ({ apps: apps })
+
+            svc().open()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+
+            svc().revalidatePool()
+            compare(apps.queries.length, 2)
+            compare(svc().loading, true)
+            resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0)])
+            compare(svc().loading, false)
+            compare(svc().results.length, 1)
         }
 
         // --- keyboard contract ---
@@ -449,32 +548,31 @@ Item {
             compare(svc().results[0].id, "n")
         }
 
-        function test_reopenWithIdenticalPoolEngagesFastPath() {
-            // close() clears _pooledMode but keeps displayPool; if a
-            // fresh-open pull returns the same ids, the pooled mode marker
-            // must still be restored - otherwise every keystroke re-hits
-            // the data source and can capture mid-rescan snapshots.
+        function test_clipboardCloseRepullsAppsOnceThenStaysLocal() {
+            // Only the apps pool survives a close; time-sensitive modes must
+            // re-fetch. After the mode-switch reopen re-pulls once, the
+            // restored marker must keep every later keystroke local.
             var apps = makeManualAdapter()
-            svc()._adapters = { apps: apps }
+            var clips = makeManualAdapter()
+            svc()._adapters = ({ apps: apps, clipboard: clips })
 
             svc().open()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+            compare(svc()._pooledMode, "apps")
 
-            // Production toggle: close resets _pooledMode but keeps the
-            // pool; the reopen pull returns identical ids.
+            svc().query = ">clip "
+            resolveRefresh(clips, 0, [makeItem("c1", "Clip", 0, 0)])
+            compare(svc()._pooledMode, "clipboard")
+
             svc().close()
             svc().open()
-            var queriesAfterReopen = apps.queries.length
-            resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0)])
-            compare(apps.queries.length, queriesAfterReopen)
-
-            svc().query = "a"
-            compare(apps.queries.length, queriesAfterReopen,
-                    "keystroke after identical reopen re-pulled the source")
+            compare(apps.queries.length, 2, "apps reopen must re-pull after a clipboard session")
+            resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
+            compare(svc().results.length, 2)
 
             svc().query = "al"
-            compare(apps.queries.length, queriesAfterReopen,
-                    "second keystroke re-pulled the source")
+            compare(apps.queries.length, 2, "keystroke re-pulled the source")
+            compare(svc().results.length, 1)
             verify(svc().results.length >= 1)
         }
 
@@ -496,8 +594,7 @@ Item {
                    "identical refresh replaced the results array")
 
             // A genuinely changed pull swaps the array.
-            svc().close()
-            svc().open()
+            svc().refresh(true)
             resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0)])
             verify(svc().results !== first, "changed refresh must swap arrays")
         }

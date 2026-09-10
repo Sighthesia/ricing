@@ -83,8 +83,13 @@ QtObject {
         // late completions cannot resurrect closed-session state.
         _refreshToken++
         root.visible = false
+        // The apps pool is the expensive one to rebuild (a full source pull
+        // with per-entry icon theme lookups); keep it pooled across closes
+        // so the next plain open serves results locally without re-pulling.
+        // Other modes carry time-sensitive data (clipboard history) and must
+        // re-fetch on their next open.
+        root._pooledMode = LauncherLogic.parseQuery(root.query).mode === "apps" ? "apps" : ""
         root.query = ""
-        root._pooledMode = ""
         root.results = []
         root.loading = false
         root.error = ""
@@ -164,8 +169,9 @@ QtObject {
         if (!poolStable)
             root.displayPool = sorted
         // The pooled-mode marker must be restored even when the content is
-        // unchanged: close() clears it while the pool survives, and without
-        // this every keystroke would re-hit the data source after a reopen.
+        // unchanged: a clipboard-mode close clears it while the pool
+        // survives, and without this every keystroke would re-hit the data
+        // source after a reopen.
         root._pooledMode = pooledMode
         var filtered = LauncherLogic.filterResults(root.displayPool, requestText)
         root.selectedIndex = requestText.length > 0
@@ -175,6 +181,40 @@ QtObject {
         // not reassign results or the surface replays its refill animation.
         root.results = LauncherLogic.poolMatches(previous, filtered)
                 ? previous : filtered
+    }
+
+    // Background revalidation for change announcers (desktop-entry rescans,
+    // launch-count updates): the pooled apps list is refreshed on demand
+    // when the underlying data changes instead of on every open. Visible
+    // sessions ride the normal force-pull commit (loading/error/cascade
+    // semantics); closed sessions swap only the pooled array so the next
+    // open starts from fresh data without touching visible state.
+    function revalidatePool() {
+        if (root.visible) {
+            if (root.mode === "apps")
+                root.refresh(true)
+            return
+        }
+        if (root._pooledMode !== "apps" || root.displayPool.length === 0)
+            return
+        // Only a registered adapter may answer; the neutral fallback would
+        // resolve to an empty set and silently wipe the pool.
+        var registered = root._adapters ? root._adapters["apps"] : null
+        if (!registered || typeof registered.refresh !== "function")
+            return
+        var adapter = root._adapterFor("apps")
+        var token = ++_refreshToken
+        adapter.refresh("", "apps", function(outcome) {
+            if (token !== _refreshToken)
+                return
+            // While closed there is no error surface; keep the stale pool
+            // rather than dropping it on a transient source failure.
+            if (!outcome || !Array.isArray(outcome))
+                return
+            var sorted = LauncherLogic.sortResults(outcome)
+            if (!LauncherLogic.poolMatches(sorted, root.displayPool))
+                root.displayPool = sorted
+        })
     }
 
     function selectNext() {

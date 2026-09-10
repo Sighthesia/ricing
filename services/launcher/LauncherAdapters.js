@@ -129,6 +129,19 @@ function createAppsAdapter(config) {
     var actionRunner = typeof config.actionRunner === "function" ? config.actionRunner : null
     var ipcHelperPath = config.ipcHelperPath == null ? "" : String(config.ipcHelperPath)
 
+    // Icon resolution hits the icon theme (a synchronous filesystem-backed
+    // lookup per name); cache by raw icon name so repeated pool pulls -
+    // rescans, revalidations - never re-pay it. Missing icons cache as "".
+    var iconCache = {}
+    function cachedIcon(rawIcon) {
+        var key = rawIcon == null ? "" : String(rawIcon)
+        if (Object.prototype.hasOwnProperty.call(iconCache, key))
+            return iconCache[key]
+        var resolved = iconResolver ? String(iconResolver(key)) : directIconPath(key)
+        iconCache[key] = resolved
+        return resolved
+    }
+
     // DesktopEntries.applications.values is a QML list object rather than a
     // JavaScript array; accept anything indexable with a numeric length.
     function entryValues() {
@@ -168,7 +181,7 @@ function createAppsAdapter(config) {
                     continue
                 if (!appMatches(entry, needle))
                     continue
-                out.push(appItem(entry, launchCounts, iconResolver))
+                out.push(appItem(entry, launchCounts, cachedIcon))
             }
             for (var commandIndex = 0; commandIndex < commands.length; commandIndex++) {
                 var candidate = commands[commandIndex]
