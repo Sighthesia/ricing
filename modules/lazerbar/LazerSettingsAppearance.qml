@@ -375,6 +375,15 @@ LazerSettingsSection {
         resetCallback: function() { root.resetKey("themeAdaptation") }
         LazerSettingsToggle { id: themeAdaptationToggleControl; checked: root.settingsObject ? root.settingsObject.themeAdaptation !== false : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.themeAdaptation = value; root.save() } } }
     }
+
+    // Preset color scheme cards (active while wallpaper adaptation is off).
+    PresetSchemePicker {
+        id: presetSchemePicker
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        settingsObject: root.settingsObject
+        saveCallback: root.saveCallback
+    }
     LazerSettingsRow {
         id: rippleRow
         width: parent.width - 16; x: 8
