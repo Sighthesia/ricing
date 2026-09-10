@@ -769,35 +769,38 @@ Item {
                     }
                 }
             }
+        }
 
-            // Metadata footer pinned to the pane bottom with an opaque rail
-            // background: scrolled content slides underneath it. Declared
-            // after the Flickable so it paints on top; the full text already
-            // renders above, so this never repeats the content itself.
-            Rectangle {
-                id: metaCaption
+        // Metadata footer pinned to the pane bottom with an opaque rail
+        // background: scrolled content slides underneath it. A direct child
+        // of the pane — never the Flickable — so the anchor baseline is the
+        // pane viewport rather than the content space, and it cannot drift
+        // past the bottom with long text. Declared after the Flickable so
+        // it paints on top; the full text already renders above, so this
+        // never repeats the content itself.
+        Rectangle {
+            id: metaCaption
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: metaText.implicitHeight + 12
+            visible: previewPane.shown && metaText.text.length > 0
+            color: LazerTheme.settingsRail
+            radius: 6
+
+            Text {
+                id: metaText
                 anchors.left: parent.left
+                anchors.leftMargin: 10
                 anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: metaText.implicitHeight + 12
-                visible: previewPane.shown && metaText.text.length > 0
-                color: LazerTheme.settingsRail
-                radius: 6
-
-                Text {
-                    id: metaText
-                    anchors.left: parent.left
-                    anchors.leftMargin: 10
-                    anchors.right: parent.right
-                    anchors.rightMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: previewPane.selectedResult
-                          ? (previewPane.selectedResult.description || "") : ""
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                    color: LazerTheme.textMuted
-                    font.pixelSize: 11
-                }
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                text: previewPane.selectedResult
+                      ? (previewPane.selectedResult.description || "") : ""
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                color: LazerTheme.textMuted
+                font.pixelSize: 11
             }
         }
     }
