@@ -14,10 +14,8 @@ FocusScope {
     property real requestedWidth: implicitWidth
     property string accessibleName: ""
     property bool fillWidth: true
-    // Reuse the slider's two-level row layout: muted label beside the editor.
-    readonly property string rowPresentation: "split"
-    readonly property bool ownsRowValue: true
-    readonly property bool splitAlignLeft: true
+    // Stack below a slider-style small label: full-width editor, left aligned.
+    readonly property bool smallRowLabel: true
     readonly property bool effectiveEnabled: enabled && rowEnabled
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property string displayText: text

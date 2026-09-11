@@ -186,17 +186,15 @@ Item {
         }
 
         function test_twoLineFieldsUseSliderLabelLayout() {
-            verify(panel.appearancePage.wallpaperField.rowPresentation === "split")
-            verify(panel.appearancePage.sunriseField.rowPresentation === "split")
-            verify(panel.appearancePage.sunsetField.rowPresentation === "split")
-            compare(panel.appearancePage.wallpaperRow.splitPresentation, true)
-            compare(panel.appearancePage.sunriseRow.splitPresentation, true)
-            compare(panel.appearancePage.sunsetRow.splitPresentation, true)
-            compare(panel.appearancePage.wallpaperRow.controlOwnsValue, true)
-            compare(panel.appearancePage.wallpaperRow.valueTextItem.visible, false)
-            compare(panel.appearancePage.wallpaperField.displayText, panel.appearancePage.wallpaperField.text)
-            compare(panel.appearancePage.wallpaperRow.splitAlignLeft, true)
-            compare(panel.appearancePage.wallpaperRow.controlRegionLeft, panel.appearancePage.wallpaperRow.contentPadding)
+            verify(panel.appearancePage.wallpaperField.smallRowLabel === true)
+            verify(panel.appearancePage.sunriseField.smallRowLabel === true)
+            verify(panel.appearancePage.sunsetField.smallRowLabel === true)
+            compare(panel.appearancePage.wallpaperRow.rowPresentation, "standard")
+            compare(panel.appearancePage.wallpaperRow.smallLabelStyle, true)
+            compare(panel.appearancePage.wallpaperRow.labelTextItem.font.pixelSize, 11)
+            compare(panel.appearancePage.wallpaperRow.labelTextItem.color, Lazer.LazerTheme.settingsNavInactive)
+            compare(panel.appearancePage.wallpaperField.width, panel.appearancePage.wallpaperRow.contentItem.width)
+            compare(panel.appearancePage.sunriseField.width, panel.appearancePage.sunriseRow.contentItem.width)
         }
 
         function test_schemePickersKeepTitlesAboveTheirSharedSurface() {

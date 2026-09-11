@@ -56,7 +56,10 @@ Item {
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
     readonly property bool controlOwnsValue: controlItem !== null && controlItem.ownsRowValue === true
-    readonly property bool splitAlignLeft: controlItem !== null && controlItem.splitAlignLeft === true
+    // Text fields stack full-width below the label but reuse the slider's
+    // small muted label style instead of the large standard title.
+    readonly property bool controlUsesSmallLabel: controlItem !== null && controlItem.smallRowLabel === true
+    readonly property bool smallLabelStyle: root.splitPresentation || root.controlUsesSmallLabel
     readonly property bool rowHovered: ((rowHover.hovered && rowHover.point.position.x < root.revertVisibleX)
                                         || rowHoverArea.containsMouse)
                                       || (controlItem && controlItem.hovered === true)
@@ -404,8 +407,8 @@ Item {
             anchors.bottom: root.splitPresentation ? valueItem.top : undefined
             anchors.bottomMargin: root.splitPresentation ? 2 : 0
             text: root.labelText
-            color: root.splitPresentation ? LazerTheme.settingsNavInactive : LazerTheme.textPrimary
-            font.pixelSize: root.splitPresentation ? 11 : 14
+            color: root.smallLabelStyle ? LazerTheme.settingsNavInactive : LazerTheme.textPrimary
+            font.pixelSize: root.smallLabelStyle ? 11 : 14
             elide: Text.ElideRight
             verticalAlignment: root.inlinePresentation ? Text.AlignVCenter : Text.AlignTop
         }
@@ -427,10 +430,8 @@ Item {
 
         Item {
             id: controlHost
-             x: root.inlinePresentation
-                ? Math.max(0, parent.width - width)
-                : (root.splitPresentation && !root.splitAlignLeft
-                   ? Math.max(0, parent.width - width) : 0)
+            x: root.inlinePresentation || root.splitPresentation
+               ? Math.max(0, parent.width - width) : 0
             y: root.choicePresentation ? 0
                : root.inlinePresentation ? Math.max(0, (parent.height - height) / 2)
                : root.splitPresentation ? Math.max(0, (parent.height - height) / 2)
