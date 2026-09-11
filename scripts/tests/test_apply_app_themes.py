@@ -114,7 +114,8 @@ def test_terminal_clear_text_on_by_default(sandbox):
     assert run_apply(palette, "dark", home).returncode == 0
     conf = (home / ".config/kitty/kitty.conf").read_text()
     assert "dim_opacity 1.0" in conf
-    assert "background_tint 0.35" in conf
+    # Background tint is intentionally unmanaged (user opt-out).
+    assert "background_tint" not in conf
     # Idempotent: second apply keeps exactly one managed block.
     assert run_apply(palette, "dark", home).returncode == 0
     conf = (home / ".config/kitty/kitty.conf").read_text()
@@ -162,3 +163,26 @@ def test_only_kitty_text_needs_no_palette(sandbox):
     assert result.returncode == 0, result.stderr
     conf = (home / ".config/kitty/kitty.conf").read_text()
     assert "dim_opacity 1.0" in conf
+
+
+def _slot(content, name):
+    import re
+    match = re.search(rf"^{name}\s+(#[0-9a-fA-F]{{6}})", content, re.MULTILINE)
+    assert match, name
+    return match.group(1).lower()
+
+
+def test_kitty_greys_track_modes(sandbox):
+    tmp, palette = sandbox
+    home = tmp / "home"
+    assert run_apply(palette, "dark", home).returncode == 0
+    dark = (home / ".config/kitty/kitty-colors.conf").read_text()
+    assert run_apply(palette, "light", home).returncode == 0
+    light = (home / ".config/kitty/kitty-colors.conf").read_text()
+    assert "{{" not in dark and "{{" not in light
+    # Black slot is a true dark distinct from the background in both modes.
+    assert _slot(dark, "color0") != _slot(dark, "background")
+    assert _slot(light, "color0") != _slot(light, "background")
+    # Bright-black stays apart from the foreground in both modes.
+    assert _slot(dark, "color8") != _slot(dark, "foreground")
+    assert _slot(light, "color8") != _slot(light, "foreground")

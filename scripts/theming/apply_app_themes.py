@@ -44,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--terminal-clear-text', dest='terminal_clear_text',
                         action='store_true', default=True,
                         help='Full-brightness terminal text for translucent backgrounds '
-                             '(manages dim_opacity/background_tint in kitty.conf; default: on)')
+                             '(manages dim_opacity in kitty.conf; default: on)')
     parser.add_argument('--no-terminal-clear-text', dest='terminal_clear_text',
                         action='store_false',
                         help='Remove the managed clear-text lines from kitty.conf')
@@ -74,11 +74,12 @@ def _which(name: str) -> str | None:
 # Managed kitty.conf block for the "transparent-terminal clear text" setting:
 # dim text is drawn translucent by kitty (0.75 default), which compounds with
 # a translucent background and washes TUI secondary rows out. Full brightness
-# + palette colors keeps hierarchy readable on transparency.
+# keeps hierarchy readable on transparency (hierarchy reads via color).
+# background_tint is intentionally NOT managed (user opted out); any stray
+# background_tint line is removed as legacy.
 _MANAGED_BEGIN = "# >>> Afloat managed: transparent-terminal clear text. Do not edit."
 _MANAGED_END = "# <<< Afloat managed."
-_MANAGED_BODY = ("dim_opacity 1.0\n"
-                 "background_tint 0.35\n")
+_MANAGED_BODY = ("dim_opacity 1.0\n")
 # Stale hand-written comment lines from the manual fix (removed on sync).
 _LEGACY_COMMENTS = {
     "# Tint the wallpaper bleed toward the background color so text stays",
