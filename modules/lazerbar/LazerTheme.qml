@@ -33,6 +33,19 @@ QtObject {
         return Qt.rgba(baseColor.r, baseColor.g, baseColor.b, alpha)
     }
 
+    // Linear RGB blend used to mute light-scheme surfaces toward paper white.
+    // Monotonic in lightness so the panel < section < card order is preserved.
+    function mix(firstColor, secondColor, ratio) {
+        var t = Number(ratio)
+        if (!isFinite(t))
+            t = 0.5
+        t = Math.max(0, Math.min(1, t))
+        return Qt.rgba(firstColor.r + (secondColor.r - firstColor.r) * t,
+            firstColor.g + (secondColor.g - firstColor.g) * t,
+            firstColor.b + (secondColor.b - firstColor.b) * t,
+            firstColor.a + (secondColor.a - firstColor.a) * t)
+    }
+
     readonly property color bgDark: adapt && colorService ? colorService.mSurface : "#18171C"
     // Light-scheme bar surface follows the extracted palette the same way
     // bgDark does (Color switches palettes by effective scheme); the fixed
@@ -81,27 +94,51 @@ QtObject {
     readonly property color musicGold: "#FFD000"
     readonly property color musicMuted: adapt && colorService ? shade(colorService.mOnSurfaceVariant, 0.72) : "#A0A0A0"
 
+    // Warm-paper base for light-scheme blends; keeps the wallpaper hue at
+    // a fraction of its chroma so text contrast survives vibrant palettes.
+    readonly property color paperWhite: "#FFFFFF"
     // Settings surfaces reuse the extracted tonal steps instead of the
     // dedicated violet hierarchy when adaptation is on.
     readonly property color accentColor: adapt && colorService ? colorService.mPrimary : "#765BFF"
     readonly property color settingsAccent: accentColor
-    readonly property color settingsControlSurface: adapt && colorService ? colorService.mSurfaceContainerLow : "#25222E"
-    readonly property color settingsPanel: adapt && colorService ? colorService.mSurface : "#18161D"
-    readonly property color settingsSection: adapt && colorService ? colorService.mSurfaceContainerHigh : "#282532"
+    readonly property color settingsControlSurface: adapt && colorService
+        ? (lightScheme ? mix(colorService.mSurfaceContainerLow, paperWhite, 0.35) : colorService.mSurfaceContainerLow)
+        : "#25222E"
+    // Light scheme mirrors the dark anchor in reverse: dark presses the rail
+    // darker to converge, light lifts the panel toward paper and mutes the
+    // rail toward the surface instead of using the raw Highest peach.
+    readonly property color settingsPanel: adapt && colorService
+        ? (lightScheme ? mix(colorService.mSurface, paperWhite, 0.55) : colorService.mSurface)
+        : "#18161D"
+    readonly property color settingsSection: adapt && colorService
+        ? (lightScheme ? mix(colorService.mSurfaceContainerHigh, paperWhite, 0.30) : colorService.mSurfaceContainerHigh)
+        : "#282532"
     readonly property color settingsPanelBorder: "transparent"
     // Title/rail layers: dark scheme darkens the surface 15%; light scheme
-    // takes the palette's clean container step instead (darker() on a light
-    // surface reads muddy). Fixed fallback serves the adaptation opt-out.
+    // blends Highest toward the surface so the sidebar anchors without going
+    // orange. Fixed fallback serves the adaptation opt-out.
     readonly property color settingsRail: !adapt || !colorService ? "#131217"
-        : lightScheme ? colorService.mSurfaceContainerHighest
+        : lightScheme ? mix(colorService.mSurfaceContainerHighest, colorService.mSurface, 0.45)
         : Qt.darker(colorService.mSurface, 1.15)
-    readonly property color settingsNavInactive: adapt && colorService ? shade(colorService.mOnSurfaceVariant, 0.62) : "#8A8795"
-    readonly property color settingsSearchSurface: adapt && colorService ? colorService.mSurfaceContainerLow : "#201E27"
-    readonly property color settingsToggleOff: adapt && colorService ? colorService.mSurfaceContainerHighest : "#322E3F"
+    readonly property color settingsNavInactive: adapt && colorService
+        ? (lightScheme ? shade(colorService.mOnSurfaceVariant, 0.78) : shade(colorService.mOnSurfaceVariant, 0.62))
+        : "#8A8795"
+    readonly property color settingsSearchSurface: adapt && colorService
+        ? (lightScheme ? mix(colorService.mSurfaceContainerLow, paperWhite, 0.35) : colorService.mSurfaceContainerLow)
+        : "#201E27"
+    readonly property color settingsToggleOff: adapt && colorService
+        ? (lightScheme ? settingsRail : colorService.mSurfaceContainerHighest)
+        : "#322E3F"
     readonly property color settingsRow: "transparent"
-    readonly property color settingsRowHover: adapt && colorService ? colorService.mSurfaceContainerHighest : "#FF363842"
-    readonly property color settingsCard: adapt && colorService ? colorService.mSurfaceContainerLow : "#221F2B"
-    readonly property color settingsCardHover: adapt && colorService ? colorService.mSurfaceContainerHigh : "#272332"
+    readonly property color settingsRowHover: adapt && colorService
+        ? (lightScheme ? settingsRail : colorService.mSurfaceContainerHighest)
+        : "#FF363842"
+    readonly property color settingsCard: adapt && colorService
+        ? (lightScheme ? mix(colorService.mSurfaceContainerLow, paperWhite, 0.60) : colorService.mSurfaceContainerLow)
+        : "#221F2B"
+    readonly property color settingsCardHover: adapt && colorService
+        ? (lightScheme ? settingsRail : colorService.mSurfaceContainerHigh)
+        : "#272332"
     readonly property color settingsSelected: adapt && colorService ? shade(colorService.mPrimary, 0x40 / 255) : "#40765BFF"
     readonly property real settingsScrimOpacity: 0.6
     readonly property int settingsRadius: 16
@@ -139,7 +176,9 @@ QtObject {
     readonly property int settingsChoiceRadius: 6
     readonly property int settingsControlPadding: 9
     readonly property int settingsRangePadding: 8
-    readonly property color settingsTrack: adapt && colorService ? colorService.mSurfaceContainerHighest : "#2E2A3A"
+    readonly property color settingsTrack: adapt && colorService
+        ? (lightScheme ? settingsRail : colorService.mSurfaceContainerHighest)
+        : "#2E2A3A"
     readonly property color settingsSliderThumb: adapt && colorService ? Qt.lighter(colorService.mPrimary, 1.35) : "#EBE5FF"
     readonly property color settingsSliderThumbLight: "#EBE5FF"
     readonly property color settingsResetSurface: adapt && colorService ? colorService.mPrimaryContainer : "#302A42"
