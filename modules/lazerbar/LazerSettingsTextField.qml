@@ -135,6 +135,7 @@ FocusScope {
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         clip: true
+        horizontalAlignment: Text.AlignLeft
         enabled: root.effectiveEnabled
         color: LazerTheme.textPrimary
         selectionColor: LazerTheme.osuPink
