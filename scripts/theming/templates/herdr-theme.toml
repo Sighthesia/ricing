@@ -1,0 +1,30 @@
+# Afloat-generated Herdr theme overrides.
+# 参考上游模板结构: https://github.com/InioX/matugen-themes/tree/main/templates
+# (上游暂无 herdr 模板;键名来自 Herdr 配置参考 [theme] / [theme.custom])。
+# 用法: 将本文件内容追加合并到 ~/.config/herdr/config.toml，
+# 保留 [theme] name = "terminal" 让基础色跟随 kitty ANSI，并建议开启:
+#   [theme]
+#   name = "terminal"
+#   auto_switch = true
+# 明暗子表一次写全，Herdr 按宿主终端报告的外观自动选用。
+
+[theme.custom]
+accent = "{{colors.primary.default.hex}}"
+red = "{{colors.error.default.hex}}"
+green = "{{colors.tertiary.default.hex}}"
+yellow = "{{colors.secondary.default.hex}}"
+blue = "{{colors.primary.default.hex}}"
+
+[theme.custom.light]
+text = "{{colors.on_surface.light.hex}}"
+panel_bg = "reset"
+sidebar_bg = "reset"
+active_row_bg = "{{colors.primary_container.light.hex}}"
+selection_bg = "{{colors.secondary_container.light.hex}}"
+
+[theme.custom.dark]
+text = "{{colors.on_surface.dark.hex}}"
+panel_bg = "reset"
+sidebar_bg = "reset"
+active_row_bg = "{{colors.primary_container.dark.hex}}"
+selection_bg = "{{colors.secondary_container.dark.hex}}"

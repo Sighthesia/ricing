@@ -126,6 +126,21 @@ def test_opencode_dual_variant(sandbox):
     assert theme["theme"]["text"]["dark"] == "#cdd6f4"
 
 
+def test_herdr_snippet(sandbox):
+    import tomllib
+    tmp, palette = sandbox
+    home = tmp / "home"
+    assert run_apply(palette, "light", home).returncode == 0
+    snippet = tomllib.loads((home / ".config/afloat/app-themes/herdr-theme.toml").read_text())
+    custom = snippet["theme"]["custom"]
+    assert custom["accent"] == custom["blue"]
+    assert len({custom["red"], custom["green"], custom["yellow"], custom["blue"]}) == 4
+    assert custom["light"]["text"] == "#4c4f69", custom["light"]
+    assert custom["dark"]["text"] == "#cdd6f4", custom["dark"]
+    assert custom["light"]["panel_bg"] == "reset"
+    assert custom["dark"]["sidebar_bg"] == "reset"
+
+
 def test_terminal_clear_text_on_by_default(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"

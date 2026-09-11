@@ -93,6 +93,15 @@ output_path = "~/.config/afloat/app-themes/firefox-colors.css"
 
 # opencode: dual dark/light variants in one file (opencode picks by terminal
 # background at runtime). Generation only: activate with /theme afloat.
+# 键覆盖参考上游: https://github.com/InioX/matugen-themes/blob/main/templates/opencode-colors.json
 [templates.opencode]
 input_path = "./opencode-theme.json"
 output_path = "~/.config/opencode/themes/Afloat.json"
+
+# Herdr: generation only (config.toml 含用户按键绑定，不可整体覆写).
+# Merge the rendered snippet's [theme.custom] tables into
+# ~/.config/herdr/config.toml, keeping [theme] name = "terminal" so the base
+# follows the kitty ANSI palette; enable auto_switch for light/dark subtables.
+[templates.herdr]
+input_path = "./herdr-theme.toml"
+output_path = "~/.config/afloat/app-themes/herdr-theme.toml"
