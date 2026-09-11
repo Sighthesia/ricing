@@ -221,13 +221,50 @@ Item {
         function onWindowsUpdated() {
             Qt.callLater(root.refreshWindowMap)
             Qt.callLater(root.updateIndicator)
+            Qt.callLater(root.updateHighlight)
         }
         function onWorkspacesUpdated() {
             Qt.callLater(root.updateIndicator)
+            Qt.callLater(root.updateHighlight)
         }
         function onWorkspaceActivated() {
             Qt.callLater(root.updateIndicator)
+            Qt.callLater(root.updateHighlight)
         }
+    }
+
+    // Sliding active-workspace highlight state (see activeHighlight below).
+    property bool _highlightPlaced: false
+    property real _highlightX: 0
+    property real _highlightWidth: 0
+    property bool _highlightOn: false
+
+    // Track the active square's geometry so one continuous highlight surface
+    // can glide between squares instead of each square popping its own fill.
+    function updateHighlight() {
+        if (!workspaceRepeater || workspaceRepeater.count === 0) {
+            root._highlightOn = false
+            return
+        }
+        const wsModel = Services.NiriService.workspaces
+        let activeIndex = -1
+        for (let i = 0; i < wsModel.count; i++) {
+            const ws = wsModel.get(i)
+            if (ws && ws.isActive)
+                activeIndex = i
+        }
+        const item = activeIndex >= 0 ? workspaceRepeater.itemAt(activeIndex) : null
+        if (!item) {
+            root._highlightOn = false
+            return
+        }
+        const p = item.mapToItem(root, 0, 0)
+        root._highlightX = p.x
+        root._highlightWidth = item.width
+        if (!root._highlightOn)
+            root._highlightOn = true
+        if (!root._highlightPlaced)
+            root._highlightPlaced = true
     }
 
     // Slide the single indicator to the focused app icon when there is one,
@@ -302,13 +339,17 @@ Item {
     }
 
     onFocusedWinIdChanged: Qt.callLater(root.updateIndicator)
-    onWidthChanged: Qt.callLater(root.updateIndicator)
+    onWidthChanged: {
+        Qt.callLater(root.updateIndicator)
+        Qt.callLater(root.updateHighlight)
+    }
     onHeightChanged: Qt.callLater(root.updateIndicator)
 
     Component.onCompleted: {
         snapEdgesTo(indicatorCenterX, indicatorTargetKey)
         root.refreshWindowMap()
         Qt.callLater(root.updateIndicator)
+        Qt.callLater(root.updateHighlight)
     }
 
     implicitWidth: workspaceRow.implicitWidth
@@ -345,8 +386,14 @@ Item {
                                   : LazerTheme.barWidgetHeight
                 height: LazerTheme.barWidgetHeight
 
-                onXChanged: Qt.callLater(root.updateIndicator)
-                onWidthChanged: Qt.callLater(root.updateIndicator)
+                onXChanged: {
+                    Qt.callLater(root.updateIndicator)
+                    Qt.callLater(root.updateHighlight)
+                }
+                onWidthChanged: {
+                    Qt.callLater(root.updateIndicator)
+                    Qt.callLater(root.updateHighlight)
+                }
 
                 // Center of this square in Workspaces coordinates: fallback
                 // target when the focused app icon cannot be resolved.
@@ -382,9 +429,10 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     radius: 0
-                    color: workspaceSquare.isActive
-                           ? LazerTheme.activeFill
-                           : workspaceSquare.hovered ? LazerTheme.hoverFill : "transparent"
+                    // The active arm moved to the sliding activeHighlight
+                    // surface; squares keep only instant hover feedback.
+                    color: !workspaceSquare.isActive && workspaceSquare.hovered
+                           ? LazerTheme.hoverFill : "transparent"
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 }
@@ -541,6 +589,14 @@ Item {
         _edgeSnapping = false
     }
 
+    // One white blink on the indicator per genuine target switch; no-op
+    // under reduced motion, matching the shared click-flash contract.
+    function flashIndicator() {
+        if (MotionTokens.reducedMotion)
+            return
+        indicatorFlash.restart()
+    }
+
     // Route every indicator re-anchor through here. A genuine target switch
     // (key change after placement) desyncs bar and shadow into the trail;
     // duplicate updates are deduped against the logical anchor so an
@@ -558,6 +614,7 @@ Item {
             _edgeAnchorX = target
             _edgeX = target
             _edgeShadowX = target
+            flashIndicator()
             return
         }
         if (Math.abs(target - _edgeAnchorX) < 3)
@@ -579,5 +636,50 @@ Item {
         visible: root.indicatorVisible
         x: root._edgeRectLeft
         y: Math.round(root.height / 2 + (LazerTheme.barGlyphSize - 4) / 2 + 4)
+
+        // Switch flash: same white blink look as the media progress bar's
+        // beat flash, driven by the shared click-flash decay contract.
+        Rectangle {
+            id: indicatorFlashOverlay
+
+            anchors.fill: parent
+            radius: parent.radius
+            color: LazerTheme.textPrimary
+            opacity: 0
+            enabled: false
+        }
+
+        NumberAnimation {
+            id: indicatorFlash
+
+            target: indicatorFlashOverlay
+            property: "opacity"
+            from: MotionTokens.clickFlashOpacity
+            to: 0
+            duration: MotionTokens.clickFlashDuration
+            easing.type: MotionTokens.clickFlashEasing
+        }
+    }
+
+    // Sliding active highlight behind the squares (z below the row).
+    Rectangle {
+        id: activeHighlight
+
+        z: -1
+        x: root._highlightX
+        y: workspaceRow.y
+        width: root._highlightWidth
+        height: LazerTheme.barWidgetHeight
+        visible: root._highlightOn
+        color: LazerTheme.activeFill
+
+        Behavior on x {
+            enabled: root._highlightPlaced && !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+        }
+        Behavior on width {
+            enabled: root._highlightPlaced && !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+        }
     }
 }
