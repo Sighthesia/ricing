@@ -55,6 +55,7 @@ Item {
     readonly property bool inlinePresentation: rowPresentation === "inline"
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
+    readonly property bool controlOwnsValue: controlItem !== null && controlItem.ownsRowValue === true
     readonly property bool rowHovered: ((rowHover.hovered && rowHover.point.position.x < root.revertVisibleX)
                                         || rowHoverArea.containsMouse)
                                       || (controlItem && controlItem.hovered === true)
@@ -410,7 +411,7 @@ Item {
 
         Text {
             id: valueItem
-            visible: root.splitPresentation
+            visible: root.splitPresentation && !root.controlOwnsValue
             anchors.left: labelItem.left
             anchors.top: root.splitPresentation ? undefined : labelItem.bottom
             anchors.bottom: root.splitPresentation ? parent.bottom : undefined

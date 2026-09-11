@@ -192,6 +192,9 @@ Item {
             compare(panel.appearancePage.wallpaperRow.splitPresentation, true)
             compare(panel.appearancePage.sunriseRow.splitPresentation, true)
             compare(panel.appearancePage.sunsetRow.splitPresentation, true)
+            compare(panel.appearancePage.wallpaperRow.controlOwnsValue, true)
+            compare(panel.appearancePage.wallpaperRow.valueTextItem.visible, false)
+            compare(panel.appearancePage.wallpaperField.displayText, panel.appearancePage.wallpaperField.text)
         }
 
         function test_schemePickersKeepTitlesAboveTheirSharedSurface() {
