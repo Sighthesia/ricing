@@ -2,69 +2,38 @@
 
 ## Project
 
-Afloat is a Wayland desktop shell built with **Quickshell** (QML-based compositor shell framework), targeting the Niri compositor. The working branch (`lazer`) contains the full shell: an osu!lazer-styled frontend plus the service/backend layer.
+Afloat is a Wayland desktop shell built with **Quickshell** (QML), targeting the Niri compositor. Branch `lazer`: osu!lazer-styled frontend + service layer.
 
 ## Architecture
 
-- `shell.qml` — entrypoint. Mounts wallpaper background, top bar, and notification host via `Variants { model: Quickshell.screens }` per-screen instances.
-- `services/` — **singleton QML services** (registered in `services/qmldir`), imported as `Services.*`. Key ones: `IslandService`, `BarLayoutService`, `SettingsService`, `ColorService`, `NiriService`, `VolumeService`, `MediaService`, `LauncherService`, `NotificationService`, `WindowHintService`.
-  - Pure logic lives in sibling `.js` files (e.g. `barlayout/`, `launcher/`, `LauncherLogic.js`) for testability without instantiating QML.
-- `modules/bar/` — layout-driven top bar (`TopBar`, `BarContent`) and per-widget components in `widgets/`.
-- `modules/lazerbar/` — osu!lazer-styled surfaces: settings panel (`LazerSettings*`), launcher page, notifications, fullscreen overlay/music pages. Shared singletons here: `LazerTheme`, `MotionTokens`, `SettingsOverlayBridge` (see its `qmldir`).
-- `modules/shared/glsl/` — shader sources.
-- `scripts/` — Python/shell helpers: `afloat-ipc` (IPC wrapper around `qs ipc -p <config> call <target> <function>`), `netease_web_lyrics_bridge.py` + `beat_tracker_bridge.py` (tested under `scripts/tests/`, run with `pytest`), `theming/`, `tampermonkey/`, `window_hint_trigger.py`.
-- `tests/qml/` — QML logic tests (`TestCase` from QtTest), one file per unit, importing service `.js` logic directly via relative paths. Root-level `tst_*.qml` files are behavioral harnesses for singleton services (see qml-testing skill).
-- `docs/superpowers/` — implementation plans and specs (dated); consult for design intent of existing features.
+- `shell.qml` — entrypoint. Mounts wallpaper, top bar, notification host, session lock. Must run from repo root: `qs -p /path/to/afloat`.
+- `services/` — QML **singletons** (registered in `services/qmldir`, imported as `Services.*`). Pure logic lives in sibling `.js` files (e.g. `barlayout/`, `launcher/`) so it can be tested without instantiating QML.
+- `modules/bar/` — layout-driven top bar (`TopBar`, `BarContent`, `widgets/`). `modules/lazerbar/` — lazer surfaces (settings panel, launcher, notifications, overlays; singletons `LazerTheme`, `MotionTokens`, `SettingsOverlayBridge` via its own `qmldir`). `modules/lock/` — session lock. `modules/shared/glsl/` — shaders.
+- `scripts/` — `afloat-ipc <target> <function> [args...]` wraps `qs ipc`; Python bridges tested under `scripts/tests/`. `docs/superpowers/` — dated design-intent plans.
 
-## Running
+## Running & testing
 
-- Launch config: `qs -p /path/to/afloat` (or symlink).
-- IPC: `scripts/afloat-ipc <target> <function> [args...]`
-- Tests run per file — there is no test runner aggregate. `qs -p` does NOT
-  execute QtTest; use the Qt6 runner for logic tests and root-level
-  harnesses for singleton services (see qml-testing skill):
-  - `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt`
-  - `qs -p tst_media_binding.qml` (from repo root)
-- **After every QML change**, run the relevant test files and fix any WARN/ERROR output before considering the task done.
+- Launch: `qs -p /path/to/afloat`. IPC: `scripts/afloat-ipc <target> <function> [args...]`.
+- Logic tests (pure `.js`, in `tests/qml/`): `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt`
+  - Use the Qt6 runner path exactly — `/usr/bin/qmltestrunner` is Qt5 and fails silently. `qs -p tests/qml/tst_*.qml` runs **zero** tests (Quickshell never drives QtTest).
+- Service-behavior harnesses (need Quickshell singletons) live in the **repo root**: `qs -p tst_media_binding.qml` (from repo root).
+- Python: `python3 -m pytest scripts/tests/`.
+- **After every QML change**, run the relevant test file(s) and fix WARN/ERROR output before finishing.
 
-## Conventions
+## Gotchas
 
-- Every service in `services/` is a **QML singleton** declared in `services/qmldir`. Do not instantiate them; import and reference directly. New services must be registered there.
-- Modules use `Variants { model: Quickshell.screens }` to create per-screen window instances.
-- Panel windows use `Quickshell.Wayland` (`WlrLayershell`, `WlrKeyboardFocus`) for layer-shell integration.
-- **PanelWindow is not a QML Item** — do not attach `Keys.*` handlers directly; put them on an inner `Item`/`Rectangle` with `focus: true`.
-- **PanelWindow sizing**: use `implicitWidth`/`implicitHeight`, not `width`/`height` (the latter triggers deprecation warnings).
-- Comment before major QML element declarations (see skill below).
-- Commit style: conventional commits (`feat(bar): ...`, `fix(notifications): ...`).
+- QML singletons are lazy: a bare reference can be dropped without instantiating. `shell.qml` injects `LazerTheme.settingsService/colorService` and calls `Services.AppThemeService.apply()` explicitly to force instantiation — follow that pattern.
+- Import blackhole: `qs -p <file>` silently empties any relative import resolving outside the config root (e.g. `../../services` from `tests/qml/`). Hence root-level harnesses for singletons, pure-JS imports only under `tests/qml/`.
+- Cross-service signals fire mid-cascade while sibling bindings still hold stale values — defer consumer refreshes one event-loop turn (`Qt.callLater` / 0-interval `Timer`).
+- `PanelWindow` is not an `Item`: no `Keys.*` handlers on it (inner `Item` with `focus: true` instead); size with `implicitWidth`/`implicitHeight`, not `width`/`height`.
+- Lock screen (`modules/lock/`, `LockService`): `WlSessionLockSurface` constraints — no `Repeater`, backdrop z-order, re-arm choreography. Load `session-lock-surface-constraints` skill before touching it.
 
-## Visual language
+## Style
 
-The visual language is osu!lazer "sharp": major surfaces use right-angled rectangles and geometric joins (triangles/diamonds/rect strips); rounded corners belong only to component details and icons. The **settings panel is the style authority** — reuse its verified highlight/click-flash/scroll patterns and `MotionTokens` values rather than inventing new motion or feedback styles.
+- Visual language is osu!lazer "sharp": right-angled rectangles + geometric joins on major surfaces; rounded corners only on details/icons. Settings panel is the style authority — reuse its highlight/click-flash/scroll patterns and `MotionTokens` values, never invent new motion.
+- Comment before major QML element declarations. Conventional commits (`feat(bar): ...`, `fix(notifications): ...`).
 
-## Skills
+## Skills (`.agents/skills/`)
 
-Load these for detailed context on specific topics:
-
-| Skill | When to use |
-| --- | --- |
-| [osu-sharp-design-language](.agents/skills/osu-sharp-design-language/SKILL.md) | Creating or reshaping any visible QML element. Load before adding any new UI shape. |
-| [osu-lazer-ui-reference](.agents/skills/osu-lazer-ui-reference/SKILL.md) | Needing lazer's exact colors, font sizes, durations, or easing values; styling buttons/sliders/text fields/menus to lazer spec. |
-| [settings-panel-style-authority](.agents/skills/settings-panel-style-authority/SKILL.md) | Any new visible surface, interaction feedback, scrolling, or motion. Reuse the settings panel's verified patterns first. |
-| [lazer-settings-surface-details](.agents/skills/lazer-settings-surface-details/SKILL.md) | Modifying the lazer settings panel, rows, controls, hover/press/motion behavior. Preserves geometry, z-order, input isolation, slide transition contracts. |
-| [visual-transition-rules](.agents/skills/visual-transition-rules/SKILL.md) | Adjusting colors, radii, opacity, blur, shadows, spacing, scale. |
-| [comment-before-declarations](.agents/skills/comment-before-declarations/SKILL.md) | Editing QML modules that should stay self-documenting. |
-| [reactive-measurement-layout-debugging](.agents/skills/reactive-measurement-layout-debugging/SKILL.md) | Layout bugs where measured/preferred/target/actual/clipped sizes diverge. |
-| [surface-owner-split-debugging](.agents/skills/surface-owner-split-debugging/SKILL.md) | Regressions after moving a surface's visible owner (hover, editing, content, geometry). |
-| [async-layer-sync-lag-debugging](.agents/skills/async-layer-sync-lag-debugging/SKILL.md) | Secondary async/coalesced layer lags behind per-frame main layer during fast animations. |
-| [overlay-pointer-event-starvation](.agents/skills/overlay-pointer-event-starvation/SKILL.md) | Inner/lower element stops getting hover/pointer events due to overlapping upper element. |
-| [multi-instance-focus-ownership](.agents/skills/multi-instance-focus-ownership/SKILL.md) | Text field works on first open but loses keyboard input on reopen/page switch. |
-| [per-frame-surface-resize-jank](.agents/skills/per-frame-surface-resize-jank/SKILL.md) | Expand/collapse stutters because per-frame size hits an expensive commit boundary. Fix: fixed outer surface, animate clipped inner content. |
-| [reveal-before-clip](.agents/skills/reveal-before-clip/SKILL.md) | Content inside an expanding surface overflows during grow/shrink. Drive reveal from host progress before clip masks. |
-| [browser-media-metadata-fallback](.agents/skills/browser-media-metadata-fallback/SKILL.md) | Web-player (Firefox/Chrome) MPRIS metadata is incomplete, delayed, or churns; lyrics/artwork flicker or vanish. |
-| [active-window-live-sync](.agents/skills/active-window-live-sync/SKILL.md) | Active-window title or app identity stops updating after Niri focus, workspace, or event-stream changes. |
-| [marquee-exit-ghosts](.agents/skills/marquee-exit-ghosts/SKILL.md) | Modifying marquee scrolling or diagnosing long titles whose old characters disappear instead of falling during a switch. |
-| [first-batch-cold-path-prewarm](.agents/skills/first-batch-cold-path-prewarm/SKILL.md) | Search/picker/results list stutters only on the first large match or open, smooth afterwards. |
-| [submenu-surface-motion](.agents/skills/submenu-surface-motion/SKILL.md) | Tray menu (BarTrayMenu), submenu panels, or popup deform/retract/morph motion. Preserves occlusion-based reveal, ease-in retract with data retention, visibility-gated morphs. |
-| [qml-testing](.agents/skills/qml-testing/SKILL.md) | Running or writing tests. `qs -p` does not run QtTest; use the Qt6 qmltestrunner for logic tests and root-level harnesses for services. |
-| [effective-visibility-cycle-debugging](.agents/skills/effective-visibility-cycle-debugging/SKILL.md) | State/geometry look healthy and the layer surface is mapped but nothing paints; ancestor/descendant `visible` bindings deadlock at false. |
-| [session-lock-surface-constraints](.agents/skills/session-lock-surface-constraints/SKILL.md) | Modifying the lock screen (LockScreen/LockSurface/LockService). Rendering, lifecycle, and ops constraints for WlSessionLockSurface: no Repeater, backdrop z-order, re-arm choreography, failsafe, clean-restart testing. |
+- Before running/writing tests: `qml-testing`. Before any visible UI change: `osu-sharp-design-language` + `settings-panel-style-authority`.
+- Load others on symptom: `lazer-settings-surface-details` (settings panel edits), `submenu-surface-motion` (tray/submenu motion), `overlay-pointer-event-starvation` (lost hover), `multi-instance-focus-ownership` (input lost on reopen), `effective-visibility-cycle-debugging` (mapped but paints nothing), `reactive-measurement-layout-debugging` (clipped/drifted sizes), `per-frame-surface-resize-jank` / `reveal-before-clip` / `async-layer-sync-lag-debugging` (animation jank), `browser-media-metadata-fallback` (web-player metadata), `active-window-live-sync`, `marquee-exit-ghosts`, `first-batch-cold-path-prewarm`, `surface-owner-split-debugging`, `visual-transition-rules`, `comment-before-declarations`, `osu-lazer-ui-reference` (exact lazer colors/sizes/durations).
