@@ -22,7 +22,8 @@ Item {
 
     implicitWidth: 400
     width: parent ? parent.width : implicitWidth
-    implicitHeight: titleText.height + 8 + grid.height + 14
+    readonly property real titleBandHeight: titleText.height + 8
+    implicitHeight: titleBandHeight + grid.height + 14
     // Collapse like a search-hidden row so the section frees the space.
     height: searchHidden ? 0 : implicitHeight
     visible: !searchHidden || opacity > 0.01
@@ -51,6 +52,18 @@ Item {
     property var previews: null
     // Card delegates in display order, exposed for tests and diagnostics.
     readonly property alias schemeCards: grid.children
+
+    // Keep the picker title and scheme cards on one square appearance surface.
+    Rectangle {
+        id: background
+        z: -1
+        anchors.fill: parent
+        color: LazerTheme.settingsSection
+    }
+
+    readonly property Item backgroundItem: background
+    readonly property Item titleItem: titleText
+    readonly property Item gridItem: grid
 
     FileView {
         id: previewsFile

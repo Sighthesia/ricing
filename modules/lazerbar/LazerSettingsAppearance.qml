@@ -31,6 +31,7 @@ LazerSettingsSection {
     property alias sunriseRow: sunriseRow
     property alias sunsetRow: sunsetRow
     property alias themeSchemePicker: themeSchemePicker
+    property alias presetSchemePicker: presetSchemePicker
     property alias panelOpacityRow: panelOpacityRow
     property alias enableBlurRow: enableBlurRow
     property alias blurSurfaceRow: blurSurfaceRow

@@ -185,6 +185,24 @@ Item {
             compare(panel.notificationPage.headerItem.children.length, 1)
         }
 
+        function test_twoLineFieldsUseSliderLabelLayout() {
+            verify(panel.appearancePage.wallpaperField.rowPresentation === "split")
+            verify(panel.appearancePage.sunriseField.rowPresentation === "split")
+            verify(panel.appearancePage.sunsetField.rowPresentation === "split")
+            compare(panel.appearancePage.wallpaperRow.splitPresentation, true)
+            compare(panel.appearancePage.sunriseRow.splitPresentation, true)
+            compare(panel.appearancePage.sunsetRow.splitPresentation, true)
+        }
+
+        function test_schemePickersKeepTitlesAboveTheirSharedSurface() {
+            var preset = panel.appearancePage.presetSchemePicker
+            var templates = panel.appearancePage.themeSchemePicker
+            compare(preset.backgroundItem.color, Lazer.LazerTheme.settingsSection)
+            compare(templates.backgroundItem.color, Lazer.LazerTheme.settingsSection)
+            verify(preset.gridItem.y >= preset.descriptionItem.y + preset.descriptionItem.height + 5.9)
+            verify(templates.gridItem.y >= templates.titleItem.y + templates.titleItem.height + 7.9)
+        }
+
         function test_sidebarActionsUseCompactFullWidthGeometry() {
             var sidebar = panel.sidebar
             compare(sidebar.collapseButton.x, 0)

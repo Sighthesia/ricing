@@ -21,9 +21,18 @@ Item {
     // The preset only paints while wallpaper adaptation is off.
     readonly property bool presetActive: settingsObject ? settingsObject.themeAdaptation === false : false
 
+    // Keep the picker title, description, and cards on one square surface.
+    Rectangle {
+        id: background
+        z: -1
+        anchors.fill: parent
+        color: LazerTheme.settingsSection
+    }
+
     implicitWidth: 400
     width: parent ? parent.width : implicitWidth
-    implicitHeight: titleText.height + 8 + grid.height + 14
+    readonly property real titleBandHeight: titleText.height + descriptionText.height + 12
+    implicitHeight: titleBandHeight + grid.height + 14
     height: searchHidden ? 0 : implicitHeight
     visible: !searchHidden || opacity > 0.01
     opacity: searchHidden ? 0 : 1
@@ -52,6 +61,7 @@ Item {
     }
 
     Text {
+        id: descriptionText
         anchors.left: parent.left
         anchors.leftMargin: 12
         anchors.top: titleText.bottom
@@ -62,12 +72,17 @@ Item {
         opacity: 0.85
     }
 
+    readonly property Item backgroundItem: background
+    readonly property Item titleItem: titleText
+    readonly property Item descriptionItem: descriptionText
+    readonly property Item gridItem: grid
+
     Grid {
         id: grid
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: titleText.bottom
-        anchors.topMargin: 8
+        anchors.top: descriptionText.bottom
+        anchors.topMargin: 6
         columns: 4
         columnSpacing: 6
         rowSpacing: 6
