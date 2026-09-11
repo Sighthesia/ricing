@@ -108,6 +108,24 @@ def test_missing_palette_fails(sandbox):
     assert result.returncode == 1
 
 
+def test_opencode_dual_variant(sandbox):
+    import json as _json
+    tmp, palette = sandbox
+    home = tmp / "home"
+    # Light apply must still carry the dark variant (opencode picks at runtime).
+    assert run_apply(palette, "light", home).returncode == 0
+    theme = _json.loads((home / ".config/opencode/themes/Afloat.json").read_text())
+    text = theme["theme"]["text"]
+    assert text["light"] == "#4c4f69", text
+    assert text["dark"] == "#cdd6f4", text
+    assert theme["theme"]["background"] == "none"
+    # Dark apply keeps the light variant too.
+    assert run_apply(palette, "dark", home).returncode == 0
+    theme = _json.loads((home / ".config/opencode/themes/Afloat.json").read_text())
+    assert theme["theme"]["text"]["light"] == "#4c4f69"
+    assert theme["theme"]["text"]["dark"] == "#cdd6f4"
+
+
 def test_terminal_clear_text_on_by_default(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"

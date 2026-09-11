@@ -140,8 +140,8 @@ Examples:
     parser.add_argument(
         '--default-mode',
         choices=['dark', 'light'],
-        default='dark',
-        help='Theme mode to use for "default" in templates (default: dark)'
+        default=None,
+        help='Theme mode to use for "default" in templates (default: follows --mode)'
     )
 
     return parser.parse_args()
@@ -178,18 +178,25 @@ def main() -> int:
 
             # Scheme format: {"dark": {"mPrimary": "#...", ...}, "light": {...}}
             # or single mode: {"mPrimary": "#...", ...}
-            for mode in modes:
-                if mode in scheme_data:
-                    # Multi-mode format
-                    result[mode] = expand_predefined_scheme(scheme_data[mode], mode)
-                    inject_terminal_colors(result[mode], scheme_data[mode])
-                elif "mPrimary" in scheme_data or "primary" in scheme_data:
-                    # Single-mode format - use same colors for requested mode
+            # Multi-mode files always expand every mode present so
+            # dual-variant templates (e.g. opencode) can reference dark and
+            # light explicitly; "default" still follows --mode/--default-mode.
+            if "dark" in scheme_data or "light" in scheme_data:
+                for mode in ("dark", "light"):
+                    if mode in scheme_data:
+                        result[mode] = expand_predefined_scheme(scheme_data[mode], mode)
+                        inject_terminal_colors(result[mode], scheme_data[mode])
+                if not result:
+                    print("Error: Invalid scheme format - missing 'dark'/'light'", file=sys.stderr)
+                    return 1
+            elif "mPrimary" in scheme_data or "primary" in scheme_data:
+                # Single-mode format - use same colors for requested mode
+                for mode in modes:
                     result[mode] = expand_predefined_scheme(scheme_data, mode)
                     inject_terminal_colors(result[mode], scheme_data)
-                else:
-                    print(f"Error: Invalid scheme format - missing '{mode}' or 'mPrimary'", file=sys.stderr)
-                    return 1
+            else:
+                print("Error: Invalid scheme format - missing 'dark'/'light' or 'mPrimary'", file=sys.stderr)
+                return 1
 
         except json.JSONDecodeError as e:
             print(f"Error parsing scheme JSON: {e}", file=sys.stderr)
@@ -316,7 +323,8 @@ def main() -> int:
     # Process templates
     if args.render or args.config:
         image_path = str(args.image) if args.image else None
-        renderer = TemplateRenderer(result, default_mode=args.default_mode, image_path=image_path, scheme_type=args.scheme_type)
+        default_mode = args.default_mode or args.mode or "dark"
+        renderer = TemplateRenderer(result, default_mode=default_mode, image_path=image_path, scheme_type=args.scheme_type)
 
         if args.render:
             for render_spec in args.render:

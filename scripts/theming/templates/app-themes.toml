@@ -90,3 +90,9 @@ output_path = "~/.config/fuzzel/Afloat.ini"
 [templates.firefox]
 input_path = "./firefox-colors.css"
 output_path = "~/.config/afloat/app-themes/firefox-colors.css"
+
+# opencode: dual dark/light variants in one file (opencode picks by terminal
+# background at runtime). Generation only: activate with /theme afloat.
+[templates.opencode]
+input_path = "./opencode-theme.json"
+output_path = "~/.config/opencode/themes/Afloat.json"
