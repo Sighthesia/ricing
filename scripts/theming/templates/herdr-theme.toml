@@ -45,8 +45,11 @@ text = "{{colors.on_surface.dark.hex}}"
 subtext0 = "{{colors.on_surface_variant.dark.hex}}"
 panel_bg = "reset"
 sidebar_bg = "reset"
-active_row_bg = "{{colors.surface_container_high.dark.hex}}"
-selection_bg = "{{colors.surface_container_high.dark.hex}}"
+# dark 下按用户要求，边框/选中行/光标行同取 kitty color4
+#（primary 加深 10%），三者合流、存在感让位给正文。
+accent = "{{colors.primary.dark.hex | darken: 10.0}}"
+active_row_bg = "{{colors.primary.dark.hex | darken: 10.0}}"
+selection_bg = "{{colors.primary.dark.hex | darken: 10.0}}"
 surface_dim = "{{colors.surface_container_lowest.dark.hex}}"
 surface0 = "{{colors.surface_container_low.dark.hex}}"
 surface1 = "{{colors.surface_container.dark.hex}}"

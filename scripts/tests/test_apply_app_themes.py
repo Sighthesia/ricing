@@ -145,9 +145,10 @@ def test_herdr_snippet(sandbox):
     #（Herdr 里边框和顶部 tab 共用 accent，行是独立键）。
     assert custom["light"]["active_row_bg"] == custom["light"]["selection_bg"]
     assert custom["light"]["accent"] == custom["light"]["active_row_bg"]
-    assert "accent" not in custom["dark"]
-    assert custom["accent"] != custom["dark"]["active_row_bg"]
-    assert custom["dark"]["active_row_bg"] == custom["dark"]["selection_bg"]
+    # dark 下三键同取 color4（primary 加深 10%，沙盒色板下为 #b077f3）。
+    assert custom["dark"]["accent"] == custom["dark"]["active_row_bg"]
+    assert custom["dark"]["accent"] == custom["dark"]["selection_bg"]
+    assert custom["dark"]["accent"] == "#b077f3", custom["dark"]
     # 表面阶梯与次级文字按明暗一次写全，阶梯单调、不与正文重合。
     for mode in ("light", "dark"):
         sub = custom[mode]
