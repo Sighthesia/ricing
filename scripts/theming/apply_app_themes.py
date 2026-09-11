@@ -162,6 +162,7 @@ def main() -> int:
         [sys.executable, str(PROCESSOR),
          "--scheme", str(args.palette),
          "--mode", args.mode,
+         "--default-mode", args.mode,
          "--config", str(args.config)],
         capture_output=True, text=True,
         # Matugen semantics: template input_path is relative to the config.
