@@ -56,6 +56,7 @@ Item {
     readonly property bool splitPresentation: rowPresentation === "split"
     readonly property bool choicePresentation: rowPresentation === "choice"
     readonly property bool controlOwnsValue: controlItem !== null && controlItem.ownsRowValue === true
+    readonly property bool splitAlignLeft: controlItem !== null && controlItem.splitAlignLeft === true
     readonly property bool rowHovered: ((rowHover.hovered && rowHover.point.position.x < root.revertVisibleX)
                                         || rowHoverArea.containsMouse)
                                       || (controlItem && controlItem.hovered === true)
@@ -426,8 +427,10 @@ Item {
 
         Item {
             id: controlHost
-            x: root.inlinePresentation || root.splitPresentation
-               ? Math.max(0, parent.width - width) : 0
+             x: root.inlinePresentation
+                ? Math.max(0, parent.width - width)
+                : (root.splitPresentation && !root.splitAlignLeft
+                   ? Math.max(0, parent.width - width) : 0)
             y: root.choicePresentation ? 0
                : root.inlinePresentation ? Math.max(0, (parent.height - height) / 2)
                : root.splitPresentation ? Math.max(0, (parent.height - height) / 2)

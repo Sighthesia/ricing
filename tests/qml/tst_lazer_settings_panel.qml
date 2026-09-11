@@ -195,6 +195,8 @@ Item {
             compare(panel.appearancePage.wallpaperRow.controlOwnsValue, true)
             compare(panel.appearancePage.wallpaperRow.valueTextItem.visible, false)
             compare(panel.appearancePage.wallpaperField.displayText, panel.appearancePage.wallpaperField.text)
+            compare(panel.appearancePage.wallpaperRow.splitAlignLeft, true)
+            compare(panel.appearancePage.wallpaperRow.controlRegionLeft, panel.appearancePage.wallpaperRow.contentPadding)
         }
 
         function test_schemePickersKeepTitlesAboveTheirSharedSurface() {
