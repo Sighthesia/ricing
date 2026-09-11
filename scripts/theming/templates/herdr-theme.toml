@@ -19,10 +19,10 @@ blue = "{{colors.primary.default.hex}}"
 text = "{{colors.on_surface.light.hex}}"
 panel_bg = "reset"
 sidebar_bg = "reset"
-# 与选中 tab 同色系但更深：tab 选中态是 accent 底+自动反白字，行内字不会反白，
-# 直接套 accent 对比只有 3.5；secondary 深色字对比 5.1，又醒目又不断层。
-active_row_bg = "{{colors.secondary.light.hex}}"
-selection_bg = "{{colors.secondary.light.hex}}"
+# 与顶部选中 tab 同色（accent）：用户明确要求对齐 tab 底色。注意 tab 选中态配自动
+# 反白字，行内字不会反白，此处深色字对比约 3.5、大字可用，小字偏肉。
+active_row_bg = "{{colors.primary.light.hex}}"
+selection_bg = "{{colors.primary.light.hex}}"
 
 [theme.custom.dark]
 text = "{{colors.on_surface.dark.hex}}"

@@ -139,9 +139,9 @@ def test_herdr_snippet(sandbox):
     assert custom["dark"]["text"] == "#cdd6f4", custom["dark"]
     assert custom["light"]["panel_bg"] == "reset"
     assert custom["dark"]["sidebar_bg"] == "reset"
-    # 选中行与选中 tab 同色系：取 secondary（深色字对比 5.1），不用 accent（3.5）。
-    assert custom["light"]["active_row_bg"] == custom["yellow"]
-    assert custom["light"]["selection_bg"] == custom["yellow"]
+    # 选中行与顶部选中 tab 同色（accent）。
+    assert custom["light"]["active_row_bg"] == custom["accent"]
+    assert custom["light"]["selection_bg"] == custom["accent"]
 
 
 def test_terminal_clear_text_on_by_default(sandbox):
