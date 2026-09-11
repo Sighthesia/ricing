@@ -23,6 +23,7 @@ Item {
     readonly property bool geometryHeld: searchEmpty || revealHeld
     // Rows injected as section content, exposed for the entrance wave walk.
     readonly property alias contentRows: contentColumn.children
+    readonly property alias headerItem: header
     readonly property Item dimItem: dim
     readonly property Item dimAreaItem: dimArea
 
@@ -123,7 +124,7 @@ Item {
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
-    // Present the category title as the section header with a bottom rule.
+    // Present the category title directly on the shared section background.
     Item {
         id: header
         x: 0
@@ -142,13 +143,6 @@ Item {
             elide: Text.ElideRight
         }
 
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 1
-            color: LazerTheme.divider
-        }
     }
 
     // Lay out the injected rows below the header; rows own their own gap.

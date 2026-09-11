@@ -179,6 +179,12 @@ Item {
             verify(panel.content.menuCatcherItem.enabled === false)
         }
 
+        function test_sectionHeaderHasNoBottomRule() {
+            compare(panel.appearancePage.headerItem.children.length, 1)
+            compare(panel.barPage.headerItem.children.length, 1)
+            compare(panel.notificationPage.headerItem.children.length, 1)
+        }
+
         function test_sidebarActionsUseCompactFullWidthGeometry() {
             var sidebar = panel.sidebar
             compare(sidebar.collapseButton.x, 0)
