@@ -325,11 +325,13 @@ def main() -> int:
         image_path = str(args.image) if args.image else None
         default_mode = args.default_mode or args.mode or "dark"
         renderer = TemplateRenderer(result, default_mode=default_mode, image_path=image_path, scheme_type=args.scheme_type)
+        failed = False
 
         if args.render:
             for render_spec in args.render:
                 if ':' not in render_spec:
                     print(f"Error: Invalid render spec (must be input:output): {render_spec}", file=sys.stderr)
+                    failed = True
                     continue
 
                 input_str, output_str = render_spec.split(':', 1)
@@ -338,15 +340,23 @@ def main() -> int:
 
                 if not input_path.exists():
                     print(f"Error: Template not found: {input_path}", file=sys.stderr)
+                    failed = True
                     continue
 
-                renderer.render_file(input_path, output_path)
+                ok, _ = renderer.render_file(input_path, output_path)
+                if not ok:
+                    failed = True
 
         if args.config:
             if not args.config.exists():
                 print(f"Error: Config file not found: {args.config}", file=sys.stderr)
+                failed = True
             else:
-                renderer.process_config_file(args.config)
+                if not renderer.process_config_file(args.config):
+                    failed = True
+
+        if failed:
+            return 1
 
     return 0
 

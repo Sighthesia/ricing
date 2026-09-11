@@ -139,9 +139,11 @@ def test_herdr_snippet(sandbox):
     assert custom["dark"]["text"] == "#cdd6f4", custom["dark"]
     assert custom["light"]["panel_bg"] == "reset"
     assert custom["dark"]["sidebar_bg"] == "reset"
-    # 选中行/光标行/顶部 tab 全部对齐 kitty 非活动 tab 色（surface_container_high）。
+    # 选中行/光标行对齐 kitty 非活动 tab 色；活动边框（accent）取 color8=primary，
+    # 与行解耦（Herdr 里边框和顶部 tab 共用 accent，行是独立键）。
     assert custom["light"]["active_row_bg"] == custom["light"]["selection_bg"]
-    assert custom["light"]["accent"] == custom["light"]["active_row_bg"]
+    assert custom["light"]["accent"] == custom["accent"]
+    assert custom["light"]["accent"] != custom["light"]["active_row_bg"]
     assert custom["dark"]["active_row_bg"] == custom["dark"]["selection_bg"]
 
 
@@ -238,3 +240,21 @@ def test_kitty_accents_are_distinct(sandbox):
     for content in (dark, light):
         accents = {_slot(content, f"color{i}") for i in (1, 2, 3, 4, 5, 6)}
         assert len(accents) == 6, accents
+
+
+def test_single_mode_palette_renders_dual_variant(tmp_path):
+    """Live-wallpaper shape (one mode only): dual-variant templates must still
+    render exit-0 with the missing variant falling back to the active mode."""
+    import json as _json
+    import tomllib
+    palette = tmp_path / "palette.json"
+    palette.write_text(_json.dumps({"light": PALETTE["light"]}))
+    home = tmp_path / "home"
+    result = run_apply(palette, "light", home)
+    assert result.returncode == 0, result.stderr
+    snippet = tomllib.loads((home / ".config/afloat/app-themes/herdr-theme.toml").read_text())
+    custom = snippet["theme"]["custom"]
+    assert custom["light"]["text"] == "#4c4f69"
+    assert custom["dark"]["text"] == "#4c4f69"
+    theme = _json.loads((home / ".config/opencode/themes/Afloat.json").read_text())
+    assert theme["theme"]["text"] == {"dark": "#4c4f69", "light": "#4c4f69"}

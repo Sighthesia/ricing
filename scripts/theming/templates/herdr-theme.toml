@@ -6,7 +6,8 @@
 #   [theme]
 #   name = "terminal"
 #   auto_switch = true
-# 明暗子表一次写全，Herdr 按宿主终端报告的外观自动选用。
+# 明暗子表一次写全，Herdr 按宿主终端报告的外观自动选用。注意：实时壁纸输入
+# 只有当前模式，另一子表回退为同值，切模式重渲染后自动修正。
 
 [theme.custom]
 accent = "{{colors.primary.default.hex}}"
@@ -19,9 +20,10 @@ blue = "{{colors.primary.default.hex}}"
 text = "{{colors.on_surface.light.hex}}"
 panel_bg = "reset"
 sidebar_bg = "reset"
-# 与 kitty 非活动 tab 同色（surface_container_high）：spaces/agents 选中行、光标行、
-# 顶部选中 tab（accent）全部对齐到该色。tab 选中态配自动反白字，无需担心对比。
-accent = "{{colors.surface_container_high.light.hex}}"
+# 活动边框/焦点指示与顶部选中 tab 共用 accent（Herdr 键位限制，拆不开）：
+# 此处取 primary（= color8，动态跟随），边框回到强色，tab 底同步变回赭红；
+# spaces/agents 行是独立键，不受影响，继续对齐非活动 tab 色。
+accent = "{{colors.primary.light.hex}}"
 active_row_bg = "{{colors.surface_container_high.light.hex}}"
 selection_bg = "{{colors.surface_container_high.light.hex}}"
 

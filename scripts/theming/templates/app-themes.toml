@@ -94,6 +94,7 @@ output_path = "~/.config/afloat/app-themes/firefox-colors.css"
 # opencode: dual dark/light variants in one file (opencode picks by terminal
 # background at runtime). Generation only: activate with /theme afloat.
 # 键覆盖参考上游: https://github.com/InioX/matugen-themes/blob/main/templates/opencode-colors.json
+# 注意：实时壁纸输入只有当前模式，另一变体回退为同值，切模式重渲染后修正。
 [templates.opencode]
 input_path = "./opencode-theme.json"
 output_path = "~/.config/opencode/themes/Afloat.json"

@@ -153,6 +153,7 @@ class TemplateRenderer:
         self._current_file: Optional[str] = None
         self._error_count = 0
         self._colors_map: Optional[dict[str, dict[str, str]]] = None
+        self._mode_fallback_warned: set[str] = set()
 
     def _log_error(self, message: str, line_hint: str = ""):
         """Log an error to stderr."""
@@ -641,6 +642,18 @@ class TemplateRenderer:
             mode_data = self.theme_data.get(self.default_mode) or self.theme_data.get("dark") or self.theme_data.get("light")
         else:
             mode_data = self.theme_data.get(mode)
+            if not mode_data and mode in ("dark", "light") and self.theme_data:
+                # Single-mode input (e.g. a live wallpaper palette that only
+                # carries the current mode): explicit cross-mode references
+                # fall back to the active mode so dual-variant templates
+                # (opencode/herdr) still render. The other variant refreshes
+                # on the next opposite-mode render.
+                if mode not in self._mode_fallback_warned:
+                    self._mode_fallback_warned.add(mode)
+                    prefix = f"[{self._current_file}] " if self._current_file else ""
+                    print(f"Template note: {prefix}mode '{mode}' not in input, "
+                          f"using '{self.default_mode}' values", file=sys.stderr)
+                mode_data = self.theme_data.get(self.default_mode) or self.theme_data.get("dark") or self.theme_data.get("light")
 
         if not mode_data:
             self._log_error(f"Unknown mode '{mode}'", f"colors.{color_name}.{mode}")
@@ -1139,12 +1152,13 @@ class TemplateRenderer:
         current = Path.home() / ".config" / "kitty" / "current-theme.conf"
         return not current.is_file()
 
-    def process_config_file(self, config_path: Path):
-        """Process Matugen TOML configuration file."""
+    def process_config_file(self, config_path: Path) -> bool:
+        """Process Matugen TOML configuration file. Returns False if any template failed."""
         if not tomllib:
             print("Error: tomllib module not available (requires Python 3.11+)", file=sys.stderr)
-            return
+            return False
 
+        failed = False
         try:
             with open(config_path, "rb") as f:
                 data = tomllib.load(f)
@@ -1176,6 +1190,7 @@ class TemplateRenderer:
 
                 ok, wrote = self.render_file(Path(input_path).expanduser(), Path(output_path).expanduser())
                 if not ok:
+                    failed = True
                     continue
 
                 out_path = Path(output_path).expanduser()
@@ -1216,5 +1231,8 @@ class TemplateRenderer:
 
         except FileNotFoundError:
             print(f"Error: Config file not found: {config_path}", file=sys.stderr)
+            return False
         except Exception as e:
             print(f"Error processing config file {config_path}: {e}", file=sys.stderr)
+            return False
+        return not failed
