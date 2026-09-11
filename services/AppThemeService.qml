@@ -26,6 +26,11 @@ Singleton {
         ? String(Services.SettingsService.appearance.presetScheme || "")
         : ""
 
+    // Transparent-terminal clear text (kitty dim_opacity/background_tint).
+    // Defaults on so settings.json written before the key existed keeps
+    // the compensation instead of silently dropping it.
+    readonly property bool terminalClearText: Services.SettingsService.appearance.terminalClearText !== false
+
     // Test seam: prefix redirected sandbox + hook skip (see script).
     readonly property string homePrefix: Quickshell.env("AFLOAT_APP_THEME_PREFIX") || ""
 
@@ -46,11 +51,26 @@ Singleton {
             target = "--palette '" + Quickshell.cacheDir + "/colors.json'"
         }
         const prefix = root.homePrefix !== "" ? " --home-prefix '" + root.homePrefix + "'" : ""
+        const textFlag = root.terminalClearText ? "" : " --no-terminal-clear-text"
         const cmd = "python3 " + Quickshell.shellDir
             + "/scripts/theming/apply_app_themes.py " + target
-            + " --mode '" + mode + "'" + prefix
+            + " --mode '" + mode + "'" + textFlag + prefix
         applyProcess.command = ["sh", "-c", cmd]
         // Restart-safe: bounce so a run while running re-fires after exit.
+        applyProcess.running = false
+        applyProcess.running = true
+    }
+
+    // The clear-text toggle only touches kitty.conf: sync it immediately
+    // even when full app-theme sync is disabled (fast path, no rendering).
+    function syncTerminalText() {
+        const mode = Services.SettingsService.effectiveColorScheme || "dark"
+        const textFlag = root.terminalClearText ? "" : " --no-terminal-clear-text"
+        const prefix = root.homePrefix !== "" ? " --home-prefix '" + root.homePrefix + "'" : ""
+        const cmd = "python3 " + Quickshell.shellDir
+            + "/scripts/theming/apply_app_themes.py"
+            + " --mode '" + mode + "' --only-kitty-text" + textFlag + prefix
+        applyProcess.command = ["sh", "-c", cmd]
         applyProcess.running = false
         applyProcess.running = true
     }
@@ -77,6 +97,7 @@ Singleton {
         function onPresetSchemeChanged() { root.apply() }
         function onThemeAdaptationChanged() { root.apply() }
         function onSyncAppThemesChanged() { root.apply() }
+        function onTerminalClearTextChanged() { root.syncTerminalText() }
     }
 
     // Wallpaper extraction writes colors.json asynchronously; re-apply on

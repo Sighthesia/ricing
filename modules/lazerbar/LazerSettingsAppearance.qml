@@ -396,6 +396,16 @@ LazerSettingsSection {
         LazerSettingsToggle { id: syncAppThemesToggleControl; checked: root.settingsObject ? root.settingsObject.syncAppThemes === true : false; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.syncAppThemes = value; root.save() } } }
     }
     LazerSettingsRow {
+        id: terminalClearTextRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: "透明终端清晰字"; descriptionText: "透明背景下终端文字全亮度绘制，用颜色区分层级"
+        defaultValue: root.defaultOf("terminalClearText")
+        currentValue: root.settingsObject ? root.settingsObject.terminalClearText : null
+        resetCallback: function() { root.resetKey("terminalClearText") }
+        LazerSettingsToggle { id: terminalClearTextToggleControl; checked: root.settingsObject ? root.settingsObject.terminalClearText !== false : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.terminalClearText = value; root.save() } } }
+    }
+    LazerSettingsRow {
         id: rippleRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery

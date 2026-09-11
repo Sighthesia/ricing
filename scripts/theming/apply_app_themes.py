@@ -41,6 +41,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--config', type=Path, default=DEFAULT_CONFIG)
     parser.add_argument('--home-prefix', type=Path, default=None,
                         help='Redirect ~ to this root for testing (disables system hooks)')
+    parser.add_argument('--terminal-clear-text', dest='terminal_clear_text',
+                        action='store_true', default=True,
+                        help='Full-brightness terminal text for translucent backgrounds '
+                             '(manages dim_opacity/background_tint in kitty.conf; default: on)')
+    parser.add_argument('--no-terminal-clear-text', dest='terminal_clear_text',
+                        action='store_false',
+                        help='Remove the managed clear-text lines from kitty.conf')
+    parser.add_argument('--only-kitty-text', action='store_true', default=False,
+                        help='Only sync the kitty.conf clear-text block, skip template rendering')
     return parser.parse_args()
 
 
@@ -60,6 +69,66 @@ def ensure_line(path: Path, line: str) -> bool:
 def _which(name: str) -> str | None:
     from shutil import which
     return which(name)
+
+
+# Managed kitty.conf block for the "transparent-terminal clear text" setting:
+# dim text is drawn translucent by kitty (0.75 default), which compounds with
+# a translucent background and washes TUI secondary rows out. Full brightness
+# + palette colors keeps hierarchy readable on transparency.
+_MANAGED_BEGIN = "# >>> Afloat managed: transparent-terminal clear text. Do not edit."
+_MANAGED_END = "# <<< Afloat managed."
+_MANAGED_BODY = ("dim_opacity 1.0\n"
+                 "background_tint 0.35\n")
+# Stale hand-written comment lines from the manual fix (removed on sync).
+_LEGACY_COMMENTS = {
+    "# Tint the wallpaper bleed toward the background color so text stays",
+    "# readable on translucent background (Afloat: keeps the glow, kills the washout)",
+    "# Dim (SGR 2) text is drawn translucent by default (0.75); on a translucent",
+    "# background that compounds and washes TUI secondary rows out entirely.",
+    "# 1.0 = dim text at full brightness, fixes all terminal apps at once.",
+    "# Drop to 0.9 if you want a hint of hierarchy back.",
+    "# 1.0 = dim text at full brightness (applies to every terminal app, no",
+    "# per-app templates needed). Drop to 0.9 if you want a hint of hierarchy back.",
+}
+
+
+def sync_kitty_clear_text(home: Path, enabled: bool) -> bool:
+    """Sync the managed clear-text block in kitty.conf. Returns True on change."""
+    conf = home / ".config/kitty/kitty.conf"
+    conf.parent.mkdir(parents=True, exist_ok=True)
+    existing = conf.read_text() if conf.exists() else ""
+
+    kept: list[str] = []
+    skip = False
+    for raw in existing.splitlines():
+        stripped = raw.strip()
+        if stripped == _MANAGED_BEGIN:
+            skip = True
+            continue
+        if stripped == _MANAGED_END:
+            skip = False
+            continue
+        if skip:
+            continue
+        key = stripped.split()[0] if stripped.split() else ""
+        if key in ("dim_opacity", "background_tint"):
+            continue
+        if stripped in _LEGACY_COMMENTS:
+            continue
+        kept.append(raw)
+
+    if enabled:
+        block = _MANAGED_BEGIN + "\n" + _MANAGED_BODY + _MANAGED_END
+        text = "\n".join(kept).rstrip("\n")
+        text = (text + "\n\n" if text else "") + block + "\n"
+    else:
+        text = "\n".join(kept)
+        if text:
+            text += "\n"
+    if text == existing or (not text and not conf.exists()):
+        return False
+    conf.write_text(text)
+    return True
 
 
 def _theme_exists(name: str) -> bool:
@@ -134,6 +203,20 @@ def run_hooks(mode: str) -> None:
 def main() -> int:
     args = parse_args()
 
+    if args.home_prefix is not None:
+        # Sandbox ~ for both the renderer and the include-ensure step.
+        args.home_prefix.mkdir(parents=True, exist_ok=True)
+        import os
+        os.environ["HOME"] = str(args.home_prefix)
+
+    if args.only_kitty_text:
+        # Kitty-only fast path: no palette or template config needed.
+        home = Path.home()
+        sync_kitty_clear_text(home, args.terminal_clear_text)
+        state = "on" if args.terminal_clear_text else "off"
+        print(f"Kitty clear text {state}")
+        return 0
+
     if args.scheme_name:
         home = Path.home()
         candidates = [
@@ -152,12 +235,6 @@ def main() -> int:
         print(f"Error: config not found: {args.config}", file=sys.stderr)
         return 1
 
-    if args.home_prefix is not None:
-        # Sandbox ~ for both the renderer and the include-ensure step.
-        args.home_prefix.mkdir(parents=True, exist_ok=True)
-        import os
-        os.environ["HOME"] = str(args.home_prefix)
-
     render = subprocess.run(
         [sys.executable, str(PROCESSOR),
          "--scheme", str(args.palette),
@@ -175,6 +252,7 @@ def main() -> int:
     ensure_line(home / ".config/kitty/kitty.conf", "include kitty-colors.conf")
     ensure_line(home / ".config/gtk-3.0/gtk.css", "@import 'colors.css';")
     ensure_line(home / ".config/gtk-4.0/gtk.css", "@import 'colors.css';")
+    sync_kitty_clear_text(home, args.terminal_clear_text)
 
     if args.home_prefix is None:
         run_hooks(args.mode)

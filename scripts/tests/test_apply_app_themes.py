@@ -40,11 +40,12 @@ def sandbox(tmp_path):
     return tmp_path, palette
 
 
-def run_apply(palette, mode, home_prefix):
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), "--palette", str(palette),
-         "--mode", mode, "--home-prefix", str(home_prefix)],
-        capture_output=True, text=True, timeout=60)
+def run_apply(palette, mode, home_prefix, extra=None):
+    cmd = [sys.executable, str(SCRIPT), "--palette", str(palette),
+           "--mode", mode, "--home-prefix", str(home_prefix)]
+    if extra:
+        cmd.extend(extra)
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
 
 def test_dark_render_and_includes(sandbox):
@@ -105,3 +106,59 @@ def test_missing_palette_fails(sandbox):
     tmp, _ = sandbox
     result = run_apply(tmp / "missing.json", "dark", tmp / "home")
     assert result.returncode == 1
+
+
+def test_terminal_clear_text_on_by_default(sandbox):
+    tmp, palette = sandbox
+    home = tmp / "home"
+    assert run_apply(palette, "dark", home).returncode == 0
+    conf = (home / ".config/kitty/kitty.conf").read_text()
+    assert "dim_opacity 1.0" in conf
+    assert "background_tint 0.35" in conf
+    # Idempotent: second apply keeps exactly one managed block.
+    assert run_apply(palette, "dark", home).returncode == 0
+    conf = (home / ".config/kitty/kitty.conf").read_text()
+    assert conf.count(">>> Afloat managed") == 1
+    assert conf.count("<<< Afloat managed") == 1
+    assert conf.count("dim_opacity") == 1
+
+
+def test_terminal_clear_text_off_removes_block(sandbox):
+    tmp, palette = sandbox
+    home = tmp / "home"
+    assert run_apply(palette, "dark", home).returncode == 0
+    assert run_apply(palette, "dark", home,
+                      ["--no-terminal-clear-text"]).returncode == 0
+    conf = (home / ".config/kitty/kitty.conf").read_text()
+    assert "dim_opacity" not in conf
+    assert "background_tint" not in conf
+    assert "Afloat managed" not in conf
+
+
+def test_terminal_clear_text_replaces_legacy_lines(sandbox):
+    tmp, palette = sandbox
+    home = tmp / "home"
+    kitty_dir = home / ".config/kitty"
+    kitty_dir.mkdir(parents=True)
+    (kitty_dir / "kitty.conf").write_text(
+        "background_opacity 0.7\n"
+        "# Tint the wallpaper bleed toward the background color so text stays\n"
+        "background_tint             0.35\n"
+        "dim_opacity 0.8\n"
+        "shell fish\n")
+    assert run_apply(palette, "dark", home).returncode == 0
+    conf = (kitty_dir / "kitty.conf").read_text()
+    assert "background_opacity 0.7" in conf
+    assert "shell fish" in conf
+    assert "Tint the wallpaper bleed" not in conf
+    assert conf.count("dim_opacity") == 1
+    assert "dim_opacity 1.0" in conf
+
+
+def test_only_kitty_text_needs_no_palette(sandbox):
+    tmp, _ = sandbox
+    home = tmp / "home"
+    result = run_apply(tmp / "missing.json", "dark", home, ["--only-kitty-text"])
+    assert result.returncode == 0, result.stderr
+    conf = (home / ".config/kitty/kitty.conf").read_text()
+    assert "dim_opacity 1.0" in conf
