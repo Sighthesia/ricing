@@ -15,10 +15,12 @@ PanelWindow {
     margins { top: Services.SettingsService.bar.floating ? Math.max(0, Math.min(24, Services.SettingsService.bar.floatingMargin)) : 0; bottom: Services.SettingsService.bar.floating ? Math.max(0, Math.min(24, Services.SettingsService.bar.floatingMargin)) : 0; left: Services.SettingsService.bar.floating ? Math.max(0, Math.min(24, Services.SettingsService.bar.floatingMargin)) : 0; right: Services.SettingsService.bar.floating ? Math.max(0, Math.min(24, Services.SettingsService.bar.floatingMargin)) : 0 }
     mask: Region {}
 
+    // Opaque like kitty's `background` (same mSurface token): any
+    // translucency lets the wallpaper bleed in and drift off kitty.
     Rectangle {
         anchors.fill: parent
         color: Services.SettingsService.effectiveColorScheme === "light" ? LazerTheme.bgLight : LazerTheme.bgDark
-        opacity: Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity))
+        opacity: 1
         radius: 0
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
