@@ -204,6 +204,8 @@ Item {
             compare(templates.backgroundItem.color, Lazer.LazerTheme.settingsCard)
             verify(preset.gridItem.y >= preset.descriptionItem.y + preset.descriptionItem.height + 5.9)
             verify(templates.gridItem.y >= templates.titleItem.y + templates.titleItem.height + 7.9)
+            compare(Math.round(templates.backgroundItem.height - (templates.gridItem.y + templates.gridItem.height)),
+                    templates.bottomPadding)
         }
 
         function test_sidebarActionsUseCompactFullWidthGeometry() {

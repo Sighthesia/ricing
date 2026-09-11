@@ -32,8 +32,9 @@ Item {
 
     implicitWidth: 400
     width: parent ? parent.width : implicitWidth
+    readonly property real bottomPadding: 12
     readonly property real titleBandHeight: 10 + titleText.height + 2 + descriptionText.height + 6
-    implicitHeight: titleBandHeight + grid.height + 12
+    implicitHeight: grid.y + grid.height + bottomPadding
     height: searchHidden ? 0 : implicitHeight
     visible: !searchHidden || opacity > 0.01
     opacity: searchHidden ? 0 : 1

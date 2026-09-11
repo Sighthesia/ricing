@@ -22,8 +22,9 @@ Item {
 
     implicitWidth: 400
     width: parent ? parent.width : implicitWidth
+    readonly property real bottomPadding: 12
     readonly property real titleBandHeight: 10 + titleText.height + 8
-    implicitHeight: titleBandHeight + grid.height + 12
+    implicitHeight: grid.y + grid.height + bottomPadding
     // Collapse like a search-hidden row so the section frees the space.
     height: searchHidden ? 0 : implicitHeight
     visible: !searchHidden || opacity > 0.01
