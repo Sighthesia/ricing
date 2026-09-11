@@ -140,11 +140,13 @@ def test_herdr_snippet(sandbox):
     assert custom["dark"]["text"] == "#cdd6f4", custom["dark"]
     assert custom["light"]["panel_bg"] == "reset"
     assert custom["dark"]["sidebar_bg"] == "reset"
-    # 选中行/光标行对齐 kitty 非活动 tab 色；活动边框（accent）取 primary，
-    # 与行解耦（Herdr 里边框和顶部 tab 共用 accent，行是独立键）。
+    # 选中行/光标行对齐 kitty 非活动 tab 色。light 下 accent 按用户要求
+    # 同取该色（与行合流）；dark 下 accent 保持 primary 强色、与行解耦
+    #（Herdr 里边框和顶部 tab 共用 accent，行是独立键）。
     assert custom["light"]["active_row_bg"] == custom["light"]["selection_bg"]
-    assert custom["light"]["accent"] == custom["accent"]
-    assert custom["light"]["accent"] != custom["light"]["active_row_bg"]
+    assert custom["light"]["accent"] == custom["light"]["active_row_bg"]
+    assert "accent" not in custom["dark"]
+    assert custom["accent"] != custom["dark"]["active_row_bg"]
     assert custom["dark"]["active_row_bg"] == custom["dark"]["selection_bg"]
     # 表面阶梯与次级文字按明暗一次写全，阶梯单调、不与正文重合。
     for mode in ("light", "dark"):
@@ -219,7 +221,7 @@ def _slot(content, name):
     return match.group(1).lower()
 
 
-def test_kitty_color8_tracks_tab_bar_background(sandbox):
+def test_kitty_color8_tracks_color13(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"
     assert run_apply(palette, "dark", home).returncode == 0
@@ -230,9 +232,9 @@ def test_kitty_color8_tracks_tab_bar_background(sandbox):
     # Black slot is a true dark distinct from the background in both modes.
     assert _slot(dark, "color0") != _slot(dark, "background")
     assert _slot(light, "color0") != _slot(light, "background")
-    # User override: bright-black tracks tab_bar_background in both modes.
-    assert _slot(dark, "color8") == _slot(dark, "tab_bar_background")
-    assert _slot(light, "color8") == _slot(light, "tab_bar_background")
+    # User override: bright-black tracks bright-magenta (primary-fixed-dim).
+    assert _slot(dark, "color8") == _slot(dark, "color13")
+    assert _slot(light, "color8") == _slot(light, "color13")
     # ...while staying apart from the foreground in both modes.
     assert _slot(dark, "color8") != _slot(dark, "foreground")
     assert _slot(light, "color8") != _slot(light, "foreground")

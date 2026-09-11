@@ -27,9 +27,9 @@ subtext0 = "{{colors.on_surface_variant.light.hex}}"
 panel_bg = "reset"
 sidebar_bg = "reset"
 # 活动边框/焦点指示与顶部选中 tab 共用 accent（Herdr 键位限制，拆不开）：
-# 此处取 primary，边框回到强色；spaces/agents 行是独立键，不受影响，
-# 继续对齐 kitty 非活动 tab 色（surface_container_high），与 accent 解耦。
-accent = "{{colors.primary.light.hex}}"
+# light 下按用户要求取 kitty 非活动 tab 色（surface_container_high），
+# 与选中行/overlay0 同色，边框存在感弱化；dark 下保持 primary 强色。
+accent = "{{colors.surface_container_high.light.hex}}"
 active_row_bg = "{{colors.surface_container_high.light.hex}}"
 selection_bg = "{{colors.surface_container_high.light.hex}}"
 # 表面阶梯：dim < surface0 < surface1 < overlay0 < overlay1，
