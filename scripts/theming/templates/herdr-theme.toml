@@ -19,8 +19,10 @@ blue = "{{colors.primary.default.hex}}"
 text = "{{colors.on_surface.light.hex}}"
 panel_bg = "reset"
 sidebar_bg = "reset"
-active_row_bg = "{{colors.primary_container.light.hex}}"
-selection_bg = "{{colors.secondary_container.light.hex}}"
+# 与选中 tab 同色系但更深：tab 选中态是 accent 底+自动反白字，行内字不会反白，
+# 直接套 accent 对比只有 3.5；secondary 深色字对比 5.1，又醒目又不断层。
+active_row_bg = "{{colors.secondary.light.hex}}"
+selection_bg = "{{colors.secondary.light.hex}}"
 
 [theme.custom.dark]
 text = "{{colors.on_surface.dark.hex}}"
