@@ -211,7 +211,7 @@ def _slot(content, name):
     return match.group(1).lower()
 
 
-def test_kitty_color8_tracks_inactive_tab(sandbox):
+def test_kitty_color8_tracks_color12(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"
     assert run_apply(palette, "dark", home).returncode == 0
@@ -222,9 +222,9 @@ def test_kitty_color8_tracks_inactive_tab(sandbox):
     # Black slot is a true dark distinct from the background in both modes.
     assert _slot(dark, "color0") != _slot(dark, "background")
     assert _slot(light, "color0") != _slot(light, "background")
-    # User override: bright-black tracks inactive_tab_background in both modes.
-    assert _slot(dark, "color8") == _slot(dark, "inactive_tab_background")
-    assert _slot(light, "color8") == _slot(light, "inactive_tab_background")
+    # User override: bright-black tracks bright-blue (primary) in both modes.
+    assert _slot(dark, "color8") == _slot(dark, "color12")
+    assert _slot(light, "color8") == _slot(light, "color12")
     # ...while staying apart from the foreground in both modes.
     assert _slot(dark, "color8") != _slot(dark, "foreground")
     assert _slot(light, "color8") != _slot(light, "foreground")
