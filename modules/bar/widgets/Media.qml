@@ -354,12 +354,13 @@ BarPill {
             // unplayed remainder); sits under the played fill overlay.
             Rectangle {
                 anchors.fill: parent
-                color: LazerTheme.textPrimary
+                color: LazerTheme.flashWash
                 opacity: MotionTokens.reducedMotion
                     ? 0
                     : Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 0.5
                 visible: opacity > 0.01
 
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
 
@@ -376,12 +377,13 @@ BarPill {
                 Rectangle {
                     anchors.fill: parent
                     radius: 1.5
-                    color: LazerTheme.textPrimary
+                    color: LazerTheme.flashWash
                     opacity: MotionTokens.reducedMotion
                         ? 0
                         : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 1.8)
                     visible: opacity > 0.01
 
+                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                     Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
                 }
 
@@ -467,6 +469,9 @@ BarPill {
             anchors.fill: parent
             values: Services.SpectrumService.values
             barColor: Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.58)
+            // Light scheme brightens the wavefront toward white; dark keeps
+            // the legacy alpha boost, which already brightens on dark glass.
+            waveColor: LazerTheme.lightScheme ? "#FFFFFF" : "#00000000"
             // One sweep per beat interval: the front hits the far edge just
             // as the next beat fires the next wave.
             waveDuration: Services.SpectrumService.bpm > 0

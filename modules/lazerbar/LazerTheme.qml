@@ -82,6 +82,10 @@ QtObject {
                        : shade(colorService.mTertiary, 0x24 / 255))
         : "#2400FFA2"
     readonly property color focusRing: adapt && colorService ? colorService.mPrimary : "#FFF2F8"
+    // Beat/tick flash wash: dark uses on-surface ink (near-white); light
+    // must stay a white wash — textPrimary is dark ink there and would read
+    // as dimming on saturated fills.
+    readonly property color flashWash: lightScheme ? "#FFFFFF" : textPrimary
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"

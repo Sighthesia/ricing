@@ -12,6 +12,10 @@ Item {
     property var values: []
     // lazer accent (#765BFF) at 34% — caller may override for theming.
     property color barColor: Qt.rgba(0.462, 0.356, 1.0, 0.34)
+    // Wavefront tint: transparent keeps the legacy alpha boost (dark glass);
+    // an opaque color whitens the bars toward it as the front passes, so the
+    // sweep brightens instead of saturating on light backgrounds.
+    property color waveColor: "#00000000"
     // Sweep duration; callers derive it from the current BPM so a new wave
     // launches right as the previous one reaches the far edge.
     property int waveDuration: MotionTokens.beatWave
@@ -77,11 +81,18 @@ Item {
             radius: 0
             x: index * root.slotWidth + ((root.slotWidth - width) / 2)
             y: root.height - height - root.floorInset
-            color: Qt.rgba(
-                root.barColor.r,
-                root.barColor.g,
-                root.barColor.b,
-                Math.min(1, root.barColor.a * emphasis + waveBoost * 0.85))
+            // Transparent waveColor preserves the legacy alpha-only boost;
+            // otherwise the front mixes the bar toward waveColor (brighten).
+            color: {
+                var boost = Math.min(1, waveBoost)
+                if (root.waveColor.a <= 0 || boost <= 0)
+                    return Qt.rgba(root.barColor.r, root.barColor.g, root.barColor.b,
+                        Math.min(1, root.barColor.a * emphasis + waveBoost * 0.85))
+                return Qt.rgba(root.barColor.r + (root.waveColor.r - root.barColor.r) * boost,
+                    root.barColor.g + (root.waveColor.g - root.barColor.g) * boost,
+                    root.barColor.b + (root.waveColor.b - root.barColor.b) * boost,
+                    Math.min(1, root.barColor.a * emphasis + waveBoost * 0.85))
+            }
             visible: height > 0.5 && root.visible
         }
     }

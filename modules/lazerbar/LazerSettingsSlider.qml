@@ -215,6 +215,8 @@ Item {
     }
 
     // Flash the track once when a user action lands on a new discrete step.
+    // White wash in both schemes so the tick reads as brightening; the
+    // overlay only covers the saturated fill, never the pale track.
     Rectangle {
         id: flashOverlay
         z: 2
@@ -223,8 +225,10 @@ Item {
         anchors.bottom: fillRect.bottom
         width: fillRect.width
         radius: trackRect.radius
-        color: LazerTheme.textPrimary
+        color: LazerTheme.flashWash
         opacity: 0
+
+        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
     // Match osu's click flash: a 0.3 white overlay fading for 800ms with OutQuint.
