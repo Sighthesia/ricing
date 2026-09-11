@@ -15,21 +15,40 @@ red = "{{colors.error.default.hex}}"
 green = "{{colors.tertiary.default.hex}}"
 yellow = "{{colors.secondary.default.hex}}"
 blue = "{{colors.primary.default.hex}}"
+# 与 kitty bright 槽同构：magenta/cyan 槽取 fixed-dim 阶，herdr 的
+# mauve/teal/peach 跟随它们，七个语义色各保一阶、不互撞。
+mauve = "{{colors.primary_fixed_dim.default.hex}}"
+teal = "{{colors.tertiary_fixed_dim.default.hex}}"
+peach = "{{colors.secondary_fixed_dim.default.hex}}"
 
 [theme.custom.light]
 text = "{{colors.on_surface.light.hex}}"
+subtext0 = "{{colors.on_surface_variant.light.hex}}"
 panel_bg = "reset"
 sidebar_bg = "reset"
 # 活动边框/焦点指示与顶部选中 tab 共用 accent（Herdr 键位限制，拆不开）：
-# 此处取 primary（= color8，动态跟随），边框回到强色，tab 底同步变回赭红；
-# spaces/agents 行是独立键，不受影响，继续对齐非活动 tab 色。
+# 此处取 primary，边框回到强色；spaces/agents 行是独立键，不受影响，
+# 继续对齐 kitty 非活动 tab 色（surface_container_high），与 accent 解耦。
 accent = "{{colors.primary.light.hex}}"
 active_row_bg = "{{colors.surface_container_high.light.hex}}"
 selection_bg = "{{colors.surface_container_high.light.hex}}"
+# 表面阶梯：dim < surface0 < surface1 < overlay0 < overlay1，
+# 与 kitty tab 栏底（surface_container_lowest）同源。
+surface_dim = "{{colors.surface_container_lowest.light.hex}}"
+surface0 = "{{colors.surface_container_low.light.hex}}"
+surface1 = "{{colors.surface_container.light.hex}}"
+overlay0 = "{{colors.surface_container_high.light.hex}}"
+overlay1 = "{{colors.surface_container_highest.light.hex}}"
 
 [theme.custom.dark]
 text = "{{colors.on_surface.dark.hex}}"
+subtext0 = "{{colors.on_surface_variant.dark.hex}}"
 panel_bg = "reset"
 sidebar_bg = "reset"
 active_row_bg = "{{colors.surface_container_high.dark.hex}}"
 selection_bg = "{{colors.surface_container_high.dark.hex}}"
+surface_dim = "{{colors.surface_container_lowest.dark.hex}}"
+surface0 = "{{colors.surface_container_low.dark.hex}}"
+surface1 = "{{colors.surface_container.dark.hex}}"
+overlay0 = "{{colors.surface_container_high.dark.hex}}"
+overlay1 = "{{colors.surface_container_highest.dark.hex}}"

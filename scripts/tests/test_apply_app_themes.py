@@ -134,17 +134,25 @@ def test_herdr_snippet(sandbox):
     snippet = tomllib.loads((home / ".config/afloat/app-themes/herdr-theme.toml").read_text())
     custom = snippet["theme"]["custom"]
     assert custom["accent"] == custom["blue"]
-    assert len({custom["red"], custom["green"], custom["yellow"], custom["blue"]}) == 4
+    assert len({custom["red"], custom["green"], custom["yellow"], custom["blue"],
+                custom["mauve"], custom["teal"], custom["peach"]}) == 7
     assert custom["light"]["text"] == "#4c4f69", custom["light"]
     assert custom["dark"]["text"] == "#cdd6f4", custom["dark"]
     assert custom["light"]["panel_bg"] == "reset"
     assert custom["dark"]["sidebar_bg"] == "reset"
-    # 选中行/光标行对齐 kitty 非活动 tab 色；活动边框（accent）取 color8=primary，
+    # 选中行/光标行对齐 kitty 非活动 tab 色；活动边框（accent）取 primary，
     # 与行解耦（Herdr 里边框和顶部 tab 共用 accent，行是独立键）。
     assert custom["light"]["active_row_bg"] == custom["light"]["selection_bg"]
     assert custom["light"]["accent"] == custom["accent"]
     assert custom["light"]["accent"] != custom["light"]["active_row_bg"]
     assert custom["dark"]["active_row_bg"] == custom["dark"]["selection_bg"]
+    # 表面阶梯与次级文字按明暗一次写全，阶梯单调、不与正文重合。
+    for mode in ("light", "dark"):
+        sub = custom[mode]
+        assert sub["subtext0"] != sub["text"]
+        ladder = [sub["surface_dim"], sub["surface0"], sub["surface1"],
+                  sub["overlay0"], sub["overlay1"]]
+        assert len(set(ladder)) == 5, (mode, ladder)
 
 
 def test_terminal_clear_text_on_by_default(sandbox):
