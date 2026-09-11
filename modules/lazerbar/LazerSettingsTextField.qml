@@ -129,16 +129,17 @@ FocusScope {
     // caret plus falling-ghost feedback for deleted characters.
     OsuTextField {
         id: editor
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.right: parent.right
+        anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         clip: true
-        leftPadding: 12
-        rightPadding: 12
-        horizontalAlignment: TextInput.AlignLeft
         enabled: root.effectiveEnabled
         color: LazerTheme.textPrimary
         selectionColor: LazerTheme.osuPink
         font.pixelSize: 13
+        horizontalAlignment: TextInput.AlignLeft
         onAccepted: root.commit()
         onActiveFocusChanged: {
             if (!activeFocus) {
@@ -152,8 +153,7 @@ FocusScope {
     }
 
     Text {
-        anchors.left: parent.left
-        anchors.leftMargin: editor.leftPadding
+        anchors.left: editor.left
         anchors.verticalCenter: editor.verticalCenter
         visible: !editor.text && !editor.activeFocus
         text: root.placeholderText

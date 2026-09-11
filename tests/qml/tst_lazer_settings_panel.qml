@@ -195,9 +195,7 @@ Item {
             compare(panel.appearancePage.wallpaperRow.labelTextItem.color, Lazer.LazerTheme.settingsNavInactive)
             compare(panel.appearancePage.wallpaperField.width, panel.appearancePage.wallpaperRow.contentItem.width)
             compare(panel.appearancePage.sunriseField.width, panel.appearancePage.sunriseRow.contentItem.width)
-            compare(panel.appearancePage.wallpaperField.editorItem.horizontalAlignment, Text.AlignLeft)
-            compare(panel.appearancePage.wallpaperField.editorItem.leftPadding, 12)
-            compare(panel.appearancePage.wallpaperField.editorItem.rightPadding, 12)
+            compare(panel.appearancePage.wallpaperField.editorItem.horizontalAlignment, TextInput.AlignLeft)
         }
 
         function test_schemePickersKeepTitlesAboveTheirSharedSurface() {
