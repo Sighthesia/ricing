@@ -130,9 +130,9 @@ FocusScope {
     OsuTextField {
         id: editor
         anchors.left: parent.left
-        anchors.leftMargin: 12
+        anchors.leftMargin: 0
         anchors.right: parent.right
-        anchors.rightMargin: 12
+        anchors.rightMargin: 0
         anchors.verticalCenter: parent.verticalCenter
         clip: true
         enabled: root.effectiveEnabled
