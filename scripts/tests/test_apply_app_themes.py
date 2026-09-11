@@ -139,9 +139,10 @@ def test_herdr_snippet(sandbox):
     assert custom["dark"]["text"] == "#cdd6f4", custom["dark"]
     assert custom["light"]["panel_bg"] == "reset"
     assert custom["dark"]["sidebar_bg"] == "reset"
-    # 选中行与顶部选中 tab 同色（accent）。
-    assert custom["light"]["active_row_bg"] == custom["accent"]
-    assert custom["light"]["selection_bg"] == custom["accent"]
+    # 选中行/光标行/顶部 tab 全部对齐 kitty 非活动 tab 色（surface_container_high）。
+    assert custom["light"]["active_row_bg"] == custom["light"]["selection_bg"]
+    assert custom["light"]["accent"] == custom["light"]["active_row_bg"]
+    assert custom["dark"]["active_row_bg"] == custom["dark"]["selection_bg"]
 
 
 def test_terminal_clear_text_on_by_default(sandbox):
@@ -208,7 +209,7 @@ def _slot(content, name):
     return match.group(1).lower()
 
 
-def test_kitty_greys_track_modes(sandbox):
+def test_kitty_color8_tracks_color12(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"
     assert run_apply(palette, "dark", home).returncode == 0
@@ -219,7 +220,10 @@ def test_kitty_greys_track_modes(sandbox):
     # Black slot is a true dark distinct from the background in both modes.
     assert _slot(dark, "color0") != _slot(dark, "background")
     assert _slot(light, "color0") != _slot(light, "background")
-    # Bright-black stays apart from the foreground in both modes.
+    # User override: bright-black tracks bright-blue (primary) in both modes.
+    assert _slot(dark, "color8") == _slot(dark, "color12")
+    assert _slot(light, "color8") == _slot(light, "color12")
+    # ...while staying apart from the foreground in both modes.
     assert _slot(dark, "color8") != _slot(dark, "foreground")
     assert _slot(light, "color8") != _slot(light, "foreground")
 

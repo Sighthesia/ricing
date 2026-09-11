@@ -19,14 +19,15 @@ blue = "{{colors.primary.default.hex}}"
 text = "{{colors.on_surface.light.hex}}"
 panel_bg = "reset"
 sidebar_bg = "reset"
-# 与顶部选中 tab 同色（accent）：用户明确要求对齐 tab 底色。注意 tab 选中态配自动
-# 反白字，行内字不会反白，此处深色字对比约 3.5、大字可用，小字偏肉。
-active_row_bg = "{{colors.primary.light.hex}}"
-selection_bg = "{{colors.primary.light.hex}}"
+# 与 kitty 非活动 tab 同色（surface_container_high）：spaces/agents 选中行、光标行、
+# 顶部选中 tab（accent）全部对齐到该色。tab 选中态配自动反白字，无需担心对比。
+accent = "{{colors.surface_container_high.light.hex}}"
+active_row_bg = "{{colors.surface_container_high.light.hex}}"
+selection_bg = "{{colors.surface_container_high.light.hex}}"
 
 [theme.custom.dark]
 text = "{{colors.on_surface.dark.hex}}"
 panel_bg = "reset"
 sidebar_bg = "reset"
-active_row_bg = "{{colors.primary_container.dark.hex}}"
-selection_bg = "{{colors.secondary_container.dark.hex}}"
+active_row_bg = "{{colors.surface_container_high.dark.hex}}"
+selection_bg = "{{colors.surface_container_high.dark.hex}}"
