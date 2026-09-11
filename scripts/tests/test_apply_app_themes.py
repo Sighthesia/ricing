@@ -186,3 +186,15 @@ def test_kitty_greys_track_modes(sandbox):
     # Bright-black stays apart from the foreground in both modes.
     assert _slot(dark, "color8") != _slot(dark, "foreground")
     assert _slot(light, "color8") != _slot(light, "foreground")
+
+
+def test_kitty_accents_are_distinct(sandbox):
+    tmp, palette = sandbox
+    home = tmp / "home"
+    assert run_apply(palette, "dark", home).returncode == 0
+    dark = (home / ".config/kitty/kitty-colors.conf").read_text()
+    assert run_apply(palette, "light", home).returncode == 0
+    light = (home / ".config/kitty/kitty-colors.conf").read_text()
+    for content in (dark, light):
+        accents = {_slot(content, f"color{i}") for i in (1, 2, 3, 4, 5, 6)}
+        assert len(accents) == 6, accents
