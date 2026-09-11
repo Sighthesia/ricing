@@ -215,7 +215,7 @@ Item {
     }
 
     // Flash the track once when a user action lands on a new discrete step.
-    // White wash in both schemes so the tick reads as brightening; the
+    // Tinted wash in both schemes so the tick reads as brightening; the
     // overlay only covers the saturated fill, never the pale track.
     Rectangle {
         id: flashOverlay
