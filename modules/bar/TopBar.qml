@@ -103,13 +103,11 @@ Variants {
             margins { top: screenScope.floatingMargin; bottom: screenScope.floatingMargin; left: screenScope.floatingMargin; right: screenScope.floatingMargin }
 
             // Paint the continuous sharp bar silhouette behind every widget.
-            // Opaque like kitty's `background` (same mSurface token): any
-            // translucency lets the wallpaper bleed in and drift off kitty.
             Rectangle {
                 anchors.fill: parent
                 radius: 0
                 color: Services.SettingsService.effectiveColorScheme === "light" ? LazerTheme.bgLight : LazerTheme.bgDark
-                opacity: 1
+                opacity: Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity))
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }

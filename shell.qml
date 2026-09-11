@@ -13,10 +13,10 @@ ShellRoot {
     Component.onCompleted: {
         LazerBar.LazerTheme.settingsService = Services.SettingsService
         LazerBar.LazerTheme.colorService = Services.Color
-        // QML singletons are lazily instantiated: touching the service here
-        // is what actually brings the app-theme sync (and its Connections)
-        // to life — nothing else references it.
-        Services.AppThemeService
+        // QML singletons are lazily instantiated and an unused bare
+        // reference can be dropped: run the sync service's entry point
+        // explicitly so the instance (and its Connections) come to life.
+        Services.AppThemeService.apply()
     }
 
     LazerBar.WallpaperBackground {}

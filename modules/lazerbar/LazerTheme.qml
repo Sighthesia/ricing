@@ -86,7 +86,7 @@ QtObject {
     // light brightens the accent toward its own luminous tint so the hue
     // survives like the dark glow does — pure white chalks saturated fills.
     readonly property color flashWash: !adapt || !colorService ? textPrimary
-        : (lightScheme ? Qt.lighter(colorService.mPrimary, 1.65) : textPrimary)
+        : (lightScheme ? Qt.lighter(colorService.mPrimary, 2) : textPrimary)
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"
