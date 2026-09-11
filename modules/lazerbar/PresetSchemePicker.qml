@@ -26,6 +26,7 @@ Item {
         id: background
         z: -1
         anchors.fill: parent
+        anchors.bottomMargin: listGap
         radius: 6
         color: LazerTheme.settingsCard
     }
@@ -33,8 +34,9 @@ Item {
     implicitWidth: 400
     width: parent ? parent.width : implicitWidth
     readonly property real bottomPadding: 12
+    readonly property real listGap: 8
     readonly property real titleBandHeight: 10 + titleText.height + 2 + descriptionText.height + 6
-    implicitHeight: grid.y + grid.height + bottomPadding
+    implicitHeight: grid.y + grid.height + bottomPadding + listGap
     height: searchHidden ? 0 : implicitHeight
     visible: !searchHidden || opacity > 0.01
     opacity: searchHidden ? 0 : 1

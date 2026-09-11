@@ -206,6 +206,8 @@ Item {
             verify(templates.gridItem.y >= templates.titleItem.y + templates.titleItem.height + 7.9)
             compare(Math.round(templates.backgroundItem.height - (templates.gridItem.y + templates.gridItem.height)),
                     templates.bottomPadding)
+            compare(Math.round(templates.height - templates.backgroundItem.height), templates.listGap)
+            compare(Math.round(preset.height - preset.backgroundItem.height), preset.listGap)
         }
 
         function test_sidebarActionsUseCompactFullWidthGeometry() {

@@ -23,8 +23,9 @@ Item {
     implicitWidth: 400
     width: parent ? parent.width : implicitWidth
     readonly property real bottomPadding: 12
+    readonly property real listGap: 8
     readonly property real titleBandHeight: 10 + titleText.height + 8
-    implicitHeight: grid.y + grid.height + bottomPadding
+    implicitHeight: grid.y + grid.height + bottomPadding + listGap
     // Collapse like a search-hidden row so the section frees the space.
     height: searchHidden ? 0 : implicitHeight
     visible: !searchHidden || opacity > 0.01
@@ -60,6 +61,7 @@ Item {
         id: background
         z: -1
         anchors.fill: parent
+        anchors.bottomMargin: listGap
         radius: 6
         color: LazerTheme.settingsCard
     }
