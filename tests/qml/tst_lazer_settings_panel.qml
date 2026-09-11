@@ -200,8 +200,8 @@ Item {
         function test_schemePickersKeepTitlesAboveTheirSharedSurface() {
             var preset = panel.appearancePage.presetSchemePicker
             var templates = panel.appearancePage.themeSchemePicker
-            compare(preset.backgroundItem.color, Lazer.LazerTheme.settingsSection)
-            compare(templates.backgroundItem.color, Lazer.LazerTheme.settingsSection)
+            compare(preset.backgroundItem.color, Lazer.LazerTheme.settingsCard)
+            compare(templates.backgroundItem.color, Lazer.LazerTheme.settingsCard)
             verify(preset.gridItem.y >= preset.descriptionItem.y + preset.descriptionItem.height + 5.9)
             verify(templates.gridItem.y >= templates.titleItem.y + templates.titleItem.height + 7.9)
         }

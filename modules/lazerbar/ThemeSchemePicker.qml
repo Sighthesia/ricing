@@ -22,8 +22,8 @@ Item {
 
     implicitWidth: 400
     width: parent ? parent.width : implicitWidth
-    readonly property real titleBandHeight: titleText.height + 8
-    implicitHeight: titleBandHeight + grid.height + 14
+    readonly property real titleBandHeight: 10 + titleText.height + 8
+    implicitHeight: titleBandHeight + grid.height + 12
     // Collapse like a search-hidden row so the section frees the space.
     height: searchHidden ? 0 : implicitHeight
     visible: !searchHidden || opacity > 0.01
@@ -53,12 +53,14 @@ Item {
     // Card delegates in display order, exposed for tests and diagnostics.
     readonly property alias schemeCards: grid.children
 
-    // Keep the picker title and scheme cards on one square appearance surface.
+    // Seat the picker title and scheme cards on one row-style card so the
+    // whole template block reads as a single surface on the section.
     Rectangle {
         id: background
         z: -1
         anchors.fill: parent
-        color: LazerTheme.settingsSection
+        radius: 6
+        color: LazerTheme.settingsCard
     }
 
     readonly property Item backgroundItem: background
@@ -109,6 +111,7 @@ Item {
         anchors.left: parent.left
         anchors.leftMargin: 12
         anchors.top: parent.top
+        anchors.topMargin: 10
         text: "主题模板"
         color: LazerTheme.textMuted
         font.pixelSize: 11
@@ -117,7 +120,9 @@ Item {
     Grid {
         id: grid
         anchors.left: parent.left
+        anchors.leftMargin: 12
         anchors.right: parent.right
+        anchors.rightMargin: 12
         anchors.top: titleText.bottom
         anchors.topMargin: 8
         columns: 4
