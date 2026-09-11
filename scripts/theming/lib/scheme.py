@@ -269,8 +269,11 @@ def expand_predefined_scheme(scheme_data: dict[str, str], mode: ThemeMode) -> di
     on_background = on_surface
 
     return {
-        # Primary
+        # Primary. surface_tint mirrors primary per MD3 (upstream palettes
+        # carry mSurfaceTint; templates like yazi reference the token).
         "primary": primary.to_hex(),
+        "surface_tint": scheme_data.get(
+            "mSurfaceTint", scheme_data.get("surface_tint", primary.to_hex())),
         "on_primary": on_primary.to_hex(),
         "primary_container": primary_container.to_hex(),
         "on_primary_container": on_primary_container.to_hex(),

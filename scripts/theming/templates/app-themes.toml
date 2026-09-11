@@ -21,3 +21,72 @@ output_path = "~/.config/qt5ct/colors/Afloat.conf"
 [templates.qt6ct]
 input_path = "./qtct-colors.conf"
 output_path = "~/.config/qt6ct/colors/Afloat.conf"
+
+# Compositor: niri merges top-level includes; add once to config.kdl:
+#   include "~/dotfiles path.../afloat-colors.kdl" (or the absolute path below)
+[templates.niri]
+input_path = "./niri-colors.kdl"
+output_path = "~/.config/niri/afloat-colors.kdl"
+
+# Terminals.
+[templates.foot]
+input_path = "./foot-colors.ini"
+output_path = "~/.config/foot/colors.ini"
+
+[templates.alacritty]
+input_path = "./alacritty.toml"
+output_path = "~/.config/alacritty/Afloat.toml"
+
+# System monitors / file managers / visualizers.
+[templates.btop]
+input_path = "./btop.theme"
+output_path = "~/.config/btop/themes/Afloat.theme"
+
+[templates.yazi]
+input_path = "./yazi-theme.toml"
+output_path = "~/.config/yazi/theme.toml"
+
+[templates.cava]
+input_path = "./cava-colors.ini"
+output_path = "~/.config/cava/config"
+
+# Editors / prompts / multiplexers / pagers.
+[templates.helix]
+input_path = "./helix.toml"
+output_path = "~/.config/helix/themes/Afloat.toml"
+
+[templates.zed]
+input_path = "./zed-colors.json"
+output_path = "~/.local/share/zed/themes/Afloat.json"
+
+[templates.vscode]
+input_path = "./vscode-colors.json"
+output_path = "~/.config/Code/User/Afloat-color-theme.json"
+
+[templates.starship]
+input_path = "./starship-colors.toml"
+output_path = "~/.config/starship-Afloat.toml"
+
+[templates.tmux]
+input_path = "./tmux-colors.conf"
+output_path = "~/.config/tmux/Afloat-colors.conf"
+
+[templates.zathura]
+input_path = "./zathura-colors"
+output_path = "~/.config/zathura/Afloat-colors"
+
+# Launchers.
+[templates.rofi]
+input_path = "./rofi-colors.rasi"
+output_path = "~/.config/rofi/Afloat-colors.rasi"
+
+[templates.fuzzel]
+input_path = "./fuzzel.ini"
+output_path = "~/.config/fuzzel/Afloat.ini"
+
+# Firefox: generation only. To use it, enable
+# toolkit.legacyUserProfileCustomizations.stylesheets and import this file
+# from a profile's chrome/userChrome.css.
+[templates.firefox]
+input_path = "./firefox-colors.css"
+output_path = "~/.config/afloat/app-themes/firefox-colors.css"
