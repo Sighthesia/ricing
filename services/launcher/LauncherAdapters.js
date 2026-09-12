@@ -269,14 +269,22 @@ function clipboardItem(raw) {
     var mime = raw.mime == null ? "text/plain" : String(raw.mime)
     var seenMs = toCount(raw.firstSeenMs)
     var imageMeta = isImage ? parseClipboardImageMeta(preview) : null
+    var metadataReady = raw.metadataReady === true
     var title = isImage
-                 ? (imageMeta ? "[Image] " + imageMeta.width + "x" + imageMeta.height : "[Image]")
+                 ? (metadataReady && Number(raw.imageWidth) > 0 && Number(raw.imageHeight) > 0
+                    ? "[Image] " + Number(raw.imageWidth) + "x" + Number(raw.imageHeight)
+                    : imageMeta ? "[Image] " + imageMeta.width + "x" + imageMeta.height : "[Image]")
                  : (normalizeText(preview).length ? preview : "(empty)")
     var description = mime
-    if (imageMeta)
-        description += " | " + imageMeta.format + " | " + imageMeta.size + " bytes"
-    else if (!isImage)
-        description += " | " + (preview.length >= 100 ? "Long text" : preview.length + " characters")
+    if (isImage) {
+        if (metadataReady && raw.imageFormat && raw.imageSize)
+            description += " | " + raw.imageFormat + " | " + raw.imageSize
+        else if (imageMeta)
+            description += " | " + imageMeta.format + " | " + imageMeta.size
+    } else if (metadataReady && Number(raw.textCharCount) >= 0)
+        description += " | " + Number(raw.textCharCount) + " characters"
+    else
+        description += " | " + (preview.length >= 100 ? "counting..." : preview.length + " characters")
     var seen = timeLabel(seenMs)
     if (seen)
         description += " · copied " + seen

@@ -21,6 +21,7 @@ Singleton {
     property int revision: 0
     property int firstSeenRevision: 0
     property int firstSeenDisplayRevision: 0
+    property int metadataRevision: 0
     property var _firstSeenById: ({})
     property var _firstSeenBySignature: ({})
     property var _pendingSignatureIds: []
@@ -75,6 +76,7 @@ Singleton {
 
     signal listCompleted
     signal firstSeenUpdated(string id, real firstSeenMs)
+    signal metadataUpdated(string id)
 
     // Probe for cliphist at startup so we never attempt commands on missing tools.
     property Process _checkProc: Process {
@@ -140,6 +142,7 @@ Singleton {
                 }
                 root.items = result
                 root.revision++
+                root._startMetadataQueue()
                 if (!root._firstListLoaded) {
                     root._firstListLoaded = true
                     root._initialFirstSeenRecovery = true
@@ -179,6 +182,84 @@ Singleton {
             root._processNextFirstSeenSignature()
             root._finishInitialFirstSeenRecovery()
         }
+    }
+
+    // Resolve exact text lengths and image dimensions after the lightweight
+    // cliphist list has reached the UI. This keeps first paint independent of
+    // per-entry decoding while making metadata authoritative when it lands.
+    property var _metadataQueue: []
+    property bool _metadataBusy: false
+    property Process _metadataProc: Process {
+        id: metadataProc
+        command: []
+        running: false
+        property var job: null
+        stdout: StdioCollector {}
+        onExited: exitCode => {
+            var completed = job
+            var output = stdout.text.trim()
+            job = null
+            root._metadataBusy = false
+            if (completed && exitCode === 0) {
+                var target = null
+                for (var index = 0; index < root.items.length; index++) {
+                    if (String(root.items[index].id) === completed.id) {
+                        target = root.items[index]
+                        break
+                    }
+                }
+                if (target) {
+                    if (completed.isImage) {
+                        var parts = output.split("|")
+                        if (parts.length >= 4) {
+                            target.imageFormat = parts[0]
+                            target.imageWidth = Number(parts[1])
+                            target.imageHeight = Number(parts[2])
+                            target.imageSize = parts.slice(3).join("|")
+                            target.metadataReady = true
+                        }
+                    } else if (/^\d+$/.test(output)) {
+                        target.textCharCount = Number(output)
+                        target.metadataReady = true
+                    }
+                    if (target.metadataReady) {
+                        root.metadataRevision++
+                        root.metadataUpdated(String(target.id))
+                    }
+                }
+            }
+            root._pumpMetadataQueue()
+        }
+    }
+
+    function _startMetadataQueue() {
+        root._metadataQueue = []
+        for (var index = 0; index < root.items.length; index++) {
+            var item = root.items[index]
+            item.metadataReady = false
+            root._metadataQueue.push({
+                id: String(item.id),
+                isImage: !!item.isImage,
+                mime: String(item.mime || "")
+            })
+        }
+        root._pumpMetadataQueue()
+    }
+
+    function _pumpMetadataQueue() {
+        if (root._metadataBusy || !root._metadataQueue.length || !root.available)
+            return
+        var job = root._metadataQueue.shift()
+        var path = "/tmp/afloat-clipboard-meta-" + job.id
+        var command = job.isImage
+                ? "cliphist decode \"$1\" > \"$2\" && identify -format '%m|%w|%h|%b' \"$2\"; status=$?; rm -f \"$2\"; exit $status"
+                : "cliphist decode \"$1\" | wc -m"
+        metadataProc.job = job
+        metadataProc.command = job.isImage
+                ? ["sh", "-c", command, "afloat-clipboard-meta", job.id, path]
+                : ["sh", "-c", command, "afloat-clipboard-meta", job.id]
+        root._metadataBusy = true
+        metadataProc.running = true
     }
     property string _currentSignatureId: ""
     property int _currentSignatureRow: -1

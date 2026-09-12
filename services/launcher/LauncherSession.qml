@@ -83,6 +83,10 @@ QtObject {
                     && LauncherLogic.parseQuery(root.query).mode === "clipboard")
                 root.refresh(true)
         }
+        function onMetadataUpdated() {
+            if (root.visible && LauncherLogic.parseQuery(root.query).mode === "clipboard")
+                root.refresh(true)
+        }
         function onPreviewDecoded(id, contentOrPath) {
             root.textPreviewDecoded(String(id == null ? "" : id),
                                     String(contentOrPath == null ? "" : contentOrPath))
