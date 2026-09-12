@@ -651,12 +651,14 @@ Item {
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
+        // Peak matches the media progress fill flash (1.8x click opacity)
+        // so the switch blink reads at the same strength.
         NumberAnimation {
             id: indicatorFlash
 
             target: indicatorFlashOverlay
             property: "opacity"
-            from: MotionTokens.clickFlashOpacity
+            from: Math.min(1, MotionTokens.clickFlashOpacity * 1.8)
             to: 0
             duration: MotionTokens.clickFlashDuration
             easing.type: MotionTokens.clickFlashEasing
