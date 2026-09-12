@@ -90,6 +90,8 @@ Item {
             svc()._adapters = ({})
             svc()._pooledMode = ""
             svc().displayPool = []
+            svc()._metadataRefreshPending = false
+            svc()._clipboardMetadataStale = false
             if (_clipboardStub) {
                 _clipboardStub.destroy()
                 _clipboardStub = null
@@ -683,6 +685,30 @@ Item {
             svc().refresh(true)
             resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0)])
             verify(svc().results !== first, "changed refresh must swap arrays")
+        }
+
+        function test_clipboardMetadataOnlyRefreshReplacesSameIdPool() {
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+            wait(0)
+            resolveRefresh(clips, 0, [{ id: "img", displayName: "[Image]" }])
+            compare(svc().results[0].displayName, "[Image]")
+            var first = svc().results
+
+            // Control: same ids with no metadata change keep the pool.
+            svc().refresh(true)
+            resolveRefresh(clips, 1, [{ id: "img", displayName: "[Image]" }])
+            verify(svc().results === first)
+
+            // Metadata arrival must bypass the id-only guard once so the new
+            // resolution/description reaches the visible rows.
+            svc()._clipboardMetadataStale = true
+            svc().refresh(true)
+            resolveRefresh(clips, 2, [{ id: "img", displayName: "[Image] 712x522" }])
+            verify(svc().results !== first)
+            compare(svc().results[0].displayName, "[Image] 712x522")
         }
 
         // --- IPC entry helpers keep their prefix behavior ---

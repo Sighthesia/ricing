@@ -64,6 +64,11 @@ QtObject {
     property bool _executionInFlight: false
     property bool _appsPrimeInFlight: false
     property bool _metadataRefreshPending: false
+    // Clipboard metadata (exact counts, image dimensions) arrives after the
+    // first paint without changing item ids or order. The pool-identity guard
+    // below must not treat that as "same content", or refreshed descriptions
+    // would never reach the visible rows.
+    property bool _clipboardMetadataStale: false
 
     // Query edits re-request data for the newly parsed mode while open;
     // closed sessions ignore edits until the next open().
@@ -85,6 +90,7 @@ QtObject {
                 root.refresh(true)
         }
         function onMetadataUpdated() {
+            root._clipboardMetadataStale = true
             if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard"
                     || root._metadataRefreshPending)
                 return
@@ -229,8 +235,9 @@ QtObject {
         // the same ordered ids, so redundant refreshes never rebuild the list.
         var sorted = LauncherLogic.sortResults(outcome || [])
         var poolStable = LauncherLogic.poolMatches(sorted, root.displayPool)
+        var forcePoolReplace = root._clipboardMetadataStale && pooledMode === "clipboard"
         var previous = root.results
-        if (!poolStable)
+        if (!poolStable || forcePoolReplace)
             root.displayPool = sorted
         // The pooled-mode marker must be restored even when the content is
         // unchanged: a clipboard-mode close clears it while the pool
@@ -243,8 +250,12 @@ QtObject {
                 : LauncherLogic.clampSelection(0, filtered.length)
         // Same array-identity guard as the pooled path: unchanged ids must
         // not reassign results or the surface replays its refill animation.
-        root.results = LauncherLogic.poolMatches(previous, filtered)
+        // Metadata-only updates bypass the guard once so new descriptions
+        // reach the rows without a full mode change.
+        root.results = (LauncherLogic.poolMatches(previous, filtered) && !forcePoolReplace)
                 ? previous : filtered
+        if (pooledMode === "clipboard")
+            root._clipboardMetadataStale = false
     }
 
     // Background revalidation for change announcers (desktop-entry rescans,
