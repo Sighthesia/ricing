@@ -479,8 +479,10 @@ BarPill {
             barColor: LazerTheme.lightScheme
                 ? Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.58)
                 : LazerTheme.accentColor
-            // The wavefront mixes bars toward the flash wash in both schemes.
+            // The wavefront mixes bars toward the flash wash in both schemes;
+            // dark softens the sweep so the 2x glow core doesn't blow out.
             waveColor: LazerTheme.flashWash
+            waveStrength: LazerTheme.lightScheme ? 1.0 : 0.55
             // One sweep per beat interval: the front hits the far edge just
             // as the next beat fires the next wave.
             waveDuration: Services.SpectrumService.bpm > 0

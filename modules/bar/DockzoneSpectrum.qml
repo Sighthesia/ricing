@@ -16,6 +16,9 @@ Item {
     // an opaque color whitens the bars toward it as the front passes, so the
     // sweep brightens instead of saturating on light backgrounds.
     property color waveColor: "#00000000"
+    // Scales the color mix toward waveColor (1.0 = full glow core); the
+    // alpha lift stays untouched so bar presence never changes with it.
+    property real waveStrength: 1.0
     // Sweep duration; callers derive it from the current BPM so a new wave
     // launches right as the previous one reaches the far edge.
     property int waveDuration: MotionTokens.beatWave
@@ -84,7 +87,7 @@ Item {
             // Transparent waveColor preserves the legacy alpha-only boost;
             // otherwise the front mixes the bar toward waveColor (brighten).
             color: {
-                var boost = Math.min(1, waveBoost)
+                var boost = Math.max(0, Math.min(1, waveBoost * root.waveStrength))
                 if (root.waveColor.a <= 0 || boost <= 0)
                     return Qt.rgba(root.barColor.r, root.barColor.g, root.barColor.b,
                         Math.min(1, root.barColor.a * emphasis + waveBoost * 0.85))
