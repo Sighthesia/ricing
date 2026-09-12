@@ -352,6 +352,22 @@ Item {
             compare(count, 1)
         }
 
+        function test_identicalCommitReleasesRowsWithoutReplayingWave() {
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0)
+            ])
+            // First commit claims the fresh rows and records their ids.
+            tryVerify(function() { return page._lastRowIds.length === 2 }, 1000)
+            // Committing the identical set again (metadata-only refreshes,
+            // identical background polls) must release instantly: a replayed
+            // stagger would hold the rows and disable them for its slots.
+            page._holdAndScheduleReleases()
+            verify(page.resultAt(0).enabled)
+            verify(page.resultAt(1).enabled)
+            compare(page._lastRowIds.length, 2)
+        }
+
         // --- empty state ---
 
         function test_emptyStateShowsWithoutDroppingSearchFocus() {

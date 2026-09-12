@@ -133,6 +133,9 @@ Item {
             // slip through unreleased.
             root._scheduleRowsCommit()
         }
+        function onClipboardMetadataMerged() {
+            root._clipMetaRev++
+        }
         function onErrorChanged() {
             if (!root.session || !root.session.error)
                 return
@@ -404,11 +407,28 @@ Item {
     // built set through the wave (first fill after open) or the lighter
     // cascade. Surviving rows are left untouched so a query edit that keeps
     // a row visible and in place never folds it shut and re-reveals it.
+    // Same-id commits (metadata-only refreshes, identical background polls)
+    // release instantly: replaying a stagger over an unchanged list reads as
+    // the entrance animation firing again. Very large first fills also skip
+    // the wave so the list stays scrollable instead of holding every row
+    // through a seconds-long stagger.
+    readonly property int largeListWaveThreshold: 24
+    property var _lastRowIds: []
+    function _releaseAllRowsInstantly() {
+        var children = resultsColumn.children
+        for (var i = 0; i < children.length; i++) {
+            if (children[i].releaseInstantly !== undefined)
+                children[i].releaseInstantly()
+        }
+    }
     function _holdAndScheduleReleases() {
         var children = resultsColumn.children
         var claimedFresh = false
+        var ids = []
         for (var h = 0; h < children.length; h++) {
             var row = children[h]
+            if (row.result)
+                ids.push(String(row.result.id))
             if (row.freshFromBuild === true) {
                 row.freshFromBuild = false
                 if (row.holdInstantly !== undefined)
@@ -416,11 +436,28 @@ Item {
                 claimedFresh = true
             }
         }
+        var sameIds = ids.length === root._lastRowIds.length
+        if (sameIds) {
+            for (var c = 0; c < ids.length; c++) {
+                if (ids[c] !== root._lastRowIds[c]) {
+                    sameIds = false
+                    break
+                }
+            }
+        }
+        root._lastRowIds = ids
+        if (sameIds) {
+            root._releaseAllRowsInstantly()
+            return
+        }
         if (resultsView.resultCount <= 0)
             return
         if (root._firstFillPending) {
             root._firstFillPending = false
-            root.playEntranceWave()
+            if (resultsView.resultCount > root.largeListWaveThreshold)
+                root._releaseAllRowsInstantly()
+            else
+                root.playEntranceWave()
         } else if (claimedFresh) {
             root.playRefillCascade()
         }
@@ -545,6 +582,11 @@ Item {
     readonly property var _thumbPaths: ({})
     readonly property var _thumbRequests: ({})
     property int _thumbRev: 0
+    // Bumped whenever the session merges clipboard metadata into the live
+    // pool in place. Rows and the preview footer read it so merged display
+    // fields repaint without replacing the pooled arrays (which would
+    // rebuild every delegate and replay the refill cascade).
+    property int _clipMetaRev: 0
     function clipThumbPath(item) {
         if (!item || !item.isImage)
             return ""
@@ -803,8 +845,15 @@ Item {
                 anchors.right: parent.right
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                text: previewPane.selectedResult
-                      ? (previewPane.selectedResult.description || "") : ""
+                text: {
+                    var selected = previewPane.selectedResult
+                    // Load-bearing read: in-place metadata merges mutate the
+                    // kept row object, so the revision must be referenced or
+                    // this binding never re-runs when merged text lands.
+                    var metaRev = root._clipMetaRev
+                    return selected && metaRev >= 0
+                            ? (selected.description || "") : ""
+                }
                 textFormat: Text.PlainText
                 elide: Text.ElideRight
                 color: LazerTheme.textMuted
@@ -1080,6 +1129,7 @@ Item {
                     Component.onCompleted: root.requestClipThumb(modelData)
                     onModelDataChanged: root.requestClipThumb(modelData)
                     thumbPath: root._thumbRev >= 0 ? root.clipThumbPath(modelData) : ""
+                    metaStamp: root._clipMetaRev
                     searchQuery: root.activeSearchText
                     selected: {
                         if (!root.session || !root.session.results || root.session.selectedIndex < 0)

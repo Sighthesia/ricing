@@ -65,10 +65,11 @@ QtObject {
     property bool _appsPrimeInFlight: false
     property bool _metadataRefreshPending: false
     // Clipboard metadata (exact counts, image dimensions) arrives after the
-    // first paint without changing item ids or order. The pool-identity guard
-    // below must not treat that as "same content", or refreshed descriptions
-    // would never reach the visible rows.
-    property bool _clipboardMetadataStale: false
+    // first paint without changing item ids or order. Merging it into the
+    // live pool must not replace the pooled arrays: a swap rebuilds every
+    // delegate and replays the refill cascade, which reads as stutter while
+    // the batch lands entry by entry.
+    signal clipboardMetadataMerged()
 
     // Query edits re-request data for the newly parsed mode while open;
     // closed sessions ignore edits until the next open().
@@ -90,21 +91,57 @@ QtObject {
                 root.refresh(true)
         }
         function onMetadataUpdated() {
-            root._clipboardMetadataStale = true
             if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard"
                     || root._metadataRefreshPending)
                 return
             root._metadataRefreshPending = true
             Qt.callLater(function() {
                 root._metadataRefreshPending = false
-                if (root.visible && LauncherLogic.parseQuery(root.query).mode === "clipboard")
-                    root.refresh(true)
+                root._mergeClipboardMetadata()
             })
         }
         function onPreviewDecoded(id, contentOrPath) {
             root.textPreviewDecoded(String(id == null ? "" : id),
                                     String(contentOrPath == null ? "" : contentOrPath))
         }
+    }
+
+    // Merge freshly resolved clipboard metadata into the live pool without
+    // replacing it: display fields are copied onto the kept row objects (the
+    // surface re-reads them through its metadata revision) while array and
+    // object identity stay intact, so no delegate is rebuilt and no cascade
+    // replays. Entries that vanished or reordered fall through to the normal
+    // refresh path on the next list poll.
+    function _mergeClipboardMetadata() {
+        if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard")
+            return
+        var adapter = _adapterFor("clipboard")
+        adapter.refresh("", "clipboard", function(outcome) {
+            if (!outcome || !Array.isArray(outcome) || !root.displayPool.length)
+                return
+            var keptById = ({})
+            for (var keptIndex = 0; keptIndex < root.displayPool.length; keptIndex++) {
+                var kept = root.displayPool[keptIndex]
+                if (kept)
+                    keptById[String(kept.id)] = kept
+            }
+            var merged = false
+            for (var freshIndex = 0; freshIndex < outcome.length; freshIndex++) {
+                var fresh = outcome[freshIndex]
+                if (!fresh)
+                    continue
+                var target = keptById[String(fresh.id)]
+                if (!target)
+                    continue
+                target.displayName = fresh.displayName
+                target.description = fresh.description
+                target.searchText = fresh.searchText
+                target.icon = fresh.icon
+                merged = true
+            }
+            if (merged)
+                root.clipboardMetadataMerged()
+        })
     }
 
     function open() {
@@ -235,9 +272,8 @@ QtObject {
         // the same ordered ids, so redundant refreshes never rebuild the list.
         var sorted = LauncherLogic.sortResults(outcome || [])
         var poolStable = LauncherLogic.poolMatches(sorted, root.displayPool)
-        var forcePoolReplace = root._clipboardMetadataStale && pooledMode === "clipboard"
         var previous = root.results
-        if (!poolStable || forcePoolReplace)
+        if (!poolStable)
             root.displayPool = sorted
         // The pooled-mode marker must be restored even when the content is
         // unchanged: a clipboard-mode close clears it while the pool
@@ -250,12 +286,8 @@ QtObject {
                 : LauncherLogic.clampSelection(0, filtered.length)
         // Same array-identity guard as the pooled path: unchanged ids must
         // not reassign results or the surface replays its refill animation.
-        // Metadata-only updates bypass the guard once so new descriptions
-        // reach the rows without a full mode change.
-        root.results = (LauncherLogic.poolMatches(previous, filtered) && !forcePoolReplace)
+        root.results = LauncherLogic.poolMatches(previous, filtered)
                 ? previous : filtered
-        if (pooledMode === "clipboard")
-            root._clipboardMetadataStale = false
     }
 
     // Background revalidation for change announcers (desktop-entry rescans,

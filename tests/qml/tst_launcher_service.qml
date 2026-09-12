@@ -23,6 +23,7 @@ Item {
         QtObject {
             property var requests: []
             signal previewDecoded(string id, string contentOrPath)
+            signal metadataUpdated(string id)
             function requestPreview(id, isImage) {
                 requests.push({ id: id, isImage: isImage })
             }
@@ -91,7 +92,6 @@ Item {
             svc()._pooledMode = ""
             svc().displayPool = []
             svc()._metadataRefreshPending = false
-            svc()._clipboardMetadataStale = false
             if (_clipboardStub) {
                 _clipboardStub.destroy()
                 _clipboardStub = null
@@ -687,7 +687,9 @@ Item {
             verify(svc().results !== first, "changed refresh must swap arrays")
         }
 
-        function test_clipboardMetadataOnlyRefreshReplacesSameIdPool() {
+        function test_clipboardMetadataMergeUpdatesRowsWithoutReplacingPool() {
+            _clipboardStub = clipboardStubComponent.createObject(null)
+            svc().clipboardService = _clipboardStub
             var clips = makeManualAdapter()
             svc()._adapters = { clipboard: clips }
 
@@ -696,19 +698,17 @@ Item {
             resolveRefresh(clips, 0, [{ id: "img", displayName: "[Image]" }])
             compare(svc().results[0].displayName, "[Image]")
             var first = svc().results
+            var merged = []
+            svc().clipboardMetadataMerged.connect(function() { merged.push(1) })
 
-            // Control: same ids with no metadata change keep the pool.
-            svc().refresh(true)
-            resolveRefresh(clips, 1, [{ id: "img", displayName: "[Image]" }])
+            // Metadata landing must merge into the kept row objects instead
+            // of swapping the pool: same array identity, fresh text.
+            _clipboardStub.metadataUpdated("img")
+            wait(0)
+            resolveRefresh(clips, 1, [{ id: "img", displayName: "[Image] 712x522" }])
             verify(svc().results === first)
-
-            // Metadata arrival must bypass the id-only guard once so the new
-            // resolution/description reaches the visible rows.
-            svc()._clipboardMetadataStale = true
-            svc().refresh(true)
-            resolveRefresh(clips, 2, [{ id: "img", displayName: "[Image] 712x522" }])
-            verify(svc().results !== first)
             compare(svc().results[0].displayName, "[Image] 712x522")
+            compare(merged.length, 1)
         }
 
         // --- IPC entry helpers keep their prefix behavior ---

@@ -20,14 +20,24 @@ Item {
     readonly property bool matchesSearch: LauncherLogic.resultMatches(result, searchQuery)
     readonly property bool searchHidden: !matchesSearch
 
-    readonly property string displayName: result && result.displayName != null ? String(result.displayName) : ""
-    readonly property string descriptionText: result && result.description != null ? String(result.description) : ""
     readonly property string iconSource: result && result.icon ? String(result.icon) : ""
 
     // Clipboard image entries show a page-provided decoded thumbnail in
     // place of the app-icon slot; decoding and caching live on the page.
     readonly property bool isClipboardImage: !!result && result.isImage === true
     property string thumbPath: ""
+    // Revision stamp from the owning page; read by the display bindings so
+    // in-place metadata merges repaint the row without rebuilding it.
+    property int metaStamp: 0
+
+    readonly property string displayName: {
+        metaStamp
+        return result && result.displayName != null ? String(result.displayName) : ""
+    }
+    readonly property string descriptionText: {
+        metaStamp
+        return result && result.description != null ? String(result.description) : ""
+    }
 
     readonly property real rowHeight: 64
     implicitWidth: 480
