@@ -110,8 +110,8 @@ BarPill {
         anchors.top: bluetoothIcon.bottom
         anchors.topMargin: 4
         width: LazerTheme.barWidgetHeight - 16
-        height: 3
-        radius: 1.5
+        height: LazerTheme.barIndicatorHeight
+        radius: LazerTheme.barIndicatorRadius
         color: Qt.rgba(1, 1, 1, 0.14)
         clip: true
 
@@ -120,7 +120,7 @@ BarPill {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: root.adapterEnabled ? parent.width : 0
-            radius: 1.5
+            radius: LazerTheme.barIndicatorRadius
             color: root.connectedCount > 0 ? LazerTheme.osuGreen : LazerTheme.accentColor
 
             Behavior on width {

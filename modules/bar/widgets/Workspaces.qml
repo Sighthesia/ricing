@@ -630,8 +630,8 @@ Item {
         id: activeIndicator
 
         width: root._edgeSpan
-        height: 3
-        radius: 1.5
+        height: LazerTheme.barIndicatorHeight
+        radius: LazerTheme.barIndicatorRadius
         color: LazerTheme.osuGreen
         visible: root.indicatorVisible
         x: root._edgeRectLeft

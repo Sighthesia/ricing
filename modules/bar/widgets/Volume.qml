@@ -95,8 +95,8 @@ BarPill {
         anchors.top: volumeIcon.bottom
         anchors.topMargin: 4
         width: LazerTheme.barWidgetHeight - 16
-        height: 3
-        radius: 1.5
+        height: LazerTheme.barIndicatorHeight
+        radius: LazerTheme.barIndicatorRadius
         color: Qt.rgba(1, 1, 1, 0.14)
         clip: true
 
@@ -105,7 +105,7 @@ BarPill {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: parent.width * root.level
-            radius: 1.5
+            radius: LazerTheme.barIndicatorRadius
             color: root.muted ? Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.35) : LazerTheme.accentColor
 
             Behavior on width {

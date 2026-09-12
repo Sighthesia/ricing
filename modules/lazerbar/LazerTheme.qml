@@ -168,6 +168,8 @@ QtObject {
         Math.max(40, Math.min(64, barHeightSetting))
     readonly property int barWidgetHeight: barLiveHeight - barWidgetGutter * 2
     readonly property int barGlyphSize: Math.max(16, Math.round(barLiveHeight * 0.5))
+    readonly property real barIndicatorHeight: 3
+    readonly property real barIndicatorRadius: barIndicatorHeight / 2
 
     // osu Nub and outlined control tokens shared by settings controls.
     readonly property real nubBorder: 3

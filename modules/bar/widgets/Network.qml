@@ -111,8 +111,8 @@ BarPill {
         anchors.top: networkIcon.bottom
         anchors.topMargin: 4
         width: LazerTheme.barWidgetHeight - 16
-        height: 3
-        radius: 1.5
+        height: LazerTheme.barIndicatorHeight
+        radius: LazerTheme.barIndicatorRadius
         color: Qt.rgba(1, 1, 1, 0.14)
         clip: true
 
@@ -121,7 +121,7 @@ BarPill {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: root.connecting && !root.ethernetConnected ? parent.width : parent.width * root.level
-            radius: 1.5
+            radius: LazerTheme.barIndicatorRadius
             color: root.connecting && !root.ethernetConnected ? LazerTheme.textMuted : LazerTheme.accentColor
 
             Behavior on width {

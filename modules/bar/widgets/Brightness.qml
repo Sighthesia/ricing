@@ -93,8 +93,8 @@ Item {
         anchors.top: brightnessIcon.bottom
         anchors.topMargin: 4
         width: LazerTheme.barWidgetHeight - 16
-        height: 3
-        radius: 1.5
+        height: LazerTheme.barIndicatorHeight
+        radius: LazerTheme.barIndicatorRadius
         color: Qt.rgba(1, 1, 1, 0.14)
         clip: true
 
@@ -103,7 +103,7 @@ Item {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: parent.width * root.level
-            radius: 1.5
+            radius: LazerTheme.barIndicatorRadius
             color: LazerTheme.accentColor
 
             Behavior on width {
