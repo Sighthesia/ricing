@@ -63,6 +63,7 @@ QtObject {
     property int _refreshToken: 0
     property bool _executionInFlight: false
     property bool _appsPrimeInFlight: false
+    property bool _metadataRefreshPending: false
 
     // Query edits re-request data for the newly parsed mode while open;
     // closed sessions ignore edits until the next open().
@@ -84,8 +85,15 @@ QtObject {
                 root.refresh(true)
         }
         function onMetadataUpdated() {
-            if (root.visible && LauncherLogic.parseQuery(root.query).mode === "clipboard")
-                root.refresh(true)
+            if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard"
+                    || root._metadataRefreshPending)
+                return
+            root._metadataRefreshPending = true
+            Qt.callLater(function() {
+                root._metadataRefreshPending = false
+                if (root.visible && LauncherLogic.parseQuery(root.query).mode === "clipboard")
+                    root.refresh(true)
+            })
         }
         function onPreviewDecoded(id, contentOrPath) {
             root.textPreviewDecoded(String(id == null ? "" : id),

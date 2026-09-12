@@ -187,77 +187,66 @@ Singleton {
     // Resolve exact text lengths and image dimensions after the lightweight
     // cliphist list has reached the UI. This keeps first paint independent of
     // per-entry decoding while making metadata authoritative when it lands.
-    property var _metadataQueue: []
     property bool _metadataBusy: false
     property Process _metadataProc: Process {
         id: metadataProc
         command: []
         running: false
-        property var job: null
         stdout: StdioCollector {}
         onExited: exitCode => {
-            var completed = job
-            var output = stdout.text.trim()
-            job = null
             root._metadataBusy = false
-            if (completed && exitCode === 0) {
-                var target = null
-                for (var index = 0; index < root.items.length; index++) {
-                    if (String(root.items[index].id) === completed.id) {
-                        target = root.items[index]
-                        break
-                    }
-                }
-                if (target) {
-                    if (completed.isImage) {
-                        var parts = output.split("|")
-                        if (parts.length >= 4) {
-                            target.imageFormat = parts[0]
-                            target.imageWidth = Number(parts[1])
-                            target.imageHeight = Number(parts[2])
-                            target.imageSize = parts.slice(3).join("|")
-                            target.metadataReady = true
-                        }
-                    } else if (/^\d+$/.test(output)) {
-                        target.textCharCount = Number(output)
-                        target.metadataReady = true
-                    }
-                    if (target.metadataReady) {
-                        root.metadataRevision++
-                        root.metadataUpdated(String(target.id))
-                    }
+            if (exitCode !== 0)
+                return
+            var byId = ({})
+            var outputLines = stdout.text.split("\n")
+            for (var lineIndex = 0; lineIndex < outputLines.length; lineIndex++) {
+                var line = outputLines[lineIndex]
+                var parts = line.trim().split("|")
+                if (parts.length < 3)
+                    continue
+                byId[parts[0]] = parts.slice(1)
+            }
+            for (var index = 0; index < root.items.length; index++) {
+                var item = root.items[index]
+                var metadata = byId[String(item.id)]
+                if (!metadata)
+                    continue
+                if (metadata[0] === "image" && metadata.length >= 5) {
+                    item.imageFormat = metadata[1]
+                    item.imageWidth = Number(metadata[2])
+                    item.imageHeight = Number(metadata[3])
+                    item.imageSize = metadata.slice(4).join("|")
+                    item.metadataReady = true
+                } else if (metadata[0] === "text" && /^\d+$/.test(metadata[1])) {
+                    item.textCharCount = Number(metadata[1])
+                    item.metadataReady = true
                 }
             }
-            root._pumpMetadataQueue()
+            root.metadataRevision++
+            root.metadataUpdated("")
         }
     }
 
     function _startMetadataQueue() {
-        root._metadataQueue = []
-        for (var index = 0; index < root.items.length; index++) {
-            var item = root.items[index]
-            item.metadataReady = false
-            root._metadataQueue.push({
-                id: String(item.id),
-                isImage: !!item.isImage,
-                mime: String(item.mime || "")
-            })
-        }
-        root._pumpMetadataQueue()
-    }
-
-    function _pumpMetadataQueue() {
-        if (root._metadataBusy || !root._metadataQueue.length || !root.available)
+        if (root._metadataBusy || !root.items.length || !root.available)
             return
-        var job = root._metadataQueue.shift()
-        var path = "/tmp/afloat-clipboard-meta-" + job.id
-        var command = job.isImage
-                ? "cliphist decode \"$1\" > \"$2\" && identify -format '%m|%w|%h|%b' \"$2\"; status=$?; rm -f \"$2\"; exit $status"
-                : "cliphist decode \"$1\" | wc -m"
-        metadataProc.job = job
-        metadataProc.command = job.isImage
-                ? ["sh", "-c", command, "afloat-clipboard-meta", job.id, path]
-                : ["sh", "-c", command, "afloat-clipboard-meta", job.id]
+        var command = ""
+                + "while [ \"$#\" -gt 1 ]; do "
+                + "id=\"$1\"; kind=\"$2\"; shift 2; "
+                + "if [ \"$kind\" = image ]; then "
+                + "path=\"/tmp/afloat-clipboard-meta-$id\"; "
+                + "if cliphist decode \"$id\" > \"$path\" 2>/dev/null; then "
+                + "meta=$(identify -format '%m|%w|%h|%b' \"$path\" 2>/dev/null); "
+                + "[ -n \"$meta\" ] && printf '%s|image|%s\\n' \"$id\" \"$meta\"; "
+                + "fi; rm -f \"$path\"; "
+                + "else count=$(cliphist decode \"$id\" 2>/dev/null | wc -m); "
+                + "printf '%s|text|%s\\n' \"$id\" \"$count\"; fi; done"
+        var args = ["sh", "-c", command, "afloat-clipboard-meta"]
+        for (var index = 0; index < root.items.length; index++) {
+            args.push(String(root.items[index].id))
+            args.push(root.items[index].isImage ? "image" : "text")
+        }
+        metadataProc.command = args
         root._metadataBusy = true
         metadataProc.running = true
     }
