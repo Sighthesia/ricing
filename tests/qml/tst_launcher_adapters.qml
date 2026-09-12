@@ -517,6 +517,31 @@ Item {
             verify(outcome[1].description.indexOf("unavailable") < 0)
         }
 
+        function test_clipboardAdapterAppliesPersistentMetadataWithoutRecounting() {
+            var items = [
+                { id: "known-text", preview: "hello world", isImage: false },
+                { id: "changed-text", preview: "new text", isImage: false },
+                { id: "known-image", preview: "[[ binary data 471 KiB png 1705x905 ]]", isImage: true },
+                { id: "type-changed", preview: "hello world", isImage: true }
+            ]
+            var cache = {
+                "known-text": { preview: "hello world", isImage: false, textCharCount: 1500 },
+                "changed-text": { preview: "old text", isImage: false, textCharCount: 42 },
+                "known-image": { preview: "[[ binary data 471 KiB png 1705x905 ]]", isImage: true, format: "PNG", width: 1705, height: 905, bytes: 482304 },
+                "type-changed": { preview: "hello world", isImage: false, textCharCount: 1500 }
+            }
+
+            compare(LauncherAdapters.applyClipboardMetadataCache(items, cache), 2)
+            verify(items[0].metadataReady)
+            compare(items[0].textCharCount, 1500)
+            verify(!items[1].metadataReady)
+            verify(items[2].metadataReady)
+            compare(items[2].imageWidth, 1705)
+            compare(items[2].imageHeight, 905)
+            compare(items[2].imageBytes, 482304)
+            verify(!items[3].metadataReady)
+        }
+
         function test_clipboardAdapterWaitsForProbeBeforeErroring() {
             clipBackend.reset()
             clipBackend.available = false

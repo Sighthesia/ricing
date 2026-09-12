@@ -292,6 +292,50 @@ function formatClipboardByteSize(bytes) {
     return (Math.round(value * 10) / 10) + " " + units[unitIndex]
 }
 
+function isValidClipboardMetadataCache(item, cached) {
+    if (!item || !cached || typeof cached !== "object")
+        return false
+    if (!!cached.isImage !== !!item.isImage)
+        return false
+    if (String(cached.preview == null ? "" : cached.preview)
+            !== String(item.preview == null ? "" : item.preview))
+        return false
+    if (cached.isImage) {
+        return typeof cached.format === "string" && cached.format.length > 0
+            && Number(cached.width) > 0 && Number(cached.height) > 0
+            && Number(cached.bytes) >= 0
+    }
+    return Number(cached.textCharCount) >= 0
+}
+
+function applyClipboardMetadataCache(items, metadataMap) {
+    if (!Array.isArray(items) || !metadataMap || typeof metadataMap !== "object")
+        return 0
+    var applied = 0
+    for (var index = 0; index < items.length; index++) {
+        var item = items[index]
+        if (!item) {
+            continue
+        }
+        var cached = metadataMap[String(item.id)]
+        if (!isValidClipboardMetadataCache(item, cached)) {
+            item.metadataReady = false
+            continue
+        }
+        if (cached.isImage) {
+            item.imageFormat = cached.format
+            item.imageWidth = Number(cached.width)
+            item.imageHeight = Number(cached.height)
+            item.imageBytes = Number(cached.bytes)
+        } else {
+            item.textCharCount = Number(cached.textCharCount)
+        }
+        item.metadataReady = true
+        applied++
+    }
+    return applied
+}
+
 function parseClipboardImageMeta(preview) {
     if (typeof preview !== "string")
         return null

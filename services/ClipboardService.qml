@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "launcher/LauncherAdapters.js" as LauncherAdapters
 
 // Clipboard history backed by cliphist; polled on a timer so the UI stays fresh.
 Singleton {
@@ -10,6 +11,7 @@ Singleton {
     readonly property string _userCacheRoot: (Quickshell.env("XDG_CACHE_HOME") || ((Quickshell.env("HOME") || "") + "/.cache"))
     readonly property string _cacheDir: root._userCacheRoot + "/afloat"
     readonly property string _firstSeenCachePath: root._cacheDir + "/clipboard-first-seen.json"
+    readonly property string _metadataCachePath: root._cacheDir + "/clipboard-metadata.json"
 
     property bool available: false
     // Mirrors _listProc.listing: a cliphist list fetch is in flight.
@@ -24,6 +26,10 @@ Singleton {
     property int metadataRevision: 0
     property var _firstSeenById: ({})
     property var _firstSeenBySignature: ({})
+    property var _metadataCacheById: ({})
+    property bool _metadataDirty: false
+    property bool _metadataCacheReady: false
+    property bool _createMetadataCache: false
     property var _pendingSignatureIds: []
     property var _pendingSignatureRows: ({})
     property var _signaturePendingById: ({})
@@ -41,6 +47,10 @@ Singleton {
                 root._createFirstSeenCache = false
                 firstSeenFile.writeAdapter()
             }
+            if (code === 0 && root._createMetadataCache) {
+                root._createMetadataCache = false
+                metadataFile.writeAdapter()
+            }
         }
     }
 
@@ -49,6 +59,13 @@ Singleton {
         interval: 500
         repeat: false
         onTriggered: firstSeenFile.writeAdapter()
+    }
+
+    Timer {
+        id: metadataSaveTimer
+        interval: 1000
+        repeat: false
+        onTriggered: metadataFile.writeAdapter()
     }
 
     FileView {
@@ -71,6 +88,29 @@ Singleton {
         JsonAdapter {
             id: firstSeenAdapter
             property var firstSeenMap: ({})
+        }
+    }
+
+    FileView {
+        id: metadataFile
+        path: root._metadataCachePath
+        blockLoading: true
+        onLoaded: root._finishMetadataCacheLoad(metadataAdapter.metadataMap)
+        onLoadFailed: error => {
+            if (error === FileViewError.FileNotFound) {
+                root._createMetadataCache = true
+                if (!_cacheDirProc.running)
+                    _cacheDirProc.running = true
+                root._finishMetadataCacheLoad({})
+            } else {
+                console.warn("ClipboardService: failed to load metadata cache, error =", error)
+                root._finishMetadataCacheLoad({})
+            }
+        }
+
+        JsonAdapter {
+            id: metadataAdapter
+            property var metadataMap: ({})
         }
     }
 
@@ -211,25 +251,74 @@ Singleton {
                 var metadata = byId[String(item.id)]
                 if (!metadata)
                     continue
+                var updated = false
                 if (metadata[0] === "image" && metadata.length >= 6) {
                     item.imageFormat = metadata[1]
                     item.imageWidth = Number(metadata[2])
                     item.imageHeight = Number(metadata[3])
                     item.imageBytes = Number(metadata[4])
                     item.metadataReady = true
+                    updated = true
                 } else if (metadata[0] === "text" && /^\d+$/.test(metadata[1])) {
                     item.textCharCount = Number(metadata[1])
                     item.metadataReady = true
+                    updated = true
+                }
+                if (updated) {
+                    if (item.isImage) {
+                        root._metadataCacheById[String(item.id)] = {
+                            preview: item.preview,
+                            isImage: true,
+                            format: item.imageFormat,
+                            width: item.imageWidth,
+                            height: item.imageHeight,
+                            bytes: item.imageBytes
+                        }
+                    } else {
+                        root._metadataCacheById[String(item.id)] = {
+                            preview: item.preview,
+                            isImage: false,
+                            textCharCount: item.textCharCount
+                        }
+                    }
+                    root._metadataDirty = true
+                    root.metadataRevision++
                 }
             }
-            root.metadataRevision++
+            root._persistMetadataCache()
             root.metadataUpdated("")
         }
+    }
+
+    function _pruneMetadataCache() {
+        var pruned = false
+        var liveIds = ({})
+        for (var index = 0; index < root.items.length; index++) {
+            liveIds[String(root.items[index].id)] = true
+        }
+        for (var cachedId in root._metadataCacheById) {
+            if (!liveIds[cachedId]) {
+                delete root._metadataCacheById[cachedId]
+                pruned = true
+            }
+        }
+        if (pruned)
+            root._persistMetadataCache()
+    }
+
+    function _persistMetadataCache() {
+        if (!root._metadataDirty)
+            return
+        root._metadataDirty = false
+        metadataAdapter.metadataMap = root._metadataCacheById
+        metadataSaveTimer.restart()
     }
 
     function _startMetadataQueue() {
         if (root._metadataBusy || !root.items.length || !root.available)
             return
+        root._pruneMetadataCache()
+        LauncherAdapters.applyClipboardMetadataCache(root.items, root._metadataCacheById)
         var command = ""
                 + "while [ \"$#\" -gt 1 ]; do "
                 + "id=\"$1\"; kind=\"$2\"; shift 2; "
@@ -243,10 +332,16 @@ Singleton {
                 + "else count=$(cliphist decode \"$id\" 2>/dev/null | wc -m); "
                 + "printf '%s|text|%s\\n' \"$id\" \"$count\"; fi; done"
         var args = ["sh", "-c", command, "afloat-clipboard-meta"]
+        var queued = false
         for (var index = 0; index < root.items.length; index++) {
+            if (root.items[index].metadataReady)
+                continue
             args.push(String(root.items[index].id))
             args.push(root.items[index].isImage ? "image" : "text")
+            queued = true
         }
+        if (!queued)
+            return
         metadataProc.command = args
         root._metadataBusy = true
         metadataProc.running = true
@@ -285,6 +380,22 @@ Singleton {
             return
         root._firstSeenBySignature = firstSeenMap || ({})
         root._firstSeenCacheReady = true
+        root._maybeStartClipboardProbe()
+    }
+
+    function _finishMetadataCacheLoad(metadataMap) {
+        if (root._metadataCacheReady)
+            return
+        root._metadataCacheById = metadataMap || ({})
+        root._metadataCacheReady = true
+        root._maybeStartClipboardProbe()
+    }
+
+    function _maybeStartClipboardProbe() {
+        if (!root._firstSeenCacheReady || !root._metadataCacheReady)
+            return
+        if (root.probeFinished || _checkProc.running)
+            return
         _checkProc.running = true
     }
 
@@ -440,6 +551,9 @@ Singleton {
         Quickshell.execDetached(["cliphist", "wipe"])
         root.items = []
         root._firstSeenById = ({})
+        root._metadataCacheById = ({})
+        root._metadataDirty = true
+        root._persistMetadataCache()
         root.revision++
     }
 
