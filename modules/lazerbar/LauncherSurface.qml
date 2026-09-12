@@ -173,7 +173,7 @@ Item {
 
     Timer {
         id: prewarmArmTimer
-        interval: 2500
+        interval: 0
         repeat: false
         running: !!root.session
         onTriggered: prewarmLoader.active = true

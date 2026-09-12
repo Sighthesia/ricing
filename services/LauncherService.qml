@@ -57,6 +57,8 @@ Singleton {
     on_DesktopEntryCountChanged: {
         entryScanRefreshTimer.restart()
         entryScanSettleTimer.restart()
+        if (!session.visible && session.displayPool.length === 0)
+            session.primeApps()
     }
 
     // Launch-count changes - a just-recorded launch or the persisted maps
@@ -117,6 +119,7 @@ Singleton {
     function execute(item) { return session.execute(item) }
     function openClipboard() { return session.openClipboard() }
     function openShortcuts() { return session.openShortcuts() }
+    function primeApps() { return session.primeApps() }
 
     // Runs one shortcut-action command at a time through a dedicated process
     // and reports its exit outcome; overlapping runs are rejected so outcomes

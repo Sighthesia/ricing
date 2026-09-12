@@ -17,6 +17,8 @@ ShellRoot {
         // reference can be dropped: run the sync service's entry point
         // explicitly so the instance (and its Connections) come to life.
         Services.AppThemeService.apply()
+        Services.LauncherService.primeApps()
+        Services.ClipboardService.warmup()
     }
 
     LazerBar.WallpaperBackground {}

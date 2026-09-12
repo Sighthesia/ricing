@@ -157,6 +157,25 @@ Item {
             compare(svc().selectedIndex, 0)
         }
 
+        function test_primeAppsBuildsClosedPoolWithoutOpeningSession() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+
+            svc().primeApps()
+
+            compare(svc().visible, false)
+            compare(svc().loading, false)
+            compare(apps.queries.length, 1)
+
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+
+            compare(svc().visible, false)
+            compare(svc()._pooledMode, "apps")
+            compare(svc().displayPool.length, 1)
+            compare(svc().results.length, 1)
+            compare(svc().selectedIndex, 0)
+        }
+
         function test_toggleFlipsVisibility() {
             svc().toggle()
             compare(svc().visible, true)

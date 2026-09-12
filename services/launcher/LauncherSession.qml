@@ -62,6 +62,7 @@ QtObject {
     // alive when execution started, may commit state.
     property int _refreshToken: 0
     property bool _executionInFlight: false
+    property bool _appsPrimeInFlight: false
 
     // Query edits re-request data for the newly parsed mode while open;
     // closed sessions ignore edits until the next open().
@@ -133,6 +134,25 @@ QtObject {
             root.close()
         else
             root.open()
+    }
+
+    // Build the apps pool while the shell is idle so the first visible open
+    // only filters already-normalized rows and creates its delegates.
+    function primeApps() {
+        if (root.visible || root._appsPrimeInFlight)
+            return
+        var adapter = _adapterFor("apps")
+        root._appsPrimeInFlight = true
+        adapter.refresh("", "apps", function(outcome) {
+            root._appsPrimeInFlight = false
+            if (root.visible || !Array.isArray(outcome))
+                return
+            var sorted = LauncherLogic.sortResults(outcome)
+            root.displayPool = sorted
+            root._pooledMode = "apps"
+            root.results = LauncherLogic.filterResults(sorted, "")
+            root.selectedIndex = LauncherLogic.clampSelection(0, root.results.length)
+        })
     }
 
     function openClipboard() {

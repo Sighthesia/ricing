@@ -203,6 +203,12 @@ Singleton {
         listProc.running = true
     }
 
+    // Explicit startup hook: constructing the singleton begins cache loading
+    // and the cliphist probe before the first clipboard launcher open.
+    function warmup() {
+        return root.available
+    }
+
     function _finishFirstSeenCacheLoad(firstSeenMap) {
         if (root._firstSeenCacheReady)
             return
