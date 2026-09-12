@@ -83,8 +83,25 @@ Singleton {
     readonly property string artUrl: {
         const mprisArt = Services.MediaService.hasPlayer ? Services.MediaService.artUrl : ""
         const neteaseArt = Services.NeteaseWebLyricsService.artUrl
-        if (root._preferLyricsMediaSource)
-            return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
+        if (root._preferLyricsMediaSource) {
+            // Only trust the MPRIS cover when it is not provably stale: if
+            // this art URL was previously cached under a different track
+            // (e.g. the paused video's cover lingering in MediaService.artUrl
+            // after the title already switched back to music), fall back to
+            // the lyric session's own art, then the cached music cover.
+            if (root._lyricsMetadataKey === "")
+                return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
+            if (mprisArt !== ""
+                    && !Services.MediaService._isArtUrlStaleForTrack(mprisArt,
+                        Services.NeteaseWebLyricsService.title,
+                        Services.NeteaseWebLyricsService.artist))
+                return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
+            if (neteaseArt !== "")
+                return neteaseArt
+            return Services.MediaService._cachedArtForTrack(
+                Services.NeteaseWebLyricsService.title,
+                Services.NeteaseWebLyricsService.artist)
+        }
         if (root._mprisPlaying)
             return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
         // A paused/stopped MPRIS video can retain its last cover even after

@@ -99,6 +99,33 @@ Item {
                                   check("paused video restores music artist", control.artist, "Music Artist")
                                   check("paused video restores cached music cover", control.artUrl, "file:///tmp/music-cover.jpg")
 
+                                  // Latched lyric source with a stale MPRIS cover:
+                                  // the player reports the music track again but
+                                  // MediaService.artUrl still holds the video cover
+                                  // (art lags title by one sync). The merged cover
+                                  // must be music, never the stale video art.
+                                  lyrics.title = "Music"
+                                  lyrics.artist = "Music Artist"
+                                  lyrics.artUrl = "file:///tmp/music-cover.jpg"
+                                  lyrics.playbackState = "playing"
+                                  control._lyricsSourceLatched = true
+                                  media._activePlayerRef = makePlayer("Music", "Music Artist",
+                                      "file:///tmp/music-track-art.jpg", MprisPlaybackState.Playing, true)
+                                  media._syncArtUrl()
+                                  media._activePlayerRef = makePlayer("Video", "", "file:///tmp/video-cover.jpg",
+                                      MprisPlaybackState.Playing, true)
+                                  media._syncArtUrl()
+                                  media._activePlayerRef = makePlayer("Music", "Music Artist",
+                                      "file:///tmp/music-track-art.jpg", MprisPlaybackState.Paused, false)
+                                  media.artUrl = "file:///tmp/video-cover.jpg"
+                                  root._steps.push(function() {
+                                      check("latched source keeps music title", control.title, "Music")
+                                      check("latched source drops stale video cover", control.artUrl, "file:///tmp/music-cover.jpg")
+                                      lyrics.artUrl = ""
+                                      root._steps.push(function() {
+                                          check("stale video cover falls back to cached music", control.artUrl, "file:///tmp/music-track-art.jpg")
+
+                          control._lyricsSourceLatched = false
                           // --- Arbitration: playing session beats paused other-tab payloads.
                          lyrics._resetState()
                          media._activePlayerRef = null
@@ -119,6 +146,10 @@ Item {
                           lyrics._resetState()
                           console.log("Totals:", root._checks - root._failures, "passed,", root._failures, "failed")
                           Qt.quit()
+                                      })
+                                      Qt.callLater(root._steps.shift())
+                                  })
+                                  Qt.callLater(root._steps.shift())
                               })
                               Qt.callLater(root._steps.shift())
                           })

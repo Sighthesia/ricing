@@ -215,6 +215,38 @@ Singleton {
         return root._isFailedArtUrl(cachedArtUrl) ? "" : cachedArtUrl
     }
 
+    // True when this art URL was previously cached under a different track
+    // and not under the given one: the caller is looking at a stale cover
+    // (e.g. a paused video's art lingering after the title switched back).
+    // Album art legitimately shared across tracks is cached under the
+    // current key too, so it is never reported stale.
+    function _isArtUrlStaleForTrack(artUrl, trackTitle, trackArtist) {
+        const wantedUrl = root._normalizeArtUrl(artUrl)
+        const wantedTitle = trackTitle != null ? String(trackTitle) : ""
+        const wantedArtist = trackArtist != null ? String(trackArtist) : ""
+        if (wantedUrl === "" || (wantedTitle === "" && wantedArtist === ""))
+            return false
+
+        const cache = root._artUrlCache || {}
+        const keys = Object.keys(cache)
+        let foundCurrent = false
+        let foundOther = false
+        for (let index = 0; index < keys.length; index += 1) {
+            if (root._normalizeArtUrl(cache[keys[index]]) !== wantedUrl)
+                continue
+            const parts = String(keys[index]).split("|")
+            if (parts.length < 3)
+                continue
+            const cachedArtist = parts.pop()
+            const cachedTitle = parts.pop()
+            if (cachedTitle === wantedTitle && cachedArtist === wantedArtist)
+                foundCurrent = true
+            else
+                foundOther = true
+        }
+        return foundOther && !foundCurrent
+    }
+
     // Look up a previously seen cover by track identity across players: when
     // a video takes over the active player, the still-playing music track's
     // cover is no longer the current player's art, but it survives here.

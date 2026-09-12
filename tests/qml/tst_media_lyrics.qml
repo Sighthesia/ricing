@@ -264,6 +264,36 @@ TestCase {
         compare(Services.MediaControlService.artUrl, "file:///tmp/music-cover.jpg")
     }
 
+    function test_latched_source_drops_stale_video_cover() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.title = "Music"
+        Services.NeteaseWebLyricsService.artist = "Music Artist"
+        Services.NeteaseWebLyricsService.playbackState = "playing"
+        Services.NeteaseWebLyricsService.artUrl = "file:///tmp/music-cover.jpg"
+        Services.MediaService._artUrlCache = {
+            "Firefox|Music|Music Artist": "file:///tmp/music-track-art.jpg",
+            "Firefox|Video|": "file:///tmp/video-cover.jpg"
+        }
+
+        const music = makePlayer(0)
+        music.trackTitle = "Music"
+        music.trackArtist = "Music Artist"
+        Services.MediaService._activePlayerRef = music
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.MediaControlService._lyricsSourceLatched = true
+        // Art lags title by one sync: title is music again, cover is stale video.
+        Services.MediaService.artUrl = "file:///tmp/video-cover.jpg"
+        Services.MediaService._positionTick += 1
+
+        compare(Services.MediaControlService.title, "Music")
+        compare(Services.MediaControlService.artUrl, "file:///tmp/music-cover.jpg")
+
+        Services.NeteaseWebLyricsService.artUrl = ""
+        compare(Services.MediaControlService.artUrl, "file:///tmp/music-track-art.jpg")
+        Services.MediaControlService._lyricsSourceLatched = false
+    }
+
     function test_paused_video_falls_back_to_cached_music_cover() {
         resetState()
 
