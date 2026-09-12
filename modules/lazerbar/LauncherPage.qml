@@ -948,6 +948,15 @@ Item {
             scrollAnim.restart()
         }
 
+        function _settleScrollEdge() {
+            var maximumY = Math.max(0, resultsView.contentHeight - resultsView.height)
+            edgeDriving = false
+            scrollEdgeSettleTimer.stop()
+            scrollDriveAnim.stop()
+            scrollSettleAnim.to = Math.max(0, Math.min(maximumY, resultsView.contentY))
+            scrollSettleAnim.restart()
+        }
+
         function _cancelScrollEdge() {
             edgeDriving = false
             scrollEdgeSettleTimer.stop()
