@@ -197,6 +197,8 @@ Item {
             compare(panel.appearancePage.sunriseField.width, panel.appearancePage.sunriseRow.contentItem.width)
             compare(panel.appearancePage.wallpaperField.editorItem.horizontalAlignment, TextInput.AlignLeft)
             compare(panel.appearancePage.wallpaperField.editorItem.x, 0)
+            compare(panel.appearancePage.wallpaperField.editorItem.font.pixelSize,
+                    panel.appearancePage.panelOpacityRow.valueTextItem.font.pixelSize)
         }
 
         function test_schemePickersKeepTitlesAboveTheirSharedSurface() {

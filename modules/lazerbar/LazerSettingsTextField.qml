@@ -138,7 +138,7 @@ FocusScope {
         enabled: root.effectiveEnabled
         color: LazerTheme.textPrimary
         selectionColor: LazerTheme.osuPink
-        font.pixelSize: 13
+        font.pixelSize: 14
         horizontalAlignment: TextInput.AlignLeft
         onAccepted: root.commit()
         onActiveFocusChanged: {
@@ -158,7 +158,7 @@ FocusScope {
         visible: !editor.text && !editor.activeFocus
         text: root.placeholderText
         color: LazerTheme.textMuted
-        font.pixelSize: 13
+        font.pixelSize: 14
     }
 
     // Keep hover state local to the editable surface so its parent row can
