@@ -82,11 +82,10 @@ QtObject {
                        : shade(colorService.mTertiary, 0x24 / 255))
         : "#2400FFA2"
     readonly property color focusRing: adapt && colorService ? colorService.mPrimary : "#FFF2F8"
-    // Beat/tick flash wash: dark uses on-surface ink (near-white soft glow);
-    // light brightens the accent toward its own luminous tint so the hue
-    // survives like the dark glow does — pure white chalks saturated fills.
+    // Beat/tick flash wash: the accent's luminous tint at 2x in both
+    // schemes so the hue survives the flash — pure white chalks fills.
     readonly property color flashWash: !adapt || !colorService ? textPrimary
-        : (lightScheme ? Qt.lighter(colorService.mPrimary, 2) : textPrimary)
+        : Qt.lighter(colorService.mPrimary, 2.0)
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"

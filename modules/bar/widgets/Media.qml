@@ -468,10 +468,13 @@ BarPill {
 
             anchors.fill: parent
             values: Services.SpectrumService.values
-            barColor: Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.58)
-            // Light scheme brightens the wavefront toward the flash wash;
-            // dark keeps the legacy alpha boost, which already glows there.
-            waveColor: LazerTheme.lightScheme ? LazerTheme.flashWash : "#00000000"
+            // Dark spectrum shares the progress fill token so the two can
+            // never drift apart; light keeps the translucent variant.
+            barColor: LazerTheme.lightScheme
+                ? Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g, LazerTheme.accentColor.b, 0.58)
+                : LazerTheme.accentColor
+            // The wavefront mixes bars toward the flash wash in both schemes.
+            waveColor: LazerTheme.flashWash
             // One sweep per beat interval: the front hits the far edge just
             // as the next beat fires the next wave.
             waveDuration: Services.SpectrumService.bpm > 0
