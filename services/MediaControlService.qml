@@ -87,11 +87,21 @@ Singleton {
             return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
         if (root._mprisPlaying)
             return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
-        // A stopped MPRIS player can retain its last cover even after the
-        // lyric session becomes the visible media source. Do not let that
-        // stale video cover survive the source switch.
-        if (Services.NeteaseWebLyricsService.active)
-            return neteaseArt
+        // A paused/stopped MPRIS video can retain its last cover even after
+        // the lyric session becomes the visible media source again. Never
+        // let that stale video cover survive the source switch: prefer the
+        // lyric session's own art, then the music track's previously cached
+        // MPRIS cover, and finally blank rather than the wrong cover.
+        if (root._neteasePlaying) {
+            if (neteaseArt !== "")
+                return neteaseArt
+            const cachedMusicArt = Services.MediaService._cachedArtForTrack(
+                Services.NeteaseWebLyricsService.title,
+                Services.NeteaseWebLyricsService.artist)
+            if (cachedMusicArt !== "")
+                return cachedMusicArt
+            return ""
+        }
         return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
     }
     readonly property string playerName: Services.MediaService.hasPlayer ? Services.MediaService.playerName : ""

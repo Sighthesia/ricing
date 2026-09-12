@@ -44,6 +44,7 @@ TestCase {
         Services.MediaService._lastArtArtist = ""
         Services.MediaService._artRecoveryPending = false
         Services.MediaService._artRecoveryStartedAt = 0
+        Services.MediaService._artUrlCache = ({})
 
         Services.NeteaseWebLyricsService._resetState()
         Services.MediaControlService._resetLyricsLatch()
@@ -256,6 +257,33 @@ TestCase {
         video.isPlaying = false
         Services.MediaService._activePlayerRef = video
         Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.MediaService._positionTick += 1
+
+        compare(Services.MediaControlService.title, "Music")
+        compare(Services.MediaControlService.artist, "Music Artist")
+        compare(Services.MediaControlService.artUrl, "file:///tmp/music-cover.jpg")
+    }
+
+    function test_paused_video_falls_back_to_cached_music_cover() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.title = "Music"
+        Services.NeteaseWebLyricsService.artist = "Music Artist"
+        Services.NeteaseWebLyricsService.playbackState = "playing"
+        Services.NeteaseWebLyricsService.artUrl = ""
+        Services.MediaService._artUrlCache = {
+            "Firefox|Music|Music Artist": "file:///tmp/music-cover.jpg"
+        }
+
+        const video = makePlayer(0)
+        video.trackTitle = "Video"
+        video.trackArtist = ""
+        video.trackArtUrl = "file:///tmp/video-cover.jpg"
+        video.playbackState = MprisPlaybackState.Paused
+        video.isPlaying = false
+        Services.MediaService._activePlayerRef = video
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.MediaService.artUrl = "file:///tmp/video-cover.jpg"
         Services.MediaService._positionTick += 1
 
         compare(Services.MediaControlService.title, "Music")

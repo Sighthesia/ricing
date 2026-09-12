@@ -71,16 +71,35 @@ Item {
                      check("video does not inherit artist", control.artist, "")
                      check("video keeps its cover", control.artUrl, "file:///tmp/video-cover.jpg")
 
-                     // Stopping that video must expose the music cover again,
-                     // even while the stopped MPRIS player remains selected.
-                     media._activePlayerRef = makePlayer("Video", "", "file:///tmp/video-cover.jpg",
-                         MprisPlaybackState.Stopped, false)
-                     root._steps.push(function() {
-                         check("stopped video restores music title", control.title, "Music")
-                         check("stopped video restores music artist", control.artist, "Music Artist")
-                         check("stopped video restores music cover", control.artUrl, "file:///tmp/music-cover.jpg")
+                      // Stopping that video must expose the music cover again,
+                      // even while the stopped MPRIS player remains selected.
+                      media._activePlayerRef = makePlayer("Video", "", "file:///tmp/video-cover.jpg",
+                          MprisPlaybackState.Stopped, false)
+                      root._steps.push(function() {
+                          check("stopped video restores music title", control.title, "Music")
+                          check("stopped video restores music artist", control.artist, "Music Artist")
+                          check("stopped video restores music cover", control.artUrl, "file:///tmp/music-cover.jpg")
 
-                         // --- Arbitration: playing session beats paused other-tab payloads.
+                          // Pause-video with an empty lyric artUrl must fall
+                          // back to the music track's cached MPRIS cover —
+                          // blank and stale video cover are both wrong.
+                          lyrics.artUrl = ""
+                          media._activePlayerRef = makePlayer("Music", "Music Artist",
+                              "file:///tmp/music-cover.jpg", MprisPlaybackState.Playing, true)
+                          media._syncArtUrl()
+                          media._activePlayerRef = makePlayer("Video", "", "file:///tmp/video-cover.jpg",
+                              MprisPlaybackState.Playing, true)
+                          media._syncArtUrl()
+                          root._steps.push(function() {
+                              check("video cover shown while playing", control.artUrl, "file:///tmp/video-cover.jpg")
+                              media._activePlayerRef = makePlayer("Video", "", "file:///tmp/video-cover.jpg",
+                                  MprisPlaybackState.Paused, false)
+                              root._steps.push(function() {
+                                  check("paused video restores music title", control.title, "Music")
+                                  check("paused video restores music artist", control.artist, "Music Artist")
+                                  check("paused video restores cached music cover", control.artUrl, "file:///tmp/music-cover.jpg")
+
+                          // --- Arbitration: playing session beats paused other-tab payloads.
                          lyrics._resetState()
                          media._activePlayerRef = null
                          lyrics._applyPayload({ songId: "7", title: "Playing Song", artist: "A",
@@ -96,12 +115,16 @@ Item {
                              playbackState: "playing", positionMs: 10, durationMs: 200000 })
                          check("newer playing tab takes over", lyrics.songId, "9")
 
-                         media._activePlayerRef = null
-                         lyrics._resetState()
-                         console.log("Totals:", root._checks - root._failures, "passed,", root._failures, "failed")
-                         Qt.quit()
-                     })
-                     Qt.callLater(root._steps.shift())
+                          media._activePlayerRef = null
+                          lyrics._resetState()
+                          console.log("Totals:", root._checks - root._failures, "passed,", root._failures, "failed")
+                          Qt.quit()
+                              })
+                              Qt.callLater(root._steps.shift())
+                          })
+                          Qt.callLater(root._steps.shift())
+                      })
+                      Qt.callLater(root._steps.shift())
                  })
                  Qt.callLater(root._steps.shift())
              })

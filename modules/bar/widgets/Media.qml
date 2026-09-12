@@ -48,11 +48,17 @@ BarPill {
             var raw = p ? String(p.trackArtUrl || "").trim() : ""
             if (raw !== "")
                 return true
-            // No MPRIS art — only show Netease art when it belongs to current lyric session.
+            // No MPRIS art: the merged control art is already vetted (lyric
+            // art, cached music cover, or blank) — trust it while the lyric
+            // session is the visible source instead of requiring an exact
+            // Netease URL match that cached covers can never satisfy.
+            if (Services.NeteaseWebLyricsService.playbackState === "playing")
+                return true
+            // Otherwise only show Netease art when it belongs to current lyric session.
             return Services.NeteaseWebLyricsService.artUrl !== ""
                 && Services.MediaControlService.artUrl === Services.NeteaseWebLyricsService.artUrl
         }
-        return Services.NeteaseWebLyricsService.artUrl !== ""
+        return Services.MediaControlService.artUrl !== ""
     }
 
     property string trackedPrimaryText: ""

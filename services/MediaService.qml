@@ -215,6 +215,32 @@ Singleton {
         return root._isFailedArtUrl(cachedArtUrl) ? "" : cachedArtUrl
     }
 
+    // Look up a previously seen cover by track identity across players: when
+    // a video takes over the active player, the still-playing music track's
+    // cover is no longer the current player's art, but it survives here.
+    function _cachedArtForTrack(trackTitle, trackArtist) {
+        const wantedTitle = trackTitle != null ? String(trackTitle) : ""
+        const wantedArtist = trackArtist != null ? String(trackArtist) : ""
+        if (wantedTitle === "" && wantedArtist === "")
+            return ""
+
+        const cache = root._artUrlCache || {}
+        const keys = Object.keys(cache)
+        for (let index = 0; index < keys.length; index += 1) {
+            const parts = String(keys[index]).split("|")
+            if (parts.length < 3)
+                continue
+            const cachedArtist = parts.pop()
+            const cachedTitle = parts.pop()
+            if (cachedTitle !== wantedTitle || cachedArtist !== wantedArtist)
+                continue
+            const cachedArtUrl = root._normalizeArtUrl(cache[keys[index]])
+            if (cachedArtUrl !== "" && !root._isFailedArtUrl(cachedArtUrl))
+                return cachedArtUrl
+        }
+        return ""
+    }
+
     function _isFailedArtUrl(artUrl) {
         const normalizedArtUrl = root._normalizeArtUrl(artUrl)
         return !!(normalizedArtUrl && root._failedArtUrlCache[normalizedArtUrl])
