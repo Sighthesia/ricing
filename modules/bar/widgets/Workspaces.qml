@@ -637,16 +637,18 @@ Item {
         x: root._edgeRectLeft
         y: Math.round(root.height / 2 + (LazerTheme.barGlyphSize - 4) / 2 + 4)
 
-        // Switch flash: same white blink look as the media progress bar's
+        // Switch flash: same tinted-glow blink as the media progress bar's
         // beat flash, driven by the shared click-flash decay contract.
         Rectangle {
             id: indicatorFlashOverlay
 
             anchors.fill: parent
             radius: parent.radius
-            color: LazerTheme.textPrimary
+            color: LazerTheme.flashWash
             opacity: 0
             enabled: false
+
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         NumberAnimation {
