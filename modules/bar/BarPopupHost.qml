@@ -80,6 +80,12 @@ PanelWindow {
     // Keep the reveal viewport large enough while displayed geometry morphs.
     readonly property real revealViewportHeight: Math.max(root.displayHeight,
             root.targetHeight, root.revealDistance, 1)
+    readonly property bool traySubmenuOverflowActive: (popupActions
+            && popupActions.trayMenuContent
+            && Number(popupActions.trayMenuContent.submenuProgress) > 0)
+        || (popupActionsOutgoing
+            && popupActionsOutgoing.trayMenuContent
+            && Number(popupActionsOutgoing.trayMenuContent.submenuProgress) > 0)
 
     readonly property real activeScreenWidth: intentScreenWidth > 0 ? intentScreenWidth : screenWidth
     readonly property real activeScreenHeight: intentScreenHeight > 0 ? intentScreenHeight : screenHeight
@@ -1066,9 +1072,9 @@ PanelWindow {
                          enabled: root._exchangeCommitted && !MotionTokens.reducedMotion
                          NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutCubic }
                      }
-                    // Tray submenus extend beyond the fixed primary content
-                    // column; the outer viewport/mask owns screen clipping.
-                    clip: false
+                    // Keep hover replacement layers inside the content column;
+                    // an open tray submenu is the only intentional overflow.
+                    clip: !root.traySubmenuOverflowActive
                      enabled: root.contentInteractive
                      onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
 
@@ -1100,10 +1106,11 @@ PanelWindow {
                          onDismissRequested: root.dismissImmediately()
                      }
 
-                     // Outgoing body leaves to the left while its replacement
-                     // is measured and morphs the host width/height.
-                     BarPopupActions {
-                         objectName: "popupActionsOutgoing"
+                      // Outgoing body leaves to the left while its replacement
+                      // is measured and morphs the host width/height.
+                      BarPopupActions {
+                          id: popupActionsOutgoing
+                          objectName: "popupActionsOutgoing"
                          z: 0
                          opacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
                          visible: root._transitionOutgoingIntent !== null

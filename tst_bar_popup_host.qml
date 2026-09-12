@@ -706,8 +706,8 @@ Item {
             root.check("hover content height positive", host.popupItem.contentLayer.height > 0, true)
             root.check("popup exit does not self-clip vertical layers", host.popupItem.clip, false)
             root.check("popup viewport retains screen clipping", host.popupViewportItem.clip, true)
-            root.check("popup content slot lets tray submenu overflow",
-                root.findByName(host.popupItem, "popupContentSlot").clip, false)
+            root.check("ordinary hover content stays inside its slot",
+                root.findByName(host.popupItem, "popupContentSlot").clip, true)
             // Slide contract: layers travel the full container distance behind
             // the bar clip edge instead of relying on the opacity channel.
             root.check("identity layer slides from behind bar", host.popupItem.sidebarOffset !== 0, true)
