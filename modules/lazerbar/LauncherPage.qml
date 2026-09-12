@@ -543,6 +543,7 @@ Item {
     // Clipboard thumbnail cache: one decode per entry id, owned here so
     // rows and the preview pane share the exact same proven path.
     readonly property var _thumbPaths: ({})
+    readonly property var _thumbRequests: ({})
     property int _thumbRev: 0
     function clipThumbPath(item) {
         if (!item || !item.isImage)
@@ -550,16 +551,23 @@ Item {
         var id = String(item.id == null ? "" : item.id)
         if (!/^[0-9]+$/.test(id))
             return ""
-        if (root._thumbPaths[id])
-            return root._thumbPaths[id]
+        return root._thumbPaths[id] || ""
+    }
+    function requestClipThumb(item) {
+        if (!item || !item.isImage)
+            return
+        var id = String(item.id == null ? "" : item.id)
+        if (!/^[0-9]+$/.test(id) || root._thumbPaths[id] || root._thumbRequests[id])
+            return
+        root._thumbRequests[id] = true
         if (root.session)
             root.session.decodeThumbnail(id, String(item.mime || ""), function(p) {
+                delete root._thumbRequests[id]
                 if (p) {
                     root._thumbPaths[id] = p
                     root._thumbRev++
                 }
             })
-        return ""
     }
 
     // Full decoded text per entry id: `cliphist list` previews are a single
@@ -1060,6 +1068,8 @@ Item {
                     required property int index
                     width: resultsColumn.width
                     result: modelData
+                    Component.onCompleted: root.requestClipThumb(modelData)
+                    onModelDataChanged: root.requestClipThumb(modelData)
                     thumbPath: root._thumbRev >= 0 ? root.clipThumbPath(modelData) : ""
                     searchQuery: root.activeSearchText
                     selected: {
