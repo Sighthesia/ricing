@@ -274,9 +274,9 @@ function clipboardItem(raw) {
                  : (normalizeText(preview).length ? preview : "(empty)")
     var description = mime
     if (imageMeta)
-        description += " · " + imageMeta.format + " · " + imageMeta.size + " bytes"
+        description += " | " + imageMeta.format + " | " + imageMeta.size + " bytes"
     else if (!isImage)
-        description += " · " + (preview.length >= 100 ? "Long text" : preview.length + " characters")
+        description += " | " + (preview.length >= 100 ? "Long text" : preview.length + " characters")
     var seen = timeLabel(seenMs)
     if (seen)
         description += " · copied " + seen

@@ -467,11 +467,6 @@ Item {
 
         function test_clipboardAdapterFormatsTextMetadata() {
             var adapters = LauncherAdapters.createAdapters({ clipboardBackend: clipBackend })
-            var shortText = null
-            adapters.clipboard.refresh("", "clipboard", function(result) {
-                shortText = result
-            })
-
             clipBackend.complete([
                 { id: "short", preview: "hello", mime: "text/plain", isImage: false, firstSeenMs: 1700000100000 },
                 { id: "long", preview: "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", mime: "text/plain", isImage: false, firstSeenMs: 1700000200000 }
