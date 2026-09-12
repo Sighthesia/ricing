@@ -219,6 +219,50 @@ TestCase {
         compare(Services.MediaControlService._lyricsSourceLatched, true)
     }
 
+    function test_video_without_artist_does_not_inherit_music_artist() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.title = "Music"
+        Services.NeteaseWebLyricsService.artist = "Music Artist"
+        Services.NeteaseWebLyricsService.playbackState = "playing"
+        Services.NeteaseWebLyricsService.artUrl = "file:///tmp/music-cover.jpg"
+
+        const video = makePlayer(0)
+        video.trackTitle = "Video"
+        video.trackArtist = ""
+        video.trackArtUrl = "file:///tmp/video-cover.jpg"
+        Services.MediaService._activePlayerRef = video
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.MediaService._positionTick += 1
+
+        compare(Services.MediaControlService.title, "Video")
+        compare(Services.MediaControlService.artist, "")
+        compare(Services.MediaControlService.artUrl, "file:///tmp/video-cover.jpg")
+    }
+
+    function test_stopped_video_does_not_keep_video_cover_over_music() {
+        resetState()
+
+        Services.NeteaseWebLyricsService.title = "Music"
+        Services.NeteaseWebLyricsService.artist = "Music Artist"
+        Services.NeteaseWebLyricsService.playbackState = "playing"
+        Services.NeteaseWebLyricsService.artUrl = "file:///tmp/music-cover.jpg"
+
+        const video = makePlayer(0)
+        video.trackTitle = "Video"
+        video.trackArtist = ""
+        video.trackArtUrl = "file:///tmp/video-cover.jpg"
+        video.playbackState = MprisPlaybackState.Stopped
+        video.isPlaying = false
+        Services.MediaService._activePlayerRef = video
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.MediaService._positionTick += 1
+
+        compare(Services.MediaControlService.title, "Music")
+        compare(Services.MediaControlService.artist, "Music Artist")
+        compare(Services.MediaControlService.artUrl, "file:///tmp/music-cover.jpg")
+    }
+
     function test_web_art_url_is_preferred_when_mpris_cover_missing() {
         resetState()
 

@@ -71,7 +71,10 @@ Singleton {
             return Services.NeteaseWebLyricsService.artist !== "" ? Services.NeteaseWebLyricsService.artist : (Services.MediaService.hasPlayer ? Services.MediaService.artist : "")
         if (root._mprisPlaying) {
             const a = Services.MediaService.artist
-            return a !== "" ? a : (Services.NeteaseWebLyricsService.artist !== "" ? Services.NeteaseWebLyricsService.artist : a)
+            // A titled MPRIS player with no artist is a complete metadata
+            // value (for example, a video), not permission to inherit the
+            // artist from the lyric session.
+            return a
         }
         if (root._neteasePlaying && Services.NeteaseWebLyricsService.artist !== "")
             return Services.NeteaseWebLyricsService.artist
@@ -84,9 +87,10 @@ Singleton {
             return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
         if (root._mprisPlaying)
             return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
-        // MPRIS not playing: fall back to any available Netease art so the
-        // cover follows the still-playing previous source like title/progress.
-        if (neteaseArt !== "")
+        // A stopped MPRIS player can retain its last cover even after the
+        // lyric session becomes the visible media source. Do not let that
+        // stale video cover survive the source switch.
+        if (Services.NeteaseWebLyricsService.active)
             return neteaseArt
         return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
     }

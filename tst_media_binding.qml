@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell.Services.Mpris
 import "./services" as Services
 
 // Behavioral checks for lyric session binding and multi-tab arbitration,
@@ -21,12 +22,14 @@ Item {
         console.log("FAIL:", label, "expected", JSON.stringify(expected), "got", JSON.stringify(actual))
     }
 
-    function makePlayer(title, artist) {
+    function makePlayer(title, artist, artUrl, playbackState, isPlaying) {
         return { identity: "Firefox", desktopEntry: "firefox",
             dbusName: "org.mpris.MediaPlayer.firefox.test", trackTitle: title,
-            trackArtist: artist, trackAlbum: "", trackArtUrl: "",
+            trackArtist: artist, trackAlbum: "", trackArtUrl: artUrl || "",
             positionSupported: true, position: 0, lengthSupported: true,
-            length: 100, playbackState: 2, isPlaying: true }
+            length: 100,
+            playbackState: playbackState === undefined ? MprisPlaybackState.Playing : playbackState,
+            isPlaying: isPlaying === undefined ? true : isPlaying }
     }
 
     function run() {
@@ -52,31 +55,58 @@ Item {
             media._activePlayerRef = null
             root._steps.push(function() {
                 check("player removed -> rebound", lyrics.boundToActivePlayer, true)
-                check("rebound restores line", lyrics.currentLyric, "Hello line")
+                 check("rebound restores line", lyrics.currentLyric, "Hello line")
 
-                // --- Arbitration: playing session beats paused other-tab payloads.
-                lyrics._resetState()
-                media._activePlayerRef = null
-                lyrics._applyPayload({ songId: "7", title: "Playing Song", artist: "A",
-                    playbackState: "playing", positionMs: 5000, durationMs: 200000 })
-                check("arbitration setup playing", lyrics.playbackState, "playing")
+                 // A titled video with no artist must not inherit the
+                 // currently active NetEase song's artist or artwork.
+                 lyrics.title = "Music"
+                 lyrics.artist = "Music Artist"
+                 lyrics.artUrl = "file:///tmp/music-cover.jpg"
+                 lyrics.playbackState = "playing"
+                 media._activePlayerRef = makePlayer("Video", "", "file:///tmp/video-cover.jpg",
+                     MprisPlaybackState.Playing, true)
+                 media._syncArtUrl()
+                 root._steps.push(function() {
+                     check("video keeps its title", control.title, "Video")
+                     check("video does not inherit artist", control.artist, "")
+                     check("video keeps its cover", control.artUrl, "file:///tmp/video-cover.jpg")
 
-                lyrics._applyPayload({ songId: "9", title: "Paused Tab Song", artist: "B",
-                    playbackState: "paused", positionMs: 100, durationMs: 200000 })
-                check("paused other tab ignored", lyrics.songId, "7")
-                check("ignored payload kept title", lyrics.title, "Playing Song")
+                     // Stopping that video must expose the music cover again,
+                     // even while the stopped MPRIS player remains selected.
+                     media._activePlayerRef = makePlayer("Video", "", "file:///tmp/video-cover.jpg",
+                         MprisPlaybackState.Stopped, false)
+                     root._steps.push(function() {
+                         check("stopped video restores music title", control.title, "Music")
+                         check("stopped video restores music artist", control.artist, "Music Artist")
+                         check("stopped video restores music cover", control.artUrl, "file:///tmp/music-cover.jpg")
 
-                lyrics._applyPayload({ songId: "9", title: "Next Playing Song", artist: "B",
-                    playbackState: "playing", positionMs: 10, durationMs: 200000 })
-                check("newer playing tab takes over", lyrics.songId, "9")
+                         // --- Arbitration: playing session beats paused other-tab payloads.
+                         lyrics._resetState()
+                         media._activePlayerRef = null
+                         lyrics._applyPayload({ songId: "7", title: "Playing Song", artist: "A",
+                             playbackState: "playing", positionMs: 5000, durationMs: 200000 })
+                         check("arbitration setup playing", lyrics.playbackState, "playing")
 
-                media._activePlayerRef = null
-                lyrics._resetState()
-                console.log("Totals:", root._checks - root._failures, "passed,", root._failures, "failed")
-                Qt.quit(root._failures === 0 ? 0 : 1)
-            })
-            Qt.callLater(root._steps.shift())
-        })
+                         lyrics._applyPayload({ songId: "9", title: "Paused Tab Song", artist: "B",
+                             playbackState: "paused", positionMs: 100, durationMs: 200000 })
+                         check("paused other tab ignored", lyrics.songId, "7")
+                         check("ignored payload kept title", lyrics.title, "Playing Song")
+
+                         lyrics._applyPayload({ songId: "9", title: "Next Playing Song", artist: "B",
+                             playbackState: "playing", positionMs: 10, durationMs: 200000 })
+                         check("newer playing tab takes over", lyrics.songId, "9")
+
+                         media._activePlayerRef = null
+                         lyrics._resetState()
+                         console.log("Totals:", root._checks - root._failures, "passed,", root._failures, "failed")
+                         Qt.quit()
+                     })
+                     Qt.callLater(root._steps.shift())
+                 })
+                 Qt.callLater(root._steps.shift())
+             })
+             Qt.callLater(root._steps.shift())
+         })
         Qt.callLater(root._steps.shift())
     }
 
