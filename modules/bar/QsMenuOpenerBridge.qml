@@ -7,7 +7,10 @@ Item {
     visible: false
     width: 0
     height: 0
-    property var menu: null
+    // Preserve the native handle type through the Loader boundary. A `var`
+    // property converts QsMenuEntry handles to QJSValue, which QsMenuOpener
+    // cannot assign to its strongly typed menu property.
+    property QsMenuHandle menu: null
     property alias children: opener.children
     property var values: []
     property int count: 0

@@ -150,11 +150,6 @@ Item {
     property Item submenuAnchorRow: null
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
     property var submenuEntries: []
-    // Native entries expose their child menu through a QsMenuHandle. Keep
-    // this separate from the entry itself because QsMenuOpener accepts the
-    // handle, not the QsMenuEntry wrapper.
-    readonly property var resolvedSubmenuHandle: submenuEntry && submenuEntry.menu
-        ? submenuEntry.menu : null
     property real heldHeight: 420
     property real rawColumnHeight: menuColumn.implicitHeight
     property real submenuAnimationTarget: 0
@@ -273,15 +268,15 @@ Item {
     // Submenus use a second opener because each QsMenuEntry owns its own handle.
     Loader {
         id: submenuOpenerLoader
-        active: !root.stubEntriesActive && root.resolvedSubmenuHandle != null
+        active: !root.stubEntriesActive && root.submenuEntry != null
         source: "QsMenuOpenerBridge.qml"
-        onLoaded: if (item) item.menu = root.resolvedSubmenuHandle
+        onLoaded: if (item) item.menu = root.submenuEntry
     }
 
     Binding {
         target: submenuOpenerLoader.item
         property: "menu"
-        value: root.resolvedSubmenuHandle
+        value: root.submenuEntry
         when: submenuOpenerLoader.item != null
     }
 

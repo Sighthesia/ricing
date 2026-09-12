@@ -1066,7 +1066,9 @@ PanelWindow {
                          enabled: root._exchangeCommitted && !MotionTokens.reducedMotion
                          NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutCubic }
                      }
-                     clip: true
+                    // Tray submenus extend beyond the fixed primary content
+                    // column; the outer viewport/mask owns screen clipping.
+                    clip: false
                      enabled: root.contentInteractive
                      onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
 

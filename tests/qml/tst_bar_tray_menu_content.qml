@@ -70,13 +70,11 @@ Item {
             item.menu = Qt.createQmlObject('import QtQuick; QtObject {}', root, "fakeMenuHandle")
             compare(menu.resolvedMenuHandle, item.menu)
         }
-        function test_submenuResolvesEntryMenuHandle() {
-            var submenuHandle = { id: "child-menu" }
+        function test_submenuOpenerKeepsEntryHandle() {
             var parent = fakeEntry("More", { hasChildren: true })
-            parent.menu = submenuHandle
             var item = makeMenu([parent])
             item.openSubmenu(parent, null)
-            compare(item.resolvedSubmenuHandle, submenuHandle)
+            compare(item.submenuEntry, parent)
         }
         function test_rowsRenderAndSeparatorNotClickable() {
             var sep = fakeEntry("", { isSeparator: true })
