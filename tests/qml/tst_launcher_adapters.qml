@@ -465,6 +465,51 @@ Item {
             verify(executed && executed.ok === true)
         }
 
+        function test_clipboardAdapterFormatsTextMetadata() {
+            var adapters = LauncherAdapters.createAdapters({ clipboardBackend: clipBackend })
+            var shortText = null
+            adapters.clipboard.refresh("", "clipboard", function(result) {
+                shortText = result
+            })
+
+            clipBackend.complete([
+                { id: "short", preview: "hello", mime: "text/plain", isImage: false, firstSeenMs: 1700000100000 },
+                { id: "long", preview: "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", mime: "text/plain", isImage: false, firstSeenMs: 1700000200000 }
+            ])
+
+            var outcome = null
+            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
+            compare(outcome.length, 2)
+            verify(outcome[0].description.indexOf("5 characters") >= 0)
+            verify(outcome[1].description.indexOf("Long text") >= 0)
+            verify(outcome[1].description.indexOf("100 characters") < 0)
+            verify(outcome[0].description.indexOf("copied") >= 0)
+        }
+
+        function test_clipboardAdapterFormatsImageMetadataAndFallsBackToMime() {
+            var parsed = LauncherAdapters.parseClipboardImageMeta(
+                "[[ binary data 12345 png 1920x1080 ]]")
+            compare(parsed.size, "12345")
+            compare(parsed.format, "png")
+            compare(parsed.width, 1920)
+            compare(parsed.height, 1080)
+
+            var adapters = LauncherAdapters.createAdapters({ clipboardBackend: clipBackend })
+            clipBackend.complete([
+                { id: "image", preview: "[[ binary data 12345 png 1920x1080 ]]", mime: "image/png", isImage: true, firstSeenMs: 1700000100000 },
+                { id: "bad-image", preview: "[[ binary data unavailable ]]", mime: "image/jpeg", isImage: true, firstSeenMs: 1700000200000 }
+            ])
+            var outcome = null
+            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
+
+            compare(outcome[0].displayName, "[Image] 1920x1080")
+            verify(outcome[0].description.indexOf("png") >= 0)
+            verify(outcome[0].description.indexOf("12345") >= 0)
+            verify(outcome[0].description.indexOf("copied") >= 0)
+            verify(outcome[1].description.indexOf("image/jpeg") >= 0)
+            verify(outcome[1].description.indexOf("unavailable") < 0)
+        }
+
         function test_clipboardAdapterWaitsForProbeBeforeErroring() {
             clipBackend.reset()
             clipBackend.available = false

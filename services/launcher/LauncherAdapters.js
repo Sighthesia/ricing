@@ -249,13 +249,34 @@ function createAppsAdapter(config) {
 
 // ---- Clipboard ----
 
+function parseClipboardImageMeta(preview) {
+    if (typeof preview !== "string")
+        return null
+    var match = /^\[\[\s*binary data\s+(\S+)\s+(\S+)\s+(\d+)x(\d+)\s*\]\]$/.exec(preview.trim())
+    if (!match)
+        return null
+    return {
+        size: match[1],
+        format: match[2],
+        width: Number(match[3]),
+        height: Number(match[4])
+    }
+}
+
 function clipboardItem(raw) {
     var preview = raw.preview == null ? "" : String(raw.preview)
     var isImage = !!raw.isImage
     var mime = raw.mime == null ? "text/plain" : String(raw.mime)
     var seenMs = toCount(raw.firstSeenMs)
-    var title = isImage ? "[Image]" : (normalizeText(preview).length ? preview : "(empty)")
+    var imageMeta = isImage ? parseClipboardImageMeta(preview) : null
+    var title = isImage
+                 ? (imageMeta ? "[Image] " + imageMeta.width + "x" + imageMeta.height : "[Image]")
+                 : (normalizeText(preview).length ? preview : "(empty)")
     var description = mime
+    if (imageMeta)
+        description += " · " + imageMeta.format + " · " + imageMeta.size + " bytes"
+    else if (!isImage)
+        description += " · " + (preview.length >= 100 ? "Long text" : preview.length + " characters")
     var seen = timeLabel(seenMs)
     if (seen)
         description += " · copied " + seen
