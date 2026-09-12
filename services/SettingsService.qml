@@ -26,6 +26,7 @@ QtObject {
         themeScheme: "tonal-spot",
         presetScheme: "",
         syncAppThemes: false,
+        syncSystemTheme: true,
         terminalClearText: true,
         panelOpacity: 0.9,
         cornerRadius: 12,
@@ -397,6 +398,9 @@ QtObject {
                 // Sync GTK/Qt/kitty app themes and the system color scheme
                 // when the shell's light/dark or palette changes.
                 property bool syncAppThemes: false
+                // Push the system light/dark preference (portals, libadwaita,
+                // Electron) on mode flips, independent of syncAppThemes.
+                property bool syncSystemTheme: true
                 // Transparent-terminal clear text: full-brightness terminal
                 // text on translucent backgrounds (manages dim_opacity and
                 // background_tint in kitty.conf); hierarchy reads via color.

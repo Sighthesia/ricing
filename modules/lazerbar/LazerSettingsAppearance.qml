@@ -386,6 +386,17 @@ LazerSettingsSection {
         saveCallback: root.saveCallback
     }
 
+    // Push system light/dark preference independently of template sync.
+    LazerSettingsRow {
+        id: syncSystemThemeRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: "同步系统亮暗"; descriptionText: "亮暗变化时推送系统色偏好，Electron/portal 应用跟随"
+        defaultValue: root.defaultOf("syncSystemTheme")
+        currentValue: root.settingsObject ? root.settingsObject.syncSystemTheme : null
+        resetCallback: function() { root.resetKey("syncSystemTheme") }
+        LazerSettingsToggle { id: syncSystemThemeToggleControl; checked: root.settingsObject ? root.settingsObject.syncSystemTheme !== false : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.syncSystemTheme = value; root.save() } } }
+    }
     LazerSettingsRow {
         id: syncAppThemesRow
         width: parent.width - 16; x: 8

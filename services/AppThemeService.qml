@@ -6,9 +6,11 @@ import "./" as Services
 
 // Apply the shell's active palette to system apps (noctalia/DymicShell
 // model): renders kitty/GTK/qtct templates from the palette for the
-// effective light/dark mode and syncs the system color-scheme preference.
+// effective light/dark mode. The system color-scheme preference (portals,
+// libadwaita, Electron) is pushed independently via appearance.syncSystemTheme
+// so mode flips reach Electron even when template sync stays off.
 // Triggered on scheme flips, palette source changes and wallpaper
-// extraction writes; opt-in via appearance.syncAppThemes.
+// extraction writes; templates opt-in via appearance.syncAppThemes.
 //
 // Deliberately resolves preset paths inside the helper script: passing a
 // scheme NAME keeps this service free of cross-singleton registry state,
@@ -17,6 +19,9 @@ Singleton {
     id: root
 
     readonly property bool enabled: Services.SettingsService.appearance.syncAppThemes === true
+    // System light/dark push stays on for configs written before the key
+    // existed, so Electron/portal apps follow mode flips out of the box.
+    readonly property bool systemEnabled: Services.SettingsService.appearance.syncSystemTheme !== false
     readonly property bool presetActive: {
         const appearance = Services.SettingsService.appearance
         return appearance.themeAdaptation === false
@@ -61,6 +66,23 @@ Singleton {
         applyProcess.running = true
     }
 
+    // Push light/dark to the system without touching templates.
+    function pushSystemTheme() {
+        if (!root.systemEnabled)
+            return
+        const mode = Services.SettingsService.effectiveColorScheme
+        if (mode === "")
+            return
+        const prefix = root.homePrefix !== "" ? " --home-prefix '" + root.homePrefix + "'" : ""
+        const cmd = "python3 " + Quickshell.shellDir
+            + "/scripts/theming/apply_app_themes.py"
+            + " --mode '" + mode + "' --only-system-theme" + prefix
+        applyProcess.command = ["sh", "-c", cmd]
+        // Restart-safe: bounce so a run while running re-fires after exit.
+        applyProcess.running = false
+        applyProcess.running = true
+    }
+
     // The clear-text toggle only touches kitty.conf: sync it immediately
     // even when full app-theme sync is disabled (fast path, no rendering).
     function syncTerminalText() {
@@ -89,7 +111,7 @@ Singleton {
     // Scheme flips and palette source changes re-apply immediately.
     property Connections _settingsConnection: Connections {
         target: Services.SettingsService
-        function onEffectiveColorSchemeChanged() { root.apply() }
+        function onEffectiveColorSchemeChanged() { root.apply(); root.pushSystemTheme() }
     }
 
     property Connections _appearanceConnection: Connections {
@@ -97,6 +119,7 @@ Singleton {
         function onPresetSchemeChanged() { root.apply() }
         function onThemeAdaptationChanged() { root.apply() }
         function onSyncAppThemesChanged() { root.apply() }
+        function onSyncSystemThemeChanged() { root.pushSystemTheme() }
         function onTerminalClearTextChanged() { root.syncTerminalText() }
     }
 
@@ -117,5 +140,5 @@ Singleton {
         onFileChanged: root._reloadTimer.restart()
     }
 
-    Component.onCompleted: Qt.callLater(root.apply)
+    Component.onCompleted: Qt.callLater(function() { root.apply(); root.pushSystemTheme() })
 }

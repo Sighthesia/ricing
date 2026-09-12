@@ -215,6 +215,16 @@ def test_only_kitty_text_needs_no_palette(sandbox):
     assert "dim_opacity 1.0" in conf
 
 
+def test_only_system_theme_needs_no_palette(sandbox):
+    tmp, _ = sandbox
+    home = tmp / "home"
+    result = run_apply(tmp / "missing.json", "dark", home, ["--only-system-theme"])
+    assert result.returncode == 0, result.stderr
+    assert "System theme applied: mode=dark" in result.stdout
+    # Sandbox path renders no templates and touches no app configs.
+    assert not (home / ".config/kitty/kitty-colors.conf").exists()
+
+
 def _slot(content, name):
     import re
     match = re.search(rf"^{name}\s+(#[0-9a-fA-F]{{6}})", content, re.MULTILINE)

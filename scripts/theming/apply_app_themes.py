@@ -50,6 +50,9 @@ def parse_args() -> argparse.Namespace:
                         help='Remove the managed clear-text lines from kitty.conf')
     parser.add_argument('--only-kitty-text', action='store_true', default=False,
                         help='Only sync the kitty.conf clear-text block, skip template rendering')
+    parser.add_argument('--only-system-theme', action='store_true', default=False,
+                        help='Only push the system light/dark preference (gsettings '
+                             'color-scheme + gtk-theme), skip template rendering')
     return parser.parse_args()
 
 
@@ -172,25 +175,35 @@ def _sync_gtk_theme(gsettings: str, mode: str) -> None:
         print(f"Warning: gtk-theme set failed: {e}", file=sys.stderr)
 
 
+def sync_system_theme(mode: str) -> None:
+    """Push the system light/dark preference (portals, libadwaita, Electron).
+
+    Standalone so a mode flip reaches Electron/Chromium even when full app
+    template sync is disabled (noctalia syncGsettings model).
+    """
+    gsettings = _which("gsettings")
+    if not gsettings:
+        return
+    value = "prefer-dark" if mode == "dark" else "prefer-light"
+    try:
+        current = subprocess.run(
+            [gsettings, "get", "org.gnome.desktop.interface", "color-scheme"],
+            capture_output=True, text=True, timeout=5).stdout.strip()
+        if current != f"'{value}'":
+            subprocess.run(
+                [gsettings, "set", "org.gnome.desktop.interface",
+                 "color-scheme", value],
+                capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"Warning: gsettings sync failed: {e}", file=sys.stderr)
+        return
+    # GTK3 visual theme pairs with the scheme (adw-gtk3 family).
+    _sync_gtk_theme(gsettings, mode)
+
+
 def run_hooks(mode: str) -> None:
     """System-level application hooks (never run under --home-prefix)."""
-    # System light/dark preference (GTK3 apps, libadwaita, portals).
-    gsettings = _which("gsettings")
-    if gsettings:
-        value = "prefer-dark" if mode == "dark" else "prefer-light"
-        try:
-            current = subprocess.run(
-                [gsettings, "get", "org.gnome.desktop.interface", "color-scheme"],
-                capture_output=True, text=True, timeout=5).stdout.strip()
-            if current != f"'{value}'":
-                subprocess.run(
-                    [gsettings, "set", "org.gnome.desktop.interface",
-                     "color-scheme", value],
-                    capture_output=True, text=True, timeout=5)
-        except (OSError, subprocess.TimeoutExpired) as e:
-            print(f"Warning: gsettings sync failed: {e}", file=sys.stderr)
-        # GTK3 visual theme pairs with the scheme (adw-gtk3 family).
-        _sync_gtk_theme(gsettings, mode)
+    sync_system_theme(mode)
 
     # Live kitty reload: the config include is ensured below in main().
     if _which("pkill"):
@@ -216,6 +229,17 @@ def main() -> int:
         sync_kitty_clear_text(home, args.terminal_clear_text)
         state = "on" if args.terminal_clear_text else "off"
         print(f"Kitty clear text {state}")
+        return 0
+
+    if args.only_system_theme:
+        # System-theme-only fast path: no palette or template config needed.
+        # Lets the shell push light/dark to portals/Electron even when full
+        # app template sync is off.
+        if args.home_prefix is None:
+            sync_system_theme(args.mode)
+        else:
+            print("System theme sync skipped (sandbox)")
+        print(f"System theme applied: mode={args.mode}")
         return 0
 
     if args.scheme_name:
