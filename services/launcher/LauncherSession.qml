@@ -61,6 +61,7 @@ QtObject {
     // Monotonic guard: only the newest dispatched refresh, or the session
     // alive when execution started, may commit state.
     property int _refreshToken: 0
+    property bool _executionInFlight: false
 
     // Query edits re-request data for the newly parsed mode while open;
     // closed sessions ignore edits until the next open().
@@ -91,7 +92,14 @@ QtObject {
         if (root.visible)
             return
         root.visible = true
-        root.refresh()
+        // Publish visibility before pulling the first result pool so the
+        // surface can claim keyboard focus in the same event-loop turn.
+        var openToken = ++root._refreshToken
+        Qt.callLater(function() {
+            if (openToken !== root._refreshToken || !root.visible)
+                return
+            root.refresh()
+        })
     }
 
     function close() {
@@ -117,6 +125,7 @@ QtObject {
         root.loading = false
         root.error = ""
         root.selectedIndex = -1
+        root._executionInFlight = false
     }
 
     function toggle() {
@@ -259,8 +268,9 @@ QtObject {
     }
 
     function execute(item) {
-        if (!item || !root.visible || !root.interactive)
+        if (!item || !root.visible || !root.interactive || root._executionInFlight)
             return
+        root._executionInFlight = true
         var adapter = _adapterFor(mode)
         var sessionToken = _refreshToken
         // A throwing adapter must not swallow the completion callback: the
@@ -280,6 +290,7 @@ QtObject {
     function _completeExecute(sessionToken, outcome) {
         if (sessionToken !== _refreshToken)
             return
+        root._executionInFlight = false
         if (outcome && outcome.ok) {
             root.close()
             return

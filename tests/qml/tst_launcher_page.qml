@@ -77,6 +77,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
             svc().open()
+            wait(0)
             resolveRefresh(apps, 0, items)
             return apps
         }
@@ -370,6 +371,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
             svc().open()
+            wait(0)
 
             compare(svc().loading, true)
             compare(page.loadingState.visible, true)
@@ -388,6 +390,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
             svc().open()
+            wait(0)
             resolveRefresh(apps, 0, { error: "cache unavailable" })
 
             compare(svc().error, "cache unavailable")

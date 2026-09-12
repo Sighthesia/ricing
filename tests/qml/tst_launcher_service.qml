@@ -72,6 +72,11 @@ Item {
             return sessionLoader.item
         }
 
+        function openAndWait() {
+            svc().open()
+            wait(0)
+        }
+
         function init() {
             verify(sessionLoader.status === Loader.Ready,
                    "LauncherSession failed to load: " + sessionLoader.source)
@@ -132,6 +137,9 @@ Item {
             svc().open()
 
             compare(svc().visible, true)
+            compare(apps.queries.length, 0)
+            wait(0)
+
             compare(svc().mode, "apps")
             compare(svc().loading, true)
             compare(apps.queries.length, 1)
@@ -165,7 +173,7 @@ Item {
             var keys = makeManualAdapter()
             svc()._adapters = ({ apps: apps, clipboard: clips, shortcuts: keys })
 
-            svc().open()
+            openAndWait()
             svc().query = ">clip secret"
 
             compare(svc().mode, "clipboard")
@@ -201,7 +209,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [
                 makeItem("a", "Alpha", 0, 0),
                 makeItem("b", "Beta", 0, 0),
@@ -229,7 +237,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [
                 makeItem("alpha", "Alpha", 0, 0),
                 makeItem("beta", "Beta", 0, 0),
@@ -257,7 +265,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("firefox", "Firefox", 0, 0)])
 
             svc().executeSelected()
@@ -280,7 +288,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("firefox", "Firefox", 0, 0)])
 
             svc().executeSelected()
@@ -298,7 +306,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, { error: "cache unavailable" })
 
             compare(svc().visible, true)
@@ -313,7 +321,7 @@ Item {
             var clips = makeManualAdapter()
             svc()._adapters = ({ apps: apps, clipboard: clips })
 
-            svc().open()
+            openAndWait()
             compare(apps.pendingRefreshes.length, 1)
 
             svc().query = ">clip x"
@@ -343,7 +351,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             svc().close()
 
             resolveRefresh(apps, 0, [makeItem("late", "Late", 9, 9)])
@@ -359,7 +367,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [
                 makeItem("alpha", "Alpha", 0, 0),
                 makeItem("beta", "Beta", 0, 0),
@@ -388,7 +396,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
             var stablePool = svc().displayPool
 
@@ -396,7 +404,7 @@ Item {
             // open must serve results locally without re-pulling the source
             // and without rebuilding the pooled array.
             svc().close()
-            svc().open()
+            openAndWait()
             compare(apps.queries.length, 1, "reopen re-pulled the source")
             verify(svc().displayPool === stablePool)
             compare(svc().results.length, 2)
@@ -415,7 +423,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
             var firstPool = svc().displayPool
             svc().close()
@@ -439,7 +447,7 @@ Item {
             compare(svc().displayPool[1].id, "n")
 
             // The next open serves the fresh pool without re-pulling.
-            svc().open()
+            openAndWait()
             compare(apps.queries.length, 2, "reopen after revalidation re-pulled the source")
             compare(svc().results.length, 2)
             compare(svc().results[1].id, "n")
@@ -449,7 +457,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
             var stablePool = svc().displayPool
             svc().close()
@@ -464,7 +472,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
             var stablePool = svc().displayPool
             svc().close()
@@ -498,7 +506,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = ({ apps: apps })
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
 
             svc().revalidatePool()
@@ -515,7 +523,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
 
             compare(svc().handleKey("down"), "down")
@@ -531,7 +539,7 @@ Item {
         }
 
         function test_escapeInRoutedModeKeepsPrefixAndClosesOnEmpty() {
-            svc().open()
+            openAndWait()
             svc().query = ">clip foo"
 
             compare(svc().handleKey("escape"), "clear")
@@ -547,7 +555,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             svc().query = "fir"
 
             compare(svc().handleKey("escape"), "clear")
@@ -562,7 +570,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             compare(svc().handleKey("enter"), "none")
 
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
@@ -577,7 +585,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
             apps.execute = function(item, done) {
                 throw new Error("broken entry")
@@ -595,7 +603,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
             var queriesBefore = apps.queries.length
 
@@ -615,7 +623,7 @@ Item {
             var clips = makeManualAdapter()
             svc()._adapters = ({ apps: apps, clipboard: clips })
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
             compare(svc()._pooledMode, "apps")
 
@@ -624,7 +632,7 @@ Item {
             compare(svc()._pooledMode, "clipboard")
 
             svc().close()
-            svc().open()
+            openAndWait()
             compare(apps.queries.length, 2, "apps reopen must re-pull after a clipboard session")
             resolveRefresh(apps, 1, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
             compare(svc().results.length, 2)
@@ -642,7 +650,7 @@ Item {
             var apps = makeManualAdapter()
             svc()._adapters = { apps: apps }
 
-            svc().open()
+            openAndWait()
             resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 1)])
             var first = svc().results
 
@@ -665,6 +673,7 @@ Item {
             svc()._adapters = { clipboard: clips }
 
             svc().openClipboard()
+            wait(0)
 
             compare(svc().visible, true)
             compare(svc().query, ">clip ")
@@ -674,6 +683,7 @@ Item {
 
             svc().close()
             svc().openShortcuts()
+            wait(0)
             compare(svc().mode, "shortcuts")
             compare(svc().query, ">key ")
         }
