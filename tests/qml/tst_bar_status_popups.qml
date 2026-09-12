@@ -109,12 +109,15 @@ Item {
             + ' property int scanCalls: 0;'
             + ' property int connectCalls: 0;'
             + ' property string lastSsid: "";'
+            + ' property string lastPassword: "";'
+            + ' property string lastSecurity: "";'
             + ' property int disconnectCalls: 0;'
             + ' function setWifiEnabled(v) { powerCalls++; lastPower = v; wifiEnabled = v }'
             + ' function scan() { scanCalls++ }'
             + ' function getStatusText() { return "HomeWifi" }'
             + ' function getSignalLabel(s) { return s >= 80 ? "Excellent" : "Good" }'
-            + ' function connect(ssid) { connectCalls++; lastSsid = ssid }'
+            + ' function isSecured(s) { return s && s !== "--" && s !== "open" }'
+            + ' function connect(ssid, password, hidden, security) { connectCalls++; lastSsid = ssid; lastPassword = password; lastSecurity = security }'
             + ' function disconnect(ssid) { disconnectCalls++; lastSsid = ssid } }',
             root, "fakeWifi")
         svc.networks = {
@@ -264,6 +267,29 @@ Item {
             var err = findByName(item, "wifiErrorText")
             verify(err.visible, "error line visible")
             compare(err.text, "Incorrect password")
+        }
+
+        function test_networkSecuredConnectionCollectsPassword() {
+            var svc = makeNetworkService()
+            svc.wifiConnected = false
+            svc.networks = {
+                Cafe: { ssid: "Cafe", security: "WPA2", signal: 55, connected: false, existing: false }
+            }
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+
+            item.handleNetworkTap(item.wifiList[0])
+            var panel = findByName(item, "wifiPasswordPanel")
+            var input = findByName(item, "wifiPasswordInput")
+            verify(panel.visible, "password panel should open for secured network")
+            input.text = "secret"
+            item.submitWifiPassword()
+            compare(svc.connectCalls, 1)
+            compare(svc.lastSsid, "Cafe")
+            compare(svc.lastPassword, "secret")
+            compare(svc.lastSecurity, "WPA2")
+            verify(!panel.visible, "password panel should close after submit")
         }
 
         function test_networkEthernetRow() {

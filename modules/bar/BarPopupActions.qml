@@ -148,6 +148,8 @@ Item {
         return arr.slice(0, 6)
     }
     readonly property var networkService: payload && payload.networkService ? payload.networkService : null
+    property var pendingWifiNetwork: null
+    property string wifiPassword: ""
     readonly property bool wifiEnabled: {
         if (root.networkService && root.networkService.wifiEnabled !== undefined)
             return !!root.networkService.wifiEnabled
@@ -478,9 +480,29 @@ Item {
         try {
             if (network.connected && typeof service.disconnect === "function")
                 service.disconnect(String(network.ssid))
+            else if (!network.existing && service.isSecured && service.isSecured(String(network.security || "--"))) {
+                root.pendingWifiNetwork = network
+                root.wifiPassword = ""
+                wifiPasswordInput.forceActiveFocus()
+            }
             else if (typeof service.connect === "function")
-                service.connect(String(network.ssid))
+                service.connect(String(network.ssid), "", false, String(network.security || ""))
         } catch (e) {}
+    }
+
+    function cancelWifiPassword() {
+        root.pendingWifiNetwork = null
+        root.wifiPassword = ""
+        wifiPasswordInput.focus = false
+    }
+
+    function submitWifiPassword() {
+        var network = root.pendingWifiNetwork
+        if (!network || !root.wifiPassword || !root.networkService || root.wifiConnecting)
+            return
+        root.networkService.connect(String(network.ssid), root.wifiPassword, false,
+            String(network.security || "wpa-psk"))
+        root.cancelWifiPassword()
     }
 
     function handleTrayActivate() {
@@ -1055,6 +1077,77 @@ Item {
                     wrapMode: Text.Wrap
                     maximumLineCount: 2
                     elide: Text.ElideRight
+                }
+
+                // Collect credentials only for an unsaved secured network.
+                Rectangle {
+                    id: wifiPasswordPanel
+                    objectName: "wifiPasswordPanel"
+                    width: parent.width
+                    height: root.pendingWifiNetwork ? 74 : 0
+                    visible: root.pendingWifiNetwork !== null
+                    color: LazerTheme.settingsCard
+                    clip: true
+
+                    TextInput {
+                        id: wifiPasswordInput
+                        objectName: "wifiPasswordInput"
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.right: wifiPasswordConnect.left
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: 32
+                        text: root.wifiPassword
+                        echoMode: TextInput.Password
+                        color: LazerTheme.textPrimary
+                        selectionColor: LazerTheme.settingsAccent
+                        clip: true
+
+                        onTextChanged: root.wifiPassword = text
+                        Keys.onReturnPressed: root.submitWifiPassword()
+                        Keys.onEnterPressed: root.submitWifiPassword()
+                    }
+
+                    // Submit credentials without exposing the password in the UI.
+                    Rectangle {
+                        id: wifiPasswordConnect
+                        anchors.right: wifiPasswordCancel.left
+                        anchors.rightMargin: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 58
+                        height: 32
+                        color: LazerTheme.settingsAccent
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Connect"
+                            color: LazerTheme.textPrimary
+                            font.pixelSize: 10
+                        }
+
+                        TapHandler { onTapped: root.submitWifiPassword() }
+                    }
+
+                    // Dismiss the credential prompt without changing network state.
+                    Rectangle {
+                        id: wifiPasswordCancel
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 48
+                        height: 32
+                        color: "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Cancel"
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 10
+                        }
+
+                        TapHandler { onTapped: root.cancelWifiPassword() }
+                    }
                 }
 
                 Rectangle {

@@ -133,10 +133,11 @@ Singleton {
         if (!root.nmcliAvailable || root.connecting) return
 
         isHidden = isHidden || false
-        securityKey = securityKey || ""
+        var requestedSecurity = securityKey || (root.networks[ssid] ? root.networks[ssid].security : "")
+        securityKey = _connectionSecurityKey(requestedSecurity)
 
         var isSaved = root.networks[ssid] && root.networks[ssid].existing
-        var isEnterprise = securityKey ? _isEnterprise(securityKey)
+        var isEnterprise = requestedSecurity ? _isEnterprise(requestedSecurity)
             : _isEnterprise(root.networks[ssid] ? root.networks[ssid].security : "")
 
         // Only support open / WPA-PSK / WEP in this精简 build; EAP rejected.
@@ -186,6 +187,15 @@ Singleton {
         if (!security) return false
         var s = security.toUpperCase()
         return s.indexOf("802.1X") !== -1 || s.indexOf("EAP") !== -1 || s.indexOf("ENTERPRISE") !== -1
+    }
+
+    function _connectionSecurityKey(security) {
+        var s = String(security || "").toLowerCase()
+        if (!s || s === "--" || s === "open" || s === "none") return "open"
+        if (s.indexOf("wep") !== -1) return "wep"
+        if (s.indexOf("sae") !== -1 && s.indexOf("wpa2") === -1) return "sae"
+        if (s.indexOf("wpa") !== -1) return "wpa-psk"
+        return s
     }
 
     function isSecured(security) {
@@ -506,6 +516,24 @@ Singleton {
                 delayedScanTimer.restart()
                 if (!deviceStatusProcess.running)
                     deviceStatusProcess.running = true
+            }
+        }
+        onExited: function (code) {
+            if (!root.connecting || root.connectingTo !== connectProcess.ssid)
+                return
+            if (code === 0) {
+                root._wifiConnected = true
+                root._updateNetworkStatus(connectProcess.ssid, true)
+                root.connecting = false
+                root.connectingTo = ""
+                delayedScanTimer.interval = 5000
+                delayedScanTimer.restart()
+                if (!deviceStatusProcess.running)
+                    deviceStatusProcess.running = true
+            } else if (!root.lastError) {
+                root.connecting = false
+                root.connectingTo = ""
+                root.lastError = "Connection failed"
             }
         }
         stderr: StdioCollector {
