@@ -211,11 +211,11 @@ Singleton {
                 var metadata = byId[String(item.id)]
                 if (!metadata)
                     continue
-                if (metadata[0] === "image" && metadata.length >= 5) {
+                if (metadata[0] === "image" && metadata.length >= 6) {
                     item.imageFormat = metadata[1]
                     item.imageWidth = Number(metadata[2])
                     item.imageHeight = Number(metadata[3])
-                    item.imageSize = metadata.slice(4).join("|")
+                    item.imageBytes = Number(metadata[4])
                     item.metadataReady = true
                 } else if (metadata[0] === "text" && /^\d+$/.test(metadata[1])) {
                     item.textCharCount = Number(metadata[1])
@@ -236,8 +236,9 @@ Singleton {
                 + "if [ \"$kind\" = image ]; then "
                 + "path=\"/tmp/afloat-clipboard-meta-$id\"; "
                 + "if cliphist decode \"$id\" > \"$path\" 2>/dev/null; then "
-                + "meta=$(identify -format '%m|%w|%h|%b' \"$path\" 2>/dev/null); "
-                + "[ -n \"$meta\" ] && printf '%s|image|%s\\n' \"$id\" \"$meta\"; "
+                + "dims=$(identify -format '%m|%w|%h' \"$path\" 2>/dev/null); "
+                + "bytes=$(wc -c < \"$path\" 2>/dev/null | tr -d ' '); "
+                + "[ -n \"$dims\" ] && [ -n \"$bytes\" ] && printf '%s|image|%s|%s\\n' \"$id\" \"$dims\" \"$bytes\"; "
                 + "fi; rm -f \"$path\"; "
                 + "else count=$(cliphist decode \"$id\" 2>/dev/null | wc -m); "
                 + "printf '%s|text|%s\\n' \"$id\" \"$count\"; fi; done"

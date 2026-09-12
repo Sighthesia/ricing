@@ -495,10 +495,15 @@ Item {
             compare(spaced.format, "png")
             compare(spaced.width, 1705)
             compare(spaced.height, 905)
+            compare(LauncherAdapters.formatClipboardByteSize(482304), "482.3 KB")
+            compare(LauncherAdapters.formatClipboardByteSize(
+                LauncherAdapters.clipboardByteCount("471 KiB")), "482.3 KB")
+            compare(LauncherAdapters.formatClipboardByteSize(
+                LauncherAdapters.clipboardByteCount("2 MiB")), "2.1 MB")
 
             var adapters = LauncherAdapters.createAdapters({ clipboardBackend: clipBackend })
             clipBackend.complete([
-                { id: "image", preview: "[[ binary data 12345 png 1920x1080 ]]", imageFormat: "PNG", imageSize: "471 KiB", imageWidth: 1705, imageHeight: 905, metadataReady: true, mime: "image/png", isImage: true, firstSeenMs: 1700000100000 },
+                { id: "image", preview: "[[ binary data 12345 png 1920x1080 ]]", imageFormat: "PNG", imageBytes: 482304, imageWidth: 1705, imageHeight: 905, metadataReady: true, mime: "image/png", isImage: true, firstSeenMs: 1700000100000 },
                 { id: "bad-image", preview: "[[ binary data unavailable ]]", mime: "image/jpeg", isImage: true, firstSeenMs: 1700000200000 }
             ])
             var outcome = null
@@ -506,7 +511,7 @@ Item {
 
             compare(outcome[0].displayName, "[Image] 1705x905")
             verify(outcome[0].description.indexOf("png") >= 0)
-            verify(outcome[0].description.indexOf("471 KiB") >= 0)
+            verify(outcome[0].description.indexOf("482.3 KB") >= 0)
             verify(outcome[0].description.indexOf("copied") >= 0)
             verify(outcome[1].description.indexOf("image/jpeg") >= 0)
             verify(outcome[1].description.indexOf("unavailable") < 0)

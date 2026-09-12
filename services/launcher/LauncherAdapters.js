@@ -249,6 +249,49 @@ function createAppsAdapter(config) {
 
 // ---- Clipboard ----
 
+function clipboardByteCount(text) {
+    var match = /^\s*([\d.]+)\s*(B|KB|MB|GB|TB|KIB|MIB|GIB|TIB)?\s*$/i.exec(text == null ? "" : String(text))
+    if (!match)
+        return NaN
+    var value = Number(match[1])
+    var unit = (match[2] || "B").toUpperCase()
+    if (unit === "B")
+        return Math.round(value)
+    if (unit === "KB")
+        return Math.round(value * 1000)
+    if (unit === "MB")
+        return Math.round(value * 1000000)
+    if (unit === "GB")
+        return Math.round(value * 1000000000)
+    if (unit === "TB")
+        return Math.round(value * 1000000000000)
+    if (unit === "KIB")
+        return Math.round(value * 1024)
+    if (unit === "MIB")
+        return Math.round(value * 1048576)
+    if (unit === "GIB")
+        return Math.round(value * 1073741824)
+    if (unit === "TIB")
+        return Math.round(value * 1099511627776)
+    return NaN
+}
+
+function formatClipboardByteSize(bytes) {
+    var count = Number(bytes)
+    if (!isFinite(count) || count < 0)
+        return ""
+    var units = ["B", "KB", "MB", "GB", "TB"]
+    var value = count
+    var unitIndex = 0
+    while (value >= 1000 && unitIndex < units.length - 1) {
+        value = value / 1000
+        unitIndex++
+    }
+    if (unitIndex === 0)
+        return Math.round(value) + " B"
+    return (Math.round(value * 10) / 10) + " " + units[unitIndex]
+}
+
 function parseClipboardImageMeta(preview) {
     if (typeof preview !== "string")
         return null
@@ -277,10 +320,11 @@ function clipboardItem(raw) {
                  : (normalizeText(preview).length ? preview : "(empty)")
     var description = mime
     if (isImage) {
-        if (metadataReady && raw.imageFormat && raw.imageSize)
-            description += " | " + raw.imageFormat + " | " + raw.imageSize
+        var exactBytes = Number(raw.imageBytes)
+        if (metadataReady && raw.imageFormat && isFinite(exactBytes) && exactBytes >= 0)
+            description += " | " + raw.imageFormat + " | " + formatClipboardByteSize(exactBytes)
         else if (imageMeta)
-            description += " | " + imageMeta.format + " | " + imageMeta.size
+            description += " | " + imageMeta.format + " | " + formatClipboardByteSize(clipboardByteCount(imageMeta.size))
     } else if (metadataReady && Number(raw.textCharCount) >= 0)
         description += " | " + Number(raw.textCharCount) + " characters"
     else
