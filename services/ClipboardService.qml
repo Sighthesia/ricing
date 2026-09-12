@@ -320,24 +320,18 @@ Singleton {
         root._pruneMetadataCache()
         LauncherAdapters.applyClipboardMetadataCache(root.items, root._metadataCacheById)
         var command = ""
-                + "while [ \"$#\" -gt 1 ]; do "
-                + "id=\"$1\"; kind=\"$2\"; shift 2; "
-                + "if [ \"$kind\" = image ]; then "
-                + "path=\"/tmp/afloat-clipboard-meta-$id\"; "
-                + "if cliphist decode \"$id\" > \"$path\" 2>/dev/null; then "
-                + "dims=$(identify -format '%m|%w|%h' \"$path\" 2>/dev/null); "
-                + "bytes=$(wc -c < \"$path\" 2>/dev/null | tr -d ' '); "
-                + "[ -n \"$dims\" ] && [ -n \"$bytes\" ] && printf '%s|image|%s|%s\\n' \"$id\" \"$dims\" \"$bytes\"; "
-                + "fi; rm -f \"$path\"; "
-                + "else count=$(cliphist decode \"$id\" 2>/dev/null | wc -m); "
-                + "printf '%s|text|%s\\n' \"$id\" \"$count\"; fi; done"
+                + "while [ \"$#\" -gt 0 ]; do "
+                + "id=\"$1\"; shift; "
+                + "count=$(cliphist decode \"$id\" 2>/dev/null | wc -m); "
+                + "printf '%s|text|%s\\n' \"$id\" \"$count\"; done"
         var args = ["sh", "-c", command, "afloat-clipboard-meta"]
         var queued = false
         for (var index = 0; index < root.items.length; index++) {
-            if (root.items[index].metadataReady)
+            // Images already carry synchronous preview metadata; their exact
+            // bytes are resolved when their visible thumbnail is decoded.
+            if (root.items[index].metadataReady || root.items[index].isImage)
                 continue
             args.push(String(root.items[index].id))
-            args.push(root.items[index].isImage ? "image" : "text")
             queued = true
         }
         if (!queued)
@@ -480,6 +474,42 @@ Singleton {
     property var _thumbQueue: []
     property bool _thumbBusy: false
 
+    function _clipboardItemById(id) {
+        var wanted = String(id == null ? "" : id)
+        for (var index = 0; index < root.items.length; index++) {
+            var item = root.items[index]
+            if (item && String(item.id) === wanted)
+                return item
+        }
+        return null
+    }
+
+    function _storeImageMetadata(item, format, width, height, bytes) {
+        if (!item || !item.isImage)
+            return false
+        var imageWidth = Number(width)
+        var imageHeight = Number(height)
+        var imageBytes = Number(bytes)
+        if (!format || imageWidth <= 0 || imageHeight <= 0 || !(imageBytes >= 0))
+            return false
+        item.imageFormat = format
+        item.imageWidth = imageWidth
+        item.imageHeight = imageHeight
+        item.imageBytes = imageBytes
+        item.metadataReady = true
+        root._metadataCacheById[String(item.id)] = {
+            preview: item.preview,
+            isImage: true,
+            format: item.imageFormat,
+            width: item.imageWidth,
+            height: item.imageHeight,
+            bytes: item.imageBytes
+        }
+        root._metadataDirty = true
+        root.metadataRevision++
+        return true
+    }
+
     function decodeThumbnail(id: string, mime: string, callback: var) {
         var safeId = String(id == null ? "" : id)
         if (!root.available || !/^[0-9]+$/.test(safeId)) {
@@ -503,8 +533,16 @@ Singleton {
         var job = root._thumbQueue.shift()
         root._thumbBusy = true
         thumbProc.job = job
-        thumbProc.command = ["sh", "-c",
-            "mkdir -p '" + root._cacheDir + "/clipboard-thumbs' && { test -f '" + job.path + "' || cliphist decode " + job.clipId + " > '" + job.path + "'; }"]
+        var target = root._clipboardItemById(job.clipId)
+        var probeImage = !!target && target.isImage && !target.metadataReady
+        thumbProc.probeImage = probeImage
+        var ensureThumbnail = "mkdir -p '" + root._cacheDir + "/clipboard-thumbs' && { test -f '" + job.path + "' || cliphist decode " + job.clipId + " > '" + job.path + "'; }"
+        if (probeImage) {
+            ensureThumbnail += " && dims=$(identify -format '%m|%w|%h' '" + job.path + "' 2>/dev/null);"
+                + " bytes=$(wc -c < '" + job.path + "' 2>/dev/null | tr -d ' ');"
+                + " [ -n \"$dims\" ] && [ -n \"$bytes\" ] && printf '%s|%s' \"$dims\" \"$bytes\""
+        }
+        thumbProc.command = ["sh", "-c", ensureThumbnail]
         thumbProc.running = true
     }
 
@@ -513,13 +551,23 @@ Singleton {
         command: []
         running: false
         property var job: null
+        property bool probeImage: false
         stdout: StdioCollector {}
         onExited: {
             var done = job
+            var probeOutput = stdout.text.trim().split("|")
             job = null
+            probeImage = false
             root._thumbBusy = false
             if (done && done.cb)
                 done.cb(done.path)
+            if (done && probeOutput.length >= 4) {
+                var target = root._clipboardItemById(done.clipId)
+                if (root._storeImageMetadata(target, probeOutput[0], probeOutput[1], probeOutput[2], probeOutput[3])) {
+                    root._persistMetadataCache()
+                    root.metadataUpdated(String(done.clipId))
+                }
+            }
             root._pumpThumbQueue()
         }
     }

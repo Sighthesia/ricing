@@ -504,7 +504,8 @@ Item {
             var adapters = LauncherAdapters.createAdapters({ clipboardBackend: clipBackend })
             clipBackend.complete([
                 { id: "image", preview: "[[ binary data 12345 png 1920x1080 ]]", imageFormat: "PNG", imageBytes: 482304, imageWidth: 1705, imageHeight: 905, metadataReady: true, mime: "image/png", isImage: true, firstSeenMs: 1700000100000 },
-                { id: "bad-image", preview: "[[ binary data unavailable ]]", mime: "image/jpeg", isImage: true, firstSeenMs: 1700000200000 }
+                { id: "bad-image", preview: "[[ binary data unavailable ]]", mime: "image/jpeg", isImage: true, firstSeenMs: 1700000200000 },
+                { id: "preview-image", preview: "[[ binary data 37 KiB png 712x522 ]]", mime: "image/png", isImage: true, firstSeenMs: 1700000300000 }
             ])
             var outcome = null
             adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
@@ -515,6 +516,8 @@ Item {
             verify(outcome[0].description.indexOf("copied") >= 0)
             verify(outcome[1].description.indexOf("image/jpeg") >= 0)
             verify(outcome[1].description.indexOf("unavailable") < 0)
+            compare(outcome[2].displayName, "[Image] 712x522")
+            verify(outcome[2].description.indexOf("37.9 KB") >= 0)
         }
 
         function test_clipboardAdapterAppliesPersistentMetadataWithoutRecounting() {
