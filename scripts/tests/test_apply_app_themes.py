@@ -228,7 +228,7 @@ def _saturation(hex_color):
     return colorsys.rgb_to_hls(r, g, b)[2]
 
 
-def test_kitty_color8_desaturated_color13(sandbox):
+def test_kitty_ansi_mapping_matches_noctalia_template(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"
     assert run_apply(palette, "dark", home).returncode == 0
@@ -236,19 +236,25 @@ def test_kitty_color8_desaturated_color13(sandbox):
     assert run_apply(palette, "light", home).returncode == 0
     light = (home / ".config/kitty/kitty-colors.conf").read_text()
     assert "{{" not in dark and "{{" not in light
-    # Black slot is a true dark distinct from the background in both modes.
-    assert _slot(dark, "color0") != _slot(dark, "background")
-    assert _slot(light, "color0") != _slot(light, "background")
-    # User override: bright-black is color13 (primary-fixed-dim) desaturated —
-    # same hue family, strictly less saturated in both modes.
-    assert _saturation(_slot(dark, "color8")) < _saturation(_slot(dark, "color13"))
-    assert _saturation(_slot(light, "color8")) < _saturation(_slot(light, "color13"))
-    # ...while staying apart from the foreground in both modes.
-    assert _slot(dark, "color8") != _slot(dark, "foreground")
-    assert _slot(light, "color8") != _slot(light, "foreground")
+    assert _slot(dark, "color0") == _slot(dark, "background")
+    assert _slot(light, "color0") == _slot(light, "background")
+    assert _slot(dark, "color1") == _slot(dark, "color9")
+    assert _slot(light, "color1") == _slot(light, "color9")
+    assert _slot(dark, "color2") == _slot(dark, "color10")
+    assert _slot(light, "color2") == _slot(light, "color10")
+    assert _slot(dark, "color3") == _slot(dark, "color11")
+    assert _slot(light, "color3") == _slot(light, "color11")
+    assert _slot(dark, "color4") == _slot(dark, "color12")
+    assert _slot(light, "color4") == _slot(light, "color12")
+    assert _slot(dark, "color5") == _slot(dark, "color13")
+    assert _slot(light, "color5") == _slot(light, "color13")
+    assert _slot(dark, "color6") == _slot(dark, "color14")
+    assert _slot(light, "color6") == _slot(light, "color14")
+    assert _slot(dark, "color7") == _slot(dark, "color15")
+    assert _slot(light, "color7") == _slot(light, "color15")
 
 
-def test_kitty_accents_are_distinct(sandbox):
+def test_kitty_ansi_mapping_preserves_slot_order(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"
     assert run_apply(palette, "dark", home).returncode == 0
@@ -256,8 +262,9 @@ def test_kitty_accents_are_distinct(sandbox):
     assert run_apply(palette, "light", home).returncode == 0
     light = (home / ".config/kitty/kitty-colors.conf").read_text()
     for content in (dark, light):
-        accents = {_slot(content, f"color{i}") for i in (1, 2, 3, 4, 5, 6)}
-        assert len(accents) == 6, accents
+        assert _slot(content, "color1") != _slot(content, "color2")
+        assert _slot(content, "color2") != _slot(content, "color3")
+        assert _slot(content, "color3") != _slot(content, "color4")
 
 
 def test_single_mode_palette_renders_dual_variant(tmp_path):
