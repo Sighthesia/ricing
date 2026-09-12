@@ -252,7 +252,7 @@ function createAppsAdapter(config) {
 function parseClipboardImageMeta(preview) {
     if (typeof preview !== "string")
         return null
-    var match = /^\[\[\s*binary data\s+(\S+)\s+(\S+)\s+(\d+)x(\d+)\s*\]\]$/.exec(preview.trim())
+    var match = /^\[\[\s*binary data\s+([\d.]+\s*(?:KiB|MiB|GiB|B)|[^\s]+)\s+([^\s]+)\s+(\d+)x(\d+)\s*\]\]$/.exec(preview.trim())
     if (!match)
         return null
     return {

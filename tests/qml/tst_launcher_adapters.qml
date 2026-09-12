@@ -489,6 +489,13 @@ Item {
             compare(parsed.width, 1920)
             compare(parsed.height, 1080)
 
+            var spaced = LauncherAdapters.parseClipboardImageMeta(
+                "[[ binary data 471 KiB png 1705x905 ]]")
+            compare(spaced.size, "471 KiB")
+            compare(spaced.format, "png")
+            compare(spaced.width, 1705)
+            compare(spaced.height, 905)
+
             var adapters = LauncherAdapters.createAdapters({ clipboardBackend: clipBackend })
             clipBackend.complete([
                 { id: "image", preview: "[[ binary data 12345 png 1920x1080 ]]", imageFormat: "PNG", imageSize: "471 KiB", imageWidth: 1705, imageHeight: 905, metadataReady: true, mime: "image/png", isImage: true, firstSeenMs: 1700000100000 },
