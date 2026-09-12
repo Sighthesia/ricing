@@ -139,6 +139,7 @@ FocusScope {
         color: LazerTheme.textPrimary
         selectionColor: LazerTheme.osuPink
         font.pixelSize: 14
+        font.weight: Font.DemiBold
         horizontalAlignment: TextInput.AlignLeft
         onAccepted: root.commit()
         onActiveFocusChanged: {

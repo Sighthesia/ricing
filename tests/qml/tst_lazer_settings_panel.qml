@@ -199,6 +199,8 @@ Item {
             compare(panel.appearancePage.wallpaperField.editorItem.x, 0)
             compare(panel.appearancePage.wallpaperField.editorItem.font.pixelSize,
                     panel.appearancePage.panelOpacityRow.valueTextItem.font.pixelSize)
+            compare(panel.appearancePage.wallpaperField.editorItem.font.weight,
+                    panel.appearancePage.panelOpacityRow.valueTextItem.font.weight)
         }
 
         function test_schemePickersKeepTitlesAboveTheirSharedSurface() {
