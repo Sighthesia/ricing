@@ -93,3 +93,60 @@ The direct notifier self-check verified that a missing `dbus-send` returns `Fals
 
 - The live session D-Bus path was not exercised against a running KDE session in this test environment.
 - The fallback is intentionally limited to `ModuleNotFoundError`, matching the brief: runtime failures from an installed but unusable `jeepney` path are treated as a notification failure rather than switching transports.
+
+## Review Fix Report
+
+### Changes
+
+- Replaced the sandbox notification test's subprocess invocation with a same-process `module.main()` call using monkeypatched `sys.argv`. The notifier is now injected and observed in the process where it is patched.
+- Added deterministic jeepney success coverage, asserting the `/KGlobalSettings` address, `SESSION` bus, `notifyChange` signal, `ii` signature, `(0, 0)` payload, and sent signal.
+- Added deterministic `dbus-send` fallback coverage, asserting the exact command and arguments, timeout, and captured output configuration.
+- Production behavior in `scripts/theming/apply_app_themes.py` was unchanged.
+
+### Tests and outputs
+
+Command:
+
+```text
+python3 -m pytest scripts/tests/test_apply_app_themes.py::test_sandbox_skips_kde_notification scripts/tests/test_apply_app_themes.py::test_notify_kde_theme_uses_jeepney_signal scripts/tests/test_apply_app_themes.py::test_notify_kde_theme_falls_back_to_dbus_send -q
+```
+
+Output:
+
+```text
+...                                                                      [100%]
+3 passed in 1.07s
+```
+
+Command:
+
+```text
+python3 -m pytest scripts/tests/test_apply_app_themes.py -q
+```
+
+Output:
+
+```text
+...................                                                      [100%]
+19 passed in 5.12s
+```
+
+Command:
+
+```text
+python3 -m py_compile scripts/theming/apply_app_themes.py scripts/tests/test_apply_app_themes.py
+git diff --check
+```
+
+Output:
+
+```text
+```
+
+### Fix commit
+
+- Pending commit for this review fix: same-process sandbox boundary and notifier transport coverage.
+
+### Concerns
+
+- Tests mock both transport paths and intentionally do not require a live KDE session or session bus.

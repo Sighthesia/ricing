@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -56,9 +57,72 @@ def test_sandbox_skips_kde_notification(sandbox, monkeypatch):
     calls = []
     monkeypatch.setattr(module, "notify_kde_theme", lambda: calls.append(True) or True)
 
-    result = run_apply(sandbox[1], "dark", sandbox[0] / "home")
-    assert result.returncode == 0
+    monkeypatch.setattr(sys, "argv", [
+        str(SCRIPT), "--palette", str(sandbox[1]), "--mode", "dark",
+        "--home-prefix", str(sandbox[0] / "home"),
+    ])
+    monkeypatch.setenv("HOME", str(Path.home()))
+    assert module.main() == 0
     assert calls == []
+
+
+def test_notify_kde_theme_uses_jeepney_signal(monkeypatch):
+    from unittest.mock import Mock
+
+    address = object()
+    signal = object()
+    connection = Mock()
+    context = Mock()
+    context.__enter__ = Mock(return_value=connection)
+    context.__exit__ = Mock(return_value=False)
+    dbus_address = Mock(return_value=address)
+    new_signal = Mock(return_value=signal)
+    open_connection = Mock(return_value=context)
+    jeepney = types.ModuleType("jeepney")
+    jeepney.DBusAddress = dbus_address
+    jeepney.new_signal = new_signal
+    jeepney_io = types.ModuleType("jeepney.io")
+    jeepney_blocking = types.ModuleType("jeepney.io.blocking")
+    jeepney_blocking.open_dbus_connection = open_connection
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("apply_app_themes", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setitem(sys.modules, "jeepney", jeepney)
+    monkeypatch.setitem(sys.modules, "jeepney.io", jeepney_io)
+    monkeypatch.setitem(sys.modules, "jeepney.io.blocking", jeepney_blocking)
+
+    assert module.notify_kde_theme() is True
+    dbus_address.assert_called_once_with(
+        path="/KGlobalSettings", interface="org.kde.KGlobalSettings")
+    open_connection.assert_called_once_with(bus="SESSION")
+    new_signal.assert_called_once_with(address, "notifyChange", "ii", (0, 0))
+    connection.send.assert_called_once_with(signal)
+
+
+def test_notify_kde_theme_falls_back_to_dbus_send(monkeypatch):
+    from unittest.mock import Mock, patch
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("apply_app_themes", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    completed = Mock(returncode=0)
+    monkeypatch.setattr(module, "_which", Mock(return_value="/usr/bin/dbus-send"))
+    with patch.dict(sys.modules, {
+        "jeepney": None,
+        "jeepney.io": None,
+        "jeepney.io.blocking": None,
+    }), patch.object(module.subprocess, "run", return_value=completed) as run:
+        assert module.notify_kde_theme() is True
+
+    run.assert_called_once_with(
+        ["dbus-send", "/KGlobalSettings",
+         "org.kde.KGlobalSettings.notifyChange", "int32:0", "int32:0"],
+        capture_output=True,
+        timeout=5,
+    )
 
 
 def test_dark_render_and_includes(sandbox):
