@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Widgets
 import "../../lazerbar"
 import "../../../services" as Services
+import "WorkspacesWheel.js" as WheelLogic
 
 // Workspace overview squares that expand to show each workspace's app icons
 // (noctalia-shell grouped mode): click a square to focus the workspace, click
@@ -48,6 +49,9 @@ Item {
     readonly property int iconSize: 16
     readonly property int iconSpacing: 4
     readonly property int cellPadding: 8
+    // Wheel throttle: one focus step per 120ms so a single flick never
+    // floods niri with a burst of focus-window/focus-workspace calls.
+    property double _lastWheelTimeMs: 0
 
     // Factory for stable per-workspace icon models (ListModel keeps row
     // delegates and their loaded images alive across syncs).
@@ -111,6 +115,66 @@ Item {
             : null
         const iconName = entry && entry.icon ? String(entry.icon) : normalizedAppId
         return Quickshell.iconPath(iconName, "application-x-executable") || fallback
+    }
+
+    // Plain-array snapshots so the wheel resolver stays testable without
+    // touching the live ListModels.
+    function snapshotWorkspaces() {
+        const rows = []
+        const model = Services.NiriService.workspaces
+        for (let i = 0; i < model.count; i++) {
+            const ws = model.get(i)
+            if (!ws)
+                continue
+            rows.push({
+                wsId: String(ws.wsId),
+                idx: Number(ws.idx),
+                isActive: !!ws.isActive
+            })
+        }
+        return rows
+    }
+
+    function snapshotWindows() {
+        const rows = []
+        const model = Services.NiriService.windows
+        for (let i = 0; i < model.count; i++) {
+            const win = model.get(i)
+            if (!win)
+                continue
+            rows.push({
+                winId: String(win.winId),
+                workspaceId: String(win.workspaceId || ""),
+                colIdx: win.colIdx,
+                rowIdx: win.rowIdx
+            })
+        }
+        return rows
+    }
+
+    // One wheel step: windows first inside the active workspace, crossing
+    // into the neighbor workspace only at the edge (纵滚都切).
+    function handleWheelScroll(direction) {
+        const now = Date.now()
+        if (now - root._lastWheelTimeMs < 120)
+            return
+        root._lastWheelTimeMs = now
+        const step = WheelLogic.resolveWheelStep(root.snapshotWorkspaces(),
+                                                 root.snapshotWindows(),
+                                                 root.focusedWinId, direction)
+        if (!step)
+            return
+        if (step.kind === "window") {
+            Quickshell.execDetached([
+                "niri", "msg", "action", "focus-window",
+                "--id", String(step.winId)
+            ])
+        } else if (step.kind === "workspace") {
+            Quickshell.execDetached([
+                "niri", "msg", "action", "focus-workspace",
+                String(step.idx)
+            ])
+        }
     }
 
     function refreshWindowMap() {
@@ -354,6 +418,22 @@ Item {
 
     implicitWidth: workspaceRow.implicitWidth
     implicitHeight: LazerTheme.barWidgetHeight
+
+    // Wheel-to-focus: vertical scroll steps windows first, neighbor
+    // workspace only at the edge; horizontal scroll falls back the same way.
+    WheelHandler {
+        objectName: "workspacesWheelHandler"
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: event => {
+            const direction = WheelLogic.directionFromDeltas(
+                event.angleDelta.y, event.angleDelta.x,
+                event.pixelDelta.y, event.pixelDelta.x)
+            if (direction === 0)
+                return
+            root.handleWheelScroll(direction)
+            event.accepted = true
+        }
+    }
 
     Row {
         id: workspaceRow
