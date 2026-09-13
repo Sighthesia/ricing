@@ -80,6 +80,14 @@ def test_dark_render_and_includes(sandbox):
         assert conf.exists(), major
         assert "#1e1e2e" in conf.read_text()
 
+    kde_colors = home / ".local/share/color-schemes/Afloat.colors"
+    assert kde_colors.exists()
+    kde_content = kde_colors.read_text()
+    assert "BackgroundNormal=#1e1e2e" in kde_content
+    assert "ForegroundNormal=#cdd6f4" in kde_content
+    assert "DecorationFocus=#cba6f7" in kde_content
+    assert "ForegroundNegative=#f38ba8" in kde_content
+
 
 def test_light_variant_switch(sandbox):
     tmp, palette = sandbox

@@ -22,6 +22,10 @@ output_path = "~/.config/qt5ct/colors/Afloat.conf"
 input_path = "./qtct-colors.conf"
 output_path = "~/.config/qt6ct/colors/Afloat.conf"
 
+[templates.kde]
+input_path = "./kde-colors.conf"
+output_path = "~/.local/share/color-schemes/Afloat.colors"
+
 # Compositor: niri merges top-level includes; add once to config.kdl:
 #   include "~/dotfiles path.../afloat-colors.kdl" (or the absolute path below)
 [templates.niri]
