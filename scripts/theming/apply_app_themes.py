@@ -81,27 +81,24 @@ def notify_kde_theme() -> bool:
         from jeepney import DBusAddress, new_signal
         from jeepney.io.blocking import open_dbus_connection
 
-        address = DBusAddress(
-            path="/KGlobalSettings",
-            interface="org.kde.KGlobalSettings",
-        )
+        address = DBusAddress("/KGlobalSettings", interface="org.kde.KGlobalSettings")
         with open_dbus_connection(bus="SESSION") as connection:
             connection.send(new_signal(address, "notifyChange", "ii", (0, 0)))
         return True
-    except ModuleNotFoundError:
-        if not _which("dbus-send"):
-            return False
-        try:
-            result = subprocess.run(
-                ["dbus-send", "/KGlobalSettings",
-                 "org.kde.KGlobalSettings.notifyChange", "int32:0", "int32:0"],
-                capture_output=True,
-                timeout=5,
-            )
-            return result.returncode == 0
-        except (OSError, subprocess.TimeoutExpired):
-            return False
     except Exception:
+        pass
+
+    if not _which("dbus-send"):
+        return False
+    try:
+        result = subprocess.run(
+            ["dbus-send", "/KGlobalSettings",
+             "org.kde.KGlobalSettings.notifyChange", "int32:0", "int32:0"],
+            capture_output=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
         return False
 
 
@@ -173,24 +170,28 @@ def sync_kde_theme(home: Path) -> bool:
     if not source.exists():
         return False
 
-    parser = configparser.RawConfigParser()
-    parser.optionxform = str
-    parser.read(target)
+    try:
+        parser = configparser.RawConfigParser()
+        parser.optionxform = str
+        parser.read(target)
 
-    scheme = configparser.RawConfigParser()
-    scheme.optionxform = str
-    scheme.read(source)
+        scheme = configparser.RawConfigParser()
+        scheme.optionxform = str
+        scheme.read(source)
 
-    for section in scheme.sections():
-        if not parser.has_section(section):
-            parser.add_section(section)
-        for key, value in scheme.items(section):
-            parser.set(section, key, value)
+        for section in scheme.sections():
+            if not parser.has_section(section):
+                parser.add_section(section)
+            for key, value in scheme.items(section):
+                parser.set(section, key, value)
 
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("w") as output:
-        parser.write(output, space_around_delimiters=False)
-    return True
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("w") as output:
+            parser.write(output, space_around_delimiters=False)
+        return True
+    except (configparser.Error, OSError) as e:
+        print(f"Warning: KDE theme sync failed: {e}", file=sys.stderr)
+        return False
 
 
 def _theme_exists(name: str) -> bool:

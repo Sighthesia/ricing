@@ -75,7 +75,12 @@ def test_notify_kde_theme_uses_jeepney_signal(monkeypatch):
     context = Mock()
     context.__enter__ = Mock(return_value=connection)
     context.__exit__ = Mock(return_value=False)
-    dbus_address = Mock(return_value=address)
+    def assert_address(path, *, interface):
+        assert path == "/KGlobalSettings"
+        assert interface == "org.kde.KGlobalSettings"
+        return address
+
+    dbus_address = Mock(side_effect=assert_address)
     new_signal = Mock(return_value=signal)
     open_connection = Mock(return_value=context)
     jeepney = types.ModuleType("jeepney")
@@ -95,7 +100,7 @@ def test_notify_kde_theme_uses_jeepney_signal(monkeypatch):
 
     assert module.notify_kde_theme() is True
     dbus_address.assert_called_once_with(
-        path="/KGlobalSettings", interface="org.kde.KGlobalSettings")
+        "/KGlobalSettings", interface="org.kde.KGlobalSettings")
     open_connection.assert_called_once_with(bus="SESSION")
     new_signal.assert_called_once_with(address, "notifyChange", "ii", (0, 0))
     connection.send.assert_called_once_with(signal)
@@ -123,6 +128,29 @@ def test_notify_kde_theme_falls_back_to_dbus_send(monkeypatch):
         capture_output=True,
         timeout=5,
     )
+
+
+def test_notify_kde_theme_falls_back_after_jeepney_runtime_failure(monkeypatch):
+    from unittest.mock import Mock, patch
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("apply_app_themes", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    jeepney = types.ModuleType("jeepney")
+    jeepney.DBusAddress = Mock(side_effect=RuntimeError("broken jeepney"))
+    jeepney_io = types.ModuleType("jeepney.io")
+    jeepney_blocking = types.ModuleType("jeepney.io.blocking")
+    jeepney_blocking.open_dbus_connection = Mock()
+    completed = Mock(returncode=0)
+    monkeypatch.setattr(module, "_which", Mock(return_value="/usr/bin/dbus-send"))
+    with patch.dict(sys.modules, {
+        "jeepney": jeepney,
+        "jeepney.io": jeepney_io,
+        "jeepney.io.blocking": jeepney_blocking,
+    }), patch.object(module.subprocess, "run", return_value=completed) as run:
+        assert module.notify_kde_theme() is True
+    run.assert_called_once()
 
 
 def test_dark_render_and_includes(sandbox):
@@ -160,10 +188,10 @@ def test_dark_render_and_includes(sandbox):
     kde_colors = home / ".local/share/color-schemes/Afloat.colors"
     assert kde_colors.exists()
     kde_content = kde_colors.read_text()
-    assert "BackgroundNormal=#1e1e2e" in kde_content
-    assert "ForegroundNormal=#cdd6f4" in kde_content
-    assert "DecorationFocus=#cba6f7" in kde_content
-    assert "ForegroundNegative=#f38ba8" in kde_content
+    assert "BackgroundNormal=30,30,46" in kde_content
+    assert "ForegroundNormal=205,214,244" in kde_content
+    assert "DecorationFocus=203,166,247" in kde_content
+    assert "ForegroundNegative=243,139,168" in kde_content
 
 
 def test_kdeglobals_preserves_unrelated_settings(sandbox):
@@ -179,7 +207,7 @@ def test_kdeglobals_preserves_unrelated_settings(sandbox):
     content = kdeglobals.read_text()
     assert "widgetStyle=oxygen" in content
     assert "fixed=Monospace,10" in content
-    assert "BackgroundNormal=#1e1e2e" in content
+    assert "BackgroundNormal=30,30,46" in content
 
 
 def test_light_variant_switch(sandbox):
@@ -191,8 +219,24 @@ def test_light_variant_switch(sandbox):
     assert "background #eff1f5" in content
     assert "background #1e1e2e" not in content
     kde = (home / ".local/share/color-schemes/Afloat.colors").read_text()
-    assert "BackgroundNormal=#eff1f5" in kde
-    assert "ForegroundNormal=#4c4f69" in kde
+    assert "BackgroundNormal=239,241,245" in kde
+    assert "ForegroundNormal=76,79,105" in kde
+
+
+def test_malformed_kdeglobals_does_not_abort_other_sync(sandbox):
+    tmp, palette = sandbox
+    home = tmp / "home"
+    kdeglobals = home / ".config/kdeglobals"
+    kdeglobals.parent.mkdir(parents=True)
+    kdeglobals.write_text("[KDE]\nwidgetStyle=oxygen\nwidgetStyle=plastique\n")
+
+    result = run_apply(palette, "dark", home)
+    assert result.returncode == 0, result.stderr
+    assert "Warning: KDE theme sync failed:" in result.stderr
+    assert "background #1e1e2e" in " ".join(
+        (home / ".config/kitty/kitty-colors.conf").read_text().split())
+    assert (home / ".config/gtk-3.0/colors.css").exists()
+    assert kdeglobals.read_text() == "[KDE]\nwidgetStyle=oxygen\nwidgetStyle=plastique\n"
 
 
 def test_include_idempotent(sandbox):
