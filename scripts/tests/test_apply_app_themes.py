@@ -190,6 +190,9 @@ def test_light_variant_switch(sandbox):
     content = " ".join((home / ".config/kitty/kitty-colors.conf").read_text().split())
     assert "background #eff1f5" in content
     assert "background #1e1e2e" not in content
+    kde = (home / ".local/share/color-schemes/Afloat.colors").read_text()
+    assert "BackgroundNormal=#eff1f5" in kde
+    assert "ForegroundNormal=#4c4f69" in kde
 
 
 def test_include_idempotent(sandbox):
