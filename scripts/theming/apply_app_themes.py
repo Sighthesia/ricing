@@ -123,6 +123,48 @@ _LEGACY_COMMENTS = {
     "# per-app templates needed). Drop to 0.9 if you want a hint of hierarchy back.",
 }
 
+_NIRI_INCLUDE = 'include "./afloat-colors.kdl"'
+
+
+def sync_niri_config(home: Path) -> bool:
+    """Replace DynamicShell color includes and ensure Afloat's include."""
+    config = home / ".config/niri/config.kdl"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    existing = config.read_text() if config.exists() else ""
+
+    kept = []
+    for line in existing.splitlines():
+        normalized = line.lower()
+        if ("include" in normalized
+                and ("dymicshell" in normalized or "dynamicshell" in normalized)
+                and "color" in normalized):
+            continue
+        kept.append(line)
+
+    if _NIRI_INCLUDE not in kept:
+        kept.append(_NIRI_INCLUDE)
+
+    rendered = "\n".join(kept).rstrip() + "\n"
+    if rendered == existing:
+        return False
+    config.write_text(rendered)
+    return True
+
+
+def reload_niri() -> bool:
+    """Ask Niri to reload config; failure is non-fatal for app themes."""
+    if not _which("niri"):
+        return False
+    try:
+        result = subprocess.run(
+            ["niri", "msg", "action", "load-config-file"],
+            capture_output=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
 
 def sync_kitty_clear_text(home: Path, enabled: bool) -> bool:
     """Sync the managed clear-text block in kitty.conf. Returns True on change."""
@@ -340,10 +382,13 @@ def main() -> int:
     ensure_line(home / ".config/gtk-4.0/gtk.css", "@import 'colors.css';")
     sync_kitty_clear_text(home, args.terminal_clear_text)
     sync_kde_theme(home)
+    sync_niri_config(home)
 
     if args.home_prefix is None:
         notify_kde_theme()
         run_hooks(args.mode)
+        if not reload_niri():
+            print("Warning: Niri config reload unavailable", file=sys.stderr)
 
     print(f"App themes applied: palette={args.palette} mode={args.mode}")
     return 0

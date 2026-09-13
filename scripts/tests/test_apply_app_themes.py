@@ -193,6 +193,15 @@ def test_dark_render_and_includes(sandbox):
     assert "DecorationFocus=203,166,247" in kde_content
     assert "ForegroundNegative=243,139,168" in kde_content
 
+    niri = home / ".config/niri/config.kdl"
+    niri.write_text('include "./DymicShell-colors.kdl"\nlayout {\n    gaps 8\n}\n')
+    result = run_apply(palette, "dark", home)
+    assert result.returncode == 0, result.stderr
+    niri_content = niri.read_text()
+    assert "DymicShell-colors.kdl" not in niri_content
+    assert 'include "./afloat-colors.kdl"' in niri_content
+    assert "gaps 8" in niri_content
+
 
 def test_kdeglobals_preserves_unrelated_settings(sandbox):
     tmp, palette = sandbox
@@ -405,6 +414,19 @@ def test_only_kitty_text_does_not_touch_kdeglobals(sandbox):
     result = run_apply(tmp / "missing.json", "dark", home, ["--only-kitty-text"])
     assert result.returncode == 0, result.stderr
     assert kdeglobals.read_text() == original
+
+
+def test_only_kitty_text_does_not_touch_niri(sandbox):
+    tmp, _ = sandbox
+    home = tmp / "home"
+    niri = home / ".config/niri/config.kdl"
+    niri.parent.mkdir(parents=True)
+    original = 'include "./DymicShell-colors.kdl"\n'
+    niri.write_text(original)
+
+    result = run_apply(tmp / "missing.json", "dark", home, ["--only-kitty-text"])
+    assert result.returncode == 0, result.stderr
+    assert niri.read_text() == original
 
 
 def test_only_system_theme_needs_no_palette(sandbox):
