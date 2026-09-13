@@ -14,9 +14,10 @@ ShellRoot {
         LazerBar.LazerTheme.settingsService = Services.SettingsService
         LazerBar.LazerTheme.colorService = Services.Color
         // QML singletons are lazily instantiated and an unused bare
-        // reference can be dropped: run the sync service's entry point
+        // reference can be dropped: run the sync service's entry points
         // explicitly so the instance (and its Connections) come to life.
         Services.AppThemeService.apply()
+        Services.AppThemeService.pushSystemTheme()
         Services.LauncherService.primeApps()
         Services.ClipboardService.warmup()
     }

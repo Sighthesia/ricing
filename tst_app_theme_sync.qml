@@ -76,10 +76,12 @@ Item {
         case 1: {
 
             // Wait for the sandboxed kitty output carrying Nord's surface.
+            // The template aligns columns (background + padding), so match
+            // whitespace-tolerantly.
             const f = root.fileText(root.prefix + "/.config/kitty/kitty-colors.conf")
             if (f === null)
                 return
-            if (f.indexOf("background #2e3440") < 0)
+            if (!/background\s+#2e3440/.test(f))
                 return
             root.check("kitty colors rendered for Nord dark", true)
             // Include/import lines are appended by the same apply run; wait
@@ -106,7 +108,7 @@ Item {
             const f = root.fileText(path)
             if (f === null)
                 return
-            if (f.indexOf("background #eceff4") >= 0) {
+            if (/background\s+#eceff4/.test(f)) {
                 root.check("scheme flip re-renders app theme variant", true)
                 // Restore user's values.
                 Services.SettingsService.appearance.presetScheme = root.savedPreset

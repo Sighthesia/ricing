@@ -67,6 +67,11 @@ Singleton {
     }
 
     // Push light/dark to the system without touching templates.
+    // Runs on its own Process: onEffectiveColorSchemeChanged fires apply()
+    // and pushSystemTheme() back-to-back, and sharing one Process let the
+    // second command kill the full template render before it finished —
+    // kitty/KDE outputs then only refreshed on restart (via the colors.json
+    // reload timer). Separate processes let both run to completion.
     function pushSystemTheme() {
         if (!root.systemEnabled)
             return
@@ -77,14 +82,16 @@ Singleton {
         const cmd = "python3 " + Quickshell.shellDir
             + "/scripts/theming/apply_app_themes.py"
             + " --mode '" + mode + "' --only-system-theme" + prefix
-        applyProcess.command = ["sh", "-c", cmd]
+        systemProcess.command = ["sh", "-c", cmd]
         // Restart-safe: bounce so a run while running re-fires after exit.
-        applyProcess.running = false
-        applyProcess.running = true
+        systemProcess.running = false
+        systemProcess.running = true
     }
 
     // The clear-text toggle only touches kitty.conf: sync it immediately
     // even when full app-theme sync is disabled (fast path, no rendering).
+    // Own Process for the same reason as pushSystemTheme: never steal the
+    // full-render slot (or vice versa) when the two fire together.
     function syncTerminalText() {
         const mode = Services.SettingsService.effectiveColorScheme || "dark"
         const textFlag = root.terminalClearText ? "" : " --no-terminal-clear-text"
@@ -92,13 +99,39 @@ Singleton {
         const cmd = "python3 " + Quickshell.shellDir
             + "/scripts/theming/apply_app_themes.py"
             + " --mode '" + mode + "' --only-kitty-text" + textFlag + prefix
-        applyProcess.command = ["sh", "-c", cmd]
-        applyProcess.running = false
-        applyProcess.running = true
+        kittyTextProcess.command = ["sh", "-c", cmd]
+        kittyTextProcess.running = false
+        kittyTextProcess.running = true
     }
 
+    // Full template render (kitty/GTK/KDE/niri). Never shares a Process
+    // with the fast paths above.
     property Process applyProcess: Process {
         id: applyProcess
+
+        stdout: SplitParser {
+            onRead: data => console.log("AppTheme:", data)
+        }
+        stderr: SplitParser {
+            onRead: data => console.warn("AppTheme:", data)
+        }
+    }
+
+    // Light/dark-only push (gsettings color-scheme + gtk-theme).
+    property Process systemProcess: Process {
+        id: systemProcess
+
+        stdout: SplitParser {
+            onRead: data => console.log("AppTheme:", data)
+        }
+        stderr: SplitParser {
+            onRead: data => console.warn("AppTheme:", data)
+        }
+    }
+
+    // kitty.conf clear-text block only.
+    property Process kittyTextProcess: Process {
+        id: kittyTextProcess
 
         stdout: SplitParser {
             onRead: data => console.log("AppTheme:", data)
