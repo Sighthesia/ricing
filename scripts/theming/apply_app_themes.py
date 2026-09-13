@@ -173,11 +173,13 @@ def sync_kde_theme(home: Path) -> bool:
     try:
         parser = configparser.RawConfigParser()
         parser.optionxform = str
-        parser.read(target)
+        target_text = target.read_text() if target.exists() else ""
+        if target_text:
+            parser.read_string(target_text, source=str(target))
 
         scheme = configparser.RawConfigParser()
         scheme.optionxform = str
-        scheme.read(source)
+        scheme.read_string(source.read_text(), source=str(source))
 
         for section in scheme.sections():
             if not parser.has_section(section):

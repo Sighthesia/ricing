@@ -239,6 +239,34 @@ def test_malformed_kdeglobals_does_not_abort_other_sync(sandbox):
     assert kdeglobals.read_text() == "[KDE]\nwidgetStyle=oxygen\nwidgetStyle=plastique\n"
 
 
+def test_kde_source_read_failure_does_not_abort_other_sync(sandbox, monkeypatch, capsys):
+    import importlib.util
+
+    tmp, palette = sandbox
+    home = tmp / "home"
+    spec = importlib.util.spec_from_file_location("apply_app_themes", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    original_read_text = Path.read_text
+
+    def fail_kde_source(path, *args, **kwargs):
+        if path == home / ".local/share/color-schemes/Afloat.colors":
+            raise OSError("simulated KDE source read failure")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", fail_kde_source)
+    monkeypatch.setattr(sys, "argv", [
+        str(SCRIPT), "--palette", str(palette), "--mode", "dark",
+        "--home-prefix", str(home),
+    ])
+
+    assert module.main() == 0
+    assert "Warning: KDE theme sync failed: simulated KDE source read failure" in capsys.readouterr().err
+    assert (home / ".config/kitty/kitty-colors.conf").exists()
+    assert (home / ".config/gtk-3.0/colors.css").exists()
+
+
 def test_include_idempotent(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"
