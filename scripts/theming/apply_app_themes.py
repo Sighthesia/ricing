@@ -75,6 +75,36 @@ def _which(name: str) -> str | None:
     return which(name)
 
 
+def notify_kde_theme() -> bool:
+    """Tell KDE applications that global colors changed."""
+    try:
+        from jeepney import DBusAddress, new_signal
+        from jeepney.io.blocking import open_dbus_connection
+
+        address = DBusAddress(
+            path="/KGlobalSettings",
+            interface="org.kde.KGlobalSettings",
+        )
+        with open_dbus_connection(bus="SESSION") as connection:
+            connection.send(new_signal(address, "notifyChange", "ii", (0, 0)))
+        return True
+    except ModuleNotFoundError:
+        if not _which("dbus-send"):
+            return False
+        try:
+            result = subprocess.run(
+                ["dbus-send", "/KGlobalSettings",
+                 "org.kde.KGlobalSettings.notifyChange", "int32:0", "int32:0"],
+                capture_output=True,
+                timeout=5,
+            )
+            return result.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+    except Exception:
+        return False
+
+
 # Managed kitty.conf block for the "transparent-terminal clear text" setting:
 # dim text is drawn translucent by kitty (0.75 default), which compounds with
 # a translucent background and washes TUI secondary rows out. Full brightness
@@ -309,6 +339,7 @@ def main() -> int:
     sync_kde_theme(home)
 
     if args.home_prefix is None:
+        notify_kde_theme()
         run_hooks(args.mode)
 
     print(f"App themes applied: palette={args.palette} mode={args.mode}")

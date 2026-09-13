@@ -48,6 +48,19 @@ def run_apply(palette, mode, home_prefix, extra=None):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
 
+def test_sandbox_skips_kde_notification(sandbox, monkeypatch):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("apply_app_themes", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    calls = []
+    monkeypatch.setattr(module, "notify_kde_theme", lambda: calls.append(True) or True)
+
+    result = run_apply(sandbox[1], "dark", sandbox[0] / "home")
+    assert result.returncode == 0
+    assert calls == []
+
+
 def test_dark_render_and_includes(sandbox):
     tmp, palette = sandbox
     result = run_apply(palette, "dark", tmp / "home")
