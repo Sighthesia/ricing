@@ -1004,8 +1004,7 @@ Item {
             scrollAnim.restart()
         }
 
-        function _settleScrollEdge() {
-            var maximumY = Math.max(0, resultsView.contentHeight - resultsView.height)
+        function _settleScrollEdge() {            var maximumY = Math.max(0, resultsView.contentHeight - resultsView.height)
             edgeDriving = false
             scrollEdgeSettleTimer.stop()
             scrollDriveAnim.stop()
@@ -1022,12 +1021,26 @@ Item {
 
         property bool edgeDriving: false
         readonly property real edgeTakeoverDistance: 80
+        // Hard overscroll rails for the edge-takeover and bounce bands,
+        // mirroring LazerSettingsSections.overscrollDistance.
+        readonly property real overscrollDistance: 88
+
+        // Rubber-band resistance, ported from
+        // LazerSettingsSections._resistedTarget: the further past the bound,
+        // the smaller each additional step becomes, like a spring approaching
+        // full tension. (Callers must use the resultsView receiver: this
+        // helper lives on the viewport, not the page.)
+        function _resistedScrollTarget(current, delta, bound) {
+            var past = Math.max(0, Math.abs(current - bound))
+            var tension = Math.min(1, past / resultsView.overscrollDistance)
+            return current - delta * (1 - tension)
+        }
 
         Timer {
             id: scrollEdgeSettleTimer
             interval: 140
             repeat: false
-            onTriggered: root._settleScrollEdge()
+            onTriggered: resultsView._settleScrollEdge()
         }
 
         NumberAnimation {
@@ -1090,7 +1103,7 @@ Item {
                 var nearBottom = scrollingDown && maximumY - resultsView.contentY <= resultsView.edgeTakeoverDistance
                 var nearTop = !scrollingDown && resultsView.contentY <= resultsView.edgeTakeoverDistance
                 if (resultsView.edgeDriving && !nearBottom && !nearTop)
-                    root._settleScrollEdge()
+                    resultsView._settleScrollEdge()
                 if (!MotionTokens.reducedMotion && (nearBottom || nearTop)) {
                     resultsView.cancelFlick()
                     resultsView.edgeDriving = true
@@ -1098,10 +1111,11 @@ Item {
                     scrollSettleAnim.stop()
                     var proposed = resultsView.contentY - delta
                     if (proposed < 0)
-                        proposed = root._resistedScrollTarget(resultsView.contentY, delta, 0)
+                        proposed = resultsView._resistedScrollTarget(resultsView.contentY, delta, 0)
                     else if (proposed > maximumY)
-                        proposed = root._resistedScrollTarget(resultsView.contentY, delta, maximumY)
-                    proposed = Math.max(-88, Math.min(maximumY + 88, proposed))
+                        proposed = resultsView._resistedScrollTarget(resultsView.contentY, delta, maximumY)
+                    proposed = Math.max(-resultsView.overscrollDistance,
+                                        Math.min(maximumY + resultsView.overscrollDistance, proposed))
                     scrollDriveAnim.from = resultsView.contentY
                     scrollDriveAnim.to = proposed
                     scrollDriveAnim.restart()
@@ -1111,7 +1125,9 @@ Item {
                         || (scrollingDown && resultsView.contentY >= maximumY - 0.5)) {
                     resultsView.cancelFlick()
                     scrollBounceOut.from = resultsView.contentY
-                    scrollBounceOut.to = Math.max(-88, Math.min(maximumY + 88, resultsView.contentY - delta))
+                    scrollBounceOut.to = Math.max(-resultsView.overscrollDistance,
+                                                        Math.min(maximumY + resultsView.overscrollDistance,
+                                                                 resultsView.contentY - delta))
                     scrollBounceBack.to = Math.max(0, Math.min(maximumY, scrollBounceOut.to))
                     scrollBounce.restart()
                 }

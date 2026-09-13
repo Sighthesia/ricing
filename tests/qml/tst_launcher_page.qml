@@ -384,6 +384,38 @@ Item {
             }, 3000)
         }
 
+        function test_scrollEdgeTakeoverSettlesWithoutMissingHelpers() {
+            // The edge-takeover wheel path must resolve its viewport
+            // helpers: a wrong receiver (or an unported helper) throws a
+            // TypeError that both warns and strands edgeDriving, freezing
+            // further wheel input. Kept under the base window so no window
+            // growth can interfere with the scroll geometry.
+            var items = []
+            for (var i = 0; i < 40; i++)
+                items.push(makeItem("item" + i, "Item " + i, 0, 0))
+            openWithResults(items)
+            var view = page.resultsView
+            tryVerify(function() {
+                return view.contentHeight > view.height && !page.entranceBusy
+            }, 3000)
+
+            var maximumY = Math.max(0, view.contentHeight - view.height)
+            verify(maximumY > view.edgeTakeoverDistance)
+
+            // Park at the bottom edge and push further down: the overshoot
+            // is resisted and the view takes over edge driving.
+            // NOTE: Qt6 mouseWheel takes deltas before buttons/modifiers:
+            // (item, x, y, xDelta, yDelta, buttons, modifiers).
+            view.contentY = maximumY
+            mouseWheel(view, view.width / 2, view.height / 2, 0, -120, 0, 0)
+            compare(view.edgeDriving, true)
+
+            // A wheel back in the middle settles the edge drive synchronously.
+            view.contentY = Math.min(100, maximumY / 2)
+            mouseWheel(view, view.width / 2, view.height / 2, 0, 120, 0, 0)
+            compare(view.edgeDriving, false)
+        }
+
         function test_failedThumbnailHidesWithoutBreakingItsBinding() {
             // A thumbnail file that fails to load must hide the image slot
             // without clearing the bound path, so later paths (and reused
