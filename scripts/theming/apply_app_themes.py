@@ -20,6 +20,7 @@ system hooks (gsettings/kitty signals); it exists for tests.
 from __future__ import annotations
 
 import argparse
+import configparser
 import subprocess
 import sys
 from pathlib import Path
@@ -135,6 +136,33 @@ def sync_kitty_clear_text(home: Path, enabled: bool) -> bool:
     return True
 
 
+def sync_kde_theme(home: Path) -> bool:
+    """Merge the rendered Afloat scheme into kdeglobals."""
+    source = home / ".local/share/color-schemes/Afloat.colors"
+    target = home / ".config/kdeglobals"
+    if not source.exists():
+        return False
+
+    parser = configparser.RawConfigParser()
+    parser.optionxform = str
+    parser.read(target)
+
+    scheme = configparser.RawConfigParser()
+    scheme.optionxform = str
+    scheme.read(source)
+
+    for section in scheme.sections():
+        if not parser.has_section(section):
+            parser.add_section(section)
+        for key, value in scheme.items(section):
+            parser.set(section, key, value)
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w") as output:
+        parser.write(output, space_around_delimiters=False)
+    return True
+
+
 def _theme_exists(name: str) -> bool:
     """Check a GTK theme exists in the standard lookup locations."""
     import os
@@ -227,6 +255,7 @@ def main() -> int:
         # Kitty-only fast path: no palette or template config needed.
         home = Path.home()
         sync_kitty_clear_text(home, args.terminal_clear_text)
+        sync_kde_theme(home)
         state = "on" if args.terminal_clear_text else "off"
         print(f"Kitty clear text {state}")
         return 0
@@ -278,6 +307,7 @@ def main() -> int:
     ensure_line(home / ".config/gtk-3.0/gtk.css", "@import 'colors.css';")
     ensure_line(home / ".config/gtk-4.0/gtk.css", "@import 'colors.css';")
     sync_kitty_clear_text(home, args.terminal_clear_text)
+    sync_kde_theme(home)
 
     if args.home_prefix is None:
         run_hooks(args.mode)

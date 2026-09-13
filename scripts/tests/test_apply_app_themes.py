@@ -89,6 +89,22 @@ def test_dark_render_and_includes(sandbox):
     assert "ForegroundNegative=#f38ba8" in kde_content
 
 
+def test_kdeglobals_preserves_unrelated_settings(sandbox):
+    tmp, palette = sandbox
+    home = tmp / "home"
+    kdeglobals = home / ".config/kdeglobals"
+    kdeglobals.parent.mkdir(parents=True)
+    kdeglobals.write_text("[KDE]\nwidgetStyle=oxygen\n\n[Fonts]\nfixed=Monospace,10\n")
+
+    result = run_apply(palette, "dark", home)
+    assert result.returncode == 0, result.stderr
+
+    content = kdeglobals.read_text()
+    assert "widgetStyle=oxygen" in content
+    assert "fixed=Monospace,10" in content
+    assert "BackgroundNormal=#1e1e2e" in content
+
+
 def test_light_variant_switch(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"
