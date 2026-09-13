@@ -131,14 +131,19 @@ function createAppsAdapter(config) {
 
     // Icon resolution hits the icon theme (a synchronous filesystem-backed
     // lookup per name); cache by raw icon name so repeated pool pulls -
-    // rescans, revalidations - never re-pay it. Missing icons cache as "".
+    // rescans, revalidations - never re-pay it. Misses resolve to "" but are
+    // deliberately NOT cached: an early lookup during the desktop-entry scan
+    // or before the icon theme settles would otherwise poison the entry and
+    // leave the icon blank until restart, even though a later lookup
+    // succeeds. Only hits are cached.
     var iconCache = {}
     function cachedIcon(rawIcon) {
         var key = rawIcon == null ? "" : String(rawIcon)
         if (Object.prototype.hasOwnProperty.call(iconCache, key))
             return iconCache[key]
         var resolved = iconResolver ? String(iconResolver(key)) : directIconPath(key)
-        iconCache[key] = resolved
+        if (resolved)
+            iconCache[key] = resolved
         return resolved
     }
 

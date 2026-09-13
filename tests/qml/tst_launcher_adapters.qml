@@ -244,6 +244,36 @@ Item {
             compare(outcome[0].favoriteWeight, 3)
         }
 
+        function test_appsAdapterIconCacheRetriesMissesInsteadOfPinningBlanks() {
+            // A lookup that misses while the desktop-entry scan or icon
+            // theme is still settling must not pin "" forever: later pulls
+            // retry and pick the icon up once resolution succeeds, while
+            // hits stay cached and never re-hit the theme.
+            var lookups = []
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([
+                    makeAppEntry("alpha", "Alpha", "", { icon: "alpha-icon" })
+                ]),
+                iconResolver: function(name) {
+                    lookups.push(name)
+                    return lookups.length > 1 ? "theme:" + name : ""
+                }
+            })
+
+            var first = null
+            adapters.apps.refresh("", "apps", function(result) { first = result })
+            compare(first[0].icon, "")
+
+            var second = null
+            adapters.apps.refresh("", "apps", function(result) { second = result })
+            compare(second[0].icon, "theme:alpha-icon")
+
+            var third = null
+            adapters.apps.refresh("", "apps", function(result) { third = result })
+            compare(third[0].icon, "theme:alpha-icon")
+            compare(lookups.length, 2)
+        }
+
         function test_appsAdapterFiltersQueriesAcrossNameCommentAndId() {
             var adapters = LauncherAdapters.createAdapters({
                 appsSource: makeAppsSource([

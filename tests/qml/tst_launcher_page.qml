@@ -19,6 +19,12 @@ Item {
 
     SignalSpy { id: modeSpy; target: page; signalName: "modeChangeRequested" }
 
+    // Standalone result-row probe for thumbnail failure behavior.
+    Component {
+        id: rowProbe
+        Lazer.LauncherResultRow {}
+    }
+
     TestCase {
         name: "LauncherPage"
         when: windowShown
@@ -352,8 +358,53 @@ Item {
             compare(count, 1)
         }
 
-        function test_identicalCommitReleasesRowsWithoutReplayingWave() {
-            openWithResults([
+        function test_deepMatchStretchesWindowInsteadOfBlankList() {
+            var many = []
+            for (var i = 0; i < 200; i++)
+                many.push(makeItem("item" + i, "Item " + i, 0, 0))
+            many.push(makeItem("deep-target", "Zzz Quux", 0, 0))
+            openWithResults(many)
+            compare(page.resultCount, 96)
+
+            // The pool holds the only match at index 200, far past the base
+            // window. Typing the query must stretch the materialized window
+            // so the match renders; results are non-empty so the empty state
+            // stays hidden — without the stretch the list sits blank with no
+            // explanation until an impossible scroll.
+            svc().query = "zzz"
+
+            compare(svc().results.length, 1)
+            tryCompare(page, "resultCount", 201, 1000)
+            compare(page.emptyState.visible, false)
+            compare(page.resultsView.visible, true)
+            tryVerify(function() {
+                var row = page.resultAt(200)
+                return row && row.displayName === "Zzz Quux"
+                        && row.enabled && row.opacity === 1
+            }, 3000)
+        }
+
+        function test_failedThumbnailHidesWithoutBreakingItsBinding() {
+            // A thumbnail file that fails to load must hide the image slot
+            // without clearing the bound path, so later paths (and reused
+            // delegates) still flow through the same binding.
+            var row = rowProbe.createObject(testRoot, {
+                result: { id: "7", displayName: "Clip", description: "d", icon: "", isImage: true },
+                thumbPath: Qt.resolvedUrl("tst_missing_thumb_xyz.png")
+            })
+            verify(row)
+
+            tryVerify(function() { return row.thumbFailed === true }, 2000)
+            verify(!row.thumbnailItem.visible)
+            verify(row.thumbPath.length > 0)
+
+            row.thumbPath = Qt.resolvedUrl("../../modules/lazerbar/icons/apps.svg")
+            tryVerify(function() { return row.thumbnailItem.status === Image.Ready }, 2000)
+            verify(row.thumbnailItem.visible)
+            row.destroy()
+        }
+
+        function test_identicalCommitReleasesRowsWithoutReplayingWave() {            openWithResults([
                 makeItem("a", "Alpha", 0, 0),
                 makeItem("b", "Beta", 0, 0)
             ])

@@ -562,6 +562,10 @@ Item {
     // Stretch the materialized window past the base slice only when a query
     // actually matches rows beyond it; growing swaps the Repeater model and
     // rebuilds delegates, so it must never fire per keystroke without need.
+    // NB: this must run on query edits, not just pool replacements — the
+    // pool already holds the match while the base window does not, and then
+    // the list renders blank (results non-empty, so the empty state hides
+    // too) until a scroll that folded rows can never trigger.
     function _syncWindowToMatches() {
         if (!root.activeSearchText)
             return
@@ -575,7 +579,10 @@ Item {
         root._resultWindowExtra = needed - root.resultWindowBase
         Qt.callLater(root._scheduleRowsCommit)
     }
-    onActiveSearchTextChanged: resultsView.normalizeViewport()
+    onActiveSearchTextChanged: {
+        resultsView.normalizeViewport()
+        root._syncWindowToMatches()
+    }
 
     // Clipboard thumbnail cache: one decode per entry id, owned here so
     // rows and the preview pane share the exact same proven path.

@@ -26,6 +26,13 @@ Item {
     // place of the app-icon slot; decoding and caching live on the page.
     readonly property bool isClipboardImage: !!result && result.isImage === true
     property string thumbPath: ""
+    // Set when the thumbnail file fails to load; hides the image slot
+    // without clearing thumbPath, so the binding back to the page cache
+    // survives and later paths (or reused delegates) still flow through.
+    // An imperative thumbPath = "" here would sever that binding for good
+    // and strand reused delegates with permanently missing thumbnails.
+    property bool thumbFailed: false
+    onThumbPathChanged: thumbFailed = false
     // Revision stamp from the owning page; read by the display bindings so
     // in-place metadata merges repaint the row without rebuilding it.
     property int metaStamp: 0
@@ -188,9 +195,11 @@ Item {
 
         // Clipboard image preview: the decoded entry sits directly in the
         // icon rail with no extra frame - the pixels speak for themselves.
+        // A failed load hides the slot via thumbFailed; the thumbPath
+        // binding itself is never touched (see its declaration).
         Image {
             id: thumbImage
-            visible: root.isClipboardImage && root.thumbPath.length > 0
+            visible: root.isClipboardImage && root.thumbPath.length > 0 && !root.thumbFailed
             anchors.left: parent.left
             anchors.leftMargin: 2
             anchors.verticalCenter: parent.verticalCenter
@@ -201,8 +210,8 @@ Item {
             asynchronous: true
             enabled: false
             onStatusChanged: {
-                if (status === Image.Error)
-                    root.thumbPath = ""
+                if (status === Image.Error && root.thumbPath.length > 0)
+                    root.thumbFailed = true
             }
         }
 
