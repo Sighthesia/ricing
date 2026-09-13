@@ -255,7 +255,6 @@ def main() -> int:
         # Kitty-only fast path: no palette or template config needed.
         home = Path.home()
         sync_kitty_clear_text(home, args.terminal_clear_text)
-        sync_kde_theme(home)
         state = "on" if args.terminal_clear_text else "off"
         print(f"Kitty clear text {state}")
         return 0

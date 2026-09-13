@@ -239,6 +239,22 @@ def test_only_kitty_text_needs_no_palette(sandbox):
     assert "dim_opacity 1.0" in conf
 
 
+def test_only_kitty_text_does_not_touch_kdeglobals(sandbox):
+    tmp, _ = sandbox
+    home = tmp / "home"
+    source = home / ".local/share/color-schemes/Afloat.colors"
+    source.parent.mkdir(parents=True)
+    source.write_text("[Colors:Window]\nBackgroundNormal=#1e1e2e\n")
+    kdeglobals = home / ".config/kdeglobals"
+    kdeglobals.parent.mkdir(parents=True)
+    original = "[KDE]\nwidgetStyle=oxygen\n"
+    kdeglobals.write_text(original)
+
+    result = run_apply(tmp / "missing.json", "dark", home, ["--only-kitty-text"])
+    assert result.returncode == 0, result.stderr
+    assert kdeglobals.read_text() == original
+
+
 def test_only_system_theme_needs_no_palette(sandbox):
     tmp, _ = sandbox
     home = tmp / "home"
