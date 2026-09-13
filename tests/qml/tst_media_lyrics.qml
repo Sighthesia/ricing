@@ -126,6 +126,38 @@ TestCase {
         compare(Services.NeteaseWebLyricsService.currentLyric, "Line two")
     }
 
+    function test_lyric_window_restores_when_mismatched_player_pauses() {
+        resetState()
+
+        Services.NeteaseWebLyricsService._applyPayload({
+            songId: "11",
+            title: "Song",
+            artist: "Artist",
+            playbackState: "playing",
+            positionMs: 1000,
+            durationMs: 5000,
+            rawLyric: "[00:00.00]Line one\n[00:10.00]Line two"
+        })
+        compare(Services.NeteaseWebLyricsService.currentLyric, "Line one")
+
+        const playingVideo = makePlayer(0)
+        playingVideo.trackTitle = "Video"
+        playingVideo.trackArtist = ""
+        Services.MediaService._activePlayerRef = playingVideo
+        Services.MediaService._preferredPlayerKey = "Firefox"
+        Services.NeteaseWebLyricsService._syncLyricWindow()
+        compare(Services.NeteaseWebLyricsService.currentLyric, "")
+
+        const pausedVideo = makePlayer(0)
+        pausedVideo.trackTitle = "Video"
+        pausedVideo.trackArtist = ""
+        pausedVideo.playbackState = MprisPlaybackState.Paused
+        pausedVideo.isPlaying = false
+        Services.MediaService._activePlayerRef = pausedVideo
+        Services.NeteaseWebLyricsService._syncLyricWindow()
+        compare(Services.NeteaseWebLyricsService.currentLyric, "Line one")
+    }
+
     function test_lyric_window_matches_media_position_with_artist_format_differences() {
         resetState()
 

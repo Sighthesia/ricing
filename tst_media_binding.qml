@@ -125,6 +125,33 @@ Item {
                                       root._steps.push(function() {
                                           check("stale video cover falls back to cached music", control.artUrl, "file:///tmp/music-track-art.jpg")
 
+                                          // Lyric line must survive a video interruption:
+                                          // while the video plays the window hides, but once
+                                          // it pauses the music lyric line returns instead of
+                                          // falling back to the song title.
+                                          lyrics._applyPayload({ songId: "11", title: "Music", artist: "Music Artist",
+                                              playbackState: "playing", positionMs: 1000, durationMs: 200000,
+                                              rawLyric: "[00:00.00]Line one\n[00:10.00]Line two" })
+                                          media._activePlayerRef = makePlayer("Music", "Music Artist",
+                                              "file:///tmp/music-cover.jpg", MprisPlaybackState.Playing, true)
+                                          media._syncArtUrl()
+                                          control._refreshLyricsSession()
+                                          root._steps.push(function() {
+                                              check("music lyric line shown", control.compactPrimaryLyric, "Line one")
+                                              media._activePlayerRef = makePlayer("Video", "", "file:///tmp/video-cover.jpg",
+                                                  MprisPlaybackState.Playing, true)
+                                              media._syncArtUrl()
+                                              root._steps.push(function() {
+                                                  check("video hides lyric line", lyrics.currentLyric, "")
+                                                  check("video shows its own title", control.title, "Video")
+                                                  media._activePlayerRef = makePlayer("Video", "", "file:///tmp/video-cover.jpg",
+                                                      MprisPlaybackState.Paused, false)
+                                                  lyrics._syncLyricWindow()
+                                                  root._steps.push(function() {
+                                                      check("paused video restores lyric line", lyrics.currentLyric, "Line one")
+                                                      check("paused video shows lyric, not title", control.compactPrimaryLyric, "Line one")
+                                                      check("paused video shows compact lyric", control.showCompactLyric, true)
+
                           control._lyricsSourceLatched = false
                           // --- Arbitration: playing session beats paused other-tab payloads.
                          lyrics._resetState()
@@ -146,6 +173,12 @@ Item {
                           lyrics._resetState()
                           console.log("Totals:", root._checks - root._failures, "passed,", root._failures, "failed")
                           Qt.quit()
+                                                  })
+                                                  Qt.callLater(root._steps.shift())
+                                              })
+                                              Qt.callLater(root._steps.shift())
+                                          })
+                                          Qt.callLater(root._steps.shift())
                                       })
                                       Qt.callLater(root._steps.shift())
                                   })

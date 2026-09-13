@@ -292,9 +292,13 @@ Singleton {
     }
 
     function _syncLyricWindow() {
-        // Suspended session: keep the fetched lyrics but show nothing, so a
-        // background tab's song never bleeds into another player's display.
-        if (!root.boundToActivePlayer) {
+        // Suspended session: while another player is actively playing, keep
+        // the fetched lyrics but show nothing, so a background tab's song
+        // never bleeds into another player's display. A paused/stopped
+        // player claims no focus: the still-playing lyric session is the
+        // audible source, so its window stays visible and restores after
+        // the interruption instead of falling back to the song title.
+        if (!root.boundToActivePlayer && Services.MediaService.playbackState === "playing") {
             root.currentLyric = ""
             root.nextLyric = ""
             root.currentLyricIndex = -1
