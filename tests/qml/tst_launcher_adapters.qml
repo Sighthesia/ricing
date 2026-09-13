@@ -186,6 +186,13 @@ Item {
         function resetSession() {
             var s = svc()
             s._refreshToken++
+            // In-flight guards must return to fresh-session state as well: a
+            // test that starts an execution without completing it (a manual
+            // adapter swallowing done) would otherwise silently disarm
+            // execute() for every later test in the case.
+            s._executionInFlight = false
+            s._appsPrimeInFlight = false
+            s._metadataRefreshPending = false
             s.visible = false
             s.query = ""
             s.results = []
@@ -797,6 +804,9 @@ Item {
             })
 
             svc().open()
+            // open() publishes visibility first and pulls the pool on the
+            // next turn so the surface can claim focus synchronously.
+            wait(0)
 
             compare(svc().visible, true)
             compare(svc().mode, "apps")
@@ -821,6 +831,9 @@ Item {
             })
 
             svc().open()
+            // open() publishes visibility first and pulls the pool on the
+            // next turn so the surface can claim focus synchronously.
+            wait(0)
 
             compare(svc().loading, false)
             compare(svc().error, "")
@@ -841,6 +854,9 @@ Item {
             svc()._adapters = ({ apps: apps })
 
             svc().open()
+            // open() publishes visibility first and pulls the pool on the
+            // next turn so the surface can claim focus synchronously.
+            wait(0)
             compare(svc().loading, true)
 
             // Stale results from a previous view must not execute mid-load.
@@ -864,6 +880,9 @@ Item {
             svc()._adapters = ({ apps: apps })
 
             svc().open()
+            // open() publishes visibility first and pulls the pool on the
+            // next turn so the surface can claim focus synchronously.
+            wait(0)
             apps.pendingRefreshes[0]({ error: "source failed" })
             compare(svc().interactive, false)
 
