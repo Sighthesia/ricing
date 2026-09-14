@@ -189,7 +189,7 @@ Item {
             width: card.width + 16
             height: card.height + 16
             radius: root.cardRadius + 8
-            color: LazerTheme.notificationFlash
+            color: LazerTheme.accentColor
             opacity: 0
 
             NumberAnimation {
@@ -497,15 +497,15 @@ Item {
                 }
             }
 
-            // Full white-out entry flash from osu LoadComplete: pure white
-            // over the whole card (icon and text included). It starts on
-            // the same beat as the slide-in so the card arrives flashing
-            // instead of blinking after it lands.
+            // Primary-color entry flash from osu LoadComplete: the whole
+            // card (icon and text included) takes the accent for a beat
+            // while it slides in, then releases. Reads on both card tones
+            // because the primary always contrasts the card surface.
             Rectangle {
                 id: flash
                 anchors.fill: parent
                 radius: root.cardRadius
-                color: "#FFFFFF"
+                color: LazerTheme.accentColor
                 opacity: 0
 
                 NumberAnimation {
