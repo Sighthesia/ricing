@@ -93,7 +93,6 @@ Item {
         if (!root.reducedMotion) {
             slideInAnim.restart()
             flashFade.restart()
-            edgeFade.restart()
         }
     }
 
@@ -489,32 +488,6 @@ Item {
                     target: flash
                     property: "opacity"
                     from: 1
-                    to: 0
-                    duration: root.reducedMotion ? 0 : 2000
-                    easing.type: Easing.OutQuart
-                }
-            }
-
-            // Entry edge glow: accent ring just inside the card bounds,
-            // following the settings-panel focus-ring recipe. An outer halo
-            // spilled past the card into neighbors and the layer edge, so
-            // the "lights up" read lives on the edge instead — same pulse
-            // timing as the wash, painted above it to stay crisp.
-            Rectangle {
-                id: edgeGlow
-                anchors.fill: parent
-                anchors.margins: 1
-                radius: root.cardRadius - 1
-                color: "transparent"
-                border.color: LazerTheme.accentColor
-                border.width: 2
-                opacity: 0
-
-                NumberAnimation {
-                    id: edgeFade
-                    target: edgeGlow
-                    property: "opacity"
-                    from: 0.9
                     to: 0
                     duration: root.reducedMotion ? 0 : 2000
                     easing.type: Easing.OutQuart
