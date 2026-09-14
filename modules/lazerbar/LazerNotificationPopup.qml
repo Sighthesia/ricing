@@ -93,7 +93,7 @@ Item {
         if (!root.reducedMotion) {
             slideInAnim.restart()
             flashFade.restart()
-            haloFade.restart()
+            edgeFade.restart()
         }
     }
 
@@ -177,30 +177,6 @@ Item {
             id: springBack
             NumberAnimation { target: dragContainer; property: "dragX"; to: 0; duration: 800; easing.type: Easing.OutElastic }
             NumberAnimation { target: dragContainer; property: "dragY"; to: 0; duration: 800; easing.type: Easing.OutElastic }
-        }
-
-        // Halo pulse behind the card: an overlay alone cannot brighten an
-        // already near-white light card, so the "lights up" read comes
-        // from light spilling past the card edges. Same entry timing as
-        // the wash; declared before the card so it paints underneath.
-        Rectangle {
-            id: halo
-            anchors.centerIn: card
-            width: card.width + 16
-            height: card.height + 16
-            radius: root.cardRadius + 8
-            color: LazerTheme.accentColor
-            opacity: 0
-
-            NumberAnimation {
-                id: haloFade
-                target: halo
-                property: "opacity"
-                from: 0.55
-                to: 0
-                duration: root.reducedMotion ? 0 : 2000
-                easing.type: Easing.OutQuart
-            }
         }
 
         // Pop-in slide from the screen edge, like osu LoadComplete MoveToX(500 OutQuint).
@@ -513,6 +489,32 @@ Item {
                     target: flash
                     property: "opacity"
                     from: 1
+                    to: 0
+                    duration: root.reducedMotion ? 0 : 2000
+                    easing.type: Easing.OutQuart
+                }
+            }
+
+            // Entry edge glow: accent ring just inside the card bounds,
+            // following the settings-panel focus-ring recipe. An outer halo
+            // spilled past the card into neighbors and the layer edge, so
+            // the "lights up" read lives on the edge instead — same pulse
+            // timing as the wash, painted above it to stay crisp.
+            Rectangle {
+                id: edgeGlow
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: root.cardRadius - 1
+                color: "transparent"
+                border.color: LazerTheme.accentColor
+                border.width: 2
+                opacity: 0
+
+                NumberAnimation {
+                    id: edgeFade
+                    target: edgeGlow
+                    property: "opacity"
+                    from: 0.9
                     to: 0
                     duration: root.reducedMotion ? 0 : 2000
                     easing.type: Easing.OutQuart
