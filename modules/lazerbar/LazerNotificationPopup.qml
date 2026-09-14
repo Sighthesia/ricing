@@ -472,12 +472,15 @@ Item {
                 }
             }
 
-            // Additive-style initial flash from osu LoadComplete.
+            // Additive-style initial flash from osu LoadComplete. Uses the
+            // settings-panel click-flash recipe (textPrimary inverts with
+            // the scheme) so the blink stays visible on light paper-white
+            // cards where a pure-white overlay disappears.
             Rectangle {
                 id: flash
                 anchors.fill: parent
                 radius: root.cardRadius
-                color: "#CCFFFFFF"
+                color: LazerTheme.textPrimary
                 opacity: 0
 
                 NumberAnimation {
