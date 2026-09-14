@@ -86,10 +86,14 @@ QtObject {
     // schemes so the hue survives the flash — pure white chalks fills.
     readonly property color flashWash: !adapt || !colorService ? textPrimary
         : Qt.lighter(colorService.mPrimary, 2.0)
-    // Notification entry flash: near-pure white in the dark scheme for a
-    // crisp osu LoadComplete blink; dark ink in the light scheme where a
-    // white overlay disappears on paper-white cards.
-    readonly property color notificationFlash: lightScheme ? textPrimary : "#FFFFFF"
+    // Notification entry flash stays bright in both schemes: near-pure
+    // white over dark cards, and the palette's light primary-container
+    // tint over paper-white light cards (pure white would vanish there).
+    // The branch mirrors the settingsCard lightness (light only when the
+    // adapted light scheme is active); the unadapted fallback card is
+    // dark, so it keeps the white flash.
+    readonly property color notificationFlash: (adapt && colorService && lightScheme)
+        ? colorService.mPrimaryContainer : "#FFFFFF"
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"

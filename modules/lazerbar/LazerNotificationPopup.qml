@@ -473,8 +473,9 @@ Item {
             }
 
             // Additive-style initial flash from osu LoadComplete. Uses the
-            // scheme-aware notification flash (near-white in dark, dark
-            // ink in light) so the blink reads on both card tones.
+            // scheme-aware notification flash (near-white in dark, light
+            // accent tint in light) so the blink stays bright and visible
+            // on both card tones.
             Rectangle {
                 id: flash
                 anchors.fill: parent
