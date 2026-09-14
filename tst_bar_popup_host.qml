@@ -670,6 +670,21 @@ Item {
         onTriggered: {
             root.check("mid-transition cleanup clears current", host.currentIntent, null)
             root.check("mid-transition cleanup clears surface", host.surfaceActive, false)
+            // Regression: height arriving mid-reveal must rebase live so the
+            // shell has already settled once fully expanded (no second motion
+            // after expansion). Stale display must catch up synchronously.
+            host.showIntent({
+                widgetId: "volume", instanceKey: "volume:0", kind: "hover",
+                title: "Volume", actionKind: "volume",
+                anchorX: 200, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.popupItem.revealProgress = 0.5
+            host.displayHeight = 7
+            host.updateTargetGeometry(host.currentIntent)
+            root.check("mid-reveal height rebases live instead of lagging expansion",
+                host.displayHeight, host.targetHeight)
+            host.dismissImmediately()
             console.log("Totals:", (root._checks - root._failures), "passed,", root._failures, "failed")
             Qt.quit()
         }

@@ -515,14 +515,11 @@ PanelWindow {
     function popupHeightForIntent(intentObj) {
         if (!intentObj)
             return 1
-        // Hold stable height while the two-layer reveal is in flight so a
-        // late DBus menu fetch does not retarget geometry mid-slide.
-        if (popup.revealProgress > 0.01 && popup.revealProgress < 0.99) {
-            if (popup.stableContentHeight > 0)
-                return popup.stableContentHeight
-            if (popup.stableSidebarHeight > 0)
-                return popup.stableSidebarHeight
-        }
+        // Track live height even while the two-layer reveal is in flight:
+        // holding a stale height here defers the correction until after
+        // full expansion, which reads as a second jump once already open.
+        // Late arrivals glide concurrently via rebaseGlide in
+        // retargetGeometry, so no post-reveal motion remains.
         var height = String(intentObj.kind || "") === "context"
                 ? contextPopupActions.implicitHeight : popupActions.implicitHeight
         return isFinite(Number(height)) && Number(height) > 0 ? Number(height) : 1
@@ -614,12 +611,17 @@ PanelWindow {
             return
         // Single shared progress driver: display* is only written by the
         // progress function (or the immediate/reduced-motion direct assign).
-        // Late DBus batches must not restart the glide mid-slide: rebase
-        // keeps the current progress so the remaining curve covers the
-        // corrected distance without a bounce.
+        // Late arrivals during the reveal rebase instead of waiting for
+        // settle: on a settled glide this snaps display to the new target
+        // (nothing else is travelling), on a running glide it keeps the
+        // current progress so the remaining curve covers the corrected
+        // distance without a bounce. Either way the shell has settled by
+        // the time the reveal completes, instead of starting a second
+        // motion after full expansion.
         if (!immediate && !MotionTokens.reducedMotion
                 && popup.revealProgress > 0.01 && popup.revealProgress < 0.99
                 && !root.pendingIntent && root.transitionProgress >= 0.999) {
+            root.rebaseGlide()
             return
         }
         if (immediate || MotionTokens.reducedMotion) {
