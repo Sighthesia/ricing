@@ -473,9 +473,8 @@ Item {
             }
 
             // Entry flash from osu LoadComplete: the whole card (icon and
-            // text included) takes the flash color for a beat while it
-            // slides in, then releases. Near-white in dark, primary accent
-            // in light, so it reads on both card tones.
+            // text included) takes the luminous primary tint for a beat
+            // while it slides in, then releases.
             Rectangle {
                 id: flash
                 anchors.fill: parent

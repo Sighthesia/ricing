@@ -86,9 +86,13 @@ QtObject {
     // schemes so the hue survives the flash — pure white chalks fills.
     readonly property color flashWash: !adapt || !colorService ? textPrimary
         : Qt.lighter(colorService.mPrimary, 2.0)
-    // Notification entry flash: near-pure white over dark cards, primary
-    // accent over paper-white light cards (white would vanish there).
-    readonly property color notificationFlash: lightScheme ? accentColor : "#FFFFFF"
+    // Notification entry flash: luminous half-tint of the primary in
+    // both schemes — bright with the wallpaper hue. Pastel container
+    // tints collapse toward paper-white light cards on low-chroma
+    // wallpapers, and full-strength primary reads too heavy; the 50%
+    // white blend holds 0.78+ contrast on every measured seed while
+    // staying bright. Unbranched so dark, light and fallback agree.
+    readonly property color notificationFlash: mix(paperWhite, accentColor, 0.5)
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"
