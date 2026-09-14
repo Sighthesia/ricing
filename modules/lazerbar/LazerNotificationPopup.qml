@@ -498,22 +498,18 @@ Item {
             }
 
             // Full white-out entry flash from osu LoadComplete: pure white
-            // over the whole card (icon and text included) so the card
-            // bleaches completely for a beat, then releases.
+            // over the whole card (icon and text included). It starts on
+            // the same beat as the slide-in so the card arrives flashing
+            // instead of blinking after it lands.
             Rectangle {
                 id: flash
                 anchors.fill: parent
                 radius: root.cardRadius
                 color: "#FFFFFF"
                 opacity: 0
-            }
 
-            // Hold one fade-in beat so the white peak lands after the card
-            // itself is opaque; otherwise the parent fade masks the peak.
-            SequentialAnimation {
-                id: flashFade
-                PauseAnimation { duration: 200 }
                 NumberAnimation {
+                    id: flashFade
                     target: flash
                     property: "opacity"
                     from: 1
