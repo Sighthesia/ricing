@@ -473,14 +473,13 @@ Item {
             }
 
             // Additive-style initial flash from osu LoadComplete. Uses the
-            // settings-panel click-flash recipe (textPrimary inverts with
-            // the scheme) so the blink stays visible on light paper-white
-            // cards where a pure-white overlay disappears.
+            // scheme-aware notification flash (near-white in dark, dark
+            // ink in light) so the blink reads on both card tones.
             Rectangle {
                 id: flash
                 anchors.fill: parent
                 radius: root.cardRadius
-                color: LazerTheme.textPrimary
+                color: LazerTheme.notificationFlash
                 opacity: 0
 
                 NumberAnimation {
