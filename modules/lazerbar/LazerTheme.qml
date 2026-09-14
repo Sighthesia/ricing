@@ -86,15 +86,15 @@ QtObject {
     // schemes so the hue survives the flash — pure white chalks fills.
     readonly property color flashWash: !adapt || !colorService ? textPrimary
         : Qt.lighter(colorService.mPrimary, 2.0)
-    // Notification entry flash stays bright in both schemes: near-pure
-    // white over dark cards, and a luminous half-tint of the primary over
-    // paper-white light cards. Pastel container tints collapse toward the
-    // card on low-chroma wallpapers (measured down to 0.19 contrast on
-    // violet/neutral seeds), while the 50% primary tint holds 0.78+ on
-    // every seed; pure white would vanish entirely. The branch mirrors
-    // the settingsCard lightness (light only when the adapted light
-    // scheme is active); the unadapted fallback card is dark, so it keeps
-    // the white flash.
+    // Halo glow color for the notification entry pulse (the card wash
+    // itself is pure white): near-pure white over dark cards, and a
+    // luminous half-tint of the primary over paper-white light cards.
+    // Pastel container tints collapse toward the card on low-chroma
+    // wallpapers (measured down to 0.19 contrast on violet/neutral
+    // seeds), while the 50% primary tint holds 0.78+ on every seed.
+    // The branch mirrors the settingsCard lightness (light only when
+    // the adapted light scheme is active); the unadapted fallback card
+    // is dark, so it keeps the white glow.
     readonly property color notificationFlash: (adapt && colorService && lightScheme)
         ? mix(paperWhite, colorService.mPrimary, 0.5) : "#FFFFFF"
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"

@@ -497,22 +497,26 @@ Item {
                 }
             }
 
-            // Additive-style initial flash from osu LoadComplete. Uses the
-            // scheme-aware notification flash (near-white in dark, luminous
-            // primary tint in light) so the blink stays bright and visible
-            // on both card tones.
+            // Full white-out entry flash from osu LoadComplete: pure white
+            // over the whole card (icon and text included) so the card
+            // bleaches completely for a beat, then releases.
             Rectangle {
                 id: flash
                 anchors.fill: parent
                 radius: root.cardRadius
-                color: LazerTheme.notificationFlash
+                color: "#FFFFFF"
                 opacity: 0
+            }
 
+            // Hold one fade-in beat so the white peak lands after the card
+            // itself is opaque; otherwise the parent fade masks the peak.
+            SequentialAnimation {
+                id: flashFade
+                PauseAnimation { duration: 200 }
                 NumberAnimation {
-                    id: flashFade
                     target: flash
                     property: "opacity"
-                    from: 0.8
+                    from: 1
                     to: 0
                     duration: root.reducedMotion ? 0 : 2000
                     easing.type: Easing.OutQuart
