@@ -93,6 +93,7 @@ Item {
         if (!root.reducedMotion) {
             slideInAnim.restart()
             flashFade.restart()
+            haloFade.restart()
         }
     }
 
@@ -176,6 +177,30 @@ Item {
             id: springBack
             NumberAnimation { target: dragContainer; property: "dragX"; to: 0; duration: 800; easing.type: Easing.OutElastic }
             NumberAnimation { target: dragContainer; property: "dragY"; to: 0; duration: 800; easing.type: Easing.OutElastic }
+        }
+
+        // Halo pulse behind the card: an overlay alone cannot brighten an
+        // already near-white light card, so the "lights up" read comes
+        // from light spilling past the card edges. Same entry timing as
+        // the wash; declared before the card so it paints underneath.
+        Rectangle {
+            id: halo
+            anchors.centerIn: card
+            width: card.width + 16
+            height: card.height + 16
+            radius: root.cardRadius + 8
+            color: LazerTheme.notificationFlash
+            opacity: 0
+
+            NumberAnimation {
+                id: haloFade
+                target: halo
+                property: "opacity"
+                from: 0.55
+                to: 0
+                duration: root.reducedMotion ? 0 : 2000
+                easing.type: Easing.OutQuart
+            }
         }
 
         // Pop-in slide from the screen edge, like osu LoadComplete MoveToX(500 OutQuint).
