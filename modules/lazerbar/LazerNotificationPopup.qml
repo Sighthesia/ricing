@@ -472,15 +472,15 @@ Item {
                 }
             }
 
-            // Primary-color entry flash from osu LoadComplete: the whole
-            // card (icon and text included) takes the accent for a beat
-            // while it slides in, then releases. Reads on both card tones
-            // because the primary always contrasts the card surface.
+            // Entry flash from osu LoadComplete: the whole card (icon and
+            // text included) takes the flash color for a beat while it
+            // slides in, then releases. Near-white in dark, primary accent
+            // in light, so it reads on both card tones.
             Rectangle {
                 id: flash
                 anchors.fill: parent
                 radius: root.cardRadius
-                color: LazerTheme.accentColor
+                color: LazerTheme.notificationFlash
                 opacity: 0
 
                 NumberAnimation {
