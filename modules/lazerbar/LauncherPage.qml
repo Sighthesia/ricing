@@ -116,6 +116,9 @@ Item {
                 root.cancelEntranceWave()
                 entranceSettle.stop()
                 root._firstFillPending = false
+                // Pointer preview dies with the surface so a reopen starts
+                // from the focused row instead of a stale hover.
+                root._hoveredResult = null
             }
         }
         function onSelectedIndexChanged() {
@@ -237,6 +240,9 @@ Item {
     function navigateSelection(direction) {
         if (!root.session)
             return false
+        // Keyboard navigation reclaims the preview: a resting mouse would
+        // otherwise keep the hovered row previewed while the highlight moves.
+        root._hoveredResult = null
         if (direction < 0 && typeof root.session.selectPrevious === "function") {
             root.session.selectPrevious()
             // Arrow navigation changes the selected row but must not move the

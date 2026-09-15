@@ -268,6 +268,41 @@ Item {
             compare(svc().selectedIndex, 0)
         }
 
+        function test_arrowNavigationReclaimsPreviewFromHover() {
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0),
+                makeItem("c", "Gamma", 0, 0)
+            ])
+
+            // A resting mouse keeps its row previewed ahead of the keyboard.
+            var hovered = svc().results[2]
+            page.trackHover(hovered, true)
+            compare(page._hoveredResult, hovered)
+
+            // Arrow navigation hands the preview back to the focused row.
+            verify(page.navigateSelection(1))
+            verify(page._hoveredResult === null)
+            compare(svc().selectedIndex, 1)
+
+            verify(page.navigateSelection(-1))
+            verify(page._hoveredResult === null)
+            compare(svc().selectedIndex, 0)
+        }
+
+        function test_hiddenSessionClearsHoverPreview() {
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0)
+            ])
+
+            page.trackHover(svc().results[1], true)
+            verify(page._hoveredResult !== null)
+
+            svc().close()
+            verify(page._hoveredResult === null)
+        }
+
         function test_enterExecutesSelectedResult() {
             var apps = openWithResults([
                 makeItem("firefox", "Firefox", 5, 10),
