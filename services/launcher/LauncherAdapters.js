@@ -394,6 +394,31 @@ function matchClipboardCopySeed(seeds, preview, isImage, nowMs) {
     return 0
 }
 
+// Preview decode queue: a single cliphist decode runs at a time and every
+// completion keeps its own id. New requests wait instead of overwriting the
+// running id (which misattributed the in-flight content to the newest
+// request, so preview text stopped following the selection). Consumed
+// newest-first so rapid navigation previews the current selection within
+// one decode; every queued decode still completes and fills its cache.
+function queuePreviewDecode(queue, id, isImage) {
+    var list = Array.isArray(queue) ? queue : []
+    var key = id == null ? "" : String(id)
+    if (!key)
+        return list
+    for (var index = 0; index < list.length; index++) {
+        if (list[index] && String(list[index].id) === key)
+            return list
+    }
+    list.push({ id: key, isImage: !!isImage })
+    return list
+}
+
+function takeNewestPreviewDecode(queue) {
+    if (!Array.isArray(queue) || !queue.length)
+        return null
+    return queue.pop()
+}
+
 // Splits one "<id>\t<preview>" cliphist list row; null for blank lines.
 // Pure so the history row parse stays unit-testable without a Quickshell
 // process (a scope slip here used to abort the whole fetch mid-loop).

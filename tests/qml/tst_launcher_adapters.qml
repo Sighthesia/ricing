@@ -714,6 +714,24 @@ Item {
             compare(LauncherAdapters.clipboardMimeForPreview("[[ binary data 1 bmp 2x2 ]]", true), "image/*")
         }
 
+        function test_previewDecodeQueueCoalescesAndServesNewestFirst() {
+            // Overlapping preview requests used to overwrite the running id
+            // and misattribute content; queued requests keep their identity
+            // and drain newest-first so the current selection previews next.
+            var queue = LauncherAdapters.queuePreviewDecode(null, "a", false)
+            queue = LauncherAdapters.queuePreviewDecode(queue, "b", false)
+            queue = LauncherAdapters.queuePreviewDecode(queue, "a", false)
+            compare(queue.length, 2)
+            compare(queue[0].id, "a")
+            compare(queue[1].id, "b")
+            verify(LauncherAdapters.queuePreviewDecode(queue, "", false) === queue)
+
+            compare(LauncherAdapters.takeNewestPreviewDecode(queue).id, "b")
+            compare(LauncherAdapters.takeNewestPreviewDecode(queue).id, "a")
+            verify(LauncherAdapters.takeNewestPreviewDecode(queue) === null)
+            verify(LauncherAdapters.takeNewestPreviewDecode(null) === null)
+        }
+
         function test_clipboardCopySeedRoundTripInheritsTimestamp() {
             // The shell copying an entry back recreates it under a fresh id;
             // matching the seed must hand back the original timestamp so the

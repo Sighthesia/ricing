@@ -620,11 +620,14 @@ Singleton {
     }
 
     // ---- Preview support: decode an item for inline preview. ----
-    // Tracks the most recent request id so stale completions are ignored.
+    // Decodes run one at a time through a small queue; every completion
+    // keeps its own id so rapid selection changes preview the current item
+    // instead of misattributing in-flight content to the newest request.
     property string _previewRequestId: ""
     // Tracks which id the currently running process belongs to.
     property string _runningDecodeId: ""
     property string _runningDecodePath: ""
+    property var _previewQueue: []
     property int _previewRevision: 0
     signal previewDecoded(string id, string contentOrPath)
 
@@ -638,16 +641,16 @@ Singleton {
             var runningPath = root._runningDecodePath
             root._runningDecodeId = ""
             root._runningDecodePath = ""
-            if (!runningId || code !== 0) return
-            // Ignore if a newer request has superseded this one.
-            if (runningId !== root._previewRequestId) return
-            if (root._previewDecodeIsImage) {
-                // Image was piped to a temp file by the shell command.
-                root._previewRevision++
-                root.previewDecoded(runningId, "file://" + runningPath + "?rev=" + root._previewRevision)
-            } else {
-                root.previewDecoded(runningId, stdout.text)
+            if (runningId && code === 0) {
+                if (root._previewDecodeIsImage) {
+                    // Image was piped to a temp file by the shell command.
+                    root._previewRevision++
+                    root.previewDecoded(runningId, "file://" + runningPath + "?rev=" + root._previewRevision)
+                } else {
+                    root.previewDecoded(runningId, stdout.text)
+                }
             }
+            root._pumpPreviewQueue()
         }
     }
     property bool _previewDecodeIsImage: false
@@ -656,24 +659,49 @@ Singleton {
     // For images the result is a file:// URL; for text the raw content string.
     function requestPreview(id, isImage) {
         if (!root.available || !id) return
-        root._previewRequestId = id
+        var key = String(id)
+        root._previewRequestId = key
+        // A decode already in flight keeps its own identity; queue behind it
+        // instead of overwriting the running id.
+        if (previewDecodeProc.running) {
+            if (root._runningDecodeId === key)
+                return
+            root._previewQueue = LauncherAdapters.queuePreviewDecode(root._previewQueue, key, isImage)
+            return
+        }
+        root._startPreviewDecode(key, !!isImage)
+    }
+
+    // Runs queued preview decodes newest-first (popped at start so a failed
+    // head still drains) so rapid navigation previews the current selection
+    // within one decode while every queued decode still fills its cache.
+    function _pumpPreviewQueue() {
+        if (previewDecodeProc.running)
+            return
+        var next = LauncherAdapters.takeNewestPreviewDecode(root._previewQueue)
+        if (!next)
+            return
+        root._startPreviewDecode(next.id, next.isImage)
+    }
+
+    function _startPreviewDecode(key, isImage) {
         root._previewDecodeIsImage = isImage
         if (isImage) {
-            var safeName = encodeURIComponent(id).replace(/%/g, "_")
+            var safeName = encodeURIComponent(key).replace(/%/g, "_")
             var path = "/tmp/afloat-clip-preview-" + safeName + ".img"
             previewDecodeProc.command = [
                 "sh", "-c",
                 "cliphist decode \"$1\" > \"$2\"",
                 "afloat-clip-preview",
-                id,
+                key,
                 path
             ]
             root._runningDecodePath = path
         } else {
-            previewDecodeProc.command = ["cliphist", "decode", id]
+            previewDecodeProc.command = ["cliphist", "decode", key]
             root._runningDecodePath = ""
         }
-        root._runningDecodeId = id
+        root._runningDecodeId = key
         previewDecodeProc.running = true
     }
 
