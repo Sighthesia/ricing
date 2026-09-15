@@ -53,6 +53,11 @@ QtObject {
         isGeocoding = true
         lastError = ""
         var xhr = new XMLHttpRequest()
+        xhr.timeout = 12000
+        xhr.ontimeout = function () {
+            root.isGeocoding = false
+            root._fail("城市解析超时，检查网络后重试")
+        }
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== XMLHttpRequest.DONE)
                 return
@@ -86,7 +91,12 @@ QtObject {
             }
         }
         xhr.open("GET", geocodeUrl(name))
-        xhr.send()
+        try {
+            xhr.send()
+        } catch (e) {
+            root.isGeocoding = false
+            root._fail("城市解析请求失败，检查网络后重试")
+        }
     }
 
     // Record the failure inline and push it to the message band together.

@@ -142,20 +142,29 @@ LazerSettingsSection {
 
     // City commit goes through the injected location service when present
     // (live shell geocodes); otherwise store the text directly (tests).
+    // The typed text is persisted first so the async round-trip never wipes
+    // the editor and the field binding stays stable throughout.
     function commitCity(field, text) {
         if (!root.settingsObject || !field)
             return
+        var next = String(text == null ? "" : text).trim()
         var current = root.settingsObject.autoCity != null ? String(root.settingsObject.autoCity) : ""
-        if (root.locationService) {
-            root.locationService.geocodeCity(text)
-        } else {
-            var next = String(text).trim()
-            if (next !== current) {
-                root.settingsObject.autoCity = next
-                root.save()
-            }
+        if (next !== current) {
+            root.settingsObject.autoCity = next
+            root.save()
         }
+        if (next !== "" && root.locationService)
+            root.locationService.geocodeCity(next)
+        else if (next === "" && root.locationService)
+            root.locationService.clearCity()
         field.syncEditorFromText()
+    }
+
+    // A failed geocode must not wedge the field: the text-field dedup would
+    // otherwise swallow an identical retry, so reopen commits on error.
+    onLocationErrorChanged: {
+        if (root.locationError !== "" && cityFieldControl)
+            cityFieldControl.lastCommittedText = ""
     }
 
     LazerSettingsRow {

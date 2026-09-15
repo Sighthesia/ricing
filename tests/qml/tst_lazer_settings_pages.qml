@@ -43,6 +43,14 @@ Item {
     }
     QtObject { id: fakeWallpaper; property string changed: ""; function changeWallpaper(path) { changed = path } }
     QtObject { id: saveState; property int count: 0; function save() { count++ } }
+    QtObject {
+        id: fakeLocation
+        property int geocodeCount: 0
+        property string lastCity: ""
+        property int clearCount: 0
+        function geocodeCity(city) { geocodeCount++; lastCity = city }
+        function clearCity() { clearCount++ }
+    }
 
     Lazer.LazerSettingsAppearance {
         id: appearancePage; width: 600; height: 180
@@ -90,6 +98,11 @@ Item {
             notificationSettings.dnd = false
             appearancePage.defaults = ({})
             appearancePage.resetCallback = null
+            appearancePage.locationService = null
+            appearancePage.locationError = ""
+            fakeLocation.geocodeCount = 0
+            fakeLocation.lastCity = ""
+            fakeLocation.clearCount = 0
             barPage.defaults = ({})
             barPage.resetCallback = null
             notificationsPage.defaults = ({})
@@ -274,10 +287,25 @@ Item {
             verify(appearancePage.cityRow.enabled)
             verify(appearancePage.latitudeRow.enabled)
             verify(appearancePage.longitudeRow.enabled)
-            // City without a location service stores the text directly.
+            // City persists the typed text first so the async round-trip
+            // never wipes the editor, then delegates to the service.
+            appearancePage.locationService = fakeLocation
             appearancePage.cityField.editorItem.text = "上海"
             appearancePage.cityField.commit()
             compare(appearanceSettings.autoCity, "上海")
+            compare(appearancePage.cityField.editorItem.text, "上海")
+            compare(fakeLocation.geocodeCount, 1)
+            compare(fakeLocation.lastCity, "上海")
+            // Identical input dedups while healthy...
+            appearancePage.cityField.commit()
+            compare(fakeLocation.geocodeCount, 1)
+            // ...but a failed geocode reopens commits so retrying fires.
+            appearancePage.locationError = "定位失败"
+            compare(appearancePage.cityField.lastCommittedText, "")
+            appearancePage.cityField.commit()
+            compare(fakeLocation.geocodeCount, 2)
+            appearancePage.locationError = ""
+            appearancePage.locationService = null
             // Valid coordinates persist; garbage snaps back.
             appearancePage.latitudeField.editorItem.text = "31.23"
             appearancePage.latitudeField.commit()
