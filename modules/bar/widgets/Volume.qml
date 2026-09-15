@@ -15,6 +15,8 @@ BarPill {
 
     readonly property bool muted: Services.VolumeService.sinkMuted
     readonly property real level: root.muted ? 0 : Math.max(0, Math.min(1, Services.VolumeService.sinkVolume))
+    // Last discrete step that already flashed; -1 until first paint.
+    property int _lastFlashStep: -1
 
     // Opt-in hover intent for BarPopupHost.
     hoverIntentEnabled: true
@@ -61,6 +63,22 @@ BarPill {
     onXChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
     onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
+    // Flash the bottom level bar once per discrete step, mirroring slider ticks.
+    onLevelChanged: root._noteLiveStep()
+
+    function _noteLiveStep() {
+        var step = Math.round(root.level * 100)
+        if (root._lastFlashStep < 0) {
+            root._lastFlashStep = step
+            return
+        }
+        if (step === root._lastFlashStep)
+            return
+        root._lastFlashStep = step
+        if (!MotionTokens.reducedMotion)
+            levelFlashAnimation.restart()
+    }
+
     WheelHandler {
         objectName: "volumeWheelHandler"
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -101,6 +119,7 @@ BarPill {
         clip: true
 
         Rectangle {
+            id: volumeFill
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
@@ -110,9 +129,43 @@ BarPill {
 
             Behavior on width {
                 enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
             }
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+
+        // Tick wash follows the travelled fill; non-interactive visual layer.
+        Rectangle {
+            id: levelFlash
+            anchors.fill: volumeFill
+            radius: LazerTheme.barIndicatorRadius
+            color: LazerTheme.flashWash
+            opacity: 0
+
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+    }
+
+    // Shared tick flash: white-equivalent wash fading with OutQuint.
+    NumberAnimation {
+        id: levelFlashAnimation
+        target: levelFlash
+        property: "opacity"
+        from: MotionTokens.clickFlashOpacity
+        to: 0
+        duration: MotionTokens.clickFlashDuration
+        easing.type: MotionTokens.clickFlashEasing
+        running: false
+    }
+
+    // Keep the wash dark when reduced motion is toggled mid-flight.
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (MotionTokens.reducedMotion) {
+                levelFlashAnimation.stop()
+                levelFlash.opacity = 0
+            }
         }
     }
 
