@@ -33,6 +33,11 @@ Singleton {
     property var _pendingSignatureIds: []
     property var _pendingSignatureRows: ({})
     property var _signaturePendingById: ({})
+    // Copy seeds: entries the shell just copied back are recreated by
+    // cliphist with a fresh id; unknown ids matching a seed inherit its
+    // timestamp so the row never jumps to the top before the async
+    // content-signature recovery confirms the same timestamp.
+    property var _recentCopySeeds: []
     property bool _firstSeenDirty: false
     property bool _firstSeenCacheReady: false
     property bool _createFirstSeenCache: false
@@ -158,7 +163,13 @@ Singleton {
                     let preview = tab >= 0 ? line.slice(tab + 1) : line.slice(id.length + 1)
                     let lowerPreview = preview.toLowerCase()
                     if (!root._firstSeenById[id]) {
-                        root._firstSeenById[id] = Date.now()
+                        // Entries the shell just copied back surface here with
+                        // a fresh id; inherit the original timestamp so the row
+                        // keeps its position instead of jumping to the top
+                        // until signature recovery confirms the same value.
+                        var seededMs = LauncherAdapters.matchClipboardCopySeed(
+                            root._recentCopySeeds, preview, isImage, Date.now())
+                        root._firstSeenById[id] = seededMs > 0 ? seededMs : Date.now()
                         root._enqueueFirstSeenSignature(id, index)
                     }
                     // cliphist marks binary/image entries with the exact
@@ -463,6 +474,7 @@ Singleton {
 
     function copyItem(id: string) {
         if (!root.available) return
+        root._rememberCopySeed(id)
         actionProc.command = ["sh", "-c", "cliphist decode " + id + " | wl-copy"]
         actionProc.running = true
     }
@@ -575,8 +587,25 @@ Singleton {
     function pasteItem(id: string) {
         if (!root.available) return
         // Decode into clipboard then synthesise the paste shortcut via wtype
+        root._rememberCopySeed(id)
         actionProc.command = ["sh", "-c", "cliphist decode " + id + " | wl-copy && wtype -M ctrl -M shift v"]
         actionProc.running = true
+    }
+
+    // Records the timestamp of the entry being copied back so its cliphist
+    // recreation (fresh id, same content) inherits the original position.
+    function _rememberCopySeed(id) {
+        var key = String(id == null ? "" : id)
+        var item = key ? root._clipboardItemById(key) : null
+        var seen = Number(root._firstSeenById[key]) || 0
+        if (!(seen > 0) && item)
+            seen = Number(item.firstSeenMs) || 0
+        root._recentCopySeeds = LauncherAdapters.rememberClipboardCopySeed(
+            root._recentCopySeeds,
+            item ? item.preview : "",
+            item ? !!item.isImage : false,
+            seen,
+            Date.now())
     }
 
     // Separate process for delete so we can reliably refresh after exit.
@@ -599,6 +628,7 @@ Singleton {
         Quickshell.execDetached(["cliphist", "wipe"])
         root.items = []
         root._firstSeenById = ({})
+        root._recentCopySeeds = []
         root._metadataCacheById = ({})
         root._metadataDirty = true
         root._persistMetadataCache()

@@ -341,6 +341,59 @@ function applyClipboardMetadataCache(items, metadataMap) {
     return applied
 }
 
+// Copy seeds remember the timestamps of entries the shell itself just
+// copied back: copy/paste replays content through wl-copy, so cliphist
+// deletes and recreates the row with a fresh id. When the recreated row
+// surfaces with an unknown id it inherits the original timestamp instead
+// of Date.now(), so the entry never visibly jumps to the top and back once
+// the async content-signature recovery confirms the same timestamp.
+var clipboardCopySeedMaxAgeMs = 60000
+var clipboardCopySeedLimit = 16
+
+function rememberClipboardCopySeed(seeds, preview, isImage, firstSeenMs, nowMs) {
+    var list = Array.isArray(seeds) ? seeds.slice() : []
+    var seen = Number(firstSeenMs)
+    if (!isFinite(seen) || seen <= 0)
+        seen = Number(nowMs) || 0
+    var now = Number(nowMs) || 0
+    list.push({
+        preview: preview == null ? "" : String(preview),
+        isImage: !!isImage,
+        firstSeenMs: seen,
+        at: now
+    })
+    var fresh = []
+    var cutoff = now - clipboardCopySeedMaxAgeMs
+    for (var index = 0; index < list.length; index++) {
+        var seed = list[index]
+        if (seed && Number(seed.at) >= cutoff)
+            fresh.push(seed)
+    }
+    while (fresh.length > clipboardCopySeedLimit)
+        fresh.shift()
+    return fresh
+}
+
+function matchClipboardCopySeed(seeds, preview, isImage, nowMs) {
+    if (!Array.isArray(seeds) || !seeds.length)
+        return 0
+    var wantedPreview = preview == null ? "" : String(preview)
+    var wantedImage = !!isImage
+    var cutoff = (Number(nowMs) || 0) - clipboardCopySeedMaxAgeMs
+    for (var index = seeds.length - 1; index >= 0; index--) {
+        var seed = seeds[index]
+        if (!seed || Number(seed.at) < cutoff)
+            continue
+        if (!!seed.isImage !== wantedImage)
+            continue
+        if (String(seed.preview == null ? "" : seed.preview) !== wantedPreview)
+            continue
+        var seen = Number(seed.firstSeenMs)
+        return isFinite(seen) && seen > 0 ? seen : 0
+    }
+    return 0
+}
+
 function parseClipboardImageMeta(preview) {
     if (typeof preview !== "string")
         return null

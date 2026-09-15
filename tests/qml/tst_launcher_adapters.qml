@@ -651,6 +651,50 @@ Item {
             verify(noService && noService.error === "clipboard service unavailable")
         }
 
+        function test_clipboardCopySeedRoundTripInheritsTimestamp() {
+            // The shell copying an entry back recreates it under a fresh id;
+            // matching the seed must hand back the original timestamp so the
+            // row keeps its position instead of jumping to the top.
+            var seeds = LauncherAdapters.rememberClipboardCopySeed(
+                null, "hello token", false, 1700000100000, 1700000200000)
+            compare(seeds.length, 1)
+            compare(LauncherAdapters.matchClipboardCopySeed(
+                seeds, "hello token", false, 1700000201000), 1700000100000)
+        }
+
+        function test_clipboardCopySeedRejectsMismatchesAndExpiry() {
+            var now = 1700000200000
+            var seeds = LauncherAdapters.rememberClipboardCopySeed(
+                null, "hello token", false, 1700000100000, now)
+            // Different preview, different type, and expired seeds miss.
+            compare(LauncherAdapters.matchClipboardCopySeed(seeds, "other text", false, now + 1000), 0)
+            compare(LauncherAdapters.matchClipboardCopySeed(seeds, "hello token", true, now + 1000), 0)
+            compare(LauncherAdapters.matchClipboardCopySeed(
+                seeds, "hello token", false,
+                now + LauncherAdapters.clipboardCopySeedMaxAgeMs + 1), 0)
+            // Newest matching seed wins.
+            seeds = LauncherAdapters.rememberClipboardCopySeed(
+                seeds, "hello token", false, 1700000150000, now + 2000)
+            compare(LauncherAdapters.matchClipboardCopySeed(seeds, "hello token", false, now + 3000),
+                    1700000150000)
+        }
+
+        function test_clipboardCopySeedPrunesExpiredAndCapsLength() {
+            var now = 1700000200000
+            var seeds = LauncherAdapters.rememberClipboardCopySeed(
+                null, "stale", false, 1, now - LauncherAdapters.clipboardCopySeedMaxAgeMs - 1)
+            seeds = LauncherAdapters.rememberClipboardCopySeed(seeds, "fresh", false, 2, now)
+            compare(seeds.length, 1)
+            compare(seeds[0].preview, "fresh")
+
+            var many = []
+            for (var i = 0; i < LauncherAdapters.clipboardCopySeedLimit + 4; i++)
+                many = LauncherAdapters.rememberClipboardCopySeed(many, "item-" + i, false, i + 1, now + i)
+            compare(many.length, LauncherAdapters.clipboardCopySeedLimit)
+            compare(many[many.length - 1].preview,
+                    "item-" + (LauncherAdapters.clipboardCopySeedLimit + 3))
+        }
+
         // --- shortcuts ---
 
         function makeShortcutRow(entryId, label, sequence, detail, actionId, managedByShell) {
