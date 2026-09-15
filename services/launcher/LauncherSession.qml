@@ -166,9 +166,13 @@ QtObject {
         // The apps pool is the expensive one to rebuild (a full source pull
         // with per-entry icon theme lookups); keep it pooled across closes
         // so the next plain open serves results locally without re-pulling.
-        // Other modes carry time-sensitive data (clipboard history) and must
-        // re-fetch on their next open.
-        root._pooledMode = LauncherLogic.parseQuery(root.query).mode === "apps" ? "apps" : ""
+        // Clipboard history is also kept pooled so a reopen serves the last
+        // rows instantly instead of blanking on "Searching..." plus a full
+        // entrance wave; freshness still arrives through the 5s poll and the
+        // list-completed background refresh, which commit without flashing
+        // loading over stale rows.
+        var closingMode = LauncherLogic.parseQuery(root.query).mode
+        root._pooledMode = (closingMode === "apps" || closingMode === "clipboard") ? closingMode : ""
         root.query = ""
         // Freeze the last visible set instead of zeroing results: an empty
         // array tears down every live row delegate, and the next open would
@@ -211,8 +215,19 @@ QtObject {
     }
 
     function openClipboard() {
+        var servingPooled = root._pooledMode === "clipboard" && root.displayPool.length > 0
         query = ">clip "
         root.open()
+        // A pooled reopen serves instantly; kick one backend fetch so copies
+        // made while closed (e.g. the just-executed entry bumped by cliphist)
+        // land promptly through the list-completed background refresh instead
+        // of waiting for the next 5s poll. Null-safe for test doubles.
+        if (servingPooled && clipboardService && typeof clipboardService.list === "function") {
+            Qt.callLater(function() {
+                if (root.visible && LauncherLogic.parseQuery(root.query).mode === "clipboard")
+                    clipboardService.list()
+            })
+        }
     }
 
     function openShortcuts() {
@@ -249,7 +264,15 @@ QtObject {
 
         var adapter = _adapterFor(parsed.mode)
         var token = ++_refreshToken
-        root.loading = true
+        // Stale-while-revalidate for clipboard only: history polls land every
+        // few seconds, and raising loading would hide the list behind
+        // "Searching..." on each of them. When same-mode rows are already on
+        // screen the fetch commits in the background instead. First paints
+        // and mode switches have no stale rows and keep the loading state;
+        // apps keeps its existing refresh semantics untouched.
+        var hasStaleRows = parsed.mode === "clipboard" && root._pooledMode === "clipboard"
+                && root.displayPool.length > 0 && root.results && root.results.length > 0
+        root.loading = !hasStaleRows
         root.error = ""
         adapter.refresh("", parsed.mode, function(outcome) {
             root._completeRefresh(token, outcome, parsed.mode, parsed.text)

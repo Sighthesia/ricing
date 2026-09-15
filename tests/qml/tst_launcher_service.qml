@@ -637,7 +637,7 @@ Item {
         }
 
         function test_clipboardCloseRepullsAppsOnceThenStaysLocal() {
-            // Only the apps pool survives a close; time-sensitive modes must
+            // The apps and clipboard pools survive a close; other modes must
             // re-fetch. After the mode-switch reopen re-pulls once, the
             // restored marker must keep every later keystroke local.
             var apps = makeManualAdapter()
@@ -662,6 +662,67 @@ Item {
             compare(apps.queries.length, 2, "keystroke re-pulled the source")
             compare(svc().results.length, 1)
             verify(svc().results.length >= 1)
+        }
+
+        function test_clipboardReopenServesPooledWithoutLoadingFlash() {
+            // Reopening clipboard must serve the kept pool instantly: no new
+            // source pull, no loading flash hiding the just-selected rows,
+            // and the same array identity so the surface skips its wave.
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+            wait(0)
+            resolveRefresh(clips, 0, [makeItem("c1", "Clip one", 0, 10), makeItem("c2", "Clip two", 0, 5)])
+            compare(svc()._pooledMode, "clipboard")
+            compare(svc().loading, false)
+            compare(svc().selectedIndex, 0)
+            var firstPool = svc().displayPool
+
+            svc().close()
+            compare(svc().visible, false)
+            compare(svc()._pooledMode, "clipboard")
+            // close() freezes a pool-derived slice; the reopen must keep
+            // that frozen array instead of swapping in a fresh one.
+            var frozenResults = svc().results
+            compare(frozenResults.length, 2)
+
+            var queriesBefore = clips.queries.length
+            svc().openClipboard()
+            wait(0)
+
+            compare(clips.queries.length, queriesBefore, "clipboard reopen re-pulled the source")
+            compare(svc().loading, false)
+            compare(svc().error, "")
+            compare(svc().results.length, 2)
+            compare(svc().results[0].id, "c1")
+            verify(svc().results === frozenResults, "reopen replaced the results array")
+            verify(svc().displayPool === firstPool, "reopen replaced the pooled array")
+            compare(svc().selectedIndex, 0)
+        }
+
+        function test_clipboardBackgroundPollCommitsWithoutLoadingFlash() {
+            // The 5s history poll force-pulls while open; with stale rows on
+            // screen it must commit in the background instead of blanking
+            // the list behind "Searching...".
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+            wait(0)
+            resolveRefresh(clips, 0, [makeItem("c1", "Clip one", 0, 10)])
+            compare(svc().loading, false)
+
+            svc().refresh(true)
+            compare(clips.queries.length, 2)
+            compare(svc().loading, false, "background poll raised loading over stale rows")
+            compare(svc().interactive, true)
+            compare(svc().results.length, 1)
+
+            resolveRefresh(clips, 1, [makeItem("c1", "Clip one", 0, 10), makeItem("c2", "Clip two", 0, 5)])
+            compare(svc().loading, false)
+            compare(svc().error, "")
+            compare(svc().results.length, 2)
         }
 
         function test_identicalRefreshKeepsResultsIdentity() {
