@@ -65,6 +65,22 @@ Item {
         }
     }
 
+    // Backend whose startup caches have not landed yet: list() is a no-op
+    // and no completion will ever fire for the wait.
+    Component {
+        id: cachePendingBackendComponent
+        QtObject {
+            property bool available: true
+            property bool probeFinished: true
+            property var items: []
+            property int revision: 0
+            property bool _firstSeenCacheReady: false
+            property bool listRequested: false
+            signal listCompleted()
+            function list() { listRequested = true }
+        }
+    }
+
     // Fixture shortcut backend mirroring NiriShortcutService's public
     // surface: load state, surfaced error text, binds model, reload signal.
     QtObject {
@@ -649,6 +665,21 @@ Item {
             var noService = null
             missingBackend.clipboard.refresh("", "clipboard", function(result) { noService = result })
             verify(noService && noService.error === "clipboard service unavailable")
+        }
+
+        function test_clipboardAdapterAnswersImmediatelyWhenCachesNotReady() {
+            // list() is a no-op until the backend's startup caches land; the
+            // adapter must answer with what it has instead of waiting for a
+            // completion that will never arrive (stuck "Searching...").
+            var backend = cachePendingBackendComponent.createObject(clipBackend)
+            var adapters = LauncherAdapters.createAdapters({ clipboardBackend: backend })
+
+            var outcome = "pending"
+            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
+
+            verify(Array.isArray(outcome), "waited for a completion that never comes")
+            compare(outcome.length, 0)
+            backend.destroy()
         }
 
         function test_clipboardCopySeedRoundTripInheritsTimestamp() {

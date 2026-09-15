@@ -530,6 +530,16 @@ function createClipboardAdapter(config) {
                 done(mapClipboardItems(items, needle))
                 return
             }
+            // list() is a documented no-op until the backend's startup caches
+            // land; entering the wait for a completion that was never armed
+            // would stick the session on "Searching..." forever. Answer with
+            // what we have instead — later polls/completions refill once the
+            // backend is ready. Backends without the seam (test doubles) keep
+            // the previous waiting behavior.
+            if (backend._firstSeenCacheReady === false) {
+                done(mapClipboardItems(items, needle))
+                return
+            }
             waiting = { needle: needle, done: done }
             if (!completionHandler) {
                 completionHandler = settle

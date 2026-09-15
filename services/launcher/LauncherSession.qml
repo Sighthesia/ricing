@@ -171,8 +171,13 @@ QtObject {
         // entrance wave; freshness still arrives through the 5s poll and the
         // list-completed background refresh, which commit without flashing
         // loading over stale rows.
+        // Retain only when the closing query agrees with the pooled marker:
+        // closing mid-load (or a stale extra close) must not re-label a pool
+        // built for another mode, or the next open would serve that pool's
+        // rows under the wrong mode (e.g. apps rows under ">clip ").
         var closingMode = LauncherLogic.parseQuery(root.query).mode
-        root._pooledMode = (closingMode === "apps" || closingMode === "clipboard") ? closingMode : ""
+        if (closingMode === root._pooledMode)
+            root._pooledMode = (closingMode === "apps" || closingMode === "clipboard") ? closingMode : ""
         root.query = ""
         // Freeze the last visible set instead of zeroing results: an empty
         // array tears down every live row delegate, and the next open would

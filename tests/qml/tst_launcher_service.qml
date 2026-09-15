@@ -725,6 +725,66 @@ Item {
             compare(svc().results.length, 2)
         }
 
+        function test_closeDuringClipboardLoadKeepsTruthfulPoolMarker() {
+            // Switching to clipboard then closing before the pull resolves:
+            // the pool still holds apps rows, so the marker must stay "apps"
+            // instead of claiming "clipboard" (which would later serve apps
+            // rows under ">clip ").
+            var apps = makeManualAdapter()
+            var clips = makeManualAdapter()
+            svc()._adapters = ({ apps: apps, clipboard: clips })
+
+            openAndWait()
+            resolveRefresh(apps, 0, [makeItem("a", "Alpha", 0, 0)])
+            compare(svc()._pooledMode, "apps")
+
+            svc().query = ">clip "
+            compare(clips.queries.length, 1)
+            compare(svc().loading, true)
+            svc().close()
+            compare(svc()._pooledMode, "apps")
+
+            // The stale pull must not resurrect closed-session state.
+            resolveRefresh(clips, 0, [makeItem("c1", "Clip", 0, 0)])
+            compare(svc().visible, false)
+
+            // Reopening clipboard re-pulls real clipboard rows instead of
+            // serving the apps pool under the clipboard prefix.
+            svc().openClipboard()
+            wait(0)
+            compare(clips.queries.length, 2)
+            compare(svc().loading, true)
+            resolveRefresh(clips, 1, [makeItem("c1", "Clip", 0, 0)])
+            compare(svc().mode, "clipboard")
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "c1")
+        }
+
+        function test_redundantCloseKeepsRetainedClipboardMarker() {
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+            wait(0)
+            resolveRefresh(clips, 0, [makeItem("c1", "Clip", 0, 0)])
+            compare(svc()._pooledMode, "clipboard")
+
+            svc().close()
+            compare(svc()._pooledMode, "clipboard")
+            // A redundant close (e.g. a host onClosed landing after the
+            // session already closed) reads an empty query and must not
+            // downgrade the retained marker to "apps".
+            svc().close()
+            compare(svc()._pooledMode, "clipboard")
+
+            var queriesBefore = clips.queries.length
+            svc().openClipboard()
+            wait(0)
+            compare(clips.queries.length, queriesBefore, "reopen re-pulled after marker downgrade")
+            compare(svc().loading, false)
+            compare(svc().results[0].id, "c1")
+        }
+
         function test_identicalRefreshKeepsResultsIdentity() {
             // Background polls (clipboard every 5s) re-resolve with the same
             // ids; the results array must keep its identity so the surface
