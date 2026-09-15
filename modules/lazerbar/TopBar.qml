@@ -143,6 +143,12 @@ Variants {
                 panel.notificationDefaults: Services.SettingsService.notificationDefaults
                 panel.settingsReset: Services.SettingsService.resetCategorySetting
                 panel.wallpaperService: Services.WallpaperService
+                panel.locationService: Services.LocationService
+                panel.effectiveSunrise: Services.SettingsService.effectiveSunrise
+                panel.effectiveSunset: Services.SettingsService.effectiveSunset
+                panel.coordsValid: Services.SettingsService.locationCoordsValid
+                panel.locationError: Services.LocationService.lastError
+                panel.locationDisplayName: Services.LocationService.displayName
                 debugHoverEnabled: Services.SettingsService.hoverDebugEnabled
                 debugHoverToken: Services.SettingsService.hoverDebugToken
                 debugMaskOverride: Services.SettingsService.settingsMaskOverride

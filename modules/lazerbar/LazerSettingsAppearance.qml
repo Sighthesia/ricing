@@ -1,5 +1,6 @@
 import QtQuick
 import "../../services/ColorSchemeLogic.js" as ColorLogic
+import "../../services/SolarCalc.js" as SolarCalc
 
 // Present the supported appearance settings as one flat section block.
 LazerSettingsSection {
@@ -9,6 +10,15 @@ LazerSettingsSection {
     property var wallpaperService: null
     property var defaults: ({})
     property var resetCallback: null
+    // Location-mode wiring (injected by the host so this page stays
+    // singleton-free and runnable under plain qmltestrunner; the live shell
+    // passes Services.LocationService + Services.SettingsService values).
+    property var locationService: null
+    property string effectiveSunrise: ""
+    property string effectiveSunset: ""
+    property bool coordsValid: false
+    property string locationError: ""
+    property string locationDisplayName: ""
     title: "外观"
 
     property alias wallpaperField: wallpaperFieldControl
@@ -30,6 +40,12 @@ LazerSettingsSection {
     property alias autoModeRow: autoModeRow
     property alias sunriseRow: sunriseRow
     property alias sunsetRow: sunsetRow
+    property alias cityRow: cityRow
+    property alias latitudeRow: latitudeRow
+    property alias longitudeRow: longitudeRow
+    property alias cityField: cityFieldControl
+    property alias latitudeField: latitudeFieldControl
+    property alias longitudeField: longitudeFieldControl
     property alias themeSchemePicker: themeSchemePicker
     property alias presetSchemePicker: presetSchemePicker
     property alias panelOpacityRow: panelOpacityRow
@@ -61,13 +77,22 @@ LazerSettingsSection {
     }
 
     function normalizeAutoMode(value) {
-        return value === "system" ? "system" : "time"
+        var text = value != null ? String(value).toLowerCase() : ""
+        if (text === "system" || text === "location")
+            return text
+        return "time"
     }
 
     function isAutoTimeMode() {
         var intent = normalizeColorScheme(root.settingsObject ? root.settingsObject.colorScheme : "auto")
         var mode = normalizeAutoMode(root.settingsObject ? root.settingsObject.colorSchemeAutoMode : "time")
         return intent === "auto" && mode === "time"
+    }
+
+    function isAutoLocationMode() {
+        var intent = normalizeColorScheme(root.settingsObject ? root.settingsObject.colorScheme : "auto")
+        var mode = normalizeAutoMode(root.settingsObject ? root.settingsObject.colorSchemeAutoMode : "time")
+        return intent === "auto" && mode === "location"
     }
 
     function isAutoMode() {
@@ -85,6 +110,50 @@ LazerSettingsSection {
         if (normalized !== current) {
             root.settingsObject[key] = normalized
             root.save()
+        }
+        field.syncEditorFromText()
+    }
+
+    // Commit a coordinate edit: keep valid values, snap rejected input back
+    // to the stored value so the text binding stays intact.
+    function commitCoordinate(field, key, text, isLatitude) {
+        if (!root.settingsObject || !field)
+            return
+        var current = root.settingsObject[key] != null ? String(root.settingsObject[key]) : ""
+        var trimmed = String(text).trim()
+        var valid = trimmed !== "" && (isLatitude
+            ? SolarCalc.isValidLatitude(Number(trimmed))
+            : SolarCalc.isValidLongitude(Number(trimmed)))
+        if (valid && trimmed !== current) {
+            root.settingsObject[key] = trimmed
+            root.save()
+        }
+        field.syncEditorFromText()
+    }
+
+    // One-line summary of the solar timetable while in location mode.
+    function locationTimetableHint() {
+        if (!root.isAutoLocationMode())
+            return ""
+        if (!root.coordsValid)
+            return "填写经纬度或解析城市后自动计算"
+        return "按位置算出 " + root.effectiveSunrise + "～" + root.effectiveSunset
+    }
+
+    // City commit goes through the injected location service when present
+    // (live shell geocodes); otherwise store the text directly (tests).
+    function commitCity(field, text) {
+        if (!root.settingsObject || !field)
+            return
+        var current = root.settingsObject.autoCity != null ? String(root.settingsObject.autoCity) : ""
+        if (root.locationService) {
+            root.locationService.geocodeCity(text)
+        } else {
+            var next = String(text).trim()
+            if (next !== current) {
+                root.settingsObject.autoCity = next
+                root.save()
+            }
         }
         field.syncEditorFromText()
     }
@@ -149,16 +218,16 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.isAutoMode()
-        labelText: "自动模式"; descriptionText: "跟随时间或跟随系统"
+        labelText: "自动模式"; descriptionText: "跟随时间、位置或跟随系统"
         defaultValue: root.defaultOf("colorSchemeAutoMode")
         currentValue: autoModeChoiceControl.currentValue
         resetCallback: function() { root.resetKey("colorSchemeAutoMode") }
         LazerSettingsChoice {
             id: autoModeChoiceControl
-            model: [{ value: "time", label: "跟随时间" }, { value: "system", label: "跟随系统" }]
+            model: [{ value: "time", label: "跟随时间" }, { value: "location", label: "跟随位置" }, { value: "system", label: "跟随系统" }]
             currentValue: root.normalizeAutoMode(root.settingsObject ? root.settingsObject.colorSchemeAutoMode : "time")
             onValueSelected: function(value) {
-                if (root.settingsObject && (value === "time" || value === "system")) {
+                if (root.settingsObject && (value === "time" || value === "location" || value === "system")) {
                     root.settingsObject.colorSchemeAutoMode = value
                     root.save()
                 }
@@ -171,7 +240,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.isAutoTimeMode()
-        labelText: "日出时间"; descriptionText: "自动模式按此切到浅色（HH:MM）"
+        labelText: "日出时间"; descriptionText: root.isAutoLocationMode() ? root.locationTimetableHint() : "自动模式按此切到浅色（HH:MM）"
         defaultValue: root.defaultOf("autoSunrise")
         currentValue: root.settingsObject ? root.settingsObject.autoSunrise : ""
         resetCallback: function() { root.resetKey("autoSunrise") }
@@ -188,7 +257,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.isAutoTimeMode()
-        labelText: "日落时间"; descriptionText: "自动模式按此切到深色（HH:MM）"
+        labelText: "日落时间"; descriptionText: root.isAutoLocationMode() ? root.locationTimetableHint() : "自动模式按此切到深色（HH:MM）"
         defaultValue: root.defaultOf("autoSunset")
         currentValue: root.settingsObject ? root.settingsObject.autoSunset : ""
         resetCallback: function() { root.resetKey("autoSunset") }
@@ -197,6 +266,69 @@ LazerSettingsSection {
             text: root.settingsObject ? root.settingsObject.autoSunset : ""
             placeholderText: "18:30"
             onTextCommitted: function(text) { root.commitTime(sunsetFieldControl, "autoSunset", text, "18:30") }
+        }
+    }
+
+    // Location-driven timetable (cf. noctalia LocationService): city resolves
+    // to coordinates, then SolarCalc derives sunrise/sunset offline.
+    LazerSettingsRow {
+        id: cityRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.isAutoLocationMode()
+        labelText: "城市"; descriptionText: root.locationError !== "" ? root.locationError : (root.locationDisplayName !== "" ? root.locationDisplayName : "输入城市名后回车解析经纬度")
+        defaultValue: root.defaultOf("autoCity")
+        currentValue: root.settingsObject ? root.settingsObject.autoCity : ""
+        resetCallback: function() { root.resetKey("autoCity") }
+        LazerSettingsTextField {
+            id: cityFieldControl
+            text: root.settingsObject ? root.settingsObject.autoCity : ""
+            placeholderText: "上海"
+            onTextCommitted: function(text) { root.commitCity(cityFieldControl, text) }
+            onClearRequested: function() {
+                if (root.locationService)
+                    root.locationService.clearCity()
+                else if (root.settingsObject && root.settingsObject.autoCity !== "") {
+                    root.settingsObject.autoCity = ""
+                    root.save()
+                }
+            }
+        }
+    }
+
+    // Manual coordinates backing the solar timetable (-90..90 / -180..180).
+    LazerSettingsRow {
+        id: latitudeRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.isAutoLocationMode()
+        labelText: "纬度"; descriptionText: "范围 -90 到 90"
+        defaultValue: root.defaultOf("autoLatitude")
+        currentValue: root.settingsObject ? root.settingsObject.autoLatitude : ""
+        resetCallback: function() { root.resetKey("autoLatitude") }
+        LazerSettingsTextField {
+            id: latitudeFieldControl
+            text: root.settingsObject ? root.settingsObject.autoLatitude : ""
+            placeholderText: "31.23"
+            onTextCommitted: function(text) { root.commitCoordinate(latitudeFieldControl, "autoLatitude", text, true) }
+        }
+    }
+
+    // Manual coordinates backing the solar timetable (-90..90 / -180..180).
+    LazerSettingsRow {
+        id: longitudeRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.isAutoLocationMode()
+        labelText: "经度"; descriptionText: "范围 -180 到 180"
+        defaultValue: root.defaultOf("autoLongitude")
+        currentValue: root.settingsObject ? root.settingsObject.autoLongitude : ""
+        resetCallback: function() { root.resetKey("autoLongitude") }
+        LazerSettingsTextField {
+            id: longitudeFieldControl
+            text: root.settingsObject ? root.settingsObject.autoLongitude : ""
+            placeholderText: "121.47"
+            onTextCommitted: function(text) { root.commitCoordinate(longitudeFieldControl, "autoLongitude", text, false) }
         }
     }
 

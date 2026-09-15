@@ -11,6 +11,9 @@ Item {
         property string colorSchemeAutoMode: "time"
         property string autoSunrise: "06:30"
         property string autoSunset: "18:30"
+        property string autoCity: ""
+        property string autoLatitude: ""
+        property string autoLongitude: ""
         property real panelOpacity: 0.9
         property bool enableBlur: true
         property real blurSurfaceOpacity: 0.35
@@ -64,6 +67,9 @@ Item {
             appearanceSettings.colorSchemeAutoMode = "time"
             appearanceSettings.autoSunrise = "06:30"
             appearanceSettings.autoSunset = "18:30"
+            appearanceSettings.autoCity = ""
+            appearanceSettings.autoLatitude = ""
+            appearanceSettings.autoLongitude = ""
             appearanceSettings.panelOpacity = 0.9
             appearanceSettings.enableBlur = true
             appearanceSettings.blurSurfaceOpacity = 0.35
@@ -213,9 +219,10 @@ Item {
             compare(appearancePage.visibleResultCount, 1)
             verify(appearancePage.wallpaperRow.visible)
             appearancePage.searchQuery = ""
-            // True total is 17 rows + theme picker = 18 (the old 13 predates
-            // the theme-adaptation row and the picker, which were never recounted).
-            compare(appearancePage.visibleResultCount, 18)
+            // True total is 20 rows + theme picker = 21 (the old 13 predates
+            // the theme-adaptation row, the picker, and the location rows,
+            // which were never recounted).
+            compare(appearancePage.visibleResultCount, 21)
             verify(appearancePage.wallpaperRow.visible)
         }
 
@@ -257,6 +264,35 @@ Item {
             verify(!appearancePage.autoModeRow.enabled)
             verify(!appearancePage.sunriseRow.enabled)
             verify(saveState.count >= 4)
+        }
+
+        function test_locationModeTogglesRowsAndValidatesCoordinates() {
+            appearancePage.autoModeChoice.selectValue("location")
+            compare(appearanceSettings.colorSchemeAutoMode, "location")
+            verify(!appearancePage.sunriseRow.enabled)
+            verify(!appearancePage.sunsetRow.enabled)
+            verify(appearancePage.cityRow.enabled)
+            verify(appearancePage.latitudeRow.enabled)
+            verify(appearancePage.longitudeRow.enabled)
+            // City without a location service stores the text directly.
+            appearancePage.cityField.editorItem.text = "上海"
+            appearancePage.cityField.commit()
+            compare(appearanceSettings.autoCity, "上海")
+            // Valid coordinates persist; garbage snaps back.
+            appearancePage.latitudeField.editorItem.text = "31.23"
+            appearancePage.latitudeField.commit()
+            compare(appearanceSettings.autoLatitude, "31.23")
+            appearancePage.longitudeField.editorItem.text = "121.47"
+            appearancePage.longitudeField.commit()
+            compare(appearanceSettings.autoLongitude, "121.47")
+            appearancePage.latitudeField.editorItem.text = "999"
+            appearancePage.latitudeField.commit()
+            compare(appearanceSettings.autoLatitude, "31.23")
+            compare(appearancePage.latitudeField.editorItem.text, "31.23")
+            appearancePage.autoModeChoice.selectValue("time")
+            compare(appearanceSettings.colorSchemeAutoMode, "time")
+            verify(appearancePage.sunriseRow.enabled)
+            verify(!appearancePage.cityRow.enabled)
         }
 
         function test_searchDoesNotTriggerSave() {

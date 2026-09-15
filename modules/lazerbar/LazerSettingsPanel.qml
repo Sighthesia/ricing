@@ -12,6 +12,14 @@ Item {
     property var notificationSettings: null
     property var saveCallback: null
     property var wallpaperService: null
+    // Location-mode wiring for the appearance page (live shell injects
+    // Services.LocationService + Services.SettingsService timetable values).
+    property var locationService: null
+    property string effectiveSunrise: ""
+    property string effectiveSunset: ""
+    property bool coordsValid: false
+    property string locationError: ""
+    property string locationDisplayName: ""
     property var appearanceDefaults: ({})
     property var barDefaults: ({})
     property var notificationDefaults: ({})
@@ -273,6 +281,12 @@ Item {
                     settingsObject: root.appearanceSettings
                     saveCallback: root.saveCallback
                     wallpaperService: root.wallpaperService
+                    locationService: root.locationService
+                    effectiveSunrise: root.effectiveSunrise
+                    effectiveSunset: root.effectiveSunset
+                    coordsValid: root.coordsValid
+                    locationError: root.locationError
+                    locationDisplayName: root.locationDisplayName
                     defaults: root.appearanceDefaults
                     resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("appearance", key, value) }
                     onActivated: root.selectCategory("appearance")

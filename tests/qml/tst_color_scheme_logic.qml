@@ -22,6 +22,7 @@ Item {
         function test_normalizeAutoMode() {
             compare(ColorLogic.normalizeAutoMode("time"), "time")
             compare(ColorLogic.normalizeAutoMode("system"), "system")
+            compare(ColorLogic.normalizeAutoMode("location"), "location")
             compare(ColorLogic.normalizeAutoMode("invalid"), "time")
             compare(ColorLogic.normalizeAutoMode(""), "time")
             compare(ColorLogic.normalizeAutoMode(undefined), "time")
@@ -99,6 +100,27 @@ Item {
             // Unknown OS scheme falls back to the timetable (midnight -> dark).
             compare(ColorLogic.effectiveMode("auto", "system", "06:30", "18:30", 0, "unknown"), "dark")
             compare(ColorLogic.effectiveMode("auto", "system", "06:30", "18:30", 0, "garbage"), "dark")
+        }
+
+        function test_resolveTimetableTimes_location() {
+            // Resolved solar times win while in location mode.
+            var r = ColorLogic.resolveTimetableTimes("location", "06:30", "18:30", "04:45", "19:46")
+            compare(r.sunrise, "04:45")
+            compare(r.sunset, "19:46")
+            // Missing/invalid location fix falls back to the manual timetable.
+            var f = ColorLogic.resolveTimetableTimes("location", "06:30", "18:30", "", "")
+            compare(f.sunrise, "06:30")
+            compare(f.sunset, "18:30")
+            // Time mode ignores the location fix.
+            var t = ColorLogic.resolveTimetableTimes("time", "06:30", "18:30", "04:45", "19:46")
+            compare(t.sunrise, "06:30")
+            compare(t.sunset, "18:30")
+        }
+
+        function test_effectiveMode_autoLocation() {
+            // Location mode follows the (already resolved) timetable.
+            compare(ColorLogic.effectiveMode("auto", "location", "04:45", "19:46", 720, "unknown"), "light")
+            compare(ColorLogic.effectiveMode("auto", "location", "04:45", "19:46", 0, "unknown"), "dark")
         }
     }
 }

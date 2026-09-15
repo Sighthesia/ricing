@@ -5,6 +5,7 @@ import Quickshell.Io
 import "./" as Services
 import "WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 import "ColorSchemeLogic.js" as ColorSchemeLogic
+import "SolarCalc.js" as SolarCalc
 
 // Persist user-facing shell settings (bar, appearance, notifications) to settings.json.
 QtObject {
@@ -23,6 +24,11 @@ QtObject {
         colorSchemeAutoMode: "time",
         autoSunrise: "06:30",
         autoSunset: "18:30",
+        // Location-driven timetable (cf. noctalia LocationService): city is
+        // geocoded to coordinates, then SolarCalc derives sunrise/sunset.
+        autoCity: "",
+        autoLatitude: "",
+        autoLongitude: "",
         themeScheme: "tonal-spot",
         presetScheme: "",
         syncAppThemes: false,
@@ -88,11 +94,28 @@ QtObject {
     property int themeClockTick: 0
     // The mode the shell should actually paint. Manual intents pass through;
     // "auto" resolves via the timetable or the OS scheme (see ColorSchemeLogic).
+    // Location mode resolves sunrise/sunset from coordinates via SolarCalc.
+    readonly property bool locationCoordsValid: SolarCalc.isValidLatitude(parseFloat(appearance.autoLatitude))
+        && SolarCalc.isValidLongitude(parseFloat(appearance.autoLongitude))
+    readonly property var solarTimes: {
+        root.themeClockTick
+        if (!root.locationCoordsValid)
+            return null
+        return SolarCalc.sunTimesForDate(new Date(),
+            parseFloat(appearance.autoLatitude), parseFloat(appearance.autoLongitude))
+    }
+    // Effective timetable after location resolution; manual values survive
+    // as the fallback when the location fix is missing/invalid.
+    readonly property var effectiveTimetable: ColorSchemeLogic.resolveTimetableTimes(
+        appearance.colorSchemeAutoMode, appearance.autoSunrise, appearance.autoSunset,
+        solarTimes ? solarTimes.sunrise : "", solarTimes ? solarTimes.sunset : "")
+    readonly property string effectiveSunrise: effectiveTimetable.sunrise
+    readonly property string effectiveSunset: effectiveTimetable.sunset
     readonly property string effectiveColorScheme: {
         root.themeClockTick
         var now = new Date()
         return ColorSchemeLogic.effectiveMode(appearance.colorScheme,
-            appearance.colorSchemeAutoMode, appearance.autoSunrise, appearance.autoSunset,
+            appearance.colorSchemeAutoMode, effectiveSunrise, effectiveSunset,
             now.getHours() * 60 + now.getMinutes(), root.systemColorScheme)
     }
 
@@ -384,11 +407,18 @@ QtObject {
                 property string wallpaperPath: ""
                 property string colorScheme: "auto"
                 // Auto-mode source: "time" follows autoSunrise/autoSunset,
+                // "location" follows the solar timetable derived from
+                // autoLatitude/autoLongitude (autoCity geocodes into them),
                 // "system" follows the OS color scheme with a time fallback.
                 property string colorSchemeAutoMode: "time"
                 // Timetable for automatic light/dark switching (HH:MM).
                 property string autoSunrise: "06:30"
                 property string autoSunset: "18:30"
+                // Coordinates/city backing location mode (cf. noctalia's
+                // LocationService stableLatitude/stableLongitude).
+                property string autoCity: ""
+                property string autoLatitude: ""
+                property string autoLongitude: ""
                 // Wallpaper palette scheme template (Material scheme type).
                 property string themeScheme: "tonal-spot"
                 // Color scheme preset name used when wallpaper adaptation is

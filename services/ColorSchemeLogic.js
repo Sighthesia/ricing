@@ -16,9 +16,17 @@ function normalizeColorScheme(value) {
 }
 
 // Auto-mode source: "time" follows the sunrise/sunset timetable,
+// "location" follows the computed solar timetable for the configured
+// coordinates/city (resolved upstream via SolarCalc; falls back to the
+// manual timetable when the location fix is unavailable),
 // "system" follows the OS color scheme (falling back to time when unknown).
 function normalizeAutoMode(value) {
-    return value != null && String(value).toLowerCase() === "system" ? "system" : "time"
+    var text = value != null ? String(value).toLowerCase() : ""
+    if (text === "system")
+        return "system"
+    if (text === "location")
+        return "location"
+    return "time"
 }
 
 function normalizeSystemMode(value) {
@@ -74,6 +82,21 @@ function isDarkAtMinutes(nowMinutes, sunriseMinutes, sunsetMinutes) {
     else
         isDay = now >= rise || now < set
     return !isDay
+}
+
+// Pick the timetable to paint with. Location mode uses the solar-computed
+// times when they parse; otherwise it falls back to the manual timetable
+// (same contract as noctalia's location scheduling degrading gracefully).
+function resolveTimetableTimes(autoMode, manualSunrise, manualSunset, locationSunrise, locationSunset) {
+    if (normalizeAutoMode(autoMode) === "location") {
+        var rise = parseTimeMinutes(locationSunrise)
+        var set = parseTimeMinutes(locationSunset)
+        if (rise >= 0 && set >= 0)
+            return { sunrise: normalizeTimeString(locationSunrise, DEFAULT_SUNRISE),
+                sunset: normalizeTimeString(locationSunset, DEFAULT_SUNSET) }
+    }
+    return { sunrise: normalizeTimeString(manualSunrise, DEFAULT_SUNRISE),
+        sunset: normalizeTimeString(manualSunset, DEFAULT_SUNSET) }
 }
 
 // The mode the shell should actually paint: "dark" or "light".
