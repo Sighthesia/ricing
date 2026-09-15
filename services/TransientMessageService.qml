@@ -102,9 +102,20 @@ Singleton {
         onTriggered: root._advance()
     }
 
+    // Local one-shot notice (cf. noctalia ToastService.showNotice): renders in
+    // the bar message band without touching notification history or DND.
+    // Repeats coalesce under one key so rapid retries refresh in place.
+    function announce(title, body) {
+        root._push({
+            kind: "notification", key: "announce",
+            icon: "", glyph: "◎",
+            appName: "", title: String(title == null ? "" : title),
+            body: String(body == null ? "" : body), progress: -1
+        })
+    }
+
     // --- Notifications ---
-    property Connections _notifConn: Connections {
-        target: Services.NotificationService.popupList
+    property Connections _notifConn: Connections {        target: Services.NotificationService.popupList
         function onRowsInserted(parent, first, last) {
             for (var i = first; i <= last; ++i) {
                 var n = Services.NotificationService.popupList.get(i)

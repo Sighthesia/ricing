@@ -40,6 +40,8 @@ QtObject {
 
     // Resolve a city name and store its coordinates into appearance settings.
     // Empty input clears the stored city without touching manual coordinates.
+    // Every outcome surfaces in the bar message band (cf. noctalia toasts)
+    // on top of the inline row hint, so failures are never silent.
     function geocodeCity(city) {
         var name = String(city == null ? "" : city).trim()
         if (name === "") {
@@ -69,18 +71,27 @@ QtObject {
                             root.displayName = (first.name || name)
                                 + (first.country ? ", " + first.country : "")
                             Services.SettingsService.save()
+                            var times = SolarCalc.sunTimesForDate(new Date(), lat, lon)
+                            Services.TransientMessageService.announce("已定位到 " + root.displayName,
+                                "日出 " + times.sunrise + " · 日落 " + times.sunset)
                             return
                         }
                     }
-                    root.lastError = "未找到该城市"
+                    root._fail("未找到该城市「" + name + "」，换个写法试试")
                 } catch (e) {
-                    root.lastError = "解析城市结果失败"
+                    root._fail("城市结果解析失败，稍后重试")
                 }
             } else {
-                root.lastError = "城市解析失败 (" + xhr.status + ")"
+                root._fail("城市解析失败（网络 " + xhr.status + "），检查网络后重试")
             }
         }
         xhr.open("GET", geocodeUrl(name))
         xhr.send()
+    }
+
+    // Record the failure inline and push it to the message band together.
+    function _fail(message) {
+        root.lastError = message
+        Services.TransientMessageService.announce("定位失败", message)
     }
 }
