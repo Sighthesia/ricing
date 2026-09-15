@@ -17,6 +17,10 @@ BarPill {
     readonly property bool adapterEnabled: Services.BluetoothService.enabled
     readonly property var connectedDevices: Services.BluetoothService.connectedDevices
     readonly property int connectedCount: root.connectedDevices ? root.connectedDevices.length : 0
+    // Fill fraction of the power bar below the icon; full when on, empty when off.
+    readonly property real fillFraction: root.adapterEnabled ? 1 : 0
+    // Last discrete step that already flashed; -1 until first paint.
+    property int _lastFlashStep: -1
     readonly property string firstDeviceName: {
         if (!root.connectedDevices || root.connectedDevices.length === 0) return ""
         var dev = root.connectedDevices[0]
@@ -74,6 +78,22 @@ BarPill {
     onXChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
     onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
+    // Flash the power bar once per on/off switch, mirroring slider ticks.
+    onFillFractionChanged: root._noteLiveStep()
+
+    function _noteLiveStep() {
+        var step = Math.round(root.fillFraction * 100)
+        if (root._lastFlashStep < 0) {
+            root._lastFlashStep = step
+            return
+        }
+        if (step === root._lastFlashStep)
+            return
+        root._lastFlashStep = step
+        if (!MotionTokens.reducedMotion)
+            levelFlashAnimation.restart()
+    }
+
     // Icon stays vertically centered; status sits directly below it.
     // Scheme-aware glyph (dark in light mode, white in dark mode).
     BarIcon {
@@ -116,6 +136,7 @@ BarPill {
         clip: true
 
         Rectangle {
+            id: bluetoothFill
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
@@ -128,6 +149,40 @@ BarPill {
                 NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
             }
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+
+        // Tick wash follows the travelled fill; non-interactive visual layer.
+        Rectangle {
+            id: levelFlash
+            anchors.fill: bluetoothFill
+            radius: LazerTheme.barIndicatorRadius
+            color: LazerTheme.flashWash
+            opacity: 0
+
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        }
+    }
+
+    // Shared tick flash: white-equivalent wash fading with OutQuint.
+    NumberAnimation {
+        id: levelFlashAnimation
+        target: levelFlash
+        property: "opacity"
+        from: MotionTokens.clickFlashOpacity
+        to: 0
+        duration: MotionTokens.clickFlashDuration
+        easing.type: MotionTokens.clickFlashEasing
+        running: false
+    }
+
+    // Keep the wash dark when reduced motion is toggled mid-flight.
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (MotionTokens.reducedMotion) {
+                levelFlashAnimation.stop()
+                levelFlash.opacity = 0
+            }
         }
     }
 }
