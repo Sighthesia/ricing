@@ -682,6 +682,38 @@ Item {
             backend.destroy()
         }
 
+        function test_clipboardListRowParseSplitsTabAndFallsBackToSpace() {
+            // The history fetch loop runs these helpers inline; a scope slip
+            // there used to abort the whole fetch (stuck "Searching..."), so
+            // the parse itself is pinned here.
+            var tabbed = LauncherAdapters.splitClipboardListLine("42\thello token")
+            verify(tabbed !== null)
+            compare(tabbed.id, "42")
+            compare(tabbed.preview, "hello token")
+
+            var spaced = LauncherAdapters.splitClipboardListLine("43 hello token")
+            verify(spaced !== null)
+            compare(spaced.id, "43")
+            compare(spaced.preview, "hello token")
+
+            verify(LauncherAdapters.splitClipboardListLine("") === null)
+            verify(LauncherAdapters.splitClipboardListLine(null) === null)
+        }
+
+        function test_clipboardListRowParseClassifiesImagesByPrefixOnly() {
+            verify(LauncherAdapters.isClipboardImagePreview("[[ binary data 12345 png 1920x1080 ]]"))
+            verify(!LauncherAdapters.isClipboardImagePreview("hello <img world"))
+            verify(!LauncherAdapters.isClipboardImagePreview(""))
+            verify(!LauncherAdapters.isClipboardImagePreview(null))
+
+            compare(LauncherAdapters.clipboardMimeForPreview("hello", false), "text/plain")
+            compare(LauncherAdapters.clipboardMimeForPreview("[[ binary data 1 png 2x2 ]]", true), "image/png")
+            compare(LauncherAdapters.clipboardMimeForPreview("[[ binary data 1 JPG 2x2 ]]", true), "image/jpeg")
+            compare(LauncherAdapters.clipboardMimeForPreview("[[ binary data 1 webp 2x2 ]]", true), "image/webp")
+            compare(LauncherAdapters.clipboardMimeForPreview("[[ binary data 1 gif 2x2 ]]", true), "image/gif")
+            compare(LauncherAdapters.clipboardMimeForPreview("[[ binary data 1 bmp 2x2 ]]", true), "image/*")
+        }
+
         function test_clipboardCopySeedRoundTripInheritsTimestamp() {
             // The shell copying an entry back recreates it under a fresh id;
             // matching the seed must hand back the original timestamp so the

@@ -155,13 +155,13 @@ Singleton {
                 let lines = this.text.trim().split("\n")
                 let result = []
                 for (let index = 0; index < lines.length; index++) {
-                    let line = lines[index]
-                    if (!line) continue
+                    let row = LauncherAdapters.splitClipboardListLine(lines[index])
+                    if (!row)
+                        continue
                     // cliphist separates id and preview with a tab
-                    let tab = line.indexOf("\t")
-                    let id = tab >= 0 ? line.slice(0, tab) : line.split(" ")[0]
-                    let preview = tab >= 0 ? line.slice(tab + 1) : line.slice(id.length + 1)
-                    let lowerPreview = preview.toLowerCase()
+                    let id = row.id
+                    let preview = row.preview
+                    let isImage = LauncherAdapters.isClipboardImagePreview(preview)
                     if (!root._firstSeenById[id]) {
                         // Entries the shell just copied back surface here with
                         // a fresh id; inherit the original timestamp so the row
@@ -172,23 +172,7 @@ Singleton {
                         root._firstSeenById[id] = seededMs > 0 ? seededMs : Date.now()
                         root._enqueueFirstSeenSignature(id, index)
                     }
-                    // cliphist marks binary/image entries with the exact
-                    // "[[ binary data ... ]]" preview prefix; loose substring
-                    // matches misclassify text that merely mentions <img.
-                    let isImage = preview.startsWith("[[")
-                    let mime = "text/plain"
-                    if (isImage) {
-                        if (lowerPreview.includes("png"))
-                            mime = "image/png"
-                        else if (lowerPreview.includes("jpg") || lowerPreview.includes("jpeg"))
-                            mime = "image/jpeg"
-                        else if (lowerPreview.includes("webp"))
-                            mime = "image/webp"
-                        else if (lowerPreview.includes("gif"))
-                            mime = "image/gif"
-                        else
-                            mime = "image/*"
-                    }
+                    let mime = LauncherAdapters.clipboardMimeForPreview(preview, isImage)
                     result.push({ id, preview, isImage, mime, firstSeenMs: root._firstSeenById[id] })
                 }
                 root.items = result

@@ -394,6 +394,41 @@ function matchClipboardCopySeed(seeds, preview, isImage, nowMs) {
     return 0
 }
 
+// Splits one "<id>\t<preview>" cliphist list row; null for blank lines.
+// Pure so the history row parse stays unit-testable without a Quickshell
+// process (a scope slip here used to abort the whole fetch mid-loop).
+function splitClipboardListLine(line) {
+    var text = line == null ? "" : String(line)
+    if (!text)
+        return null
+    var tab = text.indexOf("\t")
+    var id = tab >= 0 ? text.slice(0, tab) : text.split(" ")[0]
+    var preview = tab >= 0 ? text.slice(tab + 1) : text.slice(id.length + 1)
+    return { id: id, preview: preview }
+}
+
+// cliphist marks binary/image entries with the exact "[[ binary data ... ]"
+// preview prefix; loose substring matches misclassify text that merely
+// mentions <img.
+function isClipboardImagePreview(preview) {
+    return String(preview == null ? "" : preview).startsWith("[[")
+}
+
+function clipboardMimeForPreview(preview, isImage) {
+    if (!isImage)
+        return "text/plain"
+    var lower = String(preview == null ? "" : preview).toLowerCase()
+    if (lower.includes("png"))
+        return "image/png"
+    if (lower.includes("jpg") || lower.includes("jpeg"))
+        return "image/jpeg"
+    if (lower.includes("webp"))
+        return "image/webp"
+    if (lower.includes("gif"))
+        return "image/gif"
+    return "image/*"
+}
+
 function parseClipboardImageMeta(preview) {
     if (typeof preview !== "string")
         return null
