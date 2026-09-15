@@ -15,6 +15,8 @@ Item {
 
     readonly property real clampedValue: Math.max(0, Math.min(1, Number(root.value) || 0))
     readonly property bool effectiveMuted: !!root.muted
+    // Last discrete step that already flashed; -1 until first paint.
+    property int _lastFlashStep: -1
     readonly property alias sliderRow: sliderRow
     readonly property alias sliderControl: sliderControl
     readonly property alias muteRow: muteRow
@@ -42,6 +44,9 @@ Item {
             suffix: "%"
             value: Math.round(root.clampedValue * 100)
             onValueModified: function(next) {
+                // Record the emitted step so the service echo of our own
+                // drag does not flash a second time.
+                root._lastFlashStep = Math.round(Number(next))
                 root.valueCommitted(Math.max(0, Math.min(1, Number(next) / 100)))
             }
         }
@@ -64,5 +69,23 @@ Item {
             checked: root.effectiveMuted
             onToggled: root.toggleRequested()
         }
+    }
+
+    // Flash discrete steps arriving from live service follow (wheel on the
+    // bar icon, media keys, other clients) through the same shared tick
+    // feedback; init and repeats stay silent.
+    onClampedValueChanged: root._noteLiveStep()
+    Component.onCompleted: root._lastFlashStep = Math.round(root.clampedValue * 100)
+
+    function _noteLiveStep() {
+        var step = Math.round(root.clampedValue * 100)
+        if (root._lastFlashStep < 0) {
+            root._lastFlashStep = step
+            return
+        }
+        if (step === root._lastFlashStep)
+            return
+        root._lastFlashStep = step
+        sliderControl.restartFlash()
     }
 }

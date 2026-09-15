@@ -169,6 +169,35 @@ Item {
             verify(item.sliderRow.contentItem.x + item.sliderRow.contentItem.width
                     <= item.sliderRow.width - item.sliderRow.contentPadding + 0.5)
         }
+
+        function test_sliderSilentOnInit() {
+            var item = createTemporaryObject(sliderComp, root, { value: 0.42, muted: false, label: "Volume" })
+            verify(!item.sliderControl.flashActive, "init must not flash")
+        }
+
+        function test_sliderFlashesOnExternalStep() {
+            var item = createTemporaryObject(sliderComp, root, { value: 0.42, muted: false, label: "Volume" })
+            verify(!item.sliderControl.flashActive)
+            // Live follow (wheel on the bar icon) moves the value outside
+            // the slider's own setValue path; the new step must still flash.
+            item.value = 0.6
+            verify(item.sliderControl.flashActive, "external step change should flash")
+            tryCompare(item.sliderControl, "flashActive", false, 3000)
+            item.value = 0.6
+            wait(100)
+            verify(!item.sliderControl.flashActive, "repeat of the same step must not flash")
+        }
+
+        function test_sliderOwnDragEchoDoesNotReflash() {
+            var item = createTemporaryObject(sliderComp, root, { value: 0.42, muted: false, label: "Volume" })
+            item.sliderControl.setValue(70)
+            verify(item.sliderControl.flashActive, "own drag flashes once")
+            tryCompare(item.sliderControl, "flashActive", false, 3000)
+            // Service echo of our own drag carries the same step: silent.
+            item.value = 0.7
+            wait(100)
+            verify(!item.sliderControl.flashActive, "echo of own drag must not flash again")
+        }
     }
 
     TestCase {
