@@ -163,6 +163,15 @@ Item {
             sidePanel: true
             interactive: root.interactive
             progress: root.progress
+            // Default location-mode wiring (hosts may override via the panel
+            // alias; e.g. tests inject fakes). Keeps every host working even
+            // when it only passes appearance/bar/notification settings.
+            locationService: Services.LocationService
+            effectiveSunrise: Services.SettingsService.effectiveSunrise
+            effectiveSunset: Services.SettingsService.effectiveSunset
+            coordsValid: Services.SettingsService.locationCoordsValid
+            locationError: Services.LocationService.lastError
+            locationDisplayName: Services.LocationService.displayName
             onCloseRequested: root.requestClose()
         }
     }
