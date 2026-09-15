@@ -223,16 +223,20 @@ QtObject {
         var servingPooled = root._pooledMode === "clipboard" && root.displayPool.length > 0
         query = ">clip "
         root.open()
-        // A pooled reopen serves instantly; kick one backend fetch so copies
-        // made while closed (e.g. the just-executed entry bumped by cliphist)
-        // land promptly through the list-completed background refresh instead
-        // of waiting for the next 5s poll. Null-safe for test doubles.
-        if (servingPooled && clipboardService && typeof clipboardService.list === "function") {
-            Qt.callLater(function() {
-                if (root.visible && LauncherLogic.parseQuery(root.query).mode === "clipboard")
-                    clipboardService.list()
-            })
-        }
+        if (!servingPooled)
+            return
+        Qt.callLater(function() {
+            if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard")
+                return
+            // The pooled snapshot predates history that landed while closed:
+            // re-pull through the adapter (synchronous from live backend data
+            // when healthy, so nothing flashes) instead of painting stale rows
+            // until a background fetch heals them, then kick one backend fetch
+            // so the very latest copies land promptly. Null-safe for doubles.
+            root.refresh(true)
+            if (clipboardService && typeof clipboardService.list === "function")
+                clipboardService.list()
+        })
     }
 
     function openShortcuts() {

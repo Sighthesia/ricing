@@ -664,10 +664,11 @@ Item {
             verify(svc().results.length >= 1)
         }
 
-        function test_clipboardReopenServesPooledWithoutLoadingFlash() {
-            // Reopening clipboard must serve the kept pool instantly: no new
-            // source pull, no loading flash hiding the just-selected rows,
-            // and the same array identity so the surface skips its wave.
+        function test_clipboardReopenRepullsSynchronouslyWithoutLoadingFlash() {
+            // Reopening clipboard re-pulls through the adapter instead of
+            // painting the possibly-stale pool: one extra source query, but
+            // still no loading flash, and the same array identity when the
+            // backend data did not change, so the surface skips its wave.
             var clips = makeManualAdapter()
             svc()._adapters = { clipboard: clips }
 
@@ -691,8 +692,9 @@ Item {
             svc().openClipboard()
             wait(0)
 
-            compare(clips.queries.length, queriesBefore, "clipboard reopen re-pulled the source")
+            compare(clips.queries.length, queriesBefore + 1, "reopen skipped the fresh pull")
             compare(svc().loading, false)
+            resolveRefresh(clips, queriesBefore, [makeItem("c1", "Clip one", 0, 10), makeItem("c2", "Clip two", 0, 5)])
             compare(svc().error, "")
             compare(svc().results.length, 2)
             compare(svc().results[0].id, "c1")
@@ -780,8 +782,11 @@ Item {
             var queriesBefore = clips.queries.length
             svc().openClipboard()
             wait(0)
-            compare(clips.queries.length, queriesBefore, "reopen re-pulled after marker downgrade")
+            // The retained marker routes the reopen through one synchronous
+            // fresh pull (no loading flash over the frozen rows).
+            compare(clips.queries.length, queriesBefore + 1, "reopen re-pulled after marker downgrade")
             compare(svc().loading, false)
+            resolveRefresh(clips, queriesBefore, [makeItem("c1", "Clip", 0, 0)])
             compare(svc().results[0].id, "c1")
         }
 
