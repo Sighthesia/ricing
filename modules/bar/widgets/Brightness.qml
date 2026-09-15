@@ -4,7 +4,7 @@ import "../../lazerbar"
 import "../../../services" as Services
 
 // Square brightness: wheel steps, level shown as rounded horizontal bar below icon.
-Item {
+BarPill {
     id: root
 
     // Widget identity contract filled by the layout loader.
@@ -15,22 +15,11 @@ Item {
 
     readonly property real level: Math.max(0, Math.min(1, Services.BrightnessService.brightness))
 
-    // Opt-in hover intent publication for BarPopupHost.
-    signal popupRequested(var intent)
-    signal popupCloseRequested()
-    signal popupAnchorUpdate(var intent)
+    // Opt-in hover intent for BarPopupHost.
+    hoverIntentEnabled: true
 
     implicitWidth: LazerTheme.barWidgetHeight
     implicitHeight: LazerTheme.barWidgetHeight
-
-    // Hover observation for brightness pill.
-    HoverHandler {
-        id: brightnessHover
-        onHoveredChanged: {
-            if (hovered) root.popupRequested(root.buildHoverIntent())
-            else root.popupCloseRequested()
-        }
-    }
 
     // Build hover intent payload for the two-layer popup.
     function buildHoverIntent() {
@@ -58,8 +47,13 @@ Item {
         }
     }
 
-    onXChanged: if (brightnessHover.hovered) popupAnchorUpdate(buildHoverIntent())
-    onWidthChanged: if (brightnessHover.hovered) popupAnchorUpdate(buildHoverIntent())
+    onHoveredChanged: {
+        if (hovered) popupRequested(buildHoverIntent())
+        else popupCloseRequested()
+    }
+
+    onXChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
+    onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
     WheelHandler {
         objectName: "brightnessWheelHandler"
