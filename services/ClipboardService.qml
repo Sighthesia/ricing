@@ -170,6 +170,7 @@ Singleton {
                         var seededMs = LauncherAdapters.matchClipboardCopySeed(
                             root._recentCopySeeds, preview, isImage, Date.now())
                         root._firstSeenById[id] = seededMs > 0 ? seededMs : Date.now()
+                        root._firstSeenDirty = true
                         root._enqueueFirstSeenSignature(id, index)
                     }
                     let mime = LauncherAdapters.clipboardMimeForPreview(preview, isImage)
@@ -180,6 +181,12 @@ Singleton {
                 root._startMetadataQueue()
                 if (!root._firstListLoaded) {
                     root._firstListLoaded = true
+                    // Pre-seeded rows skip the assign path above, so enqueue
+                    // them here for signature learning (dedup skips the ones
+                    // just enqueued): a later copy-back then resolves to the
+                    // original timestamp instead of learning the jump time.
+                    for (var learnIndex = 0; learnIndex < result.length; learnIndex++)
+                        root._enqueueFirstSeenSignature(String(result[learnIndex].id), learnIndex)
                     root._initialFirstSeenRecovery = true
                     root._finishInitialFirstSeenRecovery()
                 }
@@ -367,7 +374,11 @@ Singleton {
     function _finishFirstSeenCacheLoad(firstSeenMap) {
         if (root._firstSeenCacheReady)
             return
-        root._firstSeenBySignature = firstSeenMap || ({})
+        var split = LauncherAdapters.splitFirstSeenCache(firstSeenMap)
+        root._firstSeenBySignature = split.signatures
+        // Pre-seed row timestamps so the first paint already carries correct
+        // dates and order; signature recovery then only confirms silently.
+        root._firstSeenById = split.ids
         root._firstSeenCacheReady = true
         root._maybeStartClipboardProbe()
     }
@@ -452,7 +463,8 @@ Singleton {
         if (!root._firstSeenDirty)
             return
         root._firstSeenDirty = false
-        firstSeenAdapter.firstSeenMap = root._firstSeenBySignature
+        firstSeenAdapter.firstSeenMap = LauncherAdapters.packFirstSeenCache(
+            root._firstSeenBySignature, root._firstSeenById, root.items)
         firstSeenSaveTimer.restart()
     }
 
@@ -616,6 +628,8 @@ Singleton {
         root._metadataCacheById = ({})
         root._metadataDirty = true
         root._persistMetadataCache()
+        root._firstSeenDirty = true
+        root._persistFirstSeenMap()
         root.revision++
     }
 

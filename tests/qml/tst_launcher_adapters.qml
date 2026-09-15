@@ -732,6 +732,40 @@ Item {
             verify(LauncherAdapters.takeNewestPreviewDecode(null) === null)
         }
 
+        function test_firstSeenCacheSplitAcceptsNewShapeAndLegacyMap() {
+            // Cold boots must restore exact row timestamps; the stored shape
+            // is { signatures, ids } while older files are bare signature maps.
+            var shaped = LauncherAdapters.splitFirstSeenCache({
+                signatures: { "aa": 100 },
+                ids: { "7": 200 }
+            })
+            compare(shaped.signatures["aa"], 100)
+            compare(shaped.ids["7"], 200)
+
+            var legacy = LauncherAdapters.splitFirstSeenCache({ "aa": 100 })
+            compare(legacy.signatures["aa"], 100)
+            verify(Object.keys(legacy.ids).length === 0)
+
+            var empty = LauncherAdapters.splitFirstSeenCache(null)
+            verify(Object.keys(empty.signatures).length === 0)
+            verify(Object.keys(empty.ids).length === 0)
+        }
+
+        function test_firstSeenCachePackPrunesDeadIds() {
+            var packed = LauncherAdapters.packFirstSeenCache(
+                { "aa": 100 },
+                { "7": 200, "gone": 300, "zero": 0 },
+                [{ id: "7", preview: "kept" }, { id: 9, preview: "numeric" }])
+            compare(packed.signatures["aa"], 100)
+            compare(packed.ids["7"], 200)
+            verify(!("gone" in packed.ids))
+            verify(!("zero" in packed.ids))
+
+            var unlisted = LauncherAdapters.packFirstSeenCache({ "aa": 100 }, { "7": 200 }, null)
+            verify(Object.keys(unlisted.ids).length === 0)
+            compare(unlisted.signatures["aa"], 100)
+        }
+
         function test_clipboardCopySeedRoundTripInheritsTimestamp() {
             // The shell copying an entry back recreates it under a fresh id;
             // matching the seed must hand back the original timestamp so the

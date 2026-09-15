@@ -419,6 +419,50 @@ function takeNewestPreviewDecode(queue) {
     return queue.pop()
 }
 
+// First-seen persistence: id->timestamp rows survive restarts so a cold boot
+// paints correct dates and order immediately instead of stamping everything
+// with boot time until signature recovery corrects it row by row. The stored
+// shape is { signatures: {...}, ids: {...} }; a legacy bare signature map
+// still loads as signatures with empty ids.
+function splitFirstSeenCache(stored) {
+    var empty = { signatures: ({}), ids: ({}) }
+    if (!stored || typeof stored !== "object" || Array.isArray(stored))
+        return empty
+    if (stored.signatures && typeof stored.signatures === "object"
+            && !Array.isArray(stored.signatures)
+            && stored.ids && typeof stored.ids === "object"
+            && !Array.isArray(stored.ids))
+        return { signatures: stored.signatures, ids: stored.ids }
+    return { signatures: stored, ids: ({}) }
+}
+
+function packFirstSeenCache(signatures, firstSeenById, items) {
+    var liveIds = ({})
+    if (Array.isArray(items)) {
+        for (var index = 0; index < items.length; index++) {
+            var item = items[index]
+            if (item && item.id != null)
+                liveIds[String(item.id)] = true
+        }
+    }
+    var ids = ({})
+    if (firstSeenById && typeof firstSeenById === "object") {
+        for (var key in firstSeenById) {
+            if (!Object.prototype.hasOwnProperty.call(firstSeenById, key))
+                continue
+            if (!liveIds[key])
+                continue
+            var seen = Number(firstSeenById[key])
+            if (isFinite(seen) && seen > 0)
+                ids[key] = seen
+        }
+    }
+    return {
+        signatures: signatures && typeof signatures === "object" ? signatures : ({}),
+        ids: ids
+    }
+}
+
 // Splits one "<id>\t<preview>" cliphist list row; null for blank lines.
 // Pure so the history row parse stays unit-testable without a Quickshell
 // process (a scope slip here used to abort the whole fetch mid-loop).
