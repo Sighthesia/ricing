@@ -303,6 +303,30 @@ Item {
             verify(page._hoveredResult === null)
         }
 
+        function test_reopenWithKeptRowsSkipsEntranceWave() {
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0),
+                makeItem("c", "Gamma", 0, 0)
+            ])
+            wait(0)
+
+            // Arm the flag to prove the open flip clears it (not leftover state).
+            page._firstFillPending = true
+            svc().close()
+            svc().open()
+            verify(page._firstFillPending === false)
+        }
+
+        function test_firstOpenWithoutRowsKeepsEntranceWave() {
+            // init() reset the session to empty results; let the repeater
+            // settle before opening onto the empty list.
+            wait(0)
+            svc().open()
+            wait(0)
+            verify(page._firstFillPending === true)
+        }
+
         function test_enterExecutesSelectedResult() {
             var apps = openWithResults([
                 makeItem("firefox", "Firefox", 5, 10),

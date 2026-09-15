@@ -165,17 +165,11 @@ Singleton {
         else open()
     }
 
-    // IPC surface for niri keybind integration.
-    IpcHandler {
-        target: "launcher"
-        function toggle() { root.toggle() }
-        function open() { root.open() }
-        function close() { root.close() }
-        function openClipboard() { root.openClipboard() }
-        function openShortcuts() { root.openShortcuts() }
-    }
-
-    // New IPC target used by the refactored island launcher flow.
+    // IPC surface for niri keybind integration. The legacy "launcher" target
+    // duplicate was dropped: Quickshell serves only one handler per target
+    // (and warned the shadowed one), so all launcher IPC goes through
+    // LauncherService while island keeps its own target below.
+    // IPC target used by the refactored island launcher flow.
     IpcHandler {
         target: "island"
         function toggle() { root.toggle() }

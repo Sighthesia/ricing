@@ -93,9 +93,13 @@ Singleton {
     // Full-content clipboard preview decode passthrough for the preview pane.
     signal textPreviewDecoded(string id, string content)
     function requestTextPreview(id) { return session.requestTextPreview(id) }
+    // Clipboard metadata-merge relay: surfaces bind this signal name on the
+    // service object, so it must be re-emitted here like the preview relay.
+    signal clipboardMetadataMerged()
     Connections {
         target: session
         function onTextPreviewDecoded(id, content) { root.textPreviewDecoded(id, content) }
+        function onClipboardMetadataMerged() { root.clipboardMetadataMerged() }
     }
     property alias query: session.query
     readonly property alias mode: session.mode

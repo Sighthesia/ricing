@@ -111,7 +111,12 @@ Item {
         function onVisibleChanged() {
             if (root.session.visible) {
                 root.focusSearch()
-                root._firstFillPending = true
+                // The full entrance wave is for a genuinely first paint; when
+                // reopening onto already-materialized rows it would fold the
+                // list away and re-reveal it row by row, reading as stale rows
+                // jumping to a new order. Those commits fall through to the
+                // light cascade (or instant release for identical ids).
+                root._firstFillPending = resultsView.resultCount <= 0
             } else {
                 root.cancelEntranceWave()
                 entranceSettle.stop()
