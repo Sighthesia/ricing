@@ -183,6 +183,9 @@ Item {
     }
 
     // Observe only the row surface; leave the exposed reset button region to its own handlers.
+    // A left click on dead row space also drops keyboard focus neutrally
+    // (any edited field commits on focus loss): controls stacked above keep
+    // their own taps, and Flickable drags still steal the gesture for scroll.
     MouseArea {
         id: rowHoverArea
         z: 0.5
@@ -192,7 +195,12 @@ Item {
         width: root.hasDefault ? Math.max(0, root.revertVisibleX) : root.width
         enabled: root.enabled && root.matchesSearch
         hoverEnabled: true
-        acceptedButtons: Qt.NoButton
+        acceptedButtons: Qt.LeftButton
+        onClicked: {
+            var holder = root.Window.window ? root.Window.window.activeFocusItem : null
+            if (holder)
+                holder.focus = false
+        }
     }
 
     // Keep one shared card surface behind every setting presentation.
