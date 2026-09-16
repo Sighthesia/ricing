@@ -25,7 +25,7 @@ QtObject {
     // weather): https://geocoding-api.open-meteo.com/v1/search
     function geocodeUrl(city) {
         return "https://geocoding-api.open-meteo.com/v1/search?name="
-            + encodeURIComponent(String(city).trim()) + "&count=1&language=en&format=json"
+            + encodeURIComponent(String(city).trim()) + "&count=1&language=zh&format=json"
     }
 
     function clearError() {
@@ -40,8 +40,8 @@ QtObject {
 
     // Resolve a city name and store its coordinates into appearance settings.
     // Empty input clears the stored city without touching manual coordinates.
-    // Every outcome surfaces in the bar message band (cf. noctalia toasts)
-    // on top of the inline row hint, so failures are never silent.
+    // Success announces in the bar message band; failures stay inline under
+    // the city field (lastError) so a typo never spams notifications.
     function geocodeCity(city) {
         var name = String(city == null ? "" : city).trim()
         if (name === "") {
@@ -99,9 +99,9 @@ QtObject {
         }
     }
 
-    // Record the failure inline and push it to the message band together.
+    // Record the failure for the inline row hint only (no toast).
     function _fail(message) {
         root.lastError = message
-        Services.TransientMessageService.announce("定位失败", message)
+        console.warn("LocationService:", message)
     }
 }

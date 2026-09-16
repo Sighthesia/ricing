@@ -112,6 +112,9 @@ QtObject {
     // dedicated violet hierarchy when adaptation is on.
     readonly property color accentColor: adapt && colorService ? colorService.mPrimary : "#765BFF"
     readonly property color settingsAccent: accentColor
+    // Inline warning (row footer hints, invalid input): warm amber that
+    // holds contrast on both the dark card and the lifted light surface.
+    readonly property color settingsWarning: "#E8A91C"
     readonly property color settingsControlSurface: adapt && colorService
         ? (lightScheme ? mix(colorService.mSurfaceContainerLow, paperWhite, 0.35) : colorService.mSurfaceContainerLow)
         : "#25222E"

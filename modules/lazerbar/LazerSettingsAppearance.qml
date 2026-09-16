@@ -150,11 +150,17 @@ LazerSettingsSection {
         var next = String(text == null ? "" : text).trim()
         var current = root.settingsObject.autoCity != null ? String(root.settingsObject.autoCity) : ""
         if (next !== current) {
-            root.settingsObject.autoCity = next
+            root.appearanceSettings.autoCity = next
             root.save()
         }
-        if (next !== "" && root.locationService)
+        cityFieldControl.lastCommittedText = next
+        if (root.locationService) {
+            // Drop the previous inline error first so the new attempt
+            // starts clean; a failure re-sets it via locationError.
+            if (root.locationService.clearError)
+                root.locationService.clearError()
             root.locationService.geocodeCity(next)
+        }
         else if (next === "" && root.locationService)
             root.locationService.clearCity()
         field.syncEditorFromText()
@@ -282,10 +288,13 @@ LazerSettingsSection {
     // to coordinates, then SolarCalc derives sunrise/sunset offline.
     LazerSettingsRow {
         id: cityRow
-        width: parent.width - 16; x: 8
+        labelText: "城市"
         searchQuery: root.searchQuery
         enabled: root.isAutoLocationMode()
-        labelText: "城市"; descriptionText: root.locationError !== "" ? root.locationError : (root.locationDisplayName !== "" ? root.locationDisplayName : "输入城市名后回车解析经纬度")
+        // A failed geocode surfaces inline under the field instead of a
+        // toast; cleared on the next commit attempt or a success.
+        footerText: root.locationError
+        currentValue: root.appearanceSettings ? root.appearanceSettings.autoCity : ""
         defaultValue: root.defaultOf("autoCity")
         currentValue: root.settingsObject ? root.settingsObject.autoCity : ""
         resetCallback: function() { root.resetKey("autoCity") }

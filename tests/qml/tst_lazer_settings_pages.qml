@@ -49,7 +49,7 @@ Item {
         property string lastCity: ""
         property int clearCount: 0
         function geocodeCity(city) { geocodeCount++; lastCity = city }
-        function clearCity() { clearCount++ }
+        function clearError() { clearCount++ }
     }
 
     Lazer.LazerSettingsAppearance {
@@ -302,9 +302,14 @@ Item {
             // ...but a failed geocode reopens commits so retrying fires.
             appearancePage.locationError = "定位失败"
             compare(appearancePage.cityField.lastCommittedText, "")
+            // The failure surfaces inline under the city card.
+            compare(appearancePage.cityRow.footerText, "定位失败")
             appearancePage.cityField.commit()
             compare(fakeLocation.geocodeCount, 2)
+            // Each attempt starts by clearing the previous inline error.
+            verify(fakeLocation.clearCount > 0)
             appearancePage.locationError = ""
+            compare(appearancePage.cityRow.footerText, "")
             appearancePage.locationService = null
             // Valid coordinates persist; garbage snaps back.
             appearancePage.latitudeField.editorItem.text = "31.23"

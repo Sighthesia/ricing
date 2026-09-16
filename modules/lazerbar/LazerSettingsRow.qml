@@ -10,6 +10,9 @@ Item {
 
     property string labelText: ""
     property string descriptionText: ""
+    // Inline footer hint rendered below the control (warning "!" + text);
+    // the card grows slightly to host it. Empty hides the line again.
+    property string footerText: ""
     property bool enabled: true
     property string searchQuery: ""
     property var defaultValue: undefined
@@ -90,10 +93,17 @@ Item {
                                                    : safeControlHeight
     readonly property real inlineControlWidth: Math.min(Math.max(0, contentHost.width), safeRequestedWidth)
     readonly property real splitControlWidth: Math.min(240, Math.max(0, contentHost.width * 0.55))
+    // Footer lives under a standard stacked control (label above field);
+    // inline/split/choice rows never host one.
+    readonly property bool standardPresentation: !root.inlinePresentation && !root.splitPresentation && !root.choicePresentation
+    readonly property bool footerVisible: root.standardPresentation && root.footerText !== ""
+    readonly property real footerGap: 4
+    readonly property real footerHeight: 16
+    readonly property real footerReserved: root.footerVisible ? root.footerGap + root.footerHeight : 0
     readonly property real cardContentHeight: inlinePresentation ? 44
-                                          : (choicePresentation ? safeControlHeight
-                                             : (splitPresentation ? 52
-                                                 : 10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10))
+                                           : (choicePresentation ? safeControlHeight
+                                              : (splitPresentation ? 52
+                                                  : 10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10 + footerReserved))
 
     implicitWidth: 640
     readonly property real textRegionWidth: contentHost.width
@@ -442,6 +452,51 @@ Item {
             height: root.safeControlHeight
             Behavior on x { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
             Behavior on width { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint } }
+        }
+
+        // Inline footer hint: warning "!" badge + muted text. The card
+        // expansion itself animates through the row height Behavior; the
+        // line grows and fades with the shared slow/fast pair.
+        Item {
+            id: footerHost
+            y: labelItem.implicitHeight + root.labelControlGap + root.safeControlHeight + root.footerGap
+            width: parent.width
+            height: root.footerVisible ? root.footerHeight : 0
+            visible: root.standardPresentation && (height > 0.5 || footerRow.opacity > 0.01)
+            enabled: false
+            Behavior on height {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutQuint }
+            }
+
+            Row {
+                id: footerRow
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+                opacity: root.footerVisible ? 1 : 0
+                Behavior on opacity {
+                    enabled: !MotionTokens.reducedMotion
+                    NumberAnimation { duration: MotionTokens.fast }
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "!"
+                    color: LazerTheme.settingsWarning
+                    font.pixelSize: 12
+                    font.weight: Font.Black
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, parent.width - x)
+                    text: root.footerText
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
+                }
+            }
         }
     }
 
