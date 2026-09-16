@@ -29,6 +29,13 @@ Item {
     readonly property int liveCount: rootOpenerLoader.item ? rootOpenerLoader.item.count : 0
     readonly property var liveValues: rootOpenerLoader.item ? rootOpenerLoader.item.values : []
     property var entries: null
+    // A new tray icon brings a new menu: retract any submenu left over from
+    // the previous icon instead of sliding it under the fresh list. The
+    // close keeps its animation (data releases at progress 0) so the host
+    // width morphs instead of snapping mid-exchange.
+    onMenuHandleChanged: closeSubmenu()
+    onTrayItemChanged: closeSubmenu()
+    onEntriesChanged: closeSubmenu()
     readonly property bool stubEntriesActive: useStubEntries
         || (entries !== null && entries !== undefined && Logic.entryList(entries).length > 0)
     readonly property var entryModel: stubEntriesActive

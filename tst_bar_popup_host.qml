@@ -803,6 +803,16 @@ Item {
             var outgoingActions = root.findByName(host.popupItem, "popupActionsOutgoing")
             root.check("content exchange creates outgoing identity", outgoingIdentity !== null, true)
             root.check("content exchange keeps outgoing identity visible", outgoingIdentity.visible, true)
+            // Regression: an open tray submenu must not open the slot clip
+            // while both bodies slide; otherwise the incoming/outgoing layers
+            // paint past the slot edge during tray-icon switches.
+            var trayIncoming = incomingActions.trayMenuContent
+            if (trayIncoming)
+                trayIncoming.submenuProgress = 1
+            root.check("exchange with submenu open keeps slot clipped",
+                slideSlot.clip, true)
+            if (trayIncoming)
+                trayIncoming.submenuProgress = 0
             root.check("exchange starts incoming transparent", incomingActions.opacity, 0)
             root.check("exchange starts outgoing opaque", outgoingActions.opacity, 1)
             host.contentSlideProgress = 0.5

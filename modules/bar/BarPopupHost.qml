@@ -80,10 +80,15 @@ PanelWindow {
     // Keep the reveal viewport large enough while displayed geometry morphs.
     readonly property real revealViewportHeight: Math.max(root.displayHeight,
             root.targetHeight, root.revealDistance, 1)
+    // The open tray submenu is the only intentional content overflow: its
+    // surface sticks out sideways past the 260-wide slot. The outgoing layer
+    // only counts while its exchange is still mounted; after settle its
+    // payload clears and its stale progress must not hold the clip open.
     readonly property bool traySubmenuOverflowActive: (popupActions
             && popupActions.trayMenuContent
             && Number(popupActions.trayMenuContent.submenuProgress) > 0)
-        || (popupActionsOutgoing
+        || (root._transitionOutgoingIntent !== null
+            && popupActionsOutgoing
             && popupActionsOutgoing.trayMenuContent
             && Number(popupActionsOutgoing.trayMenuContent.submenuProgress) > 0)
 
@@ -1076,7 +1081,10 @@ PanelWindow {
                      }
                     // Keep hover replacement layers inside the content column;
                     // an open tray submenu is the only intentional overflow.
-                    clip: !root.traySubmenuOverflowActive
+                    // While an exchange is mounted both bodies slide
+                    // horizontally, so force the clip even with a submenu open:
+                    // otherwise the sliding layers paint past the slot edge.
+                    clip: root._transitionOutgoingIntent !== null || !root.traySubmenuOverflowActive
                      enabled: root.contentInteractive
                      onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
 
