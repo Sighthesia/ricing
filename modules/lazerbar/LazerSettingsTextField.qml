@@ -117,13 +117,14 @@ FocusScope {
     // keyboard focus only: hover feedback already lives on the row card,
     // so gating the ring on hover would show it on mere mouse-over and
     // hide it from keyboard (Tab) focus.
-    // The surface extends 12px past the field's left edge while the text
+    // The surface extends 6px past the field's left edge while the text
     // stays flush with it: the text left edge aligns with slider values
-    // on the row content edge, and the 12px gap keeps glyphs off the ring.
+    // on the row content edge, the ring clears the glyphs by 6px, and it
+    // still sits 6px inside the card edge instead of merging into it.
     Rectangle {
         id: fieldSurface
-        x: -12
-        width: parent.width + 12
+        x: -6
+        width: parent.width + 6
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         radius: LazerTheme.settingsControlRadius
