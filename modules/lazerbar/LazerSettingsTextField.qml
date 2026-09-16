@@ -117,9 +117,15 @@ FocusScope {
     // keyboard focus only: hover feedback already lives on the row card,
     // so gating the ring on hover would show it on mere mouse-over and
     // hide it from keyboard (Tab) focus.
+    // The surface extends 12px past the field's left edge while the text
+    // stays flush with it: the text left edge aligns with slider values
+    // on the row content edge, and the 12px gap keeps glyphs off the ring.
     Rectangle {
         id: fieldSurface
-        anchors.fill: parent
+        x: -12
+        width: parent.width + 12
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
         radius: LazerTheme.settingsControlRadius
         color: "transparent"
         border.width: editor.activeFocus ? 2 : 0
@@ -130,14 +136,15 @@ FocusScope {
 
     // OsuTextField keeps native editing behaviour and adds the smooth osu
     // caret plus falling-ghost feedback for deleted characters. The text
-    // sits 12px inside the surface (row contentPadding) so glyphs never
-    // touch the outline; the placeholder follows the same inset.
+    // stays flush with the field edge so it aligns with slider values on
+    // the row content edge; the surface ring (shifted 12px left) provides
+    // the breathing room instead. The placeholder follows the same edge.
     OsuTextField {
         id: editor
         anchors.left: parent.left
-        anchors.leftMargin: 12
+        anchors.leftMargin: 0
         anchors.right: parent.right
-        anchors.rightMargin: 12
+        anchors.rightMargin: 0
         anchors.verticalCenter: parent.verticalCenter
         clip: true
         enabled: root.effectiveEnabled
