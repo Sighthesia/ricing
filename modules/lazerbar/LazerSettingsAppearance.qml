@@ -150,7 +150,7 @@ LazerSettingsSection {
         var next = String(text == null ? "" : text).trim()
         var current = root.settingsObject.autoCity != null ? String(root.settingsObject.autoCity) : ""
         if (next !== current) {
-            root.appearanceSettings.autoCity = next
+            root.settingsObject.autoCity = next
             root.save()
         }
         cityFieldControl.lastCommittedText = next
@@ -294,7 +294,6 @@ LazerSettingsSection {
         // A failed geocode surfaces inline under the field instead of a
         // toast; cleared on the next commit attempt or a success.
         footerText: root.locationError
-        currentValue: root.appearanceSettings ? root.appearanceSettings.autoCity : ""
         defaultValue: root.defaultOf("autoCity")
         currentValue: root.settingsObject ? root.settingsObject.autoCity : ""
         resetCallback: function() { root.resetKey("autoCity") }
