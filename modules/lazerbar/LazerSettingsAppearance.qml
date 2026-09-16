@@ -288,6 +288,7 @@ LazerSettingsSection {
     // to coordinates, then SolarCalc derives sunrise/sunset offline.
     LazerSettingsRow {
         id: cityRow
+        width: parent.width - 16; x: 8
         labelText: "城市"
         searchQuery: root.searchQuery
         enabled: root.isAutoLocationMode()
