@@ -327,6 +327,29 @@ Item {
             verify(page._firstFillPending === true)
         }
 
+        function test_closeResetsResultWindowStretch() {
+            var items = []
+            for (var i = 0; i < 150; i++)
+                items.push(makeItem("id" + i, "Item" + String(i).padStart(3, "0"), 0, i))
+            openWithResults(items)
+
+            // A query matching only the deepest row stretches the window
+            // past the base slice so the match materializes.
+            compare(page._resultWindowExtra, 0)
+            svc().query = "item000"
+            verify(page._resultWindowExtra > 0)
+
+            // Hiding drops the stretch: the next open starts from the base
+            // slice instead of rebuilding hundreds of rows on every swap.
+            svc().close()
+            compare(page._resultWindowExtra, 0)
+
+            svc().open()
+            wait(0)
+            compare(page._resultWindowExtra, 0)
+            compare(svc().results.length, 150)
+        }
+
         function test_enterExecutesSelectedResult() {
             var apps = openWithResults([
                 makeItem("firefox", "Firefox", 5, 10),

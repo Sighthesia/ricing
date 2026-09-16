@@ -124,6 +124,11 @@ Item {
                 // Pointer preview dies with the surface so a reopen starts
                 // from the focused row instead of a stale hover.
                 root._hoveredResult = null
+                // Drop any query-driven window stretch: the next open starts
+                // from the base slice and stretches only if its own query
+                // needs deep matches, instead of rebuilding hundreds of
+                // materialized rows on every pool swap.
+                root._resultWindowExtra = 0
             }
         }
         function onSelectedIndexChanged() {
