@@ -115,7 +115,7 @@ Item {
                 // reopening onto already-materialized rows it would fold the
                 // list away and re-reveal it row by row, reading as stale rows
                 // jumping to a new order. Those commits fall through to the
-                // light cascade (or instant release for identical ids).
+                // light cascade (or no touch at all for identical ids).
                 root._firstFillPending = resultsView.resultCount <= 0
             } else {
                 root.cancelEntranceWave()
@@ -129,6 +129,7 @@ Item {
                 // needs deep matches, instead of rebuilding hundreds of
                 // materialized rows on every pool swap.
                 root._resultWindowExtra = 0
+                windowStretchTimer.stop()
             }
         }
         function onSelectedIndexChanged() {
@@ -385,11 +386,10 @@ Item {
         }
     }
 
-    // Refills cascade like the settings search-exit delay: each new row set
+    // Refills cascade like the settings search-exit delay: each held row
     // unfolds with a small position-based stagger instead of a full wave.
-    // Only rows already held by the commit choreography (truly new ids)
-    // replay the stagger; survivors released instantly stay visible so a
-    // window-growth rebuild reads as an instant reorder, never an entrance.
+    // Only rows already held by the commit choreography (fresh tail, full
+    // swaps) replay the stagger; untouched survivors keep gliding.
     function playRefillCascade() {
         var children = resultsColumn.children
         if (MotionTokens.reducedMotion) {
@@ -426,20 +426,18 @@ Item {
         })
     }
 
-    // Hold only rows this commit has not claimed yet, then route the newly
-    // built set through the wave (first fill after open) or the lighter
-    // cascade. A Repeater model swap rebuilds every delegate, so a rebuilt
-    // survivor still reports freshFromBuild: only ids absent from the
-    // previous commit count as truly new and get held. Survivors release
-    // instantly so a first-search window stretch (base slice growing to
-    // cover a deep match) never folds the visible list away and re-reveals
-    // it row by row. Same-id commits (metadata-only refreshes, identical
-    // background polls) release instantly: replaying a stagger over an
-    // unchanged list reads as the entrance animation firing again. Very
-    // large first fills also skip the wave so the list stays scrollable
-    // instead of holding every row through a seconds-long stagger. A first
-    // fill that already carries typed search text skips the wave as well:
-    // the user is filtering, not opening onto a fresh list.
+    // Route each commit to exactly one animation path. Window growth
+    // rebuilds every delegate, so the commit tells survivors from
+    // newcomers by id: only ids beyond the previous window count as new.
+    // Same-id commits (query folding, metadata-only refreshes,
+    // identical background polls) leave every row untouched so the
+    // fold/glide keeps playing instead of snapping. Pure appends stagger
+    // only visible newcomers: survivors release untouched at their settled
+    // fold state and folded rows stay folded, so a deferred window stretch
+    // never replays the entrance. Order or content swaps (mode switches,
+    // pulls) hold the whole list through one full stagger. Very large
+    // first fills, and first fills that already carry typed search text,
+    // release instantly instead of waving.
     readonly property int largeListWaveThreshold: 24
     property var _lastRowIds: []
     function _releaseAllRowsInstantly() {
@@ -449,54 +447,82 @@ Item {
                 children[i].releaseInstantly()
         }
     }
-    function _holdAndScheduleReleases() {
+    function _holdAllRowsInstantly() {
         var children = resultsColumn.children
-        var prevSet = ({})
-        for (var p = 0; p < root._lastRowIds.length; p++)
-            prevSet[root._lastRowIds[p]] = true
-        var claimedFresh = false
+        for (var i = 0; i < children.length; i++) {
+            if (children[i].holdInstantly !== undefined)
+                children[i].holdInstantly()
+        }
+    }
+    function _windowRowIds() {
+        var pool = root.windowedResults
         var ids = []
+        for (var i = 0; i < pool.length; i++)
+            ids.push(String(pool[i] ? pool[i].id : ""))
+        return ids
+    }
+    function _isPrefixAppend(ids, prev) {
+        if (ids.length <= prev.length)
+            return false
+        for (var i = 0; i < prev.length; i++) {
+            if (ids[i] !== prev[i])
+                return false
+        }
+        return true
+    }
+    function _holdAndScheduleReleases() {
+        var ids = root._windowRowIds()
+        var children = resultsColumn.children
+        var freshRows = []
         for (var h = 0; h < children.length; h++) {
             var row = children[h]
-            if (row.result)
-                ids.push(String(row.result.id))
-            if (row.freshFromBuild === true) {
+            if (row.freshFromBuild === true && row.holdInstantly !== undefined) {
                 row.freshFromBuild = false
-                if (row.holdInstantly !== undefined && row.releaseInstantly !== undefined) {
-                    if (prevSet[String(row.result ? row.result.id : "")] === true)
-                        row.releaseInstantly()
-                    else {
-                        row.holdInstantly()
-                        claimedFresh = true
-                    }
-                }
+                freshRows.push(row)
             }
         }
-        var sameIds = ids.length === root._lastRowIds.length
+        var prev = root._lastRowIds
+        var sameIds = ids.length === prev.length
         if (sameIds) {
             for (var c = 0; c < ids.length; c++) {
-                if (ids[c] !== root._lastRowIds[c]) {
+                if (ids[c] !== prev[c]) {
                     sameIds = false
                     break
                 }
             }
         }
         root._lastRowIds = ids
-        if (sameIds) {
-            root._releaseAllRowsInstantly()
-            return
-        }
         if (resultsView.resultCount <= 0)
+            return
+        if (sameIds)
             return
         if (root._firstFillPending) {
             root._firstFillPending = false
-            if (resultsView.resultCount > root.largeListWaveThreshold)
-                root._releaseAllRowsInstantly()
-            else if (root.activeSearchText.length > 0)
+            if (resultsView.resultCount > root.largeListWaveThreshold
+                    || root.activeSearchText.length > 0)
                 root._releaseAllRowsInstantly()
             else
                 root.playEntranceWave()
-        } else if (claimedFresh) {
+        } else if (root._isPrefixAppend(ids, prev)) {
+            // Window growth rebuilds every delegate, so every row reports
+            // fresh: only ids beyond the previous window are truly new.
+            // Survivors release untouched (already at their settled fold
+            // state — holding them would replay the entrance), folded rows
+            // stay folded, and only visible newcomers stagger in.
+            var prevSet = ({})
+            for (var s = 0; s < prev.length; s++)
+                prevSet[prev[s]] = true
+            for (var g = 0; g < freshRows.length; g++) {
+                var grown = freshRows[g]
+                var grownId = grown.result ? String(grown.result.id) : ""
+                if (prevSet[grownId] === true || grown.searchHidden === true)
+                    grown.releaseInstantly()
+                else
+                    grown.holdInstantly()
+            }
+            root.playRefillCascade()
+        } else {
+            root._holdAllRowsInstantly()
             root.playRefillCascade()
         }
     }
@@ -598,16 +624,49 @@ Item {
         return pool.slice(0, _resultWindowLimit)
     }
     // Stretch the materialized window past the base slice only when a query
-    // actually matches rows beyond it; growing swaps the Repeater model and
-    // rebuilds delegates, so it must never fire per keystroke without need.
+    // actually matches rows beyond it. This runs in two phases: the query
+    // first folds the current window in place (persisted delegates glide,
+    // never snap), and only after the fold settles does the window grow to
+    // materialize deep matches. Growing rebuilds every delegate, so doing
+    // it in the same turn as the query would kill the fold mid-flight and
+    // read as an instant snap (or a replayed entrance). The timer doubles
+    // as a keystroke debounce: rapid typing restarts it and only the
+    // settled query pays for the rebuild.
     // NB: this must run on query edits, not just pool replacements — the
     // pool already holds the match while the base window does not, and then
     // the list renders blank (results non-empty, so the empty state hides
     // too) until a scroll that folded rows can never trigger.
+    readonly property int windowStretchDelay: 300
+    Timer {
+        id: windowStretchTimer
+        interval: root.windowStretchDelay
+        repeat: false
+        onTriggered: root._applyWindowStretch()
+    }
     function _syncWindowToMatches() {
-        if (!root.activeSearchText)
+        if (!root.activeSearchText || !root.session || !root.session.visible) {
+            windowStretchTimer.stop()
             return
-        var pool = root.session ? root.session.displayPool : null
+        }
+        var pool = root.session.displayPool
+        if (!pool || !pool.length) {
+            windowStretchTimer.stop()
+            return
+        }
+        var needed = Math.min(root.resultWindowCap,
+                              LauncherLogic.lastMatchIndex(pool, root.activeSearchText) + 1)
+        if (needed <= root._resultWindowLimit) {
+            windowStretchTimer.stop()
+            return
+        }
+        windowStretchTimer.restart()
+    }
+    // Grow the window once the fold has settled. Re-validates everything:
+    // the query, pool, or visibility may all have moved on while waiting.
+    function _applyWindowStretch() {
+        if (!root.activeSearchText || !root.session || !root.session.visible)
+            return
+        var pool = root.session.displayPool
         if (!pool || !pool.length)
             return
         var needed = Math.min(root.resultWindowCap,
@@ -1178,32 +1237,37 @@ Item {
             width: parent.width
             spacing: 0
 
+            // Count model (not the result array): same-length pool swaps
+            // only swap row content instead of rebuilding every delegate.
+            // Each row reads its item by index; prefix-stable pools resolve
+            // to the identical object and no binding re-fires. Length
+            // changes still rebuild, and the commit choreography tells
+            // survivors from newcomers by id (see _holdAndScheduleReleases).
             Repeater {
                 id: resultsRepeater
-                model: root.windowedResults
+                model: root.windowedResults.length
 
                 delegate: LauncherResultRow {
-                    required property var modelData
                     required property int index
                     width: resultsColumn.width
-                    result: modelData
-                    Component.onCompleted: root.requestClipThumb(modelData)
-                    onModelDataChanged: root.requestClipThumb(modelData)
-                    thumbPath: root._thumbRev >= 0 ? root.clipThumbPath(modelData) : ""
+                    result: root.windowedResults[index]
+                    Component.onCompleted: root.requestClipThumb(result)
+                    onResultChanged: root.requestClipThumb(result)
+                    thumbPath: root._thumbRev >= 0 ? root.clipThumbPath(result) : ""
                     metaStamp: root._clipMetaRev
                     searchQuery: root.activeSearchText
                     selected: {
                         if (!root.session || !root.session.results || root.session.selectedIndex < 0)
                             return false
                         var sel = root.session.results[root.session.selectedIndex]
-                        return !!sel && !!modelData && String(sel.id) === String(modelData.id)
+                        return !!sel && !!result && String(sel.id) === String(result.id)
                     }
                     onActivated: {
                         if (root.session)
-                            root.session.execute(modelData)
+                            root.session.execute(result)
                     }
-                    onHoveredChanged: root.trackHover(modelData, hovered)
-                    Component.onDestruction: root.clearHover(modelData)
+                    onHoveredChanged: root.trackHover(result, hovered)
+                    Component.onDestruction: root.clearHover(result)
                     onExitFlingRequested: spec => root.exitFlingRequested(spec)
                 }
             }

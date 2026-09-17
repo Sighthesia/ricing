@@ -334,10 +334,12 @@ Item {
             openWithResults(items)
 
             // A query matching only the deepest row stretches the window
-            // past the base slice so the match materializes.
+            // past the base slice so the match materializes. The stretch
+            // is deferred past the fold, so wait for it instead of
+            // asserting it synchronously.
             compare(page._resultWindowExtra, 0)
             svc().query = "item000"
-            verify(page._resultWindowExtra > 0)
+            tryVerify(function() { return page._resultWindowExtra > 0 }, 2000)
 
             // Hiding drops the stretch: the next open starts from the base
             // slice instead of rebuilding hundreds of rows on every swap.
@@ -456,7 +458,9 @@ Item {
             svc().query = "zzz"
 
             compare(svc().results.length, 1)
-            tryCompare(page, "resultCount", 201, 1000)
+            // The stretch lands after the deferred fold window plus tail
+            // delegate creation; budget generously on slow runners.
+            tryCompare(page, "resultCount", 201, 3000)
             compare(page.emptyState.visible, false)
             compare(page.resultsView.visible, true)
             tryVerify(function() {
@@ -524,40 +528,52 @@ Item {
             ])
             // First commit claims the fresh rows and records their ids.
             tryVerify(function() { return page._lastRowIds.length === 2 }, 1000)
+            tryVerify(function() { return page.resultAt(0).enabled }, 3000)
             // Committing the identical set again (metadata-only refreshes,
-            // identical background polls) must release instantly: a replayed
-            // stagger would hold the rows and disable them for its slots.
+            // identical background polls) must leave every row untouched:
+            // releasing would snap Transitions and kill the fold/glide.
             page._holdAndScheduleReleases()
             verify(page.resultAt(0).enabled)
             verify(page.resultAt(1).enabled)
             compare(page._lastRowIds.length, 2)
         }
 
-        function test_windowGrowthReleasesSurvivorsAndCascadesOnlyNewTail() {
-            // A first-search window stretch swaps the Repeater model and
-            // rebuilds every delegate, so rebuilt survivors report
-            // freshFromBuild again. Only ids absent from the previous
-            // commit may replay the stagger; survivors must release
-            // instantly instead of folding away and re-revealing.
-            openWithResults([
-                makeItem("a", "Alpha", 0, 0),
-                makeItem("b", "Beta", 0, 0),
-                makeItem("c", "Gamma", 0, 0)
-            ])
-            tryVerify(function() { return page._lastRowIds.length === 3 }, 1000)
-            tryVerify(function() { return page.resultAt(0).enabled }, 3000)
-            // Pretend the previous commit only knew the base slice.
-            page._lastRowIds = ["a", "b"]
-            page._firstFillPending = false
-            for (var i = 0; i < 3; i++)
-                page.resultAt(i).freshFromBuild = true
-            page._holdAndScheduleReleases()
-            verify(page.resultAt(0).revealHeld === false)
-            verify(page.resultAt(1).revealHeld === false)
-            verify(page.resultAt(0).enabled)
-            verify(page.resultAt(1).enabled)
-            verify(page.resultAt(2).revealHeld === true)
-            compare(page._lastRowIds, ["a", "b", "c"])
+        function test_windowGrowthKeepsSurvivorsAndFoldsInsteadOfSnapping() {
+            // First-search window stretch runs in two phases: the query
+            // first folds the current window in place (no model change, so
+            // the fold glides instead of snapping), and only after the fold
+            // settles does the window grow to materialize deep matches.
+            var items = []
+            for (var i = 0; i < 150; i++)
+                items.push(makeItem("id" + i, "Item" + String(i).padStart(3, "0"), 0, i))
+            items.push(makeItem("deep-target", "Zzz Quux", 0, 0))
+            openWithResults(items)
+            tryVerify(function() { return page.resultCount === 96 }, 1000)
+            // Wait for the first commit AND the entrance wave to settle:
+            // delegates report enabled from birth, so only a settled row
+            // proves the open choreography ran before the query lands.
+            tryVerify(function() { return page._lastRowIds.length === 96 }, 1000)
+            var sameRow = page.resultAt(0)
+            tryVerify(function() {
+                return sameRow.enabled && sameRow.snapTransitions === false
+            }, 3000)
+
+            svc().query = "zzz"
+
+            // Phase one: no synchronous rebuild — the window still holds
+            // the base slice while the fold plays on persisted delegates.
+            compare(page.resultCount, 96)
+            verify(sameRow.freshFromBuild === false)
+            verify(sameRow.snapTransitions === false)
+            verify(sameRow.revealHeld === false)
+            tryVerify(function() { return sameRow.searchHidden }, 1000)
+            // Phase two: the deferred stretch materializes the deep match.
+            tryCompare(page, "resultCount", 151, 3000)
+            tryVerify(function() {
+                var row = page.resultAt(150)
+                return row && row.displayName === "Zzz Quux"
+                        && row.enabled && row.opacity === 1
+            }, 3000)
         }
 
         function test_refillCascadeKeepsReleasedSurvivorsVisible() {
