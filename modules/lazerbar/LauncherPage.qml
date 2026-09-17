@@ -998,7 +998,7 @@ Item {
         anchors.leftMargin: 8
         anchors.rightMargin: previewPane.visible ? 12 : 8
         clip: true
-        visible: !root.stateVisible
+        visible: !root.sessionLoading && !root.sessionError
         contentWidth: width
         contentHeight: resultsColumn.height
         onContentHeightChanged: syncSelectionFrame()

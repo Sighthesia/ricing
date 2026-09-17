@@ -506,6 +506,7 @@ Item {
             // A thumbnail file that fails to load must hide the image slot
             // without clearing the bound path, so later paths (and reused
             // delegates) still flow through the same binding.
+            ignoreWarning(/QML Image: Cannot open: .*tst_missing_thumb_xyz\.png/)
             var row = rowProbe.createObject(testRoot, {
                 result: { id: "7", displayName: "Clip", description: "d", icon: "", isImage: true },
                 thumbPath: Qt.resolvedUrl("tst_missing_thumb_xyz.png")
@@ -528,7 +529,9 @@ Item {
             ])
             // First commit claims the fresh rows and records their ids.
             tryVerify(function() { return page._lastRowIds.length === 2 }, 1000)
-            tryVerify(function() { return page.resultAt(0).enabled }, 3000)
+            tryVerify(function() {
+                return page.resultAt(0).enabled && page.resultAt(1).enabled
+            }, 3000)
             // Committing the identical set again (metadata-only refreshes,
             // identical background polls) must leave every row untouched:
             // releasing would snap Transitions and kill the fold/glide.
@@ -594,6 +597,60 @@ Item {
         }
 
         // --- empty state ---
+
+        function test_zeroResultsKeepsExitVisible_data() {
+            return [
+                { tag: "apps", prefix: "", reduced: false },
+                { tag: "clipboard", prefix: ">clip ", reduced: false },
+                { tag: "apps-reduced", prefix: "", reduced: true },
+                { tag: "clipboard-reduced", prefix: ">clip ", reduced: true }
+            ]
+        }
+
+        function test_zeroResultsKeepsExitVisible(data) {
+            var adapter = makeManualAdapter()
+            svc()._adapters = ({ apps: adapter, clipboard: adapter })
+            svc().query = data.prefix
+            svc().open()
+            wait(0)
+            resolveRefresh(adapter, 0, [makeItem("alpha", "Alpha", 0, 0)])
+            tryVerify(function() { return page._lastRowIds.length === 1 }, 1000)
+            var row = page.resultAt(0)
+            tryVerify(function() {
+                return !row.snapTransitions && !row.revealHeld
+                        && row.height === row.rowHeight + row.listGap && row.opacity === 1
+            }, 1000)
+            Lazer.MotionTokens.reducedMotionOverride = data.reduced
+
+            svc().query = data.prefix + "no-match"
+            compare(svc().results.length, 0)
+            compare(page.emptyState.visible, true)
+            compare(row.enabled, false)
+            if (!data.reduced) {
+                verify(page.resultsView.visible, "Empty state must not hide exiting rows")
+                verify(row.visible)
+                tryVerify(function() {
+                    return row.height > 0 && row.height < row.rowHeight + row.listGap
+                            && row.opacity > 0 && row.opacity < 1
+                }, 200)
+                verify(row.visible)
+            }
+            tryCompare(row, "height", 0, 1000)
+            tryCompare(row, "opacity", 0, 1000)
+            compare(row.visible, false)
+
+            svc().query = data.prefix + "alpha"
+            compare(page.emptyState.visible, false)
+            tryCompare(row, "opacity", 1, 1000)
+            verify(row.visible && row.enabled)
+            verify(page.searchField.activeFocus)
+
+            svc().query = data.prefix + "no-match"
+            svc().query = data.prefix + "alpha"
+            tryCompare(row, "height", row.rowHeight + row.listGap, 1000)
+            tryCompare(row, "opacity", 1, 1000)
+            verify(row.visible && row.enabled)
+        }
 
         function test_emptyStateShowsWithoutDroppingSearchFocus() {
             openWithResults([])
