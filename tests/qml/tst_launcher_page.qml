@@ -533,6 +533,50 @@ Item {
             compare(page._lastRowIds.length, 2)
         }
 
+        function test_windowGrowthReleasesSurvivorsAndCascadesOnlyNewTail() {
+            // A first-search window stretch swaps the Repeater model and
+            // rebuilds every delegate, so rebuilt survivors report
+            // freshFromBuild again. Only ids absent from the previous
+            // commit may replay the stagger; survivors must release
+            // instantly instead of folding away and re-revealing.
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0),
+                makeItem("c", "Gamma", 0, 0)
+            ])
+            tryVerify(function() { return page._lastRowIds.length === 3 }, 1000)
+            tryVerify(function() { return page.resultAt(0).enabled }, 3000)
+            // Pretend the previous commit only knew the base slice.
+            page._lastRowIds = ["a", "b"]
+            page._firstFillPending = false
+            for (var i = 0; i < 3; i++)
+                page.resultAt(i).freshFromBuild = true
+            page._holdAndScheduleReleases()
+            verify(page.resultAt(0).revealHeld === false)
+            verify(page.resultAt(1).revealHeld === false)
+            verify(page.resultAt(0).enabled)
+            verify(page.resultAt(1).enabled)
+            verify(page.resultAt(2).revealHeld === true)
+            compare(page._lastRowIds, ["a", "b", "c"])
+        }
+
+        function test_refillCascadeKeepsReleasedSurvivorsVisible() {
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0)
+            ])
+            tryVerify(function() { return page._lastRowIds.length === 2 }, 1000)
+            tryVerify(function() { return page.resultAt(0).enabled }, 3000)
+            var survivor = page.resultAt(0)
+            var fresh = page.resultAt(1)
+            survivor.releaseInstantly()
+            fresh.holdInstantly()
+            page.playRefillCascade()
+            verify(survivor.revealHeld === false)
+            verify(survivor.enabled)
+            verify(fresh.revealHeld === true)
+        }
+
         // --- empty state ---
 
         function test_emptyStateShowsWithoutDroppingSearchFocus() {

@@ -387,6 +387,9 @@ Item {
 
     // Refills cascade like the settings search-exit delay: each new row set
     // unfolds with a small position-based stagger instead of a full wave.
+    // Only rows already held by the commit choreography (truly new ids)
+    // replay the stagger; survivors released instantly stay visible so a
+    // window-growth rebuild reads as an instant reorder, never an entrance.
     function playRefillCascade() {
         var children = resultsColumn.children
         if (MotionTokens.reducedMotion) {
@@ -395,13 +398,17 @@ Item {
                     children[r].releaseInstantly()
             return
         }
+        var revealed = 0
         for (var i = 0; i < children.length; i++) {
-            if (children[i].holdInstantly === undefined)
+            if (children[i].playReveal === undefined)
                 continue
-            children[i].holdInstantly()
+            if (children[i].revealHeld !== true)
+                continue
             children[i].playReveal(children[i].entryExitDelay)
+            revealed++
         }
-        entranceSettle.restart()
+        if (revealed > 0)
+            entranceSettle.restart()
     }
 
     // Coalesce the commit choreography across the display-pool and results
@@ -421,13 +428,18 @@ Item {
 
     // Hold only rows this commit has not claimed yet, then route the newly
     // built set through the wave (first fill after open) or the lighter
-    // cascade. Surviving rows are left untouched so a query edit that keeps
-    // a row visible and in place never folds it shut and re-reveals it.
-    // Same-id commits (metadata-only refreshes, identical background polls)
-    // release instantly: replaying a stagger over an unchanged list reads as
-    // the entrance animation firing again. Very large first fills also skip
-    // the wave so the list stays scrollable instead of holding every row
-    // through a seconds-long stagger.
+    // cascade. A Repeater model swap rebuilds every delegate, so a rebuilt
+    // survivor still reports freshFromBuild: only ids absent from the
+    // previous commit count as truly new and get held. Survivors release
+    // instantly so a first-search window stretch (base slice growing to
+    // cover a deep match) never folds the visible list away and re-reveals
+    // it row by row. Same-id commits (metadata-only refreshes, identical
+    // background polls) release instantly: replaying a stagger over an
+    // unchanged list reads as the entrance animation firing again. Very
+    // large first fills also skip the wave so the list stays scrollable
+    // instead of holding every row through a seconds-long stagger. A first
+    // fill that already carries typed search text skips the wave as well:
+    // the user is filtering, not opening onto a fresh list.
     readonly property int largeListWaveThreshold: 24
     property var _lastRowIds: []
     function _releaseAllRowsInstantly() {
@@ -439,6 +451,9 @@ Item {
     }
     function _holdAndScheduleReleases() {
         var children = resultsColumn.children
+        var prevSet = ({})
+        for (var p = 0; p < root._lastRowIds.length; p++)
+            prevSet[root._lastRowIds[p]] = true
         var claimedFresh = false
         var ids = []
         for (var h = 0; h < children.length; h++) {
@@ -447,9 +462,14 @@ Item {
                 ids.push(String(row.result.id))
             if (row.freshFromBuild === true) {
                 row.freshFromBuild = false
-                if (row.holdInstantly !== undefined)
-                    row.holdInstantly()
-                claimedFresh = true
+                if (row.holdInstantly !== undefined && row.releaseInstantly !== undefined) {
+                    if (prevSet[String(row.result ? row.result.id : "")] === true)
+                        row.releaseInstantly()
+                    else {
+                        row.holdInstantly()
+                        claimedFresh = true
+                    }
+                }
             }
         }
         var sameIds = ids.length === root._lastRowIds.length
@@ -471,6 +491,8 @@ Item {
         if (root._firstFillPending) {
             root._firstFillPending = false
             if (resultsView.resultCount > root.largeListWaveThreshold)
+                root._releaseAllRowsInstantly()
+            else if (root.activeSearchText.length > 0)
                 root._releaseAllRowsInstantly()
             else
                 root.playEntranceWave()
