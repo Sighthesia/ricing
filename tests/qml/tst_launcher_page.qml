@@ -318,6 +318,42 @@ Item {
             verify(page._firstFillPending === false)
         }
 
+        function test_launchedRowCanBeSearchedAndExecutedAfterReopen() {
+            var apps = openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0)
+            ])
+            wait(0)
+            page._releaseAllRowsInstantly()
+            svc().query = "Alpha"
+            wait(0)
+            page.executeSelected()
+            compare(apps.executions.length, 1)
+            verify(page.resultAt(0).closing)
+            resolveExecute(apps, 0, { ok: true })
+            compare(svc().visible, false)
+            wait(700)
+
+            svc().open()
+            wait(0)
+            svc().query = "Alpha"
+            wait(700)
+            compare(svc().results.length, 1)
+            compare(page.emptyState.visible, false)
+            var row = page.resultAt(0)
+            compare(row.result.id, "a")
+            verify(row.visible, "Launched row must become visible on reopen")
+            verify(row.enabled)
+            verify(!row.closing)
+            page.executeSelected()
+            compare(apps.executions.length, 2)
+            compare(apps.executions[1].id, "a")
+            // Resolve the second execution so no in-flight launch leaks
+            // into the next test's session state.
+            resolveExecute(apps, 1, { ok: true })
+            compare(svc().visible, false)
+        }
+
         function test_firstOpenWithoutRowsKeepsEntranceWave() {
             // init() reset the session to empty results; let the repeater
             // settle before opening onto the empty list.

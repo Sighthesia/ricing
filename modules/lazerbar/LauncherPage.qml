@@ -110,6 +110,15 @@ Item {
         target: root.session
         function onVisibleChanged() {
             if (root.session.visible) {
+                // Launched rows hide instantly for their fling exit; the
+                // count-model Repeater reuses those delegates on reopen, so
+                // a stale closing flag would strand the row invisible even
+                // though its result still matches. Clear it before focusing.
+                for (var i = 0; i < resultsRepeater.count; i++) {
+                    var row = resultsRepeater.itemAt(i)
+                    if (row)
+                        row.restoreFromClosing()
+                }
                 root.focusSearch()
                 // The full entrance wave is for a genuinely first paint; when
                 // reopening onto already-materialized rows it would fold the
