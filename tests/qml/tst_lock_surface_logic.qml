@@ -10,18 +10,21 @@ Item {
 
     property bool released: false
 
+    // Harness mirrors the production dual-channel contract exactly: bands
+    // 600ms OutQuad lead, body 800ms OutQuint follows; close is body InQuad
+    // with bands InSine, both 500ms, release owned by the body landing.
     Item {
         id: lockSurface
         anchors.fill: parent
-        property real waveProgress: 0
-        property real authOpacity: 0
+        property real bandsProgress: 0
+        property real bodyProgress: 0
         property bool reducedMotion: false
         property bool exitStarted: false
         property bool releaseSent: false
         signal releaseRequested()
 
         function allAnimations() {
-            return [enterAnimation, exitAnimation]
+            return [enterBands, enterBody, exitBands, exitBody]
         }
 
         function startReveal() {
@@ -32,7 +35,10 @@ Item {
                 return
             }
             SurfaceLogic.stopAll(allAnimations())
-            enterAnimation.start()
+            enterBands.from = bandsProgress
+            enterBody.from = bodyProgress
+            enterBands.start()
+            enterBody.start()
         }
 
         function stopAnimation() {
@@ -51,27 +57,37 @@ Item {
                 }
                 return
             }
-            authOpacity = 0
             SurfaceLogic.stopAll(allAnimations())
-            exitAnimation.from = waveProgress
-            exitAnimation.start()
+            exitBody.from = bodyProgress
+            exitBands.from = bandsProgress
+            exitBody.start()
+            exitBands.start()
         }
 
         NumberAnimation {
-            id: enterAnimation
+            id: enterBands
             target: lockSurface
-            property: "waveProgress"
+            property: "bandsProgress"
             from: 0
             to: 1
             duration: 600
-            easing.type: Easing.OutQuint
-            onFinished: lockSurface.authOpacity = 1
+            easing.type: Easing.OutQuad
         }
 
         NumberAnimation {
-            id: exitAnimation
+            id: enterBody
             target: lockSurface
-            property: "waveProgress"
+            property: "bodyProgress"
+            from: 0
+            to: 1
+            duration: 800
+            easing.type: Easing.OutQuint
+        }
+
+        NumberAnimation {
+            id: exitBody
+            target: lockSurface
+            property: "bodyProgress"
             to: 0
             duration: 500
             easing.type: Easing.InQuad
@@ -81,6 +97,15 @@ Item {
                     lockSurface.releaseRequested()
                 }
             }
+        }
+
+        NumberAnimation {
+            id: exitBands
+            target: lockSurface
+            property: "bandsProgress"
+            to: 0
+            duration: 500
+            easing.type: Easing.InSine
         }
 
         Component.onCompleted: startReveal()
@@ -99,8 +124,8 @@ Item {
             harness.released = false
             lockSurface.stopAnimation()
             lockSurface.reducedMotion = false
-            lockSurface.waveProgress = 0
-            lockSurface.authOpacity = 0
+            lockSurface.bandsProgress = 0
+            lockSurface.bodyProgress = 0
             lockSurface.exitStarted = false
             lockSurface.releaseSent = false
         }
@@ -108,29 +133,52 @@ Item {
         function test_surfaceIsFullSizeAndRevealCompletes() {
             compare(lockSurface.width, harness.width)
             compare(lockSurface.height, harness.height)
-            compare(lockSurface.waveProgress, 0)
+            compare(lockSurface.bandsProgress, 0)
+            compare(lockSurface.bodyProgress, 0)
             lockSurface.startReveal()
-            tryCompare(lockSurface, "waveProgress", 1, 1200)
-            tryCompare(lockSurface, "authOpacity", 1, 100)
+            tryCompare(lockSurface, "bandsProgress", 1, 1000)
+            tryCompare(lockSurface, "bodyProgress", 1, 1200)
+        }
+
+        function test_bandsAndBodyOverlapDuringReveal() {
+            lockSurface.startReveal()
+            wait(300)
+            verify(lockSurface.bandsProgress > 0 && lockSurface.bandsProgress < 1)
+            verify(lockSurface.bodyProgress > 0 && lockSurface.bodyProgress < 1)
+            tryCompare(lockSurface, "bodyProgress", 1, 1200)
+        }
+
+        function test_exitRetargetsBothChannelsFromLiveValues() {
+            lockSurface.startReveal()
+            wait(300)
+            var liveBands = lockSurface.bandsProgress
+            var liveBody = lockSurface.bodyProgress
+            verify(liveBands > 0 && liveBody > 0)
+            lockSurface.startExit()
+            verify(!harness.released)
+            tryCompare(harness, "released", true, 900)
+            compare(lockSurface.bandsProgress, 0)
+            compare(lockSurface.bodyProgress, 0)
         }
 
         function test_releaseWaitsForExitAnimation() {
             lockSurface.startReveal()
-            tryCompare(lockSurface, "waveProgress", 1, 1200)
+            tryCompare(lockSurface, "bodyProgress", 1, 1200)
             lockSurface.startExit()
             verify(!harness.released)
             tryCompare(harness, "released", true, 900)
-            tryCompare(lockSurface, "waveProgress", 0, 100)
+            tryCompare(lockSurface, "bodyProgress", 0, 100)
+            compare(lockSurface.bandsProgress, 0)
         }
 
         function test_reducedMotionUsesFinalValuesImmediately() {
             lockSurface.reducedMotion = true
             lockSurface.startReveal()
-            compare(lockSurface.waveProgress, 1)
-            compare(lockSurface.authOpacity, 1)
+            compare(lockSurface.bandsProgress, 1)
+            compare(lockSurface.bodyProgress, 1)
             lockSurface.startExit()
-            compare(lockSurface.waveProgress, 0)
-            compare(lockSurface.authOpacity, 0)
+            compare(lockSurface.bandsProgress, 0)
+            compare(lockSurface.bodyProgress, 0)
             verify(harness.released)
         }
 
@@ -140,11 +188,11 @@ Item {
             wait(40)
             lockSurface.reducedMotion = true
             lockSurface.startReveal()
-            compare(lockSurface.waveProgress, 1)
-            compare(lockSurface.authOpacity, 1)
+            compare(lockSurface.bandsProgress, 1)
+            compare(lockSurface.bodyProgress, 1)
             lockSurface.startExit()
-            compare(lockSurface.waveProgress, 0)
-            compare(lockSurface.authOpacity, 0)
+            compare(lockSurface.bandsProgress, 0)
+            compare(lockSurface.bodyProgress, 0)
             verify(harness.released)
         }
     }
@@ -359,7 +407,7 @@ Item {
             compare(SurfaceLogic.baseSource("shot.png"), "shot.png")
             compare(SurfaceLogic.baseSource(""), "")
             compare(SurfaceLogic.baseSource(null), "")
-            // Reveal: always the wallpaper; empty falls back to panel color.
+            // Reveal: the wallpaper is the curtain; empty falls back to panel color.
             compare(SurfaceLogic.revealSource("wall.png"), "wall.png")
             compare(SurfaceLogic.revealSource(""), "")
             compare(SurfaceLogic.revealSource(null), "")

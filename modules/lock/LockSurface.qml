@@ -19,8 +19,10 @@ WlSessionLockSurface {
     readonly property string snapshotUrl: snapshot && screenIndex >= 0
             ? snapshot.snapshotUrlFor(screenIndex) : ""
     property string wallpaperPath: ""
-    property real waveProgress: 0
-    property real authOpacity: 0
+    // Dual progress mirroring the launcher host: bands sweep first, the
+    // wallpaper body follows and covers them at rest.
+    property real bandsProgress: 0
+    property real bodyProgress: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
     property bool releaseSent: false
@@ -29,7 +31,8 @@ WlSessionLockSurface {
     signal releaseRequested()
 
     // The surface starts opaque with the pre-lock screenshot: the desktop
-    // appears uninterrupted until the wave mask sweeps the wallpaper over it.
+    // appears uninterrupted until the bands sweep and the wallpaper body
+    // slides up over them.
     color: "transparent"
 
     function startReveal(): void {
@@ -47,7 +50,7 @@ WlSessionLockSurface {
     function startExit(): void {
         // PROBE-EXIT: temporary unlock-path timing probe, remove after diagnosis.
         console.log("[afloat:lock-exit-probe] startExit t=" + Date.now()
-            + " waveProgress=" + waveProgress + " exitStarted=" + exitStarted
+            + " bands=" + bandsProgress + " body=" + bodyProgress + " exitStarted=" + exitStarted
             + " reducedMotion=" + reducedMotion)
         if (exitStarted)
             return
@@ -57,10 +60,11 @@ WlSessionLockSurface {
             requestRelease()
             return
         }
-        authOpacity = 0
         SurfaceLogic.stopAll(allAnimations())
-        exitAnimation.from = waveProgress
-        exitAnimation.start()
+        exitBody.from = bodyProgress
+        exitBands.from = bandsProgress
+        exitBody.start()
+        exitBands.start()
     }
 
     function requestRelease(): void {
@@ -71,7 +75,7 @@ WlSessionLockSurface {
     }
 
     function allAnimations(): var {
-        return [enterAnimation, exitAnimation]
+        return [enterBands, enterBody, exitBands, exitBody]
     }
 
     onLockContextChanged: {
@@ -89,7 +93,8 @@ WlSessionLockSurface {
         anchors.fill: parent
         snapshotSource: root.snapshotUrl
         wallpaperSource: root.wallpaperPath
-        progress: root.waveProgress
+        bandsProgress: root.bandsProgress
+        bodyProgress: root.bodyProgress
     }
 
     // Keep the screenshot visible for at least one settled frame before the
@@ -107,7 +112,11 @@ WlSessionLockSurface {
                 restart()
                 return
             }
-            enterAnimation.start()
+            // Retarget from the live values so a re-reveal never jumps.
+            enterBands.from = root.bandsProgress
+            enterBody.from = root.bodyProgress
+            enterBands.start()
+            enterBody.start()
         }
     }
 
@@ -137,19 +146,16 @@ WlSessionLockSurface {
     }
 
     // Keep authentication content rectangular and above the reveal layers.
+    // The card rides the wallpaper body: it rises and fades with the same
+    // progress instead of appearing after the reveal lands.
     Rectangle {
         id: authSurface
         anchors.centerIn: parent
+        anchors.verticalCenterOffset: (1 - root.bodyProgress) * 28
         width: Math.min(parent.width * 0.82, 420)
         height: Math.min(parent.height * 0.48, 260)
         color: Lazer.LazerTheme.settingsPanel
-        opacity: root.authOpacity
-        // Fade the card instead of popping it: it appears when the reveal
-        // lands and dissolves as the unlock wave recedes.
-        Behavior on opacity {
-            enabled: !root.reducedMotion
-            NumberAnimation { duration: Lazer.MotionTokens.slow; easing.type: Easing.OutQuint }
-        }
+        opacity: root.bodyProgress
         z: 3
 
         // Mirror the shared password conversation: masked input plus an
@@ -231,37 +237,52 @@ WlSessionLockSurface {
     }
 
     // Keep release ownership in the animation completion path.
-    // Two-phase reveal (bands sweep, then wallpaper covers) needs the full
-    // wave-enter duration so each phase reads instead of flashing past.
+    // Enter mirrors the launcher host: bands and body start together, bands
+    // lead (600ms OutQuad) while the body follows and covers (800ms OutQuint).
     NumberAnimation {
-        id: enterAnimation
+        id: enterBands
         target: root
-        property: "waveProgress"
+        property: "bandsProgress"
+        from: 0
+        to: 1
+        duration: Lazer.MotionTokens.waveBackdropEnter
+        easing.type: Easing.OutQuad
+    }
+    NumberAnimation {
+        id: enterBody
+        target: root
+        property: "bodyProgress"
         from: 0
         to: 1
         duration: Lazer.MotionTokens.waveEnter
-        easing.type: Easing.OutQuad
-        onFinished: root.authOpacity = 1
+        easing.type: Easing.OutQuint
     }
 
-    // Unlock un-reveals the curtain back to the screenshot before release.
-    // Fast start with a gentle landing: the exit ends in a hard cut to the
-    // desktop, so the wave must arrive settled instead of rushing into the
-    // edge (a mirrored slow-start would read as sliding, then vanishing).
+    // Unlock mirrors the launcher close: body recedes first (InQuad) with
+    // the bands trailing (InSine); release fires when the body lands, the
+    // same ownership the launcher gives its closeBody.
     NumberAnimation {
-        id: exitAnimation
+        id: exitBody
         target: root
-        property: "waveProgress"
+        property: "bodyProgress"
         to: 0
         duration: Lazer.MotionTokens.waveExit
-        easing.type: Easing.OutQuad
-        onStarted: console.log("[afloat:lock-exit-probe] exitAnimation started t=" + Date.now()
-            + " from=" + from + " duration=" + duration)
+        easing.type: Easing.InQuad
         onFinished: {
-            console.log("[afloat:lock-exit-probe] exitAnimation finished t=" + Date.now()
-                + " waveProgress=" + root.waveProgress)
+            console.log("[afloat:lock-exit-probe] exitBody finished t=" + Date.now()
+                + " body=" + root.bodyProgress + " bands=" + root.bandsProgress)
             root.requestRelease()
         }
+    }
+    NumberAnimation {
+        id: exitBands
+        target: root
+        property: "bandsProgress"
+        to: 0
+        duration: Lazer.MotionTokens.waveExit
+        easing.type: Easing.InSine
+        onStarted: console.log("[afloat:lock-exit-probe] exitBands started t=" + Date.now()
+            + " from=" + from + " duration=" + duration)
     }
 
     Connections {

@@ -22,7 +22,9 @@ function baseSource(snapshotUrl) {
     return snapshotUrl || ""
 }
 
-// The reveal layer is the wallpaper the wave mask uncovers as it sweeps.
+// The reveal layer is the wallpaper body that slides up over the bands.
+// No configured wallpaper resolves to nothing; the settled bands then keep
+// showing over the screenshot instead of a flat panel color.
 function revealSource(wallpaperPath) {
     return wallpaperPath || ""
 }
@@ -82,12 +84,12 @@ function screenSlot(screens, screen) {
 
 function applyRevealImmediately(surface, animations) {
     stopAll(animations)
-    surface.waveProgress = 1
-    surface.authOpacity = 1
+    surface.bandsProgress = 1
+    surface.bodyProgress = 1
 }
 
 function applyExitImmediately(surface, animations) {
     stopAll(animations)
-    surface.waveProgress = 0
-    surface.authOpacity = 0
+    surface.bandsProgress = 0
+    surface.bodyProgress = 0
 }
