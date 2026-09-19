@@ -45,6 +45,14 @@ Item {
             compare(layers.waveRepeater.itemAt(3).z, 3)
         }
 
+        function test_opacityRampForwardsToBands() {
+            compare(layers.opacityRamp, 1.6)
+            compare(layers.waveRepeater.itemAt(0).opacityRamp, 1.6)
+            layers.opacityRamp = 8
+            compare(layers.waveRepeater.itemAt(0).opacityRamp, 8)
+            layers.opacityRamp = 1.6
+        }
+
         function test_progressReachesFinalGeometry() {
             layers.progress = 0
             compare(layers.waveRepeater.itemAt(0).progress, 0)

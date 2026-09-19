@@ -20,6 +20,9 @@ Item {
     // the lock screen shows only the leading sliver, so the bright band
     // leads the edge and stays readable over the screenshot.
     property bool reverseOrder: false
+    // Forwarded to every band's opacity ramp; the lock reveal raises it so
+    // its thin sliver turns solid early instead of staying translucent.
+    property real opacityRamp: 1.6
     property alias waveRepeater: waveRepeater
 
     anchors.fill: parent
@@ -33,6 +36,7 @@ Item {
         delegate: FullscreenWave {
             required property int index
             z: root.reverseOrder ? (3 - index) : index
+            opacityRamp: root.opacityRamp
             anchors.fill: parent
             progress: root.progress
             angle: Logic.waveAngle(index)

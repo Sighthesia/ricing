@@ -31,16 +31,17 @@ Item {
     // The launcher wave panel's pink bands, sweeping ahead of the wallpaper
     // mask below so the lock reveal carries the same decoration. The bands
     // share the mask's progress (like the launcher waves tracking the body)
-    // with only a small geometric lead: two edge systems running at
-    // different speeds read as flicker, while a steady sliver reads as one
-    // curtain. The catching-up wallpaper covers the bands by the settled
-    // frame, which is unchanged.
+    // with a geometric lead wide enough to read as a band rather than a
+    // hairline, and a steep opacity ramp so the thin sliver turns solid
+    // instead of staying translucent. The catching-up wallpaper covers the
+    // bands by the settled frame, which is unchanged.
     Lazer.WaveRevealLayers {
         id: waveDecoration
         anchors.fill: parent
         progress: root.progress
         palette: Lazer.LazerTheme.wavePalette
-        leadOffset: -height * 0.10
+        leadOffset: -height * 0.20
+        opacityRamp: 8
         reverseOrder: true
     }
 
