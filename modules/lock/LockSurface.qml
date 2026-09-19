@@ -245,13 +245,16 @@ WlSessionLockSurface {
     }
 
     // Unlock un-reveals the curtain back to the screenshot before release.
+    // Fast start with a gentle landing: the exit ends in a hard cut to the
+    // desktop, so the wave must arrive settled instead of rushing into the
+    // edge (a mirrored slow-start would read as sliding, then vanishing).
     NumberAnimation {
         id: exitAnimation
         target: root
         property: "waveProgress"
         to: 0
         duration: Lazer.MotionTokens.waveExit
-        easing.type: Easing.InSine
+        easing.type: Easing.OutQuad
         onStarted: console.log("[afloat:lock-exit-probe] exitAnimation started t=" + Date.now()
             + " from=" + from + " duration=" + duration)
         onFinished: {
