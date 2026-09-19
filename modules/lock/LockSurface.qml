@@ -1,5 +1,6 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
-import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Wayland
 import "../lazerbar" as Lazer
@@ -44,6 +45,10 @@ WlSessionLockSurface {
     }
 
     function startExit(): void {
+        // PROBE-EXIT: temporary unlock-path timing probe, remove after diagnosis.
+        console.log("[afloat:lock-exit-probe] startExit t=" + Date.now()
+            + " waveProgress=" + waveProgress + " exitStarted=" + exitStarted
+            + " reducedMotion=" + reducedMotion)
         if (exitStarted)
             return
         exitStarted = true
@@ -79,25 +84,12 @@ WlSessionLockSurface {
         keyboardOwner.forceActiveFocus()
     }
 
-    // Base layer, painted before anything animates: the pre-lock desktop
-    // capture over an opaque floor, so the surface never exposes the desktop.
-    Rectangle {
-        id: baseFloor
+    LockBackdrop {
+        id: backdrop
         anchors.fill: parent
-        color: Lazer.LazerTheme.bgDark
-    }
-
-    Image {
-        id: baseImage
-        anchors.fill: parent
-        source: SurfaceLogic.baseSource(root.snapshotUrl)
-        visible: status === Image.Ready && source !== ""
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        onStatusChanged: {
-            if (status === Image.Ready)
-                revealStartTimer.restart()
-        }
+        snapshotSource: root.snapshotUrl
+        wallpaperSource: root.wallpaperPath
+        progress: root.waveProgress
     }
 
     // Keep the screenshot visible for at least one settled frame before the
@@ -105,35 +97,17 @@ WlSessionLockSurface {
     // after a bounded wait rather than exposing the wallpaper immediately.
     Timer {
         id: revealStartTimer
-        interval: root.snapshotUrl !== "" && baseImage.status !== Image.Ready ? 250 : 0
+        interval: 250
         repeat: false
         onTriggered: {
-            if (root.snapshotUrl !== "" && baseImage.status !== Image.Ready
-                    && root.revealWaitTicks < 12) {
+            if (root.exitStarted || root.reducedMotion)
+                return
+            if (!backdrop.imagesReady && root.revealWaitTicks < 12) {
                 root.revealWaitTicks += 1
                 restart()
                 return
             }
             enterAnimation.start()
-        }
-    }
-
-    // Wave mask: four angled bands, rendered offscreen in white. Wherever a
-    // band has swept, the mask lets the wallpaper layer through; the bands'
-    // opacity ramp gives the reveal a soft leading edge.
-    Item {
-        id: waveMask
-        anchors.fill: parent
-
-        Lazer.WaveRevealLayers {
-            anchors.fill: parent
-            progress: root.waveProgress
-            palette: ({
-                light4: "#FFFFFFFF",
-                light3: "#FFFFFFFF",
-                dark4: "#FFFFFFFF",
-                dark3: "#FFFFFFFF"
-            })
         }
     }
 
@@ -162,50 +136,6 @@ WlSessionLockSurface {
         }
     }
 
-    ShaderEffectSource {
-        id: waveMaskTexture
-        anchors.fill: parent
-        sourceItem: waveMask
-        hideSource: true
-        live: true
-    }
-
-    // Reveal layer: the wallpaper, masked by the sweeping wave, laid over the
-    // screenshot base. Without a configured wallpaper the settled bands still
-    // read as the themed panel surface.
-    Item {
-        id: revealLayer
-        z: 1
-        anchors.fill: parent
-        layer.enabled: true
-        layer.effect: OpacityMask {
-            maskSource: waveMaskTexture
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            visible: revealImage.status !== Image.Ready || revealImage.source === ""
-            color: Lazer.LazerTheme.settingsPanel
-        }
-
-        Image {
-            id: revealImage
-            anchors.fill: parent
-            source: SurfaceLogic.revealSource(root.wallpaperPath)
-            visible: status === Image.Ready && source !== ""
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-        }
-
-        // Dim the wallpaper for password legibility.
-        Rectangle {
-            anchors.fill: parent
-            visible: revealImage.visible
-            color: Lazer.LazerTheme.bgDark
-            opacity: 0.35
-        }
-    }
-
     // Keep authentication content rectangular and above the reveal layers.
     Rectangle {
         id: authSurface
@@ -214,6 +144,12 @@ WlSessionLockSurface {
         height: Math.min(parent.height * 0.48, 260)
         color: Lazer.LazerTheme.settingsPanel
         opacity: root.authOpacity
+        // Fade the card instead of popping it: it appears when the reveal
+        // lands and dissolves as the unlock wave recedes.
+        Behavior on opacity {
+            enabled: !root.reducedMotion
+            NumberAnimation { duration: Lazer.MotionTokens.slow; easing.type: Easing.OutQuint }
+        }
         z: 3
 
         // Mirror the shared password conversation: masked input plus an
@@ -296,6 +232,8 @@ WlSessionLockSurface {
 
     // Keep release ownership in the animation completion path.
     // The wave mask sweeps the wallpaper over the screenshot, then auth fades.
+    // Wave sweeps the wallpaper curtain over the pre-lock screenshot, using
+    // the launcher surface's backdrop timing (waves lead the body).
     NumberAnimation {
         id: enterAnimation
         target: root
@@ -303,19 +241,25 @@ WlSessionLockSurface {
         from: 0
         to: 1
         duration: Lazer.MotionTokens.waveBackdropEnter
-        easing.type: Easing.OutQuint
+        easing.type: Easing.OutQuad
         onFinished: root.authOpacity = 1
     }
 
-    // Unlock un-reveals the wallpaper back to the screenshot before release.
+    // Unlock un-reveals the curtain back to the screenshot before release.
     NumberAnimation {
         id: exitAnimation
         target: root
         property: "waveProgress"
         to: 0
         duration: Lazer.MotionTokens.waveExit
-        easing.type: Easing.InQuad
-        onFinished: root.requestRelease()
+        easing.type: Easing.InSine
+        onStarted: console.log("[afloat:lock-exit-probe] exitAnimation started t=" + Date.now()
+            + " from=" + from + " duration=" + duration)
+        onFinished: {
+            console.log("[afloat:lock-exit-probe] exitAnimation finished t=" + Date.now()
+                + " waveProgress=" + root.waveProgress)
+            root.requestRelease()
+        }
     }
 
     Connections {

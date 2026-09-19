@@ -30,13 +30,15 @@ Item {
 
     // The launcher wave panel's pink bands, sweeping ahead of the wallpaper
     // mask below so the lock reveal carries the same decoration. The bands
-    // run at 1.5x the mask rate (like the launcher waves leading the body),
-    // so pink dominates the early sweep and the catching-up wallpaper covers
-    // the bands by the settled frame, which is unchanged.
+    // share the mask's progress (like the launcher waves tracking the body)
+    // with only a small geometric lead: two edge systems running at
+    // different speeds read as flicker, while a steady sliver reads as one
+    // curtain. The catching-up wallpaper covers the bands by the settled
+    // frame, which is unchanged.
     Lazer.WaveRevealLayers {
         id: waveDecoration
         anchors.fill: parent
-        progress: Math.min(1, root.progress * 1.5)
+        progress: root.progress
         palette: Lazer.LazerTheme.wavePalette
         leadOffset: -height * 0.10
         reverseOrder: true
@@ -86,6 +88,9 @@ Item {
         anchors.fill: parent
         sourceItem: maskItem
         hideSource: true
+        // Keep live: freezing on settled frames was tried and reverted —
+        // the frozen texture is always one animation tick stale, leaving a
+        // permanent pink sliver under the fully revealed wallpaper.
         live: true
         visible: false
     }

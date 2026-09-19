@@ -65,12 +65,7 @@ Item {
                 backdrop.progress = stages[i]
                 wait(80)
                 var image = grabImage(backdrop)
-                // Mid-sweep the bright leading band covers the top; the
-                // settled/open frames stay screenshot/wallpaper pure.
-                if (stages[i] === 0.5)
-                    verify(isPinkBand(image.pixel(160, 10)), "pink leading edge at 0.5")
-                else
-                    compare(image.pixel(160, 10), stages[i] === 1 ? "#0000ff" : "#ff0000", "top at " + stages[i])
+                compare(image.pixel(160, 10), stages[i] === 1 ? "#0000ff" : "#ff0000", "top at " + stages[i])
                 compare(image.pixel(160, 230), stages[i] === 0 ? "#ff0000" : "#0000ff", "bottom at " + stages[i])
             }
         }
