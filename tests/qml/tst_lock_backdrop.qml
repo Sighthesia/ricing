@@ -34,28 +34,48 @@ Item {
             verify(item.imagesReady === false)
         }
 
-        function isPinkBand(c) {
-            return c.r > 0.75 && c.g < 0.63 && c.b > 0.31 && c.b < 0.82
+        function isScreenshotRed(c) { return c.r > 0.9 && c.g < 0.1 && c.b < 0.1 }
+        function isWallpaperBlue(c) { return c.b > 0.9 && c.r < 0.1 && c.g < 0.1 }
+
+        // Pixels that are neither screenshot-red nor wallpaper-blue carry
+        // wave bands; their count measures how much band is on screen.
+        function bandArea(image) {
+            var bands = 0
+            for (var x = 8; x < 320; x += 8)
+                for (var y = 0; y < 240; y += 8) {
+                    var c = image.pixel(x, y)
+                    var isRed = c.r > 0.9 && c.g < 0.1 && c.b < 0.1
+                    var isBlue = c.b > 0.9 && c.r < 0.1 && c.g < 0.1
+                    if (!isRed && !isBlue)
+                        ++bands
+                }
+            return bands
         }
 
-        function test_waveDecorationBands() {
+        function test_twoPhaseReveal() {
             tryCompare(backdrop, "imagesReady", true)
-            // Mid-sweep the pink bands peek ahead of the wallpaper edge.
+            // Phase one: bands sweep the screenshot alone, no wallpaper yet.
+            backdrop.progress = 0.25
+            wait(120)
+            var phaseOne = grabImage(backdrop)
+            verify(bandArea(phaseOne) > 300, "bands must dominate phase one")
+            verify(!isWallpaperBlue(phaseOne.pixel(160, 230)), "wallpaper waits during phase one")
+            // Handoff: bands at rest wash the frame pink edge to edge.
             backdrop.progress = 0.5
             wait(120)
-            var sweeping = grabImage(backdrop)
-            var pinkSeen = false
-            for (var y = 40; y <= 80; y += 4) {
-                if (isPinkBand(sweeping.pixel(160, y)))
-                    pinkSeen = true
-            }
-            verify(pinkSeen, "pink wave bands must lead the wallpaper edge mid-sweep")
-            // The settled frame stays pure wallpaper with no bands left over.
+            var handoff = grabImage(backdrop)
+            compare(handoff.pixel(160, 10), "#75293f", "pink wash at handoff")
+            var handoffBottom = handoff.pixel(160, 230)
+            verify(!isScreenshotRed(handoffBottom) && !isWallpaperBlue(handoffBottom),
+                "full pink wash at handoff")
+            // Phase two: wallpaper sweeps over the pink, then settles clean.
+            backdrop.progress = 0.75
+            wait(120)
+            var phaseTwo = grabImage(backdrop)
+            compare(phaseTwo.pixel(160, 230), "#0000ff", "wallpaper leads phase two")
             backdrop.progress = 1
             wait(120)
-            var settled = grabImage(backdrop)
-            for (var y2 = 0; y2 < 240; y2 += 8)
-                verify(!isPinkBand(settled.pixel(160, y2)), "no pink bands at rest y=" + y2)
+            compare(bandArea(grabImage(backdrop)), 0, "no bands left at rest")
         }
 
         function test_curtainBothDirections() {
@@ -65,8 +85,16 @@ Item {
                 backdrop.progress = stages[i]
                 wait(80)
                 var image = grabImage(backdrop)
-                compare(image.pixel(160, 10), stages[i] === 1 ? "#0000ff" : "#ff0000", "top at " + stages[i])
-                compare(image.pixel(160, 230), stages[i] === 0 ? "#ff0000" : "#0000ff", "bottom at " + stages[i])
+                // Mid-sweep the settled bands wash the frame pink; the open
+                // and settled frames stay screenshot/wallpaper pure.
+                if (stages[i] === 0.5) {
+                    compare(image.pixel(160, 10), "#75293f", "top at 0.5")
+                    var bottomMid = image.pixel(160, 230)
+                    verify(!isScreenshotRed(bottomMid) && !isWallpaperBlue(bottomMid), "bottom bands at 0.5")
+                } else {
+                    compare(image.pixel(160, 10), stages[i] === 1 ? "#0000ff" : "#ff0000", "top at " + stages[i])
+                    compare(image.pixel(160, 230), stages[i] === 1 ? "#0000ff" : "#ff0000", "bottom at " + stages[i])
+                }
             }
         }
     }

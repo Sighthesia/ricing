@@ -27,32 +27,6 @@ Item {
             verify(layers.waveRepeater.itemAt(0).clip)
         }
 
-        function test_leadOffsetShiftsRestGeometry() {
-            compare(layers.leadOffset, 0)
-            layers.leadOffset = -60
-            compare(layers.waveRepeater.itemAt(0).restOffset, -600 * 0.72 - 60)
-            compare(layers.waveRepeater.itemAt(3).restOffset, -600 * 0.16 - 60)
-            layers.leadOffset = 0
-        }
-
-        function test_reverseOrderPutsLightBandOnTop() {
-            compare(layers.reverseOrder, false)
-            layers.reverseOrder = true
-            compare(layers.waveRepeater.itemAt(0).z, 3)
-            compare(layers.waveRepeater.itemAt(3).z, 0)
-            layers.reverseOrder = false
-            compare(layers.waveRepeater.itemAt(0).z, 0)
-            compare(layers.waveRepeater.itemAt(3).z, 3)
-        }
-
-        function test_opacityRampForwardsToBands() {
-            compare(layers.opacityRamp, 1.6)
-            compare(layers.waveRepeater.itemAt(0).opacityRamp, 1.6)
-            layers.opacityRamp = 8
-            compare(layers.waveRepeater.itemAt(0).opacityRamp, 8)
-            layers.opacityRamp = 1.6
-        }
-
         function test_progressReachesFinalGeometry() {
             layers.progress = 0
             compare(layers.waveRepeater.itemAt(0).progress, 0)

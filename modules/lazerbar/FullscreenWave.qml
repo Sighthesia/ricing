@@ -13,14 +13,10 @@ Item {
             ? restOffset : hiddenOffset + (restOffset - hiddenOffset) * Math.max(0, Math.min(1, progress))
     property alias paintedLayer: layer
 
-    // Opacity reaches full once progress passes 1 / ramp (default 1.6).
-    // Surfaces that show only a thin leading sliver (the lock reveal) raise
-    // the ramp so the sliver reads solid instead of nearly transparent.
-    property real opacityRamp: 1.6
     clip: true
     // Ramp opacity ahead of position so the sweep reads as a reveal; reduced motion tracks progress exactly.
     opacity: MotionTokens.reducedMotion ? Math.max(0, Math.min(1, progress))
-            : Math.max(0, Math.min(1, progress * opacityRamp))
+            : Math.max(0, Math.min(1, progress * 1.6))
 
     Rectangle {
         id: layer

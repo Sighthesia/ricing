@@ -10,6 +10,12 @@ Item {
     property url snapshotSource: ""
     property url wallpaperSource: ""
     property real progress: 0
+    // Two-phase reveal mirroring the launcher wave panel: the pink bands
+    // sweep the screenshot alone first (like waves over the desktop), then
+    // the wallpaper mask sweeps over the pink (like the body over waves).
+    // One moving edge system at a time so the sweep never shimmers.
+    readonly property real bandsProgress: Math.min(1, root.progress * 2)
+    readonly property real maskProgress: Math.max(0, Math.min(1, (root.progress - 0.5) * 2))
     readonly property bool snapshotReady: screenshot.status === Image.Ready
     readonly property bool imagesReady: snapshotReady && wallpaper.status === Image.Ready
 
@@ -28,21 +34,15 @@ Item {
         visible: status === Image.Ready
     }
 
-    // The launcher wave panel's pink bands, sweeping ahead of the wallpaper
-    // mask below so the lock reveal carries the same decoration. The bands
-    // share the mask's progress (like the launcher waves tracking the body)
-    // with a geometric lead wide enough to read as a band rather than a
-    // hairline, and a steep opacity ramp so the thin sliver turns solid
-    // instead of staying translucent. The catching-up wallpaper covers the
-    // bands by the settled frame, which is unchanged.
+    // The launcher wave panel's bands with zero customization: same
+    // palette, geometry, stacking, and opacity ramp. They run on the first
+    // phase while the wallpaper mask waits, so the full bands read exactly
+    // like the launcher sweep.
     Lazer.WaveRevealLayers {
         id: waveDecoration
         anchors.fill: parent
-        progress: root.progress
+        progress: root.bandsProgress
         palette: Lazer.LazerTheme.wavePalette
-        leadOffset: -height * 0.20
-        opacityRamp: 8
-        reverseOrder: true
     }
 
     Item {
@@ -52,7 +52,7 @@ Item {
 
         Lazer.FullscreenWave {
             anchors.fill: parent
-            progress: root.progress
+            progress: root.maskProgress
             angle: WaveLogic.waveAngle(0)
             restOffset: -height * 0.72
             colour: "white"
@@ -60,7 +60,7 @@ Item {
         }
         Lazer.FullscreenWave {
             anchors.fill: parent
-            progress: root.progress
+            progress: root.maskProgress
             angle: WaveLogic.waveAngle(1)
             restOffset: -height * 0.5
             colour: "white"
@@ -68,7 +68,7 @@ Item {
         }
         Lazer.FullscreenWave {
             anchors.fill: parent
-            progress: root.progress
+            progress: root.maskProgress
             angle: WaveLogic.waveAngle(2)
             restOffset: -height * 0.32
             colour: "white"
@@ -76,7 +76,7 @@ Item {
         }
         Lazer.FullscreenWave {
             anchors.fill: parent
-            progress: root.progress
+            progress: root.maskProgress
             angle: WaveLogic.waveAngle(3)
             restOffset: -height * 0.16
             colour: "white"

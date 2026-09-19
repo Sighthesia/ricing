@@ -231,16 +231,15 @@ WlSessionLockSurface {
     }
 
     // Keep release ownership in the animation completion path.
-    // The wave mask sweeps the wallpaper over the screenshot, then auth fades.
-    // Wave sweeps the wallpaper curtain over the pre-lock screenshot, using
-    // the launcher surface's backdrop timing (waves lead the body).
+    // Two-phase reveal (bands sweep, then wallpaper covers) needs the full
+    // wave-enter duration so each phase reads instead of flashing past.
     NumberAnimation {
         id: enterAnimation
         target: root
         property: "waveProgress"
         from: 0
         to: 1
-        duration: Lazer.MotionTokens.waveBackdropEnter
+        duration: Lazer.MotionTokens.waveEnter
         easing.type: Easing.OutQuad
         onFinished: root.authOpacity = 1
     }
