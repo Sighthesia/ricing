@@ -15,6 +15,11 @@ Item {
     // its wallpaper mask with a small negative value so the pink bands peek
     // out ahead of the reveal edge while sharing the same progress.
     property real leadOffset: 0
+    // Paint the lightest band on top instead of the darkest. The launcher
+    // keeps the dark band on top (an opaque body covers the stack at rest);
+    // the lock screen shows only the leading sliver, so the bright band
+    // leads the edge and stays readable over the screenshot.
+    property bool reverseOrder: false
     property alias waveRepeater: waveRepeater
 
     anchors.fill: parent
@@ -27,6 +32,7 @@ Item {
         // Paint one palette layer with the established Wave geometry.
         delegate: FullscreenWave {
             required property int index
+            z: root.reverseOrder ? (3 - index) : index
             anchors.fill: parent
             progress: root.progress
             angle: Logic.waveAngle(index)

@@ -29,14 +29,17 @@ Item {
     }
 
     // The launcher wave panel's pink bands, sweeping ahead of the wallpaper
-    // mask below so the lock reveal carries the same decoration. At rest the
-    // fully revealed wallpaper covers them, so the settled frame is unchanged.
+    // mask below so the lock reveal carries the same decoration. The bands
+    // run at 1.5x the mask rate (like the launcher waves leading the body),
+    // so pink dominates the early sweep and the catching-up wallpaper covers
+    // the bands by the settled frame, which is unchanged.
     Lazer.WaveRevealLayers {
         id: waveDecoration
         anchors.fill: parent
-        progress: root.progress
+        progress: Math.min(1, root.progress * 1.5)
         palette: Lazer.LazerTheme.wavePalette
         leadOffset: -height * 0.10
+        reverseOrder: true
     }
 
     Item {

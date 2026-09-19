@@ -35,6 +35,16 @@ Item {
             layers.leadOffset = 0
         }
 
+        function test_reverseOrderPutsLightBandOnTop() {
+            compare(layers.reverseOrder, false)
+            layers.reverseOrder = true
+            compare(layers.waveRepeater.itemAt(0).z, 3)
+            compare(layers.waveRepeater.itemAt(3).z, 0)
+            layers.reverseOrder = false
+            compare(layers.waveRepeater.itemAt(0).z, 0)
+            compare(layers.waveRepeater.itemAt(3).z, 3)
+        }
+
         function test_progressReachesFinalGeometry() {
             layers.progress = 0
             compare(layers.waveRepeater.itemAt(0).progress, 0)
