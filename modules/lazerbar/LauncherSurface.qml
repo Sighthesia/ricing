@@ -26,17 +26,19 @@ Item {
     // Opener Item awaiting the coordinated open dispatch (bar entry path).
     property Item pendingOpener: null
 
-    // Launcher palette anchored on the osu pink family; independent of the
-    // retired Wiki/News/Beatmap palettes.
+    // Launcher palette anchored on the osu pink family; the wave bands come
+    // from the shared LazerTheme.wavePalette so the launcher and the lock
+    // screen sweep the same pinks. Independent of the retired
+    // Wiki/News/Beatmap palettes.
     readonly property var launcherPalette: ({
         kind: "pink",
         body: "#33202B",
         header: "#B23A62",
         sidebar: "#3A2531",
-        light4: "#F492B8",
-        light3: "#E56E97",
-        dark4: "#AC3F63",
-        dark3: "#75293F",
+        light4: LazerTheme.wavePalette.light4,
+        light3: LazerTheme.wavePalette.light3,
+        dark4: LazerTheme.wavePalette.dark4,
+        dark3: LazerTheme.wavePalette.dark3,
         text: "#FFF2F6",
         muted: "#D9BCC9",
         accent: LazerTheme.osuPink

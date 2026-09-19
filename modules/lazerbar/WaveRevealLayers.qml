@@ -10,6 +10,11 @@ Item {
     property real progress: 0
     // `final` keeps this intentional name from shadowing Item.palette.
     final property var palette: ({})
+    // Geometric head-start added to every band's rest offset (pixels,
+    // negative runs ahead/up). The launcher keeps 0; the lock screen leads
+    // its wallpaper mask with a small negative value so the pink bands peek
+    // out ahead of the reveal edge while sharing the same progress.
+    property real leadOffset: 0
     property alias waveRepeater: waveRepeater
 
     anchors.fill: parent
@@ -29,7 +34,7 @@ Item {
                     : index === 1 ? (root.palette.light3 || "transparent")
                     : index === 2 ? (root.palette.dark4 || "transparent")
                     : (root.palette.dark3 || "transparent")
-            restOffset: -parent.height * ([0.72, 0.5, 0.32, 0.16][index])
+            restOffset: -parent.height * ([0.72, 0.5, 0.32, 0.16][index]) + root.leadOffset
         }
     }
 }

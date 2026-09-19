@@ -55,6 +55,15 @@ QtObject {
     readonly property color modeContainerBorder: "#0FFFFFFF"
     readonly property color osuPink: adapt && colorService ? colorService.mPrimary : "#FF66AA"
     readonly property color osuGreen: adapt && colorService ? colorService.mTertiary : "#00FFA2"
+    // Wave-curtain pinks shared by the launcher wave panel and the lock
+    // screen reveal. Anchored on the osu pink family and independent of
+    // wallpaper adaptation so every wave surface carries the same bands.
+    readonly property var wavePalette: ({
+        light4: "#F492B8",
+        light3: "#E56E97",
+        dark4: "#AC3F63",
+        dark3: "#75293F"
+    })
     readonly property color iconInactive: adapt && colorService ? shade(colorService.mOnSurfaceVariant, 0.72) : "#A0A0A0"
     readonly property color textPrimary: adapt && colorService ? colorService.mOnSurface : "#FFFFFF"
     readonly property color textMuted: adapt && colorService ? colorService.mOnSurfaceVariant : "#B8B4BC"

@@ -27,6 +27,14 @@ Item {
             verify(layers.waveRepeater.itemAt(0).clip)
         }
 
+        function test_leadOffsetShiftsRestGeometry() {
+            compare(layers.leadOffset, 0)
+            layers.leadOffset = -60
+            compare(layers.waveRepeater.itemAt(0).restOffset, -600 * 0.72 - 60)
+            compare(layers.waveRepeater.itemAt(3).restOffset, -600 * 0.16 - 60)
+            layers.leadOffset = 0
+        }
+
         function test_progressReachesFinalGeometry() {
             layers.progress = 0
             compare(layers.waveRepeater.itemAt(0).progress, 0)
