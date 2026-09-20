@@ -316,12 +316,6 @@ Item {
             return payload.spectrumValues
         return []
     }
-    readonly property bool mediaSpectrumIdle: {
-        if (root.mediaSpectrumService && root.mediaSpectrumService.isIdle !== undefined)
-            return !!root.mediaSpectrumService.isIdle
-        return (root.mediaSpectrumValues === null || root.mediaSpectrumValues === undefined
-            || root.mediaSpectrumValues.length === undefined || root.mediaSpectrumValues.length === 0)
-    }
     readonly property int mediaSpectrumWaveDuration: {
         var bpm = 0
         if (root.mediaSpectrumService && root.mediaSpectrumService.bpm !== undefined)
@@ -812,97 +806,99 @@ Item {
                     }
                 }
 
-                // Spectrum sits above the progress bar while audio is present.
-                DockzoneSpectrum {
-                    id: mediaSpectrum
-                    objectName: "mediaSpectrum"
+                // Spectrum + seek stay glued together; the spectrum strip
+                // is always resident (empty when idle) so the card never
+                // jumps as audio starts and stops.
+                Column {
                     width: parent.width
-                    height: visible ? 36 : 0
-                    visible: root.mediaSpectrumValues !== null
-                        && root.mediaSpectrumValues !== undefined
-                        && root.mediaSpectrumValues.length !== undefined
-                        && root.mediaSpectrumValues.length > 0
-                        && !root.mediaSpectrumIdle
-                    values: root.mediaSpectrumValues
-                    barColor: LazerTheme.lightScheme
-                        ? Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g,
-                            LazerTheme.accentColor.b, 0.58)
-                        : LazerTheme.accentColor
-                    waveColor: LazerTheme.flashWash
-                    waveStrength: LazerTheme.lightScheme ? 1.0 : 0.55
-                    waveDuration: root.mediaSpectrumWaveDuration
-                }
+                    spacing: 2
 
-                // Draggable seek bar with a generous hit area.
-                Item {
-                    id: mediaSeekArea
-                    objectName: "mediaSeekArea"
-                    width: parent.width
-                    height: 20
-                    enabled: root.mediaCanSeek
-
-                    function seekFromX(x) {
-                        var ratio = Math.max(0, Math.min(1, Number(x) / Math.max(1, width)))
-                        if (!isFinite(ratio))
-                            return
-                        mediaContent.scrubbing = true
-                        mediaContent.scrubValue = ratio
+                    DockzoneSpectrum {
+                        id: mediaSpectrum
+                        objectName: "mediaSpectrum"
+                        width: parent.width
+                        height: 36
+                        values: root.mediaSpectrumValues
+                        barColor: LazerTheme.lightScheme
+                            ? Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g,
+                                LazerTheme.accentColor.b, 0.58)
+                            : LazerTheme.accentColor
+                        waveColor: LazerTheme.flashWash
+                        waveStrength: LazerTheme.lightScheme ? 1.0 : 0.55
+                        waveDuration: root.mediaSpectrumWaveDuration
                     }
 
-                    Rectangle {
-                        objectName: "mediaProgressTrack"
-                        anchors.verticalCenter: parent.verticalCenter
+                    // Draggable seek bar with a generous hit area.
+                    Item {
+                        id: mediaSeekArea
+                        objectName: "mediaSeekArea"
                         width: parent.width
-                        height: 4
-                        radius: 2
-                        color: Qt.rgba(1, 1, 1, 0.14)
-                        clip: true
+                        height: 20
+                        enabled: root.mediaCanSeek
+
+                        function seekFromX(x) {
+                            var ratio = Math.max(0, Math.min(1, Number(x) / Math.max(1, width)))
+                            if (!isFinite(ratio))
+                                return
+                            mediaContent.scrubbing = true
+                            mediaContent.scrubValue = ratio
+                        }
 
                         Rectangle {
-                            objectName: "mediaProgressFill"
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            anchors.bottom: parent.bottom
-                            width: parent.width * mediaContent.effectiveProgress
+                            objectName: "mediaProgressTrack"
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width
+                            height: 4
                             radius: 2
-                            color: LazerTheme.accentColor
+                            color: Qt.rgba(1, 1, 1, 0.14)
+                            clip: true
 
-                            Behavior on width {
-                                enabled: !MotionTokens.reducedMotion && !mediaContent.scrubbing
-                                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+                            Rectangle {
+                                objectName: "mediaProgressFill"
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: parent.width * mediaContent.effectiveProgress
+                                radius: 2
+                                color: LazerTheme.accentColor
+
+                                Behavior on width {
+                                    enabled: !MotionTokens.reducedMotion && !mediaContent.scrubbing
+                                    NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+                                }
                             }
                         }
-                    }
 
-                    // Small thumb marks the playhead; thumb radius stays
-                    // in the 4-6px detail band of the sharp language.
-                    Rectangle {
-                        objectName: "mediaProgressThumb"
-                        width: 10
-                        height: 10
-                        radius: 5
-                        x: Math.max(0, Math.min(mediaSeekArea.width - width,
-                            mediaSeekArea.width * mediaContent.effectiveProgress - width / 2))
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: LazerTheme.settingsSliderThumb
-                        visible: root.mediaCanSeek
-                    }
-
-                    MouseArea {
-                        objectName: "mediaProgressTap"
-                        anchors.fill: parent
-                        enabled: root.mediaCanSeek
-                        hoverEnabled: true
-                        cursorShape: root.mediaCanSeek ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onPressed: mouse => mediaSeekArea.seekFromX(mouse.x)
-                        onPositionChanged: mouse => {
-                            if (pressed)
-                                mediaSeekArea.seekFromX(mouse.x)
+                        // Small thumb marks the playhead; thumb radius stays
+                        // in the 4-6px detail band of the sharp language.
+                        Rectangle {
+                            objectName: "mediaProgressThumb"
+                            width: 10
+                            height: 10
+                            radius: 5
+                            x: Math.max(0, Math.min(mediaSeekArea.width - width,
+                                mediaSeekArea.width * mediaContent.effectiveProgress - width / 2))
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: LazerTheme.settingsSliderThumb
+                            visible: root.mediaCanSeek
                         }
-                        onReleased: mouse => {
-                            mediaSeekArea.seekFromX(mouse.x)
-                            root.handleMediaSeek(mediaContent.scrubValue)
-                            mediaContent.scrubbing = false
+
+                        MouseArea {
+                            objectName: "mediaProgressTap"
+                            anchors.fill: parent
+                            enabled: root.mediaCanSeek
+                            hoverEnabled: true
+                            cursorShape: root.mediaCanSeek ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onPressed: mouse => mediaSeekArea.seekFromX(mouse.x)
+                            onPositionChanged: mouse => {
+                                if (pressed)
+                                    mediaSeekArea.seekFromX(mouse.x)
+                            }
+                            onReleased: mouse => {
+                                mediaSeekArea.seekFromX(mouse.x)
+                                root.handleMediaSeek(mediaContent.scrubValue)
+                                mediaContent.scrubbing = false
+                            }
                         }
                     }
                 }

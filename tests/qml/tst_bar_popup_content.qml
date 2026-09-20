@@ -309,15 +309,18 @@ Item {
             tryCompare(fakeM, "nextCount", 1, 500)
         }
 
-        function test_mediaSpectrumShowsWithValues() {
+        function test_mediaSpectrumStaysResident() {
             var item = createTemporaryObject(actionsComp, root, { actionKind: "media", payload: { title: "T", spectrumValues: [0.2, 0.5, 0.8] } })
             var spectrum = findByName(item, "mediaSpectrum")
             verify(spectrum !== null, "spectrum should exist")
             verify(spectrum.visible, "spectrum visible with values")
+            compare(spectrum.height, 36)
+            // No audio: the strip keeps its slot instead of collapsing.
             var emptyItem = createTemporaryObject(actionsComp, root, { actionKind: "media", payload: { title: "T" } })
             var emptySpectrum = findByName(emptyItem, "mediaSpectrum")
             verify(emptySpectrum !== null)
-            verify(!emptySpectrum.visible, "spectrum hidden without values")
+            verify(emptySpectrum.visible, "spectrum stays resident without values")
+            compare(emptySpectrum.height, 36)
         }
 
         function test_notificationsExposesDndAndClear() {
