@@ -264,8 +264,8 @@ Item {
         }
 
         function test_mediaExposesPreviousPlayNext() {
-            var fakeM = Qt.createQmlObject('import QtQuick; QtObject { property int prev:0; property int play:0; property int nextCount:0; property int positionMs:65000; property int lengthMs:180000; function previous(){ prev++ } function playPause(){ play++ } function next(){ nextCount++ } }', root, "fakeMedia")
-            var item = createTemporaryObject(actionsComp, root, { actionKind: "media", payload: { mediaService: fakeM } })
+            var fakeM = Qt.createQmlObject('import QtQuick; QtObject { property int prev:0; property int play:0; property int nextCount:0; property int positionMs:65000; property int lengthMs:180000; property real lastSeek:-1; function previous(){ prev++ } function playPause(){ play++ } function next(){ nextCount++ } function setProgress(v){ lastSeek=v } }', root, "fakeMedia")
+            var item = createTemporaryObject(actionsComp, root, { actionKind: "media", payload: { mediaService: fakeM, title: "Song title", artist: "Artist name" } })
             var prevBtn = findByName(item, "mediaPrevButton")
             var playBtn = findByName(item, "mediaPlayPauseButton")
             var nextBtn = findByName(item, "mediaNextButton")
@@ -273,11 +273,33 @@ Item {
             verify(playBtn !== null, "play button should exist")
             verify(nextBtn !== null, "next button should exist")
             verify(findByName(item, "mediaContent").visible)
-            var progressText = findByName(item, "mediaProgressText")
-            verify(progressText !== null, "media progress text should exist")
-            compare(progressText.text, "1:05 / 3:00")
+            // Left cover plus right identity column.
+            verify(findByName(item, "mediaCoverFrame") !== null, "cover frame should exist")
+            verify(findByName(item, "mediaCoverImage") !== null, "cover image should exist")
+            var titleNode = findByName(item, "mediaTitleText")
+            verify(titleNode !== null, "title text should exist")
+            compare(titleNode.text, "Song title")
+            var artistNode = findByName(item, "mediaArtistText")
+            verify(artistNode !== null, "artist text should exist")
+            compare(artistNode.text, "Artist name")
+            var posText = findByName(item, "mediaPositionText")
+            var lenText = findByName(item, "mediaLengthText")
+            verify(posText !== null, "position text should exist")
+            verify(lenText !== null, "length text should exist")
+            compare(posText.text, "1:05")
+            compare(lenText.text, "3:00")
+            // Draggable progress bar and thumb.
+            verify(findByName(item, "mediaSeekArea") !== null, "seek area should exist")
+            verify(findByName(item, "mediaProgressTrack") !== null, "progress track should exist")
+            verify(findByName(item, "mediaProgressFill") !== null, "progress fill should exist")
+            verify(findByName(item, "mediaProgressThumb") !== null, "progress thumb should exist")
+            verify(findByName(item, "mediaProgressTap") !== null, "progress tap should exist")
             fakeM.positionMs = 70000
-            tryCompare(progressText, "text", "1:10 / 3:00", 500)
+            tryCompare(posText, "text", "1:10", 500)
+            // Seek routes through the media service.
+            fakeM.lastSeek = -1
+            item.handleMediaSeek(0.5)
+            compare(fakeM.lastSeek, 0.5)
             fakeM.prev = 0; fakeM.play = 0; fakeM.nextCount = 0
             mouseClick(prevBtn, prevBtn.width/2, prevBtn.height/2, Qt.LeftButton)
             tryCompare(fakeM, "prev", 1, 500)
@@ -285,6 +307,17 @@ Item {
             tryCompare(fakeM, "play", 1, 500)
             mouseClick(nextBtn, nextBtn.width/2, nextBtn.height/2, Qt.LeftButton)
             tryCompare(fakeM, "nextCount", 1, 500)
+        }
+
+        function test_mediaSpectrumShowsWithValues() {
+            var item = createTemporaryObject(actionsComp, root, { actionKind: "media", payload: { title: "T", spectrumValues: [0.2, 0.5, 0.8] } })
+            var spectrum = findByName(item, "mediaSpectrum")
+            verify(spectrum !== null, "spectrum should exist")
+            verify(spectrum.visible, "spectrum visible with values")
+            var emptyItem = createTemporaryObject(actionsComp, root, { actionKind: "media", payload: { title: "T" } })
+            var emptySpectrum = findByName(emptyItem, "mediaSpectrum")
+            verify(emptySpectrum !== null)
+            verify(!emptySpectrum.visible, "spectrum hidden without values")
         }
 
         function test_notificationsExposesDndAndClear() {

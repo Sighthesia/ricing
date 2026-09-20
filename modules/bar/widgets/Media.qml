@@ -142,9 +142,11 @@ BarPill {
                 artist: summaryText,
                 mediaControlService: Services.MediaControlService,
                 mediaService: Services.MediaService,
+                spectrumService: Services.SpectrumService,
                 onPrevious: function() { Services.MediaService.previous() },
                 onPlayPause: function() { Services.MediaService.playPause() },
-                onNext: function() { Services.MediaService.next() }
+                onNext: function() { Services.MediaService.next() },
+                onSeek: function(progress) { Services.MediaControlService.seekToProgress(progress) }
             }
         }
     }

@@ -11,7 +11,7 @@ Item {
     property var payload: null
     signal dismissRequested()
 
-    implicitWidth: 260
+    implicitWidth: root.actionKind === "media" ? 320 : 260
     implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
     width: implicitWidth
     height: implicitHeight
@@ -247,6 +247,89 @@ Item {
             return Math.max(0, Number(payload.lengthMs))
         return 0
     }
+    readonly property string mediaTitle: {
+        if (payload && payload.mediaControlService && payload.mediaControlService.title !== undefined
+                && String(payload.mediaControlService.title) !== "")
+            return String(payload.mediaControlService.title)
+        if (payload && payload.mediaService && payload.mediaService.title !== undefined
+                && String(payload.mediaService.title) !== "")
+            return String(payload.mediaService.title)
+        if (payload && payload.title !== undefined && String(payload.title) !== "")
+            return String(payload.title)
+        return ""
+    }
+    readonly property string mediaArtist: {
+        if (payload && payload.mediaControlService && payload.mediaControlService.artist !== undefined
+                && String(payload.mediaControlService.artist) !== "")
+            return String(payload.mediaControlService.artist)
+        if (payload && payload.mediaService && payload.mediaService.artist !== undefined
+                && String(payload.mediaService.artist) !== "")
+            return String(payload.mediaService.artist)
+        if (payload && payload.artist !== undefined)
+            return String(payload.artist || "")
+        return ""
+    }
+    readonly property string mediaArtUrl: {
+        if (payload && payload.mediaControlService && payload.mediaControlService.artUrl !== undefined
+                && String(payload.mediaControlService.artUrl) !== "")
+            return String(payload.mediaControlService.artUrl)
+        if (payload && payload.mediaService && payload.mediaService.artUrl !== undefined
+                && String(payload.mediaService.artUrl) !== "")
+            return String(payload.mediaService.artUrl)
+        if (payload && payload.artUrl !== undefined)
+            return String(payload.artUrl || "")
+        return ""
+    }
+    readonly property bool mediaPlaying: {
+        if (payload && payload.mediaControlService && payload.mediaControlService.playbackState !== undefined)
+            return String(payload.mediaControlService.playbackState) === "playing"
+        if (payload && payload.mediaService && payload.mediaService.playbackState !== undefined)
+            return String(payload.mediaService.playbackState) === "playing"
+        if (payload && payload.playing !== undefined)
+            return !!payload.playing
+        if (payload && payload.isPlaying !== undefined)
+            return !!payload.isPlaying
+        return false
+    }
+    readonly property real mediaProgress: {
+        if (root.mediaLengthMs <= 0)
+            return 0
+        return Math.max(0, Math.min(1, root.mediaPositionMs / root.mediaLengthMs))
+    }
+    readonly property bool mediaCanSeek: {
+        if (payload && payload.mediaControlService && payload.mediaControlService.canSeek !== undefined)
+            return !!payload.mediaControlService.canSeek
+        if (payload && payload.mediaService && payload.mediaService.canSeek !== undefined)
+            return !!payload.mediaService.canSeek
+        if (payload && payload.canSeek !== undefined)
+            return !!payload.canSeek
+        return root.mediaLengthMs > 0
+    }
+    // Spectrum values flow through the hover payload so this file stays
+    // free of direct service imports for qmltestrunner isolation.
+    readonly property var mediaSpectrumService:
+        payload && payload.spectrumService ? payload.spectrumService : null
+    readonly property var mediaSpectrumValues: {
+        if (root.mediaSpectrumService && root.mediaSpectrumService.values !== undefined)
+            return root.mediaSpectrumService.values
+        if (payload && payload.spectrumValues !== undefined && payload.spectrumValues !== null)
+            return payload.spectrumValues
+        return []
+    }
+    readonly property bool mediaSpectrumIdle: {
+        if (root.mediaSpectrumService && root.mediaSpectrumService.isIdle !== undefined)
+            return !!root.mediaSpectrumService.isIdle
+        return (root.mediaSpectrumValues === null || root.mediaSpectrumValues === undefined
+            || root.mediaSpectrumValues.length === undefined || root.mediaSpectrumValues.length === 0)
+    }
+    readonly property int mediaSpectrumWaveDuration: {
+        var bpm = 0
+        if (root.mediaSpectrumService && root.mediaSpectrumService.bpm !== undefined)
+            bpm = Number(root.mediaSpectrumService.bpm)
+        if (isFinite(bpm) && bpm > 0)
+            return Math.round(Math.max(240, Math.min(1200, 60000 / bpm)))
+        return MotionTokens.beatWave
+    }
     readonly property var trayMenuHandle: Logic.menuHandleFromPayload(payload)
     readonly property var trayMenuContent: trayMenu
 
@@ -340,6 +423,24 @@ Item {
         }
         if (payload && payload.mediaService && typeof payload.mediaService.next === "function") {
             payload.mediaService.next()
+            return
+        }
+    }
+
+    function handleMediaSeek(progressValue) {
+        var clamped = Math.max(0, Math.min(1, Number(progressValue)))
+        if (!isFinite(clamped))
+            return
+        if (payload && typeof payload.onSeek === "function") {
+            payload.onSeek(clamped)
+            return
+        }
+        if (payload && payload.mediaControlService && typeof payload.mediaControlService.seekToProgress === "function") {
+            payload.mediaControlService.seekToProgress(clamped)
+            return
+        }
+        if (payload && payload.mediaService && typeof payload.mediaService.setProgress === "function") {
+            payload.mediaService.setProgress(clamped)
             return
         }
     }
@@ -605,15 +706,23 @@ Item {
             }
         }
 
-        // Media content: progress plus previous / playPause / next.
+        // Media content: large cover left, title/artist plus icon transport
+        // right, draggable progress and spectrum along the bottom.
         Item {
             id: mediaContent
             objectName: "mediaContent"
             width: parent.width
-            height: 72
+            height: mediaColumn.height + 16
             visible: root.actionKind === "media"
 
-            // Settings-row card hosts the transport controls.
+            // Scrub preview while dragging so the fill tracks the pointer
+            // instead of lagging one service round-trip behind.
+            property bool scrubbing: false
+            property real scrubValue: 0
+            readonly property real effectiveProgress:
+                mediaContent.scrubbing ? mediaContent.scrubValue : root.mediaProgress
+
+            // Settings-row card hosts the whole media surface.
             Rectangle {
                 objectName: "mediaCard"
                 anchors.fill: parent
@@ -623,102 +732,263 @@ Item {
             }
             HoverHandler { id: mediaCardHover; blocking: false }
 
-            // Existing media timeline data remains visible alongside controls.
-            Text {
-                objectName: "mediaProgressText"
+            Column {
+                id: mediaColumn
+                objectName: "mediaColumn"
+                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: root.formatMediaTime(root.mediaPositionMs) + " / "
-                    + root.formatMediaTime(root.mediaLengthMs)
-                color: LazerTheme.textMuted
-                font.pixelSize: 10
-            }
-
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
+                anchors.margins: 8
                 spacing: 8
 
-                // Previous button.
-                Rectangle {
-                    id: mediaPrevButton
-                    objectName: "mediaPrevButton"
-                    width: 48
-                    height: 32
-                    radius: 6
-                    color: prevHover.hovered ? LazerTheme.hoverFill : "transparent"
+                // Top: cover art beside the track identity and transport.
+                Row {
+                    width: parent.width
+                    spacing: 10
 
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                    // Large cover art on the left; the music glyph fills in
+                    // while no usable artwork is reported.
+                    Rectangle {
+                        id: mediaCoverFrame
+                        objectName: "mediaCoverFrame"
+                        width: 104
+                        height: 104
+                        radius: 6
+                        color: LazerTheme.settingsTrack
+                        clip: true
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Prev"
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 11
-                        font.bold: true
+                        Image {
+                            id: mediaCoverImage
+                            objectName: "mediaCoverImage"
+                            anchors.fill: parent
+                            source: root.mediaArtUrl
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            visible: root.mediaArtUrl !== "" && status !== Image.Error
+                            opacity: visible ? 1 : 0
+
+                            Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                        }
+
+                        Text {
+                            objectName: "mediaCoverFallback"
+                            anchors.centerIn: parent
+                            text: "\u266B"
+                            visible: !mediaCoverImage.visible
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 32
+                        }
                     }
 
-                    HoverHandler { id: prevHover }
-                    TapHandler {
-                        objectName: "mediaPrevTap"
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.handleMediaPrevious()
+                    // Track identity above icon transport controls.
+                    Column {
+                        width: parent.width - mediaCoverFrame.width - 10
+                        height: mediaCoverFrame.height
+                        spacing: 2
+
+                        Text {
+                            objectName: "mediaTitleText"
+                            width: parent.width
+                            text: root.mediaTitle !== "" ? root.mediaTitle : "Unknown title"
+                            color: LazerTheme.textPrimary
+                            font.pixelSize: 13
+                            font.bold: true
+                            elide: Text.ElideRight
+                            maximumLineCount: 2
+                            wrapMode: Text.NoWrap
+                        }
+
+                        Text {
+                            objectName: "mediaArtistText"
+                            width: parent.width
+                            text: root.mediaArtist !== "" ? root.mediaArtist : "Unknown artist"
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            wrapMode: Text.NoWrap
+                        }
+
+                        Item { width: 1; height: 6 }
+
+                        // Icon transport buttons.
+                        Row {
+                            spacing: 4
+
+                            IconButton {
+                                id: mediaPrevButton
+                                objectName: "mediaPrevButton"
+                                implicitWidth: 32
+                                implicitHeight: 32
+                                width: 32
+                                height: 32
+                                source: Qt.resolvedUrl("../lazerbar/icons/previous.svg")
+                                accessibleName: "Previous track"
+                                onClicked: root.handleMediaPrevious()
+                            }
+
+                            IconButton {
+                                id: mediaPlayPauseButton
+                                objectName: "mediaPlayPauseButton"
+                                implicitWidth: 32
+                                implicitHeight: 32
+                                width: 32
+                                height: 32
+                                source: root.mediaPlaying
+                                    ? Qt.resolvedUrl("../lazerbar/icons/pause.svg")
+                                    : Qt.resolvedUrl("../lazerbar/icons/play.svg")
+                                accessibleName: root.mediaPlaying ? "Pause" : "Play"
+                                onClicked: root.handleMediaPlayPause()
+                            }
+
+                            IconButton {
+                                id: mediaNextButton
+                                objectName: "mediaNextButton"
+                                implicitWidth: 32
+                                implicitHeight: 32
+                                width: 32
+                                height: 32
+                                source: Qt.resolvedUrl("../lazerbar/icons/next.svg")
+                                accessibleName: "Next track"
+                                onClicked: root.handleMediaNext()
+                            }
+                        }
                     }
                 }
 
-                // Play/Pause button.
-                Rectangle {
-                    id: mediaPlayPauseButton
-                    objectName: "mediaPlayPauseButton"
-                    width: 64
-                    height: 32
-                    radius: 6
-                    color: playHover.hovered ? LazerTheme.hoverFill : "transparent"
+                // Bottom: time labels over a draggable progress bar.
+                Column {
+                    width: parent.width
+                    spacing: 4
 
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                    Item {
+                        width: parent.width
+                        height: 14
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Play"
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 11
-                        font.bold: true
+                        Text {
+                            objectName: "mediaPositionText"
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.formatMediaTime(
+                                mediaContent.scrubbing
+                                    ? mediaContent.scrubValue * root.mediaLengthMs
+                                    : root.mediaPositionMs)
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 10
+                        }
+
+                        Text {
+                            objectName: "mediaLengthText"
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.formatMediaTime(root.mediaLengthMs)
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 10
+                        }
                     }
 
-                    HoverHandler { id: playHover }
-                    TapHandler {
-                        objectName: "mediaPlayPauseTap"
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.handleMediaPlayPause()
+                    // Draggable seek bar with a generous hit area.
+                    Item {
+                        id: mediaSeekArea
+                        objectName: "mediaSeekArea"
+                        width: parent.width
+                        height: 20
+                        enabled: root.mediaCanSeek
+
+                        function seekFromX(x) {
+                            var ratio = Math.max(0, Math.min(1, Number(x) / Math.max(1, width)))
+                            if (!isFinite(ratio))
+                                return
+                            mediaContent.scrubbing = true
+                            mediaContent.scrubValue = ratio
+                        }
+
+                        Rectangle {
+                            objectName: "mediaProgressTrack"
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width
+                            height: 4
+                            radius: 2
+                            color: Qt.rgba(1, 1, 1, 0.14)
+                            clip: true
+
+                            Rectangle {
+                                objectName: "mediaProgressFill"
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: parent.width * mediaContent.effectiveProgress
+                                radius: 2
+                                color: LazerTheme.accentColor
+
+                                Behavior on width {
+                                    enabled: !MotionTokens.reducedMotion && !mediaContent.scrubbing
+                                    NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+                                }
+                            }
+                        }
+
+                        // Small thumb marks the playhead; thumb radius stays
+                        // in the 4-6px detail band of the sharp language.
+                        Rectangle {
+                            objectName: "mediaProgressThumb"
+                            width: 10
+                            height: 10
+                            radius: 5
+                            x: Math.max(0, Math.min(mediaSeekArea.width - width,
+                                mediaSeekArea.width * mediaContent.effectiveProgress - width / 2))
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: LazerTheme.settingsSliderThumb
+                            visible: root.mediaCanSeek
+                        }
+
+                        MouseArea {
+                            objectName: "mediaProgressTap"
+                            anchors.fill: parent
+                            enabled: root.mediaCanSeek
+                            hoverEnabled: true
+                            cursorShape: root.mediaCanSeek ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onPressed: mouse => mediaSeekArea.seekFromX(mouse.x)
+                            onPositionChanged: mouse => {
+                                if (pressed)
+                                    mediaSeekArea.seekFromX(mouse.x)
+                            }
+                            onReleased: mouse => {
+                                mediaSeekArea.seekFromX(mouse.x)
+                                root.handleMediaSeek(mediaContent.scrubValue)
+                                mediaContent.scrubbing = false
+                            }
+                        }
                     }
                 }
 
-                // Next button.
-                Rectangle {
-                    id: mediaNextButton
-                    objectName: "mediaNextButton"
-                    width: 48
-                    height: 32
-                    radius: 6
-                    color: nextHover.hovered ? LazerTheme.hoverFill : "transparent"
-
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Next"
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 11
-                        font.bold: true
-                    }
-
-                    HoverHandler { id: nextHover }
-                    TapHandler {
-                        objectName: "mediaNextTap"
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.handleMediaNext()
-                    }
+                // Spectrum strip closes the card while audio is present.
+                DockzoneSpectrum {
+                    id: mediaSpectrum
+                    objectName: "mediaSpectrum"
+                    width: parent.width
+                    height: visible ? 36 : 0
+                    visible: root.mediaSpectrumValues !== null
+                        && root.mediaSpectrumValues !== undefined
+                        && root.mediaSpectrumValues.length !== undefined
+                        && root.mediaSpectrumValues.length > 0
+                        && !root.mediaSpectrumIdle
+                    values: root.mediaSpectrumValues
+                    barColor: LazerTheme.lightScheme
+                        ? Qt.rgba(LazerTheme.accentColor.r, LazerTheme.accentColor.g,
+                            LazerTheme.accentColor.b, 0.58)
+                        : LazerTheme.accentColor
+                    waveColor: LazerTheme.flashWash
+                    waveStrength: LazerTheme.lightScheme ? 1.0 : 0.55
+                    waveDuration: root.mediaSpectrumWaveDuration
                 }
+            }
+
+            // Beat-driven wavefront sweeps the popup spectrum like the pill.
+            Connections {
+                target: root.mediaSpectrumService
+                ignoreUnknownSignals: true
+                function onBeat() { mediaSpectrum.triggerWave() }
             }
         }
 
