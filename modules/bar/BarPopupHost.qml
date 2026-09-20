@@ -517,8 +517,21 @@ PanelWindow {
         return _intentNumber(intentObj, "screenHeight", root.activeScreenHeight, 1)
     }
 
-    function popupHeightForIntent(intentObj) {
-        if (!intentObj)
+    // Popup width follows the intent: media carries a wide card (cover +
+    // identity + spectrum), everything else stays at the classic 260.
+    function popupWidthForIntent(intentObj) {
+        if (!intentObj || String(intentObj.kind || "") === "context")
+            return 260
+        return String(intentObj.actionKind || "") === "media" ? 420 : 260
+    }
+
+    // Slot width fits both sliding layers during an exchange so the
+    // outgoing body is never squeezed before it leaves.
+    readonly property real incomingPopupWidth: popupWidthForIntent(root.currentIntent)
+    readonly property real outgoingPopupWidth: popupWidthForIntent(root._transitionOutgoingIntent)
+    readonly property real popupSlotWidth: Math.max(root.incomingPopupWidth, root.outgoingPopupWidth)
+
+    function popupHeightForIntent(intentObj) {        if (!intentObj)
             return 1
         // Track live height even while the two-layer reveal is in flight:
         // holding a stale height here defers the correction until after
@@ -1024,8 +1037,8 @@ PanelWindow {
                 // Persistent context menus expose the header close affordance.
                 sidebarData: Item {
                     objectName: "popupIdentityTransition"
-                    width: 260
-                    implicitWidth: 260
+                    width: root.popupSlotWidth
+                    implicitWidth: root.popupSlotWidth
                     height: 48
                     implicitHeight: 48
                     clip: true
@@ -1042,7 +1055,7 @@ PanelWindow {
                         iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
                         tintIcon: root.currentIntent ? root.currentIntent.tintIcon === true : false
                         summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
-                        hostWidth: 260
+                        hostWidth: root.popupSlotWidth
                         showClose: root.currentIntent ? String(root.currentIntent.kind || "") === "context" : false
                         onCloseRequested: root.requestAnimatedClose()
                     }
@@ -1059,7 +1072,7 @@ PanelWindow {
                         iconSource: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.iconSource || "") : ""
                         tintIcon: root._transitionOutgoingIntent ? root._transitionOutgoingIntent.tintIcon === true : false
                         summary: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.summary || "") : ""
-                        hostWidth: 260
+                        hostWidth: root.popupSlotWidth
                         showClose: false
                     }
                 }
@@ -1068,8 +1081,8 @@ PanelWindow {
                 // intent contributes to the popup height and visible surface.
                 contentData: Item {
                      objectName: "popupContentSlot"
-                     width: 260
-                     implicitWidth: 260
+                     width: root.popupSlotWidth
+                     implicitWidth: root.popupSlotWidth
                      implicitHeight: root.popupHeightForIntent(root.currentIntent)
                      height: implicitHeight
                      // Visible height channel: animate toward the new content's
@@ -1087,6 +1100,7 @@ PanelWindow {
                     clip: root._transitionOutgoingIntent !== null || !root.traySubmenuOverflowActive
                      enabled: root.contentInteractive
                      onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
+                     onImplicitWidthChanged: root.updateTargetGeometry(root.currentIntent)
 
                     // Settings section-block surface under the action rows; the
                     // darker cards float on it exactly like the settings panel.
