@@ -36,8 +36,6 @@ Item {
 
         function isScreenshotRed(c) { return c.r > 0.9 && c.g < 0.1 && c.b < 0.1 }
         function isWallpaperBlue(c) { return c.b > 0.9 && c.r < 0.1 && c.g < 0.1 }
-        // Mid-rise the body is translucent, so only blue-dominance holds.
-        function isBluish(c) { return c.b > c.r && c.b > c.g }
 
         // Pixels that are neither screenshot-red nor wallpaper-blue carry
         // wave bands; their count measures how much band is on screen.
@@ -70,9 +68,11 @@ Item {
             // Bands at rest wash the frame; the open frame stays screenshot.
             var wash = setStage(1, 0)
             compare(wash.pixel(160, 10), "#75293f", "pink wash at rest")
-            // Body rises over the wash, then settles clean.
+            // Body fades in over the wash, then settles clean.
             var covering = setStage(1, 0.5)
-            verify(isBluish(covering.pixel(160, 230)), "body covers from the bottom")
+            var coveringBottom = covering.pixel(160, 230)
+            verify(!isScreenshotRed(coveringBottom) && !isWallpaperBlue(coveringBottom),
+                "body blends over the wash")
             var settled = setStage(1, 1)
             compare(bandArea(settled), 0, "no bands left at rest")
             var open = setStage(0, 0)

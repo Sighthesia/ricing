@@ -40,15 +40,14 @@ Item {
         palette: Lazer.LazerTheme.wavePalette
     }
 
-    // Wallpaper body: slides up and fades exactly like the launcher body,
-    // covering the bands at rest. No mask chain — direct scene drawing, so
-    // the bands keep full ownership of the sweep.
+    // Wallpaper body: pinned fullscreen, fades in over the bands while they
+    // sweep (the launcher body also slides, but a photo body must not travel).
+    // At rest the opaque wallpaper covers the bands exactly like the panel
+    // covers them. No mask chain — direct scene drawing, so the bands keep
+    // full ownership of the sweep.
     Image {
         id: wallpaperBody
-        width: parent.width
-        height: parent.height
-        x: 0
-        y: parent.height * (1 - root.bodyProgress)
+        anchors.fill: parent
         opacity: root.bodyProgress
         source: root.wallpaperSource
         fillMode: Image.PreserveAspectCrop
