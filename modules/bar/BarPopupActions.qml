@@ -780,7 +780,8 @@ Item {
                         }
                     }
 
-                    // Track identity above icon transport controls.
+                    // Track identity beside the cover; transport controls
+                    // live in the bottom row under the progress bar.
                     Column {
                         width: parent.width - mediaCoverFrame.width - 10
                         height: mediaCoverFrame.height
@@ -808,161 +809,10 @@ Item {
                             maximumLineCount: 1
                             wrapMode: Text.NoWrap
                         }
-
-                        Item { width: 1; height: 6 }
-
-                        // Icon transport buttons.
-                        Row {
-                            spacing: 4
-
-                            IconButton {
-                                id: mediaPrevButton
-                                objectName: "mediaPrevButton"
-                                implicitWidth: 32
-                                implicitHeight: 32
-                                width: 32
-                                height: 32
-                                source: Qt.resolvedUrl("../lazerbar/icons/previous.svg")
-                                accessibleName: "Previous track"
-                                onClicked: root.handleMediaPrevious()
-                            }
-
-                            IconButton {
-                                id: mediaPlayPauseButton
-                                objectName: "mediaPlayPauseButton"
-                                implicitWidth: 32
-                                implicitHeight: 32
-                                width: 32
-                                height: 32
-                                source: root.mediaPlaying
-                                    ? Qt.resolvedUrl("../lazerbar/icons/pause.svg")
-                                    : Qt.resolvedUrl("../lazerbar/icons/play.svg")
-                                accessibleName: root.mediaPlaying ? "Pause" : "Play"
-                                onClicked: root.handleMediaPlayPause()
-                            }
-
-                            IconButton {
-                                id: mediaNextButton
-                                objectName: "mediaNextButton"
-                                implicitWidth: 32
-                                implicitHeight: 32
-                                width: 32
-                                height: 32
-                                source: Qt.resolvedUrl("../lazerbar/icons/next.svg")
-                                accessibleName: "Next track"
-                                onClicked: root.handleMediaNext()
-                            }
-                        }
                     }
                 }
 
-                // Bottom: time labels over a draggable progress bar.
-                Column {
-                    width: parent.width
-                    spacing: 4
-
-                    Item {
-                        width: parent.width
-                        height: 14
-
-                        Text {
-                            objectName: "mediaPositionText"
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: root.formatMediaTime(
-                                mediaContent.scrubbing
-                                    ? mediaContent.scrubValue * root.mediaLengthMs
-                                    : root.mediaPositionMs)
-                            color: LazerTheme.textMuted
-                            font.pixelSize: 10
-                        }
-
-                        Text {
-                            objectName: "mediaLengthText"
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: root.formatMediaTime(root.mediaLengthMs)
-                            color: LazerTheme.textMuted
-                            font.pixelSize: 10
-                        }
-                    }
-
-                    // Draggable seek bar with a generous hit area.
-                    Item {
-                        id: mediaSeekArea
-                        objectName: "mediaSeekArea"
-                        width: parent.width
-                        height: 20
-                        enabled: root.mediaCanSeek
-
-                        function seekFromX(x) {
-                            var ratio = Math.max(0, Math.min(1, Number(x) / Math.max(1, width)))
-                            if (!isFinite(ratio))
-                                return
-                            mediaContent.scrubbing = true
-                            mediaContent.scrubValue = ratio
-                        }
-
-                        Rectangle {
-                            objectName: "mediaProgressTrack"
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width
-                            height: 4
-                            radius: 2
-                            color: Qt.rgba(1, 1, 1, 0.14)
-                            clip: true
-
-                            Rectangle {
-                                objectName: "mediaProgressFill"
-                                anchors.left: parent.left
-                                anchors.top: parent.top
-                                anchors.bottom: parent.bottom
-                                width: parent.width * mediaContent.effectiveProgress
-                                radius: 2
-                                color: LazerTheme.accentColor
-
-                                Behavior on width {
-                                    enabled: !MotionTokens.reducedMotion && !mediaContent.scrubbing
-                                    NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
-                                }
-                            }
-                        }
-
-                        // Small thumb marks the playhead; thumb radius stays
-                        // in the 4-6px detail band of the sharp language.
-                        Rectangle {
-                            objectName: "mediaProgressThumb"
-                            width: 10
-                            height: 10
-                            radius: 5
-                            x: Math.max(0, Math.min(mediaSeekArea.width - width,
-                                mediaSeekArea.width * mediaContent.effectiveProgress - width / 2))
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: LazerTheme.settingsSliderThumb
-                            visible: root.mediaCanSeek
-                        }
-
-                        MouseArea {
-                            objectName: "mediaProgressTap"
-                            anchors.fill: parent
-                            enabled: root.mediaCanSeek
-                            hoverEnabled: true
-                            cursorShape: root.mediaCanSeek ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onPressed: mouse => mediaSeekArea.seekFromX(mouse.x)
-                            onPositionChanged: mouse => {
-                                if (pressed)
-                                    mediaSeekArea.seekFromX(mouse.x)
-                            }
-                            onReleased: mouse => {
-                                mediaSeekArea.seekFromX(mouse.x)
-                                root.handleMediaSeek(mediaContent.scrubValue)
-                                mediaContent.scrubbing = false
-                            }
-                        }
-                    }
-                }
-
-                // Spectrum strip closes the card while audio is present.
+                // Spectrum sits above the progress bar while audio is present.
                 DockzoneSpectrum {
                     id: mediaSpectrum
                     objectName: "mediaSpectrum"
@@ -981,6 +831,151 @@ Item {
                     waveColor: LazerTheme.flashWash
                     waveStrength: LazerTheme.lightScheme ? 1.0 : 0.55
                     waveDuration: root.mediaSpectrumWaveDuration
+                }
+
+                // Draggable seek bar with a generous hit area.
+                Item {
+                    id: mediaSeekArea
+                    objectName: "mediaSeekArea"
+                    width: parent.width
+                    height: 20
+                    enabled: root.mediaCanSeek
+
+                    function seekFromX(x) {
+                        var ratio = Math.max(0, Math.min(1, Number(x) / Math.max(1, width)))
+                        if (!isFinite(ratio))
+                            return
+                        mediaContent.scrubbing = true
+                        mediaContent.scrubValue = ratio
+                    }
+
+                    Rectangle {
+                        objectName: "mediaProgressTrack"
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width
+                        height: 4
+                        radius: 2
+                        color: Qt.rgba(1, 1, 1, 0.14)
+                        clip: true
+
+                        Rectangle {
+                            objectName: "mediaProgressFill"
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: parent.width * mediaContent.effectiveProgress
+                            radius: 2
+                            color: LazerTheme.accentColor
+
+                            Behavior on width {
+                                enabled: !MotionTokens.reducedMotion && !mediaContent.scrubbing
+                                NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuad }
+                            }
+                        }
+                    }
+
+                    // Small thumb marks the playhead; thumb radius stays
+                    // in the 4-6px detail band of the sharp language.
+                    Rectangle {
+                        objectName: "mediaProgressThumb"
+                        width: 10
+                        height: 10
+                        radius: 5
+                        x: Math.max(0, Math.min(mediaSeekArea.width - width,
+                            mediaSeekArea.width * mediaContent.effectiveProgress - width / 2))
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: LazerTheme.settingsSliderThumb
+                        visible: root.mediaCanSeek
+                    }
+
+                    MouseArea {
+                        objectName: "mediaProgressTap"
+                        anchors.fill: parent
+                        enabled: root.mediaCanSeek
+                        hoverEnabled: true
+                        cursorShape: root.mediaCanSeek ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onPressed: mouse => mediaSeekArea.seekFromX(mouse.x)
+                        onPositionChanged: mouse => {
+                            if (pressed)
+                                mediaSeekArea.seekFromX(mouse.x)
+                        }
+                        onReleased: mouse => {
+                            mediaSeekArea.seekFromX(mouse.x)
+                            root.handleMediaSeek(mediaContent.scrubValue)
+                            mediaContent.scrubbing = false
+                        }
+                    }
+                }
+
+                // Bottom row: current/total time with icon transport between.
+                Item {
+                    width: parent.width
+                    height: 32
+
+                    Text {
+                        objectName: "mediaPositionText"
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.formatMediaTime(
+                            mediaContent.scrubbing
+                                ? mediaContent.scrubValue * root.mediaLengthMs
+                                : root.mediaPositionMs)
+                        color: LazerTheme.textMuted
+                        font.pixelSize: 10
+                    }
+
+                    Text {
+                        objectName: "mediaLengthText"
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.formatMediaTime(root.mediaLengthMs)
+                        color: LazerTheme.textMuted
+                        font.pixelSize: 10
+                    }
+
+                    // Icon transport buttons.
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 4
+
+                        IconButton {
+                            id: mediaPrevButton
+                            objectName: "mediaPrevButton"
+                            implicitWidth: 32
+                            implicitHeight: 32
+                            width: 32
+                            height: 32
+                            source: Qt.resolvedUrl("../lazerbar/icons/previous.svg")
+                            accessibleName: "Previous track"
+                            onClicked: root.handleMediaPrevious()
+                        }
+
+                        IconButton {
+                            id: mediaPlayPauseButton
+                            objectName: "mediaPlayPauseButton"
+                            implicitWidth: 32
+                            implicitHeight: 32
+                            width: 32
+                            height: 32
+                            source: root.mediaPlaying
+                                ? Qt.resolvedUrl("../lazerbar/icons/pause.svg")
+                                : Qt.resolvedUrl("../lazerbar/icons/play.svg")
+                            accessibleName: root.mediaPlaying ? "Pause" : "Play"
+                            onClicked: root.handleMediaPlayPause()
+                        }
+
+                        IconButton {
+                            id: mediaNextButton
+                            objectName: "mediaNextButton"
+                            implicitWidth: 32
+                            implicitHeight: 32
+                            width: 32
+                            height: 32
+                            source: Qt.resolvedUrl("../lazerbar/icons/next.svg")
+                            accessibleName: "Next track"
+                            onClicked: root.handleMediaNext()
+                        }
+                    }
                 }
             }
 
