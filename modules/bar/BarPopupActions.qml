@@ -11,7 +11,7 @@ Item {
     property var payload: null
     signal dismissRequested()
 
-    implicitWidth: root.actionKind === "media" ? 320 : 260
+    implicitWidth: root.actionKind === "media" ? 360 : 260
     implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
     width: implicitWidth
     height: implicitHeight
