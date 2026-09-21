@@ -34,10 +34,12 @@ QtObject {
     }
 
     function commandFor(wallpaperPath, outputPath, mode, scheme) {
-        const modeFlag = mode === "dark" ? " --dark" : mode === "light" ? " --light" : ""
+        // colors.json 始终写双模式：opencode/herdr 等双变体模板需要同时
+        // 引用 dark/light，单模式回退只能复制当前值。双模式额外开销仅为
+        // 一次 generate_theme，明暗翻转无需重新提取。
         const scriptPath = Quickshell.shellDir + "/scripts/theming/template-processor.py"
         return 'mkdir -p "' + Quickshell.cacheDir + '" && python3 "' + scriptPath
-                + '" "' + wallpaperPath + '"' + modeFlag
+                + '" "' + wallpaperPath + '" --both'
                 + ' --scheme-type ' + (scheme || requestedScheme)
                 + ' -o "' + outputPath + '"'
     }

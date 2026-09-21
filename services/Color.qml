@@ -135,7 +135,7 @@ QtObject {
     }
 
     // Automatic sunrise/sunset and OS-scheme flips repaint without re-extraction:
-    // colors.json already carries both palettes in auto mode.
+    // colors.json always carries both palettes.
     property Connections _effectiveConnection: Connections {
         target: Services.SettingsService
         function onEffectiveColorSchemeChanged() { root.applyColors() }
