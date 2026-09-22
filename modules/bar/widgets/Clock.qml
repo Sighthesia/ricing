@@ -1,5 +1,4 @@
 import QtQuick
-import ".."
 import "../../lazerbar"
 import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 
@@ -7,15 +6,23 @@ import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 // line uses the pre-lazer rolling-digit strips so digits flip on change;
 // the date line stays static text. RollingClockTime resolves as a sibling
 // member of Afloat.BarWidgets (see qmldir): no self directory import, which
-// quickshell's module interceptor cannot serve deterministically.
+// quickshell's module interceptor cannot serve deterministically. Hover
+// publishes a calendar intent to the shared popup host (live HH:MM:SS plus
+// month grid).
 Item {
     id: root
+
+    // Hover intent publication for the shared popup host.
+    signal popupRequested(var intent)
+    signal popupCloseRequested()
+    signal popupAnchorUpdate(var intent)
 
     // Widget identity contract filled by the layout loader.
     property string widgetId: ""
     property string instanceKey: ""
     property string section: ""
     property string screenName: ""
+    readonly property bool hovered: clockHover.hovered
 
     readonly property var defaults: WidgetSettingsRegistry.defaults("clock")
     readonly property bool showDate: defaults.showDate !== false
@@ -37,6 +44,26 @@ Item {
     readonly property bool useRollingDigits: root.timeFormat === "HH:mm" || root.timeFormat === "hh:mm"
         || root.timeFormat === "HH:mm:ss" || root.timeFormat === "hh:mm:ss"
     readonly property bool showSeconds: root.timeFormat.indexOf("s") >= 0
+
+    function buildHoverIntent() {
+        var centerX = 0
+        try { centerX = root.mapToGlobal(root.width / 2, root.height / 2).x } catch (e) {
+            try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
+        }
+        if (!isFinite(centerX)) centerX = 0
+        return {
+            widgetId: root.widgetId,
+            instanceKey: root.instanceKey,
+            screenName: root.screenName,
+            title: "Calendar",
+            iconSource: Qt.resolvedUrl("../../lazerbar/icons/clock.svg"),
+            tintIcon: true,
+            summary: root.dateText,
+            actionKind: "clock",
+            anchorX: centerX,
+            payload: null
+        }
+    }
 
     implicitWidth: Math.max(timeSlotWidth, showDate ? dateTextWidth : 0) + 8
     implicitHeight: LazerTheme.barWidgetHeight
@@ -100,5 +127,18 @@ Item {
             font.pixelSize: 10
         }
     }
+
+    // Passive hover observation; HoverHandler never consumes pointer input.
+    HoverHandler {
+        id: clockHover
+        onHoveredChanged: {
+            if (hovered) popupRequested(buildHoverIntent())
+            else popupCloseRequested()
+        }
+    }
+
+    // Update anchor while the bar layout moves.
+    onXChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
+    onWidthChanged: if (hovered) popupAnchorUpdate(buildHoverIntent())
 
 }

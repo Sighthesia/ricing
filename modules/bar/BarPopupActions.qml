@@ -1,8 +1,9 @@
 import QtQuick
 import "../lazerbar"
+import "widgets" as ClockWidgets
 import "./BarTrayMenuLogic.js" as Logic
 
-// Content body for volume, brightness, media, notifications and tray.
+// Content body for volume, brightness, media, notifications, tray and clock.
 // Bound via BarPopupHost contentData; intent actionKind/payload drive visible kind.
 Item {
     id: root
@@ -697,6 +698,27 @@ Item {
                 label: "Brightness"
                 showMute: false
                 onValueCommitted: function(v) { root.handleBrightnessValue(v) }
+            }
+        }
+
+        // Clock content: live rolling HH:MM:SS plus the month calendar.
+        // The card ticks on its own timer; reset the viewed month on open
+        // so every hover starts at today like the old popup did.
+        Item {
+            id: clockContent
+            objectName: "clockContent"
+            width: parent.width
+            height: clockPopup.height
+            visible: root.actionKind === "clock"
+            onVisibleChanged: {
+                if (visible)
+                    clockPopup.resetView()
+            }
+
+            ClockWidgets.ClockPopupContent {
+                id: clockPopup
+                objectName: "clockPopup"
+                width: parent.width
             }
         }
 
@@ -1541,7 +1563,7 @@ Item {
             height: 32
             radius: 6
             color: LazerTheme.settingsCard
-            visible: root.actionKind !== "volume" && root.actionKind !== "brightness" && root.actionKind !== "media" && root.actionKind !== "notifications" && root.actionKind !== "tray" && root.actionKind !== "battery" && root.actionKind !== "bluetooth" && root.actionKind !== "network" && root.actionKind !== ""
+            visible: root.actionKind !== "volume" && root.actionKind !== "brightness" && root.actionKind !== "media" && root.actionKind !== "notifications" && root.actionKind !== "tray" && root.actionKind !== "battery" && root.actionKind !== "bluetooth" && root.actionKind !== "network" && root.actionKind !== "clock" && root.actionKind !== ""
 
             Text {
                 anchors.centerIn: parent

@@ -26,6 +26,8 @@ Item {
 
     width: digitWidth
     height: digitHeight
+    implicitWidth: digitWidth
+    implicitHeight: digitHeight
     clip: true
 
     // Measure the widest digit so the strip never reflows mid-roll.
