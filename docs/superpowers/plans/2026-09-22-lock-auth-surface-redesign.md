@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the lock screen's floating, fading password card with a compact authentication surface centered on a single password input slot.
+**Goal:** Replace the lock screen's floating password card with a time-led lock screen whose bottom lock button morphs in place into a password field on interaction.
 
-**Architecture:** Keep `LockSurface.qml` as the owner of authentication layout, keyboard focus, and lock lifecycle. Remove the visual card semantics from the outer authentication container, retain a small themed input slot as the primary surface, and animate the authentication content with a short positional reveal instead of a full-card opacity reveal. Background wave animation, PAM context, and release ownership remain unchanged.
+**Architecture:** Keep `LockSurface.qml` as the owner of the clock, lock button, authentication mode, keyboard focus, and lock lifecycle. Reuse `RollingClockTime`, `OsuTextField`, `OsuTextCaret`, and the existing lock SVG. The default state shows only time/date and a lock button; the same bottom rounded rectangle morphs into the password field after a click or first key event. Background wave animation, PAM context, and release ownership remain unchanged.
 
 **Tech Stack:** QtQuick/QML, Quickshell Wayland session lock, existing `LazerTheme` and `MotionTokens`, Qt6 `qmllint`, Qt6 `qmltestrunner`.
 
@@ -12,8 +12,11 @@
 
 - Do not change password input, keyboard focus, PAM verification, failure handling, unlock timing, background wave, screenshot, wallpaper reveal, or multi-screen ownership behavior.
 - Do not add a second animation timing system; use `MotionTokens` and `MotionTokens.reducedMotion`.
-- The outer authentication area must not render as an independent full card or complete border.
-- The password input slot remains the main visible surface and may retain a restrained internal radius.
+- Default state must show no password-related text, including title, placeholder text, operation hint, verification text, or error text.
+- The bottom control is one complete rounded rectangle in both lock-button and input states.
+- The empty password field uses a rounded rectangular placeholder thicker than the caret, not text.
+- Time and date are visible above the control; hours/minutes reuse `RollingClockTime.qml`.
+- Input editing must reuse `OsuTextField.qml` and `OsuTextCaret.qml`, including falling deletion ghosts.
 - Use `Services.SettingsService.effectiveColorScheme` for light/dark selection and preserve readable fallback colors.
 - Add the required descriptive comment immediately before every major new or changed QML element declaration.
 - Run the relevant QML test and `qmllint` after every QML change.
@@ -21,15 +24,16 @@
 
 ---
 
-### Task 1: Lock Authentication Surface Geometry
+### Task 1: Lock Time And Authentication Surface
 
 **Files:**
-- Modify: `modules/lock/LockSurface.qml:145-265`
+- Modify: `modules/lock/LockSurface.qml`
+- Reuse: `modules/bar/widgets/RollingClockTime.qml`, `modules/lazerbar/OsuTextField.qml`, `modules/lazerbar/OsuTextCaret.qml`, `modules/lazerbar/icons/lock.svg`
 - Test: `tests/qml/tst_lock_surface_logic.qml`
 
 **Interfaces:**
-- Consumes the existing `root.lockContext`, `root.lightScheme`, `LazerTheme`, `MotionTokens`, and `SurfaceLogic` values.
-- Produces the same keyboard and `LockContext` behavior while changing only the authentication area's visual hierarchy.
+- Consumes the existing `root.lockContext`, `root.lightScheme`, `LazerTheme`, `MotionTokens`, and `SurfaceLogic` values plus the reusable clock and text field components.
+- Produces default clock/date/lock-button state, click/first-key activation, password editing feedback, and the same `LockContext` behavior.
 
 - [ ] **Step 1: Record the existing behavioral baseline**
 
@@ -42,70 +46,78 @@ QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner \
 
 Expected: `Totals: 26 passed, 0 failed` or the current passing total if the test file has changed independently.
 
-- [ ] **Step 2: Replace the outer card role with a transparent layout host**
+- [ ] **Step 2: Add the default time/date composition**
 
-In `LockSurface.qml`, retain the centered authentication item's width and stable height contract, but remove its complete card appearance:
-
-```qml
-// Position authentication content without introducing a floating dialog frame.
-Item {
-    id: authSurface
-    anchors.centerIn: parent
-    anchors.verticalCenterOffset: authRevealOffset
-    width: Math.min(parent.width * 0.82, 420)
-    height: Math.min(parent.height * 0.48, 260)
-    z: 3
-    opacity: authRevealOpacity
-}
-```
-
-The host must not have a `color`, `border.color`, or `border.width` binding. Preserve the host's stable geometry so content changes do not affect the lock surface layout.
-
-- [ ] **Step 3: Add reduced-motion-aware authentication reveal values**
-
-Add root-level readonly values near the existing lock-surface properties. They must use the existing wave progress as the reveal completion signal and settle immediately when reduced motion is active:
+Add a clock region in the upper-center area. Drive it with a one-second `Timer`, use `RollingClockTime` with the existing clock flip durations, and place a date `Text` below it. Do not add labels or password-related text.
 
 ```qml
-readonly property real authRevealProgress: reducedMotion
-        ? 1 : Math.max(0, Math.min(1, backdrop.maskProgress))
-readonly property real authRevealOffset: (1 - authRevealProgress) * 10
-readonly property real authRevealOpacity: 0.94 + authRevealProgress * 0.06
-```
-
-Do not introduce a new timer or animation. This keeps authentication reveal synchronized with the already existing backdrop reveal and avoids a second lifecycle owner.
-
-- [ ] **Step 4: Make the input slot the primary visual surface**
-
-Keep `maskSlot` as the only substantial rectangle in the authentication area. Preserve its fixed `44px` height, light/dark readability, `settingsControlRadius`, masked text, empty-state text, and existing `lockContext` bindings.
-
-Use the existing pink accent as a short indicator rather than a full-width card edge:
-
-```qml
-// Mark the authentication state without outlining a floating card.
-Rectangle {
+// Keep the primary time readout above the interaction control.
+Column {
+    id: lockTime
     anchors.horizontalCenter: parent.horizontalCenter
-    anchors.bottom: maskSlot.top
-    anchors.bottomMargin: 10
-    width: 44
-    height: 3
-    color: Lazer.LazerTheme.osuPink
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.verticalCenterOffset: -parent.height * 0.18
+    spacing: 8
+
+    RollingClockTime {
+        currentTime: root.now
+        digitPixelSize: 48
+        showSeconds: false
+        digitColor: root.lightScheme ? "#211F24" : Lazer.LazerTheme.textPrimary
+        separatorColor: digitColor
+        hourTransitionDuration: Lazer.MotionTokens.clockHourFlip
+        minuteTransitionDuration: Lazer.MotionTokens.clockMinuteFlip
+        transitionEasing: Lazer.MotionTokens.clockFlipEasing
+    }
+
+    Text {
+        text: Qt.formatDate(root.now, "yyyy.MM.dd")
+        color: root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted
+        font.pixelSize: 16
+    }
 }
 ```
 
-Place the indicator outside the input slot's hit area and keep it static in shape. It must not be a new input catcher.
+The time region is informational and must not receive pointer input.
 
-- [ ] **Step 5: Rebalance the content hierarchy without changing state bindings**
+- [ ] **Step 3: Add click/keyboard authentication mode**
 
-Keep the existing `PASSWORD`, status, and instruction texts, but position them around the input slot so the slot reads first. The `Column` may continue to own the layout; reduce the visual prominence of the instruction line and keep the status line reserved in the existing stable content area where possible.
+Add a boolean `inputMode` and one `enterInputMode()` function. The function must be idempotent, force the reusable password field focus, and never alter PAM state. A `TapHandler` on the bottom control calls it. The existing keyboard handler must call it before processing any printable key, Backspace, or Enter event.
+
+```qml
+property bool inputMode: false
+
+function enterInputMode() {
+    if (!inputMode)
+        inputMode = true
+    passwordField.forceActiveFocus()
+}
+```
+
+Do not create a second lifecycle owner for input. The same bottom surface remains mounted in both modes.
+
+- [ ] **Step 4: Build the bottom lock button and in-place input morph**
+
+Create one bottom-centered rounded rectangle with a stable height. In default mode it shows only `icons/lock.svg`; in input mode it expands in place and contains `OsuTextField`. Do not display any text labels or error/status messages.
+
+Use a single surface with a width binding driven by `inputMode` and a `Behavior` using `MotionTokens.medium`; reduced motion must settle immediately. The password field must use `echoMode: TextInput.Password`, bind to `lockContext.currentText`, and submit through the existing `lockContext.submit()` path.
+
+The empty-state placeholder is a rounded rectangle thicker than `OsuTextCaret`, for example `width: 12`, `height: 6`, `radius: 3`, and must be visible only when the password is empty and the field is focused.
+
+The button and field share the same hit area. The SVG should be tinted from the current theme rather than assuming white.
+
+- [ ] **Step 5: Reuse launcher editing feedback without changing auth bindings**
+
+Use the existing `OsuTextField` so its `OsuTextCaret` and `textdiff.js` deletion ghosts are reused directly. Bind the field to the lock context through the current text-change path, suppressing only programmatic synchronization where needed. Keep all authentication behavior in `LockContext`.
 
 Do not alter these expressions:
 
 ```qml
-SurfaceLogic.maskedPassword(root.lockContext ? root.lockContext.currentText : "")
-SurfaceLogic.authStatus(...)
 root.lockContext.submit()
 root.lockContext.currentText
 ```
+
+No `PASSWORD`, `Enter password`, `Type the password`, `Verifying...`, or error text may remain in the visual tree.
 
 - [ ] **Step 6: Run static and behavioral verification**
 
@@ -126,14 +138,14 @@ git add modules/lock/LockSurface.qml
 git commit -m "refactor(lock): simplify authentication surface"
 ```
 
-### Task 2: Verify Visual and Lifecycle Regressions
+### Task 2: Verify Time, Input Mode, And Lifecycle Regressions
 
 **Files:**
 - Modify: none unless verification exposes a regression
 - Test: `tests/qml/tst_lock_surface_logic.qml`, `tests/qml/tst_lock_backdrop.qml`, `tests/qml/tst_lock_controller_logic.qml`
 
 **Interfaces:**
-- Verifies the unchanged `LockSurfaceLogic`, `LockBackdrop`, and `LockController` contracts after the visual-only edit.
+- Verifies clock/input-mode visual contracts plus unchanged `LockSurfaceLogic`, `LockBackdrop`, and `LockController` behavior.
 - Produces a final validation record for the approved design.
 
 - [ ] **Step 1: Run the complete lock logic test set**
