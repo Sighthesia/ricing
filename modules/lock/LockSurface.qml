@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../lazerbar" as Lazer
+import "../../services" as Services
 import "./LockLogic.js" as LockLogic
 import "./LockSurfaceLogic.js" as SurfaceLogic
 
@@ -19,20 +20,27 @@ WlSessionLockSurface {
     readonly property string snapshotUrl: snapshot && screenIndex >= 0
             ? snapshot.snapshotUrlFor(screenIndex) : ""
     property string wallpaperPath: ""
-    // Dual progress mirroring the launcher host: bands sweep first, the
-    // wallpaper body follows and covers them at rest.
-    property real bandsProgress: 0
-    property real bodyProgress: 0
+    // Single reveal driver; the backdrop derives the trailing mask from it
+    // so bands and wallpaper edge always move as one curtain.
+    property real waveProgress: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
     property bool releaseSent: false
     property int revealWaitTicks: 0
+    // Read the effective mode directly here. The lock surface can be created
+    // before the shared theme palette has finished applying its new scheme.
+    readonly property bool lightScheme: Services.SettingsService.effectiveColorScheme === "light"
+    // Keep authentication reveal synchronized with the established backdrop
+    // curtain while reduced motion settles it at its final state.
+    readonly property real authRevealProgress: reducedMotion
+            ? 1 : Math.max(0, Math.min(1, backdrop.maskProgress))
+    readonly property real authRevealOffset: (1 - authRevealProgress) * 10
+    readonly property real authRevealOpacity: 0.94 + authRevealProgress * 0.06
 
     signal releaseRequested()
 
     // The surface starts opaque with the pre-lock screenshot: the desktop
-    // appears uninterrupted until the bands sweep and the wallpaper body
-    // slides up over them.
+    // appears uninterrupted until the bands sweep and unveil the wallpaper.
     color: "transparent"
 
     function startReveal(): void {
@@ -50,7 +58,7 @@ WlSessionLockSurface {
     function startExit(): void {
         // PROBE-EXIT: temporary unlock-path timing probe, remove after diagnosis.
         console.log("[afloat:lock-exit-probe] startExit t=" + Date.now()
-            + " bands=" + bandsProgress + " body=" + bodyProgress + " exitStarted=" + exitStarted
+            + " waveProgress=" + waveProgress + " exitStarted=" + exitStarted
             + " reducedMotion=" + reducedMotion)
         if (exitStarted)
             return
@@ -61,10 +69,8 @@ WlSessionLockSurface {
             return
         }
         SurfaceLogic.stopAll(allAnimations())
-        exitBody.from = bodyProgress
-        exitBands.from = bandsProgress
-        exitBody.start()
-        exitBands.start()
+        exitAnimation.from = waveProgress
+        exitAnimation.start()
     }
 
     function requestRelease(): void {
@@ -75,7 +81,7 @@ WlSessionLockSurface {
     }
 
     function allAnimations(): var {
-        return [enterBands, enterBody, exitBands, exitBody]
+        return [enterAnimation, exitAnimation]
     }
 
     onLockContextChanged: {
@@ -93,8 +99,7 @@ WlSessionLockSurface {
         anchors.fill: parent
         snapshotSource: root.snapshotUrl
         wallpaperSource: root.wallpaperPath
-        bandsProgress: root.bandsProgress
-        bodyProgress: root.bodyProgress
+        progress: root.waveProgress
     }
 
     // Keep the screenshot visible for at least one settled frame before the
@@ -112,16 +117,14 @@ WlSessionLockSurface {
                 restart()
                 return
             }
-            // Retarget from the live values so a re-reveal never jumps.
-            enterBands.from = root.bandsProgress
-            enterBody.from = root.bodyProgress
-            enterBands.start()
-            enterBody.start()
+            // Retarget from the live value so a re-reveal never jumps.
+            enterAnimation.from = root.waveProgress
+            enterAnimation.start()
         }
     }
 
-    // Keep keyboard ownership independent of the animated auth card. The
-    // session-lock surface must accept password input even while the card is
+    // Keep keyboard ownership independent of the animated auth content. The
+    // session-lock surface must accept password input even while the content is
     // still fading in or when the background image is unavailable.
     Item {
         id: keyboardOwner
@@ -145,18 +148,15 @@ WlSessionLockSurface {
         }
     }
 
-    // Keep authentication content rectangular and above the reveal layers.
-    // The card rides the wallpaper body: it rises and fades with the same
-    // progress instead of appearing after the reveal lands.
-    Rectangle {
+    // Position authentication content without introducing a floating dialog frame.
+    Item {
         id: authSurface
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: (1 - root.bodyProgress) * 28
+        anchors.verticalCenterOffset: root.authRevealOffset
         width: Math.min(parent.width * 0.82, 420)
         height: Math.min(parent.height * 0.48, 260)
-        color: Lazer.LazerTheme.settingsPanel
-        opacity: root.bodyProgress
         z: 3
+        opacity: root.authRevealOpacity
 
         // Mirror the shared password conversation: masked input plus an
         // outcome line, driven entirely by LockContext state.
@@ -170,36 +170,62 @@ WlSessionLockSurface {
             Text {
                 width: parent.width
                 text: "PASSWORD"
-                color: Lazer.LazerTheme.textMuted
+                color: root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted
                 font.pixelSize: 11
                 font.letterSpacing: 2
             }
 
-            // Hold the masked line at a fixed height so the layout never
-            // jumps between empty and filled buffers.
+            // Reserve a short state marker above the input slot rather than
+            // outlining the authentication area as a floating card.
             Item {
+                width: parent.width
+                height: 3
+
+                // Keep the marker outside the password slot's hit area.
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: parent.bottom
+                    width: 44
+                    height: 3
+                    color: Lazer.LazerTheme.osuPink
+                }
+            }
+
+            // Hold the masked line at a fixed height so the layout never
+            // jumps between empty and filled buffers. Inset control surface
+            // keeps the input slot legible on the lifted section.
+            Rectangle {
                 id: maskSlot
                 width: parent.width
-                height: 30
+                height: 44
+                color: root.lightScheme ? "#FFFFFF" : Lazer.LazerTheme.settingsControlSurface
+                radius: Lazer.LazerTheme.settingsControlRadius
+                Behavior on color { ColorAnimation { duration: Lazer.MotionTokens.fast } }
 
                 // Render bullets only; the password never becomes visible.
+                // barIcon tracks the scheme in fallback and adapted modes,
+                // while textPrimary stays white in the adaptation opt-out.
                 Text {
                     id: maskText
+                    anchors.left: parent.left
+                    anchors.leftMargin: 12
                     anchors.verticalCenter: parent.verticalCenter
                     text: SurfaceLogic.maskedPassword(
                               root.lockContext ? root.lockContext.currentText : "")
                     visible: text.length > 0
-                    color: Lazer.LazerTheme.textPrimary
+                    color: root.lightScheme ? "#211F24" : Lazer.LazerTheme.textPrimary
                     font.pixelSize: 20
                     font.letterSpacing: 4
                 }
 
                 // Keep an empty buffer visibly alive instead of a blank slot.
                 Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 12
                     anchors.verticalCenter: parent.verticalCenter
                     visible: maskText.text.length === 0
                     text: "Enter password"
-                    color: Lazer.LazerTheme.textMuted
+                    color: root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted
                     font.pixelSize: 15
                     font.italic: true
                 }
@@ -220,7 +246,8 @@ WlSessionLockSurface {
                            root.lockContext ? root.lockContext.showFailure : false,
                            root.lockContext ? root.lockContext.errorMessage : "").tone
                        === SurfaceLogic.authTones.failure
-                       ? Lazer.LazerTheme.osuPink : Lazer.LazerTheme.textMuted
+                       ? Lazer.LazerTheme.osuPink
+                       : (root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted)
                 font.pixelSize: 13
                 wrapMode: Text.WordWrap
             }
@@ -229,7 +256,7 @@ WlSessionLockSurface {
             Text {
                 width: parent.width
                 text: "Type the password, press Enter to unlock"
-                color: Lazer.LazerTheme.textMuted
+                color: root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted
                 font.pixelSize: 11
                 opacity: 0.8
             }
@@ -237,52 +264,34 @@ WlSessionLockSurface {
     }
 
     // Keep release ownership in the animation completion path.
-    // Enter mirrors the launcher host: bands and body start together, bands
-    // lead (600ms OutQuad) while the body follows and covers (800ms OutQuint).
+    // One driver sweeps bands and trailing mask as a single curtain.
     NumberAnimation {
-        id: enterBands
+        id: enterAnimation
         target: root
-        property: "bandsProgress"
-        from: 0
-        to: 1
-        duration: Lazer.MotionTokens.waveBackdropEnter
-        easing.type: Easing.OutQuad
-    }
-    NumberAnimation {
-        id: enterBody
-        target: root
-        property: "bodyProgress"
+        property: "waveProgress"
         from: 0
         to: 1
         duration: Lazer.MotionTokens.waveEnter
-        easing.type: Easing.OutQuint
+        easing.type: Easing.OutQuad
     }
 
-    // Unlock mirrors the launcher close: body recedes first (InQuad) with
-    // the bands trailing (InSine); release fires when the body lands, the
-    // same ownership the launcher gives its closeBody.
+    // Unlock reverses the same curtain; release fires on landing. Fast start
+    // stays responsive while the gentle OutQuad tail settles the bands past
+    // the edge instead of rushing them into it.
     NumberAnimation {
-        id: exitBody
+        id: exitAnimation
         target: root
-        property: "bodyProgress"
+        property: "waveProgress"
         to: 0
         duration: Lazer.MotionTokens.waveExit
-        easing.type: Easing.InQuad
+        easing.type: Easing.OutQuad
+        onStarted: console.log("[afloat:lock-exit-probe] exitAnimation started t=" + Date.now()
+            + " from=" + from + " duration=" + duration)
         onFinished: {
-            console.log("[afloat:lock-exit-probe] exitBody finished t=" + Date.now()
-                + " body=" + root.bodyProgress + " bands=" + root.bandsProgress)
+            console.log("[afloat:lock-exit-probe] exitAnimation finished t=" + Date.now()
+                + " waveProgress=" + root.waveProgress)
             root.requestRelease()
         }
-    }
-    NumberAnimation {
-        id: exitBands
-        target: root
-        property: "bandsProgress"
-        to: 0
-        duration: Lazer.MotionTokens.waveExit
-        easing.type: Easing.InSine
-        onStarted: console.log("[afloat:lock-exit-probe] exitBands started t=" + Date.now()
-            + " from=" + from + " duration=" + duration)
     }
 
     Connections {
