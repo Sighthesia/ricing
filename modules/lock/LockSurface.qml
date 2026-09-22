@@ -1,8 +1,10 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
+import "../bar/widgets" as BarWidgets
 import "../lazerbar" as Lazer
 import "../../services" as Services
 import "./LockLogic.js" as LockLogic
@@ -36,6 +38,18 @@ WlSessionLockSurface {
             ? 1 : Math.max(0, Math.min(1, backdrop.maskProgress))
     readonly property real authRevealOffset: (1 - authRevealProgress) * 10
     readonly property real authRevealOpacity: 0.94 + authRevealProgress * 0.06
+    readonly property real authInputWidth: Math.max(0, Math.min(360, root.width - 48))
+    readonly property color authControlColor: root.lightScheme
+            ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface
+    readonly property color authTextColor: root.lightScheme
+            ? "#211F24" : Lazer.LazerTheme.textPrimary
+    readonly property color authDateColor: root.lightScheme
+            ? "#5F5A66" : Lazer.LazerTheme.textMuted
+    readonly property bool authFailureVisible: root.lockContext
+            ? root.lockContext.showFailure : false
+    property date now: new Date()
+    property bool inputMode: false
+    property bool syncingPasswordField: false
 
     signal releaseRequested()
 
@@ -46,6 +60,8 @@ WlSessionLockSurface {
     function startReveal(): void {
         exitStarted = false
         releaseSent = false
+        inputMode = false
+        syncPasswordField()
         if (reducedMotion) {
             SurfaceLogic.applyRevealImmediately(root, allAnimations())
             return
@@ -84,12 +100,43 @@ WlSessionLockSurface {
         return [enterAnimation, exitAnimation]
     }
 
+    // Enter the inline authentication mode without changing PAM state.
+    function enterInputMode(): void {
+        inputMode = true
+        passwordField.forceActiveFocus()
+    }
+
+    // Synchronize external authentication changes without creating delete ghosts.
+    function syncPasswordField(): void {
+        if (!root.lockContext || !passwordField)
+            return
+        var nextText = root.lockContext.currentText == null
+                ? "" : String(root.lockContext.currentText)
+        if (passwordField.text === nextText)
+            return
+        syncingPasswordField = true
+        passwordField.suppressDeleteFx = true
+        passwordField.text = nextText
+        passwordField.suppressDeleteFx = false
+        syncingPasswordField = false
+    }
+
+    // Keep falling deletion feedback masked while preserving its motion.
+    function maskPasswordGhosts(): void {
+        var ghosts = passwordField.ghostLayerItem.children
+        for (var i = 0; i < ghosts.length; i++) {
+            if (ghosts[i])
+                ghosts[i].text = "\u2022"
+        }
+    }
+
     onLockContextChanged: {
-        if (lockContext)
-            contextConnections.target = lockContext
+        contextConnections.target = lockContext
+        syncPasswordField()
     }
 
     Component.onCompleted: {
+        syncPasswordField()
         startReveal()
         keyboardOwner.forceActiveFocus()
     }
@@ -135,131 +182,266 @@ WlSessionLockSurface {
         Keys.onPressed: event => {
             if (!root.lockContext)
                 return
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            var isSubmit = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+            var isBackspace = event.key === Qt.Key_Backspace
+            var isPrintable = event.text && event.text.length === 1
+            if (!isSubmit && !isBackspace && !isPrintable)
+                return
+            root.enterInputMode()
+            if (isSubmit) {
                 root.lockContext.submit()
                 event.accepted = true
-            } else if (event.key === Qt.Key_Backspace) {
-                root.lockContext.currentText = root.lockContext.currentText.slice(0, -1)
+            } else if (isBackspace) {
+                passwordField.text = passwordField.text.slice(0, -1)
+                passwordField.cursorPosition = passwordField.text.length
                 event.accepted = true
-            } else if (event.text && event.text.length === 1) {
-                root.lockContext.currentText += event.text
+            } else if (isPrintable) {
+                passwordField.text += event.text
+                passwordField.cursorPosition = passwordField.text.length
                 event.accepted = true
             }
         }
     }
 
-    // Position authentication content without introducing a floating dialog frame.
+    // Keep the clock and authentication control in one full-screen reveal layer.
     Item {
         id: authSurface
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: root.authRevealOffset
-        width: Math.min(parent.width * 0.82, 420)
-        height: Math.min(parent.height * 0.48, 260)
+        anchors.fill: parent
         z: 3
         opacity: root.authRevealOpacity
+        transform: Translate { y: root.authRevealOffset }
 
-        // Mirror the shared password conversation: masked input plus an
-        // outcome line, driven entirely by LockContext state.
+        // Keep the primary clock above the interaction control.
         Column {
-            id: authContent
-            anchors.centerIn: parent
-            spacing: 10
-            width: parent.width - 48
+            id: timeContent
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: -parent.height * 0.18
+            spacing: 8
 
-            // Name the field so the masked line reads as a password.
-            Text {
-                width: parent.width
-                text: "PASSWORD"
-                color: root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted
-                font.pixelSize: 11
-                font.letterSpacing: 2
+            // Show hours and minutes with the shared rolling digit component.
+            BarWidgets.RollingClockTime {
+                anchors.horizontalCenter: parent.horizontalCenter
+                currentTime: root.now
+                digitPixelSize: 48
+                digitFontFamily: "monospace"
+                digitBold: true
+                showSeconds: false
+                digitColor: root.authTextColor
+                mutedDigitColor: root.authTextColor
+                separatorColor: root.authTextColor
+                hourTransitionDuration: Lazer.MotionTokens.clockHourFlip
+                minuteTransitionDuration: Lazer.MotionTokens.clockMinuteFlip
+                transitionEasing: Lazer.MotionTokens.clockFlipEasing
             }
 
-            // Reserve a short state marker above the input slot rather than
-            // outlining the authentication area as a floating card.
+            // Keep the calendar date directly below the primary time.
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: Qt.formatDate(root.now, "yyyy.MM.dd")
+                color: root.authDateColor
+                font.family: "monospace"
+                font.pixelSize: 16
+            }
+        }
+
+        // Keep the lock entry centered at the bottom in both visual states.
+        Rectangle {
+            id: authControl
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 56
+            width: root.inputMode ? root.authInputWidth : 68
+            height: 48
+            radius: Lazer.LazerTheme.settingsChoiceRadius
+            color: root.authControlColor
+            border.width: root.authFailureVisible ? 2 : 1
+            border.color: root.authFailureVisible ? Lazer.LazerTheme.osuPink
+                                                   : Lazer.LazerTheme.divider
+            property real failureOffset: 0
+
+            Behavior on width {
+                enabled: !root.reducedMotion
+                NumberAnimation {
+                    duration: Lazer.MotionTokens.medium
+                    easing.type: Easing.OutQuint
+                }
+            }
+            Behavior on color {
+                enabled: !root.reducedMotion
+                ColorAnimation { duration: Lazer.MotionTokens.fast }
+            }
+            Behavior on border.width {
+                enabled: !root.reducedMotion
+                NumberAnimation {
+                    duration: Lazer.MotionTokens.fast
+                    easing.type: Easing.OutQuint
+                }
+            }
+            Behavior on border.color {
+                enabled: !root.reducedMotion
+                ColorAnimation { duration: Lazer.MotionTokens.fast }
+            }
+            transform: Translate { x: authControl.failureOffset }
+
+            // Fade the lock glyph away as the same rectangle opens for input.
             Item {
-                width: parent.width
-                height: 3
+                id: lockIconLayer
+                anchors.fill: parent
+                opacity: root.inputMode ? 0 : 1
+                visible: opacity > 0.01
+                Behavior on opacity {
+                    enabled: !root.reducedMotion
+                    NumberAnimation {
+                        duration: Lazer.MotionTokens.medium
+                        easing.type: Easing.OutQuint
+                    }
+                }
 
-                // Keep the marker outside the password slot's hit area.
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    width: 44
-                    height: 3
-                    color: Lazer.LazerTheme.osuPink
+                // Load the shared lock glyph before applying the theme tint.
+                Image {
+                    id: lockIconSource
+                    anchors.centerIn: parent
+                    width: 22
+                    height: 22
+                    source: Qt.resolvedUrl("../lazerbar/icons/lock.svg")
+                    fillMode: Image.PreserveAspectFit
+                    visible: false
+                }
+
+                // Tint the white source glyph for both color schemes.
+                MultiEffect {
+                    anchors.fill: lockIconSource
+                    source: lockIconSource
+                    colorization: 1
+                    colorizationColor: root.authTextColor
+                    Behavior on colorizationColor {
+                        enabled: !root.reducedMotion
+                        ColorAnimation { duration: Lazer.MotionTokens.fast }
+                    }
                 }
             }
 
-            // Hold the masked line at a fixed height so the layout never
-            // jumps between empty and filled buffers. Inset control surface
-            // keeps the input slot legible on the lifted section.
+            // Reuse the launcher field for password masking, caret, and ghosts.
+            Lazer.OsuTextField {
+                id: passwordField
+                anchors.fill: parent
+                anchors.leftMargin: 20
+                anchors.rightMargin: 20
+                anchors.topMargin: 4
+                anchors.bottomMargin: 4
+                visible: root.inputMode || opacity > 0.01
+                enabled: root.inputMode
+                opacity: root.inputMode ? 1 : 0
+                clip: true
+                echoMode: TextInput.Password
+                color: root.authTextColor
+                selectionColor: Lazer.LazerTheme.osuPink
+                font.family: "monospace"
+                font.pixelSize: 18
+                font.weight: Font.DemiBold
+                verticalAlignment: TextInput.AlignVCenter
+                text: ""
+
+                onTextChanged: {
+                    if (root.syncingPasswordField || !root.lockContext)
+                        return
+                    if (root.lockContext.currentText !== text)
+                        root.lockContext.currentText = text
+                }
+                onAccepted: {
+                    if (root.lockContext)
+                        root.lockContext.submit()
+                }
+                onGhostCountChanged: root.maskPasswordGhosts()
+                Behavior on opacity {
+                    enabled: !root.reducedMotion
+                    NumberAnimation {
+                        duration: Lazer.MotionTokens.medium
+                        easing.type: Easing.OutQuint
+                    }
+                }
+            }
+
+            // Keep the reusable caret legible against the active surface.
+            Binding {
+                target: passwordField.caretItem
+                property: "color"
+                value: root.authTextColor
+            }
+
+            // Show a non-text insertion marker only for an empty focused field.
             Rectangle {
-                id: maskSlot
-                width: parent.width
-                height: 44
-                color: root.lightScheme ? "#FFFFFF" : Lazer.LazerTheme.settingsControlSurface
-                radius: Lazer.LazerTheme.settingsControlRadius
-                Behavior on color { ColorAnimation { duration: Lazer.MotionTokens.fast } }
-
-                // Render bullets only; the password never becomes visible.
-                // barIcon tracks the scheme in fallback and adapted modes,
-                // while textPrimary stays white in the adaptation opt-out.
-                Text {
-                    id: maskText
-                    anchors.left: parent.left
-                    anchors.leftMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: SurfaceLogic.maskedPassword(
-                              root.lockContext ? root.lockContext.currentText : "")
-                    visible: text.length > 0
-                    color: root.lightScheme ? "#211F24" : Lazer.LazerTheme.textPrimary
-                    font.pixelSize: 20
-                    font.letterSpacing: 4
-                }
-
-                // Keep an empty buffer visibly alive instead of a blank slot.
-                Text {
-                    anchors.left: parent.left
-                    anchors.leftMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: maskText.text.length === 0
-                    text: "Enter password"
-                    color: root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted
-                    font.pixelSize: 15
-                    font.italic: true
+                id: emptyPasswordMarker
+                x: passwordField.x + passwordField.cursorRectangle.x
+                y: passwordField.y + passwordField.cursorRectangle.y
+                    + (passwordField.cursorRectangle.height - height) / 2
+                width: 12
+                height: 6
+                radius: 3
+                color: root.authTextColor
+                opacity: root.inputMode && passwordField.activeFocus
+                    && passwordField.text.length === 0 ? 1 : 0
+                visible: root.inputMode
+                enabled: false
+                Behavior on opacity {
+                    enabled: !root.reducedMotion
+                    NumberAnimation {
+                        duration: Lazer.MotionTokens.fast
+                        easing.type: Easing.OutQuint
+                    }
                 }
             }
 
-            // Report verifying/failed outcomes, with a spoken default when
-            // PAM returns an empty message.
-            Text {
-                id: statusText
-                width: parent.width
-                text: SurfaceLogic.authStatus(
-                          root.lockContext ? root.lockContext.unlockInProgress : false,
-                          root.lockContext ? root.lockContext.showFailure : false,
-                          root.lockContext ? root.lockContext.errorMessage : "").message
-                visible: text.length > 0
-                color: SurfaceLogic.authStatus(
-                           root.lockContext ? root.lockContext.unlockInProgress : false,
-                           root.lockContext ? root.lockContext.showFailure : false,
-                           root.lockContext ? root.lockContext.errorMessage : "").tone
-                       === SurfaceLogic.authTones.failure
-                       ? Lazer.LazerTheme.osuPink
-                       : (root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted)
-                font.pixelSize: 13
-                wrapMode: Text.WordWrap
+            // Shake the unchanged input region when authentication fails.
+            SequentialAnimation {
+                id: failureAnimation
+                running: false
+                NumberAnimation {
+                    target: authControl
+                    property: "failureOffset"
+                    from: 0
+                    to: -6
+                    duration: Lazer.MotionTokens.fast
+                    easing.type: Easing.OutQuint
+                }
+                NumberAnimation {
+                    target: authControl
+                    property: "failureOffset"
+                    to: 6
+                    duration: Lazer.MotionTokens.fast
+                    easing.type: Easing.OutQuint
+                }
+                NumberAnimation {
+                    target: authControl
+                    property: "failureOffset"
+                    to: -3
+                    duration: Lazer.MotionTokens.instant
+                    easing.type: Easing.OutQuint
+                }
+                NumberAnimation {
+                    target: authControl
+                    property: "failureOffset"
+                    to: 0
+                    duration: Lazer.MotionTokens.fast
+                    easing.type: Easing.OutQuint
+                }
             }
 
-            // State the keys so the surface is usable without prior knowledge.
-            Text {
-                width: parent.width
-                text: "Type the password, press Enter to unlock"
-                color: root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted
-                font.pixelSize: 11
-                opacity: 0.8
+            // Activate the inline field when the default lock entry is clicked.
+            TapHandler {
+                enabled: !root.inputMode
+                onTapped: root.enterInputMode()
             }
+        }
+
+        // Keep the clock current without adding a second time source.
+        Timer {
+            interval: 1000
+            repeat: true
+            running: true
+            triggeredOnStart: true
+            onTriggered: root.now = new Date()
         }
     }
 
@@ -304,8 +486,18 @@ WlSessionLockSurface {
         // A failed conversation must hand keyboard focus straight back so
         // the next attempt can be typed without a pointer.
         function onShowFailureChanged() {
-            if (root.lockContext && root.lockContext.showFailure)
-                keyboardOwner.forceActiveFocus()
+            if (root.lockContext && root.lockContext.showFailure) {
+                root.enterInputMode()
+                passwordField.forceActiveFocus()
+                if (root.reducedMotion)
+                    authControl.failureOffset = 0
+                else
+                    failureAnimation.restart()
+            }
+        }
+
+        function onCurrentTextChanged() {
+            root.syncPasswordField()
         }
     }
 }
