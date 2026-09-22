@@ -244,6 +244,60 @@ Item {
             compare(surf2.color, Lazer.LazerTheme.settingsCardHover)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
+        function test_submenuLeafClickRetractsBeforeDismiss() {
+            // Animated: the click frame must start the retract (phase
+            // closing, data kept) while still emitting the dismiss.
+            var child = fakeEntry("Child")
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([parent])
+            item.openSubmenu(parent, null)
+            tryCompare(item, "submenuPhase", "open", 900)
+            item.submenuEntries = [child]
+            wait(0)
+            var dismissed = 0
+            item.dismissRequested.connect(function() { dismissed++ })
+            var live = item.submenuSections[0][0]
+            item.activateEntry(live, 2)
+            compare(live.triggeredCalls, 1)
+            compare(dismissed, 1)
+            // Retract starts on the click frame; data releases at progress 0.
+            compare(item.submenuPhase, "closing")
+            compare(item.submenuEntry !== null, true)
+            tryCompare(item, "submenuEntry", null, Lazer.MotionTokens.settingsSidebarFade + 300)
+        }
+        function test_pendingCatcherBridgesColdFetch() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+            wait(0)
+            item.openSubmenu(parent, null)
+            // Cold fetch: no rows yet, surface hidden, pending bridge live.
+            var pending = findByName(item, "traySubmenuPendingCatcher")
+            verify(pending !== null)
+            compare(pending.visible, true)
+            compare(findByName(item, "traySubmenuSurface").visible, false)
+            compare(pending.x, findByName(item, "traySubmenuSurface").x)
+            compare(pending.width, findByName(item, "traySubmenuSurface").width)
+            // Traversal parks the cursor; the late batch highlights from it.
+            // Poll like the long-menu test: delegates position over frames.
+            item.lastCursorX = 300
+            item.lastCursorY = 72
+            item.submenuEntries = [fakeEntry("Child")]
+            var hl = null
+            for (var i = 0; i < 100 && hl === null; i++) {
+                wait(10)
+                hl = item.highlightedSubmenuRow
+            }
+            verify(hl !== null)
+            // Handoff: surface owns input again, row highlighted, taps live.
+            compare(pending.visible, false)
+            compare(findByName(item, "traySubmenuSurface").visible, true)
+            var surf = findByName(findByName(item, "traySubmenuSurface"), "trayMenuRowSurface")
+            verify(surf !== null)
+            compare(surf.color, Lazer.LazerTheme.settingsCardHover)
+            compare(item.submenuInteractable, true)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
         function test_transitToSubmenuBouncesBackFromClosing() {
             var parent = fakeEntry("More", { hasChildren: true })
             var item = makeMenu([parent])

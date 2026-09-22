@@ -192,8 +192,14 @@ Item {
             if (typeof entry.triggered === "function")
                 entry.triggered()
         } catch (err) {}
-        if (Logic.shouldDismissOnTrigger(entry))
+        if (Logic.shouldDismissOnTrigger(entry)) {
+            // Retract the second level on the click frame so a submenu-leaf
+            // activation exits with the shared retract motion (data releases
+            // at progress 0) instead of vanishing with the host. No-op when
+            // no submenu is open.
+            closeSubmenu()
             dismissRequested()
+        }
     }
 
     function openSubmenu(entry, row) {
@@ -352,6 +358,30 @@ Item {
     function transitToSubmenu() {
         if (submenuEntry && submenuPhase !== "open")
             openSubmenu(submenuEntry, submenuAnchorRow)
+    }
+    // Cold-fetch bridge: while the second level travels but its rows have
+    // not arrived yet the surface stays hidden (no blank panel) and its own
+    // catcher is deaf. This catcher mirrors the surface geometry so the
+    // traversal still lands and remembers the cursor; the late batch then
+    // highlights via resolveSubHoverFromMemory. Mutually exclusive with the
+    // surface visibility, so it never starves the real catcher.
+    MouseArea {
+        id: submenuPendingCatcher
+        objectName: "traySubmenuPendingCatcher"
+        x: submenuSurface.x
+        y: submenuSurface.y
+        width: submenuSurface.width
+        height: submenuSurface.height
+        z: 4
+        visible: root.submenuProgress > 0.01 && !submenuSurface.visible
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        onEntered: root.rememberCursor(mouseX + x, mouseY + y)
+        onPositionChanged: root.rememberCursor(mouseX + x, mouseY + y)
+        onExited: {
+            if (!submenuSurface.visible)
+                root.forgetCursor()
+        }
     }
     // Submenu hover state lives here at root level: functions nested inside
     // the surface are unreachable via root.* and fail silently.

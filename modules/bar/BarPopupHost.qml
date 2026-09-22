@@ -698,6 +698,27 @@ PanelWindow {
         root.requestClose()
     }
 
+    // Click-driven dismiss (tray row activation, …): same cleanup the close
+    // timer performs, but starting on the click frame instead of after the
+    // hover grace. The exit reveal and any open tray submenu retract stay
+    // visible together; intents are retained until clearIntentTimer so a
+    // same-frame revive still wins over the exit.
+    function dismissAnimated() {
+        closeTimer.stop()
+        transitionMotion.stop()
+        root.transitionSerial += 1
+        root.pendingIntent = null
+        root._deferredRebaseSerial = -1
+        var tc = popupActions ? popupActions.trayMenuContent : null
+        if (tc) {
+            tc.closeSubmenu()
+            tc.forgetCursor()
+        }
+        root.open = false
+        root.closeRequested()
+        clearIntentTimer.restart()
+    }
+
     // Release the popup owner before another overlay claims the screen.
     function dismissImmediately() {
         root.debugLog("dismissed", { "open": root.open, "surfaceActive": root.surfaceActive })
@@ -1127,7 +1148,7 @@ PanelWindow {
                          actionKind: root.currentIntent && root.currentIntent.kind !== "context"
                                  ? (root.currentIntent.actionKind || "") : "context"
                          payload: root.currentIntent ? root.currentIntent.payload : null
-                         onDismissRequested: root.dismissImmediately()
+                         onDismissRequested: root.dismissAnimated()
                      }
 
                       // Outgoing body leaves to the left while its replacement
