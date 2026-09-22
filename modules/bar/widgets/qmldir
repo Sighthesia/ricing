@@ -1,0 +1,16 @@
+module Afloat.BarWidgets
+ActiveWindow 1.0 ActiveWindow.qml
+Battery 1.0 Battery.qml
+Bluetooth 1.0 Bluetooth.qml
+Brightness 1.0 Brightness.qml
+Clock 1.0 Clock.qml
+LauncherButton 1.0 LauncherButton.qml
+Media 1.0 Media.qml
+Network 1.0 Network.qml
+Notifications 1.0 Notifications.qml
+RollingClockTime 1.0 RollingClockTime.qml
+RollingDigit 1.0 RollingDigit.qml
+SettingsButton 1.0 SettingsButton.qml
+Tray 1.0 Tray.qml
+Volume 1.0 Volume.qml
+Workspaces 1.0 Workspaces.qml

@@ -1,12 +1,13 @@
 import QtQuick
 import ".."
 import "../../lazerbar"
-import "./" as ClockParts
 import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 
 // Two-line clock driven by the clock widget's registry defaults. The time
 // line uses the pre-lazer rolling-digit strips so digits flip on change;
-// the date line stays static text.
+// the date line stays static text. RollingClockTime resolves as a sibling
+// member of Afloat.BarWidgets (see qmldir): no self directory import, which
+// quickshell's module interceptor cannot serve deterministically.
 Item {
     id: root
 
@@ -56,7 +57,7 @@ Item {
         spacing: 1
 
         // Time line: rolling digit strips with the flip transition.
-        ClockParts.RollingClockTime {
+        RollingClockTime {
             id: rollingTime
 
             anchors.horizontalCenter: parent.horizontalCenter
