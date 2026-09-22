@@ -46,5 +46,20 @@ Item {
             verify(clock.timeSlotWidth > 0)
             verify(clock.implicitWidth > 0)
         }
+        function test_flipTokensMatchLegacy() {
+            // Ported pacing: old Motion.color.transitionDuration (300) x 8/4/1.
+            compare(Lazer.MotionTokens.clockHourFlip, 2400)
+            compare(Lazer.MotionTokens.clockMinuteFlip, 1200)
+            compare(Lazer.MotionTokens.clockSecondFlip, 300)
+            compare(Lazer.MotionTokens.clockFlipEasing, Easing.OutCubic)
+            // Component defaults match the old branch components.
+            compare(rolling.hourTransitionDuration, 180)
+            compare(rolling.minuteTransitionDuration, 180)
+            compare(rolling.secondTransitionDuration, 180)
+            compare(rolling.transitionEasing, Easing.InOutCubic)
+            compare(digit.transitionDuration, 180)
+            compare(digit.transitionEasing, Easing.InOutCubic)
+            compare(rolling.digitPixelSize, 14)
+        }
     }
 }

@@ -44,6 +44,13 @@ QtObject {
     readonly property int clickFlashEasing: Easing.OutQuint
     // Spectrum beat-wave sweep across its host surface.
     readonly property int beatWave: 400
+    // Flip-clock rolling digits ported from the pre-lazer bar (main branch
+    // RollingClockTime.qml): slow gliding rolls paced at the old
+    // Motion.color.transitionDuration (300) x 8/4/1 with OutCubic easing.
+    readonly property int clockHourFlip: 2400
+    readonly property int clockMinuteFlip: 1200
+    readonly property int clockSecondFlip: 300
+    readonly property int clockFlipEasing: Easing.OutCubic
     readonly property int controlCommit: 120
     readonly property int tooltipIn: 120
     readonly property int tooltipOut: 160

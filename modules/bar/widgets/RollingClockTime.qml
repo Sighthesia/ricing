@@ -1,10 +1,9 @@
 import QtQuick
-import "../../lazerbar"
 
 // Shared rolling clock time block ported from the pre-lazer bar (main branch
 // RollingClockTime.qml): HH:mm as four RollingDigit strips plus an optional
-// seconds pair. Hour digits roll on MotionTokens.slow, minutes on medium,
-// seconds on fast, matching the old hour*8 / minute*4 / second*1 weighting.
+// seconds pair. Tens digits stay bright, ones digits dim while idle; the bar
+// caller drives the pacing with the MotionTokens clock flip tokens.
 Item {
     id: root
 
@@ -14,10 +13,15 @@ Item {
     property color mutedDigitColor: "white"
     property color separatorColor: "white"
     property real separatorOpacity: 1.0
-    property int digitPixelSize: 15
+    property int digitPixelSize: 14
+    property real digitScale: 1.0
     property string digitFontFamily: "monospace"
     property bool digitBold: true
     property int digitSpacing: 0
+    property int hourTransitionDuration: 180
+    property int minuteTransitionDuration: 180
+    property int secondTransitionDuration: 180
+    property int transitionEasing: Easing.InOutCubic
 
     readonly property string hourText: Qt.formatDateTime(root.currentTime, "hh")
     readonly property string minuteText: Qt.formatDateTime(root.currentTime, "mm")
@@ -46,11 +50,13 @@ Item {
             RollingDigit {
                 targetDigit: root.hourTens
                 digitColor: root.digitColor
-                mutedDigitColor: root.mutedDigitColor
+                mutedDigitColor: root.digitColor
                 digitPixelSize: root.digitPixelSize
+                digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
                 digitBold: root.digitBold
-                transitionDuration: MotionTokens.slow
+                transitionDuration: root.hourTransitionDuration
+                transitionEasing: root.transitionEasing
             }
 
             RollingDigit {
@@ -58,9 +64,11 @@ Item {
                 digitColor: root.digitColor
                 mutedDigitColor: root.mutedDigitColor
                 digitPixelSize: root.digitPixelSize
+                digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
                 digitBold: root.digitBold
-                transitionDuration: MotionTokens.slow
+                transitionDuration: root.hourTransitionDuration
+                transitionEasing: root.transitionEasing
             }
         }
 
@@ -82,11 +90,13 @@ Item {
             RollingDigit {
                 targetDigit: root.minuteTens
                 digitColor: root.digitColor
-                mutedDigitColor: root.mutedDigitColor
+                mutedDigitColor: root.digitColor
                 digitPixelSize: root.digitPixelSize
+                digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
                 digitBold: root.digitBold
-                transitionDuration: MotionTokens.medium
+                transitionDuration: root.minuteTransitionDuration
+                transitionEasing: root.transitionEasing
             }
 
             RollingDigit {
@@ -94,9 +104,11 @@ Item {
                 digitColor: root.digitColor
                 mutedDigitColor: root.mutedDigitColor
                 digitPixelSize: root.digitPixelSize
+                digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
                 digitBold: root.digitBold
-                transitionDuration: MotionTokens.medium
+                transitionDuration: root.minuteTransitionDuration
+                transitionEasing: root.transitionEasing
             }
         }
 
@@ -123,11 +135,13 @@ Item {
                 RollingDigit {
                     targetDigit: root.secondTens
                     digitColor: root.digitColor
-                    mutedDigitColor: root.mutedDigitColor
+                    mutedDigitColor: root.digitColor
                     digitPixelSize: root.digitPixelSize
+                    digitScale: root.digitScale
                     digitFontFamily: root.digitFontFamily
                     digitBold: root.digitBold
-                    transitionDuration: MotionTokens.fast
+                    transitionDuration: root.secondTransitionDuration
+                    transitionEasing: root.transitionEasing
                 }
 
                 RollingDigit {
@@ -135,9 +149,11 @@ Item {
                     digitColor: root.digitColor
                     mutedDigitColor: root.mutedDigitColor
                     digitPixelSize: root.digitPixelSize
+                    digitScale: root.digitScale
                     digitFontFamily: root.digitFontFamily
                     digitBold: root.digitBold
-                    transitionDuration: MotionTokens.fast
+                    transitionDuration: root.secondTransitionDuration
+                    transitionEasing: root.transitionEasing
                 }
             }
         }

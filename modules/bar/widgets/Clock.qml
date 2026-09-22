@@ -56,7 +56,8 @@ Item {
         anchors.centerIn: parent
         spacing: 1
 
-        // Time line: rolling digit strips with the flip transition.
+        // Time line: rolling digit strips with the flip transition, paced by
+        // the ported clock flip tokens (old 300ms x 8/4/1, OutCubic).
         RollingClockTime {
             id: rollingTime
 
@@ -64,12 +65,16 @@ Item {
             visible: root.useRollingDigits
             currentTime: root.now
             showSeconds: root.showSeconds
-            digitPixelSize: 15
+            digitPixelSize: 14
             digitFontFamily: "monospace"
             digitBold: true
             digitColor: LazerTheme.textPrimary
-            mutedDigitColor: LazerTheme.textPrimary
+            mutedDigitColor: LazerTheme.textMuted
             separatorColor: LazerTheme.textPrimary
+            hourTransitionDuration: MotionTokens.clockHourFlip
+            minuteTransitionDuration: MotionTokens.clockMinuteFlip
+            secondTransitionDuration: MotionTokens.clockSecondFlip
+            transitionEasing: MotionTokens.clockFlipEasing
         }
 
         Text {
@@ -80,7 +85,7 @@ Item {
             text: root.timeText
             color: LazerTheme.textPrimary
             font.family: "monospace"
-            font.pixelSize: 15
+            font.pixelSize: 14
             font.bold: true
         }
 

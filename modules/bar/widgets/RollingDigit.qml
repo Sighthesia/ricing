@@ -4,20 +4,22 @@ import "../../lazerbar"
 // Rolling digit strip ported from the pre-lazer bar (main branch
 // RollingDigit.qml): a 0-9 strip inside a clipped window that slides when
 // the target digit changes, giving the clock its flip/roll transition.
-// Lazer adaptation: plain Text + LazerTheme-agnostic colors via properties,
-// all timings from MotionTokens with a reducedMotion gate.
+// Defaults (180ms InOutCubic) match the old component; callers override
+// with the clock flip tokens. Lazer adaptation: plain Text with
+// caller-supplied colors, reducedMotion gate on the slide.
 Item {
     id: root
 
     property int targetDigit: 0
     property color digitColor: "white"
     property color mutedDigitColor: "white"
-    property int digitPixelSize: 15
+    property int digitPixelSize: 14
+    property real digitScale: 1.0
     property string digitFontFamily: "monospace"
     property bool digitBold: true
     property real overscanFactor: 1.35
-    property int transitionDuration: MotionTokens.medium
-    property int transitionEasing: MotionTokens.clickFlashEasing
+    property int transitionDuration: 180
+    property int transitionEasing: Easing.InOutCubic
 
     readonly property int digitHeight: Math.max(1, Math.round(root.digitPixelSize * root.overscanFactor))
     readonly property int digitWidth: Math.max(1, Math.ceil(_digitMetrics.advanceWidth))
@@ -31,7 +33,7 @@ Item {
         id: _digitMetrics
         text: "8"
         font.family: root.digitFontFamily
-        font.pixelSize: root.digitPixelSize
+        font.pixelSize: Math.round(root.digitPixelSize * root.digitScale)
         font.bold: root.digitBold
     }
 
