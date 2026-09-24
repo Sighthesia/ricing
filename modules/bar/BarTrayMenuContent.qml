@@ -14,7 +14,7 @@ Item {
         if (emptyStateVisible) return 32
         if (menuLoading) return Math.max(heldHeight, 72)
         return Math.max(heldHeight, menuFlick.height,
-            submenuNeedsHeight ? submenuMinHeight : 0)
+            submenuNeedsHeight ? submenuSurface.height : 0)
     }
 
     // No Behavior here: batch arrivals settle while the host reveal is held
@@ -158,13 +158,19 @@ Item {
     property Item submenuAnchorRow: null
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
     property var submenuEntries: []
-    // Floor the second level at title + padding + one row. Without it a
-    // short primary menu creates a negative submenu viewport and starves
-    // hover/click delivery. Longer submenus never grow the popup: the
-    // surface stays bounded to the primary height and scrolls internally,
-    // so the primary list never shifts or gets covered when the second
-    // level appears.
-    readonly property real submenuMinHeight: 48 + root.submenuPad * 2 + 32
+    // Second-level sizing: the panel pops out short (never taller than
+    // the primary list), then grows to its full content height once the
+    // horizontal reveal settles. Taller submenus therefore extend below
+    // the primary instead of shifting or covering it; beyond maxMenuHeight
+    // the excess scrolls inside. The 96px floor (title + padding + one
+    // row) keeps the viewport non-negative on short primary menus so
+    // hover and click delivery stay alive.
+    readonly property real submenuChromeHeight: 48 + root.submenuPad * 2
+    readonly property real submenuMinHeight: submenuChromeHeight + 32
+    readonly property real submenuStartHeight: Math.min(menuFlick.height, submenuMinHeight)
+    readonly property real submenuTargetHeight: Math.max(menuFlick.height,
+        Math.min(submenuChromeHeight + Math.max(32, submenuColumn.implicitHeight),
+            maxMenuHeight))
     property real heldHeight: 420
     property real rawColumnHeight: menuColumn.implicitHeight
     property real submenuAnimationTarget: 0
@@ -395,8 +401,12 @@ Item {
     // the surface are unreachable via root.* and fail silently.
     property Item highlightedSubmenuRow: null
         function hoverAtSubCatcher(contentY) {
-            root.rememberCursor(subHoverCatcher.mouseX + submenuSurface.x,
-                subHoverCatcher.mouseY + submenuSurface.y)
+            // The catcher fills the flickable, so root coords must include
+            // both the surface and the flick offsets; otherwise the memory
+            // resolve below recomputes a negative fy and wipes a live
+            // highlight on the next async settle (open-finish, batch).
+            root.rememberCursor(subHoverCatcher.mouseX + submenuSurface.x + submenuFlick.x,
+                subHoverCatcher.mouseY + submenuSurface.y + submenuFlick.y)
             highlightedSubmenuRow = rowAtContentY(submenuColumn, "traySubmenuSection", contentY).row
         }
     // Re-resolve under a stationary cursor from memory (root coords): the
@@ -610,15 +620,27 @@ Item {
     readonly property bool submenuNeedsHeight: submenuProgress > 0.01
         && (hasSubmenuContent || submenuPhase === "closing")
     // Preserve the second-level surface during its closing transition.
-    // Keep submenu the same bounded size as the primary flick so the
-    // root list never shifts when the second level appears.
+    // Height is staged: short while sliding (opening/closing), full once
+    // the reveal settles. The Behavior below grows/shrinks it smoothly so
+    // the host height follows without snapping; late content batches just
+    // retarget the growth mid-flight.
     Rectangle {
         id: submenuSurface
         objectName: "traySubmenuSurface"
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: parent.width + root.submenuPad
-        height: Math.max(menuFlick.height, submenuNeedsHeight ? root.submenuMinHeight : 0)
+        height: {
+            if (!submenuNeedsHeight)
+                return menuFlick.height
+            if (submenuPhase !== "open")
+                return submenuStartHeight
+            return submenuTargetHeight
+        }
+        Behavior on height {
+            enabled: !Lazer.MotionTokens.reducedMotion
+            NumberAnimation { duration: Lazer.MotionTokens.slow; easing.type: Easing.OutCubic }
+        }
         x: submenuFlipped ? -(width + root.submenuPad) : parent.width + root.submenuPad
         y: 0
         color: Lazer.LazerTheme.settingsSection

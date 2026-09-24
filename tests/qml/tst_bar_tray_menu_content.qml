@@ -489,11 +489,14 @@ Item {
             compare(item.submenuInteractable, false)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
-        function test_longSubmenuClampsToPrimaryHeight() {
+        function test_longSubmenuGrowsAfterReveal() {
+            // Reduced motion: growth applies instantly once open.
             Lazer.MotionTokens.reducedMotionOverride = true
             try {
+                // Twenty rows overflow even the capped height, so the excess
+                // must scroll inside the grown panel.
                 var submenu = []
-                for (var i = 0; i < 12; i++)
+                for (var i = 0; i < 20; i++)
                     submenu.push(fakeEntry("Child " + i))
                 var parent = fakeEntry("More", { hasChildren: true })
                 var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
@@ -503,25 +506,67 @@ Item {
                     primaryHeight = findByName(item, "trayMenuFlick").height
                 }
                 verify(primaryHeight > 0)
-                item.openSubmenu(parent, null)
                 item.submenuEntries = submenu
-                var settled = false
-                for (var k = 0; k < 200 && !settled; k++) {
+                item.openSubmenu(parent, null)
+                // Twenty rows overflow the capped height. Delegate existence
+                // does not imply layout: poll the target value itself until
+                // it exceeds the primary and stops moving, then the popup
+                // grows with the surface and the excess scrolls.
+                var targetHeight = primaryHeight
+                var stableCount = 0
+                for (var t = 0; t < 400 && stableCount < 10; t++) {
                     wait(10)
-                    var probe = findByName(item, "traySubmenuFlick")
-                    settled = probe && probe.contentHeight > probe.height && probe.height > 0
+                    var currentTarget = item.submenuTargetHeight
+                    if (currentTarget > primaryHeight && currentTarget === targetHeight)
+                        stableCount++
+                    else {
+                        stableCount = 0
+                        targetHeight = currentTarget
+                    }
                 }
-                verify(settled)
-                // Overflow never grows the popup: the surface stays bounded to
-                // the primary height and the excess scrolls inside.
-                compare(item.submenuSurface.height, primaryHeight)
-                compare(item.implicitHeight, Math.max(item.heldHeight, primaryHeight))
+                verify(targetHeight > primaryHeight)
+                for (var k = 0; k < 200 && item.submenuSurface.height !== targetHeight; k++)
+                    wait(10)
+                compare(item.submenuSurface.height, targetHeight)
+                compare(item.implicitHeight, Math.max(item.heldHeight, primaryHeight, targetHeight))
                 var flick = findByName(item, "traySubmenuFlick")
                 verify(flick.contentHeight > flick.height)
                 verify(flick.height > 0)
             } finally {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
+            // Animated: the panel pops out short, then grows tall. Land the
+            // delegates before opening so the target is already stable.
+            var item2 = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+            var primary2 = 0
+            for (var m = 0; m < 200 && primary2 <= 0; m++) {
+                wait(10)
+                primary2 = findByName(item2, "trayMenuFlick").height
+            }
+            verify(primary2 > 0)
+            item2.submenuEntries = submenu
+            var target2 = primary2
+            var stable2 = 0
+            for (var n = 0; n < 400 && stable2 < 10; n++) {
+                wait(10)
+                var current2 = item2.submenuTargetHeight
+                if (current2 > primary2 && current2 === target2)
+                    stable2++
+                else {
+                    stable2 = 0
+                    target2 = current2
+                }
+            }
+            verify(target2 > primary2)
+            item2.openSubmenu(parent, null)
+            compare(item2.submenuPhase, "opening")
+            wait(30)
+            // Still sliding: short, never taller than the primary list.
+            verify(item2.submenuSurface.height <= primary2)
+            verify(item2.submenuSurface.height < item2.submenuTargetHeight)
+            // Settled: grown to the full content height.
+            tryCompare(item2.submenuSurface, "height", item2.submenuTargetHeight, 3000)
+            verify(item2.submenuTargetHeight > primary2)
         }
         function test_realSubmenuPointerHoverAndClick() {
             Lazer.MotionTokens.reducedMotionOverride = true
@@ -541,6 +586,10 @@ Item {
                 item.dismissRequested.connect(function() { dismissed++ })
                 var flick = findByName(item, "traySubmenuFlick")
                 var point = flick.mapToItem(item, 40, 16)
+                // Two-hop parking first: a jump straight from a stale cursor
+                // position can arrive with no events (containsMouse lags the
+                // physical position), so wake the chain like hoverFresh does.
+                hoverFresh(item, point.x, point.y)
                 // Synthetic hover/click delivery flakes under load; retry the
                 // stimulus like the other pointer tests instead of one shot.
                 verify(pollAct(function() { mouseMove(item, point.x, point.y) },
@@ -548,6 +597,33 @@ Item {
                 verify(pollAct(function() { mouseClick(item, point.x, point.y) },
                     function() { return dismissed === 1 }))
                 compare(dismissed, 1)
+            } finally {
+                Lazer.MotionTokens.reducedMotionOverride = false
+            }
+        }
+        function test_submenuHoverSurvivesMemoryResolve() {
+            // The catcher fills the flickable: remembered coords must carry
+            // the flick offset, or the next async settle (open-finish, batch)
+            // recomputes a negative fy and wipes the live highlight.
+            Lazer.MotionTokens.reducedMotionOverride = true
+            try {
+                var parent = fakeEntry("More", { hasChildren: true })
+                var item = makeMenu([parent])
+                item.openSubmenu(parent, null)
+                item.submenuEntries = [fakeEntry("Child")]
+                var landed = false
+                for (var i = 0; i < 200 && !landed; i++) {
+                    wait(10)
+                    landed = findAllByName(item, "trayMenuRow").length >= 2
+                }
+                verify(landed)
+                // Hover the first submenu row (catcher-relative 40,16).
+                item.hoverAtSubCatcher(16)
+                verify(item.highlightedSubmenuRow !== null)
+                // Simulate the async settle; highlight must survive it.
+                item.resolveSubHoverFromMemory()
+                wait(30)
+                verify(item.highlightedSubmenuRow !== null)
             } finally {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
