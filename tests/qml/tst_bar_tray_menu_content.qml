@@ -535,13 +535,22 @@ Item {
             } finally {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
-            // Animated: the panel pops out short, then grows tall. Land the
-            // delegates before opening so the target is already stable.
+            // Animated: the panel pops out flush with the primary bottom,
+            // then grows tall. Settle the primary first: its layout steps
+            // retrigger the height Behavior, so sample only after 300ms of
+            // stability (past the 240ms motion duration).
             var item2 = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
             var primary2 = 0
-            for (var m = 0; m < 200 && primary2 <= 0; m++) {
+            var primaryStable = 0
+            for (var m = 0; m < 400 && primaryStable < 30; m++) {
                 wait(10)
-                primary2 = findByName(item2, "trayMenuFlick").height
+                var primaryProbe = findByName(item2, "trayMenuFlick").height
+                if (primaryProbe > 0 && primaryProbe === primary2)
+                    primaryStable++
+                else {
+                    primaryStable = 0
+                    primary2 = primaryProbe
+                }
             }
             verify(primary2 > 0)
             item2.submenuEntries = submenu
@@ -561,7 +570,8 @@ Item {
             item2.openSubmenu(parent, null)
             compare(item2.submenuPhase, "opening")
             wait(30)
-            // Still sliding: short, never taller than the primary list.
+            // Still sliding: not grown past the primary bottom yet, and far
+            // from the full content height.
             verify(item2.submenuSurface.height <= primary2)
             verify(item2.submenuSurface.height < item2.submenuTargetHeight)
             // Settled: grown to the full content height.

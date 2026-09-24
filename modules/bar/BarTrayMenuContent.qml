@@ -158,16 +158,16 @@ Item {
     property Item submenuAnchorRow: null
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
     property var submenuEntries: []
-    // Second-level sizing: the panel pops out short (never taller than
-    // the primary list), then grows to its full content height once the
-    // horizontal reveal settles. Taller submenus therefore extend below
-    // the primary instead of shifting or covering it; beyond maxMenuHeight
-    // the excess scrolls inside. The 96px floor (title + padding + one
-    // row) keeps the viewport non-negative on short primary menus so
-    // hover and click delivery stay alive.
+    // Second-level sizing: while sliding (opening/closing) the panel
+    // stays flush with the primary bottom; once the horizontal reveal
+    // settles it grows to its full content height. Taller submenus
+    // therefore extend below the primary instead of shifting or covering
+    // it; beyond maxMenuHeight the excess scrolls inside. The 96px floor
+    // (title + padding + one row) keeps the settled viewport
+    // non-negative on short primary menus so hover and click delivery
+    // stay alive.
     readonly property real submenuChromeHeight: 48 + root.submenuPad * 2
     readonly property real submenuMinHeight: submenuChromeHeight + 32
-    readonly property real submenuStartHeight: Math.min(menuFlick.height, submenuMinHeight)
     readonly property real submenuTargetHeight: Math.max(menuFlick.height,
         Math.min(submenuChromeHeight + Math.max(32, submenuColumn.implicitHeight),
             maxMenuHeight))
@@ -623,23 +623,18 @@ Item {
     readonly property bool submenuNeedsHeight: submenuProgress > 0.01
         && (hasSubmenuContent || submenuPhase === "closing")
     // Preserve the second-level surface during its closing transition.
-    // Height is staged: short while sliding (opening/closing), full once
-    // the reveal settles. The Behavior below grows/shrinks it smoothly so
-    // the host height follows without snapping; late content batches just
-    // retarget the growth mid-flight.
+    // Height stays flush with the primary bottom while sliding and grows
+    // to the content target only after the reveal settles. The Behavior
+    // below smooths the growth so the host height follows without
+    // snapping; late content batches just retarget mid-flight.
     Rectangle {
         id: submenuSurface
         objectName: "traySubmenuSurface"
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: parent.width + root.submenuPad
-        height: {
-            if (!submenuNeedsHeight)
-                return menuFlick.height
-            if (submenuPhase !== "open")
-                return submenuStartHeight
-            return submenuTargetHeight
-        }
+        height: submenuNeedsHeight && submenuPhase === "open"
+            ? submenuTargetHeight : menuFlick.height
         Behavior on height {
             enabled: !Lazer.MotionTokens.reducedMotion
             NumberAnimation { duration: Lazer.MotionTokens.slow; easing.type: Easing.OutCubic }
