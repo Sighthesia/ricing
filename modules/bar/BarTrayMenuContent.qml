@@ -14,7 +14,7 @@ Item {
         if (emptyStateVisible) return 32
         if (menuLoading) return Math.max(heldHeight, 72)
         return Math.max(heldHeight, menuFlick.height,
-            submenuNeedsHeight ? submenuPanelHeight : 0)
+            submenuNeedsHeight ? submenuMinHeight : 0)
     }
 
     // No Behavior here: batch arrivals settle while the host reveal is held
@@ -158,14 +158,13 @@ Item {
     property Item submenuAnchorRow: null
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
     property var submenuEntries: []
-    // Reserve enough vertical space for the second-level title, padding, and
-    // one row. Without this floor, a short primary menu creates a negative
-    // submenu viewport and starves both hover and click delivery.
-    readonly property real submenuChromeHeight: 48 + root.submenuPad * 2
-    readonly property real submenuBodyHeight: Math.min(
-        Math.max(32, submenuColumn.implicitHeight),
-        Math.max(32, maxMenuHeight - submenuChromeHeight))
-    readonly property real submenuPanelHeight: submenuChromeHeight + submenuBodyHeight
+    // Floor the second level at title + padding + one row. Without it a
+    // short primary menu creates a negative submenu viewport and starves
+    // hover/click delivery. Longer submenus never grow the popup: the
+    // surface stays bounded to the primary height and scrolls internally,
+    // so the primary list never shifts or gets covered when the second
+    // level appears.
+    readonly property real submenuMinHeight: 48 + root.submenuPad * 2 + 32
     property real heldHeight: 420
     property real rawColumnHeight: menuColumn.implicitHeight
     property real submenuAnimationTarget: 0
@@ -619,7 +618,7 @@ Item {
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: parent.width + root.submenuPad
-        height: Math.max(menuFlick.height, root.submenuPanelHeight)
+        height: Math.max(menuFlick.height, submenuNeedsHeight ? root.submenuMinHeight : 0)
         x: submenuFlipped ? -(width + root.submenuPad) : parent.width + root.submenuPad
         y: 0
         color: Lazer.LazerTheme.settingsSection

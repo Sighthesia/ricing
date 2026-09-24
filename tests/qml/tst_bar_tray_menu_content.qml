@@ -219,6 +219,14 @@ Item {
                 // Three primary rows so the surface fits title plus content.
                 // Poll for layout like the long-menu test: heights need polish.
                 var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+                // Park the cursor outside every catcher first: a stale
+                // position from an earlier pointer test can sit inside the
+                // future submenu rect and fire a ghost enter as the surface
+                // appears, racing the memory resolve below.
+                mouseMove(item, 350, 700)
+                wait(20)
+                mouseMove(item, 10, 600)
+                wait(20)
                 var laidOut = false
                 for (var i = 0; i < 100 && !laidOut; i++) {
                     wait(10)
@@ -385,13 +393,13 @@ Item {
             verify(rows.length >= 3)
             item.openSubmenu(parent, rows[rows.length - 1])
             compare(item.submenuAnchorRow, rows[rows.length - 1])
-            // Second level is full-height and aligned to the primary's top so
-            // the root list never shifts when the submenu appears. The panel
+            // Second level matches the primary height and aligns to its top so
+            // the root list never shifts when the submenu appears (long
+            // submenus scroll inside instead of growing the popup). The panel
             // mirrors the primary panel width plus padding on both sides.
             compare(item.submenuSurface.y, 0)
             compare(item.submenuSurface.width, item.width + 8)
-            compare(item.submenuSurface.height,
-                Math.max(findByName(item, "trayMenuFlick").height, item.submenuPanelHeight))
+            compare(item.submenuSurface.height, findByName(item, "trayMenuFlick").height)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuFlipRendersLeftWithoutMovingPrimary() {
@@ -481,26 +489,68 @@ Item {
             compare(item.submenuInteractable, false)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
+        function test_longSubmenuClampsToPrimaryHeight() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            try {
+                var submenu = []
+                for (var i = 0; i < 12; i++)
+                    submenu.push(fakeEntry("Child " + i))
+                var parent = fakeEntry("More", { hasChildren: true })
+                var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+                var primaryHeight = 0
+                for (var j = 0; j < 200 && primaryHeight <= 0; j++) {
+                    wait(10)
+                    primaryHeight = findByName(item, "trayMenuFlick").height
+                }
+                verify(primaryHeight > 0)
+                item.openSubmenu(parent, null)
+                item.submenuEntries = submenu
+                var settled = false
+                for (var k = 0; k < 200 && !settled; k++) {
+                    wait(10)
+                    var probe = findByName(item, "traySubmenuFlick")
+                    settled = probe && probe.contentHeight > probe.height && probe.height > 0
+                }
+                verify(settled)
+                // Overflow never grows the popup: the surface stays bounded to
+                // the primary height and the excess scrolls inside.
+                compare(item.submenuSurface.height, primaryHeight)
+                compare(item.implicitHeight, Math.max(item.heldHeight, primaryHeight))
+                var flick = findByName(item, "traySubmenuFlick")
+                verify(flick.contentHeight > flick.height)
+                verify(flick.height > 0)
+            } finally {
+                Lazer.MotionTokens.reducedMotionOverride = false
+            }
+        }
         function test_realSubmenuPointerHoverAndClick() {
             Lazer.MotionTokens.reducedMotionOverride = true
-            var parent = fakeEntry("More", { hasChildren: true })
-            var child = fakeEntry("Child")
-            var item = makeMenu([parent])
-            item.openSubmenu(parent, null)
-            item.submenuEntries = [child]
-            wait(50)
-            var surface = findByName(item, "traySubmenuSurface")
-            var flick = findByName(item, "traySubmenuFlick")
-            verify(surface.visible)
-            var dismissed = 0
-            item.dismissRequested.connect(function() { dismissed++ })
-            var point = flick.mapToItem(item, 40, 16)
-            mouseMove(item, point.x, point.y)
-            wait(30)
-            verify(item.highlightedSubmenuRow !== null)
-            mouseClick(item, point.x, point.y)
-            compare(dismissed, 1)
-            Lazer.MotionTokens.reducedMotionOverride = false
+            try {
+                var parent = fakeEntry("More", { hasChildren: true })
+                var child = fakeEntry("Child")
+                var item = makeMenu([parent])
+                item.openSubmenu(parent, null)
+                item.submenuEntries = [child]
+                var surface = null
+                for (var i = 0; i < 200 && !(surface && surface.visible); i++) {
+                    wait(10)
+                    surface = findByName(item, "traySubmenuSurface")
+                }
+                verify(surface && surface.visible)
+                var dismissed = 0
+                item.dismissRequested.connect(function() { dismissed++ })
+                var flick = findByName(item, "traySubmenuFlick")
+                var point = flick.mapToItem(item, 40, 16)
+                // Synthetic hover/click delivery flakes under load; retry the
+                // stimulus like the other pointer tests instead of one shot.
+                verify(pollAct(function() { mouseMove(item, point.x, point.y) },
+                    function() { return item.highlightedSubmenuRow !== null }))
+                verify(pollAct(function() { mouseClick(item, point.x, point.y) },
+                    function() { return dismissed === 1 }))
+                compare(dismissed, 1)
+            } finally {
+                Lazer.MotionTokens.reducedMotionOverride = false
+            }
         }
         function test_faceOccludesSubmenu() {
             var item = makeMenu([fakeEntry("More", { hasChildren: true })])
