@@ -158,17 +158,29 @@ Item {
     property Item submenuAnchorRow: null
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
     property var submenuEntries: []
-    // Second-level sizing: the rows viewport always matches the primary
-    // flick exactly (same y, same height, bottom edges aligned), and the
-    // 48px title strip hangs below the primary panel with its top edge
-    // flush against the primary bottom edge. Longer submenus scroll inside
-    // the fixed viewport, so the popup only ever grows by the fixed title
-    // strip and the primary list never shifts. The viewport is at least
-    // one primary row tall, so hover and click delivery stay alive.
+    // Second-level placement: the panel hangs from its anchor row (title
+    // top flush with the anchor bottom edge) and extends downward,
+    // bottom-clamped to the primary flick so the popup never grows.
+    // Longer submenus scroll inside; when the anchor sits too low the
+    // panel shifts up instead. The rows viewport keeps title + padding
+    // + at least one row, so hover and click delivery stay alive.
+    property real submenuAnchorBottomY: 0
+    // Space below the anchor row inside the primary flick.
+    readonly property real submenuAvailHeight: Math.max(0, menuFlick.height - submenuAnchorBottomY)
+    // Full rows height (title/padding excluded), at least one row.
+    readonly property real submenuBodyFull: Math.max(32, submenuColumn.implicitHeight)
+    // Minimum surface: title + padding + one row + padding.
+    readonly property real submenuMinSurface: 48 + root.submenuPad + 32 + root.submenuPad
     readonly property real submenuTitleHeight: 48
-    // Primary visual height, locked while the submenu is open: the title
-    // strip extends below it instead of stretching it.
-    readonly property real primaryMenuHeight: menuFlick.height
+    // Surface spans from the anchor down while it fits; otherwise it
+    // shifts up to stay inside the primary flick (tiny primaries may
+    // still exceed below by a bounded strip, keeping input alive).
+    readonly property real submenuSurfaceHeight: submenuAvailHeight >= submenuMinSurface
+        ? Math.min(56 + submenuBodyFull + 8, submenuAvailHeight)
+        : submenuMinSurface
+    readonly property real submenuSurfaceY: submenuAvailHeight >= submenuMinSurface
+        ? submenuAnchorBottomY
+        : Math.max(0, menuFlick.height - submenuMinSurface)
     property real heldHeight: 420
     property real rawColumnHeight: menuColumn.implicitHeight
     property real submenuAnimationTarget: 0
@@ -193,11 +205,23 @@ Item {
         ? Math.max(180, Screen.desktopAvailableHeight * 0.7) : 420
     signal dismissRequested()
 
-    function activateEntry(entry, level) {
+    // Anchor bottom edge in root coords for the submenu panel. Row
+    // delegates are rebuilt on model changes, so resolve defensively and
+    // keep the last good anchor when the row is gone.
+    function anchorBottomFromRow(row) {
+        try {
+            var y = row.mapToItem(root, 0, row.height).y
+            if (isFinite(y))
+                return y
+        } catch (err) {}
+        return null
+    }
+
+    function activateEntry(entry, level, row) {
         if (!Logic.isEnabled(entry))
             return
         if (Logic.shouldOpenSubmenu(entry)) {
-            openSubmenu(entry, null)
+            openSubmenu(entry, row || null)
             return
         }
         try {
@@ -217,21 +241,27 @@ Item {
     function openSubmenu(entry, row) {
         if (!Logic.shouldOpenSubmenu(entry))
             return
+        // Pin the panel to the anchor row; a gone row keeps the last pin.
+        function pinAnchor(candidate) {
+            if (candidate) {
+                var bottom = anchorBottomFromRow(candidate)
+                if (bottom !== null)
+                    submenuAnchorBottomY = bottom
+                submenuAnchorRow = candidate
+            }
+        }
         // Redirect without replaying reveal when already visible.
         if ((submenuPhase === "open" || submenuPhase === "opening") && submenuEntry === entry) {
-            if (row)
-                submenuAnchorRow = row
+            pinAnchor(row)
             return
         }
         if (submenuPhase === "open" || submenuPhase === "opening") {
             submenuEntry = entry
-            if (row)
-                submenuAnchorRow = row
+            pinAnchor(row)
             return
         }
         submenuEntry = entry
-        if (row)
-            submenuAnchorRow = row
+        pinAnchor(row)
         // Match the primary content layer: 500ms, OutCubic in.
         submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.settingsSidebarFade
         submenuAnimation.easing.type = Easing.OutCubic
@@ -593,7 +623,7 @@ Item {
                         onTapped: {
                             clickFlash.opacity = Lazer.MotionTokens.clickFlashOpacity
                             clickFlashFade.restart()
-                            activateEntry(modelData, level)
+                            activateEntry(modelData, level, rootRow)
                         }
                     }
 
@@ -623,28 +653,32 @@ Item {
     readonly property bool submenuNeedsHeight: submenuProgress > 0.01
         && (hasSubmenuContent || submenuPhase === "closing")
     // Preserve the second-level surface during its closing transition.
-    // Rows fill the primary-height viewport up top; the title strip hangs
-    // below the primary panel, top edge flush with its bottom edge.
+    // The panel hangs from the anchor row: title top flush with the
+    // anchor bottom edge, content extending downward inside the primary
+    // vertical range.
     Rectangle {
         id: submenuSurface
         objectName: "traySubmenuSurface"
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: parent.width + root.submenuPad
-        height: submenuNeedsHeight ? menuFlick.height + submenuTitleHeight : menuFlick.height
+        height: submenuNeedsHeight ? submenuSurfaceHeight : menuFlick.height
         x: submenuFlipped ? -(width + root.submenuPad) : parent.width + root.submenuPad
-        y: 0
+        // Panel top tracks the anchor from the first frame (even before
+        // rows arrive) so cold-fetch cursor memory stays valid across
+        // the batch; hidden anyway until content lands.
+        y: submenuSurfaceY
         color: Lazer.LazerTheme.settingsSection
         clip: true
 
-        // Submenu title footer: full-width settingsRail block, 48 high,
-        // hanging below the primary panel with its top edge flush against
-        // the primary bottom edge. Bold 13px label on 12px margins.
+        // Submenu title: full-width settingsRail block, 48 high, pinned to
+        // the panel top so its top edge meets the anchor row bottom edge.
+        // Bold 13px label on 12px margins.
         Rectangle {
             objectName: "traySubmenuTitleBlock"
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.bottom: parent.bottom
+            anchors.top: parent.top
             height: submenuTitleHeight
             color: Lazer.LazerTheme.settingsRail
 
@@ -682,8 +716,7 @@ Item {
         // at root level; a nested Connections here proved unreliable.)
 
         // Child entries remain held during closing and update from the live opener.
-        // The rows viewport matches the primary flick exactly (same y, same
-        // height): the title strip below reserves the bottom 48px.
+        // Rows start below the title with the outer-edge padding rhythm.
         Flickable {
             id: submenuFlick
             objectName: "traySubmenuFlick"
@@ -694,9 +727,9 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: root.submenuFlipped ? 0 : root.submenuPad
             anchors.top: parent.top
-            anchors.topMargin: 0
+            anchors.topMargin: 48 + root.submenuPad
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: submenuTitleHeight
+            anchors.bottomMargin: root.submenuPad
             contentHeight: submenuColumn.implicitHeight
             clip: true
             interactive: contentHeight > height

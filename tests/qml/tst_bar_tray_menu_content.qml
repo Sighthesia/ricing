@@ -236,10 +236,19 @@ Item {
                 // Open with no content yet (cold fetch), stage parked-cursor
                 // memory as a real arrival would leave it, then content arrives
                 // under the parked cursor and must highlight via memory resolve.
-                // Flick starts at the surface top: first row spans y 0..32.
+                // Sample the point from live geometry: the anchor pin lands
+                // at open time, so pre-batch coordinates stay valid.
                 item.openSubmenu(parent, null)
-                item.lastCursorX = 300
-                item.lastCursorY = 16
+                var stagePoint = null
+                for (var s = 0; s < 100 && stagePoint === null; s++) {
+                    wait(10)
+                    var sfl = findByName(item, "traySubmenuFlick")
+                    if (sfl && sfl.y === 56 && sfl.height > 0)
+                        stagePoint = sfl.mapToItem(item, 40, 16)
+                }
+                verify(stagePoint !== null)
+                item.lastCursorX = stagePoint.x
+                item.lastCursorY = stagePoint.y
                 item.submenuEntries = [fakeEntry("Child")]
                 for (var j = 0; j < 20; j++) {
                     item.resolveSubHoverFromMemory()
@@ -303,9 +312,17 @@ Item {
             compare(pending.width, findByName(item, "traySubmenuSurface").width)
             // Traversal parks the cursor; the late batch highlights from it.
             // Poll like the long-menu test: delegates position over frames.
-            // Flick starts at the surface top: first row spans y 0..32.
-            item.lastCursorX = 300
-            item.lastCursorY = 16
+            // Sample from live geometry: the anchor pin lands at open time.
+            var cpoint = null
+            for (var c = 0; c < 100 && cpoint === null; c++) {
+                wait(10)
+                var cfl = findByName(item, "traySubmenuFlick")
+                if (cfl && cfl.y === 56 && cfl.height > 0)
+                    cpoint = cfl.mapToItem(item, 40, 16)
+            }
+            verify(cpoint !== null)
+            item.lastCursorX = cpoint.x
+            item.lastCursorY = cpoint.y
             item.submenuEntries = [fakeEntry("Child")]
             var hl = null
             for (var i = 0; i < 100 && hl === null; i++) {
@@ -395,13 +412,16 @@ Item {
             verify(rows.length >= 3)
             item.openSubmenu(parent, rows[rows.length - 1])
             compare(item.submenuAnchorRow, rows[rows.length - 1])
-            // Second level matches the primary height and aligns to its top so
-            // the root list never shifts when the submenu appears (long
-            // submenus scroll inside instead of growing the popup). The panel
-            // mirrors the primary panel width plus padding on both sides.
-            compare(item.submenuSurface.y, 0)
+            // Anchor pin: title top will meet this row's bottom edge.
+            var anchorBottom = rows[rows.length - 1].mapToItem(item, 0, 32).y
+            compare(item.submenuAnchorBottomY, anchorBottom)
+            // Anchor sits at the primary bottom here, so the panel shifts up
+            // to stay inside instead of overflowing below. Width still
+            // mirrors the primary panel plus padding on both sides.
+            var flickH = findByName(item, "trayMenuFlick").height
+            compare(item.submenuSurface.y, Math.max(0, flickH - 96))
             compare(item.submenuSurface.width, item.width + 8)
-            compare(item.submenuSurface.height, findByName(item, "trayMenuFlick").height)
+            compare(item.submenuSurface.height, flickH)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuFlipRendersLeftWithoutMovingPrimary() {
@@ -477,10 +497,11 @@ Item {
             compare(block.width, item.submenuSurface.width)
             compare(findByName(item, "traySubmenuTitle").text, "More")
             compare(findByName(item, "traySubmenuTitle").font.bold, true)
-            // Rows viewport matches the primary flick; the title strip hangs
-            // below it, top edge flush with the primary bottom edge.
-            compare(findByName(item, "traySubmenuFlick").anchors.topMargin, 0)
-            compare(findByName(item, "traySubmenuFlick").anchors.bottomMargin, item.submenuTitleHeight)
+            // Title pinned to the panel top; rows start below it with the
+            // outer-edge padding rhythm.
+            compare(block.y, 0)
+            compare(findByName(item, "traySubmenuFlick").anchors.topMargin, 56)
+            compare(findByName(item, "traySubmenuFlick").anchors.bottomMargin, 8)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuRowsInteractableOnlyWhenOpen() {
@@ -494,27 +515,60 @@ Item {
             compare(item.submenuInteractable, false)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
-        function test_longSubmenuKeepsPrimaryViewportWithFooterTitle() {
-            // Rows viewport always matches the primary flick; the 48px title
-            // strip hangs below it. Longer submenus scroll inside instead of
-            // growing the popup.
+        function test_longSubmenuAnchorsAndClampsToPrimary() {
+            // The panel hangs from its anchor row (title top flush with the
+            // anchor bottom edge) and never leaves the primary vertical
+            // range; longer submenus scroll inside instead of growing the
+            // popup. Eight primary rows give a mid-list anchor real room.
             Lazer.MotionTokens.reducedMotionOverride = true
+            function primaryRowsOf(target) {
+                var found = []
+                var all = findAllByName(target, "trayMenuRow")
+                for (var i = 0; i < all.length; i++) {
+                    if (all[i].level === 1)
+                        found.push(all[i])
+                }
+                return found
+            }
             try {
-                // Twenty rows overflow the fixed viewport, so the excess
+                // Twenty rows overflow any clamped viewport, so the excess
                 // must scroll inside it.
                 var submenu = []
                 for (var i = 0; i < 20; i++)
                     submenu.push(fakeEntry("Child " + i))
-                var parent = fakeEntry("More", { hasChildren: true })
-                var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+                var primaries = [fakeEntry("Top"), fakeEntry("More", { hasChildren: true })]
+                for (var p = 0; p < 6; p++)
+                    primaries.push(fakeEntry(" filler " + p))
+                var parent = primaries[1]
+                var item = makeMenu(primaries)
+                // Anchor math reads live primary geometry: wait for the
+                // anchor row AND a stable primary height, or later rows
+                // landing mid-assert will move everything under us.
+                var anchor = null
                 var primaryHeight = 0
-                for (var j = 0; j < 200 && primaryHeight <= 0; j++) {
+                var stableP = 0
+                for (var j = 0; j < 400 && (anchor === null || stableP < 5); j++) {
                     wait(10)
-                    primaryHeight = findByName(item, "trayMenuFlick").height
+                    var prows = primaryRowsOf(item)
+                    if (prows.length >= 8 && prows[1].y > 0)
+                        anchor = prows[1]
+                    var curP = findByName(item, "trayMenuFlick").height
+                    if (anchor !== null && curP > 0 && curP === primaryHeight)
+                        stableP++
+                    else {
+                        stableP = 0
+                        primaryHeight = curP
+                    }
                 }
+                verify(anchor !== null)
                 verify(primaryHeight > 0)
+                var anchorBottom = anchor.mapToItem(item, 0, 32).y
                 item.submenuEntries = submenu
-                item.openSubmenu(parent, null)
+                item.openSubmenu(parent, anchor)
+                // Pin wiring: title top meets the anchor bottom edge.
+                compare(item.submenuAnchorBottomY, anchorBottom)
+                compare(item.submenuSurface.y, anchorBottom)
+                // Bottom-clamped to the primary flick: rows scroll inside.
                 var settled = false
                 for (var k = 0; k < 200 && !settled; k++) {
                     wait(10)
@@ -522,36 +576,52 @@ Item {
                     settled = probe && probe.contentHeight > probe.height && probe.height > 0
                 }
                 verify(settled)
-                // Surface is exactly the primary plus the title strip; the
-                // rows viewport matches the primary one-to-one.
-                compare(item.submenuSurface.height, primaryHeight + item.submenuTitleHeight)
+                compare(item.submenuSurface.y + item.submenuSurface.height, primaryHeight)
                 var flick = findByName(item, "traySubmenuFlick")
-                compare(flick.height, primaryHeight)
-                compare(flick.y, 0)
                 verify(flick.contentHeight > flick.height)
-                // Title strip hangs below the primary panel, top edge flush.
-                var block = findByName(item, "traySubmenuTitleBlock")
-                compare(block.y, primaryHeight)
-                compare(item.implicitHeight,
-                    Math.max(item.heldHeight, primaryHeight + item.submenuTitleHeight))
+                // Title stays pinned to the panel top.
+                compare(findByName(item, "traySubmenuTitleBlock").y, 0)
+                // The submenu adds no height beyond the primary list.
+                compare(item.implicitHeight, Math.max(item.heldHeight, primaryHeight))
             } finally {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
-            // Animated: the fixed-height panel slides out once, no growth.
-            var item2 = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+            // Animated: the clamped panel slides out at its final geometry.
+            var item2 = makeMenu(primaries)
+            var anchor2 = null
             var primary2 = 0
-            for (var m = 0; m < 200 && primary2 <= 0; m++) {
+            var stableP2 = 0
+            for (var m = 0; m < 400 && (anchor2 === null || stableP2 < 5); m++) {
                 wait(10)
-                primary2 = findByName(item2, "trayMenuFlick").height
+                var prows2 = primaryRowsOf(item2)
+                if (prows2.length >= 8 && prows2[1].y > 0)
+                    anchor2 = prows2[1]
+                var curP2 = findByName(item2, "trayMenuFlick").height
+                if (anchor2 !== null && curP2 > 0 && curP2 === primary2)
+                    stableP2++
+                else {
+                    stableP2 = 0
+                    primary2 = curP2
+                }
             }
+            verify(anchor2 !== null)
             verify(primary2 > 0)
+            var anchorBottom2 = anchor2.mapToItem(item2, 0, 32).y
             item2.submenuEntries = submenu
-            item2.openSubmenu(parent, null)
+            item2.openSubmenu(parent, anchor2)
             compare(item2.submenuPhase, "opening")
-            // Height is already final while sliding: primary plus title.
-            tryCompare(item2.submenuSurface, "height", primary2 + item2.submenuTitleHeight, 1500)
+            compare(item2.submenuSurface.y, anchorBottom2)
             tryCompare(item2, "submenuPhase", "open", 1500)
-            compare(item2.submenuSurface.height, primary2 + item2.submenuTitleHeight)
+            // Submenu layout trails the reveal: wait until rows overflow
+            // the clamped viewport before asserting final geometry.
+            var settled2 = false
+            for (var s = 0; s < 200 && !settled2; s++) {
+                wait(10)
+                var probe2 = findByName(item2, "traySubmenuFlick")
+                settled2 = probe2 && probe2.contentHeight > probe2.height && probe2.height > 0
+            }
+            verify(settled2)
+            compare(item2.submenuSurface.y + item2.submenuSurface.height, primary2)
         }
         function test_realSubmenuPointerHoverAndClick() {
             Lazer.MotionTokens.reducedMotionOverride = true

@@ -51,6 +51,21 @@ Item {
         return null
     }
 
+    // Collecting search across children/data.
+    function findAllByName(item, name, result) {
+        var found = result || []
+        if (!item)
+            return found
+        if (item.objectName === name)
+            found.push(item)
+        var kids = item.children
+        if (kids) {
+            for (var i = 0; i < kids.length; i++)
+                findAllByName(kids[i], name, found)
+        }
+        return found
+    }
+
     TestCase {
         name: "BarPopupIdentity"
         when: windowShown
@@ -373,10 +388,19 @@ Item {
             verify(findByName(item, "trayEmptyState").visible)
         }
 
-        function test_trayPrimaryBackgroundLockedWhileSubmenuGrows() {
-            // A taller submenu extends below the primary panel with its own
-            // surface; the primary background must not stretch with it.
+        function test_traySubmenuAnchorsToParentRow() {
+            // Panel hangs from the anchor row inside the primary vertical
+            // range; backgrounds keep covering the full tray content.
             Lazer.MotionTokens.reducedMotionOverride = true
+            function primaryRowsOf(target) {
+                var found = []
+                var all = findAllByName(target, "trayMenuRow")
+                for (var i = 0; i < all.length; i++) {
+                    if (all[i].level === 1)
+                        found.push(all[i])
+                }
+                return found
+            }
             try {
                 var submenu = []
                 for (var i = 0; i < 20; i++)
@@ -386,27 +410,53 @@ Item {
                 verify(menu !== null)
                 menu.useStubEntries = true
                 menu.menuHandle = { id: "stub" }
-                menu.entries = [{ text: "Top", enabled: true },
-                    { text: "More", enabled: true, hasChildren: true },
-                    { text: "Bottom", enabled: true }]
-                var more = menu.entryModel[1]
-                menu.submenuEntries = submenu
-                menu.openSubmenu(more, null)
-                // Primary rows lay out asynchronously; everything else is
-                // synchronous under reduced motion.
+                var primaries = [{ text: "Top", enabled: true },
+                    { text: "More", enabled: true, hasChildren: true }]
+                for (var p = 0; p < 6; p++)
+                    primaries.push({ text: " filler " + p, enabled: true })
+                menu.entries = primaries
+                var anchor = null
                 var primaryHeight = 0
-                for (var i = 0; i < 200 && primaryHeight <= 0; i++) {
+                var stableP = 0
+                for (var i = 0; i < 400 && (anchor === null || stableP < 5); i++) {
                     wait(10)
-                    primaryHeight = menu.primaryMenuHeight
+                    var prows = primaryRowsOf(menu)
+                    if (prows.length >= 8 && prows[1].y > 0)
+                        anchor = prows[1]
+                    var curP = findByName(menu, "trayMenuFlick").height
+                    if (anchor !== null && curP > 0 && curP === primaryHeight)
+                        stableP++
+                    else {
+                        stableP = 0
+                        primaryHeight = curP
+                    }
                 }
+                verify(anchor !== null)
                 verify(primaryHeight > 0)
-                // Surface is exactly the primary plus the title strip; the
-                // primary background stays locked and never stretches.
-                compare(menu.submenuSurface.height, primaryHeight + menu.submenuTitleHeight)
+                var more = menu.entryModel[1]
+                var anchorBottom = anchor.mapToItem(menu, 0, 32).y
+                menu.submenuEntries = submenu
+                menu.openSubmenu(more, anchor)
+                // Pin wiring: title top meets the anchor bottom edge. Wait
+                // for submenu layout first: settled content pins the clamp.
+                var subSettled = false
+                for (var s = 0; s < 200 && !subSettled; s++) {
+                    wait(10)
+                    var subProbe = findByName(menu, "traySubmenuFlick")
+                    subSettled = subProbe && subProbe.contentHeight > subProbe.height
+                        && subProbe.height > 0
+                }
+                verify(subSettled)
+                // Panel bottom clamped to the primary flick.
+                compare(menu.submenuAnchorBottomY, anchorBottom)
+                compare(menu.submenuSurface.y, anchorBottom)
+                compare(menu.submenuSurface.y + menu.submenuSurface.height, primaryHeight)
+                compare(findByName(menu, "traySubmenuTitleBlock").y, 0)
+                // Backgrounds still cover the full tray content behind it.
+                var trayBody = findByName(item, "trayContent")
                 var bg = findByName(item, "trayContentBackground")
                 verify(bg !== null)
-                compare(bg.height, primaryHeight + 16)
-                verify(menu.submenuSurface.height > primaryHeight)
+                compare(bg.height, trayBody.height + 16)
             } finally {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
