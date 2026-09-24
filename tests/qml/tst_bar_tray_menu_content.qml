@@ -214,35 +214,49 @@ Item {
         }
         function test_submenuHighlightAppearsAndSurvivesRebuild() {
             Lazer.MotionTokens.reducedMotionOverride = true
-            var parent = fakeEntry("More", { hasChildren: true })
-            // Three primary rows so the surface fits title plus content.
-            // Poll for layout like the long-menu test: heights need polish.
-            var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
-            var laidOut = false
-            for (var i = 0; i < 100 && !laidOut; i++) {
-                wait(10)
-                laidOut = findByName(item, "trayMenuFlick").height > 0
+            try {
+                var parent = fakeEntry("More", { hasChildren: true })
+                // Three primary rows so the surface fits title plus content.
+                // Poll for layout like the long-menu test: heights need polish.
+                var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+                var laidOut = false
+                for (var i = 0; i < 100 && !laidOut; i++) {
+                    wait(10)
+                    laidOut = findByName(item, "trayMenuFlick").height > 0
+                }
+                verify(laidOut)
+                // Open with no content yet (cold fetch), stage parked-cursor
+                // memory as a real arrival would leave it, then content arrives
+                // under the parked cursor and must highlight via memory resolve.
+                item.openSubmenu(parent, null)
+                item.lastCursorX = 300
+                item.lastCursorY = 72
+                item.submenuEntries = [fakeEntry("Child")]
+                for (var j = 0; j < 20; j++) {
+                    item.resolveSubHoverFromMemory()
+                    wait(10)
+                    var probe = findByName(findByName(item, "traySubmenuSurface"), "trayMenuRowSurface")
+                    if (probe && probe.color === Lazer.LazerTheme.settingsCardHover)
+                        break
+                }
+                var surf = findByName(findByName(item, "traySubmenuSurface"), "trayMenuRowSurface")
+                verify(surf !== null)
+                compare(surf.color, Lazer.LazerTheme.settingsCardHover)
+                // Cold-style batch with identical content rebuilds delegates
+                // under the parked cursor; highlight must survive.
+                item.submenuEntries = [fakeEntry("Child")]
+                for (var k = 0; k < 20; k++) {
+                    item.resolveSubHoverFromMemory()
+                    wait(10)
+                    if (surf && surf.color === Lazer.LazerTheme.settingsCardHover)
+                        break
+                }
+                var surf2 = findByName(findByName(item, "traySubmenuSurface"), "trayMenuRowSurface")
+                verify(surf2 !== null)
+                compare(surf2.color, Lazer.LazerTheme.settingsCardHover)
+            } finally {
+                Lazer.MotionTokens.reducedMotionOverride = false
             }
-            verify(laidOut)
-            // Open with no content yet (cold fetch), stage parked-cursor
-            // memory as a real arrival would leave it, then content arrives
-            // under the parked cursor and must highlight via memory resolve.
-            item.openSubmenu(parent, null)
-            item.lastCursorX = 300
-            item.lastCursorY = 72
-            item.submenuEntries = [fakeEntry("Child")]
-            wait(100)
-            var surf = findByName(findByName(item, "traySubmenuSurface"), "trayMenuRowSurface")
-            verify(surf !== null)
-            compare(surf.color, Lazer.LazerTheme.settingsCardHover)
-            // Cold-style batch with identical content rebuilds delegates
-            // under the parked cursor; highlight must survive.
-            item.submenuEntries = [fakeEntry("Child")]
-            wait(100)
-            var surf2 = findByName(findByName(item, "traySubmenuSurface"), "trayMenuRowSurface")
-            verify(surf2 !== null)
-            compare(surf2.color, Lazer.LazerTheme.settingsCardHover)
-            Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuLeafClickRetractsBeforeDismiss() {
             // Animated: the click frame must start the retract (phase
@@ -376,7 +390,8 @@ Item {
             // mirrors the primary panel width plus padding on both sides.
             compare(item.submenuSurface.y, 0)
             compare(item.submenuSurface.width, item.width + 8)
-            compare(item.submenuSurface.height, findByName(item, "trayMenuFlick").height)
+            compare(item.submenuSurface.height,
+                Math.max(findByName(item, "trayMenuFlick").height, item.submenuPanelHeight))
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuFlipRendersLeftWithoutMovingPrimary() {
@@ -464,6 +479,30 @@ Item {
             compare(item.submenuInteractable, true)
             item.closeSubmenu()
             compare(item.submenuInteractable, false)
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
+        function test_realSubmenuPointerHoverAndClick() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var parent = fakeEntry("More", { hasChildren: true })
+            var child = fakeEntry("Child")
+            var item = makeMenu([parent])
+            // Simulate the expanded popup input host while keeping the tray's
+            // primary visual width at its normal size.
+            item.width = 600
+            item.openSubmenu(parent, null)
+            item.submenuEntries = [child]
+            wait(50)
+            var surface = findByName(item, "traySubmenuSurface")
+            var flick = findByName(item, "traySubmenuFlick")
+            verify(surface.visible)
+            var dismissed = 0
+            item.dismissRequested.connect(function() { dismissed++ })
+            var point = flick.mapToItem(item, 40, 16)
+            mouseMove(item, point.x, point.y)
+            wait(30)
+            verify(item.highlightedSubmenuRow !== null)
+            mouseClick(item, point.x, point.y)
+            compare(dismissed, 1)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_faceOccludesSubmenu() {

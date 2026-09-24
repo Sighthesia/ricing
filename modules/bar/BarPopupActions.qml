@@ -327,6 +327,10 @@ Item {
     }
     readonly property var trayMenuHandle: Logic.menuHandleFromPayload(payload)
     readonly property var trayMenuContent: trayMenu
+    // Tray submenu input can extend beyond the normal 260px popup body. The
+    // tray component keeps its primary visual width separately while this
+    // value is used to preserve that width inside an expanded content slot.
+    readonly property real trayMenuPrimaryWidth: Math.max(0, root.implicitWidth - 16)
 
     function formatMediaTime(milliseconds) {
         var seconds = Math.floor(Math.max(0, Number(milliseconds)) / 1000)
@@ -1546,6 +1550,7 @@ Item {
             BarTrayMenuContent {
                 id: trayMenu
                 width: parent.width
+                menuWidth: root.trayMenuPrimaryWidth
                 menuHandle: root.trayMenuHandle
                 trayItem: root.payload && root.payload.trayItem ? root.payload.trayItem : null
                 entries: root.payload && root.payload.entries !== undefined
