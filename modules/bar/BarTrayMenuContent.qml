@@ -25,11 +25,6 @@ Item {
     property var menuHandle: null
     property bool useStubEntries: false
     property var trayItem: null
-    // The QML item may expand to the full popup slot so overflowing submenu
-    // input remains inside its ancestor hit tree. Keep the primary menu's
-    // visual/layout width independent from that expanded input host.
-    property real menuWidth: 0
-    readonly property real visualMenuWidth: menuWidth > 0 ? menuWidth : implicitWidth
     readonly property var resolvedMenuHandle: menuHandle !== null && menuHandle !== undefined
         ? menuHandle : (trayItem ? trayItem.menu : null)
     readonly property int liveCount: rootOpenerLoader.item ? rootOpenerLoader.item.count : 0
@@ -315,7 +310,7 @@ Item {
         objectName: "trayMenuFace"
         z: 2
         x: -root.submenuPad
-        width: root.visualMenuWidth + root.submenuPad * 2
+        width: parent.width + root.submenuPad * 2
         height: menuFlick.height
         color: Lazer.LazerTheme.settingsSection
     }
@@ -359,7 +354,7 @@ Item {
     MouseArea {
         id: transitCatcher
         objectName: "traySubmenuTransitCatcher"
-        x: root.submenuFlipped ? -root.submenuPad : root.visualMenuWidth
+        x: root.submenuFlipped ? -root.submenuPad : menuFlick.width
         y: menuFlick.y
         width: root.submenuPad
         height: menuFlick.height
@@ -485,7 +480,7 @@ Item {
         objectName: "trayMenuFlick"
         anchors.left: parent.left
         anchors.top: parent.top
-        width: root.visualMenuWidth
+        width: parent.width
         height: Math.min(menuColumn.implicitHeight, maxMenuHeight)
         contentHeight: menuColumn.implicitHeight
         clip: true
@@ -623,9 +618,9 @@ Item {
         objectName: "traySubmenuSurface"
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
-        width: root.visualMenuWidth + root.submenuPad
+        width: parent.width + root.submenuPad
         height: Math.max(menuFlick.height, root.submenuPanelHeight)
-        x: submenuFlipped ? -(width + root.submenuPad) : root.visualMenuWidth + root.submenuPad
+        x: submenuFlipped ? -(width + root.submenuPad) : parent.width + root.submenuPad
         y: 0
         color: Lazer.LazerTheme.settingsSection
         clip: true
@@ -767,7 +762,7 @@ Item {
     Item {
         objectName: "traySubmenuBridge"
         z: 0
-        x: submenuFlipped ? -root.submenuPad : root.visualMenuWidth
+        x: submenuFlipped ? -root.submenuPad : parent.width
         y: submenuSurface.y
         width: submenuProgress > 0 ? root.submenuPad : 0
         height: submenuProgress > 0 ? submenuSurface.height : 0

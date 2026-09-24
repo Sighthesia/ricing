@@ -1100,18 +1100,10 @@ PanelWindow {
 
                 // Keep both menu bodies in one content host so only the active
                 // intent contributes to the popup height and visible surface.
-                 contentData: Item {
-                      objectName: "popupContentSlot"
-                      // Tray submenus intentionally overflow the primary
-                      // column. Give the content slot the live popup width so
-                      // the visual overflow also remains inside the ancestor
-                      // input tree; the tray component locks its own primary
-                      // visual width through menuWidth.
-                      width: root.currentIntent
-                              && String(root.currentIntent.actionKind || "") === "tray"
-                              ? Math.max(root.popupSlotWidth, root.displayWidth)
-                              : root.popupSlotWidth
-                      implicitWidth: root.popupSlotWidth
+                contentData: Item {
+                     objectName: "popupContentSlot"
+                     width: root.popupSlotWidth
+                     implicitWidth: root.popupSlotWidth
                      implicitHeight: root.popupHeightForIntent(root.currentIntent)
                      height: implicitHeight
                      // Visible height channel: animate toward the new content's

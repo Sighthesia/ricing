@@ -486,9 +486,6 @@ Item {
             var parent = fakeEntry("More", { hasChildren: true })
             var child = fakeEntry("Child")
             var item = makeMenu([parent])
-            // Simulate the expanded popup input host while keeping the tray's
-            // primary visual width at its normal size.
-            item.width = 600
             item.openSubmenu(parent, null)
             item.submenuEntries = [child]
             wait(50)
