@@ -373,6 +373,47 @@ Item {
             verify(findByName(item, "trayEmptyState").visible)
         }
 
+        function test_trayPrimaryBackgroundLockedWhileSubmenuGrows() {
+            // A taller submenu extends below the primary panel with its own
+            // surface; the primary background must not stretch with it.
+            Lazer.MotionTokens.reducedMotionOverride = true
+            try {
+                var submenu = []
+                for (var i = 0; i < 20; i++)
+                    submenu.push({ text: "Child " + i, enabled: true })
+                var item = createTemporaryObject(actionsComp, root, { actionKind: "tray" })
+                var menu = findByName(item, "trayMenuRoot")
+                verify(menu !== null)
+                menu.useStubEntries = true
+                menu.menuHandle = { id: "stub" }
+                menu.entries = [{ text: "Top", enabled: true },
+                    { text: "More", enabled: true, hasChildren: true },
+                    { text: "Bottom", enabled: true }]
+                var more = menu.entryModel[1]
+                menu.submenuEntries = submenu
+                menu.openSubmenu(more, null)
+                var target = menu.primaryMenuHeight
+                var stable = 0
+                for (var i = 0; i < 400 && stable < 10; i++) {
+                    wait(10)
+                    var current = menu.submenuTargetHeight
+                    if (current > menu.primaryMenuHeight && current === target) {
+                        stable++
+                    } else {
+                        stable = 0
+                        target = current
+                    }
+                }
+                verify(target > menu.primaryMenuHeight)
+                var bg = findByName(item, "trayContentBackground")
+                verify(bg !== null)
+                compare(bg.height, menu.primaryMenuHeight + 16)
+                verify(menu.submenuSurface.height > menu.primaryMenuHeight)
+            } finally {
+                Lazer.MotionTokens.reducedMotionOverride = false
+            }
+        }
+
         function test_volumeAndBrightnessFollowLiveService() {
             var fakeVol = Qt.createQmlObject('import QtQuick; QtObject { property real sinkVolume: 0.42; property bool sinkMuted: true; function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }', root, "fakeVolLive")
             var volumeItem = createTemporaryObject(actionsComp, root, {

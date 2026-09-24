@@ -1125,12 +1125,18 @@ PanelWindow {
 
                     // Settings section-block surface under the action rows; the
                     // darker cards float on it exactly like the settings panel.
+                    // For tray it ends at the primary panel: a taller submenu
+                    // carries its own surface below instead of stretching this.
                     Rectangle {
                         objectName: "popupContentSurface"
                         x: 0
                         y: root.direction === "down" ? -1 : 0
                         width: parent.width
-                        height: parent.height + 1
+                        height: root.currentIntent
+                                && String(root.currentIntent.actionKind || "") === "tray"
+                                && popupActions.trayMenuContent
+                            ? popupActions.trayMenuContent.primaryMenuHeight + 17
+                            : parent.height + 1
                         color: LazerTheme.settingsSection
                     }
 

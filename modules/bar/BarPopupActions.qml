@@ -1534,10 +1534,18 @@ Item {
                 }
             }
 
+            // Background covers the primary panel only: a taller submenu
+            // extends below it with its own surface instead of stretching
+            // the primary panel taller.
             Rectangle {
                 objectName: "trayContentBackground"
-                anchors.fill: parent
-                anchors.margins: -8
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: -8
+                anchors.rightMargin: -8
+                anchors.topMargin: -8
+                height: trayMenu.primaryMenuHeight + 16
                 color: LazerTheme.settingsSection
                 visible: root.actionKind === "tray"
             }

@@ -561,8 +561,9 @@ Item {
             item2.openSubmenu(parent, null)
             compare(item2.submenuPhase, "opening")
             wait(30)
-            // Still sliding: short, never taller than the primary list.
-            verify(item2.submenuSurface.height <= primary2)
+            // Sliding and growing together: never below the primary panel,
+            // not yet at the full height either.
+            verify(item2.submenuSurface.height >= primary2 - 1)
             verify(item2.submenuSurface.height < item2.submenuTargetHeight)
             // Settled: grown to the full content height.
             tryCompare(item2.submenuSurface, "height", item2.submenuTargetHeight, 3000)
