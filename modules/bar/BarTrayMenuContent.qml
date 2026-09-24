@@ -158,21 +158,16 @@ Item {
     property Item submenuAnchorRow: null
     property int submenuAnchorLevel: submenuAnchorRow ? submenuAnchorRow.level : 0
     property var submenuEntries: []
-    // Second-level sizing: while sliding (opening/closing) the panel
-    // stays flush with the primary bottom; once the horizontal reveal
-    // settles it grows to its full content height. Taller submenus
-    // therefore extend below the primary instead of shifting or covering
-    // it; beyond maxMenuHeight the excess scrolls inside. The 96px floor
-    // (title + padding + one row) keeps the settled viewport
-    // non-negative on short primary menus so hover and click delivery
-    // stay alive.
-    readonly property real submenuChromeHeight: 48 + root.submenuPad * 2
-    readonly property real submenuMinHeight: submenuChromeHeight + 32
-    readonly property real submenuTargetHeight: Math.max(menuFlick.height,
-        Math.min(submenuChromeHeight + Math.max(32, submenuColumn.implicitHeight),
-            maxMenuHeight))
-    // Primary visual height, locked while the submenu is open: the longer
-    // second level extends below it instead of stretching it.
+    // Second-level sizing: the rows viewport always matches the primary
+    // flick exactly (same y, same height, bottom edges aligned), and the
+    // 48px title strip hangs below the primary panel with its top edge
+    // flush against the primary bottom edge. Longer submenus scroll inside
+    // the fixed viewport, so the popup only ever grows by the fixed title
+    // strip and the primary list never shifts. The viewport is at least
+    // one primary row tall, so hover and click delivery stay alive.
+    readonly property real submenuTitleHeight: 48
+    // Primary visual height, locked while the submenu is open: the title
+    // strip extends below it instead of stretching it.
     readonly property real primaryMenuHeight: menuFlick.height
     property real heldHeight: 420
     property real rawColumnHeight: menuColumn.implicitHeight
@@ -431,7 +426,12 @@ Item {
         var fx = sx - submenuFlick.x
         var fy = sy - submenuFlick.y
         if (!inX || fy < 0 || fy >= submenuFlick.height) {
-            highlightedSubmenuRow = null
+            // A laid-out viewport lags delegate creation by frames under
+            // load; retry briefly instead of wiping a live highlight.
+            if (submenuFlick.height <= 0 && retry < 5)
+                Qt.callLater(function() { root.resolveSubHoverFromMemory(retry + 1) })
+            else
+                highlightedSubmenuRow = null
             return
         }
         var m = rowAtContentY(submenuColumn, "traySubmenuSection", fy + submenuFlick.contentY)
@@ -623,35 +623,29 @@ Item {
     readonly property bool submenuNeedsHeight: submenuProgress > 0.01
         && (hasSubmenuContent || submenuPhase === "closing")
     // Preserve the second-level surface during its closing transition.
-    // Height stays flush with the primary bottom while sliding and grows
-    // to the content target only after the reveal settles. The Behavior
-    // below smooths the growth so the host height follows without
-    // snapping; late content batches just retarget mid-flight.
+    // Rows fill the primary-height viewport up top; the title strip hangs
+    // below the primary panel, top edge flush with its bottom edge.
     Rectangle {
         id: submenuSurface
         objectName: "traySubmenuSurface"
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: parent.width + root.submenuPad
-        height: submenuNeedsHeight && submenuPhase === "open"
-            ? submenuTargetHeight : menuFlick.height
-        Behavior on height {
-            enabled: !Lazer.MotionTokens.reducedMotion
-            NumberAnimation { duration: Lazer.MotionTokens.slow; easing.type: Easing.OutCubic }
-        }
+        height: submenuNeedsHeight ? menuFlick.height + submenuTitleHeight : menuFlick.height
         x: submenuFlipped ? -(width + root.submenuPad) : parent.width + root.submenuPad
         y: 0
         color: Lazer.LazerTheme.settingsSection
         clip: true
 
-        // Submenu title mirrors the popup identity header: full-width
-        // settingsRail block, 48 high, bold 13px label on 12px margins.
+        // Submenu title footer: full-width settingsRail block, 48 high,
+        // hanging below the primary panel with its top edge flush against
+        // the primary bottom edge. Bold 13px label on 12px margins.
         Rectangle {
             objectName: "traySubmenuTitleBlock"
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: parent.top
-            height: 48
+            anchors.bottom: parent.bottom
+            height: submenuTitleHeight
             color: Lazer.LazerTheme.settingsRail
 
             Text {
@@ -688,6 +682,8 @@ Item {
         // at root level; a nested Connections here proved unreliable.)
 
         // Child entries remain held during closing and update from the live opener.
+        // The rows viewport matches the primary flick exactly (same y, same
+        // height): the title strip below reserves the bottom 48px.
         Flickable {
             id: submenuFlick
             objectName: "traySubmenuFlick"
@@ -698,9 +694,9 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: root.submenuFlipped ? 0 : root.submenuPad
             anchors.top: parent.top
-            anchors.topMargin: 48 + root.submenuPad
+            anchors.topMargin: 0
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: root.submenuPad
+            anchors.bottomMargin: submenuTitleHeight
             contentHeight: submenuColumn.implicitHeight
             clip: true
             interactive: contentHeight > height

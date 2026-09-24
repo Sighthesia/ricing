@@ -392,23 +392,21 @@ Item {
                 var more = menu.entryModel[1]
                 menu.submenuEntries = submenu
                 menu.openSubmenu(more, null)
-                var target = menu.primaryMenuHeight
-                var stable = 0
-                for (var i = 0; i < 400 && stable < 10; i++) {
+                // Primary rows lay out asynchronously; everything else is
+                // synchronous under reduced motion.
+                var primaryHeight = 0
+                for (var i = 0; i < 200 && primaryHeight <= 0; i++) {
                     wait(10)
-                    var current = menu.submenuTargetHeight
-                    if (current > menu.primaryMenuHeight && current === target) {
-                        stable++
-                    } else {
-                        stable = 0
-                        target = current
-                    }
+                    primaryHeight = menu.primaryMenuHeight
                 }
-                verify(target > menu.primaryMenuHeight)
+                verify(primaryHeight > 0)
+                // Surface is exactly the primary plus the title strip; the
+                // primary background stays locked and never stretches.
+                compare(menu.submenuSurface.height, primaryHeight + menu.submenuTitleHeight)
                 var bg = findByName(item, "trayContentBackground")
                 verify(bg !== null)
-                compare(bg.height, menu.primaryMenuHeight + 16)
-                verify(menu.submenuSurface.height > menu.primaryMenuHeight)
+                compare(bg.height, primaryHeight + 16)
+                verify(menu.submenuSurface.height > primaryHeight)
             } finally {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }

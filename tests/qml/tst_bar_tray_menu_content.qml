@@ -236,9 +236,10 @@ Item {
                 // Open with no content yet (cold fetch), stage parked-cursor
                 // memory as a real arrival would leave it, then content arrives
                 // under the parked cursor and must highlight via memory resolve.
+                // Flick starts at the surface top: first row spans y 0..32.
                 item.openSubmenu(parent, null)
                 item.lastCursorX = 300
-                item.lastCursorY = 72
+                item.lastCursorY = 16
                 item.submenuEntries = [fakeEntry("Child")]
                 for (var j = 0; j < 20; j++) {
                     item.resolveSubHoverFromMemory()
@@ -302,8 +303,9 @@ Item {
             compare(pending.width, findByName(item, "traySubmenuSurface").width)
             // Traversal parks the cursor; the late batch highlights from it.
             // Poll like the long-menu test: delegates position over frames.
+            // Flick starts at the surface top: first row spans y 0..32.
             item.lastCursorX = 300
-            item.lastCursorY = 72
+            item.lastCursorY = 16
             item.submenuEntries = [fakeEntry("Child")]
             var hl = null
             for (var i = 0; i < 100 && hl === null; i++) {
@@ -475,7 +477,10 @@ Item {
             compare(block.width, item.submenuSurface.width)
             compare(findByName(item, "traySubmenuTitle").text, "More")
             compare(findByName(item, "traySubmenuTitle").font.bold, true)
-            compare(findByName(item, "traySubmenuFlick").anchors.topMargin, 56)
+            // Rows viewport matches the primary flick; the title strip hangs
+            // below it, top edge flush with the primary bottom edge.
+            compare(findByName(item, "traySubmenuFlick").anchors.topMargin, 0)
+            compare(findByName(item, "traySubmenuFlick").anchors.bottomMargin, item.submenuTitleHeight)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
         function test_submenuRowsInteractableOnlyWhenOpen() {
@@ -489,12 +494,14 @@ Item {
             compare(item.submenuInteractable, false)
             Lazer.MotionTokens.reducedMotionOverride = false
         }
-        function test_longSubmenuGrowsAfterReveal() {
-            // Reduced motion: growth applies instantly once open.
+        function test_longSubmenuKeepsPrimaryViewportWithFooterTitle() {
+            // Rows viewport always matches the primary flick; the 48px title
+            // strip hangs below it. Longer submenus scroll inside instead of
+            // growing the popup.
             Lazer.MotionTokens.reducedMotionOverride = true
             try {
-                // Twenty rows overflow even the capped height, so the excess
-                // must scroll inside the grown panel.
+                // Twenty rows overflow the fixed viewport, so the excess
+                // must scroll inside it.
                 var submenu = []
                 for (var i = 0; i < 20; i++)
                     submenu.push(fakeEntry("Child " + i))
@@ -508,75 +515,43 @@ Item {
                 verify(primaryHeight > 0)
                 item.submenuEntries = submenu
                 item.openSubmenu(parent, null)
-                // Twenty rows overflow the capped height. Delegate existence
-                // does not imply layout: poll the target value itself until
-                // it exceeds the primary and stops moving, then the popup
-                // grows with the surface and the excess scrolls.
-                var targetHeight = primaryHeight
-                var stableCount = 0
-                for (var t = 0; t < 400 && stableCount < 10; t++) {
+                var settled = false
+                for (var k = 0; k < 200 && !settled; k++) {
                     wait(10)
-                    var currentTarget = item.submenuTargetHeight
-                    if (currentTarget > primaryHeight && currentTarget === targetHeight)
-                        stableCount++
-                    else {
-                        stableCount = 0
-                        targetHeight = currentTarget
-                    }
+                    var probe = findByName(item, "traySubmenuFlick")
+                    settled = probe && probe.contentHeight > probe.height && probe.height > 0
                 }
-                verify(targetHeight > primaryHeight)
-                for (var k = 0; k < 200 && item.submenuSurface.height !== targetHeight; k++)
-                    wait(10)
-                compare(item.submenuSurface.height, targetHeight)
-                compare(item.implicitHeight, Math.max(item.heldHeight, primaryHeight, targetHeight))
+                verify(settled)
+                // Surface is exactly the primary plus the title strip; the
+                // rows viewport matches the primary one-to-one.
+                compare(item.submenuSurface.height, primaryHeight + item.submenuTitleHeight)
                 var flick = findByName(item, "traySubmenuFlick")
+                compare(flick.height, primaryHeight)
+                compare(flick.y, 0)
                 verify(flick.contentHeight > flick.height)
-                verify(flick.height > 0)
+                // Title strip hangs below the primary panel, top edge flush.
+                var block = findByName(item, "traySubmenuTitleBlock")
+                compare(block.y, primaryHeight)
+                compare(item.implicitHeight,
+                    Math.max(item.heldHeight, primaryHeight + item.submenuTitleHeight))
             } finally {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
-            // Animated: the panel pops out flush with the primary bottom,
-            // then grows tall. Settle the primary first: its layout steps
-            // retrigger the height Behavior, so sample only after 300ms of
-            // stability (past the 240ms motion duration).
+            // Animated: the fixed-height panel slides out once, no growth.
             var item2 = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
             var primary2 = 0
-            var primaryStable = 0
-            for (var m = 0; m < 400 && primaryStable < 30; m++) {
+            for (var m = 0; m < 200 && primary2 <= 0; m++) {
                 wait(10)
-                var primaryProbe = findByName(item2, "trayMenuFlick").height
-                if (primaryProbe > 0 && primaryProbe === primary2)
-                    primaryStable++
-                else {
-                    primaryStable = 0
-                    primary2 = primaryProbe
-                }
+                primary2 = findByName(item2, "trayMenuFlick").height
             }
             verify(primary2 > 0)
             item2.submenuEntries = submenu
-            var target2 = primary2
-            var stable2 = 0
-            for (var n = 0; n < 400 && stable2 < 10; n++) {
-                wait(10)
-                var current2 = item2.submenuTargetHeight
-                if (current2 > primary2 && current2 === target2)
-                    stable2++
-                else {
-                    stable2 = 0
-                    target2 = current2
-                }
-            }
-            verify(target2 > primary2)
             item2.openSubmenu(parent, null)
             compare(item2.submenuPhase, "opening")
-            wait(30)
-            // Still sliding: not grown past the primary bottom yet, and far
-            // from the full content height.
-            verify(item2.submenuSurface.height <= primary2)
-            verify(item2.submenuSurface.height < item2.submenuTargetHeight)
-            // Settled: grown to the full content height.
-            tryCompare(item2.submenuSurface, "height", item2.submenuTargetHeight, 3000)
-            verify(item2.submenuTargetHeight > primary2)
+            // Height is already final while sliding: primary plus title.
+            tryCompare(item2.submenuSurface, "height", primary2 + item2.submenuTitleHeight, 1500)
+            tryCompare(item2, "submenuPhase", "open", 1500)
+            compare(item2.submenuSurface.height, primary2 + item2.submenuTitleHeight)
         }
         function test_realSubmenuPointerHoverAndClick() {
             Lazer.MotionTokens.reducedMotionOverride = true
@@ -617,6 +592,14 @@ Item {
             // recomputes a negative fy and wipes the live highlight.
             Lazer.MotionTokens.reducedMotionOverride = true
             try {
+                // Park neutral BEFORE creating the menu: a stale cursor from
+                // an earlier pointer test can sit inside the future submenu
+                // rect and fire a ghost enter as the surface appears, latching
+                // live coords into the fresh catchers.
+                mouseMove(root, 350, 700)
+                wait(20)
+                mouseMove(root, 10, 600)
+                wait(20)
                 var parent = fakeEntry("More", { hasChildren: true })
                 var item = makeMenu([parent])
                 item.openSubmenu(parent, null)
@@ -626,14 +609,23 @@ Item {
                     wait(10)
                     landed = findAllByName(item, "trayMenuRow").length >= 2
                 }
-                verify(landed)
+                verify(landed, "submenu delegates never landed")
+                // Delegate existence precedes anchor layout by frames under
+                // load: resolve needs the laid-out viewport, not just rows.
+                var laid = false
+                for (var w = 0; w < 200 && !laid; w++) {
+                    wait(10)
+                    var fl = findByName(item, "traySubmenuFlick")
+                    laid = fl && fl.height >= 32
+                }
+                verify(laid, "submenu viewport never laid out")
                 // Hover the first submenu row (catcher-relative 40,16).
                 item.hoverAtSubCatcher(16)
-                verify(item.highlightedSubmenuRow !== null)
+                verify(item.highlightedSubmenuRow !== null, "direct hover did not highlight")
                 // Simulate the async settle; highlight must survive it.
                 item.resolveSubHoverFromMemory()
                 wait(30)
-                verify(item.highlightedSubmenuRow !== null)
+                verify(item.highlightedSubmenuRow !== null, "memory resolve wiped the highlight")
             } finally {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
