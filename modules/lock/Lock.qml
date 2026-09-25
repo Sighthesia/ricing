@@ -9,6 +9,7 @@ import "../../services" as Services
 import "./LockLogic.js" as LockLogic
 import "./LockController.js" as Controller
 import "./LockSurfaceLogic.js" as SurfaceLogic
+import "./StartupLockLogic.js" as StartupLockLogic
 
 // Own the single compositor session lock: trigger, snapshot commit, release.
 Scope {
@@ -19,6 +20,7 @@ Scope {
     property string _state: LockLogic.States.idle
     property int _requestGeneration: -1
     property bool _exitFailsafeArmed: false
+    property bool _startupLockArmed: true
 
     // Opt-in startup self-test: arm the lock on boot and force-release it on a
     // timer so the wave surface can be verified (and torn down) unattended.
@@ -48,6 +50,35 @@ Scope {
         _prepareFailsafe.restart()
         if (snapshot.ready)
             _commitLock()
+        return true
+    }
+
+    // Request the compositor lock once after the shell has discovered a screen.
+    function startupLock(): bool {
+        if (!StartupLockLogic.canAttempt(_state, _startupLockArmed,
+                                         Quickshell.screens.length > 0)) {
+            if (_startupLockArmed && Quickshell.screens.length <= 0)
+                startupLockTimer.restart()
+            else if (_startupLockArmed && _state !== LockLogic.States.idle)
+                _startupLockArmed = false
+            return false
+        }
+        const accepted = root.lock()
+        const result = StartupLockLogic.nextAttempt(
+            _startupLockArmed, Quickshell.screens.length > 0, _state, accepted)
+        _startupLockArmed = result.armed
+        if (result.retry)
+            startupLockTimer.restart()
+        return accepted
+    }
+
+    // Return to the lock prompt without disturbing an active PAM conversation.
+    function requestSessionLock(): bool {
+        if (Controller.canLock(_state))
+            return root.lock()
+        if (_state !== LockLogic.States.locked || lockContext.unlockInProgress)
+            return false
+        lockContext.reset()
         return true
     }
 
@@ -143,6 +174,13 @@ Scope {
         startupSelfTestTimer.start()
     }
 
+    // Retry only while the compositor has not populated the screen list.
+    property Timer startupLockTimer: Timer {
+        interval: 100
+        repeat: false
+        onTriggered: root.startupLock()
+    }
+
     // One compositor-owned lock; Quickshell creates one surface per screen.
     WlSessionLock {
         id: sessionLock
@@ -182,6 +220,14 @@ Scope {
             // forever, so successful authentication bounds it with a timer.
             if (Controller.armExitFailsafe(previous, next))
                 root._exitFailsafe.restart()
+        }
+    }
+
+    // Session-menu Lock requests share the normal manual lock state machine.
+    Connections {
+        target: Services.SessionService
+        function onLockRequested(): void {
+            root.requestSessionLock()
         }
     }
 

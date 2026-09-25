@@ -20,6 +20,8 @@ ShellRoot {
         Services.AppThemeService.pushSystemTheme()
         Services.LauncherService.primeApps()
         Services.ClipboardService.warmup()
+        if (!lockModule.selfTestEnabled)
+            Qt.callLater(() => lockModule.startupLock())
     }
 
     LazerBar.WallpaperBackground {}
@@ -32,5 +34,7 @@ ShellRoot {
     LazerBar.NotificationHost {}
 
     // Compositor-enforced session lock; creates one surface per screen.
-    LockModule.Lock {}
+    LockModule.Lock {
+        id: lockModule
+    }
 }

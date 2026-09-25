@@ -170,6 +170,26 @@ WlSessionLockSurface {
         }
     }
 
+    // Keep session actions inside this compositor-owned surface.
+    LockSessionMenu {
+        id: sessionMenu
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 28
+        anchors.bottomMargin: 28
+        reducedMotion: root.reducedMotion
+        sessionService: Services.SessionService
+        z: 3.5
+    }
+
+    Connections {
+        target: sessionMenu
+        function onOpenChanged() {
+            if (!sessionMenu.open)
+                keyboardOwner.forceActiveFocus()
+        }
+    }
+
     // Keep keyboard ownership independent of the animated auth content. The
     // session-lock surface must accept password input even while the content is
     // still fading in or when the background image is unavailable.
@@ -180,6 +200,10 @@ WlSessionLockSurface {
         z: 4
 
         Keys.onPressed: event => {
+            if (event.key === Qt.Key_Escape && sessionMenu.handleEscape()) {
+                event.accepted = true
+                return
+            }
             if (!root.lockContext)
                 return
             var isSubmit = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
