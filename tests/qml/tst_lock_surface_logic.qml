@@ -353,6 +353,30 @@ Item {
             compare(SurfaceLogic.inputEscapeAction(false, false), "none")
         }
 
+        function test_passwordInputKeepsMixedCaseAndDigitsOnOnePath() {
+            var state = SurfaceLogic.passwordInputEdit("", false, false, "A")
+            compare(state.action, "edit")
+            compare(state.text, "A")
+            state = SurfaceLogic.passwordInputEdit(state.text, false, false, "7")
+            compare(state.text, "A7")
+            state = SurfaceLogic.passwordInputEdit(state.text, false, false, "z")
+            compare(state.text, "A7z")
+            state = SurfaceLogic.passwordInputEdit(state.text, false, true, "")
+            compare(state.text, "A7")
+            state = SurfaceLogic.passwordInputEdit(state.text, true, false, "")
+            compare(state.action, "submit")
+            compare(state.text, "A7")
+        }
+
+        function test_passwordInputIgnoresNonPrintableEvents() {
+            var state = SurfaceLogic.passwordInputEdit("A7", false, false, "\u0001")
+            compare(state.action, "none")
+            compare(state.text, "A7")
+            state = SurfaceLogic.passwordInputEdit("A7", false, false, "\u007f")
+            compare(state.action, "none")
+            compare(state.text, "A7")
+        }
+
         function test_trailingRevealStartsAtWallpaperBoundary() {
             compare(SurfaceLogic.trailingRevealStarted(0, 0.3), false)
             compare(SurfaceLogic.trailingRevealStarted(0.3, 0.3), false)

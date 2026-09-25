@@ -76,6 +76,20 @@ function inputEscapeAction(inputMode, unlockInProgress) {
     return inputMode === true || unlockInProgress === true ? "cancel-input" : "none"
 }
 
+// Keep keyboard editing on one focused owner instead of handing events off to
+// a native TextInput after the first key.
+function passwordInputEdit(currentText, isSubmit, isBackspace, eventText) {
+    var text = String(currentText || "")
+    if (isSubmit)
+        return { action: "submit", text: text }
+    if (isBackspace)
+        return { action: "edit", text: text.slice(0, -1) }
+    var typed = String(eventText || "")
+    if (typed.length === 1 && typed.charCodeAt(0) >= 0x20 && typed.charCodeAt(0) !== 0x7f)
+        return { action: "edit", text: text + typed }
+    return { action: "none", text: text }
+}
+
 // Show foreground content as soon as the trailing wave edge starts unveiling
 // the wallpaper. Keeping this pure makes the lock entrance timing testable
 // without Wayland.

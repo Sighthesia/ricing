@@ -47,7 +47,6 @@ WlSessionLockSurface {
             ? root.lockContext.showFailure : false
     property date now: new Date()
     property bool inputMode: false
-    property bool syncingPasswordField: false
 
     signal releaseRequested()
 
@@ -59,7 +58,6 @@ WlSessionLockSurface {
         exitStarted = false
         releaseSent = false
         inputMode = false
-        syncPasswordField()
         if (reducedMotion) {
             SurfaceLogic.applyRevealImmediately(root, allAnimations())
             return
@@ -101,7 +99,7 @@ WlSessionLockSurface {
     // Enter the inline authentication mode without changing PAM state.
     function enterInputMode(): void {
         inputMode = true
-        passwordField.forceActiveFocus()
+        keyboardOwner.forceActiveFocus()
     }
 
     // Give the user a safe recovery path when authentication input is stuck.
@@ -114,42 +112,15 @@ WlSessionLockSurface {
             return false
         root.lockContext.reset()
         root.inputMode = false
-        root.syncPasswordField()
         keyboardOwner.forceActiveFocus()
         return true
     }
 
-    // Synchronize external authentication changes without creating delete ghosts.
-    function syncPasswordField(): void {
-        if (!root.lockContext || !passwordField)
-            return
-        var nextText = root.lockContext.currentText == null
-                ? "" : String(root.lockContext.currentText)
-        if (passwordField.text === nextText)
-            return
-        syncingPasswordField = true
-        passwordField.suppressDeleteFx = true
-        passwordField.text = nextText
-        passwordField.suppressDeleteFx = false
-        syncingPasswordField = false
-    }
-
-    // Keep falling deletion feedback masked while preserving its motion.
-    function maskPasswordGhosts(): void {
-        var ghosts = passwordField.ghostLayerItem.children
-        for (var i = 0; i < ghosts.length; i++) {
-            if (ghosts[i])
-                ghosts[i].text = "\u2022"
-        }
-    }
-
     onLockContextChanged: {
         contextConnections.target = lockContext
-        syncPasswordField()
     }
 
     Component.onCompleted: {
-        syncPasswordField()
         startReveal()
         keyboardOwner.forceActiveFocus()
     }
@@ -230,16 +201,13 @@ WlSessionLockSurface {
             if (!isSubmit && !isBackspace && !isPrintable)
                 return
             root.enterInputMode()
-            if (isSubmit) {
+            var edit = SurfaceLogic.passwordInputEdit(
+                        root.lockContext.currentText, isSubmit, isBackspace, event.text)
+            if (edit.action === "submit") {
                 root.lockContext.submit()
                 event.accepted = true
-            } else if (isBackspace) {
-                passwordField.text = passwordField.text.slice(0, -1)
-                passwordField.cursorPosition = passwordField.text.length
-                event.accepted = true
-            } else if (isPrintable) {
-                passwordField.text += event.text
-                passwordField.cursorPosition = passwordField.text.length
+            } else if (edit.action === "edit") {
+                root.lockContext.currentText = edit.text
                 event.accepted = true
             }
         }
@@ -364,69 +332,36 @@ WlSessionLockSurface {
                 }
             }
 
-            // Reuse the launcher field for password masking, caret, and ghosts.
-            Lazer.OsuTextField {
-                id: passwordField
+            // Render the password without mounting a second keyboard owner.
+            Text {
+                id: passwordDisplay
                 anchors.fill: parent
                 anchors.leftMargin: 20
                 anchors.rightMargin: 20
                 anchors.topMargin: 4
                 anchors.bottomMargin: 4
-                visible: root.inputMode || opacity > 0.01
-                enabled: root.inputMode
-                opacity: root.inputMode ? 1 : 0
-                clip: true
-                echoMode: TextInput.Password
+                visible: root.inputMode && text.length > 0
                 color: root.authTextColor
-                selectionColor: Lazer.LazerTheme.osuPink
                 font.family: "monospace"
                 font.pixelSize: 18
                 font.weight: Font.DemiBold
                 verticalAlignment: TextInput.AlignVCenter
-                text: ""
-
-                onTextChanged: {
-                    if (root.syncingPasswordField || !root.lockContext)
-                        return
-                    if (root.lockContext.currentText !== text)
-                        root.lockContext.currentText = text
-                }
-                onAccepted: {
-                    if (root.lockContext)
-                        root.lockContext.submit()
-                }
-                onGhostCountChanged: root.maskPasswordGhosts()
-                Keys.onEscapePressed: event => {
-                    event.accepted = root.cancelInputMode()
-                }
-                Behavior on opacity {
-                    enabled: !root.reducedMotion
-                    NumberAnimation {
-                        duration: Lazer.MotionTokens.medium
-                        easing.type: Easing.OutQuint
-                    }
-                }
-            }
-
-            // Keep the reusable caret legible against the active surface.
-            Binding {
-                target: passwordField.caretItem
-                property: "color"
-                value: root.authTextColor
+                horizontalAlignment: Text.AlignHCenter
+                text: root.lockContext
+                        ? SurfaceLogic.maskedPassword(root.lockContext.currentText) : ""
             }
 
             // Show a non-text insertion marker only for an empty focused field.
             Rectangle {
                 id: emptyPasswordMarker
-                x: passwordField.x + passwordField.cursorRectangle.x
-                y: passwordField.y + passwordField.cursorRectangle.y
-                    + (passwordField.cursorRectangle.height - height) / 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
                 width: 12
                 height: 6
                 radius: 3
                 color: root.authTextColor
-                opacity: root.inputMode && passwordField.activeFocus
-                    && passwordField.text.length === 0 ? 1 : 0
+                opacity: root.inputMode && keyboardOwner.activeFocus
+                    && (!root.lockContext || root.lockContext.currentText.length === 0) ? 1 : 0
                 visible: root.inputMode
                 enabled: false
                 Behavior on opacity {
@@ -533,16 +468,12 @@ WlSessionLockSurface {
         function onShowFailureChanged() {
             if (root.lockContext && root.lockContext.showFailure) {
                 root.enterInputMode()
-                passwordField.forceActiveFocus()
+                keyboardOwner.forceActiveFocus()
                 if (root.reducedMotion)
                     authControl.failureOffset = 0
                 else
                     failureAnimation.restart()
             }
-        }
-
-        function onCurrentTextChanged() {
-            root.syncPasswordField()
         }
     }
 }
