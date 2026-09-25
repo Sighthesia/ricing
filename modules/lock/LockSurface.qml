@@ -32,11 +32,10 @@ WlSessionLockSurface {
     // Read the effective mode directly here. The lock surface can be created
     // before the shared theme palette has finished applying its new scheme.
     readonly property bool lightScheme: Services.SettingsService.effectiveColorScheme === "light"
-    // Keep all lock-screen foreground content behind the wave's trailing edge.
-    readonly property real authRevealProgress: reducedMotion
-            ? 1 : SurfaceLogic.trailingRevealProgress(root.waveProgress, backdrop.maskDelay)
-    readonly property real authRevealOffset: (1 - authRevealProgress) * Lazer.MotionTokens.overlayFromY
-    readonly property real authRevealOpacity: authRevealProgress
+    // Reveal foreground content at the instant the trailing wave edge starts
+    // exposing the wallpaper; the content itself does not animate.
+    readonly property bool foregroundRevealed: reducedMotion
+            || SurfaceLogic.trailingRevealStarted(root.waveProgress, backdrop.maskDelay)
     readonly property real authInputWidth: Math.max(0, Math.min(360, root.width - 48))
     readonly property color authControlColor: root.lightScheme
             ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface
@@ -193,7 +192,7 @@ WlSessionLockSurface {
         anchors.bottomMargin: 28
         reducedMotion: root.reducedMotion
         sessionService: Services.SessionService
-        entranceRevealProgress: root.authRevealProgress
+        entranceRevealed: root.foregroundRevealed
         z: 3.5
     }
 
@@ -251,10 +250,8 @@ WlSessionLockSurface {
         id: authSurface
         anchors.fill: parent
         z: 3
-        visible: root.authRevealProgress > 0.01
-        enabled: root.authRevealProgress >= 0.99
-        opacity: root.authRevealOpacity
-        transform: Translate { y: root.authRevealOffset }
+        visible: root.foregroundRevealed
+        enabled: root.foregroundRevealed
 
         // Keep the primary clock above the interaction control.
         Column {

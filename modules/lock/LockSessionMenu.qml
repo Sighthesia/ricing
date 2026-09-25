@@ -12,9 +12,9 @@ Item {
     property string errorText: ""
     property string statusText: ""
     property string pendingAction: ""
-    // The lock surface supplies the shared trailing wave reveal. The menu's
-    // own open/close progress remains independent from this entrance gate.
-    property real entranceRevealProgress: 1
+    // The lock surface supplies a discrete gate at the trailing wave edge.
+    // The menu's own open/close progress remains independent from this gate.
+    property bool entranceRevealed: true
     property real revealProgress: 0
     readonly property int menuItemCount: actionColumn.children.length
     readonly property int panelHeight: 296
@@ -25,10 +25,8 @@ Item {
     implicitHeight: panelHeight + 56
     width: implicitWidth
     height: implicitHeight
-    visible: root.entranceRevealProgress > 0.01 || root.open || root.revealProgress > 0.01
-    enabled: root.entranceRevealProgress >= 0.99
-    opacity: root.entranceRevealProgress
-    transform: Translate { y: (1 - root.entranceRevealProgress) * Lazer.MotionTokens.overlayFromY }
+    visible: root.entranceRevealed
+    enabled: root.entranceRevealed
 
     function toggleOpen(): void {
         root.open = Logic.toggle(root.open)

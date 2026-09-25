@@ -57,15 +57,11 @@ Item {
 
         function test_entranceRevealKeepsMenuHiddenAndDisabledUntilWaveTail() {
             menu.open = false
-            menu.entranceRevealProgress = 0
+            menu.entranceRevealed = false
             verify(!menu.visible)
             verify(!menu.enabled)
 
-            menu.entranceRevealProgress = 0.5
-            verify(menu.visible)
-            verify(!menu.enabled)
-
-            menu.entranceRevealProgress = 1
+            menu.entranceRevealed = true
             verify(menu.visible)
             verify(menu.enabled)
         }

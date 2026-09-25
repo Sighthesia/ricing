@@ -353,13 +353,11 @@ Item {
             compare(SurfaceLogic.inputEscapeAction(false, false), "none")
         }
 
-        function test_trailingRevealWaitsForWaveTail() {
-            compare(SurfaceLogic.trailingRevealProgress(0, 0.3), 0)
-            compare(SurfaceLogic.trailingRevealProgress(0.29, 0.3), 0)
-            compare(SurfaceLogic.trailingRevealProgress(0.3, 0.3), 0)
-            verify(SurfaceLogic.trailingRevealProgress(0.65, 0.3) > 0)
-            compare(SurfaceLogic.trailingRevealProgress(1, 0.3), 1)
-            compare(SurfaceLogic.trailingRevealProgress(2, 0.3), 1)
+        function test_trailingRevealStartsAtWallpaperBoundary() {
+            compare(SurfaceLogic.trailingRevealStarted(0, 0.3), false)
+            compare(SurfaceLogic.trailingRevealStarted(0.3, 0.3), false)
+            compare(SurfaceLogic.trailingRevealStarted(0.3001, 0.3), true)
+            compare(SurfaceLogic.trailingRevealStarted(1, 0.3), true)
         }
 
         function test_screenSlotMapsByIdentity() {
