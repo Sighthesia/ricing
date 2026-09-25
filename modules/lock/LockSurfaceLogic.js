@@ -22,9 +22,9 @@ function baseSource(snapshotUrl) {
     return snapshotUrl || ""
 }
 
-// The reveal layer is the wallpaper body that slides up over the bands.
-// No configured wallpaper resolves to nothing; the settled bands then keep
-// showing over the screenshot instead of a flat panel color.
+// The reveal layer is the pinned wallpaper the trailing mask unveils at
+// the band tail. No configured wallpaper resolves to nothing; the settled
+// bands then keep showing over the screenshot instead of a flat panel color.
 function revealSource(wallpaperPath) {
     return wallpaperPath || ""
 }
@@ -70,6 +70,12 @@ function authStatus(unlockInProgress, showFailure, errorMessage) {
     return { message: "", tone: authTones.none }
 }
 
+// Escape may cancel only the local authentication presentation; it never
+// releases the compositor lock.
+function inputEscapeAction(inputMode, unlockInProgress) {
+    return inputMode === true || unlockInProgress === true ? "cancel-input" : "none"
+}
+
 // Resolve a surface's snapshot slot from the shared screen list; an unknown
 // screen resolves to no slot instead of another screen's image.
 function screenSlot(screens, screen) {
@@ -84,12 +90,10 @@ function screenSlot(screens, screen) {
 
 function applyRevealImmediately(surface, animations) {
     stopAll(animations)
-    surface.bandsProgress = 1
-    surface.bodyProgress = 1
+    surface.waveProgress = 1
 }
 
 function applyExitImmediately(surface, animations) {
     stopAll(animations)
-    surface.bandsProgress = 0
-    surface.bodyProgress = 0
+    surface.waveProgress = 0
 }

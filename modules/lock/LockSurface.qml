@@ -106,6 +106,21 @@ WlSessionLockSurface {
         passwordField.forceActiveFocus()
     }
 
+    // Give the user a safe recovery path when authentication input is stuck.
+    function cancelInputMode(): bool {
+        if (!root.lockContext)
+            return false
+        const action = SurfaceLogic.inputEscapeAction(root.inputMode,
+                                                      root.lockContext.unlockInProgress)
+        if (action === "none")
+            return false
+        root.lockContext.reset()
+        root.inputMode = false
+        root.syncPasswordField()
+        keyboardOwner.forceActiveFocus()
+        return true
+    }
+
     // Synchronize external authentication changes without creating delete ghosts.
     function syncPasswordField(): void {
         if (!root.lockContext || !passwordField)
@@ -201,6 +216,10 @@ WlSessionLockSurface {
 
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Escape && sessionMenu.handleEscape()) {
+                event.accepted = true
+                return
+            }
+            if (event.key === Qt.Key_Escape && root.cancelInputMode()) {
                 event.accepted = true
                 return
             }
@@ -378,6 +397,9 @@ WlSessionLockSurface {
                         root.lockContext.submit()
                 }
                 onGhostCountChanged: root.maskPasswordGhosts()
+                Keys.onEscapePressed: event => {
+                    event.accepted = root.cancelInputMode()
+                }
                 Behavior on opacity {
                     enabled: !root.reducedMotion
                     NumberAnimation {

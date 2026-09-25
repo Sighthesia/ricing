@@ -10,21 +10,19 @@ Item {
 
     property bool released: false
 
-    // Harness mirrors the production dual-channel contract exactly: bands
-    // 600ms OutQuad lead, body 800ms OutQuint follows; close is body InQuad
-    // with bands InSine, both 500ms, release owned by the body landing.
+    // Harness mirrors the production contract exactly: one reveal driver,
+    // enter 800ms OutQuad, exit 500ms OutQuad, release owned by the landing.
     Item {
         id: lockSurface
         anchors.fill: parent
-        property real bandsProgress: 0
-        property real bodyProgress: 0
+        property real waveProgress: 0
         property bool reducedMotion: false
         property bool exitStarted: false
         property bool releaseSent: false
         signal releaseRequested()
 
         function allAnimations() {
-            return [enterBands, enterBody, exitBands, exitBody]
+            return [enterAnimation, exitAnimation]
         }
 
         function startReveal() {
@@ -35,10 +33,8 @@ Item {
                 return
             }
             SurfaceLogic.stopAll(allAnimations())
-            enterBands.from = bandsProgress
-            enterBody.from = bodyProgress
-            enterBands.start()
-            enterBody.start()
+            enterAnimation.from = waveProgress
+            enterAnimation.start()
         }
 
         function stopAnimation() {
@@ -58,54 +54,33 @@ Item {
                 return
             }
             SurfaceLogic.stopAll(allAnimations())
-            exitBody.from = bodyProgress
-            exitBands.from = bandsProgress
-            exitBody.start()
-            exitBands.start()
+            exitAnimation.from = waveProgress
+            exitAnimation.start()
         }
 
         NumberAnimation {
-            id: enterBands
+            id: enterAnimation
             target: lockSurface
-            property: "bandsProgress"
+            property: "waveProgress"
             from: 0
             to: 1
-            duration: 600
+            duration: 800
             easing.type: Easing.OutQuad
         }
 
         NumberAnimation {
-            id: enterBody
+            id: exitAnimation
             target: lockSurface
-            property: "bodyProgress"
-            from: 0
-            to: 1
-            duration: 800
-            easing.type: Easing.OutQuint
-        }
-
-        NumberAnimation {
-            id: exitBody
-            target: lockSurface
-            property: "bodyProgress"
+            property: "waveProgress"
             to: 0
             duration: 500
-            easing.type: Easing.InQuad
+            easing.type: Easing.OutQuad
             onFinished: {
                 if (!lockSurface.releaseSent) {
                     lockSurface.releaseSent = true
                     lockSurface.releaseRequested()
                 }
             }
-        }
-
-        NumberAnimation {
-            id: exitBands
-            target: lockSurface
-            property: "bandsProgress"
-            to: 0
-            duration: 500
-            easing.type: Easing.InSine
         }
 
         Component.onCompleted: startReveal()
@@ -124,8 +99,7 @@ Item {
             harness.released = false
             lockSurface.stopAnimation()
             lockSurface.reducedMotion = false
-            lockSurface.bandsProgress = 0
-            lockSurface.bodyProgress = 0
+            lockSurface.waveProgress = 0
             lockSurface.exitStarted = false
             lockSurface.releaseSent = false
         }
@@ -133,52 +107,36 @@ Item {
         function test_surfaceIsFullSizeAndRevealCompletes() {
             compare(lockSurface.width, harness.width)
             compare(lockSurface.height, harness.height)
-            compare(lockSurface.bandsProgress, 0)
-            compare(lockSurface.bodyProgress, 0)
+            compare(lockSurface.waveProgress, 0)
             lockSurface.startReveal()
-            tryCompare(lockSurface, "bandsProgress", 1, 1000)
-            tryCompare(lockSurface, "bodyProgress", 1, 1200)
+            tryCompare(lockSurface, "waveProgress", 1, 1200)
         }
 
-        function test_bandsAndBodyOverlapDuringReveal() {
+        function test_exitRetargetsFromLiveValue() {
             lockSurface.startReveal()
             wait(300)
-            verify(lockSurface.bandsProgress > 0 && lockSurface.bandsProgress < 1)
-            verify(lockSurface.bodyProgress > 0 && lockSurface.bodyProgress < 1)
-            tryCompare(lockSurface, "bodyProgress", 1, 1200)
-        }
-
-        function test_exitRetargetsBothChannelsFromLiveValues() {
-            lockSurface.startReveal()
-            wait(300)
-            var liveBands = lockSurface.bandsProgress
-            var liveBody = lockSurface.bodyProgress
-            verify(liveBands > 0 && liveBody > 0)
+            verify(lockSurface.waveProgress > 0 && lockSurface.waveProgress < 1)
             lockSurface.startExit()
             verify(!harness.released)
             tryCompare(harness, "released", true, 900)
-            compare(lockSurface.bandsProgress, 0)
-            compare(lockSurface.bodyProgress, 0)
+            compare(lockSurface.waveProgress, 0)
         }
 
         function test_releaseWaitsForExitAnimation() {
             lockSurface.startReveal()
-            tryCompare(lockSurface, "bodyProgress", 1, 1200)
+            tryCompare(lockSurface, "waveProgress", 1, 1200)
             lockSurface.startExit()
             verify(!harness.released)
             tryCompare(harness, "released", true, 900)
-            tryCompare(lockSurface, "bodyProgress", 0, 100)
-            compare(lockSurface.bandsProgress, 0)
+            tryCompare(lockSurface, "waveProgress", 0, 100)
         }
 
         function test_reducedMotionUsesFinalValuesImmediately() {
             lockSurface.reducedMotion = true
             lockSurface.startReveal()
-            compare(lockSurface.bandsProgress, 1)
-            compare(lockSurface.bodyProgress, 1)
+            compare(lockSurface.waveProgress, 1)
             lockSurface.startExit()
-            compare(lockSurface.bandsProgress, 0)
-            compare(lockSurface.bodyProgress, 0)
+            compare(lockSurface.waveProgress, 0)
             verify(harness.released)
         }
 
@@ -188,11 +146,9 @@ Item {
             wait(40)
             lockSurface.reducedMotion = true
             lockSurface.startReveal()
-            compare(lockSurface.bandsProgress, 1)
-            compare(lockSurface.bodyProgress, 1)
+            compare(lockSurface.waveProgress, 1)
             lockSurface.startExit()
-            compare(lockSurface.bandsProgress, 0)
-            compare(lockSurface.bodyProgress, 0)
+            compare(lockSurface.waveProgress, 0)
             verify(harness.released)
         }
     }
@@ -389,6 +345,12 @@ Item {
 
             var nullish = SurfaceLogic.authStatus(false, true, null)
             compare(nullish.message, "Authentication failed")
+        }
+
+        function test_escapeCancelsOnlyAuthenticationPresentation() {
+            compare(SurfaceLogic.inputEscapeAction(true, false), "cancel-input")
+            compare(SurfaceLogic.inputEscapeAction(false, true), "cancel-input")
+            compare(SurfaceLogic.inputEscapeAction(false, false), "none")
         }
 
         function test_screenSlotMapsByIdentity() {

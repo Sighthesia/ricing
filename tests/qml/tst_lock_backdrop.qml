@@ -52,47 +52,56 @@ Item {
             return bands
         }
 
-        function setStage(bands, body) {
-            backdrop.bandsProgress = bands
-            backdrop.bodyProgress = body
-            wait(120)
-            return grabImage(backdrop)
+        function test_maskTrailsBands() {
+            tryCompare(backdrop, "imagesReady", true)
+            compare(backdrop.maskProgress, 0)
+            backdrop.progress = 0.3
+            compare(backdrop.maskProgress, 0)
+            backdrop.progress = 0.65
+            verify(Math.abs(backdrop.maskProgress - 0.5) < 0.001)
+            backdrop.progress = 1
+            compare(backdrop.maskProgress, 1)
+            backdrop.progress = 0
         }
 
-        function test_bandsSweepBeforeBody() {
+        function test_wallpaperUnveiledAtBandTail() {
             tryCompare(backdrop, "imagesReady", true)
-            // Bands sweep the screenshot while the body waits below.
-            var sweeping = setStage(0.5, 0)
-            verify(bandArea(sweeping) > 300, "bands must dominate before the body")
-            verify(!isWallpaperBlue(sweeping.pixel(160, 230)), "body waits below")
-            // Bands at rest wash the frame; the open frame stays screenshot.
-            var wash = setStage(1, 0)
-            compare(wash.pixel(160, 10), "#75293f", "pink wash at rest")
-            // Body fades in over the wash, then settles clean.
-            var covering = setStage(1, 0.5)
-            var coveringBottom = covering.pixel(160, 230)
-            verify(!isScreenshotRed(coveringBottom) && !isWallpaperBlue(coveringBottom),
-                "body blends over the wash")
-            var settled = setStage(1, 1)
-            compare(bandArea(settled), 0, "no bands left at rest")
-            var open = setStage(0, 0)
+            // Mid-sweep three zones read top to bottom: screenshot ahead,
+            // pink bands, wallpaper behind where the bands swept past.
+            backdrop.progress = 0.5
+            wait(120)
+            var sweeping = grabImage(backdrop)
+            compare(sweeping.pixel(160, 10), "#ff0000", "screenshot ahead")
+            var midSweep = sweeping.pixel(160, 120)
+            verify(!isScreenshotRed(midSweep) && !isWallpaperBlue(midSweep), "pink bands")
+            compare(sweeping.pixel(160, 230), "#0000ff", "wallpaper behind")
+            // Open and settled frames stay pure.
+            backdrop.progress = 0
+            wait(120)
+            var open = grabImage(backdrop)
             compare(bandArea(open), 0, "no bands before the sweep")
+            backdrop.progress = 1
+            wait(120)
+            var settled = grabImage(backdrop)
+            compare(bandArea(settled), 0, "no bands left at rest")
+            compare(settled.pixel(160, 10), "#0000ff", "settled wallpaper")
         }
 
         function test_curtainBothDirections() {
             tryCompare(backdrop, "imagesReady", true)
-            var stages = [[0, 0], [1, 0], [1, 1], [1, 0], [0, 0]]
+            var stages = [0, 0.5, 1, 0.5, 0]
             for (var i = 0; i < stages.length; ++i) {
-                var image = setStage(stages[i][0], stages[i][1])
-                var tag = "bands=" + stages[i][0] + " body=" + stages[i][1]
-                if (stages[i][0] === 1 && stages[i][1] === 0) {
-                    compare(image.pixel(160, 10), "#75293f", "wash " + tag)
-                } else if (stages[i][1] === 1) {
-                    compare(image.pixel(160, 10), "#0000ff", "top " + tag)
-                    compare(image.pixel(160, 230), "#0000ff", "bottom " + tag)
+                backdrop.progress = stages[i]
+                wait(80)
+                var image = grabImage(backdrop)
+                if (stages[i] === 0.5) {
+                    compare(image.pixel(160, 10), "#ff0000", "top at 0.5")
+                    var mid = image.pixel(160, 120)
+                    verify(!isScreenshotRed(mid) && !isWallpaperBlue(mid), "bands at 0.5")
+                    compare(image.pixel(160, 230), "#0000ff", "bottom at 0.5")
                 } else {
-                    compare(image.pixel(160, 10), "#ff0000", "top " + tag)
-                    compare(image.pixel(160, 230), "#ff0000", "bottom " + tag)
+                    compare(image.pixel(160, 10), stages[i] === 1 ? "#0000ff" : "#ff0000", "top at " + stages[i])
+                    compare(image.pixel(160, 230), stages[i] === 1 ? "#0000ff" : "#ff0000", "bottom at " + stages[i])
                 }
             }
         }
