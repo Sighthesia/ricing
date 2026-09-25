@@ -353,6 +353,15 @@ Item {
             compare(SurfaceLogic.inputEscapeAction(false, false), "none")
         }
 
+        function test_trailingRevealWaitsForWaveTail() {
+            compare(SurfaceLogic.trailingRevealProgress(0, 0.3), 0)
+            compare(SurfaceLogic.trailingRevealProgress(0.29, 0.3), 0)
+            compare(SurfaceLogic.trailingRevealProgress(0.3, 0.3), 0)
+            verify(SurfaceLogic.trailingRevealProgress(0.65, 0.3) > 0)
+            compare(SurfaceLogic.trailingRevealProgress(1, 0.3), 1)
+            compare(SurfaceLogic.trailingRevealProgress(2, 0.3), 1)
+        }
+
         function test_screenSlotMapsByIdentity() {
             // Identity comparison, so plain JS objects exercise the same seam.
             var first = { name: "DP-1" }

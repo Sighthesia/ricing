@@ -76,6 +76,14 @@ function inputEscapeAction(inputMode, unlockInProgress) {
     return inputMode === true || unlockInProgress === true ? "cancel-input" : "none"
 }
 
+// Derive the trailing foreground reveal from the wave's shared progress.
+// Keeping this pure makes the lock entrance timing testable without Wayland.
+function trailingRevealProgress(progress, delay) {
+    var safeProgress = Math.max(0, Math.min(1, Number(progress) || 0))
+    var safeDelay = Math.max(0, Math.min(0.99, Number(delay) || 0))
+    return Math.max(0, Math.min(1, (safeProgress - safeDelay) / (1 - safeDelay)))
+}
+
 // Resolve a surface's snapshot slot from the shared screen list; an unknown
 // screen resolves to no slot instead of another screen's image.
 function screenSlot(screens, screen) {

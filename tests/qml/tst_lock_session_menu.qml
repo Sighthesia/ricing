@@ -55,6 +55,21 @@ Item {
             compare(menu.menuItemCount, 5)
         }
 
+        function test_entranceRevealKeepsMenuHiddenAndDisabledUntilWaveTail() {
+            menu.open = false
+            menu.entranceRevealProgress = 0
+            verify(!menu.visible)
+            verify(!menu.enabled)
+
+            menu.entranceRevealProgress = 0.5
+            verify(menu.visible)
+            verify(!menu.enabled)
+
+            menu.entranceRevealProgress = 1
+            verify(menu.visible)
+            verify(menu.enabled)
+        }
+
         function test_triggerOpensAndEscapeCloses() {
             menu.toggleOpen()
             compare(menu.open, true)
