@@ -108,19 +108,34 @@ function authControlTransition(state, event) {
     return state
 }
 
+// Keep lock-surface text readable while preserving the active wallpaper hue.
+// Theme files are reloaded asynchronously, so transparent/black intermediate
+// values must never reach a visible lock label.
+function readableThemeColor(accent, lightScheme) {
+    var hue = Number(accent && accent.hslHue)
+    var saturation = Number(accent && accent.hslSaturation)
+    var alpha = Number(accent && accent.a)
+    if (!isFinite(hue) || !isFinite(saturation) || !isFinite(alpha) || alpha < 0.5
+            || saturation < 0.08) {
+        hue = 0.72
+        saturation = 0.65
+    }
+    saturation = Math.max(0.42, Math.min(0.86, saturation))
+    return Qt.hsla(hue, saturation, lightScheme === true ? 0.28 : 0.76, 1)
+}
+
+// Use a separate extreme tonal role for password/status text so it remains
+// distinct from the accent-toned icon while keeping the wallpaper hue.
+function readableTextColor(accent, lightScheme) {
+    var iconColor = readableThemeColor(accent, lightScheme)
+    return Qt.hsla(iconColor.hslHue, iconColor.hslSaturation,
+        lightScheme === true ? 0.16 : 0.90, 1)
+}
+
 // Pick a readable tonal variant of the wallpaper-derived accent without
 // falling back to unrelated pure white or pure black text.
 function clockThemeColor(accent, backgroundLuminance, lightScheme) {
-    var hue = Number(accent && accent.hslHue)
-    if (!isFinite(hue) || hue < 0)
-        hue = 0.72
-    var saturation = Number(accent && accent.hslSaturation)
-    if (!isFinite(saturation))
-        saturation = 0.65
-    saturation = Math.max(0.42, Math.min(0.86, saturation))
-    var isLight = lightScheme === true
-    var lightness = isLight ? 0.28 : 0.76
-    return Qt.hsla(hue, saturation, lightness, 1)
+    return readableThemeColor(accent, lightScheme)
 }
 
 function clockThemeMutedColor(accent, backgroundLuminance, lightScheme) {

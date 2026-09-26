@@ -396,6 +396,24 @@ Item {
                     + Math.abs(iconColor.b - textColor.b) > 0.18)
         }
 
+        function test_readableThemeColorRejectsBlackAndTransparentIntermediateValues() {
+            var invalid = Qt.rgba(0, 0, 0, 0)
+            var light = SurfaceLogic.readableThemeColor(invalid, true)
+            var dark = SurfaceLogic.readableThemeColor(invalid, false)
+            verify(light.hslLightness < 0.5)
+            verify(dark.hslLightness > 0.5)
+            verify(light.a > 0.9)
+            verify(dark.a > 0.9)
+        }
+
+        function test_readableTextColorStaysDistinctFromIconTone() {
+            var accent = Qt.rgba(0.35, 0.20, 0.65, 1)
+            var icon = SurfaceLogic.readableThemeColor(accent, true)
+            var text = SurfaceLogic.readableTextColor(accent, true)
+            verify(text.hslLightness < icon.hslLightness)
+            verify(text.a > 0.9)
+        }
+
         function test_authControlKeepsIconThroughInputAndUnlockFeedback() {
             var state = SurfaceLogic.AuthControlStates.idle
             state = SurfaceLogic.authControlTransition(state, "enter-input")

@@ -1,6 +1,7 @@
 import QtQuick
 import "../lazerbar" as Lazer
 import "LockSessionMenuLogic.js" as Logic
+import "LockSurfaceLogic.js" as SurfaceLogic
 
 // Present the session actions as a bounded Wave-style lock-screen surface.
 Item {
@@ -16,6 +17,8 @@ Item {
     // The menu's own open/close progress remains independent from this gate.
     property bool entranceRevealed: true
     property real revealProgress: 0
+    readonly property color sessionTextColor: SurfaceLogic.readableThemeColor(
+        Lazer.LazerTheme.accentColor, Lazer.LazerTheme.lightScheme)
     readonly property int menuItemCount: actionColumn.children.length
     readonly property int panelHeight: 296
 
@@ -137,7 +140,7 @@ Item {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     height: 4
-                    color: Lazer.LazerTheme.osuPink
+                    color: root.sessionTextColor
                 }
 
                 Text {
@@ -264,7 +267,7 @@ Item {
         Text {
             anchors.centerIn: parent
             text: root.open ? "CLOSE" : "SESSION"
-            color: Lazer.LazerTheme.osuPink
+            color: root.sessionTextColor
             font.pixelSize: 12
             font.bold: true
             font.letterSpacing: 1

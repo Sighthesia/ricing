@@ -36,8 +36,8 @@ WlSessionLockSurface {
     readonly property real authInputWidth: Math.max(0, Math.min(360, root.width - 48))
     readonly property color authControlColor: root.lightScheme
             ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface
-    readonly property color authTextColor: root.lightScheme
-            ? "#211F24" : Lazer.LazerTheme.textPrimary
+    readonly property color authTextColor: SurfaceLogic.readableTextColor(
+        Lazer.LazerTheme.accentColor, root.lightScheme)
     // Keep the lock glyph as an accent landmark instead of merging it with
     // the password text that occupies the same control.
     readonly property color authIconColor: SurfaceLogic.clockThemeColor(
