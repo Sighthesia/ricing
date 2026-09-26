@@ -39,7 +39,8 @@ WlSessionLockSurface {
             ? "#211F24" : Lazer.LazerTheme.textPrimary
     // Keep the lock glyph as an accent landmark instead of merging it with
     // the password text that occupies the same control.
-    readonly property color authIconColor: Lazer.LazerTheme.accentColor
+    readonly property color authIconColor: SurfaceLogic.clockThemeColor(
+        Lazer.LazerTheme.accentColor, root.clockLuminance, root.lightScheme)
     readonly property color authDateColor: root.lightScheme
             ? "#5F5A66" : Lazer.LazerTheme.textMuted
     readonly property real clockCenterX: clockLayout.ready ? clockLayout.centerX : 0.5

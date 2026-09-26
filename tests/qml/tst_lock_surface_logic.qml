@@ -387,6 +387,15 @@ Item {
             verify(lightModeText.hslSaturation > 0.3)
         }
 
+        function test_derivedIconToneStaysDistinctFromNeutralText() {
+            var accent = Qt.rgba(0.35, 0.20, 0.65, 1)
+            var iconColor = SurfaceLogic.clockThemeColor(accent, 0.5, true)
+            var textColor = Qt.rgba(0.13, 0.12, 0.14, 1)
+            verify(Math.abs(iconColor.r - textColor.r)
+                    + Math.abs(iconColor.g - textColor.g)
+                    + Math.abs(iconColor.b - textColor.b) > 0.18)
+        }
+
         function test_screenSlotMapsByIdentity() {
             // Identity comparison, so plain JS objects exercise the same seam.
             var first = { name: "DP-1" }
