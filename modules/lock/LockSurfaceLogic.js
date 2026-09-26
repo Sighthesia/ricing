@@ -90,6 +90,24 @@ function passwordInputEdit(currentText, isSubmit, isBackspace, eventText) {
     return { action: "none", text: text }
 }
 
+// Authentication control states keep the icon visible through input expansion
+// and provide a short success state before the compositor surface exits.
+var AuthControlStates = {
+    idle: "idle",
+    input: "input",
+    unlocked: "unlocked"
+}
+
+function authControlTransition(state, event) {
+    if (event === "enter-input")
+        return AuthControlStates.input
+    if (event === "auth-success")
+        return AuthControlStates.unlocked
+    if (event === "reset" || event === "auth-failure")
+        return AuthControlStates.idle
+    return state
+}
+
 // Pick a readable tonal variant of the wallpaper-derived accent without
 // falling back to unrelated pure white or pure black text.
 function clockThemeColor(accent, backgroundLuminance, lightScheme) {

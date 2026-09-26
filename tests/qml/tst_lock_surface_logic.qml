@@ -396,6 +396,16 @@ Item {
                     + Math.abs(iconColor.b - textColor.b) > 0.18)
         }
 
+        function test_authControlKeepsIconThroughInputAndUnlockFeedback() {
+            var state = SurfaceLogic.AuthControlStates.idle
+            state = SurfaceLogic.authControlTransition(state, "enter-input")
+            compare(state, SurfaceLogic.AuthControlStates.input)
+            state = SurfaceLogic.authControlTransition(state, "auth-success")
+            compare(state, SurfaceLogic.AuthControlStates.unlocked)
+            state = SurfaceLogic.authControlTransition(state, "reset")
+            compare(state, SurfaceLogic.AuthControlStates.idle)
+        }
+
         function test_screenSlotMapsByIdentity() {
             // Identity comparison, so plain JS objects exercise the same seam.
             var first = { name: "DP-1" }

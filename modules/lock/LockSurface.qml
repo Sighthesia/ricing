@@ -29,6 +29,7 @@ WlSessionLockSurface {
     property bool exitStarted: false
     property bool releaseSent: false
     property int revealWaitTicks: 0
+    property string authControlState: SurfaceLogic.AuthControlStates.idle
     // Read the effective mode directly here. The lock surface can be created
     // before the shared theme palette has finished applying its new scheme.
     readonly property bool lightScheme: Services.SettingsService.effectiveColorScheme === "light"
@@ -65,6 +66,9 @@ WlSessionLockSurface {
         exitStarted = false
         releaseSent = false
         inputMode = false
+        authControlState = SurfaceLogic.AuthControlStates.idle
+        unlockFeedbackTimer.stop()
+        unlockCollapseTimer.stop()
         if (reducedMotion) {
             SurfaceLogic.applyRevealImmediately(root, allAnimations())
             return
@@ -106,6 +110,8 @@ WlSessionLockSurface {
     // Enter the inline authentication mode without changing PAM state.
     function enterInputMode(): void {
         inputMode = true
+        authControlState = SurfaceLogic.authControlTransition(
+            authControlState, "enter-input")
         keyboardOwner.forceActiveFocus()
     }
 
@@ -119,6 +125,10 @@ WlSessionLockSurface {
             return false
         root.lockContext.reset()
         root.inputMode = false
+        root.authControlState = SurfaceLogic.authControlTransition(
+            root.authControlState, "reset")
+        unlockFeedbackTimer.stop()
+        unlockCollapseTimer.stop()
         keyboardOwner.forceActiveFocus()
         return true
     }
@@ -130,6 +140,19 @@ WlSessionLockSurface {
     Component.onCompleted: {
         startReveal()
         keyboardOwner.forceActiveFocus()
+    }
+
+    function showUnlockFeedback(): void {
+        // Hold the expanded field while the unlock glyph is readable.
+        inputMode = true
+        authControlState = SurfaceLogic.authControlTransition(
+            authControlState, "auth-success")
+        unlockFeedbackTimer.restart()
+    }
+
+    function collapseUnlockFeedback(): void {
+        inputMode = false
+        unlockCollapseTimer.restart()
     }
 
     LockBackdrop {
@@ -168,6 +191,22 @@ WlSessionLockSurface {
             enterAnimation.from = root.waveProgress
             enterAnimation.start()
         }
+    }
+
+    // Let the unlock glyph and compact control read before the wave exits.
+    Timer {
+        id: unlockFeedbackTimer
+        interval: Lazer.MotionTokens.medium
+        repeat: false
+        onTriggered: root.collapseUnlockFeedback()
+    }
+
+    // Start the curtain only after the compact success state has settled.
+    Timer {
+        id: unlockCollapseTimer
+        interval: Lazer.MotionTokens.instant
+        repeat: false
+        onTriggered: root.startExit()
     }
 
     // Keep session actions inside this compositor-owned surface.
@@ -331,13 +370,15 @@ WlSessionLockSurface {
             }
             transform: Translate { x: authControl.failureOffset }
 
-            // Fade the lock glyph away as the same rectangle opens for input.
+            // Keep the glyph visible while the same rectangle opens for input.
             Item {
                 id: lockIconLayer
-                anchors.fill: parent
-                opacity: root.inputMode ? 0 : 1
-                visible: opacity > 0.01
-                Behavior on opacity {
+                width: 22
+                height: 22
+                anchors.verticalCenter: parent.verticalCenter
+                x: root.inputMode ? 16 : (parent.width - width) / 2
+                visible: true
+                Behavior on x {
                     enabled: !root.reducedMotion
                     NumberAnimation {
                         duration: Lazer.MotionTokens.medium
@@ -348,10 +389,12 @@ WlSessionLockSurface {
                 // Load the shared lock glyph before applying the theme tint.
                 Image {
                     id: lockIconSource
-                    anchors.centerIn: parent
+                    anchors.fill: parent
                     width: 22
                     height: 22
-                    source: Qt.resolvedUrl("../lazerbar/icons/lock.svg")
+                    source: root.authControlState === SurfaceLogic.AuthControlStates.unlocked
+                            ? Qt.resolvedUrl("../lazerbar/icons/unlock.svg")
+                            : Qt.resolvedUrl("../lazerbar/icons/lock.svg")
                     fillMode: Image.PreserveAspectFit
                     visible: false
                 }
@@ -372,8 +415,8 @@ WlSessionLockSurface {
             // Render the password without mounting a second keyboard owner.
             Text {
                 id: passwordDisplay
-                anchors.fill: parent
-                anchors.leftMargin: 20
+                    anchors.fill: parent
+                anchors.leftMargin: 56
                 anchors.rightMargin: 20
                 anchors.topMargin: 4
                 anchors.bottomMargin: 4
@@ -501,13 +544,15 @@ WlSessionLockSurface {
         id: contextConnections
         target: null
         function onUnlocked() {
-            root.startExit()
+            root.showUnlockFeedback()
         }
 
         // A failed conversation must hand keyboard focus straight back so
         // the next attempt can be typed without a pointer.
         function onShowFailureChanged() {
             if (root.lockContext && root.lockContext.showFailure) {
+                root.authControlState = SurfaceLogic.authControlTransition(
+                    root.authControlState, "auth-failure")
                 root.enterInputMode()
                 keyboardOwner.forceActiveFocus()
                 if (root.reducedMotion)

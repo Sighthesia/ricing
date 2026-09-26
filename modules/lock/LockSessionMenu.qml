@@ -146,10 +146,14 @@ Item {
                     anchors.top: parent.top
                     anchors.topMargin: 18
                     text: "SESSION"
-                    color: Lazer.LazerTheme.textMuted
+                    color: Lazer.LazerTheme.osuPink
                     font.pixelSize: 11
                     font.bold: true
                     font.letterSpacing: 1
+                    Behavior on color {
+                        enabled: !root.reducedMotion
+                        ColorAnimation { duration: Lazer.MotionTokens.fast }
+                    }
                 }
 
                 Text {
@@ -260,10 +264,14 @@ Item {
         Text {
             anchors.centerIn: parent
             text: root.open ? "CLOSE" : "SESSION"
-            color: Lazer.LazerTheme.textPrimary
+            color: Lazer.LazerTheme.osuPink
             font.pixelSize: 12
             font.bold: true
             font.letterSpacing: 1
+            Behavior on color {
+                enabled: !root.reducedMotion
+                ColorAnimation { duration: Lazer.MotionTokens.fast }
+            }
         }
         TapHandler {
             onTapped: {
