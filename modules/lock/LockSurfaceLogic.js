@@ -133,6 +133,68 @@ function readableTextColor(accent, lightScheme) {
         lightScheme === true ? 0.16 : 0.90, 1)
 }
 
+function _usableColor(color) {
+    return !!color && isFinite(Number(color.a)) && Number(color.a) >= 0.5
+            && (Number(color.r) + Number(color.g) + Number(color.b)) > 0.02
+}
+
+function _nearColor(first, second) {
+    if (!_usableColor(first))
+        return false
+    return Math.abs(Number(first.r) - Number(second.r)) < 0.015
+        && Math.abs(Number(first.g) - Number(second.g)) < 0.015
+        && Math.abs(Number(first.b) - Number(second.b)) < 0.015
+}
+
+function _modeSurface(candidate, lightScheme, fallback) {
+    if (!_usableColor(candidate))
+        return fallback
+    var lightness = Number(candidate.hslLightness)
+    if (!isFinite(lightness) || (lightScheme === true ? lightness < 0.5 : lightness > 0.5))
+        return fallback
+    return candidate
+}
+
+// Freeze all lock-surface colors for one lock cycle. This prevents each child
+// from sampling a different frame of Color.qml's animated palette transition.
+function lockThemeSnapshot(lightScheme, palette) {
+    var light = lightScheme === true
+    var fallbackAccent = Qt.rgba(1, 0.4, 0.667, 1)
+    var rawAccent = palette ? palette.accent : null
+    // These are Afloat's built-in fallback accents, not wallpaper results.
+    if (!_usableColor(rawAccent) || _nearColor(rawAccent, Qt.rgba(0.463, 0.357, 1, 1))
+            || _nearColor(rawAccent, Qt.rgba(0.784, 0.749, 1, 1)))
+        rawAccent = fallbackAccent
+
+    var surfaceFallback = light ? "#F2F0F5" : "#18171C"
+    var controlFallback = light ? "#EEEAF1" : "#25222E"
+    var mutedFallback = light ? "#5F5A66" : "#B8B4BC"
+    var dividerFallback = light ? "#C9C4CE" : "#2E2C32"
+    var surface = _modeSurface(palette && palette.surface, light, surfaceFallback)
+    var control = _modeSurface(palette && palette.control, light, controlFallback)
+    var muted = _usableColor(palette && palette.muted) ? palette.muted : mutedFallback
+    var divider = _usableColor(palette && palette.divider) ? palette.divider : dividerFallback
+    var panel = _usableColor(palette && palette.panel) ? palette.panel : surface
+    var trigger = _usableColor(palette && palette.trigger) ? palette.trigger : control
+    var active = _usableColor(palette && palette.active) ? palette.active : trigger
+    return {
+        lightScheme: light,
+        accent: rawAccent,
+        surface: surface,
+        control: control,
+        panel: panel,
+        trigger: trigger,
+        active: active,
+        muted: muted,
+        divider: divider,
+        text: readableTextColor(rawAccent, light),
+        icon: readableThemeColor(rawAccent, light),
+        sessionText: readableThemeColor(rawAccent, light),
+        clock: readableThemeColor(rawAccent, light),
+        clockMuted: clockThemeMutedColor(rawAccent, 0.5, light)
+    }
+}
+
 // Pick a readable tonal variant of the wallpaper-derived accent without
 // falling back to unrelated pure white or pure black text.
 function clockThemeColor(accent, backgroundLuminance, lightScheme) {

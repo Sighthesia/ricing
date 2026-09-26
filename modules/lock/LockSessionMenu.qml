@@ -10,6 +10,12 @@ Item {
     property bool open: false
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property var sessionService: null
+    property bool lightScheme: false
+    property color sessionTextColorOverride: "transparent"
+    property color panelColorOverride: "transparent"
+    property color triggerColorOverride: "transparent"
+    property color activeColorOverride: "transparent"
+    property color dividerColorOverride: "transparent"
     property string errorText: ""
     property string statusText: ""
     property string pendingAction: ""
@@ -17,8 +23,17 @@ Item {
     // The menu's own open/close progress remains independent from this gate.
     property bool entranceRevealed: true
     property real revealProgress: 0
-    readonly property color sessionTextColor: SurfaceLogic.readableThemeColor(
-        Lazer.LazerTheme.accentColor, Lazer.LazerTheme.lightScheme)
+    readonly property color sessionTextColor: root.sessionTextColorOverride.a > 0.5
+            ? root.sessionTextColorOverride
+            : SurfaceLogic.readableThemeColor(Lazer.LazerTheme.accentColor, root.lightScheme)
+    readonly property color panelColor: root.panelColorOverride.a > 0.5
+            ? root.panelColorOverride : Lazer.LazerTheme.settingsPanel
+    readonly property color triggerColor: root.triggerColorOverride.a > 0.5
+            ? root.triggerColorOverride : Lazer.LazerTheme.settingsControlSurface
+    readonly property color activeColor: root.activeColorOverride.a > 0.5
+            ? root.activeColorOverride : Lazer.LazerTheme.activeFill
+    readonly property color dividerColor: root.dividerColorOverride.a > 0.5
+            ? root.dividerColorOverride : Lazer.LazerTheme.divider
     readonly property int menuItemCount: actionColumn.children.length
     readonly property int panelHeight: 296
 
@@ -130,9 +145,9 @@ Item {
                 y: (1 - root.revealProgress) * 12
                 width: panelHost.width
                 height: panelHost.height
-                color: Lazer.LazerTheme.settingsPanel
+                color: root.panelColor
                 border.width: 1
-                border.color: Lazer.LazerTheme.divider
+                border.color: root.dividerColor
 
                 // Identify the session surface without adding a rounded container.
                 Rectangle {
@@ -149,7 +164,7 @@ Item {
                     anchors.top: parent.top
                     anchors.topMargin: 18
                     text: "SESSION"
-                    color: Lazer.LazerTheme.osuPink
+                    color: root.sessionTextColor
                     font.pixelSize: 11
                     font.bold: true
                     font.letterSpacing: 1
@@ -167,7 +182,7 @@ Item {
                     width: parent.width - 36
                     text: root.errorText || root.statusText
                     visible: text.length > 0
-                    color: root.errorText ? Lazer.LazerTheme.osuPink : Lazer.LazerTheme.textMuted
+                    color: root.sessionTextColor
                     font.pixelSize: 11
                     elide: Text.ElideRight
                 }
@@ -261,7 +276,7 @@ Item {
         anchors.bottom: parent.bottom
         width: 152
         height: 48
-        color: root.open ? Lazer.LazerTheme.activeFill : Lazer.LazerTheme.settingsControlSurface
+        color: root.open ? root.activeColor : root.triggerColor
         border.width: root.activeFocus ? 1 : 0
         border.color: Lazer.LazerTheme.focusRing
         Text {

@@ -30,27 +30,38 @@ WlSessionLockSurface {
     property bool releaseSent: false
     property int revealWaitTicks: 0
     property string authControlState: SurfaceLogic.AuthControlStates.idle
+    property bool themeSnapshotReady: false
+    property var lockThemeSnapshot: ({})
     // Read the effective mode directly here. The lock surface can be created
     // before the shared theme palette has finished applying its new scheme.
-    readonly property bool lightScheme: Services.SettingsService.effectiveColorScheme === "light"
+    property bool lightScheme: Services.SettingsService.effectiveColorScheme === "light"
     readonly property real authInputWidth: Math.max(0, Math.min(360, root.width - 48))
-    readonly property color authControlColor: root.lightScheme
-            ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface
-    readonly property color authTextColor: SurfaceLogic.readableTextColor(
-        Lazer.LazerTheme.accentColor, root.lightScheme)
+    readonly property color authControlColor: root.themeSnapshotReady
+            ? root.lockThemeSnapshot.control
+            : (root.lightScheme ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface)
+    readonly property color authTextColor: root.themeSnapshotReady
+            ? root.lockThemeSnapshot.text
+            : SurfaceLogic.readableTextColor(Lazer.LazerTheme.accentColor, root.lightScheme)
     // Keep the lock glyph as an accent landmark instead of merging it with
     // the password text that occupies the same control.
-    readonly property color authIconColor: SurfaceLogic.clockThemeColor(
-        Lazer.LazerTheme.accentColor, root.clockLuminance, root.lightScheme)
-    readonly property color authDateColor: root.lightScheme
-            ? "#5F5A66" : Lazer.LazerTheme.textMuted
+    readonly property color authIconColor: root.themeSnapshotReady
+            ? root.lockThemeSnapshot.icon
+            : SurfaceLogic.clockThemeColor(Lazer.LazerTheme.accentColor,
+                                           root.clockLuminance, root.lightScheme)
+    readonly property color authDateColor: root.themeSnapshotReady
+            ? root.lockThemeSnapshot.muted
+            : (root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted)
     readonly property real clockCenterX: clockLayout.ready ? clockLayout.centerX : 0.5
     readonly property real clockCenterY: clockLayout.ready ? clockLayout.centerY : 0.5
     readonly property real clockLuminance: clockLayout.ready ? clockLayout.luminance : 0.5
-    readonly property color clockColor: SurfaceLogic.clockThemeColor(
-        Lazer.LazerTheme.accentColor, root.clockLuminance, root.lightScheme)
-    readonly property color clockDateColor: SurfaceLogic.clockThemeMutedColor(
-        Lazer.LazerTheme.accentColor, root.clockLuminance, root.lightScheme)
+    readonly property color clockColor: root.themeSnapshotReady
+            ? root.lockThemeSnapshot.clock
+            : SurfaceLogic.clockThemeColor(Lazer.LazerTheme.accentColor,
+                                           root.clockLuminance, root.lightScheme)
+    readonly property color clockDateColor: root.themeSnapshotReady
+            ? root.lockThemeSnapshot.clockMuted
+            : SurfaceLogic.clockThemeMutedColor(Lazer.LazerTheme.accentColor,
+                                                root.clockLuminance, root.lightScheme)
     readonly property bool authFailureVisible: root.lockContext
             ? root.lockContext.showFailure : false
     property date now: new Date()
@@ -63,6 +74,18 @@ WlSessionLockSurface {
     color: "transparent"
 
     function startReveal(): void {
+        lightScheme = Services.SettingsService.effectiveColorScheme === "light"
+        lockThemeSnapshot = SurfaceLogic.lockThemeSnapshot(lightScheme, {
+            accent: Lazer.LazerTheme.adapt ? Lazer.LazerTheme.accentColor : null,
+            surface: lightScheme ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.bgDark,
+            control: lightScheme ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface,
+            panel: Lazer.LazerTheme.settingsPanel,
+            trigger: Lazer.LazerTheme.settingsControlSurface,
+            active: Lazer.LazerTheme.activeFill,
+            muted: lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted,
+            divider: Lazer.LazerTheme.divider,
+        })
+        themeSnapshotReady = true
         exitStarted = false
         releaseSent = false
         inputMode = false
@@ -162,6 +185,8 @@ WlSessionLockSurface {
         wallpaperSource: root.wallpaperPath
         progress: root.waveProgress
         lightScheme: root.lightScheme
+        surfaceColorOverride: root.themeSnapshotReady
+                ? root.lockThemeSnapshot.surface : "transparent"
     }
 
     // Analyze the real wallpaper independently for every lock surface.
@@ -219,6 +244,17 @@ WlSessionLockSurface {
         anchors.bottomMargin: 28
         reducedMotion: root.reducedMotion
         sessionService: Services.SessionService
+        lightScheme: root.lightScheme
+        sessionTextColorOverride: root.themeSnapshotReady
+                ? root.lockThemeSnapshot.sessionText : "transparent"
+        panelColorOverride: root.themeSnapshotReady
+                ? root.lockThemeSnapshot.panel : "transparent"
+        triggerColorOverride: root.themeSnapshotReady
+                ? root.lockThemeSnapshot.trigger : "transparent"
+        activeColorOverride: root.themeSnapshotReady
+                ? root.lockThemeSnapshot.active : "transparent"
+        dividerColorOverride: root.themeSnapshotReady
+                ? root.lockThemeSnapshot.divider : "transparent"
         entranceRevealed: backdrop.revealContentInteractive
         z: 3.5
     }
@@ -342,8 +378,9 @@ WlSessionLockSurface {
             radius: Lazer.LazerTheme.settingsChoiceRadius
             color: root.authControlColor
             border.width: root.authFailureVisible ? 2 : 1
-            border.color: root.authFailureVisible ? Lazer.LazerTheme.osuPink
-                                                   : Lazer.LazerTheme.divider
+            border.color: root.authFailureVisible ? root.authIconColor
+                : (root.themeSnapshotReady ? root.lockThemeSnapshot.divider
+                                            : Lazer.LazerTheme.divider)
             property real failureOffset: 0
 
             Behavior on width {

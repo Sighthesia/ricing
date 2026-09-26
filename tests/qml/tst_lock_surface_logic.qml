@@ -416,6 +416,34 @@ Item {
             verify(text.a > 0.9)
         }
 
+        function test_lockThemeSnapshotKeepsOnePaletteGeneration() {
+            var palette = {
+                accent: Qt.rgba(1, 0.2, 0.5, 1),
+                surface: Qt.rgba(0.08, 0.07, 0.10, 1),
+                control: Qt.rgba(0.14, 0.12, 0.17, 1),
+                muted: Qt.rgba(0.72, 0.68, 0.76, 1),
+                divider: Qt.rgba(0.3, 0.28, 0.34, 1),
+            }
+            var snapshot = SurfaceLogic.lockThemeSnapshot(false, palette)
+            compare(snapshot.lightScheme, false)
+            verify(snapshot.surface.hslLightness < 0.5)
+            verify(snapshot.control.hslLightness < 0.5)
+            verify(snapshot.panel.a > 0.9)
+            verify(snapshot.trigger.a > 0.9)
+            verify(snapshot.text.hslLightness > 0.5)
+            verify(snapshot.sessionText.hslHue > 0.8)
+
+            var invalid = SurfaceLogic.lockThemeSnapshot(false, {
+                accent: Qt.rgba(0, 0, 0, 0),
+                surface: Qt.rgba(0, 0, 0, 0),
+                control: Qt.rgba(0, 0, 0, 0),
+                muted: Qt.rgba(0, 0, 0, 0),
+                divider: Qt.rgba(0, 0, 0, 0),
+            })
+            verify(invalid.sessionText.hslHue > 0.8)
+            verify(invalid.text.a > 0.9)
+        }
+
         function test_authControlKeepsIconThroughInputAndUnlockFeedback() {
             var state = SurfaceLogic.AuthControlStates.idle
             state = SurfaceLogic.authControlTransition(state, "enter-input")

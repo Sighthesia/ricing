@@ -14,6 +14,7 @@ Item {
     property url wallpaperSource: ""
     property real progress: 0
     property bool lightScheme: Lazer.LazerTheme.lightScheme
+    property color surfaceColorOverride: "transparent"
     // Mask delay in progress units: wide enough for a full pink zone, short
     // enough that the wallpaper arrives while the bands still sweep.
     readonly property real maskDelay: 0.3
@@ -22,8 +23,9 @@ Item {
     readonly property bool imagesReady: snapshotReady && wallpaperBody.status === Image.Ready
     readonly property bool revealContentInteractive: wallpaperReveal.height > 0.5
     readonly property Item revealContentHost: foregroundBody
-    readonly property color surfaceColor: root.lightScheme
-            ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.bgDark
+    readonly property color surfaceColor: root.surfaceColorOverride.a > 0.5
+            ? root.surfaceColorOverride
+            : (root.lightScheme ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.bgDark)
     default property alias content: foregroundBody.data
 
     Rectangle {
