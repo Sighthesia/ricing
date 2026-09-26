@@ -1,4 +1,5 @@
 import QtQuick
+import "../../lazerbar" as Lazer
 
 // Shared rolling clock time block ported from the pre-lazer bar (main branch
 // RollingClockTime.qml): HH:mm as four RollingDigit strips plus an optional
@@ -22,6 +23,19 @@ Item {
     property int minuteTransitionDuration: 180
     property int secondTransitionDuration: 180
     property int transitionEasing: Easing.InOutCubic
+
+    Behavior on digitColor {
+        enabled: !Lazer.MotionTokens.reducedMotion
+        ColorAnimation { duration: Lazer.MotionTokens.medium }
+    }
+    Behavior on mutedDigitColor {
+        enabled: !Lazer.MotionTokens.reducedMotion
+        ColorAnimation { duration: Lazer.MotionTokens.medium }
+    }
+    Behavior on separatorColor {
+        enabled: !Lazer.MotionTokens.reducedMotion
+        ColorAnimation { duration: Lazer.MotionTokens.medium }
+    }
 
     readonly property string hourText: Qt.formatDateTime(root.currentTime, "hh")
     readonly property string minuteText: Qt.formatDateTime(root.currentTime, "mm")

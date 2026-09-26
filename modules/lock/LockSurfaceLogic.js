@@ -90,6 +90,26 @@ function passwordInputEdit(currentText, isSubmit, isBackspace, eventText) {
     return { action: "none", text: text }
 }
 
+// Pick a readable tonal variant of the wallpaper-derived accent without
+// falling back to unrelated pure white or pure black text.
+function clockThemeColor(accent, backgroundLuminance) {
+    var hue = Number(accent && accent.hslHue)
+    if (!isFinite(hue) || hue < 0)
+        hue = 0.72
+    var saturation = Number(accent && accent.hslSaturation)
+    if (!isFinite(saturation))
+        saturation = 0.65
+    saturation = Math.max(0.42, Math.min(0.86, saturation))
+    var lightness = Number(backgroundLuminance) > 0.56 ? 0.28 : 0.76
+    return Qt.hsla(hue, saturation, lightness, 1)
+}
+
+function clockThemeMutedColor(accent, backgroundLuminance) {
+    var main = clockThemeColor(accent, backgroundLuminance)
+    var lightness = Number(backgroundLuminance) > 0.56 ? 0.40 : 0.64
+    return Qt.hsla(main.hslHue, main.hslSaturation, lightness, 1)
+}
+
 // Resolve a surface's snapshot slot from the shared screen list; an unknown
 // screen resolves to no slot instead of another screen's image.
 function screenSlot(screens, screen) {

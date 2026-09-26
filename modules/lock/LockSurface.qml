@@ -39,6 +39,13 @@ WlSessionLockSurface {
             ? "#211F24" : Lazer.LazerTheme.textPrimary
     readonly property color authDateColor: root.lightScheme
             ? "#5F5A66" : Lazer.LazerTheme.textMuted
+    readonly property real clockCenterX: clockLayout.ready ? clockLayout.centerX : 0.5
+    readonly property real clockCenterY: clockLayout.ready ? clockLayout.centerY : 0.5
+    readonly property real clockLuminance: clockLayout.ready ? clockLayout.luminance : 0.5
+    readonly property color clockColor: SurfaceLogic.clockThemeColor(
+        Lazer.LazerTheme.accentColor, root.clockLuminance)
+    readonly property color clockDateColor: SurfaceLogic.clockThemeMutedColor(
+        Lazer.LazerTheme.accentColor, root.clockLuminance)
     readonly property bool authFailureVisible: root.lockContext
             ? root.lockContext.showFailure : false
     property date now: new Date()
@@ -127,6 +134,14 @@ WlSessionLockSurface {
         snapshotSource: root.snapshotUrl
         wallpaperSource: root.wallpaperPath
         progress: root.waveProgress
+    }
+
+    // Analyze the real wallpaper independently for every lock surface.
+    WallpaperClockLayout {
+        id: clockLayout
+        wallpaperPath: root.wallpaperPath
+        screenWidth: Math.round(root.width)
+        screenHeight: Math.round(root.height)
     }
 
     // Keep the screenshot visible for at least one settled frame before the
@@ -219,37 +234,57 @@ WlSessionLockSurface {
         enabled: backdrop.revealContentInteractive
 
         // Keep the primary clock above the interaction control.
-        Column {
-            id: timeContent
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: -parent.height * 0.18
-            spacing: 8
+            Column {
+                id: timeContent
+                x: root.clockCenterX * parent.width - width / 2
+                y: root.clockCenterY * parent.height - height / 2
+                spacing: 8
 
-            // Show hours and minutes with the shared rolling digit component.
-            BarWidgets.RollingClockTime {
-                anchors.horizontalCenter: parent.horizontalCenter
+                Behavior on x {
+                    enabled: !root.reducedMotion
+                    NumberAnimation {
+                        duration: Lazer.MotionTokens.medium
+                        easing.type: Easing.OutQuint
+                    }
+                }
+                Behavior on y {
+                    enabled: !root.reducedMotion
+                    NumberAnimation {
+                        duration: Lazer.MotionTokens.medium
+                        easing.type: Easing.OutQuint
+                    }
+                }
+
+                // Show hours and minutes with the shared rolling digit component.
+                BarWidgets.RollingClockTime {
+                    id: clockTime
+                    anchors.horizontalCenter: parent.horizontalCenter
                 currentTime: root.now
                 digitPixelSize: 48
                 digitFontFamily: "monospace"
                 digitBold: true
                 showSeconds: false
-                digitColor: root.authTextColor
-                mutedDigitColor: root.authTextColor
-                separatorColor: root.authTextColor
+                    digitColor: root.clockColor
+                    mutedDigitColor: root.clockDateColor
+                    separatorColor: root.clockColor
                 hourTransitionDuration: Lazer.MotionTokens.clockHourFlip
                 minuteTransitionDuration: Lazer.MotionTokens.clockMinuteFlip
                 transitionEasing: Lazer.MotionTokens.clockFlipEasing
             }
 
             // Keep the calendar date directly below the primary time.
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: Qt.formatDate(root.now, "yyyy.MM.dd")
-                color: root.authDateColor
-                font.family: "monospace"
-                font.pixelSize: 16
-            }
+                Text {
+                    id: clockDate
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: Qt.formatDate(root.now, "yyyy.MM.dd")
+                    color: root.clockDateColor
+                    font.family: "monospace"
+                    font.pixelSize: 16
+                    Behavior on color {
+                        enabled: !root.reducedMotion
+                        ColorAnimation { duration: Lazer.MotionTokens.medium }
+                    }
+                }
         }
 
         // Keep the lock entry centered at the bottom in both visual states.

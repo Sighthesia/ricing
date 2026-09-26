@@ -100,6 +100,7 @@ Item {
             id: foregroundBody
             width: root.width
             height: root.height
+            // Align the full-surface content with the clipped wallpaper body.
             y: -(root.height - wallpaperReveal.height)
         }
     }

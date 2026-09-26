@@ -377,6 +377,16 @@ Item {
             compare(state.text, "A7")
         }
 
+        function test_clockThemeColorStaysOnAccentHueAndChoosesContrastTone() {
+            var accent = Qt.rgba(1, 0.4, 0.67, 1)
+            var darkBackground = SurfaceLogic.clockThemeColor(accent, 0.2)
+            var lightBackground = SurfaceLogic.clockThemeColor(accent, 0.8)
+            verify(darkBackground.hslLightness > 0.5)
+            verify(lightBackground.hslLightness < 0.5)
+            verify(Math.abs(darkBackground.hslHue - lightBackground.hslHue) < 0.001)
+            verify(darkBackground.hslSaturation > 0.3)
+        }
+
         function test_screenSlotMapsByIdentity() {
             // Identity comparison, so plain JS objects exercise the same seam.
             var first = { name: "DP-1" }
