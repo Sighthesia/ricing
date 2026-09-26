@@ -402,6 +402,8 @@ Item {
             var dark = SurfaceLogic.readableThemeColor(invalid, false)
             verify(light.hslLightness < 0.5)
             verify(dark.hslLightness > 0.5)
+            verify(light.hslHue > 0.85)
+            verify(dark.hslHue > 0.85)
             verify(light.a > 0.9)
             verify(dark.a > 0.9)
         }

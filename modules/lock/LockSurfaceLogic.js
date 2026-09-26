@@ -110,14 +110,15 @@ function authControlTransition(state, event) {
 
 // Keep lock-surface text readable while preserving the active wallpaper hue.
 // Theme files are reloaded asynchronously, so transparent/black intermediate
-// values must never reach a visible lock label.
+// values must never reach a visible lock label. The fallback follows Afloat's
+// osu-pink accent rather than an arbitrary violet hue.
 function readableThemeColor(accent, lightScheme) {
     var hue = Number(accent && accent.hslHue)
     var saturation = Number(accent && accent.hslSaturation)
     var alpha = Number(accent && accent.a)
     if (!isFinite(hue) || !isFinite(saturation) || !isFinite(alpha) || alpha < 0.5
             || saturation < 0.08) {
-        hue = 0.72
+        hue = 0.93
         saturation = 0.65
     }
     saturation = Math.max(0.42, Math.min(0.86, saturation))
