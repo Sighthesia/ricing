@@ -37,6 +37,9 @@ WlSessionLockSurface {
             ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface
     readonly property color authTextColor: root.lightScheme
             ? "#211F24" : Lazer.LazerTheme.textPrimary
+    // Keep the lock glyph as an accent landmark instead of merging it with
+    // the password text that occupies the same control.
+    readonly property color authIconColor: Lazer.LazerTheme.accentColor
     readonly property color authDateColor: root.lightScheme
             ? "#5F5A66" : Lazer.LazerTheme.textMuted
     readonly property real clockCenterX: clockLayout.ready ? clockLayout.centerX : 0.5
@@ -357,7 +360,7 @@ WlSessionLockSurface {
                     anchors.fill: lockIconSource
                     source: lockIconSource
                     colorization: 1
-                    colorizationColor: root.authTextColor
+                    colorizationColor: root.authIconColor
                     Behavior on colorizationColor {
                         enabled: !root.reducedMotion
                         ColorAnimation { duration: Lazer.MotionTokens.fast }
@@ -382,6 +385,10 @@ WlSessionLockSurface {
                 horizontalAlignment: Text.AlignHCenter
                 text: root.lockContext
                         ? SurfaceLogic.maskedPassword(root.lockContext.currentText) : ""
+                Behavior on color {
+                    enabled: !root.reducedMotion
+                    ColorAnimation { duration: Lazer.MotionTokens.fast }
+                }
             }
 
             // Show a non-text insertion marker only for an empty focused field.
@@ -392,7 +399,7 @@ WlSessionLockSurface {
                 width: 12
                 height: 6
                 radius: 3
-                color: root.authTextColor
+                color: root.authIconColor
                 opacity: root.inputMode && keyboardOwner.activeFocus
                     && (!root.lockContext || root.lockContext.currentText.length === 0) ? 1 : 0
                 visible: root.inputMode
