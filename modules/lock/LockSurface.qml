@@ -43,9 +43,9 @@ WlSessionLockSurface {
     readonly property real clockCenterY: clockLayout.ready ? clockLayout.centerY : 0.5
     readonly property real clockLuminance: clockLayout.ready ? clockLayout.luminance : 0.5
     readonly property color clockColor: SurfaceLogic.clockThemeColor(
-        Lazer.LazerTheme.accentColor, root.clockLuminance)
+        Lazer.LazerTheme.accentColor, root.clockLuminance, root.lightScheme)
     readonly property color clockDateColor: SurfaceLogic.clockThemeMutedColor(
-        Lazer.LazerTheme.accentColor, root.clockLuminance)
+        Lazer.LazerTheme.accentColor, root.clockLuminance, root.lightScheme)
     readonly property bool authFailureVisible: root.lockContext
             ? root.lockContext.showFailure : false
     property date now: new Date()
@@ -53,8 +53,8 @@ WlSessionLockSurface {
 
     signal releaseRequested()
 
-    // The surface starts opaque with the pre-lock screenshot: the desktop
-    // appears uninterrupted until the bands sweep and unveil the wallpaper.
+    // The surface starts with the selected theme surface until the bands sweep
+    // and unveil the wallpaper.
     color: "transparent"
 
     function startReveal(): void {
@@ -134,6 +134,7 @@ WlSessionLockSurface {
         snapshotSource: root.snapshotUrl
         wallpaperSource: root.wallpaperPath
         progress: root.waveProgress
+        lightScheme: root.lightScheme
     }
 
     // Analyze the real wallpaper independently for every lock surface.

@@ -22,6 +22,17 @@ Item {
     }
 
     Component {
+        id: lightBackdrop
+        LockBackdrop {
+            width: 320
+            height: 240
+            lightScheme: true
+            snapshotSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="red"/></svg>')
+            wallpaperSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="blue"/></svg>')
+        }
+    }
+
+    Component {
         id: foregroundProbeBackdrop
         LockBackdrop {
             width: 320
@@ -57,7 +68,8 @@ Item {
             verify(item.imagesReady === false)
         }
 
-        function isScreenshotRed(c) { return c.r > 0.9 && c.g < 0.1 && c.b < 0.1 }
+        function isThemeDark(c) { return c.r < 0.2 && c.g < 0.2 && c.b < 0.2 }
+        function isThemeLight(c) { return c.r > 0.8 && c.g > 0.8 && c.b > 0.8 }
         function isWallpaperBlue(c) { return c.b > 0.9 && c.r < 0.1 && c.g < 0.1 }
 
         // Pixels that are neither screenshot-red nor wallpaper-blue carry
@@ -67,9 +79,9 @@ Item {
             for (var x = 8; x < 320; x += 8)
                 for (var y = 0; y < 240; y += 8) {
                     var c = image.pixel(x, y)
-                    var isRed = c.r > 0.9 && c.g < 0.1 && c.b < 0.1
+                    var isSurface = isThemeDark(c)
                     var isBlue = c.b > 0.9 && c.r < 0.1 && c.g < 0.1
-                    if (!isRed && !isBlue)
+                    if (!isSurface && !isBlue)
                         ++bands
                 }
             return bands
@@ -89,14 +101,14 @@ Item {
 
         function test_wallpaperUnveiledAtBandTail() {
             tryCompare(backdrop, "imagesReady", true)
-            // Mid-sweep three zones read top to bottom: screenshot ahead,
+            // Mid-sweep three zones read top to bottom: themed surface ahead,
             // pink bands, wallpaper behind where the bands swept past.
             backdrop.progress = 0.5
             wait(120)
             var sweeping = grabImage(backdrop)
-            compare(sweeping.pixel(160, 10), "#ff0000", "screenshot ahead")
+            verify(isThemeDark(sweeping.pixel(160, 10)), "dark theme surface ahead")
             var midSweep = sweeping.pixel(160, 120)
-            verify(!isScreenshotRed(midSweep) && !isWallpaperBlue(midSweep), "pink bands")
+            verify(!isThemeDark(midSweep) && !isWallpaperBlue(midSweep), "pink bands")
             compare(sweeping.pixel(160, 230), "#0000ff", "wallpaper behind")
             // Open and settled frames stay pure.
             backdrop.progress = 0
@@ -142,15 +154,34 @@ Item {
                 wait(80)
                 var image = grabImage(backdrop)
                 if (stages[i] === 0.5) {
-                    compare(image.pixel(160, 10), "#ff0000", "top at 0.5")
+                    verify(isThemeDark(image.pixel(160, 10)), "dark surface at 0.5")
                     var mid = image.pixel(160, 120)
-                    verify(!isScreenshotRed(mid) && !isWallpaperBlue(mid), "bands at 0.5")
+                    verify(!isThemeDark(mid) && !isWallpaperBlue(mid), "bands at 0.5")
                     compare(image.pixel(160, 230), "#0000ff", "bottom at 0.5")
                 } else {
-                    compare(image.pixel(160, 10), stages[i] === 1 ? "#0000ff" : "#ff0000", "top at " + stages[i])
-                    compare(image.pixel(160, 230), stages[i] === 1 ? "#0000ff" : "#ff0000", "bottom at " + stages[i])
+                    if (stages[i] === 1) {
+                        compare(image.pixel(160, 10), "#0000ff", "top at 1")
+                        compare(image.pixel(160, 230), "#0000ff", "bottom at 1")
+                    } else {
+                        verify(isThemeDark(image.pixel(160, 10)), "top dark surface at 0")
+                        verify(isThemeDark(image.pixel(160, 230)), "bottom dark surface at 0")
+                    }
                 }
             }
+        }
+
+        function test_lightSchemeUsesLightSurfaceBeforeWallpaperReveal() {
+            var item = createTemporaryObject(lightBackdrop, backdrop.parent)
+            verify(item !== null)
+            tryCompare(item, "imagesReady", true)
+            item.progress = 0
+            wait(80)
+            var closed = grabImage(item)
+            verify(isThemeLight(closed.pixel(160, 10)), "light surface at top")
+            verify(isThemeLight(closed.pixel(160, 230)), "light surface at bottom")
+            item.progress = 1
+            wait(120)
+            compare(grabImage(item).pixel(160, 230), "#0000ff", "wallpaper remains revealed")
         }
     }
 }

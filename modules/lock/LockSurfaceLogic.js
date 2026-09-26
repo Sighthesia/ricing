@@ -92,7 +92,7 @@ function passwordInputEdit(currentText, isSubmit, isBackspace, eventText) {
 
 // Pick a readable tonal variant of the wallpaper-derived accent without
 // falling back to unrelated pure white or pure black text.
-function clockThemeColor(accent, backgroundLuminance) {
+function clockThemeColor(accent, backgroundLuminance, lightScheme) {
     var hue = Number(accent && accent.hslHue)
     if (!isFinite(hue) || hue < 0)
         hue = 0.72
@@ -100,13 +100,14 @@ function clockThemeColor(accent, backgroundLuminance) {
     if (!isFinite(saturation))
         saturation = 0.65
     saturation = Math.max(0.42, Math.min(0.86, saturation))
-    var lightness = Number(backgroundLuminance) > 0.56 ? 0.28 : 0.76
+    var isLight = lightScheme === true
+    var lightness = isLight ? 0.28 : 0.76
     return Qt.hsla(hue, saturation, lightness, 1)
 }
 
-function clockThemeMutedColor(accent, backgroundLuminance) {
-    var main = clockThemeColor(accent, backgroundLuminance)
-    var lightness = Number(backgroundLuminance) > 0.56 ? 0.40 : 0.64
+function clockThemeMutedColor(accent, backgroundLuminance, lightScheme) {
+    var main = clockThemeColor(accent, backgroundLuminance, lightScheme)
+    var lightness = lightScheme === true ? 0.40 : 0.64
     return Qt.hsla(main.hslHue, main.hslSaturation, lightness, 1)
 }
 
