@@ -19,6 +19,9 @@ Item {
     readonly property real maskProgress: Math.max(0, Math.min(1, (root.progress - root.maskDelay) / (1 - root.maskDelay)))
     readonly property bool snapshotReady: screenshot.status === Image.Ready
     readonly property bool imagesReady: snapshotReady && wallpaperBody.status === Image.Ready
+    readonly property bool revealContentInteractive: wallpaperReveal.height > 0.5
+    readonly property Item revealContentHost: foregroundBody
+    default property alias content: foregroundBody.data
 
     Rectangle {
         id: baseRect
@@ -90,6 +93,14 @@ Item {
             source: root.wallpaperSource
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
+        }
+
+        // Keep lock controls in the same clipped layer as the wallpaper.
+        Item {
+            id: foregroundBody
+            width: root.width
+            height: root.height
+            y: -(root.height - wallpaperReveal.height)
         }
     }
 }

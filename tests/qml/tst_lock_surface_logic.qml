@@ -377,13 +377,6 @@ Item {
             compare(state.text, "A7")
         }
 
-        function test_trailingRevealStartsAtWallpaperBoundary() {
-            compare(SurfaceLogic.trailingRevealStarted(0, 0.3), false)
-            compare(SurfaceLogic.trailingRevealStarted(0.3, 0.3), false)
-            compare(SurfaceLogic.trailingRevealStarted(0.3001, 0.3), true)
-            compare(SurfaceLogic.trailingRevealStarted(1, 0.3), true)
-        }
-
         function test_screenSlotMapsByIdentity() {
             // Identity comparison, so plain JS objects exercise the same seam.
             var first = { name: "DP-1" }

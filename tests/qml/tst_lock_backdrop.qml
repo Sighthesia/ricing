@@ -21,6 +21,29 @@ Item {
         }
     }
 
+    Component {
+        id: foregroundProbeBackdrop
+        LockBackdrop {
+            width: 320
+            height: 240
+            snapshotSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="red"/></svg>')
+            wallpaperSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="blue"/></svg>')
+
+            // Test markers share the wallpaper reveal clip with production content.
+            Rectangle {
+                width: 320
+                height: 24
+                color: "#00ff00"
+            }
+            Rectangle {
+                y: 216
+                width: 320
+                height: 24
+                color: "#00ff00"
+            }
+        }
+    }
+
     TestCase {
         name: "LockBackdropPixels"
         when: windowShown
@@ -85,6 +108,30 @@ Item {
             var settled = grabImage(backdrop)
             compare(bandArea(settled), 0, "no bands left at rest")
             compare(settled.pixel(160, 10), "#0000ff", "settled wallpaper")
+        }
+
+        function test_foregroundContentUsesTheWallpaperRevealClip() {
+            var item = createTemporaryObject(foregroundProbeBackdrop, backdrop.parent)
+            verify(item !== null)
+            tryCompare(item, "imagesReady", true)
+
+            item.progress = 0
+            wait(80)
+            var closed = grabImage(item)
+            verify(closed.pixel(160, 12) !== "#00ff00", "top content stays hidden")
+            verify(closed.pixel(160, 228) !== "#00ff00", "bottom content stays hidden")
+
+            item.progress = 0.5
+            wait(120)
+            var partial = grabImage(item)
+            verify(partial.pixel(160, 12) !== "#00ff00", "top content follows the clip")
+            compare(partial.pixel(160, 228), "#00ff00", "bottom content follows the clip")
+
+            item.progress = 1
+            wait(120)
+            var open = grabImage(item)
+            compare(open.pixel(160, 12), "#00ff00", "full content is revealed")
+            compare(open.pixel(160, 228), "#00ff00", "bottom content remains revealed")
         }
 
         function test_curtainBothDirections() {

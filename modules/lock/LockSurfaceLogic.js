@@ -90,15 +90,6 @@ function passwordInputEdit(currentText, isSubmit, isBackspace, eventText) {
     return { action: "none", text: text }
 }
 
-// Show foreground content as soon as the trailing wave edge starts unveiling
-// the wallpaper. Keeping this pure makes the lock entrance timing testable
-// without Wayland.
-function trailingRevealStarted(progress, delay) {
-    var safeProgress = Math.max(0, Math.min(1, Number(progress) || 0))
-    var safeDelay = Math.max(0, Math.min(0.99, Number(delay) || 0))
-    return safeProgress > safeDelay
-}
-
 // Resolve a surface's snapshot slot from the shared screen list; an unknown
 // screen resolves to no slot instead of another screen's image.
 function screenSlot(screens, screen) {

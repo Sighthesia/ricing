@@ -32,10 +32,6 @@ WlSessionLockSurface {
     // Read the effective mode directly here. The lock surface can be created
     // before the shared theme palette has finished applying its new scheme.
     readonly property bool lightScheme: Services.SettingsService.effectiveColorScheme === "light"
-    // Reveal foreground content at the instant the trailing wave edge starts
-    // exposing the wallpaper; the content itself does not animate.
-    readonly property bool foregroundRevealed: reducedMotion
-            || SurfaceLogic.trailingRevealStarted(root.waveProgress, backdrop.maskDelay)
     readonly property real authInputWidth: Math.max(0, Math.min(360, root.width - 48))
     readonly property color authControlColor: root.lightScheme
             ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface
@@ -157,13 +153,14 @@ WlSessionLockSurface {
     // Keep session actions inside this compositor-owned surface.
     LockSessionMenu {
         id: sessionMenu
+        parent: backdrop.revealContentHost
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: 28
         anchors.bottomMargin: 28
         reducedMotion: root.reducedMotion
         sessionService: Services.SessionService
-        entranceRevealed: root.foregroundRevealed
+        entranceRevealed: backdrop.revealContentInteractive
         z: 3.5
     }
 
@@ -213,13 +210,13 @@ WlSessionLockSurface {
         }
     }
 
-    // Keep the clock and authentication control in one full-screen reveal layer.
+    // Keep the clock and authentication control in the shared clipped reveal layer.
     Item {
         id: authSurface
+        parent: backdrop.revealContentHost
         anchors.fill: parent
         z: 3
-        visible: root.foregroundRevealed
-        enabled: root.foregroundRevealed
+        enabled: backdrop.revealContentInteractive
 
         // Keep the primary clock above the interaction control.
         Column {
