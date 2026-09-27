@@ -17,7 +17,7 @@ Variants {
     // startup burst, which measured as six late frames, so it stays short
     // enough not to delay the wallpaper out of caution.
     readonly property int bootFrameBudget: MotionTokens.instant + 10
-    readonly property int bootFrameRun: 12
+    readonly property int bootFrameRun: 30
 
     Scope {
         id: screenScope
