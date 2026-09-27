@@ -14,15 +14,60 @@ command is void.
 
 ## How to actually run tests
 
-| Test kind | Command |
-| --- | --- |
-| Pure JS/QML logic (`tests/qml/tst_*.qml`, no Quickshell imports) | `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt` |
-| Service behavior needing Quickshell singletons (Mpris, Process, ...) | Root-level behavioral harness: `qs -p tst_media_binding.qml` (run from repo root) |
+**Always go through `scripts/run-tests.sh`.** It runs both tiers on the
+offscreen platform, so a test run never maps a window over the user's live
+desktop.
+
+```sh
+scripts/run-tests.sh                  # whole suite, zero windows
+scripts/run-tests.sh tst_bar tst_osu  # only files matching a name
+scripts/run-tests.sh --no-python      # skip the Python bridge tests
+scripts/run-tests.sh -g               # ALSO run the window-based harnesses
+```
 
 - `/usr/bin/qmltestrunner` is **Qt 5** and fails silently (exit 1, zero
   output). Always use `/usr/lib/qt6/bin/qmltestrunner`.
 - Real failures print `FAIL!` / non-zero `Totals`; verify output, not exit codes.
 - Python helper tests: `python3 -m pytest scripts/tests/`.
+
+| Test kind | Command |
+| --- | --- |
+| Pure JS/QML logic (`tests/qml/tst_*.qml`, no Quickshell imports) | `QML_IMPORT_PATH=/usr/lib/qt6/qml QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR=/usr/share/fonts /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt` |
+| Service behavior needing Quickshell singletons (Mpris, Process, ...) | Root-level behavioral harness: `QT_QPA_PLATFORM=offscreen qs -p tst_media_binding.qml` (run from repo root) |
+
+## Never run a window-based harness unprompted
+
+Offscreen is the isolation mechanism, not a workaround: the offscreen platform
+has no layer-shell backend, so a harness that instantiates a `PanelWindow`
+**cannot** map a surface. It fails to load with `No PanelWindow backend loaded`,
+and `scripts/run-tests.sh` reports it under "window-only (skipped, desktop
+untouched)".
+
+The eight such harnesses are the ones that flash windows over the running
+desktop: `tst_bar_popup_host`, `tst_bar_two_layer_popup`, `tst_real_volume`,
+`tst_top_volume_half` (all drive `BarPopupHost`'s `surfaceActive`), plus the
+`PanelWindow`-declaring visual probes `tst_network_visual`,
+`tst_loading_ring_visual`, `tst_loading_ring_wiring`, `tst_network_popup`.
+Run them only via `scripts/run-tests.sh -g`, and only when the user asked for
+visual verification. **Do not** invoke `qs -p <window harness>` directly.
+
+## Do not let tests touch the real environment
+
+`AppThemeService` is a test seam: with `AFLOAT_APP_THEME_PREFIX` unset it runs
+`apply_app_themes.py` against the user's real `~/.config/kitty` and
+`gtk-3.0`. `scripts/run-tests.sh` exports a throwaway prefix for every run; keep
+that when invoking a harness by hand.
+
+## QtTest / Quickshell exit differences
+
+- `Qt.quit()` in Quickshell takes **no arguments**. `Qt.quit(failures === 0 ? 0 : 1)`
+  throws `Too many arguments` and the harness hangs instead of exiting.
+- A `Qt.quit()` emitted before the shell finishes loading is dropped
+  (`Signal QQmlEngine::quit() emitted, but no receivers connected`) and also
+  hangs. Defer it: `Qt.callLater(function() { Qt.quit() })`.
+- QtTest harnesses report failure through `FAIL!` lines and a non-zero
+  `Totals:`; `qs` harnesses return 0 regardless, so scan for `FAIL:` /
+  `Totals: … N failed` in the output.
 
 ## Gotcha: imports outside the config root get blackholed
 
@@ -45,8 +90,9 @@ Root-level `tst_media_binding.qml` is the reference. Structure:
 2. Step per event-loop turn with `Qt.callLater(root._steps.shift())`:
    service signals fire mid-cascade while sibling bindings still hold stale
    values; assertions must wait one turn after mutating state.
-3. Print `PASS:`/`FAIL:` lines plus a final `Totals:` line; end with
-   `Qt.quit(failures === 0 ? 0 : 1)`.
+3. Print `PASS:`/`FAIL:` lines plus a final `Totals:` line; end with a bare
+   `Qt.quit()`, deferred one event-loop turn if the run finished inside
+   `Component.onCompleted` (see the exit-differences section above).
 
 ## Cross-service signal timing
 

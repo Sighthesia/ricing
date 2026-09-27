@@ -13,10 +13,11 @@ Afloat is a Wayland desktop shell built with **Quickshell** (QML), targeting the
 
 ## Running & testing
 
+- **Run everything through `scripts/run-tests.sh`** — it defaults to the offscreen platform, so a test run never maps a window over the live desktop. `scripts/run-tests.sh <name-substring>…` filters, `--no-python` skips pytest, `-g` additionally runs the window-based harnesses (they will flash real windows — only when explicitly asked).
 - Launch: `qs -p /path/to/afloat`. IPC: `scripts/afloat-ipc <target> <function> [args...]`.
-- Logic tests (pure `.js`, in `tests/qml/`): `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt`
+- Logic tests (pure `.js`, in `tests/qml/`) run under QtTest: `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt`
   - Use the Qt6 runner path exactly — `/usr/bin/qmltestrunner` is Qt5 and fails silently. `qs -p tests/qml/tst_*.qml` runs **zero** tests (Quickshell never drives QtTest).
-- Service-behavior harnesses (need Quickshell singletons) live in the **repo root**: `qs -p tst_media_binding.qml` (from repo root).
+- Service-behavior harnesses (need Quickshell singletons) live in the **repo root**: `qs -p tst_media_binding.qml` (from repo root). Under the offscreen platform a harness that instantiates a `PanelWindow` cannot load (`No PanelWindow backend loaded`) — the runner classifies that as window-only and skips it.
 - Python: `python3 -m pytest scripts/tests/`.
 - **After every QML change**, run the relevant test file(s) and fix WARN/ERROR output before finishing.
 

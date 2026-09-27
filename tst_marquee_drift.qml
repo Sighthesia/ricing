@@ -287,7 +287,9 @@ Item {
             function () {
                 console.log("Totals:", root._checks - root._failures, "passed,",
                             root._failures, "failed")
-                Qt.quit(root._failures === 0 ? 0 : 1)
+                // Quickshell's Qt.quit() takes no arguments; passing one throws
+                // "Too many arguments" and the harness hangs after Totals.
+                Qt.quit()
             },
         ]
         Qt.callLater(root._phases.shift())

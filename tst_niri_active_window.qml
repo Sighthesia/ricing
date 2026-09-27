@@ -7,9 +7,11 @@ Item {
     id: root
 
     property int failures: 0
+    property int _checks: 0
     property string observedTitle: Services.NiriService.activeTitle
 
     function check(label, actual, expected) {
+        root._checks += 1
         if (actual === expected) {
             console.log("PASS:", label)
             return
@@ -34,6 +36,9 @@ Item {
         Services.NiriService.activateWorkspace({ id: 1 })
         root.check("workspace activation keeps current title", Services.NiriService.activeTitle, "workspace-two")
 
-        Qt.quit(root.failures === 0 ? 0 : 1)
+        console.log("Totals:", root._checks - root.failures, "passed,", root.failures, "failed")
+        // Quickshell's Qt.quit() takes no arguments, and it is dropped unless the
+        // shell has finished loading — so exit one event-loop turn later.
+        Qt.callLater(function() { Qt.quit() })
     }
 }
