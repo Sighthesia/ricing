@@ -15,6 +15,7 @@ UtilityZone 1.0 UtilityZone.qml
 StatusZone 1.0 StatusZone.qml
 BarBackground 1.0 BarBackground.qml
 WallpaperBackground 1.0 WallpaperBackground.qml
+WallpaperReveal 1.0 WallpaperReveal.qml
 ScreenCornerMask 1.0 ScreenCornerMask.qml
 ScreenRoundedCorners 1.0 ScreenRoundedCorners.qml
 TopBar 1.0 TopBar.qml

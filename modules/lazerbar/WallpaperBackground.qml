@@ -2,8 +2,11 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../../services" as Services
+import "WallpaperReveal.js" as RevealLogic
 
 // Paint each screen's desktop with the configured wallpaper behind every surface.
+// A switch reveals the incoming wallpaper through a circle that grows from the
+// point that triggered it, then settles onto the base image.
 Variants {
     id: root
     model: Quickshell.screens
@@ -22,6 +25,28 @@ Variants {
             WlrLayershell.layer: WlrLayer.Background
             WlrLayershell.namespace: "afloat:wallpaper"
             anchors { top: true; bottom: true; left: true; right: true }
+
+            // Wallpaper that is decoded but not settled yet.
+            property string pendingWallpaper: ""
+            // Live reveal circle radius, driven by revealAnimation.
+            property real revealRadius: 0
+            // Circle centre captured when the reveal starts. It is snapshotted
+            // because the service clears its trigger point right after the
+            // change, and a live binding would move the circle mid-animation.
+            property point activeRevealOrigin: Qt.point(0, 0)
+            // Screen centre, used whenever no click triggered the switch.
+            readonly property point centrePoint: Qt.point(width / 2, height / 2)
+
+            // The click that asked for this wallpaper, mapped onto this screen.
+            // Screens the click did not land on reveal from their own centre.
+            function resolveRevealOrigin() {
+                var trigger = Services.WallpaperService.revealOrigin
+                if (!trigger)
+                    return wallpaperWindow.centrePoint
+                var local = RevealLogic.localOrigin(trigger.x, trigger.y,
+                    screenScope.modelData.x, screenScope.modelData.y, width, height)
+                return local ? Qt.point(local.x, local.y) : wallpaperWindow.centrePoint
+            }
 
             // Keep the window fully click-through; the desktop owns pointer input.
             mask: Region {}
@@ -43,42 +68,29 @@ Variants {
                 asynchronous: true
             }
 
-            // Incoming wallpaper decoded offstage, then faded over the base.
-            Image {
-                id: fadeImage
+            // Incoming wallpaper spreading out of the switch point.
+            WallpaperReveal {
+                id: reveal
                 anchors.fill: parent
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false
-                opacity: 0
-
-                onStatusChanged: {
-                    if (status === Image.Ready && source !== "") {
-                        revealAnimation.restart()
-                    } else if (status === Image.Error) {
-                        console.warn("WallpaperBackground: failed to load", source)
-                        fadeImage.source = ""
-                    }
-                }
+                source: wallpaperWindow.pendingWallpaper
+                origin: wallpaperWindow.activeRevealOrigin
+                radius: wallpaperWindow.revealRadius
             }
 
-            // Crossfade the decoded image in, then settle it onto the base layer.
-            SequentialAnimation {
+            // Grow the circle from the trigger point, then settle onto the base
+            // image and drop the reveal so it stops costing a composite pass.
+            NumberAnimation {
                 id: revealAnimation
+                target: wallpaperWindow
+                property: "revealRadius"
+                to: reveal.coverRadius
+                duration: MotionTokens.wallpaperSwap
+                easing.type: Easing.OutCubic
 
-                NumberAnimation {
-                    target: fadeImage
-                    property: "opacity"
-                    from: 0
-                    to: 1
-                    duration: MotionTokens.wallpaperSwap
-                    easing.type: Easing.OutCubic
-                }
-                ScriptAction {
-                    script: {
-                        baseImage.source = fadeImage.source
-                        fadeImage.opacity = 0
-                    }
+                onFinished: {
+                    baseImage.source = wallpaperWindow.pendingWallpaper
+                    wallpaperWindow.pendingWallpaper = ""
+                    wallpaperWindow.revealRadius = 0
                 }
             }
 
@@ -92,27 +104,70 @@ Variants {
                 easing.type: Easing.OutCubic
             }
 
+            // Adopt a wallpaper as settled without any transition.
+            function settle(path) {
+                revealAnimation.stop()
+                hideAnimation.stop()
+                wallpaperWindow.pendingWallpaper = ""
+                wallpaperWindow.revealRadius = 0
+                baseImage.opacity = 1
+                baseImage.source = path
+            }
+
             // Single entry point so startup, panel commits, and file edits all
-            // follow the same crossfade path.
+            // follow the same reveal path.
             function showWallpaper(path) {
                 revealAnimation.stop()
                 hideAnimation.stop()
+                // The trigger point is consumed once so a later key write cannot
+                // inherit a stale origin; every screen reads it before this runs.
+                Qt.callLater(function() { Services.WallpaperService.revealOrigin = null })
                 if (!path) {
+                    wallpaperWindow.pendingWallpaper = ""
+                    wallpaperWindow.revealRadius = 0
                     hideAnimation.restart()
                     return
                 }
                 baseImage.opacity = 1
-                if (path === String(baseImage.source)) return
-                fadeImage.opacity = 0
-                fadeImage.source = path
+                if (path === String(baseImage.source))
+                    return
+                if (MotionTokens.reducedMotion) {
+                    wallpaperWindow.settle(path)
+                    return
+                }
+                // Decode the incoming wallpaper first, then grow the circle once
+                // the pixels are ready.
+                wallpaperWindow.activeRevealOrigin = wallpaperWindow.resolveRevealOrigin()
+                wallpaperWindow.pendingWallpaper = path
+                wallpaperWindow.revealRadius = 0
+                if (reveal.imageReady)
+                    revealAnimation.restart()
             }
 
-            // Route live wallpaper changes into the shared transition.
+            // Route live wallpaper changes into the shared reveal path.
             Connections {
                 target: Services.SettingsService.appearance
 
                 function onWallpaperPathChanged() {
                     wallpaperWindow.showWallpaper(Services.SettingsService.appearance.wallpaperPath)
+                }
+            }
+
+            // Start growing only once the incoming image can actually be shown.
+            Connections {
+                target: reveal
+
+                function onImageReadyChanged() {
+                    if (reveal.imageReady && wallpaperWindow.pendingWallpaper !== "")
+                        revealAnimation.restart()
+                }
+
+                function onImageFailedChanged() {
+                    if (!reveal.imageFailed)
+                        return
+                    console.warn("WallpaperBackground: failed to load", reveal.source)
+                    wallpaperWindow.pendingWallpaper = ""
+                    wallpaperWindow.revealRadius = 0
                 }
             }
 

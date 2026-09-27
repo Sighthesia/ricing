@@ -170,6 +170,16 @@ LazerSettingsSection {
         field.syncEditorFromText()
     }
 
+    // Pointer position that asked for a wallpaper switch, in screen coordinates.
+    // The settings surface is full-screen, so a row scene point doubles as one;
+    // a point still sitting on the surface origin means the pointer never
+    // entered the row, which falls back to the screen centre.
+    function wallpaperTriggerPoint() {
+        var point = wallpaperRow.debugHoverScenePoint
+        if (!point || (point.x <= 0 && point.y <= 0)) return null
+        return point
+    }
+
     // A failed geocode must not wedge the field: the text-field dedup would
     // otherwise swallow an identical retry, so reopen commits on error.
     onLocationErrorChanged: {
@@ -196,7 +206,7 @@ LazerSettingsSection {
                     root.settingsObject.wallpaperPath = ""
                     root.save()
                 } else if (root.wallpaperService && path !== root.settingsObject.wallpaperPath) {
-                    root.wallpaperService.changeWallpaper(path)
+                    root.wallpaperService.changeWallpaper(path, root.wallpaperTriggerPoint())
                 }
             }
             onClearRequested: function() {
