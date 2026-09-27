@@ -262,10 +262,8 @@ Item {
         }
         submenuEntry = entry
         pinAnchor(row)
-        // Second-level reveal is a small, quick gesture: medium (160ms).
-        // The old 500ms slide kept the painted panel dead to taps for half a
-        // second, so a click landing during it did nothing at all.
-        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.medium
+        // Match the primary content layer: 500ms, OutCubic in.
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.settingsSidebarFade
         submenuAnimation.easing.type = Easing.OutCubic
         submenuAnimationTarget = 1
         if (Lazer.MotionTokens.reducedMotion) {
@@ -286,11 +284,8 @@ Item {
         // forever under a moving cursor, reading as stuck half-out.
         if (submenuPhase === "closing")
             return
-        // Retract faster than the host's exit reveal (700ms): the popup is
-        // carried out of the bar viewport while the panel slides away, so a
-        // slow (240ms) retract reads as its own step instead of vanishing
-        // together with the popup. inOut keeps travel off the first frames.
-        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.slow
+        // Match the primary content layer: 500ms, InOutQuad out.
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.settingsSidebarFade
         submenuAnimation.easing.type = Easing.InOutQuad
         submenuAnimationTarget = 0
         if (Lazer.MotionTokens.reducedMotion) {
