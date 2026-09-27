@@ -93,5 +93,75 @@ Item {
         function test_emptyScreensAreNotReady() {
             verify(!Boot.isReady([], []))
         }
+
+        function test_aChangedWallpaperAlwaysReveals() {
+            compare(Boot.bootOutcome("/tmp/new.png", "/tmp/old.png", false, false), "reveal")
+            compare(Boot.bootOutcome("/tmp/new.png", "", false, false), "reveal")
+        }
+
+        function test_emptyPathCompletesWithoutAReveal() {
+            compare(Boot.bootOutcome("", "", false, false), "empty")
+            // The order is the contract: nothing below may promote an empty
+            // request into a reveal or any other outcome.
+            compare(Boot.bootOutcome("", "", true, false), "empty")
+            compare(Boot.bootOutcome("", "/tmp/old.png", false, true), "empty")
+            compare(Boot.bootOutcome("", "/tmp/old.png", true, true), "empty")
+        }
+
+        function test_imageErrorCompletesWithoutAReveal() {
+            compare(Boot.bootOutcome("/tmp/broken.png", "", true, false), "error")
+            compare(Boot.bootOutcome("/tmp/broken.png", "/tmp/broken.png", true, false), "error")
+            // An error outranks reduced motion: the image is gone either way.
+            compare(Boot.bootOutcome("/tmp/broken.png", "", true, true), "error")
+        }
+
+        function test_reducedMotionCompletesWithoutAReveal() {
+            compare(Boot.bootOutcome("/tmp/new.png", "", false, true), "reduced-motion")
+            // Reduced motion is reached with the image decoded but before the
+            // unchanged-source check, so it wins over "nothing to do".
+            compare(Boot.bootOutcome("/tmp/new.png", "/tmp/new.png", false, true),
+                    "reduced-motion")
+        }
+
+        function test_unchangedSourceCompletesWithoutAReveal() {
+            compare(Boot.bootOutcome("/tmp/same.png", "/tmp/same.png", false, false),
+                    "unchanged")
+        }
+
+        function test_everyOutcomeIsReachableExactlyOnce() {
+            var seen = {}
+            var requests = [
+                ["", "", false, false],
+                ["/tmp/broken.png", "", true, false],
+                ["/tmp/new.png", "", false, true],
+                ["/tmp/same.png", "/tmp/same.png", false, false],
+                ["/tmp/new.png", "/tmp/old.png", false, false],
+            ]
+            for (var index = 0; index < requests.length; index++) {
+                var outcome = Boot.bootOutcome(requests[index][0], requests[index][1],
+                                               requests[index][2], requests[index][3])
+                verify(!(outcome in seen), "outcome " + outcome + " was reached twice")
+                seen[outcome] = true
+            }
+            // No sixth outcome: a caller can exhaustively switch on this result.
+            compare(Object.keys(seen).sort(), [
+                "empty", "error", "reduced-motion", "reveal", "unchanged",
+            ])
+        }
+
+        function test_nonRevealOutcomesStillCompleteTheScreen() {
+            // Empty path, image error, reduced motion, and an unchanged source all
+            // settle without a circle, but each one is still a finished boot: the
+            // shell must not wait on a reveal that will never run.
+            var keys = Boot.currentKeys(screens())
+            for (var index = 0; index < keys.length; index++) {
+                var finished = Boot.markFinished([], keys[index])
+                verify(Boot.isReady(finished, [keys[index]]),
+                       "screen " + keys[index] + " must report a finished boot")
+            }
+            // A real reveal reports only after its animation settles, so a screen
+            // that has not reported yet is still not ready.
+            verify(!Boot.isReady([], [keys[0]]))
+        }
     }
 }

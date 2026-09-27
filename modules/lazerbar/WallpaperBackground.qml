@@ -260,6 +260,44 @@ Variants {
                 wallpaperWindow.reportBootOutcome()
             }
 
+            // How the boot reveal resolves, decided by the shared classifier the
+            // boot tests assert. Only the boot path consults it, so a wallpaper
+            // change after startup keeps deciding for itself.
+            function bootOutcomeFor(path) {
+                // Only a failure of *this* path counts: the previous wallpaper's
+                // error must not turn a healthy incoming one into a direct settle.
+                var failed = reveal.imageFailed && String(reveal.source) === String(path)
+                return BootLogic.bootOutcome(path, baseImage.source, failed,
+                                             MotionTokens.reducedMotion)
+            }
+
+            // End the boot reveal on an outcome that has no circle to show. Every
+            // one of them is a finished boot, so the screen reports here instead
+            // of waiting on an animation that will never run.
+            function settleWithoutReveal(outcome, path) {
+                if (outcome === "empty") {
+                    wallpaperWindow.pendingWallpaper = ""
+                    wallpaperWindow.revealRadius = 0
+                    hideAnimation.restart()
+                } else if (outcome === "error") {
+                    wallpaperWindow.settle("")
+                } else if (outcome === "reduced-motion") {
+                    // A direct settle still owns the settled layer, exactly like
+                    // the live branch it replaces.
+                    baseImage.opacity = 1
+                    wallpaperWindow.settle(path)
+                } else {
+                    // "unchanged": the settled layer already shows this path, so
+                    // the only thing left to do is take the floor back from a
+                    // previous fade-out.
+                    baseImage.opacity = 1
+                }
+                // No animation ran, so nothing holds the palette back.
+                if (outcome === "error" || outcome === "reduced-motion")
+                    Services.ColorService.revealCompleted()
+                wallpaperWindow.reportBootIfActive()
+            }
+
             // Everything past the boot reveal: switch immediately.
             function beginWallpaper(path, isBootReveal) {
                 revealAnimation.stop()
@@ -273,6 +311,17 @@ Variants {
                 if (!isBootReveal && wallpaperWindow.bootRevealActive)
                     wallpaperWindow.reportBootOutcome()
                 wallpaperWindow.bootRevealActive = !!isBootReveal
+                // The boot reveal resolves through the shared classifier, so the
+                // empty, unchanged, reduced-motion, and image-error branches are
+                // one tested decision instead of three inline copies. A live
+                // switch skips this and keeps its own branches below unchanged.
+                if (wallpaperWindow.bootRevealActive) {
+                    var boot = wallpaperWindow.bootOutcomeFor(path)
+                    if (boot !== "reveal") {
+                        wallpaperWindow.settleWithoutReveal(boot, path)
+                        return
+                    }
+                }
                 if (!path) {
                     wallpaperWindow.pendingWallpaper = ""
                     wallpaperWindow.revealRadius = 0
@@ -355,12 +404,10 @@ Variants {
                     if (!reveal.imageFailed)
                         return
                     console.warn("WallpaperBackground: failed to load", reveal.source)
-                    wallpaperWindow.settle("")
-                    // The circle will never grow, so release the palette gate.
-                    Services.ColorService.revealCompleted()
-                    // A failed boot image is still a finished boot: the theme
-                    // floor is what stays on screen.
-                    wallpaperWindow.reportBootIfActive()
+                    // A failed image is the "error" outcome, so a boot wallpaper
+                    // that never decodes reports here instead of waiting on a
+                    // circle that cannot open. The theme floor is what stays up.
+                    wallpaperWindow.settleWithoutReveal("error", "")
                 }
             }
 

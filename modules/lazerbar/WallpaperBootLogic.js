@@ -42,3 +42,20 @@ function isReady(finishedKeys, currentScreenKeys) {
     }
     return true
 }
+
+// Which outcome the first wallpaper of a session resolves to, and therefore
+// whether that screen still opens a circular reveal or settles directly. The
+// order is the contract: an empty request stays an empty outcome even when the
+// other flags are set, and a failed image is never treated as a reveal, so a
+// boot path can report completion on any branch without inspecting a surface.
+function bootOutcome(path, baseSource, imageFailed, reducedMotion) {
+    if (!path)
+        return "empty"
+    if (imageFailed === true)
+        return "error"
+    if (reducedMotion === true)
+        return "reduced-motion"
+    if (path === String(baseSource))
+        return "unchanged"
+    return "reveal"
+}
