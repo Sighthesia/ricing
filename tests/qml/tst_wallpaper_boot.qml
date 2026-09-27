@@ -150,18 +150,47 @@ Item {
         }
 
         function test_nonRevealOutcomesStillCompleteTheScreen() {
-            // Empty path, image error, reduced motion, and an unchanged source all
-            // settle without a circle, but each one is still a finished boot: the
-            // shell must not wait on a reveal that will never run.
+            // Each non-reveal outcome, built through the classifier rather than
+            // spelled out, completes its screen on the spot: the shell must not
+            // wait on a reveal that will never run.
             var keys = Boot.currentKeys(screens())
-            for (var index = 0; index < keys.length; index++) {
-                var finished = Boot.markFinished([], keys[index])
-                verify(Boot.isReady(finished, [keys[index]]),
-                       "screen " + keys[index] + " must report a finished boot")
+            var requests = [
+                ["", "/tmp/old.png", false, false],
+                ["/tmp/broken.png", "/tmp/old.png", true, false],
+                ["/tmp/new.png", "/tmp/old.png", false, true],
+                ["/tmp/same.png", "/tmp/same.png", false, false],
+            ]
+            for (var index = 0; index < requests.length; index++) {
+                var outcome = Boot.bootOutcome(requests[index][0], requests[index][1],
+                                               requests[index][2], requests[index][3])
+                verify(Boot.bootOutcomeCompletesImmediately(outcome),
+                       outcome + " must complete without an animation")
+                // Each outcome stands in for one screen's whole boot, so the
+                // outcome decides both the timing and the readiness that follows.
+                var key = keys[index % keys.length]
+                var finished = Boot.markFinished([], key)
+                verify(Boot.isReady(finished, [key]),
+                       outcome + " must mark screen " + key + " ready")
             }
-            // A real reveal reports only after its animation settles, so a screen
-            // that has not reported yet is still not ready.
+        }
+
+        function test_revealOutcomeWaitsForItsAnimation() {
+            // A real reveal owes the shell an animation, so it is not an immediate
+            // completion and its screen stays unreported until the reveal settles.
+            var outcome = Boot.bootOutcome("/tmp/new.png", "/tmp/old.png", false, false)
+            compare(outcome, "reveal")
+            verify(!Boot.bootOutcomeCompletesImmediately(outcome))
+            var keys = Boot.currentKeys(screens())
             verify(!Boot.isReady([], [keys[0]]))
+        }
+
+        function test_unknownOutcomesAreNotImmediateCompletions() {
+            // The seam is fail-closed: a string the classifier cannot produce must
+            // never be read as "settle now and report".
+            verify(!Boot.bootOutcomeCompletesImmediately("reveal"))
+            verify(!Boot.bootOutcomeCompletesImmediately(""))
+            verify(!Boot.bootOutcomeCompletesImmediately("unknown"))
+            verify(!Boot.bootOutcomeCompletesImmediately(undefined))
         }
     }
 }

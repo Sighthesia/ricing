@@ -272,9 +272,11 @@ Variants {
             }
 
             // End the boot reveal on an outcome that has no circle to show. Every
-            // one of them is a finished boot, so the screen reports here instead
-            // of waiting on an animation that will never run.
+            // outcome that completes immediately is a finished boot, so the screen
+            // reports here instead of waiting on an animation that will never run.
             function settleWithoutReveal(outcome, path) {
+                if (!BootLogic.bootOutcomeCompletesImmediately(outcome))
+                    return
                 if (outcome === "empty") {
                     wallpaperWindow.pendingWallpaper = ""
                     wallpaperWindow.revealRadius = 0
@@ -404,10 +406,19 @@ Variants {
                     if (!reveal.imageFailed)
                         return
                     console.warn("WallpaperBackground: failed to load", reveal.source)
-                    // A failed image is the "error" outcome, so a boot wallpaper
-                    // that never decodes reports here instead of waiting on a
-                    // circle that cannot open. The theme floor is what stays up.
-                    wallpaperWindow.settleWithoutReveal("error", "")
+                    // A live switch keeps its own failure handling: return to the
+                    // floor and free the palette, with no boot report.
+                    if (!wallpaperWindow.bootRevealActive) {
+                        wallpaperWindow.settle("")
+                        Services.ColorService.revealCompleted()
+                        return
+                    }
+                    // A boot wallpaper that never decodes is classified by the same
+                    // seam the boot tests assert, so this path reports through the
+                    // "error" outcome instead of waiting on a circle that cannot
+                    // open. The theme floor is what stays up.
+                    wallpaperWindow.settleWithoutReveal(
+                        wallpaperWindow.bootOutcomeFor(reveal.source), "")
                 }
             }
 

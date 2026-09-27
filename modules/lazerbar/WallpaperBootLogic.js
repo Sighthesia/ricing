@@ -59,3 +59,14 @@ function bootOutcome(path, baseSource, imageFailed, reducedMotion) {
         return "unchanged"
     return "reveal"
 }
+
+// Whether a boot outcome lets its screen report completion without waiting for
+// a reveal animation first. This is the contract that ties the classifier to
+// readiness: the four non-reveal outcomes settle straight to their final state,
+// and only "reveal" owes the shell an animation before its report counts.
+function bootOutcomeCompletesImmediately(outcome) {
+    return outcome === "empty"
+        || outcome === "error"
+        || outcome === "reduced-motion"
+        || outcome === "unchanged"
+}
