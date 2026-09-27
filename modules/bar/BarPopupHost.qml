@@ -172,6 +172,7 @@ PanelWindow {
         if (!tc)
             return null
         var anchorY = Number(tc.submenuAnchorBottomY)
+        var view = tc.submenuViewport
         return {
             "phase": String(tc.submenuPhase || ""),
             "progress": Math.round(Number(tc.submenuProgress) * 1000) / 1000,
@@ -186,6 +187,12 @@ PanelWindow {
             "body": Math.round(Number(tc.submenuBodyFull)),
             "surface": root._debugRect(tc.submenuSurface),
             "surfaceVisible": tc.submenuSurface.visible === true,
+            "pendingVisible": tc.submenuPendingCatcher.visible === true,
+            "viewH": view ? Math.round(Number(view.height)) : -1,
+            "viewContentH": view ? Math.round(Number(view.contentHeight)) : -1,
+            "viewY": view ? Math.round(Number(view.y)) : -1,
+            "viewInteractive": view ? view.interactive === true : false,
+            "contentInteractive": root.contentInteractive,
             "cursorX": Math.round(Number(tc.lastCursorX)),
             "cursorY": Math.round(Number(tc.lastCursorY)),
             "highlightSub": tc.highlightedSubmenuRow ? 1 : 0,

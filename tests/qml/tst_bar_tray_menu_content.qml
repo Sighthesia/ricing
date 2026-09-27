@@ -782,6 +782,53 @@ Item {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
         }
+        function test_coldFetchHandoffKeepsTheArrival() {
+            // Cold first-open path: the panel is still hidden when the pointer
+            // arrives, so the pending bridge owns the area. When the late batch
+            // lands the real surface takes that area over — the arrival must
+            // survive the handoff and highlight under a pointer that never
+            // moves again.
+            Lazer.MotionTokens.reducedMotionOverride = true
+            try {
+                mouseMove(root, 380, 760); wait(20)
+                mouseMove(root, 8, 700); wait(20)
+                var parent = fakeEntry("More", { hasChildren: true })
+                var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+                var row = null
+                for (var i = 0; i < 200 && row === null; i++) {
+                    wait(10)
+                    var rows = primaryRowsOf(item)
+                    if (rows.length >= 3 && rows[1].height > 0)
+                        row = rows[1]
+                }
+                verify(row !== null, "primary rows never laid out")
+                var rowPoint = row.mapToItem(item, 40, 16)
+                hoverFresh(item, rowPoint.x, rowPoint.y)
+                // Summoned with no content yet: the panel stays hidden and the
+                // bridge mirrors its geometry.
+                var summoned = false
+                for (var j = 0; j < 200 && !summoned; j++) {
+                    wait(10)
+                    summoned = findByName(item, "traySubmenuSurface")
+                        && findByName(item, "traySubmenuPendingCatcher").visible
+                }
+                verify(summoned, "cold panel never exposed its bridge")
+                // Arrive where the rows will be, before they exist.
+                var surface = findByName(item, "traySubmenuSurface")
+                var target = surface.mapToItem(item, 40, 48 + 8 + 16)
+                verify(pollAct(function() { mouseMove(item, target.x, target.y) },
+                    function() { return item.lastCursorX >= 0 }),
+                    "bridge never took the arrival")
+                // The late batch lands under the stationary pointer.
+                item.submenuEntries = [fakeEntry("Child")]
+                verify(pollAct(function() { item.resolveSubHoverFromMemory(); wait(20) },
+                    function() { return item.highlightedSubmenuRow !== null }),
+                    "handoff dropped the arrival: no highlight under a parked pointer")
+                verify(item.lastCursorX >= 0, "handoff forgot the pointer")
+            } finally {
+                Lazer.MotionTokens.reducedMotionOverride = false
+            }
+        }
         function test_scrollableSubmenuRowStaysTappable() {
             // A scrollable submenu must still take taps: the Flickable claims
             // the press for dragging, so rows below it can go dead.

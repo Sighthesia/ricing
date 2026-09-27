@@ -201,6 +201,10 @@ Item {
     readonly property alias submenuSurface: submenuSurface
     readonly property alias submenuAnimation: submenuAnimation
     readonly property alias menuFace: menuFace
+    // Input-side aliases: the cold-fetch bridge and the rows viewport are the
+    // two owners that decide whether a late arrival can be reached at all.
+    readonly property alias submenuViewport: submenuFlick
+    readonly property alias submenuPendingCatcher: submenuPendingCatcher
     readonly property real maxMenuHeight: Screen.desktopAvailableHeight > 0
         ? Math.max(180, Screen.desktopAvailableHeight * 0.7) : 420
     signal dismissRequested()
@@ -425,8 +429,16 @@ Item {
         onEntered: root.rememberCursor(mouseX + x, mouseY + y)
         onPositionChanged: root.rememberCursor(mouseX + x, mouseY + y)
         onExited: {
-            if (!submenuSurface.visible)
+            // Handoff: the real surface just claimed this area, so the arrival
+            // must survive it. Keeping the memory lets the late batch highlight
+            // under a stationary pointer (the cold first-open path spends
+            // hundreds of ms here, so this is the normal case, not an edge
+            // one). A departure that leaves the panel hidden still clears it.
+            if (!submenuSurface.visible) {
                 root.forgetCursor()
+                return
+            }
+            Qt.callLater(root.resolveSubHoverFromMemory)
         }
     }
     // Submenu hover state lives here at root level: functions nested inside
@@ -449,8 +461,11 @@ Item {
     // bridge strip.
     // Re-resolve under a stationary cursor from memory. Delegates may not
     // exist yet when this runs (model changes precede instantiation), so a
-    // miss with no rows seen retries briefly; a miss with rows present is a
-    // genuine gap and clears.
+    // miss with no rows seen retries; a miss with rows present is a genuine
+    // gap and clears. The retry budget spans the cold first-open batch: the
+    // DBus fetch lands, then the delegates are created and positioned over
+    // several frames, and the pointer never moves in between.
+    readonly property int submenuResolveRetries: 30
     function resolveSubHoverFromMemory(retry) {
         retry = retry || 0
         if (lastCursorX < 0)
@@ -464,7 +479,7 @@ Item {
         if (!inX || fy < 0 || fy >= submenuFlick.height) {
             // A laid-out viewport lags delegate creation by frames under
             // load; retry briefly instead of wiping a live highlight.
-            if (submenuFlick.height <= 0 && retry < 5)
+            if (submenuFlick.height <= 0 && retry < submenuResolveRetries)
                 Qt.callLater(function() { root.resolveSubHoverFromMemory(retry + 1) })
             else
                 highlightedSubmenuRow = null
@@ -475,7 +490,7 @@ Item {
             highlightedSubmenuRow = m.row
             return
         }
-        if (m.rowsSeen === 0 && retry < 5)
+        if (m.rowsSeen === 0 && retry < submenuResolveRetries)
             Qt.callLater(function() { root.resolveSubHoverFromMemory(retry + 1) })
         else
             highlightedSubmenuRow = null
@@ -517,7 +532,32 @@ Item {
         // Clear highlight only: leaving toward the submenu must not act
         // (arrivals would die). Stale intent resets in closeSubmenu.
         highlightedRow = null
+        // The memory is shared with the second level, and this exit is
+        // delivered after the arrival it collides with: crossing from the
+        // rows into the panel/bridge fires both, and wiping here strands the
+        // submenu highlight (the cold first-open path parks the pointer in
+        // that area for the whole fetch, so nothing re-arms it). Departures
+        // that really leave the second level are handled by its own catcher.
+        if (pointerOverSubmenu())
+            return
         forgetCursor()
+    }
+    // Is the remembered point still over the second level (its panel, or the
+    // cold-fetch bridge standing in for it)? Used to decide whether a primary
+    // exit means "left the menu" or "moved across to the submenu".
+    function pointerOverSubmenu() {
+        if (lastCursorX < 0 || submenuProgress <= 0.01)
+            return false
+        if (submenuSurface.visible) {
+            var sx = lastCursorX - submenuSurface.x
+            var sy = lastCursorY - submenuSurface.y
+            return sx >= -12 && sx <= submenuSurface.width
+                && sy >= -12 && sy <= submenuSurface.height
+        }
+        var bridge = submenuPendingCatcher
+        return bridge.visible
+            && lastCursorX >= bridge.x && lastCursorX <= bridge.x + bridge.width
+            && lastCursorY >= bridge.y && lastCursorY <= bridge.y + bridge.height
     }
     // Primary rebuilds (cold batches) under a stationary cursor.
     onMenuSectionsChanged: resolveHoverFromMemory()
