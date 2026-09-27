@@ -28,9 +28,6 @@ Variants {
 
             // Wallpaper that is decoded but not settled yet.
             property string pendingWallpaper: ""
-            // Whether this session has ever shown a wallpaper. The first one
-            // arrives from persisted settings and is adopted without a reveal.
-            property bool settledOnce: false
             // Request that arrived before the surface had a size.
             property string deferredWallpaper: ""
             // Live reveal circle radius, driven by revealAnimation.
@@ -98,7 +95,11 @@ Variants {
                 duration: MotionTokens.wallpaperSwap
                 easing.type: Easing.OutCubic
 
-                onFinished: wallpaperWindow.settle(wallpaperWindow.pendingWallpaper)
+                onFinished: {
+                    wallpaperWindow.settle(wallpaperWindow.pendingWallpaper)
+                    // The transition is over, so the palette may catch up.
+                    Services.ColorService.revealCompleted()
+                }
             }
 
             // Fade the settled layer away when the wallpaper is cleared.
@@ -160,17 +161,10 @@ Variants {
                 baseImage.opacity = 1
                 if (path === String(baseImage.source))
                     return
-                // The session's first wallpaper is not a switch: there is no
-                // previous wallpaper to reveal from, and startup is the worst
-                // moment to animate a full-screen surface because every other
-                // one-time initialisation runs in the same window. Settle it.
-                if (!wallpaperWindow.settledOnce) {
-                    wallpaperWindow.settledOnce = true
-                    wallpaperWindow.settle(path)
-                    return
-                }
                 if (MotionTokens.reducedMotion) {
                     wallpaperWindow.settle(path)
+                    // No animation will hold the palette back.
+                    Services.ColorService.revealCompleted()
                     return
                 }
                 // An interrupted reveal hands its wallpaper over before the new
@@ -182,6 +176,9 @@ Variants {
                 wallpaperWindow.activeRevealOrigin = wallpaperWindow.resolveRevealOrigin()
                 wallpaperWindow.pendingWallpaper = path
                 wallpaperWindow.revealRadius = 0
+                // Palette extraction is a ~1.6s CPU-bound job, so it waits for
+                // the circle to finish growing.
+                Services.ColorService.revealStarted()
                 revealAnimation.restart()
             }
 
@@ -204,6 +201,8 @@ Variants {
                         return
                     console.warn("WallpaperBackground: failed to load", reveal.source)
                     wallpaperWindow.settle("")
+                    // The circle will never grow, so release the palette gate.
+                    Services.ColorService.revealCompleted()
                 }
             }
 

@@ -24,24 +24,48 @@ QtObject {
         return value === "dark" || value === "light" ? value : "auto"
     }
 
-    // Palette extraction is a ~1.6s CPU-bound Python job. Two things keep it
-    // off the compositor's back:
-    //   * `nice`, so the render thread always wins a contended core, and
-    //   * a debounce that outlasts the wallpaper reveal (MotionTokens
-    //     .wallpaperSwap), so the job never overlaps the transition.
-    // DymicShell uses the same 500ms debounce for the same reason.
+    // Palette extraction is a ~1.6s CPU-bound Python job, and the wallpaper
+    // reveal animates a full-screen surface. Running the job inside that window
+    // starves the render thread and stalls the transition, so requests are held
+    // until the reveal reports it finished (see revealStarted/revealCompleted,
+    // called by the wallpaper window). The hold timer flushes regardless, so a
+    // missed signal can never leave the theme stale.
     readonly property string _lowPriority: "nice -n 19"
+    property bool _revealInFlight: false
+    property string _heldPath: ""
 
-    // Debounce rapid wallpaper changes. `delay` lets the startup call wait out
-    // the shell's own first-frame initialisation, which is the busiest moment
-    // in a session.
+    // Debounce rapid wallpaper changes. `delay` overrides the coalescing window.
     property string _pendingPath: ""
 
     function extractColors(wallpaperPath, delay) {
         if (!wallpaperPath) return
         _pendingPath = wallpaperPath
+        if (_revealInFlight) {
+            _heldPath = wallpaperPath
+            return
+        }
         _debounce.interval = delay ? Math.max(0, Number(delay)) : 500
         _debounce.restart()
+    }
+
+    // Announced by the wallpaper window: a reveal is about to animate the
+    // screen, so palette work waits.
+    function revealStarted() {
+        _revealInFlight = true
+        _holdTimer.restart()
+    }
+
+    // The reveal is done, or never ran; flush a held request right away.
+    function revealCompleted() {
+        if (!_revealInFlight)
+            return
+        _revealInFlight = false
+        _holdTimer.stop()
+        if (_heldPath) {
+            _heldPath = ""
+            _debounce.interval = 120
+            _debounce.restart()
+        }
     }
 
     function commandFor(wallpaperPath, outputPath, mode, scheme) {
@@ -76,10 +100,10 @@ QtObject {
 
     // Refresh the cached palette once at startup so a fresh shell always
     // matches the current wallpaper without waiting for a wallpaper change.
-    // Deferred well past the first frames: startup is the one moment the shell
-    // does every one-time initialisation at once, and the extraction is a
-    // ~1.6s CPU-bound job.
-    Component.onCompleted: extractColors(Services.SettingsService.appearance.wallpaperPath, 2500)
+    // The reveal gate moves this past the startup reveal when it is still
+    // running; the delay only covers the case where the window has not started
+    // its reveal yet.
+    Component.onCompleted: extractColors(Services.SettingsService.appearance.wallpaperPath, 900)
 
     // Regenerate palettes whenever the requested scheme or template changes.
     // A template/mode switch is served from the preview cache when fresh, so
@@ -153,10 +177,15 @@ QtObject {
         printErrors: false
     }
 
-    // Outlasts the wallpaper reveal (MotionTokens.wallpaperSwap = 480ms) so the
-    // extraction starts once the transition has finished rather than in the
-    // middle of it, where a CPU-bound Python job visibly starves the render
-    // thread. Restarted on every request, so rapid switches still coalesce.
+    // Safety net for a held request: a reveal that never reports completion
+    // (surface unmapped, image error, interrupted switch) must not wedge the
+    // palette.
+    property Timer _holdTimer: Timer {
+        interval: 1500
+        onTriggered: root.revealCompleted()
+    }
+
+    // Coalesces rapid wallpaper/scheme changes into one extraction run.
     property Timer _debounce: Timer {
         interval: 500
         onTriggered: {
