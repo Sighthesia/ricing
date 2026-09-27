@@ -77,8 +77,8 @@ Variants {
                 radius: wallpaperWindow.revealRadius
             }
 
-            // Grow the circle from the trigger point, then settle onto the base
-            // image and drop the reveal so it stops costing a composite pass.
+            // Grow the circle from the trigger point, then hand the wallpaper
+            // over to the settled layer.
             NumberAnimation {
                 id: revealAnimation
                 target: wallpaperWindow
@@ -87,11 +87,17 @@ Variants {
                 duration: MotionTokens.wallpaperSwap
                 easing.type: Easing.OutCubic
 
-                onFinished: {
-                    baseImage.source = wallpaperWindow.pendingWallpaper
-                    wallpaperWindow.pendingWallpaper = ""
-                    wallpaperWindow.revealRadius = 0
-                }
+                onFinished: wallpaperWindow.handOverReveal()
+            }
+
+            // The settled layer is filled asynchronously, so the reveal has to
+            // stay up until it really has pixels. Bailing out early would show
+            // the bare theme colour right at the end of the transition, which
+            // reads as a flash before the wallpaper snaps in.
+            Timer {
+                id: handoverTimeout
+                interval: MotionTokens.wallpaperSwap * 2
+                onTriggered: wallpaperWindow.endReveal()
             }
 
             // Fade the settled layer away when the wallpaper is cleared.
@@ -108,10 +114,31 @@ Variants {
             function settle(path) {
                 revealAnimation.stop()
                 hideAnimation.stop()
+                handoverTimeout.stop()
                 wallpaperWindow.pendingWallpaper = ""
                 wallpaperWindow.revealRadius = 0
                 baseImage.opacity = 1
                 baseImage.source = path
+            }
+
+            // Start the settled layer decoding, then drop the reveal once its
+            // pixels are in place (or once the fallback timer gives up).
+            function handOverReveal() {
+                if (wallpaperWindow.pendingWallpaper === "")
+                    return
+                baseImage.source = wallpaperWindow.pendingWallpaper
+                if (baseImage.status === Image.Ready) {
+                    wallpaperWindow.endReveal()
+                    return
+                }
+                handoverTimeout.restart()
+            }
+
+            // Retire the reveal; the settled layer now shows the same wallpaper.
+            function endReveal() {
+                handoverTimeout.stop()
+                wallpaperWindow.pendingWallpaper = ""
+                wallpaperWindow.revealRadius = 0
             }
 
             // Single entry point so startup, panel commits, and file edits all
@@ -119,6 +146,7 @@ Variants {
             function showWallpaper(path) {
                 revealAnimation.stop()
                 hideAnimation.stop()
+                handoverTimeout.stop()
                 // The trigger point is consumed once so a later key write cannot
                 // inherit a stale origin; every screen reads it before this runs.
                 Qt.callLater(function() { Services.WallpaperService.revealOrigin = null })
@@ -166,8 +194,17 @@ Variants {
                     if (!reveal.imageFailed)
                         return
                     console.warn("WallpaperBackground: failed to load", reveal.source)
-                    wallpaperWindow.pendingWallpaper = ""
-                    wallpaperWindow.revealRadius = 0
+                    wallpaperWindow.endReveal()
+                }
+            }
+
+            // Retire the reveal as soon as the settled layer has the pixels.
+            Connections {
+                target: baseImage
+
+                function onStatusChanged() {
+                    if (baseImage.status === Image.Ready && wallpaperWindow.pendingWallpaper !== "")
+                        wallpaperWindow.endReveal()
                 }
             }
 

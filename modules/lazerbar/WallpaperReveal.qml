@@ -36,7 +36,11 @@ Item {
         source: root.source
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
-        cache: false
+        // Keep the decoded pixmap in Qt's image cache. The host hands the
+        // settled layer the same source right after the reveal, so a cache hit
+        // makes that handover instant instead of decoding the wallpaper a
+        // second time with a frame of bare background in between.
+        cache: true
         layer.enabled: true
         layer.effect: OpacityMask {
             // The mask spans the whole surface so the circle keeps its position
