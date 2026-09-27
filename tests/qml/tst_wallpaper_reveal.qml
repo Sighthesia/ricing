@@ -15,6 +15,18 @@ Item {
         source: ""
         origin: Qt.point(40, 200)
         radius: 0
+
+        // Reach the internals the way the renderer does: the masked result and
+        // the mask container the host never touches. OpacityMask owns extra
+        // helper nodes, so it is found by capability rather than by index.
+        readonly property var revealMask: {
+            for (var i = 0; i < children.length; i++) {
+                if (children[i].maskSource !== undefined)
+                    return children[i]
+            }
+            return null
+        }
+        readonly property var maskSource: revealMask ? revealMask.maskSource : null
     }
 
     TestCase {
@@ -70,18 +82,28 @@ Item {
 
         function test_revealIsIdleUntilItHasBothPixelsAndRadius() {
             compare(reveal.coverRadius, Reveal.coverRadius(40, 200, 400, 240))
-            // No source and no radius means nothing is painted.
-            compare(reveal.active, false)
-            verify(!reveal.visible)
+            // No radius means the mask result stays hidden and nothing is drawn
+            // over the settled wallpaper.
+            verify(!reveal.revealMask.visible)
+            compare(reveal.revealMask.source.status, Image.Null)
             reveal.source = "file:///tmp/does-not-exist.png"
-            compare(reveal.active, false)
+            verify(!reveal.revealMask.visible)
             reveal.radius = 30
-            compare(reveal.active, true)
-            verify(reveal.visible)
             // A missing file must not look like a decoded wallpaper.
+            verify(reveal.revealMask.visible)
             compare(reveal.imageReady, false)
+            compare(reveal.imageFailed, true)
             reveal.radius = 0
-            compare(reveal.active, false)
+            verify(!reveal.revealMask.visible)
+        }
+
+        function test_revealDecodesSynchronouslySoTheCircleNeverOpensEarly() {
+            // The host starts growing the circle right after assigning the
+            // source, so the pixels have to exist by then; an async image would
+            // open on an empty circle and re-decode at the handover.
+            compare(reveal.revealMask.source.asynchronous, false)
+            compare(reveal.revealMask.maskSource.width, 400)
+            compare(reveal.revealMask.maskSource.height, 240)
         }
     }
 }

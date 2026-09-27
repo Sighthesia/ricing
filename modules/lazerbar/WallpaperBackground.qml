@@ -60,12 +60,15 @@ Variants {
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }
 
-            // Settled wallpaper that stays painted between swaps.
+            // Settled wallpaper that stays painted between swaps. Decoding is
+            // synchronous so handing a wallpaper over never leaves a gap where
+            // only the theme floor is painted.
             Image {
                 id: baseImage
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectCrop
-                asynchronous: true
+                asynchronous: false
+                cache: false
             }
 
             // Incoming wallpaper spreading out of the switch point.
@@ -78,7 +81,7 @@ Variants {
             }
 
             // Grow the circle from the trigger point, then hand the wallpaper
-            // over to the settled layer.
+            // over to the settled layer in the same synchronous step.
             NumberAnimation {
                 id: revealAnimation
                 target: wallpaperWindow
@@ -87,17 +90,7 @@ Variants {
                 duration: MotionTokens.wallpaperSwap
                 easing.type: Easing.OutCubic
 
-                onFinished: wallpaperWindow.handOverReveal()
-            }
-
-            // The settled layer is filled asynchronously, so the reveal has to
-            // stay up until it really has pixels. Bailing out early would show
-            // the bare theme colour right at the end of the transition, which
-            // reads as a flash before the wallpaper snaps in.
-            Timer {
-                id: handoverTimeout
-                interval: MotionTokens.wallpaperSwap * 2
-                onTriggered: wallpaperWindow.endReveal()
+                onFinished: wallpaperWindow.settle(wallpaperWindow.pendingWallpaper)
             }
 
             // Fade the settled layer away when the wallpaper is cleared.
@@ -110,35 +103,16 @@ Variants {
                 easing.type: Easing.OutCubic
             }
 
-            // Adopt a wallpaper as settled without any transition.
+            // Adopt a wallpaper as settled and retire the reveal. Both source
+            // assignments are synchronous, so no frame is ever left without a
+            // wallpaper painted.
             function settle(path) {
                 revealAnimation.stop()
                 hideAnimation.stop()
-                handoverTimeout.stop()
                 wallpaperWindow.pendingWallpaper = ""
                 wallpaperWindow.revealRadius = 0
-                baseImage.opacity = 1
-                baseImage.source = path
-            }
-
-            // Start the settled layer decoding, then drop the reveal once its
-            // pixels are in place (or once the fallback timer gives up).
-            function handOverReveal() {
-                if (wallpaperWindow.pendingWallpaper === "")
-                    return
-                baseImage.source = wallpaperWindow.pendingWallpaper
-                if (baseImage.status === Image.Ready) {
-                    wallpaperWindow.endReveal()
-                    return
-                }
-                handoverTimeout.restart()
-            }
-
-            // Retire the reveal; the settled layer now shows the same wallpaper.
-            function endReveal() {
-                handoverTimeout.stop()
-                wallpaperWindow.pendingWallpaper = ""
-                wallpaperWindow.revealRadius = 0
+                if (path)
+                    baseImage.source = path
             }
 
             // Single entry point so startup, panel commits, and file edits all
@@ -146,7 +120,6 @@ Variants {
             function showWallpaper(path) {
                 revealAnimation.stop()
                 hideAnimation.stop()
-                handoverTimeout.stop()
                 // The trigger point is consumed once so a later key write cannot
                 // inherit a stale origin; every screen reads it before this runs.
                 Qt.callLater(function() { Services.WallpaperService.revealOrigin = null })
@@ -163,13 +136,16 @@ Variants {
                     wallpaperWindow.settle(path)
                     return
                 }
-                // Decode the incoming wallpaper first, then grow the circle once
-                // the pixels are ready.
+                // An interrupted reveal hands its wallpaper over before the new
+                // one starts, so a rapid second switch never drops a frame.
+                if (wallpaperWindow.pendingWallpaper !== "")
+                    wallpaperWindow.settle(wallpaperWindow.pendingWallpaper)
+                // The reveal image decodes synchronously, so the pixels are
+                // already in place by the time the circle starts growing.
                 wallpaperWindow.activeRevealOrigin = wallpaperWindow.resolveRevealOrigin()
                 wallpaperWindow.pendingWallpaper = path
                 wallpaperWindow.revealRadius = 0
-                if (reveal.imageReady)
-                    revealAnimation.restart()
+                revealAnimation.restart()
             }
 
             // Route live wallpaper changes into the shared reveal path.
@@ -181,30 +157,16 @@ Variants {
                 }
             }
 
-            // Start growing only once the incoming image can actually be shown.
+            // The reveal decodes synchronously, so a failure is the only reason
+            // the circle would never grow.
             Connections {
                 target: reveal
-
-                function onImageReadyChanged() {
-                    if (reveal.imageReady && wallpaperWindow.pendingWallpaper !== "")
-                        revealAnimation.restart()
-                }
 
                 function onImageFailedChanged() {
                     if (!reveal.imageFailed)
                         return
                     console.warn("WallpaperBackground: failed to load", reveal.source)
-                    wallpaperWindow.endReveal()
-                }
-            }
-
-            // Retire the reveal as soon as the settled layer has the pixels.
-            Connections {
-                target: baseImage
-
-                function onStatusChanged() {
-                    if (baseImage.status === Image.Ready && wallpaperWindow.pendingWallpaper !== "")
-                        wallpaperWindow.endReveal()
+                    wallpaperWindow.settle("")
                 }
             }
 
