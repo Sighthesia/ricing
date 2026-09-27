@@ -107,6 +107,11 @@ Item {
             + ' property int powerCalls: 0;'
             + ' property bool lastPower: false;'
             + ' property int scanCalls: 0;'
+            + ' property int refreshCalls: 0;'
+            + ' property int forgetCalls: 0;'
+            + ' property string lastForgot: "";'
+            + ' property string lastErrorSsid: "";'
+            + ' property var passwordNeeded: ({});'
             + ' property int connectCalls: 0;'
             + ' property string lastSsid: "";'
             + ' property string lastPassword: "";'
@@ -114,6 +119,10 @@ Item {
             + ' property int disconnectCalls: 0;'
             + ' function setWifiEnabled(v) { powerCalls++; lastPower = v; wifiEnabled = v }'
             + ' function scan() { scanCalls++ }'
+            + ' function refreshForOpen() { refreshCalls++ }'
+            + ' function forget(s) { forgetCalls++; lastForgot = s }'
+            + ' function needsPasswordFor(s) { return !!passwordNeeded[s] }'
+            + ' function isCredentialFailure(m) { return m === "Incorrect password" }'
             + ' function getStatusText() { return "HomeWifi" }'
             + ' function getSignalLabel(s) { return s >= 80 ? "Excellent" : "Good" }'
             + ' function isSecured(s) { return s && s !== "--" && s !== "open" }'
@@ -323,6 +332,128 @@ Item {
             verify(findByName(item, "networkContent").visible)
             item.handleNetworkTap(null)
             verify(true, "no throw with null payload")
+        }
+
+        // The panel used to render whatever the shell's startup scan had
+        // found, so a network that appeared later never showed up.
+        function test_networkRefreshesOnOpen() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            tryCompare(svc, "refreshCalls", 1, 200)
+            // A deliberate rescan is a different, user-driven request.
+            item.handleWifiRescan()
+            compare(svc.scanCalls, 1)
+        }
+
+        // Six hardcoded rows left most of a dense band unreachable.
+        function test_networkListIsNotTruncated() {
+            var svc = makeNetworkService()
+            var nets = {}
+            for (var i = 0; i < 12; i++) {
+                nets["Net" + i] = {
+                    ssid: "Net" + i, security: "WPA2", signal: 90 - i,
+                    connected: false, existing: true
+                }
+            }
+            svc.networks = nets
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            compare(item.wifiList.length, 12)
+            // Sorted by signal, so the strongest network leads.
+            compare(item.wifiList[0].ssid, "Net0")
+            var list = findByName(item, "wifiListView")
+            verify(list !== null, "network list view should exist")
+            compare(list.count, 12)
+            verify(list.interactive, "an overlong list scrolls")
+            verify(list.height < list.contentHeight, "viewport is bounded")
+        }
+
+        // A saved profile whose stored secret was rejected is a dead end
+        // without a way to drop it.
+        function test_networkForgetRecoveryForStaleSecret() {
+            var svc = makeNetworkService()
+            svc.lastError = "Incorrect password"
+            svc.lastErrorSsid = "HomeWifi"
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var forgetBtn = findByName(item, "wifiForgetButton")
+            verify(forgetBtn !== null, "forget button should exist")
+            verify(forgetBtn.visible, "forget button shows for a saved secret failure")
+            item.handleForgetFailed()
+            compare(svc.forgetCalls, 1)
+            compare(svc.lastForgot, "HomeWifi")
+        }
+
+        function test_networkForgetHiddenForUnrelatedError() {
+            var svc = makeNetworkService()
+            svc.lastError = "Network not found"
+            svc.lastErrorSsid = "HomeWifi"
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            verify(!findByName(item, "wifiForgetButton").visible,
+                "forgetting a profile cannot fix a missing network")
+        }
+
+        // The service asks for the password again once it has blamed the
+        // stored secret, so the row reopens instead of failing silently.
+        function test_networkReasksPasswordForStaleSecret() {
+            var svc = makeNetworkService()
+            svc.wifiConnected = false
+            svc.networks = {
+                HomeWifi: { ssid: "HomeWifi", security: "WPA2", signal: 85, connected: false, existing: true }
+            }
+            svc.lastError = "Incorrect password"
+            svc.lastErrorSsid = "HomeWifi"
+            svc.passwordNeeded = ({ HomeWifi: true })
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            item.handleNetworkTap(item.wifiList[0])
+            var panel = findByName(item, "wifiPasswordPanel")
+            verify(panel.visible, "password panel should reopen for a stale secret")
+            compare(item.pendingWifiNetwork.ssid, "HomeWifi")
+        }
+
+        // An open network must never be gated behind a password prompt, and a
+        // saved network must not be re-prompted for an unrelated failure.
+        function test_networkOpenNetworkConnectsWithoutPassword() {
+            var svc = makeNetworkService()
+            svc.wifiConnected = false
+            svc.networks = {
+                FreeHotspot: { ssid: "FreeHotspot", security: "--", signal: 60, connected: false, existing: false }
+            }
+            svc.passwordNeeded = ({})   // service reports "no password needed"
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            item.handleNetworkTap(item.wifiList[0])
+            verify(!findByName(item, "wifiPasswordPanel").visible,
+                "an open network connects directly")
+            compare(svc.connectCalls, 1)
+            compare(svc.lastSsid, "FreeHotspot")
+        }
+
+        function test_networkSavedNetworkNotRepromptedForOtherErrors() {
+            var svc = makeNetworkService()
+            svc.wifiConnected = false
+            svc.networks = {
+                HomeWifi: { ssid: "HomeWifi", security: "WPA2", signal: 85, connected: false, existing: true }
+            }
+            svc.lastError = "Connection timeout"
+            svc.lastErrorSsid = "HomeWifi"
+            svc.passwordNeeded = ({})   // not a credential failure
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            item.handleNetworkTap(item.wifiList[0])
+            verify(!findByName(item, "wifiPasswordPanel").visible,
+                "a timeout is not fixed by retyping the password")
+            compare(svc.connectCalls, 1)
         }
     }
 }

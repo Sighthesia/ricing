@@ -12,6 +12,14 @@ Item {
     property var payload: null
     signal dismissRequested()
 
+    // Expanding the panel is the moment a stale list hurts most, so the
+    // network body asks the service for a fresh read of the radio. The popup
+    // is constructed already bound to its kind, which fires no change signal,
+    // so the first read is requested from onCompleted too.
+    onActionKindChanged: if (root.actionKind === "network") root.refreshWifi()
+    onPayloadChanged: if (root.actionKind === "network") root.refreshWifi()
+    Component.onCompleted: if (root.actionKind === "network") root.refreshWifi()
+
     implicitWidth: root.actionKind === "media" ? 420 : 260
     implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
     width: implicitWidth
@@ -194,6 +202,10 @@ Item {
             return String(payload.lastError || "")
         return ""
     }
+    // Every visible network, connected first then by signal. The list used to
+    // be truncated to six rows, so on a dense urban band most of the visible
+    // networks could not be reached at all; the row area is bounded and
+    // scrollable instead.
     readonly property var wifiList: {
         var nets = root.networkService ? root.networkService.networks
             : (payload && payload.networks ? payload.networks : null)
@@ -207,7 +219,26 @@ Item {
                 return bConn - aConn
             return (Number(b && b.signal) || 0) - (Number(a && a.signal) || 0)
         })
-        return arr.slice(0, 6)
+        return arr
+    }
+    // SSID the current error belongs to, and whether its stored secret is
+    // worth re-entering rather than just reporting another failure.
+    readonly property string wifiErrorSsid: root.networkService
+        && root.networkService.lastErrorSsid !== undefined
+        ? String(root.networkService.lastErrorSsid || "") : ""
+    readonly property bool wifiErrorIsSecret: {
+        if (root.wifiError === "")
+            return false
+        if (root.networkService && typeof root.networkService.isCredentialFailure === "function") {
+            try { return !!root.networkService.isCredentialFailure(root.wifiError) } catch (e) { return false }
+        }
+        return root.wifiError === "Incorrect password"
+    }
+    readonly property bool wifiErrorNetworkSaved: {
+        if (root.wifiErrorSsid === "" || !root.networkService)
+            return false
+        var net = root.networkService.networks ? root.networkService.networks[root.wifiErrorSsid] : null
+        return !!(net && net.existing)
     }
     readonly property bool ethAvailable: {
         if (root.networkService && root.networkService.ethernetAvailable !== undefined)
@@ -547,6 +578,34 @@ Item {
         }
     }
 
+    // Re-read the radio when the network popup actually becomes visible. The
+    // panel used to render whatever the shell's startup scan had found, so
+    // networks that appeared later only showed up after a manual rescan.
+    function refreshWifi() {
+        var service = root.networkService
+        if (!service)
+            return
+        if (typeof service.refreshForOpen === "function") {
+            try { service.refreshForOpen(); return } catch (e) {}
+        }
+        if (typeof service.scan === "function") {
+            try { service.scan() } catch (e) {}
+        }
+    }
+
+    // A saved profile whose stored secret no longer works: drop the profile so
+    // the next tap asks for the password again.
+    function handleForgetFailed() {
+        var service = root.networkService
+        if (!service || root.wifiErrorSsid === "")
+            return
+        if (typeof service.forget === "function") {
+            try { service.forget(root.wifiErrorSsid) } catch (e) {}
+        }
+        root.pendingWifiNetwork = null
+        root.wifiPassword = ""
+    }
+
     // Label a wi-fi network's signal strength.
     function wifiSignalLabel(signal) {
         if (root.networkService && typeof root.networkService.getSignalLabel === "function") {
@@ -561,8 +620,9 @@ Item {
     }
 
     // Tap a network row: disconnect the active one, otherwise connect.
-    // Saved and open networks connect directly; secured unknowns report
-    // through the service's lastError line below the list.
+    // An unsaved secured network collects its password first; a saved one
+    // whose stored secret was rejected comes back through the same row instead
+    // of failing forever on the stale profile.
     function handleNetworkTap(network) {
         if (!network || !network.ssid)
             return
@@ -573,16 +633,23 @@ Item {
         var service = root.networkService
         if (!service)
             return
+        var ssid = String(network.ssid)
         try {
-            if (network.connected && typeof service.disconnect === "function")
-                service.disconnect(String(network.ssid))
-            else if (!network.existing && service.isSecured && service.isSecured(String(network.security || "--"))) {
+            if (network.connected && typeof service.disconnect === "function") {
+                service.disconnect(ssid)
+            } else if (typeof service.needsPasswordFor === "function"
+                    && service.needsPasswordFor(ssid)) {
                 root.pendingWifiNetwork = network
                 root.wifiPassword = ""
                 wifiPasswordInput.forceActiveFocus()
+            } else if (!network.existing && service.isSecured
+                    && service.isSecured(String(network.security || "--"))) {
+                root.pendingWifiNetwork = network
+                root.wifiPassword = ""
+                wifiPasswordInput.forceActiveFocus()
+            } else if (typeof service.connect === "function") {
+                service.connect(ssid, "", false, String(network.security || ""))
             }
-            else if (typeof service.connect === "function")
-                service.connect(String(network.ssid), "", false, String(network.security || ""))
         } catch (e) {}
     }
 
@@ -1275,6 +1342,17 @@ Item {
             height: wifiColumn.height
             visible: root.actionKind === "network"
 
+            // Row metrics for the bounded network list.
+            readonly property int wifiRowHeight: 36
+            readonly property int wifiRowGap: 6
+            readonly property int wifiMaxVisibleRows: 5
+            readonly property int wifiListContentHeight: root.wifiList.length > 0
+                ? root.wifiList.length * wifiRowHeight
+                    + (root.wifiList.length - 1) * wifiRowGap
+                : 0
+            readonly property int wifiListViewportHeight: Math.min(wifiListContentHeight,
+                wifiMaxVisibleRows * wifiRowHeight + (wifiMaxVisibleRows - 1) * wifiRowGap)
+
             Column {
                 id: wifiColumn
                 width: parent.width
@@ -1352,12 +1430,46 @@ Item {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     visible: root.wifiError !== ""
+                    // Leave room for the recovery affordance when one shows.
+                    height: root.wifiError === "" ? 0
+                        : (root.wifiErrorIsSecret && root.wifiErrorNetworkSaved ? 30 : 24)
                     text: root.wifiError
                     color: LazerTheme.osuPink
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
                     maximumLineCount: 2
                     elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                // A saved profile with a rejected secret cannot recover on its
+                // own; forgetting it is the only way back to a password prompt.
+                Rectangle {
+                    id: wifiForgetButton
+                    objectName: "wifiForgetButton"
+                    width: parent.width
+                    height: visible ? 24 : 0
+                    visible: root.wifiError !== "" && root.wifiErrorIsSecret
+                        && root.wifiErrorNetworkSaved
+                    radius: 6
+                    color: forgetHover.hovered ? LazerTheme.hoverFill : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Forget saved profile and retry"
+                        color: LazerTheme.textPrimary
+                        font.pixelSize: 10
+                        font.bold: true
+                    }
+
+                    HoverHandler { id: forgetHover }
+                    TapHandler {
+                        objectName: "wifiForgetTap"
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        onTapped: root.handleForgetFailed()
+                    }
                 }
 
                 // Collect credentials only for an unsaved secured network.
@@ -1458,9 +1570,27 @@ Item {
                     }
                 }
 
-                Repeater {
-                    id: wifiRepeater
+                // Bounded, scrollable row area. The panel has to stay inside
+                // the popup's geometry budget, but the list must still reach
+                // every network the radio reported — six hardcoded rows left
+                // the rest of a dense band unreachable.
+                ListView {
+                    id: wifiListView
+                    objectName: "wifiListView"
+                    width: parent.width
+                    height: root.wifiEnabled ? networkContent.wifiListViewportHeight : 0
+                    visible: root.wifiEnabled && count > 0
                     model: root.wifiEnabled ? root.wifiList : []
+                    spacing: networkContent.wifiRowGap
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    // A list that already fits must not swallow wheel events;
+                    // an overlong one scrolls, without a fling that would keep
+                    // the panel moving after the pointer has left it.
+                    interactive: networkContent.wifiListContentHeight > height
+                    cacheBuffer: height * 2
+                    flickDeceleration: 4000
+                    maximumFlickVelocity: 200
 
                     delegate: Rectangle {
                         id: wifiNetRow
@@ -1468,9 +1598,9 @@ Item {
                         required property var modelData
                         required property int index
 
-                        objectName: "wifiNetRow" + index
-                        width: wifiColumn.width
-                        height: 36
+                        objectName: "wifiNetRow" + wifiNetRow.index
+                        width: wifiListView.width
+                        height: networkContent.wifiRowHeight
                         radius: 6
                         color: wifiRowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
                         border.width: wifiNetRow.modelData && wifiNetRow.modelData.connected ? 1.5 : 0
