@@ -26,6 +26,8 @@ Item {
             return
         analysisProcess.running = false
         analysisProcess.command = [
+            "nice",
+            "-n", "19",
             "python3",
             Quickshell.shellDir + "/scripts/wallpaper_clock_layout.py",
             "--image", root.wallpaperPath,
@@ -55,10 +57,14 @@ Item {
     onScreenHeightChanged: analyzeTimer.restart()
 
     // Debounce resize and wallpaper changes so one lock surface cannot queue
-    // several obsolete image scans during startup.
+    // several obsolete image scans during startup. The window also has to
+    // outlast the wallpaper reveal (MotionTokens.wallpaperSwap = 480ms): the
+    // scan is ~0.6s of CPU, and starting it while the reveal is animating
+    // starves the render thread and stalls the transition. The result is only
+    // needed when the session actually locks, which is far later.
     Timer {
         id: analyzeTimer
-        interval: 120
+        interval: 600
         repeat: false
         onTriggered: root.analyze()
     }

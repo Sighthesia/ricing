@@ -85,6 +85,62 @@ Variants {
                 radius: wallpaperWindow.revealRadius
             }
 
+            // TEMP DIAGNOSTIC — remove once the reveal stutter is pinned down.
+            // Records per-frame gaps while the circle grows and appends them to
+            // /tmp/afloat-wallpaper-probe.log, so a stutter can be read off the
+            // live compositor instead of guessed at. Non-intrusive: no window,
+            // and the log line is written after the transition ends.
+            property bool probing: false
+            property double lastFrameAt: 0
+            property var frameGaps: []
+            property double requestedAt: 0
+
+            FrameAnimation {
+                running: true
+                onTriggered: {
+                    var now = Date.now()
+                    if (wallpaperWindow.probing && wallpaperWindow.lastFrameAt > 0)
+                        wallpaperWindow.frameGaps.push(now - wallpaperWindow.lastFrameAt)
+                    wallpaperWindow.lastFrameAt = now
+                }
+            }
+
+            Timer {
+                id: probeWrite
+                interval: 400
+                onTriggered: wallpaperWindow.writeProbe()
+            }
+
+            function startProbe() {
+                wallpaperWindow.probing = true
+                wallpaperWindow.frameGaps = []
+                wallpaperWindow.lastFrameAt = 0
+                wallpaperWindow.requestedAt = Date.now()
+            }
+
+            function writeProbe() {
+                wallpaperWindow.probing = false
+                var gaps = wallpaperWindow.frameGaps
+                if (!gaps.length)
+                    return
+                var sum = 0
+                var max = 0
+                for (var i = 0; i < gaps.length; i++) {
+                    sum += gaps[i]
+                    if (gaps[i] > max)
+                        max = gaps[i]
+                }
+                var line = "screen=" + String(screenScope.modelData ? screenScope.modelData.name : "?")
+                    + " frames=" + gaps.length
+                    + " sum=" + sum
+                    + " avg=" + (sum / gaps.length).toFixed(1)
+                    + " max=" + max
+                    + " gaps=" + gaps.join(",")
+                    + "\\n"
+                Quickshell.execDetached(["sh", "-c",
+                    "printf '%s' '" + line.replace(/'/g, "'\\''") + "' >> /tmp/afloat-wallpaper-probe.log"])
+            }
+
             // Grow the circle from the trigger point, then hand the wallpaper
             // over to the settled layer in the same synchronous step.
             NumberAnimation {
@@ -95,7 +151,10 @@ Variants {
                 duration: MotionTokens.wallpaperSwap
                 easing.type: Easing.OutCubic
 
-                onFinished: wallpaperWindow.settle(wallpaperWindow.pendingWallpaper)
+                onFinished: {
+                    probeWrite.restart()
+                    wallpaperWindow.settle(wallpaperWindow.pendingWallpaper)
+                }
             }
 
             // Fade the settled layer away when the wallpaper is cleared.
@@ -170,6 +229,7 @@ Variants {
                 wallpaperWindow.activeRevealOrigin = wallpaperWindow.resolveRevealOrigin()
                 wallpaperWindow.pendingWallpaper = path
                 wallpaperWindow.revealRadius = 0
+                wallpaperWindow.startProbe()
                 revealAnimation.restart()
             }
 
