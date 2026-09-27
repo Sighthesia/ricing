@@ -1,7 +1,10 @@
 import Quickshell.Io
 
-// Capture one screen with grim into a per-generation PNG, then report the
+// Capture one screen with grim into a per-generation JPEG, then report the
 // file URL (or nothing on failure) once before destroying the wrapper.
+// JPEG keeps the pre-lock capture near-instant (~0.1s vs ~0.7s for PNG at
+// 2880x1800); the shot is only a transient wave-reveal base, so q85 is
+// visually indistinguishable once the curtain sweeps over it.
 Process {
     id: process
 
@@ -13,10 +16,22 @@ Process {
 
     signal captured(int screenIndex, string url)
 
-    // Wrap in sh so the runtime directory exists before grim writes into it;
-    // positional arguments keep screen names and paths out of the command.
-    command: ["sh", "-c", "mkdir -p \"$1\" && exec grim -o \"$2\" \"$3\"",
-              "grim-wrapper", process.directory, process.screenName, process.outputPath]
+    // grim's -o names the output device to capture; the image file is a
+    // positional argument. Handing the path to -o made every capture fail with
+    // "unknown output", which left the lock surface on its solid floor color.
+    // An unnamed screen falls back to grim's union-of-outputs capture.
+    readonly property var _grimArgs: {
+        const args = ["grim", "-t", "jpeg", "-q", "85"]
+        if (String(process.screenName || "") !== "")
+            args.push("-o", String(process.screenName))
+        args.push(String(process.outputPath || ""))
+        // `sh -c` creates the runtime directory first, then hands the rest of
+        // the argv to grim unchanged so paths need no escaping.
+        return ["sh", "-c", "mkdir -p \"$1\" && shift && exec \"$@\"",
+                "grim-wrapper", process.directory].concat(args)
+    }
+
+    command: process._grimArgs
 
     onExited: code => {
         captured(process.screenIndex,

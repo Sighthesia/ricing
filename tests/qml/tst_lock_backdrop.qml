@@ -71,17 +71,16 @@ Item {
         function isThemeDark(c) { return c.r < 0.2 && c.g < 0.2 && c.b < 0.2 }
         function isThemeLight(c) { return c.r > 0.8 && c.g > 0.8 && c.b > 0.8 }
         function isWallpaperBlue(c) { return c.b > 0.9 && c.r < 0.1 && c.g < 0.1 }
+        function isScreenshotRed(c) { return c.r > 0.9 && c.g < 0.1 && c.b < 0.1 }
 
-        // Pixels that are neither screenshot-red nor wallpaper-blue carry
-        // wave bands; their count measures how much band is on screen.
+        // Pixels that are neither the pre-lock screenshot nor the wallpaper
+        // carry wave bands; their count measures how much band is on screen.
         function bandArea(image) {
             var bands = 0
             for (var x = 8; x < 320; x += 8)
                 for (var y = 0; y < 240; y += 8) {
                     var c = image.pixel(x, y)
-                    var isSurface = isThemeDark(c)
-                    var isBlue = c.b > 0.9 && c.r < 0.1 && c.g < 0.1
-                    if (!isSurface && !isBlue)
+                    if (!isScreenshotRed(c) && !isWallpaperBlue(c))
                         ++bands
                 }
             return bands
@@ -101,14 +100,14 @@ Item {
 
         function test_wallpaperUnveiledAtBandTail() {
             tryCompare(backdrop, "imagesReady", true)
-            // Mid-sweep three zones read top to bottom: themed surface ahead,
-            // pink bands, wallpaper behind where the bands swept past.
+            // Mid-sweep three zones read top to bottom: the pre-lock screenshot
+            // ahead, pink bands, wallpaper behind where the bands swept past.
             backdrop.progress = 0.5
             wait(120)
             var sweeping = grabImage(backdrop)
-            verify(isThemeDark(sweeping.pixel(160, 10)), "dark theme surface ahead")
+            compare(sweeping.pixel(160, 10), "#ff0000", "screenshot ahead")
             var midSweep = sweeping.pixel(160, 120)
-            verify(!isThemeDark(midSweep) && !isWallpaperBlue(midSweep), "pink bands")
+            verify(!isScreenshotRed(midSweep) && !isWallpaperBlue(midSweep), "pink bands")
             compare(sweeping.pixel(160, 230), "#0000ff", "wallpaper behind")
             // Open and settled frames stay pure.
             backdrop.progress = 0
@@ -154,34 +153,51 @@ Item {
                 wait(80)
                 var image = grabImage(backdrop)
                 if (stages[i] === 0.5) {
-                    verify(isThemeDark(image.pixel(160, 10)), "dark surface at 0.5")
+                    compare(image.pixel(160, 10), "#ff0000", "screenshot at 0.5")
                     var mid = image.pixel(160, 120)
-                    verify(!isThemeDark(mid) && !isWallpaperBlue(mid), "bands at 0.5")
+                    verify(!isScreenshotRed(mid) && !isWallpaperBlue(mid), "bands at 0.5")
                     compare(image.pixel(160, 230), "#0000ff", "bottom at 0.5")
                 } else {
                     if (stages[i] === 1) {
                         compare(image.pixel(160, 10), "#0000ff", "top at 1")
                         compare(image.pixel(160, 230), "#0000ff", "bottom at 1")
                     } else {
-                        verify(isThemeDark(image.pixel(160, 10)), "top dark surface at 0")
-                        verify(isThemeDark(image.pixel(160, 230)), "bottom dark surface at 0")
+                        compare(image.pixel(160, 10), "#ff0000", "top screenshot at 0")
+                        compare(image.pixel(160, 230), "#ff0000", "bottom screenshot at 0")
                     }
                 }
             }
         }
 
-        function test_lightSchemeUsesLightSurfaceBeforeWallpaperReveal() {
+        function test_themedFloorOnlyShowsWithoutAScreenshot() {
             var item = createTemporaryObject(lightBackdrop, backdrop.parent)
             verify(item !== null)
             tryCompare(item, "imagesReady", true)
             item.progress = 0
             wait(80)
             var closed = grabImage(item)
-            verify(isThemeLight(closed.pixel(160, 10)), "light surface at top")
-            verify(isThemeLight(closed.pixel(160, 230)), "light surface at bottom")
+            compare(closed.pixel(160, 10), "#ff0000", "light scheme still uses the screenshot")
             item.progress = 1
             wait(120)
             compare(grabImage(item).pixel(160, 230), "#0000ff", "wallpaper remains revealed")
+        }
+
+        function test_missingSnapshotFallsBackToTheThemedFloor() {
+            var item = createTemporaryObject(coldBackdrop, backdrop.parent)
+            verify(item !== null)
+            item.progress = 0
+            wait(80)
+            var closed = grabImage(item)
+            verify(isThemeDark(closed.pixel(160, 10)), "dark floor without a capture")
+            verify(isThemeDark(closed.pixel(160, 230)), "dark floor without a capture")
+
+            var light = createTemporaryObject(coldBackdrop, backdrop.parent, { lightScheme: true })
+            verify(light !== null)
+            light.progress = 0
+            wait(80)
+            var lightClosed = grabImage(light)
+            verify(isThemeLight(lightClosed.pixel(160, 10)), "light floor without a capture")
+            verify(isThemeLight(lightClosed.pixel(160, 230)), "light floor without a capture")
         }
     }
 }

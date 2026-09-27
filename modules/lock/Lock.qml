@@ -156,7 +156,7 @@ Scope {
                 screenIndex: index,
                 screenName: String(target.name || ""),
                 directory: directory,
-                outputPath: directory + "/afloat-lock-" + generation + "-" + index + ".png"
+                outputPath: directory + "/afloat-lock-" + generation + "-" + index + ".jpg"
             }).captured.connect(report)
         }
         return { ready: false }

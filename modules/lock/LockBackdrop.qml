@@ -36,15 +36,15 @@ Item {
         Behavior on color { ColorAnimation { duration: Lazer.MotionTokens.fast } }
     }
 
+    // The pre-lock screenshot is the base the wave sweeps across; the themed
+    // floor only shows through when a screen produced no capture.
     Image {
         id: screenshot
         anchors.fill: parent
         source: root.snapshotSource
         fillMode: Image.PreserveAspectCrop
         asynchronous: false
-        // The pre-lock screenshot remains available for readiness/fallback, but
-        // the lock surface itself follows the selected light/dark theme.
-        visible: false
+        visible: String(root.snapshotSource).length > 0
     }
 
     // Keep the four lock-surface wave layers static: WlSessionLockSurface does
