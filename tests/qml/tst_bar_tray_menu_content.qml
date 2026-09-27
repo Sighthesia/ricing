@@ -782,6 +782,44 @@ Item {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
         }
+        function test_scrollableSubmenuRowStaysTappable() {
+            // A scrollable submenu must still take taps: the Flickable claims
+            // the press for dragging, so rows below it can go dead.
+            Lazer.MotionTokens.reducedMotionOverride = true
+            try {
+                mouseMove(root, 380, 760); wait(20)
+                mouseMove(root, 8, 700); wait(20)
+                var parent = fakeEntry("More", { hasChildren: true })
+                var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+                item.openSubmenu(parent, null)
+                // Long submenu: the rows viewport must overflow.
+                var many = []
+                for (var i = 0; i < 20; i++)
+                    many.push(fakeEntry("Child " + i))
+                item.submenuEntries = many
+                var ready = false
+                for (var j = 0; j < 300 && !ready; j++) {
+                    wait(10)
+                    var f = findByName(item, "traySubmenuFlick")
+                    ready = f && f.height > 0 && f.contentHeight > f.height
+                }
+                verify(ready, "submenu never became scrollable")
+                var flick = findByName(item, "traySubmenuFlick")
+                compare(flick.interactive, true, "viewport should be interactive")
+                var point = flick.mapToItem(item, 40, 16)
+                var dismissed = 0
+                item.dismissRequested.connect(function() { dismissed++ })
+                verify(pollAct(function() { hoverFresh(item, point.x, point.y) },
+                    function() { return item.highlightedSubmenuRow !== null }),
+                    "scrollable submenu row never highlighted")
+                verify(pollAct(function() { mouseClick(item, point.x, point.y) },
+                    function() { return dismissed === 1 }),
+                    "scrollable submenu row click never landed")
+                compare(dismissed, 1)
+            } finally {
+                Lazer.MotionTokens.reducedMotionOverride = false
+            }
+        }
         function test_faceOccludesSubmenu() {
             var item = makeMenu([fakeEntry("More", { hasChildren: true })])
             verify(item.submenuSurface.z < item.menuFace.z)
