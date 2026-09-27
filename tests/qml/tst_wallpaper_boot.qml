@@ -69,6 +69,27 @@ Item {
             verify(Boot.isReady(finished, addedKeys))
         }
 
+        function test_resizedScreenBlocksUntilItReportsAgain() {
+            var original = screens()
+            var keys = Boot.currentKeys(original)
+            var finished = Boot.markFinished([], keys[0])
+            finished = Boot.markFinished(finished, keys[1])
+            verify(Boot.isReady(finished, keys))
+            // A resolution change re-keys the first screen, so the completion
+            // recorded for its old geometry no longer counts and the shell
+            // blocks again.
+            var resized = [
+                { name: "DP-1", x: 0, y: 0, width: 2560, height: 1440 },
+                original[1],
+            ]
+            var resizedKeys = Boot.currentKeys(resized)
+            verify(!Boot.isReady(finished, resizedKeys))
+            // Reporting the new geometry is what the re-keyed screen does, and
+            // it must be enough to unblock without the other screen reporting
+            // a second time.
+            verify(Boot.isReady(Boot.markFinished(finished, resizedKeys[0]), resizedKeys))
+        }
+
         function test_emptyScreensAreNotReady() {
             verify(!Boot.isReady([], []))
         }
