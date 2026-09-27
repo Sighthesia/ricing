@@ -11,6 +11,12 @@ Variants {
     id: root
     model: Quickshell.screens
 
+    // Boot-reveal pacing: a frame counts as clean when it lands inside the
+    // refresh budget (two frames at 90Hz, expressed through the motion tokens),
+    // and the reveal starts after a run of them.
+    readonly property int bootFrameBudget: MotionTokens.instant + 10
+    readonly property int bootFrameRun: 30
+
     Scope {
         id: screenScope
         required property var modelData
@@ -30,12 +36,25 @@ Variants {
             property string pendingWallpaper: ""
             // Request that arrived before the surface had a size.
             property string deferredWallpaper: ""
+            // Boot choreography: the session's first wallpaper waits for a run of
+            // clean frames instead of a fixed delay. The shell's opening second
+            // goes into constructing services and the first scene graph, and a
+            // full-screen animation inside that window turns every late frame
+            // into a visible freeze. Counting clean frames starts the reveal as
+            // soon as the shell is actually keeping up, on any machine.
+            property bool bootPending: false
+            property string bootWallpaper: ""
+            property int cleanFrames: 0
+            property double lastFrameAt: 0
             // Live reveal circle radius, driven by revealAnimation.
             property real revealRadius: 0
             // Circle centre captured when the reveal starts. It is snapshotted
             // because the service clears its trigger point right after the
             // change, and a live binding would move the circle mid-animation.
             property point activeRevealOrigin: Qt.point(0, 0)
+            // Whether this session has already shown a wallpaper; the first one
+            // is the boot reveal.
+            property bool settledOnce: false
             // Screen centre, used whenever no click triggered the switch.
             readonly property point centrePoint: Qt.point(width / 2, height / 2)
             // The reveal circle is sized from the surface, so nothing can grow
@@ -139,6 +158,44 @@ Variants {
                 }
             }
 
+            // Frame watchdog for the boot reveal: starts it once the shell has
+            // produced a run of frames inside the refresh budget. The timeout is
+            // a floor for a session that never settles, so the wallpaper always
+            // appears even on a machine that is busy from the first frame.
+            FrameAnimation {
+                running: true
+                onTriggered: {
+                    if (!wallpaperWindow.bootPending)
+                        return
+                    var now = Date.now()
+                    var gap = wallpaperWindow.lastFrameAt > 0 ? now - wallpaperWindow.lastFrameAt : 0
+                    wallpaperWindow.lastFrameAt = now
+                    wallpaperWindow.cleanFrames = gap > 0 && gap <= bootFrameBudget
+                        ? wallpaperWindow.cleanFrames + 1 : 0
+                    if (wallpaperWindow.cleanFrames >= bootFrameRun)
+                        wallpaperWindow.startBootReveal()
+                }
+            }
+
+            Timer {
+                id: bootTimeout
+                interval: 2500
+                onTriggered: {
+                    if (wallpaperWindow.bootPending)
+                        wallpaperWindow.startBootReveal()
+                }
+            }
+
+            // Promote the parked boot wallpaper to a real reveal.
+            function startBootReveal() {
+                bootTimeout.stop()
+                var path = wallpaperWindow.bootWallpaper
+                wallpaperWindow.bootPending = false
+                wallpaperWindow.bootWallpaper = ""
+                if (path)
+                    wallpaperWindow.beginWallpaper(path)
+            }
+
             // Single entry point so startup, panel commits, and file edits all
             // follow the same reveal path.
             function showWallpaper(path) {
@@ -147,6 +204,23 @@ Variants {
                     layoutRetry.restart()
                     return
                 }
+                // The first wallpaper of a session is the boot reveal, and it
+                // waits for a calm frame run; everything after it switches
+                // straight away.
+                if (!wallpaperWindow.settledOnce && path) {
+                    wallpaperWindow.settledOnce = true
+                    wallpaperWindow.bootWallpaper = path
+                    wallpaperWindow.bootPending = true
+                    wallpaperWindow.cleanFrames = 0
+                    wallpaperWindow.lastFrameAt = 0
+                    bootTimeout.restart()
+                    return
+                }
+                wallpaperWindow.beginWallpaper(path)
+            }
+
+            // Everything past the boot reveal: switch immediately.
+            function beginWallpaper(path) {
                 revealAnimation.stop()
                 hideAnimation.stop()
                 // The trigger point is consumed once so a later key write cannot
