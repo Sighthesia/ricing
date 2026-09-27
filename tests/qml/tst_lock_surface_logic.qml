@@ -10,6 +10,20 @@ Item {
 
     property bool released: false
 
+    // Stands in for the animated theme singleton: Color.qml animates every
+    // palette token with `Behavior on color`, and a color read out of such a
+    // property keeps re-evaluating when stored in a JS object.
+    QtObject {
+        id: themeSource
+        property color surface: "#101010"
+        property color panel: "#202020"
+        property color hover: Qt.rgba(0.1, 0.1, 0.12, 0.078)
+
+        Behavior on surface { ColorAnimation { duration: 40 } }
+        Behavior on panel { ColorAnimation { duration: 40 } }
+        Behavior on hover { ColorAnimation { duration: 40 } }
+    }
+
     // Harness mirrors the production contract exactly: one reveal driver,
     // enter 800ms OutQuad, exit 500ms OutQuad, release owned by the landing.
     Item {
@@ -416,8 +430,38 @@ Item {
             verify(text.a > 0.9)
         }
 
-        function test_lockThemeSnapshotKeepsOnePaletteGeneration() {
-            var palette = {
+        // A color read from a QML property is a binding-backed value type: when
+        // it is stored in a JS object it keeps re-evaluating, so a snapshot that
+        // aliases it silently repaints from the live theme. That is what made
+        // the session panel change color under an already-open lock.
+        // lockThemeSnapshot() therefore copies every accepted color into a plain
+        // Qt.rgba value. Note: qmltestrunner compares colors by value and does
+        // not retain the animated binding, so this test pins the contract but
+        // cannot reproduce the runtime repaint on its own.
+        function test_lockThemeSnapshotIgnoresLaterThemeChanges() {
+            const snapshot = SurfaceLogic.lockThemeSnapshot(false, {
+                accent: Qt.rgba(1, 0.4, 0.667, 1),
+                surface: themeSource.surface,
+                panel: themeSource.panel,
+                hover: themeSource.hover,
+            })
+            const panel = snapshot.panel
+            const surface = snapshot.surface
+            const hover = snapshot.hover
+
+            themeSource.surface = "#010101"
+            themeSource.panel = "#ffffff"
+            themeSource.hover = Qt.rgba(0.9, 0.1, 0.4, 0.5)
+            // Let the ColorAnimations land; the snapshot must ignore them.
+            wait(200)
+
+            compare(snapshot.panel, panel, "panel must not follow the theme")
+            compare(snapshot.surface, surface, "surface must not follow the theme")
+            compare(snapshot.hover, hover, "hover must not follow the theme")
+            verify(snapshot.panel.a > 0.9, "detached colors keep their alpha")
+        }
+
+        function test_lockThemeSnapshotKeepsOnePaletteGeneration() {            var palette = {
                 accent: Qt.rgba(1, 0.2, 0.5, 1),
                 surface: Qt.rgba(0.08, 0.07, 0.10, 1),
                 control: Qt.rgba(0.14, 0.12, 0.17, 1),

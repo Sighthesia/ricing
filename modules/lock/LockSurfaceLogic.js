@@ -133,9 +133,29 @@ function readableTextColor(accent, lightScheme) {
         lightScheme === true ? 0.16 : 0.90, 1)
 }
 
-function _usableColor(color) {
-    return !!color && isFinite(Number(color.a)) && Number(color.a) >= 0.5
+// Detach a color from the binding that produced it. A color read from a
+// QML property is a binding-backed value type: stored in a JS object it keeps
+// re-evaluating, so an un-detached "snapshot" silently follows the live theme
+// and the lock surface keeps repainting. Copying the channels into a plain
+// Qt.rgba value is what actually freezes a lock cycle.
+function _detach(color) {
+    // Literal fallbacks are already inert; only real color values carry a
+    // binding that has to be broken.
+    if (typeof color === "string")
+        return color
+    return Qt.rgba(Number(color.r), Number(color.g), Number(color.b), Number(color.a))
+}
+
+// A tint may legitimately be nearly transparent (hover washes sit around 8%
+// alpha), so fills only need a visible alpha. Surfaces and text must be solid
+// enough to stay readable.
+function _visibleColor(color) {
+    return !!color && isFinite(Number(color.a)) && Number(color.a) > 0.02
             && (Number(color.r) + Number(color.g) + Number(color.b)) > 0.02
+}
+
+function _usableColor(color) {
+    return _visibleColor(color) && Number(color.a) >= 0.5
 }
 
 function _nearColor(first, second) {
@@ -172,26 +192,44 @@ function lockThemeSnapshot(lightScheme, palette) {
     var dividerFallback = light ? "#C9C4CE" : "#2E2C32"
     var surface = _modeSurface(palette && palette.surface, light, surfaceFallback)
     var control = _modeSurface(palette && palette.control, light, controlFallback)
+    var labelFallback = light ? "#1D1B20" : "#E6E1E5"
+    var hoverFallback = light ? "#141D1B20" : "#18FFFFFF"
     var muted = _usableColor(palette && palette.muted) ? palette.muted : mutedFallback
     var divider = _usableColor(palette && palette.divider) ? palette.divider : dividerFallback
     var panel = _usableColor(palette && palette.panel) ? palette.panel : surface
     var trigger = _usableColor(palette && palette.trigger) ? palette.trigger : control
-    var active = _usableColor(palette && palette.active) ? palette.active : trigger
+    // Interactive washes are allowed to stay translucent; rejecting them would
+    // silently swap a real hover/active tint for an unrelated surface color.
+    var active = _visibleColor(palette && palette.active) ? palette.active : trigger
+    var hover = _visibleColor(palette && palette.hover) ? palette.hover : hoverFallback
+    var label = _usableColor(palette && palette.label) ? palette.label : labelFallback
+    // osuPink and focusRing both track the primary in the adapting theme; keep a
+    // distinct value when one is supplied, otherwise reuse the frozen accent.
+    var pink = _visibleColor(palette && palette.pink) ? palette.pink : rawAccent
+    var focus = _visibleColor(palette && palette.focus) ? palette.focus : rawAccent
+    // Detach every accepted color: a stored binding-backed color would keep
+    // tracking the animated theme and repaint this lock cycle.
     return {
         lightScheme: light,
-        accent: rawAccent,
-        surface: surface,
-        control: control,
-        panel: panel,
-        trigger: trigger,
-        active: active,
-        muted: muted,
-        divider: divider,
-        text: readableTextColor(rawAccent, light),
-        icon: readableThemeColor(rawAccent, light),
-        sessionText: readableThemeColor(rawAccent, light),
-        clock: readableThemeColor(rawAccent, light),
-        clockMuted: clockThemeMutedColor(rawAccent, 0.5, light)
+        accent: _detach(rawAccent),
+        surface: _detach(surface),
+        control: _detach(control),
+        panel: _detach(panel),
+        trigger: _detach(trigger),
+        active: _detach(active),
+        hover: _detach(hover),
+        label: _detach(label),
+        muted: _detach(muted),
+        pink: _detach(pink),
+        focus: _detach(focus),
+        divider: _detach(divider),
+        text: _detach(readableTextColor(rawAccent, light)),
+        // Row icons follow the muted ink; the lock glyph uses the accent tone.
+        icon: _detach(readableThemeColor(rawAccent, light)),
+        rowIcon: _detach(muted),
+        sessionText: _detach(readableThemeColor(rawAccent, light)),
+        clock: _detach(readableThemeColor(rawAccent, light)),
+        clockMuted: _detach(clockThemeMutedColor(rawAccent, 0.5, light))
     }
 }
 

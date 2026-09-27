@@ -82,6 +82,10 @@ WlSessionLockSurface {
             panel: Lazer.LazerTheme.settingsPanel,
             trigger: Lazer.LazerTheme.settingsControlSurface,
             active: Lazer.LazerTheme.activeFill,
+            hover: Lazer.LazerTheme.hoverFill,
+            label: Lazer.LazerTheme.textPrimary,
+            pink: Lazer.LazerTheme.osuPink,
+            focus: Lazer.LazerTheme.focusRing,
             muted: lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted,
             divider: Lazer.LazerTheme.divider,
         })
@@ -245,16 +249,7 @@ WlSessionLockSurface {
         reducedMotion: root.reducedMotion
         sessionService: Services.SessionService
         lightScheme: root.lightScheme
-        sessionTextColorOverride: root.themeSnapshotReady
-                ? root.lockThemeSnapshot.sessionText : "transparent"
-        panelColorOverride: root.themeSnapshotReady
-                ? root.lockThemeSnapshot.panel : "transparent"
-        triggerColorOverride: root.themeSnapshotReady
-                ? root.lockThemeSnapshot.trigger : "transparent"
-        activeColorOverride: root.themeSnapshotReady
-                ? root.lockThemeSnapshot.active : "transparent"
-        dividerColorOverride: root.themeSnapshotReady
-                ? root.lockThemeSnapshot.divider : "transparent"
+        lockTheme: root.themeSnapshotReady ? root.lockThemeSnapshot : null
         entranceRevealed: backdrop.revealContentInteractive
         z: 3.5
     }

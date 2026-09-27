@@ -11,11 +11,9 @@ Item {
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property var sessionService: null
     property bool lightScheme: false
-    property color sessionTextColorOverride: "transparent"
-    property color panelColorOverride: "transparent"
-    property color triggerColorOverride: "transparent"
-    property color activeColorOverride: "transparent"
-    property color dividerColorOverride: "transparent"
+    // One frozen palette for the whole lock cycle. Null only when the menu is
+    // used standalone, in which case the live theme singleton is the source.
+    property var lockTheme: null
     property string errorText: ""
     property string statusText: ""
     property string pendingAction: ""
@@ -23,17 +21,14 @@ Item {
     // The menu's own open/close progress remains independent from this gate.
     property bool entranceRevealed: true
     property real revealProgress: 0
-    readonly property color sessionTextColor: root.sessionTextColorOverride.a > 0.5
-            ? root.sessionTextColorOverride
-            : SurfaceLogic.readableThemeColor(Lazer.LazerTheme.accentColor, root.lightScheme)
-    readonly property color panelColor: root.panelColorOverride.a > 0.5
-            ? root.panelColorOverride : Lazer.LazerTheme.settingsPanel
-    readonly property color triggerColor: root.triggerColorOverride.a > 0.5
-            ? root.triggerColorOverride : Lazer.LazerTheme.settingsControlSurface
-    readonly property color activeColor: root.activeColorOverride.a > 0.5
-            ? root.activeColorOverride : Lazer.LazerTheme.activeFill
-    readonly property color dividerColor: root.dividerColorOverride.a > 0.5
-            ? root.dividerColorOverride : Lazer.LazerTheme.divider
+    readonly property color sessionTextColor: root.themeColor(
+        "sessionText", SurfaceLogic.readableThemeColor(Lazer.LazerTheme.accentColor,
+                                                        root.lightScheme))
+    readonly property color panelColor: root.themeColor("panel", Lazer.LazerTheme.settingsPanel)
+    readonly property color triggerColor: root.themeColor("trigger",
+        Lazer.LazerTheme.settingsControlSurface)
+    readonly property color activeColor: root.themeColor("active", Lazer.LazerTheme.activeFill)
+    readonly property color dividerColor: root.themeColor("divider", Lazer.LazerTheme.divider)
     readonly property int menuItemCount: actionColumn.children.length
     readonly property int panelHeight: 296
 
@@ -45,6 +40,15 @@ Item {
     height: implicitHeight
     visible: root.entranceRevealed
     enabled: root.entranceRevealed
+
+    // Read one role out of the lock-cycle snapshot; fall back to the live theme
+    // singleton only when no snapshot was supplied.
+    function themeColor(role, fallback): color {
+        if (!root.lockTheme)
+            return fallback
+        const value = root.lockTheme[role]
+        return value === undefined ? fallback : value
+    }
 
     function toggleOpen(): void {
         root.open = Logic.toggle(root.open)
@@ -278,7 +282,7 @@ Item {
         height: 48
         color: root.open ? root.activeColor : root.triggerColor
         border.width: root.activeFocus ? 1 : 0
-        border.color: Lazer.LazerTheme.focusRing
+        border.color: root.themeColor("focus", Lazer.LazerTheme.focusRing)
         Text {
             anchors.centerIn: parent
             text: root.open ? "CLOSE" : "SESSION"

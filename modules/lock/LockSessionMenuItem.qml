@@ -24,15 +24,25 @@ Item {
     opacity: available ? 1 : Lazer.MotionTokens.disabledOpacity
     activeFocusOnTab: interactive
 
+    // Row colors come from the lock cycle snapshot so rows cannot drift while
+    // the panel around them stays frozen.
+    readonly property color activeColor: root.themeColor("active", Lazer.LazerTheme.activeFill)
+    readonly property color hoverColor: root.themeColor("hover", Lazer.LazerTheme.hoverFill)
+    readonly property color accentColor: root.themeColor("accent", Lazer.LazerTheme.accentColor)
+    readonly property color pinkColor: root.themeColor("pink", Lazer.LazerTheme.osuPink)
+    readonly property color labelColor: root.themeColor("label", Lazer.LazerTheme.textPrimary)
+    readonly property color iconColor: root.themeColor("rowIcon", Lazer.LazerTheme.textMuted)
+    readonly property color focusColor: root.themeColor("focus", Lazer.LazerTheme.focusRing)
+
     // Use color layers and a narrow bar for hover and confirmation states.
     Rectangle {
         id: surface
         anchors.fill: parent
-        color: root.confirmationPending ? Lazer.LazerTheme.activeFill
+        color: root.confirmationPending ? root.activeColor
                                         : hoverHandler.hovered
-                                          ? Lazer.LazerTheme.hoverFill : "transparent"
+                                          ? root.hoverColor : "transparent"
         border.width: root.activeFocus ? 1 : 0
-        border.color: Lazer.LazerTheme.focusRing
+        border.color: root.focusColor
 
         Behavior on color {
             enabled: !Lazer.MotionTokens.reducedMotion
@@ -45,8 +55,7 @@ Item {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 3
-        color: root.confirmationPending ? Lazer.LazerTheme.osuPink
-                                        : Lazer.LazerTheme.accentColor
+        color: root.confirmationPending ? root.pinkColor : root.accentColor
         opacity: root.confirmationPending || hoverHandler.hovered || root.activeFocus ? 1 : 0
         Behavior on opacity {
             enabled: !Lazer.MotionTokens.reducedMotion
@@ -61,7 +70,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: 22
         text: root.iconSource
-        color: root.confirmationPending ? Lazer.LazerTheme.osuPink : Lazer.LazerTheme.textMuted
+        color: root.confirmationPending ? root.pinkColor : root.iconColor
         font.pixelSize: 12
         font.bold: true
         horizontalAlignment: Text.AlignHCenter
@@ -74,7 +83,7 @@ Item {
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         text: root.confirmationPending ? "Confirm " + root.label + "?" : root.label
-        color: Lazer.LazerTheme.textPrimary
+        color: root.labelColor
         font.pixelSize: 14
         elide: Text.ElideRight
     }
@@ -83,7 +92,7 @@ Item {
         id: flashOverlay
         z: 10
         anchors.fill: parent
-        color: Lazer.LazerTheme.textPrimary
+        color: root.labelColor
         opacity: 0
         enabled: false
     }
@@ -97,6 +106,16 @@ Item {
         duration: Lazer.MotionTokens.clickFlashDuration
         easing.type: Lazer.MotionTokens.clickFlashEasing
         running: false
+    }
+
+    // Resolve one color role from the host's lock-cycle snapshot, falling back
+    // to the live theme singleton when no snapshot exists (standalone use).
+    function themeColor(role, fallback): color {
+        const theme = root.menuHost ? root.menuHost.lockTheme : null
+        if (!theme)
+            return fallback
+        const value = theme[role]
+        return value === undefined ? fallback : value
     }
 
     function activate(): void {
