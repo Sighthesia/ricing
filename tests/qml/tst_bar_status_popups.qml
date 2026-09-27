@@ -99,6 +99,7 @@ Item {
             + ' property bool wifiConnected: true;'
             + ' property bool scanningActive: false;'
             + ' property bool connecting: false;'
+            + ' property string connectingTo: "";'
             + ' property bool ethernetAvailable: false;'
             + ' property bool ethernetConnected: false;'
             + ' property string activeEthernetConnection: "";'
@@ -242,7 +243,10 @@ Item {
             })
             verify(findByName(item, "networkContent").visible, "networkContent visible")
             verify(!findByName(item, "fallbackContent").visible)
-            compare(findByName(item, "wifiStatusText").text, "HomeWifi")
+            // The centered status line duplicated the connected network's own
+            // row, so it is gone; the row carries the state instead.
+            verify(findByName(item, "wifiStatusText") === null,
+                "centered status line must not come back")
             compare(item.wifiList.length, 2)
             compare(item.wifiList[0].ssid, "HomeWifi")
             compare(item.wifiSignalLabel(85), "Excellent")
@@ -316,8 +320,9 @@ Item {
             verify(row !== null, "ethernet row should exist")
             verify(row.visible, "ethernet row visible when adapter present")
             compare(findByName(item, "ethernetStatusText").text, "Connected")
-            // Wired link wins the header line.
-            compare(findByName(item, "wifiStatusText").text, "Office LAN")
+            // The wired link names itself on its own card; the removed centered
+            // line used to repeat it.
+            compare(findByName(item, "ethernetNameText").text, "Office LAN")
         }
 
         function test_networkEthernetHiddenWithoutAdapter() {
@@ -454,6 +459,47 @@ Item {
             verify(!findByName(item, "wifiPasswordPanel").visible,
                 "a timeout is not fixed by retyping the password")
             compare(svc.connectCalls, 1)
+        }
+        // The centered status line repeated the connected network's own row, so
+        // the panel is now: power row → error → list → rescan, with the row
+        // itself reporting "Connecting…".
+        function test_networkLayoutOrder() {
+            var svc = makeNetworkService()
+            svc.networks = {
+                HomeWifi: { ssid: "HomeWifi", security: "WPA2", signal: 85, connected: false, existing: true }
+            }
+            svc.connecting = true
+            svc.connectingTo = "HomeWifi"
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var list = findByName(item, "wifiListView")
+            var rescan = findByName(item, "wifiRescanButton")
+            verify(list !== null && rescan !== null)
+            // The Column positions its children during polish, so the geometry
+            // is only meaningful once the layout has settled.
+            wait(300)
+            verify(rescan.y > list.y, "rescan sits below the list (rescan.y="
+                + rescan.y + " list.y=" + list.y + " list.h=" + list.height
+                + " rescan.h=" + rescan.height + ")")
+            compare(findByName(item, "wifiRescanTap").enabled, false,
+                "rescan is inert while an attempt is live")
+            compare(findByName(item, "wifiRescanLabel").text, "Connecting…",
+                "rescan carries the transient state")
+            // The target row reports the attempt in place.
+            compare(item.wifiConnectingTo, "HomeWifi")
+        }
+
+        // The list is the panel's content, so the refresh action reads as its
+        // foot; assert the ordering, not just presence.
+        function test_networkRescanIsLastChild() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var column = findByName(item, "wifiColumn")
+            verify(column !== null, "wifi column should exist")
+            compare(column.children[column.children.length - 1].objectName, "wifiRescanButton")
         }
     }
 }

@@ -100,7 +100,6 @@ ShellRoot {
             return
         }
         var list = root.findByName(actions, "wifiListView")
-        var rows = root.findByName(actions, "wifiList") || list
         var svc = Services.NetworkService
         var count = svc.networks ? Object.keys(svc.networks).length : 0
         console.log("--- panel ---")
@@ -122,10 +121,9 @@ ShellRoot {
         }
         var rescan = root.findByName(actions, "wifiRescanButton")
         check("rescan affordance present", !!rescan && rescan.visible)
-        var status = root.findByName(actions, "wifiStatusText")
-        check("status line rendered", !!status && status.text !== undefined, status ? status.text : "")
-        // The refresh contract: opening the panel must have produced a list
-        // that is at least as new as the service's own scan.
+        check("rescan sits below the list", !!rescan && !!list && rescan.y > list.y,
+            "rescan.y=" + Math.round(rescan.y) + " list.y=" + Math.round(list.y))
+        check("no centered status line", root.findByName(actions, "wifiStatusText") === null)
         check("panel opened into a live list", count > 0, "networks=" + count)
     }
 }

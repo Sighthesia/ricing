@@ -187,12 +187,14 @@ Item {
             return !!payload.connecting
         return false
     }
-    readonly property string wifiStatusText: {
-        if (root.networkService && typeof root.networkService.getStatusText === "function") {
-            try { return String(root.networkService.getStatusText() || "") } catch (e) { return "" }
-        }
-        if (payload && payload.statusText !== undefined)
-            return String(payload.statusText || "")
+    // SSID the live attempt is aimed at, so the row itself can say
+    // "Connecting…" — the panel no longer carries a centered status line that
+    // repeated the connected network's name.
+    readonly property string wifiConnectingTo: {
+        if (root.networkService && root.networkService.connectingTo !== undefined)
+            return String(root.networkService.connectingTo || "")
+        if (payload && payload.connectingTo !== undefined)
+            return String(payload.connectingTo || "")
         return ""
     }
     readonly property string wifiError: {
@@ -1355,6 +1357,7 @@ Item {
 
             Column {
                 id: wifiColumn
+                objectName: "wifiColumn"
                 width: parent.width
                 spacing: 8
 
@@ -1369,6 +1372,7 @@ Item {
                     color: LazerTheme.settingsCard
 
                     Text {
+                        objectName: "ethernetNameText"
                         anchors.left: parent.left
                         anchors.leftMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
@@ -1405,24 +1409,6 @@ Item {
                         checked: root.wifiEnabled
                         onToggled: function(next) { root.handleWifiPower(next) }
                     }
-                }
-
-                Text {
-                    objectName: "wifiStatusText"
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    visible: root.wifiEnabled || root.ethConnected
-                    text: {
-                        if (root.ethConnected) return root.ethName !== "" ? root.ethName : "Wired"
-                        if (root.wifiConnecting) return "Connecting…"
-                        if (root.wifiStatusText !== "") return root.wifiStatusText
-                        if (root.wifiScanning) return "Scanning…"
-                        return "Not connected"
-                    }
-                    color: LazerTheme.textMuted
-                    font.pixelSize: 11
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
                 }
 
                 Text {
@@ -1543,33 +1529,6 @@ Item {
                     }
                 }
 
-                Rectangle {
-                    id: wifiRescanButton
-                    objectName: "wifiRescanButton"
-                    width: parent.width
-                    height: 32
-                    radius: 6
-                    visible: root.wifiEnabled
-                    color: rescanHover.hovered ? LazerTheme.hoverFill : "transparent"
-
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: root.wifiScanning ? "Scanning…" : "Rescan"
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 11
-                        font.bold: true
-                    }
-
-                    HoverHandler { id: rescanHover }
-                    TapHandler {
-                        objectName: "wifiRescanTap"
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.handleWifiRescan()
-                    }
-                }
-
                 // Bounded, scrollable row area. The panel has to stay inside
                 // the popup's geometry budget, but the list must still reach
                 // every network the radio reported — six hardcoded rows left
@@ -1634,12 +1593,60 @@ Item {
                             anchors.right: parent.right
                             anchors.rightMargin: 10
                             anchors.verticalCenter: parent.verticalCenter
-                            text: wifiNetRow.modelData && wifiNetRow.modelData.connected
-                                ? "Connected" : root.wifiSignalLabel(wifiNetRow.modelData ? wifiNetRow.modelData.signal : 0)
+                            // The row is the only place a network is named, so
+                            // the in-flight attempt is reported here rather than
+                            // in a separate centered status line.
+                            text: {
+                                var data = wifiNetRow.modelData
+                                if (!data) return ""
+                                if (data.connected) return "Connected"
+                                if (root.wifiConnecting && root.wifiConnectingTo === String(data.ssid || ""))
+                                    return "Connecting…"
+                                return root.wifiSignalLabel(data.signal)
+                            }
                             color: wifiNetRow.modelData && wifiNetRow.modelData.connected
-                                ? LazerTheme.osuGreen : LazerTheme.textMuted
+                                ? LazerTheme.osuGreen
+                                : (root.wifiConnecting
+                                    && root.wifiConnectingTo === String((wifiNetRow.modelData || {}).ssid || "")
+                                    ? LazerTheme.settingsAccent : LazerTheme.textMuted)
                             font.pixelSize: 10
                         }
+                    }
+                }
+
+                // Rescan sits last: the list is the panel's content, and the
+                // refresh action reads as the foot of it. It also carries the
+                // transient state the removed centered line used to show.
+                Rectangle {
+                    id: wifiRescanButton
+                    objectName: "wifiRescanButton"
+                    width: parent.width
+                    height: 32
+                    radius: 6
+                    visible: root.wifiEnabled
+                    color: rescanHover.hovered ? LazerTheme.hoverFill : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+
+                    Text {
+                        objectName: "wifiRescanLabel"
+                        anchors.centerIn: parent
+                        text: {
+                            if (root.wifiConnecting) return "Connecting…"
+                            if (root.wifiScanning) return "Scanning…"
+                            return "Rescan"
+                        }
+                        color: LazerTheme.textPrimary
+                        font.pixelSize: 11
+                        font.bold: true
+                    }
+
+                    HoverHandler { id: rescanHover }
+                    TapHandler {
+                        objectName: "wifiRescanTap"
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        enabled: !root.wifiScanning && !root.wifiConnecting
+                        onTapped: root.handleWifiRescan()
                     }
                 }
             }
