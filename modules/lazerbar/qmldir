@@ -18,6 +18,7 @@ WallpaperBackground 1.0 WallpaperBackground.qml
 WallpaperReveal 1.0 WallpaperReveal.qml
 ScreenCornerMask 1.0 ScreenCornerMask.qml
 ScreenRoundedCorners 1.0 ScreenRoundedCorners.qml
+LazerLoadingRing 1.0 LazerLoadingRing.qml
 TopBar 1.0 TopBar.qml
 OsuTopBarButton 1.0 OsuTopBarButton.qml
 OsuTextCaret 1.0 OsuTextCaret.qml
