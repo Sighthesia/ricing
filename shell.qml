@@ -33,6 +33,10 @@ ShellRoot {
 
     LazerBar.NotificationHost {}
 
+    // Fake rounded display corners; mounted last so the bezel composites above
+    // the wallpaper and the bar within the overlay layer.
+    LazerBar.ScreenRoundedCorners {}
+
     // Compositor-enforced session lock; creates one surface per screen.
     LockModule.Lock {
         id: lockModule

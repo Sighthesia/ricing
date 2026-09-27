@@ -36,6 +36,8 @@ var settingsEntries = [
     { label: "Overview Solid Color", category: "Appearance", description: "Solid color vs blurred overview", targetCategory: "appearance" },
     { label: "Overview Blur", category: "Appearance", description: "Background blur intensity", targetCategory: "appearance" },
     { label: "Overview Tint", category: "Appearance", description: "Background tint opacity", targetCategory: "appearance" },
+    { label: "Screen Rounded Corners", category: "Appearance", description: "Mask the screen corners with a black bezel", targetCategory: "appearance" },
+    { label: "Screen Corner Radius", category: "Appearance", description: "Bezel corner radius in pixels", targetCategory: "appearance" },
 
     // ── Fonts ──
     { label: "Default Font", category: "Fonts", description: "UI text font family", targetCategory: "fonts" },

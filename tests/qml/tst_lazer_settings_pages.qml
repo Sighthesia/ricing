@@ -25,6 +25,8 @@ Item {
         property bool overviewBackgroundSolid: false
         property real overviewBackgroundBlur: 0.4
         property real overviewBackgroundTint: 0.5
+        property bool screenRoundedCorners: true
+        property int screenCornerRadius: 16
     }
     QtObject {
         id: barSettings
@@ -85,6 +87,8 @@ Item {
             appearanceSettings.glassGlowIntensity = 0.22
             appearanceSettings.glassThemeAdaptive = true
             appearanceSettings.ripplePulseEnabled = true
+            appearanceSettings.screenRoundedCorners = true
+            appearanceSettings.screenCornerRadius = 16
             fakeWallpaper.changed = ""
             appearancePage.wallpaperField.text = appearanceSettings.wallpaperPath
             barSettings.height = 48
@@ -123,6 +127,37 @@ Item {
             compare(barPage.title, "顶部栏")
             compare(notificationsPage.title, "通知")
             verify(notificationsPage.hasVisibleContent)
+        }
+
+        function test_screenCornerRowsGateClampAndReset() {
+            appearancePage.defaults = { "screenRoundedCorners": true, "screenCornerRadius": 16 }
+            appearancePage.resetCallback = function(key, value) {
+                if (key === "screenRoundedCorners") appearanceSettings.screenRoundedCorners = value
+                else if (key === "screenCornerRadius") appearanceSettings.screenCornerRadius = value
+            }
+            // Radius row is live only while the bezel is enabled.
+            verify(appearancePage.screenCornerRadiusRow.enabled)
+            verify(!appearancePage.screenCornersRow.revertVisible)
+            appearancePage.screenCornersToggle.activate()
+            compare(appearanceSettings.screenRoundedCorners, false)
+            verify(!appearancePage.screenCornerRadiusRow.enabled)
+            verify(appearancePage.screenCornersRow.revertVisible)
+            appearancePage.screenCornersRow.activateReset()
+            compare(appearanceSettings.screenRoundedCorners, true)
+            verify(appearancePage.screenCornerRadiusRow.enabled)
+
+            appearancePage.screenCornerRadiusSlider.setValue(24)
+            compare(appearanceSettings.screenCornerRadius, 24)
+            verify(appearancePage.screenCornerRadiusRow.revertVisible)
+            appearancePage.screenCornerRadiusSlider.setValue(48)
+            compare(appearanceSettings.screenCornerRadius, 32)
+            appearancePage.screenCornerRadiusSlider.setValue(-4)
+            compare(appearanceSettings.screenCornerRadius, 0)
+            appearancePage.screenCornerRadiusRow.activateReset()
+            compare(appearanceSettings.screenCornerRadius, 16)
+            verify(saveState.count >= 3)
+            appearancePage.defaults = ({})
+            appearancePage.resetCallback = null
         }
 
         function test_appearanceWritesAllSupportedValues() {
@@ -232,10 +267,10 @@ Item {
             compare(appearancePage.visibleResultCount, 1)
             verify(appearancePage.wallpaperRow.visible)
             appearancePage.searchQuery = ""
-            // True total is 20 rows + theme picker = 21 (the old 13 predates
-            // the theme-adaptation row, the picker, and the location rows,
-            // which were never recounted).
-            compare(appearancePage.visibleResultCount, 21)
+            // True total is 22 rows + theme picker = 23 (the old 13 predates
+            // the theme-adaptation row, the picker, the location rows, and the
+            // screen-corner rows, which were never recounted).
+            compare(appearancePage.visibleResultCount, 23)
             verify(appearancePage.wallpaperRow.visible)
         }
 

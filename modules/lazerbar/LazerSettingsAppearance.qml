@@ -55,6 +55,10 @@ LazerSettingsSection {
     property alias overviewSolidRow: overviewSolidRow
     property alias overviewBlurRow: overviewBlurRow
     property alias overviewTintRow: overviewTintRow
+    property alias screenCornersRow: screenCornersRow
+    property alias screenCornersToggle: screenCornersToggleControl
+    property alias screenCornerRadiusRow: screenCornerRadiusRow
+    property alias screenCornerRadiusSlider: screenCornerRadiusSliderControl
     property alias glassGlowRow: glassGlowRow
 
     function save() {
@@ -471,6 +475,39 @@ LazerSettingsSection {
             defaultValue: root.defaultOf("overviewBackgroundTint")
             value: root.settingsObject ? root.settingsObject.overviewBackgroundTint : 0.5
             onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.overviewBackgroundTint = Math.max(0, Math.min(1, value)); root.save() } }
+        }
+    }
+
+    // 屏幕伪圆角：用黑色边框遮罩模拟显示器圆角
+    LazerSettingsRow {
+        id: screenCornersRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: "屏幕伪圆角"; descriptionText: "用黑色边框遮罩模拟显示器圆角"
+        defaultValue: root.defaultOf("screenRoundedCorners")
+        currentValue: root.settingsObject ? root.settingsObject.screenRoundedCorners : null
+        resetCallback: function() { root.resetKey("screenRoundedCorners") }
+        LazerSettingsToggle {
+            id: screenCornersToggleControl
+            checked: root.settingsObject ? root.settingsObject.screenRoundedCorners !== false : true
+            onToggled: function(value) { if (root.settingsObject) { root.settingsObject.screenRoundedCorners = value; root.save() } }
+        }
+    }
+
+    LazerSettingsRow {
+        id: screenCornerRadiusRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        enabled: root.settingsObject ? root.settingsObject.screenRoundedCorners !== false : false
+        labelText: "屏幕圆角半径"; descriptionText: "范围 0 到 32 像素"
+        defaultValue: root.defaultOf("screenCornerRadius")
+        currentValue: root.settingsObject ? root.settingsObject.screenCornerRadius : null
+        resetCallback: function() { root.resetKey("screenCornerRadius") }
+        LazerSettingsSlider {
+            id: screenCornerRadiusSliderControl; from: 0; to: 32; stepSize: 1
+            defaultValue: root.defaultOf("screenCornerRadius")
+            value: root.settingsObject ? root.settingsObject.screenCornerRadius : 16
+            onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.screenCornerRadius = Math.round(Math.max(0, Math.min(32, value))); root.save() } }
         }
     }
 

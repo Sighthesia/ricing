@@ -60,6 +60,9 @@ QtObject {
         overviewBackgroundSolid: false,
         overviewBackgroundBlur: 0.4,
         overviewBackgroundTint: 0.5,
+        // Fake rounded display corners: a black bezel masks the screen corners.
+        screenRoundedCorners: true,
+        screenCornerRadius: 16,
     })
     readonly property var barDefaults: ({
         height: 48,
@@ -469,6 +472,10 @@ QtObject {
                 property bool overviewBackgroundSolid: false
                 property real overviewBackgroundBlur: 0.4
                 property real overviewBackgroundTint: 0.5
+                // Fake rounded display corners: black bezel wedges painted over
+                // the screen corners, with their radius in pixels.
+                property bool screenRoundedCorners: true
+                property int screenCornerRadius: 16
      }
 
             property JsonObject notifications: JsonObject {
