@@ -163,8 +163,39 @@ PanelWindow {
         }
     }
 
+    // Tray submenu internals: phase/geometry/highlight of the second level.
+    // The host snapshot only sees the two layers, so the failure modes that
+    // live inside the tray menu (cold fetch, anchor clamp, hover memory) are
+    // invisible without this block.
+    function _trayDebug() {
+        var tc = popupActions ? popupActions.trayMenuContent : null
+        if (!tc)
+            return null
+        var anchorY = Number(tc.submenuAnchorBottomY)
+        return {
+            "phase": String(tc.submenuPhase || ""),
+            "progress": Math.round(Number(tc.submenuProgress) * 1000) / 1000,
+            "interactable": tc.submenuInteractable === true,
+            "content": tc.hasSubmenuContent === true,
+            "liveCount": Number(tc.liveCount),
+            "rawCol": Math.round(Number(tc.rawColumnHeight)),
+            "held": Math.round(Number(tc.heldHeight)),
+            "flickH": Math.round(Number(tc.submenuAvailHeight) + anchorY),
+            "anchorY": Math.round(anchorY),
+            "avail": Math.round(Number(tc.submenuAvailHeight)),
+            "body": Math.round(Number(tc.submenuBodyFull)),
+            "surface": root._debugRect(tc.submenuSurface),
+            "surfaceVisible": tc.submenuSurface.visible === true,
+            "cursorX": Math.round(Number(tc.lastCursorX)),
+            "cursorY": Math.round(Number(tc.lastCursorY)),
+            "highlightSub": tc.highlightedSubmenuRow ? 1 : 0,
+            "highlightRow": tc.highlightedRow ? 1 : 0,
+        }
+    }
+
     function debugSnapshot() {
         return {
+            "tray": root._trayDebug(),
             "host": {
                 "phase": root.open ? "open" : (root.surfaceActive ? "revealing" : "closed"),
                 "surfaceActive": root.surfaceActive, "widgetHovered": root.widgetHovered,
