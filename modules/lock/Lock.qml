@@ -21,6 +21,12 @@ Scope {
     property int _requestGeneration: -1
     property bool _exitFailsafeArmed: false
     property bool _startupLockArmed: true
+    // The startup auto-lock is a per-compositor-session event, not a per-shell
+    // event: a Quickshell reload must never re-lock a desktop that was already
+    // unlocked. The marker file records the session key that consumed it.
+    readonly property string _startupSessionKey: StartupLockLogic.sessionKey(
+        Quickshell.env("NIRI_SOCKET"), Quickshell.env("XDG_SESSION_ID"))
+    property bool _startupGateResolved: false
 
     // Opt-in startup self-test: arm the lock on boot and force-release it on a
     // timer so the wave surface can be verified (and torn down) unattended.
@@ -53,8 +59,14 @@ Scope {
         return true
     }
 
-    // Request the compositor lock once after the shell has discovered a screen.
+    // Request the compositor lock once per niri session, after the shell has
+    // discovered a screen. The marker gate resolves first so a shell reload
+    // inside an already-used session never locks again.
     function startupLock(): bool {
+        if (_startupSessionKey.length > 0 && !_startupGateResolved) {
+            startupLockTimer.restart()
+            return false
+        }
         if (!StartupLockLogic.canAttempt(_state, _startupLockArmed,
                                          Quickshell.screens.length > 0)) {
             if (_startupLockArmed && Quickshell.screens.length <= 0)
@@ -69,7 +81,27 @@ Scope {
         _startupLockArmed = result.armed
         if (result.retry)
             startupLockTimer.restart()
+        if (accepted)
+            _consumeStartupSession()
         return accepted
+    }
+
+    // Adopt the persisted marker: a matching key means this session already
+    // spent its one automatic lock, so disarm before any request is made.
+    function _resolveStartupGate(markerText: string): void {
+        _startupGateResolved = true
+        if (_startupSessionKey.length === 0)
+            return
+        if (StartupLockLogic.markerMatches(markerText, _startupSessionKey))
+            _startupLockArmed = false
+    }
+
+    // Record the session key only after a request was accepted, so a rejected
+    // startup attempt stays retryable within the same shell lifetime.
+    function _consumeStartupSession(): void {
+        if (_startupSessionKey.length === 0)
+            return
+        _startupMarker.setText(_startupSessionKey)
     }
 
     // Return to the lock prompt without disturbing an active PAM conversation.
@@ -179,6 +211,20 @@ Scope {
         interval: 100
         repeat: false
         onTriggered: root.startupLock()
+    }
+
+    // Persisted record of which compositor session already auto-locked once.
+    // A missing file is the normal first-run state and arms the lock.
+    property FileView _startupMarker: FileView {
+        path: Quickshell.cacheDir + "/startup-lock-session"
+        blockLoading: true
+        watchChanges: false
+        onLoaded: root._resolveStartupGate(_startupMarker.text())
+        onLoadFailed: error => {
+            if (error !== FileViewError.FileNotFound)
+                console.warn("Lock: failed to read startup-lock-session:", error)
+            root._resolveStartupGate("")
+        }
     }
 
     // One compositor-owned lock; Quickshell creates one surface per screen.
