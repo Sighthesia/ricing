@@ -24,6 +24,14 @@ QtObject {
         return value === "dark" || value === "light" ? value : "auto"
     }
 
+    // Palette extraction is a ~1.6s CPU-bound Python job. Two things keep it
+    // off the compositor's back:
+    //   * `nice`, so the render thread always wins a contended core, and
+    //   * a debounce that outlasts the wallpaper reveal (MotionTokens
+    //     .wallpaperSwap), so the job never overlaps the transition.
+    // DymicShell uses the same 500ms debounce for the same reason.
+    readonly property string _lowPriority: "nice -n 19"
+
     // Debounce rapid wallpaper changes
     property string _pendingPath: ""
 
@@ -38,7 +46,8 @@ QtObject {
         // 引用 dark/light，单模式回退只能复制当前值。双模式额外开销仅为
         // 一次 generate_theme，明暗翻转无需重新提取。
         const scriptPath = Quickshell.shellDir + "/scripts/theming/template-processor.py"
-        return 'mkdir -p "' + Quickshell.cacheDir + '" && python3 "' + scriptPath
+        return 'mkdir -p "' + Quickshell.cacheDir + '" && ' + root._lowPriority
+                + ' python3 "' + scriptPath
                 + '" "' + wallpaperPath + '" --both'
                 + ' --scheme-type ' + (scheme || requestedScheme)
                 + ' -o "' + outputPath + '"'
@@ -54,11 +63,12 @@ QtObject {
         let jobs = ''
         for (let i = 0; i < schemeTypes.length; i++) {
             const s = schemeTypes[i]
-            jobs += 'python3 "' + scriptPath + '" "' + wallpaperPath
+            jobs += root._lowPriority + ' python3 "' + scriptPath + '" "' + wallpaperPath
                     + '" --scheme-type ' + s + ' -o "' + dir + '/' + s + '.json" & '
         }
         return 'mkdir -p "' + dir + '" && rm -f "' + dir + '"/*.json && ('
-                + jobs + 'wait) && python3 "' + mergeScript + '" "' + dir + '" "' + merged + '"'
+                + jobs + 'wait) && ' + root._lowPriority + ' python3 "' + mergeScript
+                + '" "' + dir + '" "' + merged + '"'
     }
 
     // Refresh the cached palette once at startup so a fresh shell always
@@ -137,8 +147,12 @@ QtObject {
         printErrors: false
     }
 
+    // Outlasts the wallpaper reveal (MotionTokens.wallpaperSwap = 480ms) so the
+    // extraction starts once the transition has finished rather than in the
+    // middle of it, where a CPU-bound Python job visibly starves the render
+    // thread. Restarted on every request, so rapid switches still coalesce.
     property Timer _debounce: Timer {
-        interval: 150
+        interval: 500
         onTriggered: {
             if (extractProcess.running) {
                 extractProcess.running = false

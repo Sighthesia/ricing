@@ -22,7 +22,11 @@ Variants {
             id: backdropWindow
 
             readonly property var cfg: Services.SettingsService.appearance
-            readonly property string wallpaperPath: cfg.wallpaperPath || ""
+            // Only load the wallpaper while the backdrop is actually in use: an
+            // Image decodes its source whether or not the surface is mapped, so
+            // keeping the source set would re-decode a full-screen wallpaper on
+            // every switch for a window that is not even visible.
+            readonly property string wallpaperPath: cfg.overviewBackground ? (cfg.wallpaperPath || "") : ""
             readonly property string wallpaperSource: {
                 if (!wallpaperPath)
                     return ""
