@@ -12,10 +12,12 @@ Variants {
     model: Quickshell.screens
 
     // Boot-reveal pacing: a frame counts as clean when it lands inside the
-    // refresh budget (two frames at 90Hz, expressed through the motion tokens),
-    // and the reveal starts after a run of them.
+    // refresh budget (expressed through the motion tokens), and the reveal
+    // starts after a short run of them. The run only has to outlast the
+    // startup burst, which measured as six late frames, so it stays short
+    // enough not to delay the wallpaper out of caution.
     readonly property int bootFrameBudget: MotionTokens.instant + 10
-    readonly property int bootFrameRun: 30
+    readonly property int bootFrameRun: 12
 
     Scope {
         id: screenScope

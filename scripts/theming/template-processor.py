@@ -307,6 +307,21 @@ def main() -> int:
             for mode in modes:
                 result[mode] = generate_theme(palette, mode, scheme_type)
 
+    # Stamp the palette with its source so a shell restart can tell whether the
+    # cached colors.json is still usable and skip re-extraction. Consumers read
+    # the per-mode blocks only, so the extra key is inert for them.
+    if args.image is not None:
+        try:
+            st = args.image.stat()
+            result["source"] = {
+                "path": str(args.image),
+                "mtime": int(st.st_mtime),
+                "size": int(st.st_size),
+                "scheme": scheme_type,
+            }
+        except OSError:
+            pass
+
     # Output JSON
     json_output = json.dumps(result, indent=2)
 

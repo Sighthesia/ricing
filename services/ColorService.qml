@@ -37,8 +37,39 @@ QtObject {
     // Debounce rapid wallpaper changes. `delay` overrides the coalescing window.
     property string _pendingPath: ""
 
+    // A restart usually re-extracts a palette that is already cached, which is
+    // a ~1.6s CPU-bound job for no gain. The extractor stamps colors.json with
+    // its source, so a matching stamp means the cached palette is still the
+    // right one and the job can be skipped. Only an in-place edit of the
+    // wallpaper file (same path, new pixels, shell not running) is missed;
+    // changing the wallpaper through the shell always changes the path.
+    property FileView _paletteFile: FileView {
+        path: Quickshell.cacheDir + "/colors.json"
+        preload: true
+        blockLoading: true
+        printErrors: false
+    }
+
+    function _cacheCovers(wallpaperPath) {
+        var raw = _paletteFile.text()
+        if (raw === "")
+            return false
+        try {
+            var source = JSON.parse(raw).source
+            return !!source
+                && String(source.path || "") === String(wallpaperPath)
+                && String(source.scheme || "") === String(requestedScheme)
+        } catch (error) {
+            return false
+        }
+    }
+
     function extractColors(wallpaperPath, delay) {
         if (!wallpaperPath) return
+        if (_cacheCovers(wallpaperPath)) {
+            _pendingPath = ""
+            return
+        }
         _pendingPath = wallpaperPath
         if (_revealInFlight) {
             _heldPath = wallpaperPath
