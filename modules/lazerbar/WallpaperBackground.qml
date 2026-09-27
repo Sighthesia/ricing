@@ -28,6 +28,8 @@ Variants {
 
             // Wallpaper that is decoded but not settled yet.
             property string pendingWallpaper: ""
+            // Request that arrived before the surface had a size.
+            property string deferredWallpaper: ""
             // Live reveal circle radius, driven by revealAnimation.
             property real revealRadius: 0
             // Circle centre captured when the reveal starts. It is snapshotted
@@ -36,6 +38,9 @@ Variants {
             property point activeRevealOrigin: Qt.point(0, 0)
             // Screen centre, used whenever no click triggered the switch.
             readonly property point centrePoint: Qt.point(width / 2, height / 2)
+            // The reveal circle is sized from the surface, so nothing can grow
+            // until the window has been measured.
+            readonly property bool surfaceReady: width > 0 && height > 0
 
             // The click that asked for this wallpaper, mapped onto this screen.
             // Screens the click did not land on reveal from their own centre.
@@ -115,9 +120,29 @@ Variants {
                     baseImage.source = path
             }
 
+            // Retry a request that landed before the first layout. Startup and
+            // the settings file both land in that window, and a circle sized
+            // from a zero-sized surface would simply never grow.
+            Timer {
+                id: layoutRetry
+                interval: MotionTokens.fast
+                onTriggered: {
+                    if (wallpaperWindow.deferredWallpaper === "")
+                        return
+                    var path = wallpaperWindow.deferredWallpaper
+                    wallpaperWindow.deferredWallpaper = ""
+                    wallpaperWindow.showWallpaper(path)
+                }
+            }
+
             // Single entry point so startup, panel commits, and file edits all
             // follow the same reveal path.
             function showWallpaper(path) {
+                if (!wallpaperWindow.surfaceReady) {
+                    wallpaperWindow.deferredWallpaper = path
+                    layoutRetry.restart()
+                    return
+                }
                 revealAnimation.stop()
                 hideAnimation.stop()
                 // The trigger point is consumed once so a later key write cannot
