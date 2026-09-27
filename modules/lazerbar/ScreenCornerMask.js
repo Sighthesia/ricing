@@ -2,14 +2,28 @@
 
 // Fake screen-corner bezel geometry.
 //
-// Each screen corner gets one wedge: a radius-sized square anchored on the
-// screen corner, with a quarter-circle arc cut out of it. The wedge is emitted
-// as SVG path data for QtQuick.Shapes' PathSvg so the arc stays smooth without
-// per-corner hand-written geometry. Only the math lives here, which keeps the
-// arc verifiable without instantiating QML.
+// Each screen corner gets one wedge: a quarter-circle arc cut out of a square
+// anchored on the screen corner. The wedge is described as a small list of path
+// commands that the mask replays on a Canvas, so the arc is rasterized by
+// QPainter. (QtQuick.Shapes is not used here: its curve renderer leaves a 1px
+// opaque white ring on the antialiased arc, which reads as a light outline
+// around the bezel.) Only the math lives here, which keeps the arc verifiable
+// without instantiating QML.
+//
+// Every box is padded by `bleed` past the screen edge on purpose: a shape whose
+// own bounds sit exactly on the outermost pixel column/row loses coverage to
+// subpixel surface scaling, which reads as a hairline along the screen border.
+// The padding puts solid paint under the screen boundary and lets the
+// off-screen part be clipped away.
 
 // Corner order used by the mask: top-left, top-right, bottom-right, bottom-left.
 var CORNER_COUNT = 4
+
+// Path command verbs emitted by cornerPath.
+var MOVE = "M"
+var LINE = "L"
+var CURVE = "C"
+var CLOSE = "Z"
 
 // Quarter-circle control offset measured from the arc's tangent points.
 // (1 - PI/6) * radius is the exact Bézier handle for a 90 degree arc, so the
@@ -33,53 +47,55 @@ function clampRadius(radius, width, height) {
     return Math.min(value, limit)
 }
 
-// The screen-facing corner of the wedge box, in local wedge coordinates.
-function cornerPoint(corner, radius) {
-    var r = Math.max(0, Number(radius) || 0)
+// Side length of a padded wedge box.
+function cornerBoxSize(radius, bleed) {
+    return Math.max(0, Number(radius) || 0) + Math.max(0, Number(bleed) || 0)
+}
+
+// Top-left position of the wedge box for one screen corner. The box is anchored
+// so it overhangs the screen by `bleed` on both screen-facing sides.
+function cornerOrigin(corner, boxSize, width, height) {
+    var size = Math.max(0, Number(boxSize) || 0)
     var index = normalizeCorner(corner)
-    if (index === 0)
-        return [0, 0]
-    if (index === 1)
-        return [r, 0]
-    if (index === 2)
-        return [r, r]
-    return [0, r]
+    var onLeft = index === 0 || index === 3
+    var onTop = index === 0 || index === 1
+    var right = Math.max(0, (Number(width) || 0) - size)
+    var bottom = Math.max(0, (Number(height) || 0) - size)
+    return [onLeft ? 0 : right, onTop ? 0 : bottom]
 }
 
-// Top-left position of the wedge box for one screen corner.
-function cornerOrigin(corner, radius, width, height) {
-    var r = Math.max(0, Number(radius) || 0)
-    var point = cornerPoint(corner, r)
-    var right = Math.max(0, (Number(width) || 0) - r)
-    var bottom = Math.max(0, (Number(height) || 0) - r)
-    return [point[0] === 0 ? 0 : right, point[1] === 0 ? 0 : bottom]
-}
-
-// One wedge as SVG path data inside its own r x r box: straight edges along the
-// two screen borders, closed by the bezel's quarter-circle arc.
-function cornerPath(radius, corner) {
+// One wedge as path commands inside its padded box: the box corner the screen
+// corner is nearest, the arc's tangent points on the two box edges it hugs, and
+// the travel direction at each end of the curve.
+function cornerPath(radius, bleed, corner) {
     var r = Math.max(0, Number(radius) || 0)
     if (r <= 0)
-        return ""
-    var cornerX = cornerPoint(corner, r)[0]
-    var cornerY = cornerPoint(corner, r)[1]
-    // Arc centre sits diagonally opposite the screen corner inside the box; the
-    // travel directions point away from that corner along both screen edges.
-    var centerX = r - cornerX
-    var centerY = r - cornerY
+        return []
+    var size = cornerBoxSize(r, bleed)
+    var index = normalizeCorner(corner)
+    var onLeft = index === 0 || index === 3
+    var onTop = index === 0 || index === 1
+    // Arc centre sits `radius` in from both screen edges, so the arc is tangent
+    // to the box edge that runs along each screen border.
+    var centerX = onLeft ? r : size - r
+    var centerY = onTop ? r : size - r
+    var tangentHorizontalX = centerX
+    var tangentHorizontalY = onTop ? 0 : size
+    var tangentVerticalX = onLeft ? 0 : size
+    var tangentVerticalY = centerY
+    // The curve leaves along the horizontal edge (toward the screen corner) and
+    // arrives along the vertical edge (away from it).
+    var leaveX = onLeft ? -1 : 1
+    var arriveY = onTop ? 1 : -1
     var handle = r - controlOffset(r)
-    var travelX = cornerX === 0 ? -1 : 1
-    var travelY = cornerY === 0 ? 1 : -1
-    var tangentOnHorizontal = centerX
-    var tangentOnVertical = centerY
-    var controlA = tangentOnHorizontal + travelX * handle
-    var controlB = tangentOnVertical - travelY * handle
-    return "M" + cornerX + "," + cornerY
-        + " L" + tangentOnHorizontal + "," + cornerY
-        + " C" + controlA + "," + cornerY
-        + " " + cornerX + "," + controlB
-        + " " + cornerX + "," + tangentOnVertical
-        + " Z"
+    return [
+        [MOVE, onLeft ? 0 : size, onTop ? 0 : size],
+        [LINE, tangentHorizontalX, tangentHorizontalY],
+        [CURVE, tangentHorizontalX + leaveX * handle, tangentHorizontalY,
+            tangentVerticalX, tangentVerticalY - arriveY * handle,
+            tangentVerticalX, tangentVerticalY],
+        [CLOSE]
+    ]
 }
 
 function normalizeCorner(corner) {

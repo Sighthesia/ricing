@@ -26,6 +26,7 @@ Afloat is a Wayland desktop shell built with **Quickshell** (QML), targeting the
 - Import blackhole: `qs -p <file>` silently empties any relative import resolving outside the config root (e.g. `../../services` from `tests/qml/`). Hence root-level harnesses for singletons, pure-JS imports only under `tests/qml/`.
 - Cross-service signals fire mid-cascade while sibling bindings still hold stale values — defer consumer refreshes one event-loop turn (`Qt.callLater` / 0-interval `Timer`).
 - `PanelWindow` is not an `Item`: no `Keys.*` handlers on it (inner `Item` with `focus: true` instead); size with `implicitWidth`/`implicitHeight`, not `width`/`height`.
+- `QtQuick.Shapes` (every renderer, Qt 6.11) leaves a 1px **opaque white** ring on antialiased edges, so a shape mask over a transparent layer-shell surface shows a light outline. Rasterize such masks with a `Canvas` (`renderTarget: Canvas.Image`) instead — QPainter antialiasing is clean. See `modules/lazerbar/ScreenCornerMask.qml`.
 - Lock screen (`modules/lock/`, `LockService`): `WlSessionLockSurface` constraints — no `Repeater`, backdrop z-order, re-arm choreography. Load `session-lock-surface-constraints` skill before touching it.
 
 ## Style
