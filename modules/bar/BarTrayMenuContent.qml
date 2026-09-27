@@ -262,8 +262,10 @@ Item {
         }
         submenuEntry = entry
         pinAnchor(row)
-        // Match the primary content layer: 500ms, OutCubic in.
-        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.settingsSidebarFade
+        // Second-level reveal is a small, quick gesture: medium (160ms).
+        // The old 500ms slide kept the painted panel dead to taps for half a
+        // second, so a click landing during it did nothing at all.
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.medium
         submenuAnimation.easing.type = Easing.OutCubic
         submenuAnimationTarget = 1
         if (Lazer.MotionTokens.reducedMotion) {
@@ -284,8 +286,11 @@ Item {
         // forever under a moving cursor, reading as stuck half-out.
         if (submenuPhase === "closing")
             return
-        // Match the primary content layer: 500ms, InOutQuad out.
-        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.settingsSidebarFade
+        // Retract faster than the host's exit reveal (700ms): the popup is
+        // carried out of the bar viewport while the panel slides away, so a
+        // slow (240ms) retract reads as its own step instead of vanishing
+        // together with the popup. inOut keeps travel off the first frames.
+        submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.slow
         submenuAnimation.easing.type = Easing.InOutQuad
         submenuAnimationTarget = 0
         if (Lazer.MotionTokens.reducedMotion) {
@@ -383,7 +388,12 @@ Item {
     // Transit strip: the bridge zone toward the submenu, side-aware so the
     // outer margin never resurrects. Entering it while a submenu is
     // mid-retract bounces back open (slow arrivals killed just short);
-    // otherwise it is a deliberate no-op.
+    // otherwise it is a deliberate no-op. Leaving it must NOT forget the
+    // cursor: this strip sits between the two panels, so every traversal to
+    // the submenu crosses it, and wiping the memory there strands the second
+    // level's highlight (the only re-arm channel when the arrival itself
+    // produces no catcher event). Real departures are handled by the primary
+    // catcher's exit and the host close timer.
     MouseArea {
         id: transitCatcher
         objectName: "traySubmenuTransitCatcher"
@@ -395,7 +405,6 @@ Item {
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
         onEntered: { root.rememberCursor(mouseX + transitCatcher.x, mouseY + transitCatcher.y); root.transitToSubmenu() }
-        onExited: root.forgetCursor()
     }
     function transitToSubmenu() {
         if (submenuEntry && submenuPhase !== "open")
@@ -428,14 +437,16 @@ Item {
     // Submenu hover state lives here at root level: functions nested inside
     // the surface are unreachable via root.* and fail silently.
     property Item highlightedSubmenuRow: null
-        function hoverAtSubCatcher(contentY) {
-            // The catcher fills the flickable, so root coords must include
-            // both the surface and the flick offsets; otherwise the memory
-            // resolve below recomputes a negative fy and wipes a live
-            // highlight on the next async settle (open-finish, batch).
-            root.rememberCursor(subHoverCatcher.mouseX + submenuSurface.x + submenuFlick.x,
-                subHoverCatcher.mouseY + submenuSurface.y + submenuFlick.y)
-            highlightedSubmenuRow = rowAtContentY(submenuColumn, "traySubmenuSection", contentY).row
+        // Panel-relative hover (the catcher fills the whole panel): map the
+        // point into the rows viewport's content space and refresh the root
+        // pointer memory. Hovering the title band clears the row highlight
+        // but keeps the memory fresh, which is what lets the second level
+        // re-arm its highlight after an arrival that produced no row event.
+        function hoverAtSubCatcher(panelY) {
+            root.rememberCursor(subHoverCatcher.mouseX + submenuSurface.x,
+                subHoverCatcher.mouseY + submenuSurface.y)
+            highlightedSubmenuRow = rowAtContentY(submenuColumn, "traySubmenuSection",
+                panelY - submenuFlick.y + submenuFlick.contentY).row
         }
     // Re-resolve under a stationary cursor from memory (root coords): the
     // reveal sliding under it and data rebuilds generate no hover events.
@@ -695,22 +706,27 @@ Item {
         }
 
         // Submenu hover owner, mirroring the primary catcher: rows are pure
-        // display, highlight follows the mapped row. Ungated by phase (hidden
-        // rows paint under the opaque face anyway); taps stay gated.
+        // display, highlight follows the mapped row. It covers the WHOLE
+        // panel, not just the rows viewport: the title band and the travel
+        // line above the panel are catcher-less otherwise, so a pointer
+        // arriving from the primary could reach the rows without the second
+        // level ever seeing a hover event (and with a stale pointer memory,
+        // since the strip's crossing no longer re-arms it). Ungated by phase
+        // (hidden rows paint under the opaque face anyway); taps stay gated.
         MouseArea {
             id: subHoverCatcher
             objectName: "traySubmenuHoverCatcher"
-            anchors.fill: submenuFlick
+            anchors.fill: parent
             z: 4
             hoverEnabled: true
             acceptedButtons: Qt.NoButton
-        onEntered: root.hoverAtSubCatcher(mouseY + submenuFlick.contentY)
-        onPositionChanged: root.hoverAtSubCatcher(mouseY + submenuFlick.contentY)
-        onExited: {
-            root.highlightedSubmenuRow = null
-            root.forgetCursor()
+            onEntered: root.hoverAtSubCatcher(mouseY)
+            onPositionChanged: root.hoverAtSubCatcher(mouseY)
+            onExited: {
+                root.highlightedSubmenuRow = null
+                root.forgetCursor()
+            }
         }
-    }
         // Cold batches rebuild delegates under a stationary cursor: recompute
         // from remembered position instead of losing the highlight. (Handled
         // at root level; a nested Connections here proved unreliable.)

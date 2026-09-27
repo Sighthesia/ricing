@@ -41,6 +41,16 @@ Item {
             mouseMove(item, x, y)
             wait(30)
         }
+        // Root-level rows only; submenu delegates share the objectName.
+        function primaryRowsOf(target) {
+            var found = []
+            var all = findAllByName(target, "trayMenuRow")
+            for (var i = 0; i < all.length; i++) {
+                if (all[i].level === 1)
+                    found.push(all[i])
+            }
+            return found
+        }
         // Poll an action until check passes: synthetic delivery flakes under
         // load, so retry the stimulus instead of asserting one shot.
         function pollAct(action, check, tries) {
@@ -521,15 +531,6 @@ Item {
             // range; longer submenus scroll inside instead of growing the
             // popup. Eight primary rows give a mid-list anchor real room.
             Lazer.MotionTokens.reducedMotionOverride = true
-            function primaryRowsOf(target) {
-                var found = []
-                var all = findAllByName(target, "trayMenuRow")
-                for (var i = 0; i < all.length; i++) {
-                    if (all[i].level === 1)
-                        found.push(all[i])
-                }
-                return found
-            }
             try {
                 // Twenty rows overflow any clamped viewport, so the excess
                 // must scroll inside it.
@@ -689,13 +690,94 @@ Item {
                     laid = fl && fl.height >= 32
                 }
                 verify(laid, "submenu viewport never laid out")
-                // Hover the first submenu row (catcher-relative 40,16).
-                item.hoverAtSubCatcher(16)
-                verify(item.highlightedSubmenuRow !== null, "direct hover did not highlight")
-                // Simulate the async settle; highlight must survive it.
+                // Real hover on the first submenu row: the catcher fills the
+                // panel, so this also proves the mapping through the title
+                // strip lands on the row band rather than the title itself.
+                var subFlick = findByName(item, "traySubmenuFlick")
+                var rowPoint = subFlick.mapToItem(item, 40, 16)
+                verify(pollAct(function() { hoverFresh(item, rowPoint.x, rowPoint.y) },
+                    function() { return item.highlightedSubmenuRow !== null }),
+                    "direct hover did not highlight")
+                // The title band maps to no row but keeps the memory live.
+                var titlePoint = findByName(item, "traySubmenuSurface").mapToItem(item, 40, 10)
+                verify(pollAct(function() { mouseMove(item, titlePoint.x, titlePoint.y) },
+                    function() { return item.highlightedSubmenuRow === null
+                        && item.lastCursorX >= 0 }),
+                    "title band forgot the pointer")
+                // Back onto the first row, then simulate the async settle:
+                // the highlight must survive it.
+                verify(pollAct(function() { mouseMove(item, rowPoint.x, rowPoint.y) },
+                    function() { return item.highlightedSubmenuRow !== null }))
                 item.resolveSubHoverFromMemory()
                 wait(30)
                 verify(item.highlightedSubmenuRow !== null, "memory resolve wiped the highlight")
+            } finally {
+                Lazer.MotionTokens.reducedMotionOverride = false
+            }
+        }
+        function test_submenuTakesHoverOnArrivalFromPrimary() {
+            // Realistic arrival path: hover the trigger row, travel right
+            // along that row's own y (where the panel is not painted yet, so
+            // only the transit strip is under the cursor), then drop into the
+            // rows viewport. The rows must take the hover and stay clickable;
+            // this is the path a real pointer takes and the one the direct
+            // mapToItem jumps in the other pointer tests skip.
+            Lazer.MotionTokens.reducedMotionOverride = true
+            try {
+                // Park outside the future panel rect before anything exists.
+                mouseMove(root, 380, 760)
+                wait(20)
+                mouseMove(root, 8, 700)
+                wait(20)
+                var parent = fakeEntry("More", { hasChildren: true })
+                var child = fakeEntry("Child")
+                var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+                var row = null
+                for (var i = 0; i < 200 && row === null; i++) {
+                    wait(10)
+                    var rows = primaryRowsOf(item)
+                    if (rows.length >= 3 && rows[1].height > 0)
+                        row = rows[1]
+                }
+                verify(row !== null, "primary rows never laid out")
+                var rowPoint = row.mapToItem(item, 40, 16)
+                // Hovering the trigger row summons the second level.
+                hoverFresh(item, rowPoint.x, rowPoint.y)
+                item.submenuEntries = [child]
+                var open = false
+                for (var j = 0; j < 300 && !open; j++) {
+                    wait(10)
+                    var s = findByName(item, "traySubmenuSurface")
+                    var f = findByName(item, "traySubmenuFlick")
+                    open = s && s.visible && f && f.height >= 32
+                }
+                verify(open, "submenu never revealed")
+                compare(item.submenuPhase, "open")
+                var surface = findByName(item, "traySubmenuSurface")
+                var flick = findByName(item, "traySubmenuFlick")
+                // Travel right along the trigger row: crosses the transit
+                // strip, then crosses unpainted space above the panel. The
+                // pointer memory must survive that crossing, or the second
+                // level loses the only channel that can re-arm its highlight.
+                var stripPoint = surface.mapToItem(item, 4, rowPoint.y)
+                mouseMove(item, stripPoint.x, stripPoint.y)
+                wait(30)
+                mouseMove(item, stripPoint.x + 40, stripPoint.y)
+                wait(30)
+                verify(item.lastCursorX >= 0, "traversing the transit strip forgot the cursor")
+                // Drop into the first submenu row.
+                var target = flick.mapToItem(item, 40, 16)
+                verify(pollAct(function() { mouseMove(item, target.x, target.y) },
+                    function() { return item.highlightedSubmenuRow !== null }),
+                    "submenu rows never took the hover on arrival")
+                // Delegate modelData is a pragma-library copy, so a leaf click
+                // is observed through the dismiss it requests, not triggeredCalls.
+                var dismissed = 0
+                item.dismissRequested.connect(function() { dismissed++ })
+                verify(pollAct(function() { mouseClick(item, target.x, target.y) },
+                    function() { return dismissed === 1 }),
+                    "submenu row click never landed after arrival")
+                compare(dismissed, 1)
             } finally {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
