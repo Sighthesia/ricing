@@ -1274,13 +1274,30 @@ Item {
                     font.pixelSize: 11
                 }
 
-                Text {
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
+                // Empty-state line. A scan in progress is the one case where
+                // "no devices found" would be a lie, so the ring replaces the
+                // claim with the fact. It shares the line rather than taking its
+                // own, matching how the network panel reports its scan.
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.btAvailable && root.btEnabled && root.btDeviceList.length === 0
-                    text: root.btScanning ? "Scanning…" : "No devices found"
-                    color: LazerTheme.textMuted
-                    font.pixelSize: 11
+                    spacing: 6
+
+                    LazerLoadingRing {
+                        objectName: "btScanRing"
+                        width: 16
+                        height: 16
+                        visible: root.btScanning
+                        active: visible
+                        running: visible
+                    }
+
+                    Text {
+                        objectName: "btEmptyText"
+                        text: root.btScanning ? "Scanning…" : "No devices found"
+                        color: LazerTheme.textMuted
+                        font.pixelSize: 11
+                    }
                 }
 
                 Repeater {
@@ -1628,17 +1645,39 @@ Item {
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
-                    Text {
-                        objectName: "wifiRescanLabel"
+                    // Label and ring travel as one centred unit. The ring holds
+                    // its slot while idle so the text does not shift the moment
+                    // a scan starts. The ring rides the label rather than taking
+                    // a row of its own: this button already carries the panel's
+                    // transient state, and a separate status line for the same
+                    // fact is what the foot layout was built to avoid.
+                    Row {
                         anchors.centerIn: parent
-                        text: {
-                            if (root.wifiConnecting) return "Connecting…"
-                            if (root.wifiScanning) return "Scanning…"
-                            return "Rescan"
+                        spacing: 6
+
+                        // 16px is deliberate — at that size the ring's triangle
+                        // field is skipped and the arc turns alone, which is what
+                        // a 32px button can carry without reading as speckle.
+                        LazerLoadingRing {
+                            objectName: "wifiScanRing"
+                            width: 16
+                            height: 16
+                            visible: root.wifiScanning && !root.wifiConnecting
+                            active: visible
+                            running: visible
                         }
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 11
-                        font.bold: true
+
+                        Text {
+                            objectName: "wifiRescanLabel"
+                            text: {
+                                if (root.wifiConnecting) return "Connecting…"
+                                if (root.wifiScanning) return "Scanning…"
+                                return "Rescan"
+                            }
+                            color: LazerTheme.textPrimary
+                            font.pixelSize: 11
+                            font.bold: true
+                        }
                     }
 
                     HoverHandler { id: rescanHover }

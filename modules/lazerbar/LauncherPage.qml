@@ -1323,17 +1323,33 @@ Item {
     // Loading surface keeps its own body color so stale rows never linger.
     Rectangle {
         id: loadingSurface
+        objectName: "launcherLoadingSurface"
         anchors.fill: resultsView
         visible: root.sessionLoading
         radius: 0
         color: "transparent"
 
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Searching..."
-            color: LazerTheme.textMuted
-            font.pixelSize: 14
+        // osu!lazer's loading ring, sized up from the popup's 16px because this
+        // is the one place afloat waits on something the user is watching for.
+        Column {
+            anchors.centerIn: parent
+            spacing: 10
+
+            LazerLoadingRing {
+                objectName: "launcherLoadingRing"
+                width: 28
+                height: 28
+                active: root.sessionLoading
+                running: root.sessionLoading
+            }
+
+            Text {
+                objectName: "launcherLoadingText"
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Searching…"
+                color: LazerTheme.textMuted
+                font.pixelSize: 14
+            }
         }
     }
 

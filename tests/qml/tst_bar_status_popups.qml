@@ -501,5 +501,69 @@ Item {
             verify(column !== null, "wifi column should exist")
             compare(column.children[column.children.length - 1].objectName, "wifiRescanButton")
         }
+
+        // The lazer loading ring rides the foot button's label. It has to track
+        // the scan, and it has to yield to a live connection attempt — that
+        // state already reads as in-flight on its own.
+        function test_wifiScanRingTracksTheScan() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var ring = findByName(item, "wifiScanRing")
+            verify(ring !== null, "wifi panel should carry a scan ring")
+            compare(ring.visible, false, "ring is hidden while idle")
+
+            svc.scanningActive = true
+            wait(50)
+            compare(ring.visible, true, "ring shows during a scan")
+            compare(findByName(item, "wifiRescanLabel").text, "Scanning…")
+
+            svc.connecting = true
+            svc.connectingTo = "HomeWifi"
+            wait(50)
+            compare(ring.visible, false, "ring yields to a connection attempt")
+            compare(findByName(item, "wifiRescanLabel").text, "Connecting…")
+        }
+
+        // The ring holds its slot in the row even while hidden, so the label
+        // cannot shift sideways the moment a scan starts.
+        function test_wifiScanRingDoesNotMoveTheLabel() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var ring = findByName(item, "wifiScanRing")
+            var label = findByName(item, "wifiRescanLabel")
+            var beforeX = label.x
+            var beforeY = label.y
+
+            svc.scanningActive = true
+            wait(50)
+            compare(label.x, beforeX, "label shifted horizontally when the ring appeared")
+            compare(label.y, beforeY, "label shifted vertically when the ring appeared")
+            verify(ring.width > 0 && ring.height > 0, "ring reserves a slot")
+        }
+
+        // A Bluetooth scan with nothing found yet must not claim "no devices
+        // found" — that is a claim about a search that has not finished.
+        function test_bluetoothScanRingReplacesTheEmptyClaim() {
+            var svc = makeBluetoothService()
+            svc.devices = { values: [] }
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "bluetooth", payload: { bluetoothService: svc }
+            })
+            var ring = findByName(item, "btScanRing")
+            var label = findByName(item, "btEmptyText")
+            verify(ring !== null && label !== null, "bluetooth empty state should exist")
+            compare(ring.visible, false, "ring is hidden when no scan is running")
+            compare(label.text, "No devices found")
+
+            svc.scanningActive = true
+            wait(50)
+            compare(ring.visible, true, "ring shows while discovering")
+            compare(label.text, "Scanning…",
+                "a live scan must not read as an exhausted search")
+        }
     }
 }
