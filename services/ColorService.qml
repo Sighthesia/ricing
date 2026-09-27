@@ -32,12 +32,15 @@ QtObject {
     // DymicShell uses the same 500ms debounce for the same reason.
     readonly property string _lowPriority: "nice -n 19"
 
-    // Debounce rapid wallpaper changes
+    // Debounce rapid wallpaper changes. `delay` lets the startup call wait out
+    // the shell's own first-frame initialisation, which is the busiest moment
+    // in a session.
     property string _pendingPath: ""
 
-    function extractColors(wallpaperPath) {
+    function extractColors(wallpaperPath, delay) {
         if (!wallpaperPath) return
         _pendingPath = wallpaperPath
+        _debounce.interval = delay ? Math.max(0, Number(delay)) : 500
         _debounce.restart()
     }
 
@@ -73,7 +76,10 @@ QtObject {
 
     // Refresh the cached palette once at startup so a fresh shell always
     // matches the current wallpaper without waiting for a wallpaper change.
-    Component.onCompleted: extractColors(Services.SettingsService.appearance.wallpaperPath)
+    // Deferred well past the first frames: startup is the one moment the shell
+    // does every one-time initialisation at once, and the extraction is a
+    // ~1.6s CPU-bound job.
+    Component.onCompleted: extractColors(Services.SettingsService.appearance.wallpaperPath, 2500)
 
     // Regenerate palettes whenever the requested scheme or template changes.
     // A template/mode switch is served from the preview cache when fresh, so
