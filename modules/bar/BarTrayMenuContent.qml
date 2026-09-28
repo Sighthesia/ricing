@@ -524,9 +524,35 @@ Item {
             var fy = sy - submenuFlick.y + submenuFlick.contentY
             if (!inX || fy < 0 || fy >= submenuFlick.height)
                 return
-            highlightedSubmenuRow = rowAtContentY(submenuColumn,
-                "traySubmenuSection", fy).row
+            // Which item does the bare name `submenuColumn` resolve to HERE?
+            // It is declared twice — the input band is exported as a property
+            // alias of that name, and the rows Column carries it as an id. The
+            // mapper needs the Column; if the alias wins, it receives the band
+            // and finds no sections at all, on any data path. Reporting the
+            // inventory settles it without guessing which one bound.
+            var scope = submenuColumn
+            var m = rowAtContentY(scope, "traySubmenuSection", fy)
+            if (debugEvents && (!m.row || !m.rowsSeen)) {
+                console.log("[afloat:TrayMap] fy=" + Math.round(fy)
+                    + " scope=" + (scope && scope.objectName ? scope.objectName
+                        : String(scope))
+                    + " kids=" + (scope ? scope.children.length : -1)
+                    + " sections=" + (scope ? root._countNamed(scope, "traySubmenuSection") : -1)
+                    + " rows=" + m.rowsSeen)
+            }
+            highlightedSubmenuRow = m.row
         }
+    // How many direct children carry this objectName — the mapper's first
+    // filter. Zero here with a visible panel means it was handed the wrong
+    // scope, not that the rows are missing.
+    function _countNamed(scope, name) {
+        var n = 0
+        for (var i = 0; i < scope.children.length; i++) {
+            if (scope.children[i] && scope.children[i].objectName === name)
+                n++
+        }
+        return n
+    }
     // Re-resolve under a stationary cursor from memory (root coords): the
     // reveal sliding under it and data rebuilds generate no hover events.
     // 12px tolerance toward the primary side covers arrivals parked on the

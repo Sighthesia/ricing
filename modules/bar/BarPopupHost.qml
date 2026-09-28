@@ -280,11 +280,14 @@ PanelWindow {
     // reference into a surface the popup does not own.
     // Window-space rect of an item — the space wl_surface.set_input_region is
     // expressed in. Everything else in this snapshot is viewport-local.
+    // NOTE: `mapToScene` does not exist in QML (C++ only), which silently made
+    // this return null; `mapToItem(null, ...)` is the QML spelling of the same
+    // mapping and resolves to the window's content item.
     function _sceneRect(item) {
-        if (!item || !item.mapToScene)
+        if (!item || !item.mapToItem)
             return null
-        var a = item.mapToScene(0, 0)
-        var b = item.mapToScene(item.width, item.height)
+        var a = item.mapToItem(null, 0, 0)
+        var b = item.mapToItem(null, item.width, item.height)
         return {
             "x": Math.round(a.x * 10) / 10, "y": Math.round(a.y * 10) / 10,
             "width": Math.round((b.x - a.x) * 10) / 10,
@@ -294,7 +297,7 @@ PanelWindow {
     function _cursorInScene(tc) {
         if (!tc || Number(tc.lastCursorX) < 0)
             return null
-        var p = tc.mapToScene(Number(tc.lastCursorX), Number(tc.lastCursorY))
+        var p = tc.mapToItem(null, Number(tc.lastCursorX), Number(tc.lastCursorY))
         return { "x": Math.round(p.x * 10) / 10, "y": Math.round(p.y * 10) / 10 }
     }
     function _sceneCovers(tc) {

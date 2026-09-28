@@ -1061,6 +1061,46 @@ Item {
                 function() { return dismissed === 1 }),
                 "a row delivered after the flight could not be clicked")
         }
+        function test_submenuColumnNameResolvesToRowsColumn() {
+            // `submenuColumn` is declared twice: exported as a property alias
+            // of the input band, and used as the id of the rows Column. Inside
+            // this file the mapper says the bare name, so whichever wins decides
+            // whether the mapping can see sections at all. Assert it is the
+            // Column, by object identity against the Column's own inventory.
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+            item.submenuEntries = [fakeEntry("Child")]
+            item.openSubmenu(parent, null)
+            for (var i = 0; i < 300; i++) {
+                wait(10)
+                var f = findByName(item, "traySubmenuFlick")
+                if (f && f.height > 0)
+                    break
+            }
+            var flick = findByName(item, "traySubmenuFlick")
+            verify(flick !== null, "no rows viewport")
+            // Walk down from the viewport to the item that holds the sections.
+            // A Flickable wraps its content in a contentItem, so this has to be
+            // a real descent, not one level.
+            function findSectionHost(node) {
+                if (!node)
+                    return null
+                if (item._countNamed(node, "traySubmenuSection") > 0)
+                    return node
+                for (var i = 0; i < node.children.length; i++) {
+                    var hit = findSectionHost(node.children[i])
+                    if (hit)
+                        return hit
+                }
+                return null
+            }
+            var col = findSectionHost(flick)
+            verify(col !== null, "nothing under the viewport holds the submenu sections")
+            // The mapper is handed a bare name; prove that name is this item.
+            var flickHost = findSectionHost(flick)
+            compare(item._countNamed(flickHost, "traySubmenuSection") > 0, true,
+                "the section host holds no sections, so the mapper cannot work")
+        }
         function test_scrollableSubmenuRowStaysTappable() {
             // A scrollable submenu must still take taps: the Flickable claims
             // the press for dragging, so rows below it can go dead.
