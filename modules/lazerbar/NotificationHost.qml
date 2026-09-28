@@ -41,7 +41,40 @@ Variants {
                 left: Services.NotificationService.notificationLeft ? 16 : 8
                 right: Services.NotificationService.notificationRight ? 16 : 8
             }
-            mask: Region { item: notificationStack.implicitHeight > 0 ? notificationStack : null }
+            // Stand down while a bar popup owns the pointer. This host and the
+            // popup are both in the Top layer and the client cannot order two
+            // surfaces within one layer — the compositor decides, at map time,
+            // and NotificationHost maps later (shell.qml declares it after
+            // TopBar), so a card's region sits permanently above the popup's.
+            // niri then hands the pointer to this surface and the popup gets a
+            // leave with the pointer still over it: no row highlight, no click,
+            // menu closed. Emptying the mask is the only lever that works,
+            // because stacking is not ours to choose.
+            mask: Region {
+                item: !PopupInputArbitration.popupOwnsPointer
+                    && notificationStack.implicitHeight > 0
+                    ? notificationStack : null
+            }
+
+            // Publish the claimed region in screen coordinates for diagnostics.
+            // Without this, "the pointer was stolen by another surface" stays an
+            // assumption; with it, a departure landing inside this rect names
+            // the thief. The stack is mapped through the window because the
+            // region the compositor sees is in surface-local coordinates.
+            onWidthChanged: publishClaimedRegion()
+            onXChanged: publishClaimedRegion()
+            onYChanged: publishClaimedRegion()
+            Component.onCompleted: publishClaimedRegion()
+            function publishClaimedRegion() {
+                if (notificationStack.implicitHeight <= 0) {
+                    PopupInputArbitration.releaseInputRegion()
+                    return
+                }
+                var o = mapToItem(null, notificationStack.x, notificationStack.y)
+                PopupInputArbitration.claimInputRegion(o.x, o.y,
+                    notificationStack.width, notificationStack.height)
+            }
+            onVisibleChanged: publishClaimedRegion()
 
             // Stack only the cards; the stack keeps its content height so the
             // input mask stays limited to visible notification cards. It hugs

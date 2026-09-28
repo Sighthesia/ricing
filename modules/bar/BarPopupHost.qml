@@ -152,6 +152,20 @@ PanelWindow {
     // Reuse the settings-panel diagnostics channel so one IPC switch turns on
     // both surfaces; every popup decision is logged without adding an owner.
     readonly property bool debugEnabled: Services.SettingsService.hoverDebugEnabled
+
+    // Publish pointer ownership to the notification host. Both surfaces live in
+    // the Top layer and cannot be ordered by the client; the notification host
+    // maps later, so a visible card would sit above this popup and steal the
+    // pointer the moment its region became non-empty. Claiming ownership for the
+    // whole surface lifetime (not just while open) is deliberate: the region is
+    // committed on geometry changes, so releasing it must not hand the pointer
+    // back mid-reveal, when the popup is still on screen and still expecting it.
+    readonly property bool ownsPointer: surfaceActive
+    onOwnsPointerChanged: PopupInputArbitration.popupOwnsPointer = root.ownsPointer
+    Component.onDestruction: {
+        if (PopupInputArbitration.popupOwnsPointer)
+            PopupInputArbitration.popupOwnsPointer = false
+    }
     // Push the debug switch into the tray content so its hover exits are traced
     // on the same switch. A singleton write from here, not a separate owner.
     onDebugEnabledChanged: {
@@ -271,6 +285,18 @@ PanelWindow {
 
     // The tray handle, resolved here because both debug blocks need it and it
     // is not a property of the root.
+    // Which surface is entitled to the pixel the pointer was last seen on. The
+    // notification host publishes its own claimed rect, so this needs no
+    // reference into a surface the popup does not own.
+    function _thiefAt(p) {
+        if (!p)
+            return "none"
+        if (!PopupInputArbitration.popupOwnsPointer
+            && PopupInputArbitration.coversPoint(p.x, p.y))
+            return "notifications"
+        return root._pointInRect(p.x, p.y, popupInputRegion) ? "popup" : "none"
+    }
+
     function _trayContent() {
         return popupActions ? popupActions.trayMenuContent : null
     }
@@ -353,6 +379,22 @@ PanelWindow {
                 // fired, so treating it as the user leaving is what closes the
                 // popup under the cursor.
                 "lastDepart": String(root._lastDeparture),
+                // The rival claim on the same pixels. The popup and the
+                // notification host are both Top-layer surfaces and the client
+                // cannot order them; the notification host maps later, so a
+                // visible card sits above the popup. Recording its region turns
+                // "the pointer was stolen" from an assumption into a check: if a
+                // departure lands inside notifRegion, that is the thief.
+                "notifRegion": {
+                    "x": PopupInputArbitration.notifX,
+                    "y": PopupInputArbitration.notifY,
+                    "width": PopupInputArbitration.notifWidth,
+                    "height": PopupInputArbitration.notifHeight,
+                },
+                "notifClaimsInput": !PopupInputArbitration.popupOwnsPointer
+                    && Number(PopupInputArbitration.notifHeight) > 0,
+                "pointerStolenBy": root._thiefAt(root._cursorInViewport(
+                    root._trayContent())),
             },
             "host": {
                 "phase": root.open ? "open" : (root.surfaceActive ? "revealing" : "closed"),
