@@ -152,6 +152,8 @@ PanelWindow {
     // Reuse the settings-panel diagnostics channel so one IPC switch turns on
     // both surfaces; every popup decision is logged without adding an owner.
     readonly property bool debugEnabled: Services.SettingsService.hoverDebugEnabled
+    // "region" or "full"; see the mask binding on the window.
+    readonly property string maskMode: Services.SettingsService.popupMaskMode
     // Push the debug switch into the tray content so its hover exits are traced
     // on the same switch. A singleton write from here, not a separate owner.
     onDebugEnabledChanged: {
@@ -287,6 +289,10 @@ PanelWindow {
                 // indistinguishable from a region that does not cover the point.
                 "region": root._debugRect(popupInputRegion),
                 "regionActive": root.surfaceActive,
+                // Which mask is actually committed. With "full" the rect above is
+                // not what the compositor is using, so a "cursor inside region"
+                // reading means nothing until this is read too.
+                "maskMode": root.maskMode,
                 // Both must land inside the region for the submenu column to be
                 // reachable: the pointer Qt last saw, and where the column band
                 // actually is. Anything outside means the compositor, not the
@@ -930,12 +936,22 @@ PanelWindow {
     // No input when closed; the window otherwise masks only the popup.
     // Keep the visual/input region alive for the exit reveal after open flips
     // false; clearing it at close start cuts the second layer off immediately.
-    // The region follows the union of the displayed container and its committed
+    // "region" follows the union of the displayed container and its committed
     // target: driven by the animated width alone it lagged the summon, leaving
-    // the second level painted outside it — the compositor sent a leave while
-    // the pointer crossed and the popup closed under it. The union also keeps
-    // the region wide until a retract glide has actually finished.
-    mask: Region { item: root.surfaceActive ? popupInputRegion : null }
+    // the second level painted outside it. The union also keeps the region wide
+    // until a retract glide has actually finished.
+    // "full" makes the entire surface clickable, which removes the mask as a
+    // variable — the bisect that separates "the compositor dropped the pointer"
+    // from "the mask never covered the point" without a restart per attempt.
+    // One Region, two sources: the popup's own rect, or the root item itself
+    // (which IS the surface, so masking it makes the whole window clickable).
+    // Expressed as a single object literal because a binding cannot hold an
+    // object literal inside a ternary — the config fails to load.
+    mask: Region {
+        item: root.surfaceActive
+            ? (root.maskMode === "full" ? root : popupInputRegion)
+            : null
+    }
     // Do not keep a full-screen transparent surface above the settings window
     // when no bar popup is open or completing its reveal.
     visible: root.surfaceActive

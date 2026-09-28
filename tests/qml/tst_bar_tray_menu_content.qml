@@ -7,6 +7,17 @@ Item {
     id: root
     width: 400; height: 800
     Component { id: menuComp; Bar.BarTrayMenuContent {} }
+    // Plain containers for the nesting probes: the desktop puts the tray inside
+    // a content layer whose width is fixed by childrenRect, which is narrower
+    // than the submenu column that overflows it.
+    Component {
+        id: wideComp
+        Item { width: 512; height: 421 }
+    }
+    Component {
+        id: narrowComp
+        Item { width: 260; height: 372 }
+    }
 
     function fakeEntry(text, extra) {
         var e = extra || ({})
@@ -956,6 +967,49 @@ Item {
             verify(pollAct(function() { mouseClick(item, target.x, target.y) },
                 function() { return dismissed === 1 }),
                 "clicking the highlighted first-expand row did nothing")
+        }
+        function test_narrowAncestorStillDeliversHoverToTheOverflowingColumn() {
+            // The desktop's real nesting, reproduced: the tray content sits in a
+            // content layer that stays 260 wide (childrenRect of a 244-wide menu)
+            // while the container around it is 512 wide, so the submenu column
+            // band lives entirely OUTSIDE its own layer's declared width. The
+            // panel still paints there, which is why this looked like a live
+            // surface — the question is whether input reaches it.
+            mouseMove(root, 380, 760); wait(20)
+            mouseMove(root, 8, 700); wait(20)
+            var parent = fakeEntry("More", { hasChildren: true })
+            var outer = createTemporaryObject(wideComp, root, null)
+            var slot = createTemporaryObject(narrowComp, outer, null)
+            var item = createTemporaryObject(menuComp, slot, { useStubEntries: true })
+            item.menuHandle = { id: "stub" }
+            item.entries = [fakeEntry("Top"), parent, fakeEntry("Bottom")]
+            wait(0)
+            // The band must genuinely sit outside the narrow slot.
+            var band = findByName(item, "traySubmenuColumnCatcher")
+            verify(band !== null, "no column band")
+            compare(band.x, 244)
+            verify(band.x + band.width > slot.width,
+                "probe is not testing an overflowing band")
+            item.submenuEntries = [fakeEntry("Child")]
+            item.openSubmenu(parent, null)
+            var ready = false
+            for (var i = 0; i < 300 && !ready; i++) {
+                wait(10)
+                var s = findByName(item, "traySubmenuSurface")
+                var f = findByName(item, "traySubmenuFlick")
+                // Settled, not merely revealed: the panel's slide is a transform,
+                // so mapToItem mid-flight reports a position still over the
+                // primary and the probe would silently test the wrong pixel.
+                ready = s && s.visible && f && f.height > 0 && item.submenuPhase === "open"
+            }
+            verify(ready, "submenu never revealed inside the narrow slot")
+            var flick = findByName(item, "traySubmenuFlick")
+            var target = flick.mapToItem(slot, 40, 16)
+            verify(target.x > slot.width,
+                "probe row is not actually outside the narrow slot")
+            verify(pollAct(function() { mouseMove(slot, target.x, target.y) },
+                function() { return item.highlightedSubmenuRow !== null }),
+                "a narrow ancestor blocked hover on the overflowing column")
         }
         function test_lateBatchAfterFlightStillOpensAndTakesHover() {
             // Coldest first-open shape: the DBus fetch outlasts the flight, so

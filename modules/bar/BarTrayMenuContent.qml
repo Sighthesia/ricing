@@ -426,6 +426,8 @@ Item {
             // delivers right after the enter does not read as movement.
             lastColumnX = mouseX
             lastColumnY = mouseY
+            if (debugLeave)
+                console.log("[afloat:TrayDebug] enter column-band at " + mouseX + "," + mouseY)
             root.hoverAtSubColumn(mouseX, mouseY)
         }
         onPositionChanged: {
