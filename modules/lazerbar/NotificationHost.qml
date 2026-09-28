@@ -59,12 +59,9 @@ Variants {
             // Publish the claimed region in screen coordinates for diagnostics.
             // Without this, "the pointer was stolen by another surface" stays an
             // assumption; with it, a departure landing inside this rect names
-            // the thief. The stack is mapped through the window because the
-            // region the compositor sees is in surface-local coordinates.
-            onWidthChanged: publishClaimedRegion()
-            onXChanged: publishClaimedRegion()
-            onYChanged: publishClaimedRegion()
-            Component.onCompleted: publishClaimedRegion()
+            // the thief. Bound to the STACK's geometry, not the window's: the
+            // window is anchors-driven and has no x/y to observe, while the
+            // region the compositor sees is the stack's.
             function publishClaimedRegion() {
                 if (notificationStack.implicitHeight <= 0) {
                     PopupInputArbitration.releaseInputRegion()
@@ -75,6 +72,18 @@ Variants {
                     notificationStack.width, notificationStack.height)
             }
             onVisibleChanged: publishClaimedRegion()
+
+            // Re-publish whenever the claimed rect moves or resizes. A card
+            // appearing is exactly the moment the region becomes non-empty and
+            // the compositor re-evaluates pointer focus, so a stale rect here
+            // would name the wrong thief at the wrong time.
+            Connections {
+                target: notificationStack
+                function onXChanged() { notificationWindow.publishClaimedRegion() }
+                function onYChanged() { notificationWindow.publishClaimedRegion() }
+                function onWidthChanged() { notificationWindow.publishClaimedRegion() }
+                function onImplicitHeightChanged() { notificationWindow.publishClaimedRegion() }
+            }
 
             // Stack only the cards; the stack keeps its content height so the
             // input mask stays limited to visible notification cards. It hugs
