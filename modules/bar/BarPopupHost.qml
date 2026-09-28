@@ -187,7 +187,7 @@ PanelWindow {
             "body": Math.round(Number(tc.submenuBodyFull)),
             "surface": root._debugRect(tc.submenuSurface),
             "surfaceVisible": tc.submenuSurface.visible === true,
-            "pendingVisible": tc.submenuPendingCatcher.visible === true,
+            "column": root._debugRect(tc.submenuColumn),
             "viewH": view ? Math.round(Number(view.height)) : -1,
             "viewContentH": view ? Math.round(Number(view.contentHeight)) : -1,
             "viewY": view ? Math.round(Number(view.y)) : -1,

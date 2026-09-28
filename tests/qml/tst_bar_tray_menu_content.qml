@@ -307,19 +307,21 @@ Item {
             compare(item.submenuEntry !== null, true)
             tryCompare(item, "submenuEntry", null, Lazer.MotionTokens.settingsSidebarFade + 300)
         }
-        function test_pendingCatcherBridgesColdFetch() {
+        function test_columnCatcherBridgesColdFetch() {
             Lazer.MotionTokens.reducedMotionOverride = true
             var parent = fakeEntry("More", { hasChildren: true })
             var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
             wait(0)
             item.openSubmenu(parent, null)
-            // Cold fetch: no rows yet, surface hidden, pending bridge live.
-            var pending = findByName(item, "traySubmenuPendingCatcher")
-            verify(pending !== null)
-            compare(pending.visible, true)
+            // Cold fetch: no rows yet, so the panel stays hidden — but the
+            // column band beside the primary is still live input.
+            var column = findByName(item, "traySubmenuColumnCatcher")
+            verify(column !== null)
+            compare(column.visible, true)
             compare(findByName(item, "traySubmenuSurface").visible, false)
-            compare(pending.x, findByName(item, "traySubmenuSurface").x)
-            compare(pending.width, findByName(item, "traySubmenuSurface").width)
+            // The band starts flush with the primary and spans the panel width.
+            compare(column.x, findByName(item, "trayMenuFlick").width)
+            compare(column.width, findByName(item, "traySubmenuSurface").width + 8)
             // Traversal parks the cursor; the late batch highlights from it.
             // Poll like the long-menu test: delegates position over frames.
             // Sample from live geometry: the anchor pin lands at open time.
@@ -340,8 +342,8 @@ Item {
                 hl = item.highlightedSubmenuRow
             }
             verify(hl !== null)
-            // Handoff: surface owns input again, row highlighted, taps live.
-            compare(pending.visible, false)
+            // Rows landed: the row under the remembered point is highlighted
+            // and taps are live, with no handoff step in between.
             compare(findByName(item, "traySubmenuSurface").visible, true)
             var surf = findByName(findByName(item, "traySubmenuSurface"), "trayMenuRowSurface")
             verify(surf !== null)
@@ -352,10 +354,12 @@ Item {
         function test_transitToSubmenuBouncesBackFromClosing() {
             var parent = fakeEntry("More", { hasChildren: true })
             var item = makeMenu([parent])
-            // Side-aware transit strip geometry (right side by default).
-            compare(findByName(item, "traySubmenuTransitCatcher").x, findByName(item, "trayMenuFlick").width)
+            // Side-aware column geometry: flush with the primary on the right,
+            // mirrored to the panel's outer edge when flipped left.
+            var column = findByName(item, "traySubmenuColumnCatcher")
+            compare(column.x, findByName(item, "trayMenuFlick").width)
             item.submenuFlipped = true
-            compare(findByName(item, "traySubmenuTransitCatcher").x, -8)
+            compare(column.x, -(findByName(item, "traySubmenuSurface").width + 8))
             item.submenuFlipped = false
             // Fully closed with no entry: deliberate no-op.
             item.transitToSubmenu()
@@ -715,6 +719,66 @@ Item {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
         }
+        function test_columnBandCatchesFastCrossingIntoRows() {
+            // The panel hangs from its trigger row's bottom edge, so travelling
+            // right along the row crosses band that the panel does not paint.
+            // Input has to belong to the whole band, not to the painted panel:
+            // a single fast motion that skipped the old 8px transit strip used
+            // to leave the arrival unregistered, so nothing highlighted and
+            // nothing was tappable when the pointer dropped into the rows.
+            Lazer.MotionTokens.reducedMotionOverride = true
+            try {
+                mouseMove(root, 380, 760); wait(20)
+                mouseMove(root, 8, 700); wait(20)
+                var parent = fakeEntry("More", { hasChildren: true })
+                var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+                var row = null
+                for (var i = 0; i < 200 && row === null; i++) {
+                    wait(10)
+                    var rows = primaryRowsOf(item)
+                    if (rows.length >= 3 && rows[1].height > 0)
+                        row = rows[1]
+                }
+                verify(row !== null, "primary rows never laid out")
+                var rowPoint = row.mapToItem(item, 40, 16)
+                hoverFresh(item, rowPoint.x, rowPoint.y)
+                item.submenuEntries = [fakeEntry("Child")]
+                var open = false
+                for (var j = 0; j < 300 && !open; j++) {
+                    wait(10)
+                    var s = findByName(item, "traySubmenuSurface")
+                    var f = findByName(item, "traySubmenuFlick")
+                    open = s && s.visible && f && f.height >= 32
+                }
+                verify(open, "submenu never revealed")
+                var column = findByName(item, "traySubmenuColumnCatcher")
+                // The band starts flush with the primary, so the whole travel
+                // line beside the row belongs to the second level.
+                compare(column.x, findByName(item, "trayMenuFlick").width)
+                // One jump past the old strip, along the trigger row's own y.
+                var lineY = rowPoint.y
+                var jumped = column.mapToItem(item, 60, lineY)
+                verify(pollAct(function() { mouseMove(item, jumped.x, jumped.y) },
+                    function() { return item.lastCursorX >= 0 }),
+                    "the travel line beside the trigger row is not live input")
+                // Drop into the first row: highlight and tap must both work.
+                var flick = findByName(item, "traySubmenuFlick")
+                var target = flick.mapToItem(item, 40, 16)
+                verify(pollAct(function() { mouseMove(item, target.x, target.y) },
+                    function() { return item.highlightedSubmenuRow !== null }),
+                    "submenu rows never took the hover after a fast crossing")
+                var dismissed = 0
+                item.dismissRequested.connect(function() { dismissed++ })
+                verify(pollAct(function() { mouseClick(item, target.x, target.y) },
+                    function() { return dismissed === 1 }),
+                    "submenu row click never landed after a fast crossing")
+                // The click must not bounce the retracting submenu back open.
+                wait(80)
+                compare(item.submenuPhase !== "open", true)
+            } finally {
+                Lazer.MotionTokens.reducedMotionOverride = false
+            }
+        }
         function test_submenuTakesHoverOnArrivalFromPrimary() {
             // Realistic arrival path: hover the trigger row, travel right
             // along that row's own y (where the panel is not painted yet, so
@@ -804,15 +868,16 @@ Item {
                 verify(row !== null, "primary rows never laid out")
                 var rowPoint = row.mapToItem(item, 40, 16)
                 hoverFresh(item, rowPoint.x, rowPoint.y)
-                // Summoned with no content yet: the panel stays hidden and the
-                // bridge mirrors its geometry.
+                // Summoned with no content yet: the panel stays hidden while the
+                // column band beside the primary is already live input.
                 var summoned = false
                 for (var j = 0; j < 200 && !summoned; j++) {
                     wait(10)
                     summoned = findByName(item, "traySubmenuSurface")
-                        && findByName(item, "traySubmenuPendingCatcher").visible
+                        && !findByName(item, "traySubmenuSurface").visible
+                        && findByName(item, "traySubmenuColumnCatcher").visible
                 }
-                verify(summoned, "cold panel never exposed its bridge")
+                verify(summoned, "cold panel never exposed its column band")
                 // Arrive where the rows will be, before they exist.
                 var surface = findByName(item, "traySubmenuSurface")
                 var target = surface.mapToItem(item, 40, 48 + 8 + 16)

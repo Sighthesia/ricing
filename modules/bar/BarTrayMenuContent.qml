@@ -201,10 +201,10 @@ Item {
     readonly property alias submenuSurface: submenuSurface
     readonly property alias submenuAnimation: submenuAnimation
     readonly property alias menuFace: menuFace
-    // Input-side aliases: the cold-fetch bridge and the rows viewport are the
-    // two owners that decide whether a late arrival can be reached at all.
     readonly property alias submenuViewport: submenuFlick
-    readonly property alias submenuPendingCatcher: submenuPendingCatcher
+    // Input-side alias: the column catcher is the second level's only input
+    // owner, so its geometry is what diagnostics need to judge an arrival.
+    readonly property alias submenuColumn: submenuColumnCatcher
     readonly property real maxMenuHeight: Screen.desktopAvailableHeight > 0
         ? Math.max(180, Screen.desktopAvailableHeight * 0.7) : 420
     signal dismissRequested()
@@ -237,6 +237,7 @@ Item {
             // activation exits with the shared retract motion (data releases
             // at progress 0) instead of vanishing with the host. No-op when
             // no submenu is open.
+            dismissingForLeaf = true
             closeSubmenu()
             dismissRequested()
         }
@@ -266,6 +267,9 @@ Item {
         }
         submenuEntry = entry
         pinAnchor(row)
+        // A fresh summon from hover clears the leaf-dismiss guard; the bounce
+        // path never reaches here (transitToSubmenu returns early instead).
+        dismissingForLeaf = false
         // Match the primary content layer: 500ms, OutCubic in.
         submenuAnimation.duration = Lazer.MotionTokens.reducedMotion ? 0 : Lazer.MotionTokens.settingsSidebarFade
         submenuAnimation.easing.type = Easing.OutCubic
@@ -384,76 +388,98 @@ Item {
         onPositionChanged: { root.rememberCursor(mouseX, mouseY); root.hoverAtCatcher(mouseY + menuFlick.contentY) }
         onExited: root.hoverLeaveCatcher()
     }
-    // Transit strip: the bridge zone toward the submenu, side-aware so the
-    // outer margin never resurrects. Entering it while a submenu is
-    // mid-retract bounces back open (slow arrivals killed just short);
-    // otherwise it is a deliberate no-op. Leaving it must NOT forget the
-    // cursor: this strip sits between the two panels, so every traversal to
-    // the submenu crosses it, and wiping the memory there strands the second
-    // level's highlight (the only re-arm channel when the arrival itself
-    // produces no catcher event). Real departures are handled by the primary
-    // catcher's exit and the host close timer.
+    // Submenu column: the whole band beside the primary is one input surface,
+    // not just the painted panel. The panel hangs from its trigger row's bottom
+    // edge, so the travel line (the row's own height) and the title band sit
+    // above it: with input owned only by the panel, a pointer crossing right
+    // along the row passed through a dead gap, the primary's exit wiped the
+    // memory on the way out, and nothing re-armed it — no highlight and no tap
+    // until the pointer came back down into the rows. A fast crossing also
+    // skipped the old 8px transit strip entirely, since a single motion event
+    // never rests inside it.
+    //
+    // This catcher is always alive, so it also covers the cold first-open
+    // window (the panel is hidden until its rows arrive) and makes the
+    // panel->bridge handoff a non-event. Taps pass through to the rows.
     MouseArea {
-        id: transitCatcher
-        objectName: "traySubmenuTransitCatcher"
-        x: root.submenuFlipped ? -root.submenuPad : menuFlick.width
-        y: menuFlick.y
-        width: root.submenuPad
-        height: menuFlick.height
+        id: submenuColumnCatcher
+        objectName: "traySubmenuColumnCatcher"
+        x: root.submenuFlipped ? -(submenuSurface.width + root.submenuPad) : menuFlick.width
+        y: 0
+        width: submenuSurface.width + root.submenuPad
+        // Spans the primary's rows and the panel's full extent: on a short
+        // primary the panel's minimum surface reaches below the last row, and
+        // input must still be live where it is painted.
+        height: Math.max(menuFlick.height, submenuSurface.y + submenuSurface.height)
         z: 4
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
-        onEntered: { root.rememberCursor(mouseX + transitCatcher.x, mouseY + transitCatcher.y); root.transitToSubmenu() }
+        // Arrival handling. The bounce requires real movement inside the band:
+        // the band's extent follows the panel, so opening or retracting it can
+        // slide the boundary under a stationary pointer, and Qt re-delivers a
+        // position event at the same spot — bouncing on that would pull a
+        // retracting submenu straight back open.
+        property int lastColumnX: -1
+        property int lastColumnY: -1
+        onEntered: {
+            // Seed with the crossing point itself, so the position event Qt
+            // delivers right after the enter does not read as movement.
+            lastColumnX = mouseX
+            lastColumnY = mouseY
+            root.hoverAtSubColumn(mouseX, mouseY)
+        }
+        onPositionChanged: {
+            var moved = mouseX !== lastColumnX || mouseY !== lastColumnY
+            lastColumnX = mouseX
+            lastColumnY = mouseY
+            root.hoverAtSubColumn(mouseX, mouseY)
+            if (moved)
+                root.transitToSubmenu()
+        }
+        onExited: {
+            root.highlightedSubmenuRow = null
+            root.forgetCursor()
+        }
     }
     function transitToSubmenu() {
+        // A leaf activation dismisses the whole popup; a transit arrival
+        // landing in that window must not bounce the retracting submenu back
+        // open (the click itself lands inside the column band).
+        if (dismissingForLeaf)
+            return
         if (submenuEntry && submenuPhase !== "open")
             openSubmenu(submenuEntry, submenuAnchorRow)
     }
-    // Cold-fetch bridge: while the second level travels but its rows have
-    // not arrived yet the surface stays hidden (no blank panel) and its own
-    // catcher is deaf. This catcher mirrors the surface geometry so the
-    // traversal still lands and remembers the cursor; the late batch then
-    // highlights via resolveSubHoverFromMemory. Mutually exclusive with the
-    // surface visibility, so it never starves the real catcher.
-    MouseArea {
-        id: submenuPendingCatcher
-        objectName: "traySubmenuPendingCatcher"
-        x: submenuSurface.x
-        y: submenuSurface.y
-        width: submenuSurface.width
-        height: submenuSurface.height
-        z: 4
-        visible: root.submenuProgress > 0.01 && !submenuSurface.visible
-        hoverEnabled: true
-        acceptedButtons: Qt.NoButton
-        onEntered: root.rememberCursor(mouseX + x, mouseY + y)
-        onPositionChanged: root.rememberCursor(mouseX + x, mouseY + y)
-        onExited: {
-            // Handoff: the real surface just claimed this area, so the arrival
-            // must survive it. Keeping the memory lets the late batch highlight
-            // under a stationary pointer (the cold first-open path spends
-            // hundreds of ms here, so this is the normal case, not an edge
-            // one). A departure that leaves the panel hidden still clears it.
-            if (!submenuSurface.visible) {
-                root.forgetCursor()
-                return
-            }
-            Qt.callLater(root.resolveSubHoverFromMemory)
-        }
-    }
+    // Set between a leaf activation and the next genuine summon; see
+    // transitToSubmenu. Cleared when a hover summons the panel again or when
+    // the retraction has fully released.
+    property bool dismissingForLeaf: false
     // Submenu hover state lives here at root level: functions nested inside
     // the surface are unreachable via root.* and fail silently.
     property Item highlightedSubmenuRow: null
-        // Panel-relative hover (the catcher fills the whole panel): map the
-        // point into the rows viewport's content space and refresh the root
-        // pointer memory. Hovering the title band clears the row highlight
-        // but keeps the memory fresh, which is what lets the second level
-        // re-arm its highlight after an arrival that produced no row event.
-        function hoverAtSubCatcher(panelY) {
-            root.rememberCursor(subHoverCatcher.mouseX + submenuSurface.x,
-                subHoverCatcher.mouseY + submenuSurface.y)
-            highlightedSubmenuRow = rowAtContentY(submenuColumn, "traySubmenuSection",
-                panelY - submenuFlick.y + submenuFlick.contentY).row
+        // Column-relative hover (the catcher spans the whole band beside the
+        // primary): refresh the root pointer memory, then map into the rows
+        // viewport. Points above the panel or past its rows map to no row, so
+        // travelling along the trigger row keeps the memory without lighting
+        // anything, and dropping into the rows lights the row under the cursor.
+        function hoverAtSubColumn(columnX, columnY) {
+            // Catcher-relative in, root-relative out: the surface and the
+            // memory both live in root coordinates.
+            var rootX = submenuColumnCatcher.x + columnX
+            var rootY = submenuColumnCatcher.y + columnY
+            rememberCursor(rootX, rootY)
+            highlightedSubmenuRow = null
+            if (!submenuSurface.visible)
+                return
+            var sx = rootX - submenuSurface.x
+            var sy = rootY - submenuSurface.y
+            var inX = submenuFlipped ? (sx >= 0 && sx <= submenuSurface.width + 12)
+                : (sx >= -12 && sx <= submenuSurface.width)
+            var fy = sy - submenuFlick.y + submenuFlick.contentY
+            if (!inX || fy < 0 || fy >= submenuFlick.height)
+                return
+            highlightedSubmenuRow = rowAtContentY(submenuColumn,
+                "traySubmenuSection", fy).row
         }
     // Re-resolve under a stationary cursor from memory (root coords): the
     // reveal sliding under it and data rebuilds generate no hover events.
@@ -542,22 +568,15 @@ Item {
             return
         forgetCursor()
     }
-    // Is the remembered point still over the second level (its panel, or the
-    // cold-fetch bridge standing in for it)? Used to decide whether a primary
-    // exit means "left the menu" or "moved across to the submenu".
+    // Is the remembered point still over the second level's column (the input
+    // band beside the primary)? Used to decide whether a primary exit means
+    // "left the menu" or "moved across to the submenu".
     function pointerOverSubmenu() {
         if (lastCursorX < 0 || submenuProgress <= 0.01)
             return false
-        if (submenuSurface.visible) {
-            var sx = lastCursorX - submenuSurface.x
-            var sy = lastCursorY - submenuSurface.y
-            return sx >= -12 && sx <= submenuSurface.width
-                && sy >= -12 && sy <= submenuSurface.height
-        }
-        var bridge = submenuPendingCatcher
-        return bridge.visible
-            && lastCursorX >= bridge.x && lastCursorX <= bridge.x + bridge.width
-            && lastCursorY >= bridge.y && lastCursorY <= bridge.y + bridge.height
+        var column = submenuColumnCatcher
+        return lastCursorX >= column.x && lastCursorX <= column.x + column.width
+            && lastCursorY >= column.y && lastCursorY <= column.y + column.height
     }
     // Primary rebuilds (cold batches) under a stationary cursor.
     onMenuSectionsChanged: resolveHoverFromMemory()
@@ -740,28 +759,10 @@ Item {
             }
         }
 
-        // Submenu hover owner, mirroring the primary catcher: rows are pure
-        // display, highlight follows the mapped row. It covers the WHOLE
-        // panel, not just the rows viewport: the title band and the travel
-        // line above the panel are catcher-less otherwise, so a pointer
-        // arriving from the primary could reach the rows without the second
-        // level ever seeing a hover event (and with a stale pointer memory,
-        // since the strip's crossing no longer re-arms it). Ungated by phase
-        // (hidden rows paint under the opaque face anyway); taps stay gated.
-        MouseArea {
-            id: subHoverCatcher
-            objectName: "traySubmenuHoverCatcher"
-            anchors.fill: parent
-            z: 4
-            hoverEnabled: true
-            acceptedButtons: Qt.NoButton
-            onEntered: root.hoverAtSubCatcher(mouseY)
-            onPositionChanged: root.hoverAtSubCatcher(mouseY)
-            onExited: {
-                root.highlightedSubmenuRow = null
-                root.forgetCursor()
-            }
-        }
+        // Submenu hover lives one level up: traySubmenuColumnCatcher owns the
+        // whole band beside the primary, so this panel carries display only
+        // (title, rows, their tap handlers). Ungated by phase — hidden rows
+        // paint under the opaque face anyway; taps stay gated on phase.
         // Cold batches rebuild delegates under a stationary cursor: recompute
         // from remembered position instead of losing the highlight. (Handled
         // at root level; a nested Connections here proved unreliable.)
@@ -880,6 +881,7 @@ Item {
                 submenuEntry = null
                 submenuAnchorRow = null
                 submenuPhase = "closed"
+                dismissingForLeaf = false
             } else if (submenuProgress === 1) {
                 submenuPhase = "open"
                 root.resolveSubHoverFromMemory()
