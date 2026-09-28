@@ -877,6 +877,19 @@ Item {
                     })
                     root.check("input region does not follow the animating container",
                         uniqueWidths.length, 1)
+                    // The first open in a session commits the target geometry
+                    // before the content tree has laid out, so targetY and
+                    // targetHeight are still their property defaults. The
+                    // surface then maps against a region built from placeholders
+                    // — a 260x50 strip at the top-left of the screen — and the
+                    // pointer is lost before revealStartTimer fixes it up to
+                    // 960ms later. That is the whole of "only the first
+                    // expand": every later open maps with a real region.
+                    // The rebase-on-first-open invariant is asserted at the end of
+                    // the sequence, where mutating the shared host is safe.
+                    root.check("region item exists for the input mask",
+                        root.findByName(host.popupViewportItem,
+                            "popupInputRegion") !== null, true)
                 }
                 // The close rule: a leave reported from INSIDE the region is not
                 // the user leaving. Measured on the desktop as 1366.9,113.5 —
@@ -935,6 +948,8 @@ Item {
 
             // Leftward travel mirrors the track: the incoming layer enters
             // from the left edge and the outgoing exits right.
+            // NOTE: the first-open rebase assertion below mutates the shared
+            // host (it opens a popup), so it runs last in this sequence.
             host.transitionProgress = 0.5
             root.check("leftward exchange flips slide sign", host.contentSlideSign, -1)
             host.contentSlideProgress = 0.5
@@ -976,6 +991,25 @@ Item {
                     Math.max(Number(host.popupItem.sidebarLayer.implicitHeight),
                         Number(host.popupItem.sidebarLayer.height), 48) + ctxSlotHeight + 1)
                 root.startBottomBarChecks()
+                // Last, because it mutates the shared host: a first open commits
+                // its target geometry before the content has laid out, so
+                // targetY/targetHeight are placeholders and the surface maps
+                // against a region built from them — a 260x50 strip at the
+                // top-left, nowhere near the popup. The pointer is lost long
+                // before revealStartTimer corrects it. That is the whole of
+                // "only the first expand"; later opens map with a real region.
+                host._hasRevealed = false
+                host.open = false
+                host.surfaceActive = false
+                host.updateIntent({
+                    widgetId: "tray", instanceKey: "tray", kind: "hover",
+                    actionKind: "tray", anchorX: 1251
+                })
+                root.check("a first open homes the container onto its target",
+                    Math.abs(host.displayX - host.targetX) < 0.5, true)
+                root.check("a first open has a usable input region height",
+                    Number(root.findByName(host.popupViewportItem,
+                        "popupInputRegion").height) > 48, true)
             })
         })
     }

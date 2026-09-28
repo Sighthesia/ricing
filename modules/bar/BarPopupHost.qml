@@ -165,6 +165,11 @@ PanelWindow {
     // "the user left", which is wrong when the compositor dropped focus while
     // the pointer sat inside the region — this is what tells the two apart.
     property string _lastLeave: "none"
+    // Set once a reveal has actually run to the surface. The first open in a
+    // session is the only time the content tree has not laid out when the
+    // target geometry is committed, so it is the only time the input region
+    // would be built from placeholder values.
+    property bool _hasRevealed: false
     // The popup surface's own unfiltered pointer position, in container
     // coordinates. Survives the leave, so it records where the pointer was when
     // the surface lost it.
@@ -543,6 +548,18 @@ PanelWindow {
             root.currentIntent = intentObj
             root.applyIntentFields(intentObj)
             root.updateTargetGeometry(intentObj)
+            // First reveal after the surface has been torn down, or the very
+            // first one in a session: nothing has laid out yet, so targetY and
+            // targetHeight are still the property defaults (0 and 1). The
+            // surface maps against the input region built from them — a 260x50
+            // strip at the top-left of the screen, nowhere near the popup — and
+            // the pointer is gone before revealStartTimer corrects the target
+            // up to 960ms later. That is the whole of "only the first time":
+            // on every later open the content has already laid out and the
+            // region is correct at map time. Home the display onto the target
+            // before mapping, so the region is meaningful from the first frame.
+            if (isExiting || !root._hasRevealed)
+                root.rebaseGlide()
         } else if (isReplacement) {
             // intent = newest accepted for diagnostics; content stays on A
             // until the shared progress crosses the exchange threshold.
@@ -1302,6 +1319,10 @@ PanelWindow {
             }
             root.startReveal(0)
         }
+        if (!open)
+            root._hasRevealed = false
+        else
+            root._hasRevealed = true
     }
 
     // Release the flip once the container glides home after the submenu
