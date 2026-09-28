@@ -5,12 +5,15 @@ import "../../modules/lazerbar" as Lazer
 
 // Isolate settings controls from PanelWindow, mask, overlay coordination, and
 // persistent category pages while retaining a Flickable parent.
-Window {
+// The root must be an Item: qmltestrunner hosts the file in a QQuickView and
+// rejects any other root object ("invalid root object"), which is why this file
+// used to fail at compile() before a single assertion ran. A Window root would
+// also have to be `visible: true` for `when: windowShown` to fire, i.e. it would
+// pop a window on the user's live desktop during a test run.
+Item {
     id: host
     width: 520
     height: 420
-    visible: true
-    color: "#101014"
 
     Item {
         anchors.fill: parent

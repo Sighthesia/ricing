@@ -73,8 +73,10 @@ matches_filter() {
 PASS_COUNT=0
 FAIL_COUNT=0
 SKIP_COUNT=0
+QS_MODULE_COUNT=0
 FAILED_NAMES=()
 GUI_ONLY_NAMES=()
+QS_MODULE_NAMES=()
 
 # AppThemeService is a test seam: without this prefix it runs
 # apply_app_themes.py against the REAL ~/.config/kitty + gtk-3.0, so a test run
@@ -137,6 +139,14 @@ run_qml_tests() {
             printf '  \033[33mTIMEOUT\033[0m %-42s >%ss\n' "$name" "$TEST_TIMEOUT"
             FAIL_COUNT=$((FAIL_COUNT + 1))
             FAILED_NAMES+=("$name (timeout)")
+        elif grep -qE 'plugin "quickshell-[a-z-]*plugin" not found' "$report" \
+                && grep -qE '^FAIL!.*compile\(\)' "$report"; then
+            # qmltestrunner has no Quickshell plugin (it is linked into the `qs`
+            # binary), so any file touching Quickshell.* cannot load. Not a
+            # regression — report it as a coverage gap instead of red.
+            printf '  \033[35mn/a\033[0m     %-42s needs the Quickshell module\n' "$name"
+            QS_MODULE_COUNT=$((QS_MODULE_COUNT + 1))
+            QS_MODULE_NAMES+=("$name")
         elif [ -n "$totals" ] && ! grep -qE '^FAIL' "$report"; then
             printf '  \033[32mok\033[0m     %-42s %s\n' "$name" "$totals"
             PASS_COUNT=$((PASS_COUNT + 1))
@@ -251,11 +261,17 @@ run_gui_tier
 run_python_tests
 
 section "Summary"
-printf '  passed  %s\n  failed  %s\n  skipped %s (need a window; re-run with -g)\n' \
-    "$PASS_COUNT" "$FAIL_COUNT" "$SKIP_COUNT"
+printf '  passed   %s\n  failed   %s\n  n/a      %s (need the Quickshell module)\n  skipped  %s (need a window; re-run with -g)\n' \
+    "$PASS_COUNT" "$FAIL_COUNT" "$QS_MODULE_COUNT" "$SKIP_COUNT"
 if [ ${#FAILED_NAMES[@]} -gt 0 ]; then
     printf '\n  red:\n'
     for name in "${FAILED_NAMES[@]}"; do
+        printf '    - %s\n' "$name"
+    done
+fi
+if [ ${#QS_MODULE_NAMES[@]} -gt 0 ]; then
+    printf '\n  never ran (QtTest cannot load Quickshell.* — these need a root-level\n  `qs -p` harness instead; the contracts below are currently uncovered):\n'
+    for name in "${QS_MODULE_NAMES[@]}"; do
         printf '    - %s\n' "$name"
     done
 fi

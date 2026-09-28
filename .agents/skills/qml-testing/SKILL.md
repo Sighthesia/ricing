@@ -35,6 +35,33 @@ scripts/run-tests.sh -g               # ALSO run the window-based harnesses
 | Pure JS/QML logic (`tests/qml/tst_*.qml`, no Quickshell imports) | `QML_IMPORT_PATH=/usr/lib/qt6/qml QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR=/usr/share/fonts /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt` |
 | Service behavior needing Quickshell singletons (Mpris, Process, ...) | Root-level behavioral harness: `QT_QPA_PLATFORM=offscreen qs -p tst_media_binding.qml` (run from repo root) |
 
+## The Quickshell module ceiling (why some tests "never ran")
+
+`qmltestrunner` is plain Qt: the Quickshell plugin is **linked into the `qs`
+binary**, and `/usr/lib/qt6/qml/Quickshell/qmldir` only declares
+`linktarget quickshell-coreplugin`. So any QML file that transitively touches a
+`Quickshell.*` core type or a `Quickshell.Services.*` module cannot load:
+
+```
+ThemeSchemePicker.qml:2,1: module "Quickshell" plugin "quickshell-coreplugin" not found
+tst_media_service.qml:3,1: module "Quickshell.Services.Mpris" plugin "quickshell-service-mprisplugin" not found
+```
+
+Adding a path to `QML_IMPORT_PATH` does **not** help — the `.qmltypes` are
+there, the plugin is not. `scripts/run-tests.sh` reports these as `n/a` rather
+than red, because they are a coverage gap, not a regression.
+
+The fix for an individual file is to convert it from a `tests/qml/` QtTest file
+into a **root-level `qs -p` harness** (the pattern in "Behavioral harness
+pattern" below), because `qs` *does* provide the module. Do not invent a stub
+`Quickshell` module for tests: faking `MprisPlaybackState` or `Quickshell.env`
+produces false greens.
+
+Also: a QtTest file's **root object must be an `Item`** (qmltestrunner hosts it
+in a `QQuickView` and rejects anything else with `invalid root object`). A
+`Window` root does not merely fail — to make `when: windowShown` fire it needs
+`visible: true`, which maps a window on the user's live desktop.
+
 ## Never run a window-based harness unprompted
 
 Offscreen is the isolation mechanism, not a workaround: the offscreen platform
