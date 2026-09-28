@@ -165,6 +165,14 @@ Item {
     // panel shifts up instead. The rows viewport keeps title + padding
     // + at least one row, so hover and click delivery stay alive.
     property real submenuAnchorBottomY: 0
+    // The trigger row's top edge. The panel is positioned so its FIRST ROW
+    // lands exactly here, which is the whole point: moving the pointer right
+    // off a row must land on that row, because "move right" is the gesture
+    // every menu trains. With the panel hanging below the row's bottom edge
+    // instead, the travel line sat 11px above the panel and 67px above the
+    // first row, so traversing sideways could never highlight or activate
+    // anything — the panel was visible and completely inert.
+    property real submenuAnchorTopY: 0
     // Space below the anchor row inside the primary flick.
     readonly property real submenuAvailHeight: Math.max(0, menuFlick.height - submenuAnchorBottomY)
     // Full rows height (title/padding excluded), at least one row.
@@ -178,9 +186,12 @@ Item {
     readonly property real submenuSurfaceHeight: submenuAvailHeight >= submenuMinSurface
         ? Math.min(56 + submenuBodyFull + 8, submenuAvailHeight)
         : submenuMinSurface
-    readonly property real submenuSurfaceY: submenuAvailHeight >= submenuMinSurface
-        ? submenuAnchorBottomY
-        : Math.max(0, menuFlick.height - submenuMinSurface)
+    // Position: the title occupies the strip ABOVE the trigger row so the rows
+    // start on it. Two clamps keep it inside the menu — never above the top
+    // row, never past the bottom of the flick.
+    readonly property real submenuSurfaceY: Math.max(0, Math.min(
+        submenuAnchorTopY - submenuTitleHeight,
+        menuFlick.height - submenuSurfaceHeight))
     property real heldHeight: 420
     property real rawColumnHeight: menuColumn.implicitHeight
     property real submenuAnimationTarget: 0
@@ -220,6 +231,17 @@ Item {
         } catch (err) {}
         return null
     }
+    // The trigger row's TOP edge, which is what the first submenu row has to
+    // land on. Only the bottom edge was needed while the panel hung below the
+    // row; aligning rows needs the top.
+    function anchorTopFromRow(row) {
+        try {
+            var y = row.mapToItem(root, 0, 0).y
+            if (isFinite(y))
+                return y
+        } catch (err) {}
+        return null
+    }
 
     function activateEntry(entry, level, row) {
         if (!Logic.isEnabled(entry))
@@ -252,6 +274,9 @@ Item {
                 var bottom = anchorBottomFromRow(candidate)
                 if (bottom !== null)
                     submenuAnchorBottomY = bottom
+                var top = anchorTopFromRow(candidate)
+                if (top !== null)
+                    submenuAnchorTopY = top
                 submenuAnchorRow = candidate
             }
         }

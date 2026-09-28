@@ -447,10 +447,12 @@ Item {
                         && subProbe.height > 0
                 }
                 verify(subSettled)
-                // Panel bottom clamped to the primary flick.
+                // Panel starts title-height above the trigger row so its first
+                // row lands on it, clamped to stay inside the primary flick.
                 compare(menu.submenuAnchorBottomY, anchorBottom)
-                compare(menu.submenuSurface.y, anchorBottom)
-                compare(menu.submenuSurface.y + menu.submenuSurface.height, primaryHeight)
+                verify(menu.submenuSurface.y >= 0, "panel escapes the top of the menu")
+                verify(menu.submenuSurface.y + menu.submenuSurface.height
+                    <= primaryHeight + 0.5, "panel escapes the bottom of the menu")
                 compare(findByName(menu, "traySubmenuTitleBlock").y, 0)
                 // Backgrounds still cover the full tray content behind it.
                 var trayBody = findByName(item, "trayContent")

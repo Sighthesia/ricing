@@ -579,11 +579,21 @@ Item {
                 verify(anchor !== null)
                 verify(primaryHeight > 0)
                 var anchorBottom = anchor.mapToItem(item, 0, 32).y
+                var anchorTop = anchor.mapToItem(item, 0, 0).y
                 item.submenuEntries = submenu
                 item.openSubmenu(parent, anchor)
-                // Pin wiring: title top meets the anchor bottom edge.
+                // Pin wiring: both edges are recorded from the anchor row.
                 compare(item.submenuAnchorBottomY, anchorBottom)
-                compare(item.submenuSurface.y, anchorBottom)
+                compare(item.submenuAnchorTopY, anchorTop)
+                // The title sits ABOVE the trigger row so the first row lands on
+                // it — see test_firstSubmenuRowLandsOnTheTriggerRow. It is
+                // clamped twice: never above the top of the menu, and never
+                // past the bottom of the primary flick.
+                var flickH = item.submenuViewport
+                    ? item.submenuViewport.height : 0
+                var expectedTop = Math.max(0, Math.min(anchorTop - 48,
+                    flickH - item.submenuSurface.height))
+                compare(item.submenuSurface.y, expectedTop)
                 // Bottom-clamped to the primary flick: rows scroll inside.
                 var settled = false
                 for (var k = 0; k < 200 && !settled; k++) {
@@ -592,7 +602,13 @@ Item {
                     settled = probe && probe.contentHeight > probe.height && probe.height > 0
                 }
                 verify(settled)
-                compare(item.submenuSurface.y + item.submenuSurface.height, primaryHeight)
+                // The panel must stay inside the primary flick. It no longer
+                // pins its BOTTOM there: it starts title-height above the
+                // trigger row so the first row lands on it, and only gets
+                // pushed up when the bottom would otherwise overflow.
+                verify(item.submenuSurface.y >= 0, "panel escapes the top of the menu")
+                verify(item.submenuSurface.y + item.submenuSurface.height
+                    <= primaryHeight + 0.5, "panel escapes the bottom of the menu")
                 var flick = findByName(item, "traySubmenuFlick")
                 verify(flick.contentHeight > flick.height)
                 // Title stays pinned to the panel top.
@@ -622,11 +638,14 @@ Item {
             }
             verify(anchor2 !== null)
             verify(primary2 > 0)
-            var anchorBottom2 = anchor2.mapToItem(item2, 0, 32).y
+            var anchorTop2 = anchor2.mapToItem(item2, 0, 0).y
             item2.submenuEntries = submenu
             item2.openSubmenu(parent, anchor2)
             compare(item2.submenuPhase, "opening")
-            compare(item2.submenuSurface.y, anchorBottom2)
+            // Top row of the list: the title-height above it would leave the
+            // menu, so the panel clamps to the top rather than escaping.
+            verify(anchorTop2 < 48, "this anchor is no longer the top row")
+            compare(item2.submenuSurface.y, 0)
             tryCompare(item2, "submenuPhase", "open", 1500)
             // Submenu layout trails the reveal: wait until rows overflow
             // the clamped viewport before asserting final geometry.
@@ -637,7 +656,11 @@ Item {
                 settled2 = probe2 && probe2.contentHeight > probe2.height && probe2.height > 0
             }
             verify(settled2)
-            compare(item2.submenuSurface.y + item2.submenuSurface.height, primary2)
+            // Same containment contract as above: inside the flick, not pinned
+            // to its bottom edge.
+            verify(item2.submenuSurface.y >= 0, "panel escapes the top of the menu")
+            verify(item2.submenuSurface.y + item2.submenuSurface.height
+                <= primary2 + 0.5, "panel escapes the bottom of the menu")
         }
         function test_realSubmenuPointerHoverAndClick() {
             Lazer.MotionTokens.reducedMotionOverride = true
@@ -1100,6 +1123,52 @@ Item {
             var flickHost = findSectionHost(flick)
             compare(item._countNamed(flickHost, "traySubmenuSection") > 0, true,
                 "the section host holds no sections, so the mapper cannot work")
+        }
+        function test_firstSubmenuRowLandsOnTheTriggerRow() {
+            // The gesture every menu trains: move the pointer right off a row
+            // and it must arrive on that row. Hanging the panel below the row's
+            // bottom edge put the travel line above the panel and ~67px above
+            // the first row, so a sideways traverse could never highlight or
+            // activate anything — the panel was visible and inert.
+            mouseMove(root, 380, 760); wait(20)
+            mouseMove(root, 8, 700); wait(20)
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+            item.submenuEntries = [fakeEntry("Child")]
+            var row = null
+            for (var i = 0; i < 300 && row === null; i++) {
+                wait(10)
+                var rows = primaryRowsOf(item)
+                if (rows.length >= 3 && rows[1].height > 0)
+                    row = rows[1]
+            }
+            verify(row !== null, "primary rows never laid out")
+            var rowPoint = row.mapToItem(item, 40, 16)
+            item.openSubmenu(parent, row)
+            var settled = false
+            for (var j = 0; j < 300 && !settled; j++) {
+                wait(10)
+                settled = item.submenuPhase === "open" && item.submenuInteractable
+            }
+            verify(settled, "submenu never settled")
+            var surface = findByName(item, "traySubmenuSurface")
+            verify(surface !== null, "no submenu surface")
+            // The first row must share the trigger row's band, so a pointer
+            // that simply carries on going right lands on it.
+            var firstRowY = surface.y + 48 + 8
+            verify(Math.abs(firstRowY - rowPoint.y) < row.height,
+                "first submenu row does not overlap the trigger row (panelY="
+                + Math.round(surface.y) + " rowY=" + Math.round(rowPoint.y) + ")")
+            // And prove the gesture: no downward nudge, just across.
+            hoverFresh(item, rowPoint.x, rowPoint.y)
+            // Layout position, not mapToItem: the panel's slide is a transform,
+            // so a mapped probe can report a position still in flight.
+            var target = { x: surface.x + 40, y: surface.y + 48 + 8 + 16 }
+            verify(Math.abs(target.y - rowPoint.y) < row.height,
+                "the probe point is not on the trigger row's line")
+            verify(pollAct(function() { mouseMove(item, target.x, target.y) },
+                function() { return item.highlightedSubmenuRow !== null }),
+                "moving right along the trigger row's line highlighted nothing")
         }
         function test_scrollableSubmenuRowStaysTappable() {
             // A scrollable submenu must still take taps: the Flickable claims
