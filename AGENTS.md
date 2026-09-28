@@ -21,6 +21,52 @@ Afloat is a Wayland desktop shell built with **Quickshell** (QML), targeting the
 - Python: `python3 -m pytest scripts/tests/`.
 - **After every QML change**, run the relevant test file(s) and fix WARN/ERROR output before finishing.
 
+## Never disturb the live session (read before running anything)
+
+A test that maps a real window is indistinguishable, to the user, from their
+shell misbehaving. Offscreen is the mechanism that prevents it: the offscreen
+platform has no layer-shell backend, so a window-based harness *fails to load*
+instead of painting over the desktop. Never defeat it.
+
+**Off limits — never run unprompted, and never inside automation:**
+
+| File | What it does to the live session |
+| --- | --- |
+| `lock-test.qml` | Mounts `Lock` and, with `AFLOAT_LOCK_SELFTEST=1`, **grabs the session lock and blacks out the screen for 5s**. Manual-only; ask the user first. |
+| `tst_bar_popup_host.qml`, `tst_bar_two_layer_popup.qml`, `tst_real_volume.qml`, `tst_top_volume_half.qml` | Drive `BarPopupHost.surfaceActive` → a real full-width popup panel flashes over the bar. |
+| `tst_network_visual.qml`, `tst_loading_ring_visual.qml`, `tst_loading_ring_wiring.qml`, `tst_network_popup.qml` | Declare a `PanelWindow` with an opaque background — a solid rectangle painted over the output while they run. |
+
+These run only via `scripts/run-tests.sh -g`, which prints a warning naming each
+file first. Everything else is headless-safe: the `tests/qml/` suite, the other
+root `tst_*.qml` harnesses, and the ad-hoc probes (`ghost_race_harness.qml`,
+`harness_media_char.qml`, `clock_scene_probe.qml`, `launcher_churn_stress.qml`,
+`launcher_rewrite_stress.qml`, `launcher_launch_e2e.qml` — the last three only
+write inside `/tmp/opencode/xdg-data/`, never your real desktop entries).
+
+Rules when **adding** a test:
+
+- Root-level `tst_*.qml` only, and only if it needs Quickshell singletons; a
+  pure-logic test belongs in `tests/qml/`.
+- Never give a `tests/qml/` file a `Window` root. QtTest hosts the file in a
+  `QQuickView` and rejects any other root ("invalid root object"), and the
+  `visible: true` you would add to make `when: windowShown` fire maps a window
+  on the live desktop. Use an `Item` root sized to the viewport.
+- If it instantiates `PanelWindow` / `PopupWindow` / `WlSessionLockSurface`
+  (directly or transitively, e.g. via `BarPopupHost` or anything under
+  `modules/lock/`), it is window-only by definition. Name it `tst_*.qml` at the
+  repo root so the runner auto-classifies it, and add a line to the table above.
+- Assert geometry only after it settles: a QML `TestCase` function does not run
+  the event loop, so reading a property that a `Behavior` animation drives
+  returns the pre-change value. Use `tryCompare` / `tryVerify` / an explicit
+  `wait(MotionTokens.<duration>)`, and reset anything a test function mutates
+  (a sibling test's `init()` will not do it for you).
+- Run through the runner so `AFLOAT_APP_THEME_PREFIX` points at a throwaway
+  prefix; without it `AppThemeService` restyles your real kitty/GTK config.
+- A test must be green the first time it runs. "It was red when I committed it"
+  means it never executed (the suite could not load) or it was written against
+  behaviour that had already changed — both are how the current
+  `tst_lazer_settings_controls` debt accumulated.
+
 ## Gotchas
 
 - QML singletons are lazy: a bare reference can be dropped without instantiating. `shell.qml` injects `LazerTheme.settingsService/colorService` and calls `Services.AppThemeService.apply()` explicitly to force instantiation — follow that pattern.

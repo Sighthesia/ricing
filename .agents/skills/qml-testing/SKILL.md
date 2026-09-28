@@ -78,6 +78,29 @@ desktop: `tst_bar_popup_host`, `tst_bar_two_layer_popup`, `tst_real_volume`,
 Run them only via `scripts/run-tests.sh -g`, and only when the user asked for
 visual verification. **Do not** invoke `qs -p <window harness>` directly.
 
+Worse than a popup: `lock-test.qml` (root level, and deliberately not named
+`tst_*` so the runner never touches it). With `AFLOAT_LOCK_SELFTEST=1` it mounts
+`Lock` for real, grabs the session lock and blacks out the screen for 5s.
+Manual-only, ask first. The ad-hoc probes `ghost_race_harness.qml`,
+`harness_media_char.qml`, `clock_scene_probe.qml` and the `launcher_*_stress` /
+`launcher_launch_e2e` harnesses are headless-safe — the launcher ones only write
+inside `/tmp/opencode/xdg-data/`.
+
+## Writing a test that does not lie
+
+- A test must be **green the first time it runs**. Red-on-arrival means it never
+  executed (the suite could not load — see the module ceiling above) or it was
+  written against behaviour that had already changed. Both happened repeatedly in
+  `tst_lazer_settings_controls`, which accumulated 15 failures that way.
+- A QML `TestCase` function does **not** run the event loop, so a property that a
+  `Behavior` animation drives still reads its pre-change value. Assert with
+  `tryCompare` / `tryVerify` / an explicit `wait(MotionTokens.<duration>)`.
+- `init()` resets only what you put in it. A test function that mutates
+  `row.enabled`, `slider.defaultValue` or a `Qt.binding` permanently poisons
+  every test that runs after it.
+- Read the animation's *contract* (a token or a formula) rather than a copied
+  constant, so a deliberate retune does not silently desync the test.
+
 ## Do not let tests touch the real environment
 
 `AppThemeService` is a test seam: with `AFLOAT_APP_THEME_PREFIX` unset it runs
