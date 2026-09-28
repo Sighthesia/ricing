@@ -824,6 +824,30 @@ Item {
                 root.check("input region covers the submenu column right edge",
                     inputRegion.x + inputRegion.width
                         >= host.targetX + host.targetWidth, true)
+                // The snapshot's input block is the only thing that tells a
+                // dropped-by-the-compositor event apart from one the tray never
+                // received. A ReferenceError in it silently kills the whole
+                // timeline, which reads exactly like "nothing happened" — so
+                // assert the block actually builds while a submenu is open.
+                var snap = null
+                var snapError = ""
+                try {
+                    snap = host.debugSnapshot()
+                } catch (e) {
+                    snapError = String(e)
+                }
+                root.check("debug snapshot builds with a submenu open", snapError, "")
+                if (snap) {
+                    root.check("snapshot carries the input block", snap.input !== undefined, true)
+                    root.check("snapshot reports the active region",
+                        Number(snap.input.region.width) > 0, true)
+                    if (trayIncoming && trayIncoming.lastCursorX >= 0) {
+                        root.check("snapshot maps the cursor into the region",
+                            snap.input.cursorInRegion, true)
+                    }
+                    root.check("snapshot says the submenu column is inside the region",
+                        snap.input.columnInRegion, true)
+                }
             }
             if (trayIncoming)
                 trayIncoming.submenuProgress = 0

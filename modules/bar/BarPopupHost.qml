@@ -191,7 +191,7 @@ PanelWindow {
     // live inside the tray menu (cold fetch, anchor clamp, hover memory) are
     // invisible without this block.
     function _trayDebug() {
-        var tc = popupActions ? popupActions.trayMenuContent : null
+        var tc = root._trayContent()
         if (!tc)
             return null
         var anchorY = Number(tc.submenuAnchorBottomY)
@@ -223,7 +223,14 @@ PanelWindow {
         }
     }
 
+    // The tray handle, resolved here because both debug blocks need it and it
+    // is not a property of the root.
+    function _trayContent() {
+        return popupActions ? popupActions.trayMenuContent : null
+    }
+
     function debugSnapshot() {
+        var tc = root._trayContent()
         return {
             "tray": root._trayDebug(),
             "input": {
@@ -271,7 +278,16 @@ PanelWindow {
         if (!root.debugEnabled)
             return
         var entry = Object.assign({ "event": event }, payload || ({}))
-        var signature = JSON.stringify(entry)
+        // Build the payload OUTSIDE the guard: a ReferenceError or bad property
+        // read inside debugSnapshot() must not take the whole diagnostic stream
+        // down with it, because a silent stream looks exactly like "nothing
+        // happened" — the failure this channel exists to disprove.
+        var signature
+        try {
+            signature = JSON.stringify(entry)
+        } catch (e) {
+            signature = "{\"event\":\"" + event + "\",\"payloadError\":true}"
+        }
         if (signature === root._lastDebugSignature)
             return
         root._lastDebugSignature = signature
@@ -282,11 +298,20 @@ PanelWindow {
     }
 
     function emitDebugSnapshot() {
-        root.debugLog("snapshot", root.debugSnapshot())
+        var snap
+        try {
+            snap = root.debugSnapshot()
+        } catch (e) {
+            // Report the failure instead of going quiet: an empty timeline is
+            // indistinguishable from a healthy one where nothing changed.
+            snap = { "error": "snapshot failed", "detail": String(e) }
+        }
+        root.debugLog("snapshot", snap)
     }
 
     // Poll only while diagnostics are enabled so no extra owner or timer runs live.
     Timer {
+        id: debugPoll
         interval: 120
         repeat: true
         running: root.debugEnabled
