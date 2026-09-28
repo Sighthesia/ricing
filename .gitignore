@@ -22,3 +22,14 @@ __pycache__/
 
 # Workflow runtime state (ignore all runtime state)
 .just-demand/state/
+
+# Ad-hoc diagnostic output from manual probes and render checks. These land in
+# the repo root because qs/qmltestrunner harnesses resolve relative imports from
+# there, so keep them out of version control.
+/*-preview-*.png
+/chk*.png
+/q*.png
+/ring-preview-*.png
+/*.mp3
+/aubio.err
+/live_beats.txt
