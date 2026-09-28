@@ -177,6 +177,10 @@ PanelWindow {
     // pointer focus. _mapChurn only counts surface visibility, so it reported a
     // stable "1" while the region was in fact sweeping 260 -> 504.
     property int _regionCommits: 0
+    // The input region's rect in viewport coordinates, latched as one value per
+    // commit. Assigning an object swaps all four geometry properties at once,
+    // which is one region re-commit instead of four.
+    property var regionRect: ({ "x": 0, "y": 0, "width": 260, "height": 1 })
     readonly property Item _regionItem: popupInputRegion
     onSurfaceActiveChanged: root._noteMap("surfaceActive")
     // The popup surface's own unfiltered pointer position, in container
@@ -225,6 +229,14 @@ PanelWindow {
         function onYChanged() { root._regionCommits += 1 }
         function onWidthChanged() { root._regionCommits += 1 }
         function onHeightChanged() { root._regionCommits += 1 }
+    }
+
+    // The viewport's own y offset, needed to express a screen-space target as a
+    // viewport-space region rect. Read through a function because the region
+    // rect is latched inside computeAndCommitTargets, which can run before the
+    // viewport's geometry binding has settled on the first open.
+    function _viewportY() {
+        return popupViewport.y
     }
 
     function _noteMap(what) {
@@ -961,6 +973,13 @@ PanelWindow {
         // them from the full width (that re-centers and undoes the pin).
         root.targetX = geometry.x
         root.targetY = geometry.y
+        // Latch the region with the target it belongs to, in one assignment.
+        root.regionRect = {
+            "x": geometry.x,
+            "y": geometry.y - root._viewportY(),
+            "width": geometry.width,
+            "height": geometry.height,
+        }
         root.commitRevealDistance()
     }
 
@@ -1415,10 +1434,18 @@ PanelWindow {
         Item {
             id: popupInputRegion
             objectName: "popupInputRegion"
-            x: root.targetX
-            y: root.targetY - popupViewport.y
-            width: root.targetWidth
-            height: root.targetHeight
+            // Bound to a latched rect, not to the four target properties
+            // directly. Four independent bindings meant four separate geometry
+            // changes per commit, and every one of those silently re-commits
+            // wl_surface.set_input_region and makes the compositor re-evaluate
+            // pointer focus. Measured on the first open of a session: six region
+            // commits while the surface was still settling, then one more when
+            // the submenu was summoned. The target geometry converges over
+            // several property updates, so the region swept with it.
+            x: root.regionRect.x
+            y: root.regionRect.y
+            width: root.regionRect.width
+            height: root.regionRect.height
         }
 
         // Position the rendered popup inside the bar-edge clipping viewport.

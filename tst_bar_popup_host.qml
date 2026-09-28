@@ -877,6 +877,19 @@ Item {
                     })
                     root.check("input region does not follow the animating container",
                         uniqueWidths.length, 1)
+                    // The region must be latched to one rect per target commit.
+                    // Four independent bindings produced four geometry changes
+                    // per commit, and each one re-commits set_input_region and
+                    // makes the compositor re-evaluate pointer focus — measured
+                    // as six commits while a first open was still settling.
+                    var commitsBefore = host._regionCommits
+                    var targetBefore = { x: host.targetX, y: host.targetY,
+                        w: host.targetWidth, h: host.targetHeight }
+                    host.updateTargetGeometry(host.currentIntent, true)
+                    root.check("one target commit re-commits the region at most twice",
+                        host._regionCommits - commitsBefore <= 2, true)
+                    root.check("the latched region tracks the committed target x",
+                        host.regionRect.x, targetBefore.x)
                     // The first open in a session commits the target geometry
                     // before the content tree has laid out, so targetY and
                     // targetHeight are still their property defaults. The
