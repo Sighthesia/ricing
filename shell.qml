@@ -123,15 +123,24 @@ ShellRoot {
                 // Hand the bootstrap bridge this lock so a request taken while
                 // the chrome did not exist can be replayed into the real owner.
                 root.adoptLockOwner(lockModule)
-                // QML singletons are lazily instantiated and an unused bare
-                // reference can be dropped: run the sync service's entry points
-                // explicitly so the instance (and its Connections) come to life.
-                Services.AppThemeService.apply()
-                Services.AppThemeService.pushSystemTheme()
                 Services.LauncherService.primeApps()
                 Services.ClipboardService.warmup()
                 if (!lockModule.selfTestEnabled)
                     Qt.callLater(() => lockModule.startupLock())
+            }
+
+            // Defer external app-theme work until the chrome has yielded a few
+            // frames. gsettings, KDE/Niri sync, and template rendering are not
+            // part of the shell's first-paint path and can otherwise compete
+            // with the just-finished wallpaper transition.
+            Timer {
+                interval: LazerBar.MotionTokens.slow * 5
+                repeat: false
+                running: true
+                onTriggered: {
+                    Services.AppThemeService.apply()
+                    Services.AppThemeService.pushSystemTheme()
+                }
             }
 
             // Blurred/tinted wallpaper niri renders inside its overview backdrop.
