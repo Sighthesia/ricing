@@ -265,27 +265,82 @@ Item {
             verify(svc.lastScan)
         }
 
-        // The ring rides the foot label, so it must hold its slot: a `visible`
-        // flip would drop it from the Row and slide the label sideways.
+        // The ring rides the foot label, laid out against it rather than in
+        // front of it. The label is centred and its own text changes with the
+        // state, so the invariant is its *centre* holding still — its left edge
+        // legitimately moves when "Rescan" becomes "Scanning…".
         function test_bluetoothScanRingHoldsItsSlot() {
             var svc = makeBluetoothService()
             svc.scanningActive = false
             var item = createTemporaryObject(actionsComp, root, {
                 actionKind: "bluetooth", payload: { bluetoothService: svc }
             })
+            var rescan = findByName(item, "btRescanButton")
             var ring = findByName(item, "btScanRing")
             var label = findByName(item, "btRescanLabel")
             verify(ring !== null && label !== null)
             compare(ring.active, false, "ring is idle before the scan")
-            var beforeX = label.x
+            var beforeCentre = label.x + label.width / 2
             var beforeY = label.y
 
             svc.scanningActive = true
             wait(50)
             compare(ring.active, true, "ring runs during a scan")
             compare(findByName(item, "btRescanLabel").text, "Scanning…")
-            compare(label.x, beforeX, "label shifted horizontally when the ring appeared")
+            // Polled: the label re-measures for the wider text and re-centres
+            // on the next polish, so the first read after the change is stale.
+            tryVerify(function () {
+                return Math.abs((label.x + label.width / 2) - beforeCentre) <= 1
+            }, 1000, "label drifted off centre when the ring appeared ("
+                + (label.x + label.width / 2).toFixed(1)
+                + " vs " + beforeCentre.toFixed(1) + ")")
+            tryVerify(function () {
+                return Math.abs((label.x + label.width / 2) - rescan.width / 2) <= 1
+            }, 1000, "label is not centred while scanning")
             compare(label.y, beforeY, "label shifted vertically when the ring appeared")
+        }
+
+        // The ring holds its slot while idle, so centring the ring+label pair
+        // left the text ~11px right of centre whenever no scan was running.
+        // The label itself must be centred, and must stay centred while the
+        // ring comes and goes.
+        function test_bluetoothRescanLabelIsCentred() {
+            var svc = makeBluetoothService()
+            svc.scanningActive = false
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "bluetooth", payload: { bluetoothService: svc }
+            })
+            var rescan = findByName(item, "btRescanButton")
+            var label = findByName(item, "btRescanLabel")
+            verify(rescan !== null && label !== null)
+            tryVerify(function () {
+                var slack = Math.abs((label.x + label.width / 2) - rescan.width / 2)
+                return slack <= 1
+            }, 1000, "idle label off centre by "
+                + (Math.abs((label.x + label.width / 2) - rescan.width / 2)).toFixed(1) + "px")
+
+            svc.scanningActive = true
+            wait(50)
+            tryVerify(function () {
+                var slack = Math.abs((label.x + label.width / 2) - rescan.width / 2)
+                return slack <= 1
+            }, 1000, "scanning label off centre by "
+                + (Math.abs((label.x + label.width / 2) - rescan.width / 2)).toFixed(1) + "px")
+        }
+
+        // The ring rides beside the label, never on top of it.
+        function test_bluetoothRescanRingSitsBesideTheLabel() {
+            var svc = makeBluetoothService()
+            svc.scanningActive = true
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "bluetooth", payload: { bluetoothService: svc }
+            })
+            var ring = findByName(item, "btScanRing")
+            var label = findByName(item, "btRescanLabel")
+            verify(ring.x + ring.width <= label.x + 0.5,
+                "ring overlaps the label (ring right=" + (ring.x + ring.width)
+                + " label.x=" + label.x + ")")
+            compare(ring.x + ring.width + 6, label.x, "ring is 6px off the label's edge")
         }
 
         function test_bluetoothRescanInertWhileScanning() {

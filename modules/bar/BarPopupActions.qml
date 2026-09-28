@@ -1349,28 +1349,32 @@ Item {
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
-                    Row {
+                    // The label is what gets centred, not the ring+label pair.
+                    // The ring holds its slot while idle, so a centred pair
+                    // would leave the text sitting ~11px right of centre for as
+                    // long as no scan is running — "centred" and "does not move
+                    // when a scan starts" only coexist if the ring is laid out
+                    // against the label rather than in front of it.
+                    Text {
+                        id: btRescanLabelItem
+                        objectName: "btRescanLabel"
                         anchors.centerIn: parent
-                        spacing: 6
+                        text: root.btScanning ? "Scanning…" : "Rescan"
+                        color: LazerTheme.textPrimary
+                        font.pixelSize: 11
+                        font.bold: true
+                    }
 
-                        LazerLoadingRing {
-                            objectName: "btScanRing"
-                            width: 16
-                            height: 16
-                            // Hold the slot and fade via `active`; a `visible`
-                            // flip would drop it from the Row and slide the
-                            // label sideways as the scan starts.
-                            active: root.btScanning
-                            running: active
-                        }
-
-                        Text {
-                            objectName: "btRescanLabel"
-                            text: root.btScanning ? "Scanning…" : "Rescan"
-                            color: LazerTheme.textPrimary
-                            font.pixelSize: 11
-                            font.bold: true
-                        }
+                    LazerLoadingRing {
+                        objectName: "btScanRing"
+                        width: 16
+                        height: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: btRescanLabelItem.x - 6 - width
+                        // Anchored to the label's edge, so the text does not
+                        // depend on the ring's state at all.
+                        active: root.btScanning
+                        running: active
                     }
 
                     HoverHandler { id: btRescanHover }
