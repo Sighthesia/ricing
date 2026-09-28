@@ -61,9 +61,10 @@ Singleton {
     property bool nmcliAvailable: false
 
     // --- Internal bookkeeping ---
-    // A full radio rescan is expensive; the background tick reuses NM's cached
-    // scan results and only a deliberate refresh pays for a real one.
-    property bool _rescanRequested: true
+    // A full radio rescan is expensive and can stall the shell during chrome
+    // bootstrap; startup reads NetworkManager's cached results and deliberate
+    // popup refreshes still opt into a real scan.
+    property bool _rescanRequested: false
     property int _deviceWaitTries: 0
     property bool _awaitingDevice: false
     // The profile map was ranked before the adapter name was known.
@@ -101,7 +102,9 @@ Singleton {
         interval: 500
         running: root.nmcliAvailable
         repeat: false
-        onTriggered: if (root.wifiEnabled) root.requestScan(true, false)
+        // Do not wake the radio during startup. The first popup open requests a
+        // fresh scan through refreshForOpen(); this pass only warms cached data.
+        onTriggered: if (root.wifiEnabled) root.requestScan(false, false)
     }
 
     // Powering the radio back on must rebuild the list; the cached scan results
