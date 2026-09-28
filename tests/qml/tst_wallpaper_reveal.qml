@@ -29,6 +29,15 @@ Item {
         readonly property var maskSource: revealMask ? revealMask.maskSource : null
     }
 
+    // Separate instance for the boot-only asynchronous decode contract so the
+    // synchronous failure test keeps its original status timing.
+    Lazer.WallpaperReveal {
+        id: bootReveal
+        asynchronous: true
+        source: ""
+        radius: 0
+    }
+
     TestCase {
         name: "WallpaperReveal"
         when: windowShown
@@ -104,6 +113,9 @@ Item {
             compare(reveal.revealMask.source.asynchronous, false)
             compare(reveal.revealMask.maskSource.width, 400)
             compare(reveal.revealMask.maskSource.height, 240)
+            // Boot explicitly opts into asynchronous decode before waiting for
+            // Image.Ready; live switches retain the synchronous default.
+            compare(bootReveal.children[0].asynchronous, true)
         }
     }
 }

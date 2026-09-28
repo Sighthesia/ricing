@@ -350,6 +350,10 @@ Variants {
                 // The reveal image decodes synchronously, so the pixels are
                 // already in place by the time the circle starts growing.
                 wallpaperWindow.activeRevealOrigin = wallpaperWindow.resolveRevealOrigin()
+                // Only the initial boot image decodes asynchronously. Live
+                // switches remain synchronous so their no-gap handover stays
+                // unchanged.
+                reveal.asynchronous = !!wallpaperWindow.bootRevealActive
                 wallpaperWindow.pendingWallpaper = path
                 wallpaperWindow.revealRadius = 0
                 // The boot reveal waits for its own pixels; a live switch keeps

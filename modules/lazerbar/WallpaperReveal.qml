@@ -25,6 +25,9 @@ Item {
 
     // Incoming wallpaper path. The host clears it once the reveal is handed over.
     property string source: ""
+    // Boot can decode off the GUI path before the reveal starts; live swaps keep
+    // this false so their synchronous handover contract remains unchanged.
+    property bool asynchronous: false
     // Circle centre, in this item's coordinates.
     property point origin: Qt.point(0, 0)
     // Current circle radius in pixels; 0 means nothing is revealed.
@@ -42,7 +45,7 @@ Item {
         anchors.fill: parent
         source: root.source
         fillMode: Image.PreserveAspectCrop
-        asynchronous: false
+        asynchronous: root.asynchronous
         cache: false
         visible: false
     }
