@@ -16,6 +16,11 @@ function canLock(state) {
     return state === LockLogic.States.idle
 }
 
+function prepareFailsafeInterval(backgroundMode, backgroundModes, screenshotTimeoutMs, defaultIntervalMs) {
+    return backgroundMode === backgroundModes.screenshot
+            ? screenshotTimeoutMs + defaultIntervalMs : defaultIntervalMs
+}
+
 // A prepared snapshot may commit only when it still belongs to the active
 // request generation; stale reports never flip the session lock.
 function shouldCommit(requestGeneration, preparedGeneration) {

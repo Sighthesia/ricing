@@ -106,10 +106,6 @@ WlSessionLockSurface {
     }
 
     function startExit(): void {
-        // PROBE-EXIT: temporary unlock-path timing probe, remove after diagnosis.
-        console.log("[afloat:lock-exit-probe] startExit t=" + Date.now()
-            + " waveProgress=" + waveProgress + " exitStarted=" + exitStarted
-            + " reducedMotion=" + reducedMotion)
         if (exitStarted)
             return
         exitStarted = true
@@ -563,13 +559,7 @@ WlSessionLockSurface {
         to: 0
         duration: Lazer.MotionTokens.waveExit
         easing.type: Easing.OutQuad
-        onStarted: console.log("[afloat:lock-exit-probe] exitAnimation started t=" + Date.now()
-            + " from=" + from + " duration=" + duration)
-        onFinished: {
-            console.log("[afloat:lock-exit-probe] exitAnimation finished t=" + Date.now()
-                + " waveProgress=" + root.waveProgress)
-            root.requestRelease()
-        }
+        onFinished: root.requestRelease()
     }
 
     Connections {

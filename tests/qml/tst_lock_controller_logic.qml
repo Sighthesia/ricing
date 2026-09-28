@@ -20,6 +20,7 @@ Item {
     property bool _exitFailsafeArmed: false
     property int authResets: 0
     property var snapshot: null
+    property int screenshotTimeoutMs: 0
 
     function lock(): bool {
         if (!Controller.canLock(_state))
@@ -101,7 +102,10 @@ Item {
 
     // Bounded fallback so a silent snapshot provider can never block locking.
     property Timer _prepareFailsafe: Timer {
-        interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.slow
+        interval: Controller.prepareFailsafeInterval(
+                      "screenshot", { screenshot: "screenshot" },
+                      harness.screenshotTimeoutMs,
+                      Lazer.MotionTokens.medium + Lazer.MotionTokens.slow)
         repeat: false
         onTriggered: harness._commitLock()
     }
@@ -143,6 +147,7 @@ Item {
             harness._authInProgress = false
             harness.authResets = 0
             harness._exitFailsafeArmed = false
+            harness.screenshotTimeoutMs = 0
         }
 
         function cleanup() {
@@ -218,6 +223,21 @@ Item {
             tryCompare(harness, "locked", true)
             compare(harness.sessionLockLocked, true)
             compare(preparedSignals, 1)
+        }
+
+        function test_slowCaptureFinishesBeforeSessionLock() {
+            harness.screenshotTimeoutMs = 2000
+            snapshot.fallbackIntervalMs = harness.screenshotTimeoutMs
+            snapshot.snapshotProvider = function(screen, count, generation, report) {
+                lastCallback = report
+                return { ready: false }
+            }
+            verify(harness.lock())
+            wait(600)
+            verify(!harness.locked, "must not lock while the screenshot is still capturing")
+            lastCallback(0, "desk.png")
+            tryCompare(harness, "locked", true)
+            compare(snapshot.snapshotUrlFor(0), "desk.png")
         }
 
         function test_staleGenerationCannotCommitAfterCancel() {

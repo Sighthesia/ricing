@@ -87,7 +87,14 @@ function appItem(entry, launchCounts, iconResolver) {
 // managed-bind seam: actionArgv routes actionId "shell.<target>.<fn>" through
 // the afloat IPC helper.
 function builtinCommands() {
-    return []
+    return [{
+        id: "cmd-lock-test",
+        label: "测试锁屏（5 秒）",
+        description: "Start an isolated lock screen self-test",
+        keywords: "lock test lockscreen",
+        icon: "lock",
+        actionId: "shell.lock.test"
+    }]
 }
 
 function commandMatches(command, needle) {

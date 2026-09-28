@@ -33,9 +33,12 @@ Scope {
     // The release bypasses PAM only while this test flag is armed; the normal
     // unlock() path is untouched.
     readonly property bool selfTestEnabled: (Quickshell.env("AFLOAT_LOCK_SELFTEST") || "").trim() === "1"
+    property string wallpaperPath: selfTestEnabled
+            ? Quickshell.env("AFLOAT_LOCK_WALLPAPER") || ""
+            : String(Services.SettingsService.appearance.wallpaperPath || "")
     property int selfTestDelayMs: 5000
     property bool _selfTestArmed: false
-    property bool _selfTestLockStarted: false
+    signal selfTestFinished()
 
     // Lock background order: a pre-lock desktop screenshot (grim) is painted
     // as the base, then the wave mask sweeps the wallpaper over it. Setting
@@ -45,11 +48,36 @@ Scope {
         (Quickshell.env("AFLOAT_LOCK_BACKGROUND") || "").trim())
     readonly property int _screenshotTimeoutMs: 2000
     property Component _grimCapture: LockGrimCapture {}
+    property var _snapshotImages: []
+    property Component _snapshotImage: Image {
+        visible: false
+        asynchronous: false
+        cache: true
+    }
+
+    function _prepareCapturedImage(generation, report, index, url): void {
+        if (generation !== snapshot.generation || snapshot.ready || !root.preparing)
+            return
+        if (!url) {
+            report(index, "")
+            return
+        }
+        const image = _snapshotImage.createObject(root, { source: url }) as Image
+        if (!image) {
+            report(index, "")
+            return
+        }
+        root._snapshotImages.push(image)
+        report(index, image.status === Image.Ready ? url : "")
+    }
 
     function lock(): bool {
         if (!Controller.canLock(_state))
             return false
         lockContext.reset()
+        for (const image of root._snapshotImages)
+            image.destroy()
+        root._snapshotImages = []
         _state = LockLogic.States.preparing
         snapshot.request(Quickshell.screens.length)
         _requestGeneration = snapshot.generation
@@ -152,12 +180,15 @@ Scope {
             const target = Quickshell.screens[index]
             if (!target)
                 continue
-            _grimCapture.createObject(root, {
+            const capture = _grimCapture.createObject(root, {
                 screenIndex: index,
                 screenName: String(target.name || ""),
                 directory: directory,
                 outputPath: directory + "/afloat-lock-" + generation + "-" + index + ".jpg"
-            }).captured.connect(report)
+            }) as LockGrimCapture
+            capture.captured.connect(function(screenIndex, url) {
+                root._prepareCapturedImage(generation, report, screenIndex, url)
+            })
         }
         return { ready: false }
     }
@@ -182,21 +213,31 @@ Scope {
     // Self-test release: bypasses PAM strictly while the startup test is
     // armed; arming happens only in Component.onCompleted below.
     function _selfTestRelease(): void {
-        if (!root._selfTestArmed)
+        if (!root.selfTestEnabled || !root._selfTestArmed)
+            return
+        startupSelfTestTimer.stop()
+        _selfTestTimer.stop()
+        if (_state === LockLogic.States.preparing)
+            _cancelPreparation()
+        else if (_state === LockLogic.States.exiting)
+            _finishRelease()
+        else {
+            const next = Controller.testReleaseState(_state, true)
+            if (next !== null) {
+                _state = next
+                sessionLock.locked = false
+            }
+        }
+        if (sessionLock.locked)
             return
         root._selfTestArmed = false
-        root._selfTestLockStarted = false
-        const next = Controller.testReleaseState(_state, true)
-        if (next === null)
-            return
         _prepareFailsafe.stop()
         _exitFailsafe.stop()
         _exitFailsafeArmed = false
-        _state = next
-        sessionLock.locked = false
         _requestGeneration = -1
         lockContext.reset()
         console.log("[afloat:lock] self-test lock released")
+        root.selfTestFinished()
     }
 
     Component.onCompleted: {
@@ -206,7 +247,7 @@ Scope {
         startupSelfTestTimer.start()
     }
 
-    // Retry only while the compositor has not populated the screen list.
+    // Wait for the compositor's screen list instead of submitting an empty lock.
     property Timer startupLockTimer: Timer {
         interval: 100
         repeat: false
@@ -234,7 +275,7 @@ Scope {
         surface: LockSurface {
             lockContext: lockContext
             snapshot: snapshot
-            wallpaperPath: Services.SettingsService.appearance.wallpaperPath
+            wallpaperPath: root.wallpaperPath
             onReleaseRequested: root._finishRelease()
         }
     }
@@ -264,8 +305,10 @@ Scope {
             root._state = next
             // A stalled exit animation must never hold the compositor lock
             // forever, so successful authentication bounds it with a timer.
-            if (Controller.armExitFailsafe(previous, next))
+            if (Controller.armExitFailsafe(previous, next)) {
+                root._exitFailsafeArmed = true
                 root._exitFailsafe.restart()
+            }
         }
     }
 
@@ -288,7 +331,10 @@ Scope {
 
     // Bounded fallback so a silent snapshot provider can never block locking.
     property Timer _prepareFailsafe: Timer {
-        interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.slow
+        interval: Controller.prepareFailsafeInterval(
+                      root.backgroundMode, SurfaceLogic.backgroundModes,
+                      root._screenshotTimeoutMs,
+                      Lazer.MotionTokens.medium + Lazer.MotionTokens.slow)
         repeat: false
         onTriggered: root._commitLock()
     }
@@ -311,7 +357,7 @@ Scope {
     property Timer _selfTestTimer: Timer {
         interval: root.selfTestDelayMs
         repeat: false
-        running: root.selfTestEnabled && root._selfTestArmed && root._selfTestLockStarted
+        running: root.selfTestEnabled && root._selfTestArmed
         onTriggered: root._selfTestRelease()
     }
 
@@ -327,7 +373,6 @@ Scope {
                 return
             }
             if (root.lock()) {
-                root._selfTestLockStarted = true
                 console.log("[afloat:lock] self-test lock engaged at startup")
             } else if (root._selfTestArmed) {
                 restart()
@@ -338,6 +383,15 @@ Scope {
     // Compositor keybinds reach the lock through this target.
     IpcHandler {
         target: "lock"
+
+        function test(): void {
+            if (root.selfTestEnabled || !Controller.canLock(root._state))
+                return
+            Quickshell.execDetached(["env", "AFLOAT_LOCK_SELFTEST=1",
+                "QS_DISABLE_FILE_WATCHER=1", "AFLOAT_LOCK_BACKGROUND=screenshot",
+                "AFLOAT_LOCK_WALLPAPER=" + root.wallpaperPath,
+                "qs", "-n", "-d", "-p", Quickshell.shellDir + "/lock-test.qml"])
+        }
 
         function lock(): void {
             root.lock()
