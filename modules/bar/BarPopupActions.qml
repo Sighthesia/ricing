@@ -505,13 +505,23 @@ Item {
         }
     }
 
-    function handleBluetoothScan(active) {
-        if (payload && typeof payload.onBluetoothScan === "function") {
-            payload.onBluetoothScan(!!active)
+    // Foot refresh, same contract as the network panel's Rescan: one bounded
+    // scan rather than a mode the user has to think about switching off. Falls
+    // back to the old toggle when the service predates startScan.
+    function handleBluetoothRescan() {
+        if (payload && typeof payload.onBluetoothRescan === "function") {
+            payload.onBluetoothRescan()
             return
         }
-        if (root.bluetoothService && typeof root.bluetoothService.setScanActive === "function") {
-            try { root.bluetoothService.setScanActive(!!active) } catch (e) {}
+        var service = root.bluetoothService
+        if (!service)
+            return
+        if (typeof service.startScan === "function") {
+            try { service.startScan() } catch (e) {}
+            return
+        }
+        if (typeof service.setScanActive === "function") {
+            try { service.setScanActive(true) } catch (e) {}
         }
     }
 
@@ -1230,6 +1240,7 @@ Item {
 
             Column {
                 id: btColumn
+                objectName: "btColumn"
                 width: parent.width
                 spacing: 8
 
@@ -1248,23 +1259,6 @@ Item {
                     }
                 }
 
-                LazerSettingsRow {
-                    id: btScanRow
-                    objectName: "btScanRow"
-                    width: parent.width
-                    visible: root.btEnabled && root.btAvailable
-                    height: visible ? implicitHeight + listGap : 0
-                    labelText: root.btScanning ? "Scanning…" : "Scan"
-                    currentValue: root.btScanning
-
-                    LazerSettingsToggle {
-                        id: btScanToggle
-                        objectName: "btScanToggle"
-                        checked: root.btScanning
-                        onToggled: function(next) { root.handleBluetoothScan(next) }
-                    }
-                }
-
                 Text {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
@@ -1274,32 +1268,20 @@ Item {
                     font.pixelSize: 11
                 }
 
-                // Empty-state line. A scan in progress is the one case where
-                // "no devices found" would be a lie, so the ring replaces the
-                // claim with the fact. It shares the line rather than taking its
-                // own, matching how the network panel reports its scan.
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    visible: root.btAvailable && root.btEnabled && root.btDeviceList.length === 0
-                    spacing: 6
-
-                    LazerLoadingRing {
-                        objectName: "btScanRing"
-                        width: 16
-                        height: 16
-                        // Same contract as the network panel's ring: hold the
-                        // slot and fade via `active`, so the claim next to it
-                        // never slides as a scan starts.
-                        active: root.btScanning
-                        running: active
-                    }
-
-                    Text {
-                        objectName: "btEmptyText"
-                        text: root.btScanning ? "Scanning…" : "No devices found"
-                        color: LazerTheme.textMuted
-                        font.pixelSize: 11
-                    }
+                // Empty-state line, and a claim about results rather than about
+                // progress: "no devices found" would be a claim about a search
+                // that has not finished, so a live scan states the fact here
+                // instead. The ring is not — scan progress is reported in one
+                // place only, the foot, as it is for the network panel.
+                Text {
+                    objectName: "btEmptyText"
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: root.btAvailable && root.btEnabled
+                        && root.btDeviceList.length === 0
+                    text: root.btScanning ? "Scanning…" : "No devices found"
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 11
                 }
 
                 Repeater {
@@ -1349,6 +1331,54 @@ Item {
                                 ? LazerTheme.osuGreen : LazerTheme.textMuted
                             font.pixelSize: 10
                         }
+                    }
+                }
+
+                // Foot refresh, the same shape and contract as the network
+                // panel's: the list is the content, the refresh action reads as
+                // the foot, and the ring that rides the label is the only
+                // report of scan progress in the panel.
+                Rectangle {
+                    id: btRescanButton
+                    objectName: "btRescanButton"
+                    width: parent.width
+                    height: 32
+                    radius: 6
+                    visible: root.btAvailable && root.btEnabled
+                    color: btRescanHover.hovered ? LazerTheme.hoverFill : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        LazerLoadingRing {
+                            objectName: "btScanRing"
+                            width: 16
+                            height: 16
+                            // Hold the slot and fade via `active`; a `visible`
+                            // flip would drop it from the Row and slide the
+                            // label sideways as the scan starts.
+                            active: root.btScanning
+                            running: active
+                        }
+
+                        Text {
+                            objectName: "btRescanLabel"
+                            text: root.btScanning ? "Scanning…" : "Rescan"
+                            color: LazerTheme.textPrimary
+                            font.pixelSize: 11
+                            font.bold: true
+                        }
+                    }
+
+                    HoverHandler { id: btRescanHover }
+                    TapHandler {
+                        objectName: "btRescanTap"
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        enabled: !root.btScanning
+                        onTapped: root.handleBluetoothRescan()
                     }
                 }
             }

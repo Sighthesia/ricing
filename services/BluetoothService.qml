@@ -99,6 +99,39 @@ Singleton {
         }
     }
 
+    // How long a one-shot scan keeps the radio discovering. Bounded so the
+    // refresh behaves like the network panel's Rescan instead of a permanent
+    // mode that the radio never leaves on its own.
+    property int scanWindowMs: 12000
+
+    function startScan() {
+        if (!root.adapter || !root.enabled)
+            return
+        try {
+            root.adapter.discovering = true
+            scanWindowTimer.restart()
+            console.info("[Bluetooth] scan started")
+        } catch (e) {
+            console.warn("[Bluetooth] startScan failed", e)
+        }
+    }
+
+    Timer {
+        id: scanWindowTimer
+        interval: root.scanWindowMs
+        repeat: false
+        onTriggered: {
+            if (!root.adapter || !root.adapter.discovering)
+                return
+            try {
+                root.adapter.discovering = false
+                console.info("[Bluetooth] scan window elapsed")
+            } catch (e) {
+                console.warn("[Bluetooth] could not stop scan", e)
+            }
+        }
+    }
+
     // Toggle adapter discoverability.
     function setDiscoverable(state) {
         if (!adapter) return

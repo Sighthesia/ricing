@@ -64,6 +64,7 @@ Item {
         var svc = Qt.createQmlObject(
             'import QtQuick; QtObject {'
             + ' property bool bluetoothAvailable: true;'
+            + ' property bool available: true;'
             + ' property bool enabled: true;'
             + ' property bool scanningActive: false;'
             + ' property var devices;'
@@ -75,6 +76,7 @@ Item {
             + ' property int disconnectCalls: 0;'
             + ' property int pairCalls: 0;'
             + ' function setBluetoothEnabled(v) { powerCalls++; lastPower = v; enabled = v }'
+            + ' function startScan() { scanCalls++; lastScan = true; scanningActive = true }'
             + ' function setScanActive(v) { scanCalls++; lastScan = v; scanningActive = v }'
             + ' function canConnect(d) { return d && !d.connected && (d.paired || d.trusted) }'
             + ' function canDisconnect(d) { return d && !!d.connected }'
@@ -230,6 +232,104 @@ Item {
             item.handleBluetoothDeviceTap(null)
             verify(true, "no throw with null payload")
         }
+
+        // Bluetooth mirrors the network panel: the scan toggle is gone from the
+        // head of the panel, and a bounded one-shot refresh sits at its foot.
+        function test_bluetoothRefreshSitsAtTheFoot() {
+            var svc = makeBluetoothService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "bluetooth", payload: { bluetoothService: svc }
+            })
+            verify(findByName(item, "btScanRow") === null,
+                "the scan toggle must not come back to the head of the panel")
+            verify(findByName(item, "btScanToggle") === null)
+            var rescan = findByName(item, "btRescanButton")
+            verify(rescan !== null, "foot refresh should exist")
+            verify(rescan.visible, "foot refresh visible when the adapter is on")
+            compare(findByName(item, "btRescanLabel").text, "Rescan")
+            // Same structural contract as the network foot: last child of the
+            // panel column, so it reads as the foot rather than a divider.
+            var column = findByName(item, "btColumn")
+            verify(column !== null, "bluetooth column should exist")
+            compare(column.children[column.children.length - 1].objectName, "btRescanButton")
+            // …and the same geometry. Polled, because the Column positions its
+            // children during polish and a one-shot read races it.
+            var row0 = findByName(item, "btDeviceRow0")
+            verify(row0 !== null, "device row should exist")
+            tryVerify(function () {
+                return row0.y > 0 && rescan.y > row0.y
+            }, 1000, "refresh sits below the list (rescan.y=" + rescan.y
+                + " row0.y=" + row0.y + ")")
+            item.handleBluetoothRescan()
+            compare(svc.scanCalls, 1, "one-shot scan, not a toggle")
+            verify(svc.lastScan)
+        }
+
+        // The ring rides the foot label, so it must hold its slot: a `visible`
+        // flip would drop it from the Row and slide the label sideways.
+        function test_bluetoothScanRingHoldsItsSlot() {
+            var svc = makeBluetoothService()
+            svc.scanningActive = false
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "bluetooth", payload: { bluetoothService: svc }
+            })
+            var ring = findByName(item, "btScanRing")
+            var label = findByName(item, "btRescanLabel")
+            verify(ring !== null && label !== null)
+            compare(ring.active, false, "ring is idle before the scan")
+            var beforeX = label.x
+            var beforeY = label.y
+
+            svc.scanningActive = true
+            wait(50)
+            compare(ring.active, true, "ring runs during a scan")
+            compare(findByName(item, "btRescanLabel").text, "Scanning…")
+            compare(label.x, beforeX, "label shifted horizontally when the ring appeared")
+            compare(label.y, beforeY, "label shifted vertically when the ring appeared")
+        }
+
+        function test_bluetoothRescanInertWhileScanning() {
+            var svc = makeBluetoothService()
+            svc.scanningActive = true
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "bluetooth", payload: { bluetoothService: svc }
+            })
+            compare(findByName(item, "btRescanTap").enabled, false,
+                "a second tap must not queue a second scan")
+        }
+
+        // The empty-state line is a claim about results, not about progress:
+        // "no devices found" would be a claim about a search that has not
+        // finished, so a live scan must not read that way.
+        function test_bluetoothEmptyStateDoesNotClaimAnExhaustedSearch() {
+            var svc = makeBluetoothService()
+            svc.scanningActive = false
+            svc.devices = { values: [] }
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "bluetooth", payload: { bluetoothService: svc }
+            })
+            var empty = findByName(item, "btEmptyText")
+            verify(empty.visible, "claims the search finished when nothing is scanning")
+            compare(empty.text, "No devices found")
+
+            svc.scanningActive = true
+            wait(50)
+            compare(empty.text, "Scanning…",
+                "must not read as an exhausted search while one is running")
+            compare(findByName(item, "btRescanLabel").text, "Scanning…")
+        }
+
+        // A panel with no usable adapter has no refresh to offer.
+        function test_bluetoothRefreshHiddenWithoutAdapter() {
+            var svc = makeBluetoothService()
+            svc.available = false
+            svc.enabled = false
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "bluetooth", payload: { bluetoothService: svc }
+            })
+            verify(!findByName(item, "btRescanButton").visible,
+                "no refresh without an adapter")
+        }
     }
 
     TestCase {
@@ -260,8 +360,13 @@ Item {
             // Settings rows grow with an entrance animation; wait for the
             // layout to settle before the synthetic click, like a real user.
             wait(800)
-            mouseClick(rescanBtn, rescanBtn.width / 2, rescanBtn.height / 2, Qt.LeftButton)
-            tryCompare(svc, "scanCalls", 2, 500)
+            // Click the label rather than the button's exact centre: the ring
+            // and the gap either side of it sit at the midpoint, so a press
+            // there can land on the spacing between the two children.
+            var rescanLabel = findByName(item, "wifiRescanLabel")
+            verify(rescanLabel !== null, "rescan label should exist")
+            mouseClick(rescanLabel, rescanLabel.width / 2, rescanLabel.height / 2, Qt.LeftButton)
+            tryCompare(svc, "scanCalls", 2, 2000)
             // Connected row disconnects, other rows connect.
             item.handleNetworkTap(item.wifiList[0])
             compare(svc.disconnectCalls, 1)
@@ -476,11 +581,12 @@ Item {
             var list = findByName(item, "wifiListView")
             var rescan = findByName(item, "wifiRescanButton")
             verify(list !== null && rescan !== null)
-            // The Column positions its children during polish, so the geometry
-            // is only meaningful once the layout has settled.
-            wait(300)
-            verify(rescan.y > list.y, "rescan sits below the list (rescan.y="
-                + rescan.y + " list.y=" + list.y + " list.h=" + list.height
+            // Polled, not read once: the Column positions its children during
+            // polish, so a one-shot read races the layout pass.
+            tryVerify(function () {
+                return rescan.y > list.y
+            }, 1000, "rescan sits below the list (rescan.y=" + rescan.y
+                + " list.y=" + list.y + " list.h=" + list.height
                 + " rescan.h=" + rescan.height + ")")
             compare(findByName(item, "wifiRescanTap").enabled, false,
                 "rescan is inert while an attempt is live")
@@ -565,7 +671,7 @@ Item {
 
             svc.scanningActive = true
             wait(50)
-            compare(ring.visible, true, "ring shows while discovering")
+            compare(ring.active, true, "ring runs while discovering")
             compare(label.text, "Scanning…",
                 "a live scan must not read as an exhausted search")
         }
