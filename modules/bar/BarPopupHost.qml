@@ -165,11 +165,14 @@ PanelWindow {
     // "the user left", which is wrong when the compositor dropped focus while
     // the pointer sat inside the region — this is what tells the two apart.
     property string _lastLeave: "none"
-    // Set once a reveal has actually run to the surface. The first open in a
-    // session is the only time the content tree has not laid out when the
-    // target geometry is committed, so it is the only time the input region
-    // would be built from placeholder values.
     property bool _hasRevealed: false
+    // Counts every surface-visible transition. A layer-shell surface that is
+    // unmapped and remapped loses pointer focus outright: the compositor sends
+    // leave and nothing re-enters until the pointer physically moves, which
+    // looks exactly like "the panel is there but nothing on it reacts". The
+    // counter makes that churn visible in the timeline instead of inferred.
+    property int _mapChurn: 0
+    onSurfaceActiveChanged: root._noteMap("surfaceActive")
     // The popup surface's own unfiltered pointer position, in container
     // coordinates. Survives the leave, so it records where the pointer was when
     // the surface lost it.
@@ -204,6 +207,13 @@ PanelWindow {
             "width": Math.max(0, Math.round(Number(item.width) * 10) / 10),
             "height": Math.max(0, Math.round(Number(item.height) * 10) / 10),
         }
+    }
+
+    function _noteMap(what) {
+        root._mapChurn += 1
+        root.debugLog("map", { "what": what, "active": root.surfaceActive,
+            "visible": root.visible, "churn": root._mapChurn,
+            "regionScene": root._sceneRect(popupInputRegion) })
     }
 
     function _pointInRect(px, py, rect) {
@@ -423,6 +433,9 @@ PanelWindow {
                 // Unfiltered pointer, plus the per-owner event tally. The owner
                 // that stopped speaking is the link where delivery broke.
                 "rawPoint": root._lastRawPoint,
+                "mapChurn": Number(root._mapChurn),
+                "surfaceActive": root.surfaceActive,
+                "windowVisible": root.visible === true,
                 // The region as the COMPOSITOR sees it. Region.item builds the
                 // wl_surface input region from mapToScene, i.e. window
                 // coordinates — NOT the viewport-local rect every other field
