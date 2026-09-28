@@ -849,9 +849,16 @@ Item {
         objectName: "traySubmenuSurface"
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
-        width: parent.width + root.submenuPad
+        width: parent.width
         height: submenuNeedsHeight ? submenuSurfaceHeight : menuFlick.height
-        x: submenuFlipped ? -(width + root.submenuPad) : parent.width + root.submenuPad
+        // Flush against the primary, with no gap. The pad here was an 8px strip
+        // of nothing between the two panels: visibly empty, so a pointer moving
+        // right stopped on it and never crossed. The event trace showed exactly
+        // that — enter, a same-position re-delivery, exit, all at the band's
+        // left edge, the pointer never advancing past the seam. The breathing
+        // room belongs INSIDE the panel, where the title and rows already pad
+        // themselves, not between the two surfaces.
+        x: submenuFlipped ? -width : parent.width
         // Panel top tracks the anchor from the first frame (even before
         // rows arrive) so cold-fetch cursor memory stays valid across
         // the batch; hidden anyway until content lands.
@@ -912,8 +919,9 @@ Item {
         Flickable {
             id: submenuFlick
             objectName: "traySubmenuFlick"
-            // Padding lives only on the outer edge; the meeting edge is
-            // flush so paddings never stack into a band at the joint.
+            // Padding lives only on the OUTER edge, so the row that meets the
+            // primary is flush and the pointer crosses the joint onto a row
+            // rather than onto padding. The joint carries no gap at all now.
             anchors.left: parent.left
             anchors.leftMargin: root.submenuFlipped ? root.submenuPad : 0
             anchors.right: parent.right
