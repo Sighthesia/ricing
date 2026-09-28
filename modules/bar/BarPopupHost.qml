@@ -40,6 +40,7 @@ PanelWindow {
     property real intentBarHeight: 0
     property real intentFloatingMargin: -1
     property bool popupHoverWasActive: false
+    property bool widgetHoverWasSet: false
     function setReducedMotionOverride(v) { MotionTokens.reducedMotionOverride = v }
 
     property real displayX: 0
@@ -151,7 +152,31 @@ PanelWindow {
     // Reuse the settings-panel diagnostics channel so one IPC switch turns on
     // both surfaces; every popup decision is logged without adding an owner.
     readonly property bool debugEnabled: Services.SettingsService.hoverDebugEnabled
+    // Push the debug switch into the tray content so its hover exits are traced
+    // on the same switch. A singleton write from here, not a separate owner.
+    onDebugEnabledChanged: {
+        var tc = root._trayContent()
+        if (tc)
+            tc.debugLeave = root.debugEnabled
+    }
     property string _lastDebugSignature: ""
+    // Set by every hover-exit path, with the pointer's last known position in
+    // region coordinates. The close decision treats "no owner has hover" as
+    // "the user left", which is wrong when the compositor dropped focus while
+    // the pointer sat inside the region — this is what tells the two apart.
+    property string _lastLeave: "none"
+
+    function noteLeave(source) {
+        var tc = root._trayContent()
+        var at = root._cursorInViewport(tc)
+        var region = popupInputRegion
+        var inside = at ? root._pointInRect(at.x, at.y, region) : false
+        root._lastLeave = source + (at ? (" at " + at.x + "," + at.y
+            + (inside ? " INSIDE" : " outside")) : " at none")
+        root.debugLog("leave", { "source": root._lastLeave,
+            "region": root._debugRect(region), "regionActive": root.surfaceActive,
+            "widgetHovered": root.widgetHovered, "popupHovered": root.popupHovered })
+    }
 
     function _debugRect(item) {
         if (!item)
@@ -169,21 +194,33 @@ PanelWindow {
         return px >= rect.x && px <= rect.x + rect.width
             && py >= rect.y && py <= rect.y + rect.height
     }
-    // Is the remembered pointer inside the active input region? Mapped through
-    // the live scene graph rather than compared numerically: the memory is in
-    // tray-content coordinates while the region is in viewport coordinates, and
-    // the two differ by the container's anchored position.
-    function _pointInRegion(tc) {
+    // Where the tray's remembered pointer sits inside the viewport the input
+    // region is expressed in. Mapped through the live scene graph rather than
+    // compared numerically: the memory is in tray-content coordinates, the
+    // region in viewport coordinates, and the two differ by the container's
+    // anchored position. Returns null when there is no memory at all, so
+    // "no pointer" never reads as "pointer outside".
+    function _cursorInViewport(tc) {
         if (!tc || Number(tc.lastCursorX) < 0)
-            return false
+            return null
         var p = tc.mapToItem(popupViewport, Number(tc.lastCursorX), Number(tc.lastCursorY))
-        return root._pointInRect(p.x, p.y, popupInputRegion)
+        return { "x": Math.round(p.x * 10) / 10, "y": Math.round(p.y * 10) / 10 }
     }
+    function _pointInRegion(tc) {
+        var p = root._cursorInViewport(tc)
+        return p ? root._pointInRect(p.x, p.y, popupInputRegion) : false
+    }
+    // Same rule for a rect: the inner item lives in its own parent's space, so
+    // its corners are mapped up before they are compared. Comparing raw
+    // geometry across spaces reports "outside" for everything anchored away
+    // from the origin, which is how this block first claimed the submenu column
+    // fell outside the region.
     function _rectInside(inner, outer) {
-        if (!inner || !outer)
+        if (!inner || !outer || !inner.mapToItem)
             return false
-        return _pointInRect(inner.x, inner.y, outer)
-            && _pointInRect(inner.x + inner.width, inner.y + inner.height, outer)
+        var a = inner.mapToItem(popupViewport, 0, 0)
+        var b = inner.mapToItem(popupViewport, inner.width, inner.height)
+        return root._pointInRect(a.x, a.y, outer) && root._pointInRect(b.x, b.y, outer)
     }
 
     // Tray submenu internals: phase/geometry/highlight of the second level.
@@ -229,7 +266,17 @@ PanelWindow {
         return popupActions ? popupActions.trayMenuContent : null
     }
 
+    // The tray content is swapped when the popup changes intent, so the debug
+    // switch is re-pushed whenever that happens rather than relying on the
+    // switch changing again.
+    function _syncTrayDebug() {
+        var tc = root._trayContent()
+        if (tc && tc.debugLeave !== root.debugEnabled)
+            tc.debugLeave = root.debugEnabled
+    }
+
     function debugSnapshot() {
+        root._syncTrayDebug()
         var tc = root._trayContent()
         return {
             "tray": root._trayDebug(),
@@ -247,8 +294,16 @@ PanelWindow {
                 // in tray-content coordinates, so it is mapped up into the
                 // viewport the region is expressed in.
                 "cursorInRegion": root._pointInRegion(tc),
+                // The remembered pointer in the region's own space, so a lost
+                // pointer can be located against the region without doing the
+                // mapping by hand. null means "no pointer was ever seen here".
+                "cursorAt": root._cursorInViewport(tc),
                 "columnInRegion": root._rectInside(tc ? tc.submenuColumn : null,
                     popupInputRegion),
+                // Which owner most recently reported the pointer gone. A close
+                // with every hover owner false and the pointer still inside the
+                // region means the compositor dropped focus, not the user.
+                "lastLeave": String(root._lastLeave),
             },
             "host": {
                 "phase": root.open ? "open" : (root.surfaceActive ? "revealing" : "closed"),
@@ -319,9 +374,17 @@ PanelWindow {
     }
 
     onPopupHoveredChanged: {
-        if (popupHoverWasActive && !popupHovered)
+        if (popupHoverWasActive && !popupHovered) {
+            root.noteLeave("popup-surface")
             requestClose()
+        }
         popupHoverWasActive = popupHovered
+    }
+
+    onWidgetHoveredChanged: {
+        if (root.widgetHoverWasSet && !root.widgetHovered && !root.popupHovered)
+            root.noteLeave("widget")
+        root.widgetHoverWasSet = true
     }
 
     function updateIntent(intentObj) {

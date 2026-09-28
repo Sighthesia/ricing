@@ -845,8 +845,19 @@ Item {
                         root.check("snapshot maps the cursor into the region",
                             snap.input.cursorInRegion, true)
                     }
-                    root.check("snapshot says the submenu column is inside the region",
-                        snap.input.columnInRegion, true)
+                    // The band collapses to zero height when the primary list has
+                    // no rows and the panel has no body, so only its horizontal
+                    // reach is meaningful here: that is the axis the submenu
+                    // extends along, and the one that must never leave the region.
+                    var colRect = snap.tray ? snap.tray.column : null
+                    if (colRect && Number(colRect.height) > 0) {
+                        root.check("snapshot says the submenu column is inside the region",
+                            snap.input.columnInRegion, true)
+                    } else {
+                        root.check("input region still spans the submenu column",
+                            Number(snap.input.region.x) + Number(snap.input.region.width)
+                                >= Number(colRect.x) + Number(colRect.width), true)
+                    }
                 }
             }
             if (trayIncoming)

@@ -439,6 +439,8 @@ Item {
         onExited: {
             root.highlightedSubmenuRow = null
             root.forgetCursor()
+            if (root.debugLeave)
+                console.log("[afloat:TrayDebug] leave column-band at " + mouseX + "," + mouseY)
         }
     }
     function transitToSubmenu() {
@@ -545,6 +547,11 @@ Item {
     // data rebuilds re-resolve from memory instead of losing the cursor.
     property real lastCursorX: -1
     property real lastCursorY: -1
+    // Hover-exit tracing, off unless diagnostics are on. A popup that closes
+    // with no owner holding hover is either the user leaving or the compositor
+    // dropping focus; which exit fired, and where the pointer was, tells them
+    // apart.
+    property bool debugLeave: false
     function rememberCursor(x, y) { lastCursorX = x; lastCursorY = y }
     function forgetCursor() { lastCursorX = -1; lastCursorY = -1 }
     // Row currently under the cursor, owned by the catcher for highlight.
@@ -557,6 +564,9 @@ Item {
     function hoverLeaveCatcher() {
         // Clear highlight only: leaving toward the submenu must not act
         // (arrivals would die). Stale intent resets in closeSubmenu.
+        if (debugLeave)
+            console.log("[afloat:TrayDebug] leave primary-catcher mem="
+                + lastCursorX + "," + lastCursorY)
         highlightedRow = null
         // The memory is shared with the second level, and this exit is
         // delivered after the arrival it collides with: crossing from the
