@@ -118,7 +118,7 @@ function parseProfileDetail(detailText) {
     var groups = String(detailText == null ? "" : detailText).split(/\n[ \t]*\n/)
     for (var g = 0; g < groups.length; g++) {
         var lines = groups[g].split("\n")
-        var entry = { uuid: "", ssid: "", keyMgmt: "" }
+        var entry = { uuid: "", ssid: "", keyMgmt: "", ifname: "" }
         var sawField = false
         for (var l = 0; l < lines.length; l++) {
             var raw = lines[l]
@@ -138,6 +138,9 @@ function parseProfileDetail(detailText) {
             } else if (field === "802-11-wireless-security.key-mgmt") {
                 entry.keyMgmt = value
                 sawField = true
+            } else if (field === "connection.interface-name") {
+                entry.ifname = value
+                sawField = true
             }
         }
         if (sawField && entry.uuid)
@@ -146,17 +149,46 @@ function parseProfileDetail(detailText) {
     return out
 }
 
+// Which of several profiles for one SSID should a tap actually activate?
+// NetworkManager pins a profile to the adapter it was created on, and adapter
+// names move around (wlan0 → wlo1, predictable names dropped). A profile still
+// pinned to a device that no longer exists is dead: NM refuses it with
+// "not compatible … (mismatching interface name)" and the user can do nothing
+// about it from the panel. So rank by usability against the live adapter, and
+// only then fall back to the first profile seen.
+function profileRank(profile, liveDevice) {
+    if (!profile)
+        return 3
+    var pin = profile.ifname ? String(profile.ifname) : ""
+    if (!pin)
+        return 0                   // unpinned: usable on any adapter
+    if (liveDevice && pin === String(liveDevice))
+        return 1                   // pinned to the adapter we actually have
+    return 2                       // pinned to an adapter that is gone
+}
+
+// A profile pinned to an adapter that is not the one we have can be repaired
+// instead of abandoned: re-pointing it at the live adapter is exactly what
+// NetworkManager would have written had the user connected from that adapter,
+// and it keeps the stored secret, so nothing has to be retyped.
+function isStaleAdapterPin(profile, liveDevice) {
+    if (!profile || !profile.ifname || !liveDevice)
+        return false
+    return String(profile.ifname) !== String(liveDevice)
+}
+
 // Build the saved-profile lookup from two nmcli calls:
 //
 //   nmcli -t -f NAME,UUID,TYPE connection show
-//   nmcli -t -f 802-11-wireless.ssid,connection.uuid,\
-//   802-11-wireless-security.key-mgmt connection show uuid <uuids…>
+//   nmcli -t -f 802-11-wireless.ssid,connection.uuid,
+//   802-11-wireless-security.key-mgmt,connection.interface-name
+//   connection show uuid <uuids…>
 //
 // Matching on profile NAME alone is not enough: NetworkManager appends " 1"
 // to a duplicate name, so a saved SSID can live under a name the scan never
 // sees — those networks read as unsaved, and every connect against them missed
 // (or created yet another duplicate profile).
-function parseProfileList(baseText, detailText) {
+function parseProfileList(baseText, detailText, liveDevice) {
     var bySsid = {}
     var byName = {}
     var meta = {}
@@ -186,14 +218,17 @@ function parseProfileList(baseText, detailText) {
             continue
         var owner = meta[row.uuid]
         matched[row.uuid] = true
-        // First profile wins: NM never has two usable profiles for one SSID,
-        // and a stable pick keeps repeated scans from flapping.
-        if (!bySsid[row.ssid])
-            bySsid[row.ssid] = {
-                name: owner ? owner.name : row.uuid,
-                uuid: row.uuid,
-                keyMgmt: row.keyMgmt
-            }
+        var candidate = {
+            name: owner ? owner.name : row.uuid,
+            uuid: row.uuid,
+            keyMgmt: row.keyMgmt,
+            ifname: row.ifname
+        }
+        // Only a better-ranked profile may displace the current pick, so
+        // repeated scans over an unchanged profile set stay stable.
+        if (profileRank(candidate, liveDevice)
+                < profileRank(bySsid[row.ssid], liveDevice))
+            bySsid[row.ssid] = candidate
     }
 
     // Name fallback: still correct whenever NM kept the SSID as the profile
@@ -202,8 +237,10 @@ function parseProfileList(baseText, detailText) {
         var info = meta[uuid]
         if (info.type !== "802-11-wireless" || matched[uuid])
             continue
-        if (!bySsid[info.name])
-            bySsid[info.name] = { name: info.name, uuid: uuid, keyMgmt: "" }
+        var fallback = { name: info.name, uuid: uuid, keyMgmt: "", ifname: "" }
+        if (profileRank(fallback, liveDevice)
+                < profileRank(bySsid[info.name], liveDevice))
+            bySsid[info.name] = fallback
     }
     return { bySsid: bySsid, byName: byName }
 }
@@ -246,13 +283,16 @@ function isSecured(security) {
 }
 
 // How to reach an SSID:
-//   activate — a saved profile exists, just bring it up
-//   modify   — a saved profile exists but the user retyped its password
-//   create   — no profile; let `nmcli device wifi connect` make one
-function connectPlan(savedProfile, hasPassword) {
-    if (savedProfile && savedProfile.uuid)
-        return hasPassword ? "modify" : "activate"
-    return "create"
+//   activate — a saved profile exists and is usable as-is
+//   modify   — repair it first: re-point a dead adapter pin and/or rewrite
+//              the stored secret the user retyped
+//   create   — no usable profile; let `nmcli device wifi connect` make one
+function connectPlan(savedProfile, hasPassword, liveDevice) {
+    if (!savedProfile || !savedProfile.uuid)
+        return "create"
+    if (isStaleAdapterPin(savedProfile, liveDevice) || hasPassword)
+        return "modify"
+    return "activate"
 }
 
 function activateArgs(uuid, device) {
@@ -262,11 +302,17 @@ function activateArgs(uuid, device) {
     return args
 }
 
-// Only the secret is rewritten; key-mgmt stays whatever the profile was built
-// with, so a WPA3 (SAE) profile is not silently downgraded to wpa-psk.
-function modifyArgs(uuid, password) {
-    return ["connection", "modify", "uuid", uuid,
-        "802-11-wireless-security.psk", password == null ? "" : String(password)]
+// Only the properties that actually need changing are written. The PSK goes in
+// alone when just the secret is stale, so a WPA3 (SAE) profile keeps its
+// key-mgmt; the adapter pin is only rewritten when it points at a device that
+// is gone.
+function modifyArgs(uuid, password, device, repoint) {
+    var args = ["connection", "modify", "uuid", uuid]
+    if (repoint && device)
+        args.push("connection.interface-name", device)
+    if (password != null && String(password) !== "")
+        args.push("802-11-wireless-security.psk", String(password))
+    return args
 }
 
 function createArgs(ssid, password, hidden, device) {
@@ -328,6 +374,11 @@ function classifyConnectError(rawText) {
         return "Connection timeout"
     if (lower.indexOf("unknown connection") !== -1)
         return "Saved profile is gone"
+    if (lower.indexOf("no suitable device") !== -1
+            || lower.indexOf("not compatible") !== -1
+            || lower.indexOf("mismatching interface name") !== -1
+            || lower.indexOf("incompatible") !== -1)
+        return "No adapter matches this saved profile"
     if (lower.indexOf("no suitable device") !== -1
             || lower.indexOf("not available") !== -1
             || lower.indexOf("no wifi device") !== -1

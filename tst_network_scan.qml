@@ -44,12 +44,15 @@ ShellRoot {
         }
         if (phase === "await-scan") {
             // The scan is only meaningful once the whole pipeline has landed:
-            // profile list → profile detail → wifi list, with the network map
-            // arriving last but the profile map one stage before it.
-            if (Services.NetworkService.scanningActive
-                    || Object.keys(Services.NetworkService.networks).length === 0
-                    || Object.keys(Services.NetworkService.savedProfiles).length === 0) {
-                if (ticks > 300) { check("scan pipeline settled", false, "timed out"); return root.finish() }
+            // device table → profile list → profile detail → wifi list. The
+            // adapter name comes first because it decides which duplicate
+            // profile the panel is allowed to target.
+            var svc = Services.NetworkService
+            if (!svc.wifiDevice
+                    || svc.scanningActive
+                    || Object.keys(svc.networks).length === 0
+                    || Object.keys(svc.savedProfiles).length === 0) {
+                if (ticks > 400) { check("scan pipeline settled", false, "timed out"); return root.finish() }
                 return
             }
             check("scan pipeline settled", true)
@@ -83,6 +86,9 @@ ShellRoot {
         console.log("wifiEnabled=" + svc.wifiEnabled + " wifiDevice=" + svc.wifiDevice
             + " activeIf=" + svc.activeWifiIf + " wifiConnected=" + svc.wifiConnected)
         check("wifi adapter pinned while idle", svc.wifiDevice !== "", svc.wifiDevice)
+        check("service pinned the live adapter",
+            svc.wifiDevice === root.liveWifiDevices[0],
+            "service=" + svc.wifiDevice + " nmcli=" + root.liveWifiDevices[0])
         console.log("networks=" + keys.length + " savedProfiles=" + savedKeys.length)
 
         // Every SSID the radio reported must carry the parsed essentials.
@@ -214,7 +220,8 @@ ShellRoot {
         running: false
         environment: ({ "LC_ALL": "C", "LANG": "C" })
         command: {
-            var args = ["nmcli", "-t", "-f", "802-11-wireless.ssid,connection.uuid",
+            var args = ["nmcli", "-t", "-f",
+                "802-11-wireless.ssid,connection.uuid,connection.interface-name",
                 "connection", "show", "uuid"]
             var uuids = root.liveUuids
             for (var i = 0; i < uuids.length; i++)
@@ -223,33 +230,131 @@ ShellRoot {
         }
         stdout: StdioCollector {
             onStreamFinished: {
-                var seen = {}
+                // nmcli prints the fields in `-f` order within a group, so the
+                // SSID arrives before the uuid. Accumulate and flush on the
+                // blank line between groups rather than assuming an order.
+                var rows = []
+                var buffer = {}
                 var lines = text.split("\n")
                 for (var i = 0; i < lines.length; i++) {
-                    if (lines[i].indexOf("802-11-wireless.ssid:") !== 0)
+                    var raw = lines[i]
+                    if (!raw || !raw.trim()) {
+                        if (buffer.uuid)
+                            rows.push(buffer)
+                        buffer = {}
                         continue
-                    var ssid = lines[i].substring("802-11-wireless.ssid:".length).trim()
-                    if (ssid)
-                        seen[ssid] = true
+                    }
+                    var sep = raw.indexOf(":")
+                    if (sep <= 0)
+                        continue
+                    var field = raw.substring(0, sep)
+                    var value = raw.substring(sep + 1).trim()
+                    if (field === "connection.uuid")
+                        buffer.uuid = value
+                    else if (field === "802-11-wireless.ssid")
+                        buffer.ssid = value
+                    else if (field === "connection.interface-name")
+                        buffer.ifname = value
                 }
-                var distinct = Object.keys(seen)
+                if (buffer.uuid)
+                    rows.push(buffer)
+
+                var distinct = {}
+                for (var k = 0; k < rows.length; k++) {
+                    if (rows[k].ssid)
+                        distinct[rows[k].ssid] = true
+                }
                 var saved = Services.NetworkService.savedProfiles
                 var lost = []
-                for (var d = 0; d < distinct.length; d++) {
-                    if (!saved[distinct[d]])
-                        lost.push(distinct[d])
-                }
+                Object.keys(distinct).forEach(function (ssid) {
+                    if (!saved[ssid])
+                        lost.push(ssid)
+                })
                 root.check("no saved SSID is lost by the service lookup",
-                    lost.length === 0,
-                    "distinct=" + distinct.length + " lost=" + lost.join(" | "))
+                    lost.length === 0 && Object.keys(distinct).length > 0,
+                    "distinct=" + Object.keys(distinct).length + " lost=" + lost.join(" | "))
+
+                // The invariant behind the "device wlo1 is not compatible…"
+                // failures: every profile the service targets must either be
+                // usable on an adapter this machine has, or be recognised as
+                // stranded so the connect path re-points it. Anything else would
+                // be activated and refused.
+                var liveDevices = root.liveWifiDevices
+                var stranded = []
+                var unflagged = []
+                for (var key in saved) {
+                    var pin = saved[key].ifname ? String(saved[key].ifname) : ""
+                    if (!pin || liveDevices.indexOf(pin) !== -1)
+                        continue
+                    stranded.push(key + "->" + pin)
+                    // The same predicate connect() uses to pick the repair plan.
+                    if (!(saved[key].ifname && liveDevices[0]
+                            && String(saved[key].ifname) !== liveDevices[0]))
+                        unflagged.push(key)
+                }
+                console.log("targets needing an adapter re-point: " + stranded.length
+                    + (stranded.length ? "  [" + stranded.join(" | ") + "]" : ""))
+                root.check("every stranded target is flagged for repair",
+                    unflagged.length === 0, "unflagged=" + unflagged.join(" | "))
+                // Where a usable duplicate exists, ranking must have preferred
+                // it: for each SSID, if any profile is pinned to a live adapter,
+                // the picked profile must be one of those.
+                var liveFor = {}
+                var hasStranded = {}
+                for (var s3 = 0; s3 < rows.length; s3++) {
+                    var row3 = rows[s3]
+                    if (!row3.ssid)
+                        continue
+                    if (!row3.ifname || liveDevices.indexOf(row3.ifname) === -1) {
+                        hasStranded[row3.ssid] = true
+                        continue
+                    }
+                    if (!liveFor[row3.ssid])
+                        liveFor[row3.ssid] = []
+                    liveFor[row3.ssid].push(row3.uuid)
+                }
+                var mistargeted = []
+                Object.keys(liveFor).forEach(function (ssid) {
+                    var picked = saved[ssid]
+                    if (!picked)
+                        return
+                    if (liveFor[ssid].indexOf(picked.uuid) === -1)
+                        mistargeted.push(ssid)
+                })
+                root.check("no usable duplicate was passed over",
+                    mistargeted.length === 0,
+                    "stranded-but-live=" + mistargeted.join(" | "))
                 root.detailCheckDone = true
             }
         }
     }
 
     property var liveUuids: []
+    property var liveWifiDevices: []
     property bool crossCheckDone: false
     property bool detailCheckDone: false
+
+    // Live adapter names, read independently of the service, so the stranded
+    // check compares against the machine rather than against the service.
+    Process {
+        id: deviceListProcess
+        running: false
+        environment: ({ "LC_ALL": "C", "LANG": "C" })
+        command: ["nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var wifi = []
+                var lines = text.split("\n")
+                for (var i = 0; i < lines.length; i++) {
+                    var parts = lines[i].split(":")
+                    if (parts.length >= 2 && parts[1] === "wifi")
+                        wifi.push(parts[0])
+                }
+                root.liveWifiDevices = wifi
+                console.log("live wifi adapters: " + (wifi.join(", ") || "(none)"))
+            }
+        }
+    }
 
     function finish() {
         phase = "done"
@@ -259,6 +364,7 @@ ShellRoot {
     }
 
     Component.onCompleted: {
+        deviceListProcess.running = true
         Qt.callLater(root.step)
     }
 

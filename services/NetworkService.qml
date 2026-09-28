@@ -64,6 +64,10 @@ Singleton {
     // A full radio rescan is expensive; the background tick reuses NM's cached
     // scan results and only a deliberate refresh pays for a real one.
     property bool _rescanRequested: true
+    property int _deviceWaitTries: 0
+    property bool _awaitingDevice: false
+    // The profile map was ranked before the adapter name was known.
+    property bool _profilesResolvedBlind: false
     property real _lastOpenRefreshAt: 0
     property string _connectStderr: ""
     // Immutable snapshot of the attempt in flight. onExited reads this instead
@@ -107,6 +111,21 @@ Singleton {
         function onWifiEnabledChanged() {
             if (root.nmcliAvailable && root.wifiEnabled)
                 powerOnScanTimer.restart()
+        }
+    }
+
+    // A profile map ranked before the adapter name was known can point at a
+    // profile NetworkManager still has pinned to a device that is gone, which
+    // activation refuses outright. Re-resolve the moment the name arrives.
+    Connections {
+        target: root
+        function onWifiDeviceChanged() {
+            if (root.wifiDevice === "" || !root._profilesResolvedBlind)
+                return
+            root._profilesResolvedBlind = false
+            console.info("[Network] adapter '" + root.wifiDevice
+                + "' now known, re-resolving saved profiles")
+            root.requestScan(false, false)
         }
     }
 
@@ -225,6 +244,21 @@ Singleton {
             root.scanPending = true
             return
         }
+        // Which duplicate profile a tap should target is decided by the adapter
+        // name, so never resolve the profile map before that name is known: a
+        // blind pick lands on a profile NetworkManager still has pinned to a
+        // device that no longer exists, and activation is refused with
+        // "device … is not compatible". Read the device table first.
+        if (!root.wifiDevice && root._deviceWaitTries < 3) {
+            root._deviceWaitTries++
+            root._awaitingDevice = true
+            if (!deviceStatusProcess.running)
+                deviceStatusProcess.running = true
+            else
+                scanKickTimer.restart()
+            return
+        }
+        root._deviceWaitTries = 0
         profileCheckProcess.running = true
         root.scanningActive = true
         console.info("[Network] scanning Wi-Fi (rescan=" + root._rescanRequested + ")…")
@@ -282,14 +316,21 @@ Singleton {
         root._clearError()
         connectWatchdog.restart()
 
+        var hasPassword = password != null && String(password) !== ""
+        var stalePin = Logic.isStaleAdapterPin(profile, root.wifiDevice)
         root._job = {
             ssid: ssid,
-            password: password == null ? "" : String(password),
+            password: hasPassword ? String(password) : "",
             hidden: isHidden,
             uuid: profile ? profile.uuid : "",
             savedName: profile ? profile.name : "",
             device: root.wifiDevice,
-            plan: Logic.connectPlan(profile, password != null && String(password) !== "")
+            repoint: stalePin,
+            plan: Logic.connectPlan(profile, hasPassword, root.wifiDevice)
+        }
+        if (stalePin) {
+            console.info("[Network] '" + ssid + "' is pinned to '" + profile.ifname
+                + "', re-pointing it at '" + root.wifiDevice + "'")
         }
         console.info("[Network] connect '" + ssid + "' plan=" + root._job.plan
             + (profile ? " profile=" + profile.name : ""))
@@ -521,6 +562,8 @@ Singleton {
     // One self-identifying field line per requested field, grouped per
     // connection. Passing the uuid as a field is what makes the mapping
     // order-independent; relying on row order silently crossed profiles.
+    // `connection.interface-name` rides along because a profile pinned to an
+    // adapter that no longer exists is dead weight that NM refuses outright.
     Process {
         id: profileDetailProcess
         // Set once a stdout result has been applied, so the stderr handler can
@@ -530,7 +573,8 @@ Singleton {
         environment: root.cEnvironment
         command: {
             var args = ["nmcli", "-t", "-f",
-                "802-11-wireless.ssid,connection.uuid,802-11-wireless-security.key-mgmt",
+                "802-11-wireless.ssid,connection.uuid,"
+                + "802-11-wireless-security.key-mgmt,connection.interface-name",
                 "connection", "show", "uuid"]
             var uuids = profileCheckProcess.allUuids || []
             for (var i = 0; i < uuids.length; i++)
@@ -540,7 +584,11 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 root.savedProfiles = Logic.parseProfileList(
-                    profileCheckProcess.baseText, text).bySsid
+                    profileCheckProcess.baseText, text, root.wifiDevice).bySsid
+                // Ranked blind if the adapter name was not known yet; flag it so
+                // the map is rebuilt once the name lands, rather than waiting for
+                // the next background tick with a wrong pick in place.
+                root._profilesResolvedBlind = (root.wifiDevice === "")
                 profileDetailProcess.detailApplied = true
                 Qt.callLater(root._startScan)
             }
@@ -559,7 +607,7 @@ Singleton {
                 if (!text.trim() || profileDetailProcess.detailApplied)
                     return
                 root.savedProfiles = Logic.parseProfileList(
-                    profileCheckProcess.baseText, "").bySsid
+                    profileCheckProcess.baseText, "", root.wifiDevice).bySsid
                 Qt.callLater(root._startScan)
             }
         }
@@ -639,6 +687,16 @@ Singleton {
                 root._activeEthernetIf = activeEthIf
                 root._activeEthernetConnection = activeEthConn
                 root._ethernetInterfaces = ethList
+
+                // The profile step was held back waiting for the adapter name;
+                // now it can rank duplicate profiles correctly.
+                if (root._awaitingDevice) {
+                    root._awaitingDevice = false
+                    if (!root.wifiDevice)
+                        root._deviceWaitTries = 0
+                    if (!root.scanningActive)
+                        scanKickTimer.restart()
+                }
             }
         }
         stderr: StdioCollector {
@@ -709,9 +767,9 @@ Singleton {
         }
     }
 
-    // Rewrite the stored secret of a saved profile whose old one no longer
-    // works. Only the PSK is touched; key-mgmt stays as the profile was built,
-    // so a WPA3 (SAE) profile is not silently downgraded to wpa-psk.
+    // Repair a saved profile before activating it: re-point an adapter pin
+    // that points at a device which no longer exists, and/or rewrite a secret
+    // the user retyped. Only the properties that need changing are written.
     Process {
         id: connectModifyProcess
         running: false
@@ -719,13 +777,14 @@ Singleton {
         command: {
             var job = root._job
             if (!job || !job.uuid) return ["true"]
-            return ["nmcli"].concat(Logic.modifyArgs(job.uuid, job.password))
+            return ["nmcli"].concat(Logic.modifyArgs(
+                job.uuid, job.password, job.device, job.repoint))
         }
         onExited: function (code) {
             var job = root._job
             if (!job) return
             if (code === 0) {
-                console.info("[Network] secret updated for '" + job.ssid + "'")
+                console.info("[Network] profile repaired for '" + job.ssid + "'")
                 connectProcess.running = true
             } else {
                 root._finishConnect(false, Logic.classifyConnectError(root._connectStderr))
@@ -735,7 +794,7 @@ Singleton {
             onStreamFinished: {
                 if (!text.trim()) return
                 root._connectStderr = text
-                console.warn("[Network] connect modify error: " + text.trim())
+                console.warn("[Network] connect repair error: " + text.trim())
             }
         }
     }

@@ -1,6 +1,6 @@
 ---
 name: quickshell-process-stdio-hazards
-description: "Use when an Afloat service shells out through Quickshell's Process/StdioCollector and gets wrong results, stale results, or results that flip between runs: a command that looks like it launched with the right arguments but didn't, a stdout handler that seems to run on empty input, a result that gets overwritten by the other stream, or a callback that reports the previous run's exit code."
+description: "Use when an Afloat service shells out through Quickshell's Process/StdioCollector and gets wrong results, stale results, or results that flip between runs: a command that looks like it launched with the right arguments but didn't, a stdout handler that seems to run on empty input, a result that gets overwritten by the other stream, a callback that reports the previous run's exit code, or a lookup whose first result is silently ranked on a value that had not loaded yet."
 ---
 
 # Quickshell Process / StdioCollector hazards
@@ -97,6 +97,48 @@ claim, not a stale-but-safe one.
 **Rule: only publish the empty state when the call genuinely succeeded with
 zero rows. Any partial or failed read keeps the previous value.** Stale beats
 wrong.
+
+## 5. A result computed from incomplete context is not "ready"
+
+The same class, one level up: a map ranked on a value that had not loaded yet
+is a *wrong* answer, not a partial one. It looked fine, was internally
+consistent, and every read of it returned a plausible value — so nothing
+downstream could tell it apart from a good one.
+
+Two symptoms of this, both silent:
+
+- A `readonly` property the map is built from is still its default when the
+  first pipeline run fires, so the first result is ranked blind and only the
+  *next* run is correct.
+- Re-deriving the map "when it matters" is not enough if the trigger is a
+  timer: the window between the two runs is user-visible.
+
+**Rule: if a decision depends on a value, do not compute until that value is
+known, and re-compute when it arrives.** Gate the pipeline on the dependency,
+release it from the dependency's own completion handler, and keep a flag saying
+"this result was derived from incomplete input" so the arrival can force a
+rebuild. Prefer gating over waiting for a poll.
+
+```qml
+// The profile map is ranked by adapter name, so it cannot be built before
+// the device table lands.
+if (!root.wifiDevice && root._deviceWaitTries < 3) {
+    root._deviceWaitTries++
+    root._awaitingDevice = true
+    deviceStatusProcess.running = true
+    return
+}
+...
+// …and in the device table's handler:
+if (root._awaitingDevice) {
+    root._awaitingDevice = false
+    scanKickTimer.restart()
+}
+```
+
+Bounded retries, so a genuinely missing value cannot spin forever. Pair it with
+`onXChanged` re-entry on the dependency, which covers the case where the first
+run completed *before* the dependency did.
 
 ## Verification
 
