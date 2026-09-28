@@ -83,11 +83,23 @@ Item {
             choice.closeMenu()
         }
 
+        // A row only owns "dead" left-hand space when its control does not
+        // reach the row edge. The standard (stacked) presentation offsets its
+        // content by contentPadding, so the top-left corner is genuine dead
+        // space and a click there must neutrally drop focus, not focus the field.
         function test_rowBlankDoesNotFocusControls() {
             mouseClick(textRow, 12, 8, Qt.LeftButton)
             verify(!textField.editorItem.activeFocus)
-            mouseClick(choiceRow, 12, 8, Qt.LeftButton)
-            verify(!choice.activeFocus)
+            verify(!textField.activeFocus)
+
+            // The choice row is deliberately NOT asserted here. Its contentHost
+            // starts at x: 0 (LazerSettingsRow.qml:407) and the Choice header
+            // fills the full content width, so (12, 8) is inside the control, not
+            // blank — the header's TapHandler owns that point and calls
+            // forceActiveFocus(). Whether a choice row should keep a left-hand
+            // gutter is a product decision; do not invent a dead zone the current
+            // design does not have. Its focus/blank behaviour is covered by
+            // test_choiceFocusInsideFlickable instead.
         }
     }
 }

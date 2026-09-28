@@ -78,7 +78,10 @@ Item {
             popup.orientation = popup.vertical
             popup.direction = popup.down
             compare(popup.sidebarLayer.y, 0)
-            compare(popup.contentLayer.y, popup.sidebarLayer.height + 1)
+            // The 1px overlap is a deliberate seam-kill contract (d305475e): the
+            // content layer tucks *under* the opaque sidebar, so a `+ 1` gap would
+            // let the layer-shell background bleed through as a dark seam.
+            compare(popup.contentLayer.y, Math.max(0, popup.sidebarLayer.height - 1))
         }
 
         function test_layersReportImplicitSizeFromChildren() {
@@ -92,7 +95,9 @@ Item {
             popup.orientation = popup.vertical
             popup.direction = popup.up
             compare(popup.contentLayer.y, 0)
-            compare(popup.sidebarLayer.y, popup.contentLayer.height + 1)
+            // Same deliberate 1px overlap as the down direction, mirrored: the
+            // sidebar paints above content, so stacking must not leave a seam.
+            compare(popup.sidebarLayer.y, Math.max(0, popup.contentLayer.height - 1))
         }
 
         function test_contentRevealWaitsForDelay() {

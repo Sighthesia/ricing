@@ -22,7 +22,11 @@ Item {
         }
 
         function test_dropdownLifecycle() {
-            compare(dropdown.openFromScale, 0.98)
+            // Assert the contract (the token the popup binds to), not a copied
+            // constant: 3ff46f82 retuned popupFromScale to 0.7 because the old
+            // 0.98 "read as if it never moved".
+            compare(dropdown.openFromScale, Lazer.MotionTokens.popupFromScale)
+            verify(Lazer.MotionTokens.popupFromScale < 1)
             compare(dropdown.openFromY, -4)
             compare(dropdown.openDuration, 160)
             compare(dropdown.closeDuration, 100)

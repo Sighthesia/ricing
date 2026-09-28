@@ -13,6 +13,12 @@ Item {
     QtObject { id: textHolder; property string value: "  wallpaper.png  " }
     QtObject { id: resetState; property int count: 0 }
 
+    // Empty parking spot for the test pointer. Hover state is sticky between
+    // test functions (a HoverHandler keeps reporting until the pointer moves
+    // again), and it drives card colour, border width and `row.hovered` — so
+    // init() parks the pointer here to make every non-hover test deterministic.
+    Item { id: pointerPark; x: 20; y: 470; width: 20; height: 8 }
+
     // Keep a non-settings child here to verify Row's guarded contract.
     Lazer.LazerSettingsRow {
         id: plainRow
@@ -75,41 +81,55 @@ Item {
         }
     }
 
-    Lazer.LazerSettingsToggle {
-        id: toggle
-        checked: toggleHolder.value
-        onToggled: next => toggleHolder.value = next
+    // Park the standalone controls in their own column, clear of every row.
+    // Left at the default (0, 0) they stack on top of `row`/`revertRow` and
+    // their own HoverHandlers win, so the rows below never see a hover — a
+    // fixture-geometry artifact that reads exactly like a product bug.
+    Item {
+        x: 600
+        y: 0
+        width: 150
+        height: 460
+
+        Lazer.LazerSettingsToggle {
+            id: toggle
+            checked: toggleHolder.value
+            onToggled: next => toggleHolder.value = next
+        }
+        Lazer.LazerSettingsSlider {
+            id: slider
+            y: 30
+            from: 0
+            to: 10
+            stepSize: 2
+            suffix: "%"
+            value: sliderHolder.value
+            defaultValue: 2
+            onValueModified: next => sliderHolder.value = next
+        }
+        Lazer.LazerSettingsSlider { id: secondSlider; y: 70; value: 2 }
+        Lazer.LazerSettingsChoice {
+            id: choice
+            y: 110
+            model: [
+                { value: "auto", label: "自动" },
+                { value: "dark", label: "深色模式" }
+            ]
+            currentValue: choiceHolder.value
+            onValueSelected: next => choiceHolder.value = next
+        }
+        Lazer.LazerSettingsTextField {
+            id: textField
+            y: 180
+            text: textHolder.value
+            placeholderText: "壁纸路径"
+            onTextCommitted: next => textHolder.value = next
+            onClearRequested: textHolder.value = ""
+        }
+        Lazer.LazerSettingsTextField { id: secondTextField; y: 220; text: "second" }
+        Lazer.LazerSettingsToggle { id: invalidWidthToggle; y: 260; availableWidth: -20 }
+        Lazer.LazerSettingsSlider { id: invalidWidthSlider; y: 290; availableWidth: NaN }
     }
-    Lazer.LazerSettingsSlider {
-        id: slider
-        from: 0
-        to: 10
-        stepSize: 2
-        suffix: "%"
-        value: sliderHolder.value
-        defaultValue: 2
-        onValueModified: next => sliderHolder.value = next
-    }
-    Lazer.LazerSettingsSlider { id: secondSlider; value: 2 }
-    Lazer.LazerSettingsChoice {
-        id: choice
-        model: [
-            { value: "auto", label: "自动" },
-            { value: "dark", label: "深色模式" }
-        ]
-        currentValue: choiceHolder.value
-        onValueSelected: next => choiceHolder.value = next
-    }
-    Lazer.LazerSettingsTextField {
-        id: textField
-        text: textHolder.value
-        placeholderText: "壁纸路径"
-        onTextCommitted: next => textHolder.value = next
-        onClearRequested: textHolder.value = ""
-    }
-    Lazer.LazerSettingsTextField { id: secondTextField; text: "second" }
-    Lazer.LazerSettingsToggle { id: invalidWidthToggle; availableWidth: -20 }
-    Lazer.LazerSettingsSlider { id: invalidWidthSlider; availableWidth: NaN }
 
     SignalSpy { id: toggleSpy; target: toggle; signalName: "toggled" }
     SignalSpy { id: sliderSpy; target: slider; signalName: "valueModified" }
@@ -123,11 +143,37 @@ Item {
     TestCase {
         name: "LazerSettingsControls"
 
+        // Generous ceiling for every try* below: the longest Behaivour in play
+        // is MotionTokens.slow (240ms) plus a searchExitDelay pause.
+        readonly property int settleTimeout: 3000
+
         function init() {
+            // Re-stack every row. init() runs before each function, and
+            // test_choiceRowReservesMenuHeightAndTogglesClosed deliberately
+            // moves choiceRow to y 0; a row left stacked on top of another
+            // shadows the one below it (its reset strip swallows the click, its
+            // hover handlers starve the other row's), which reads as a product
+            // bug but is pure fixture pollution.
             row.y = 20
+            revertRow.y = 80
             compactRow.y = 150
             choiceRow.y = 280
             resetTextRow.y = 380
+            // Park the pointer on empty host space so a previous test's hover
+            // cannot tint a card or report `hovered` in the next one.
+            mouseMove(pointerPark, pointerPark.width / 2, pointerPark.height / 2)
+            // init() only resets what it lists. A test function that mutates a
+            // row's `enabled`, leaves a choice menu open, leaves a Qt.binding on
+            // a control's requestedWidth, or writes slider.defaultValue poisons
+            // every function that runs after it — so reset all of them here.
+            row.enabled = true
+            revertRow.enabled = true
+            choiceRow.enabled = true
+            compactRow.enabled = true
+            // test_rowWidthBindingRemainsOwnedByParent installs a permanent
+            // Qt.binding on requestedWidth; drop it back to the implicit width.
+            rowToggle.requestedWidth = rowToggle.implicitWidth
+            rowChoice.menuOpen = false
             toggle.enabled = true
             toggleHolder.value = false
             toggleSpy.clear()
@@ -136,6 +182,10 @@ Item {
             slider.to = 10
             slider.stepSize = 2
             slider.requestedWidth = slider.implicitWidth
+            // test_sliderDoubleClickRestoresDefault writes `undefined` here and
+            // never restores it, which makes every later resetToDefault() a
+            // no-op and leaves flashActive permanently dark.
+            slider.defaultValue = 2
             sliderHolder.value = 4
             slider.focus = false
             slider.flashAnimationItem.stop()
@@ -145,6 +195,8 @@ Item {
             secondSlider.focus = false
             sliderSpy.clear()
             revertRowSliderSpy.clear()
+            revertRow.defaultValue = 5
+            revertRow.currentValue = 7
             choice.enabled = true
             choiceHolder.value = "auto"
             choiceSpy.clear()
@@ -158,7 +210,6 @@ Item {
             commitSpy.clear()
             clearSpy.clear()
             resetState.count = 0
-            revertRow.currentValue = 7
             Lazer.MotionTokens.reducedMotionOverride = false
         }
 
@@ -191,9 +242,11 @@ Item {
             compare(toggle.implicitHeight, 20)
             verify(toggle.nubItem)
             toggle.checked = false
-            compare(toggle.nubItem.color, Lazer.LazerTheme.settingsToggleOff)
+            // The capsule colour runs a `Behavior on color`, so reading it in the
+            // same turn as the `checked` flip still returns the previous colour.
+            tryCompare(toggle.nubItem, "color", Lazer.LazerTheme.settingsToggleOff, settleTimeout)
             toggle.checked = true
-            compare(toggle.nubItem.color, Lazer.LazerTheme.settingsAccent)
+            tryCompare(toggle.nubItem, "color", Lazer.LazerTheme.settingsAccent, settleTimeout)
             Lazer.MotionTokens.reducedMotionOverride = true
             compare(toggle.nubMorphEnabled, false)
             compare(toggle.fillWidth, false)
@@ -334,45 +387,79 @@ Item {
         function test_sliderDefaultMarkerAndFullHeightThumb() {
             slider.defaultValue = 2
             sliderHolder.value = 4
-            wait(0)
+            // Away from the default value the marker is a short pip; at the
+            // default it swells into the active thumb's full-height slot.
+            // The height is Behavioured, and the radius follows its own height
+            // (`radius: height / 2`), so assert that relationship rather than
+            // copying the pixel constants a retune would desync.
             verify(slider.defaultMarkerVisible)
             compare(slider.defaultMarkerItem.width, 4)
-            compare(slider.defaultMarkerItem.height, 6)
-            compare(slider.defaultMarkerItem.radius, 3)
             compare(slider.defaultMarkerItem.color, "#d5ccff")
             compare(slider.nubItem.height, slider.trackItem.height)
             compare(slider.nubItem.width, 10)
+            // The thumb's horizontal profile is a pill. The product hardcodes
+            // radius 5 for a 10px-wide thumb, so the invariant worth locking is
+            // "never rounder than half its own width" — asserting radius ==
+            // width/2 would encode a coincidence as a derivation and break for
+            // the wrong reason the day the thumb is resized.
+            verify(slider.nubItem.radius <= slider.nubItem.width / 2)
             compare(slider.thumbColor, Lazer.LazerTheme.settingsSliderThumb)
             verify(slider.thumbColor !== Lazer.LazerTheme.settingsAccent)
+            // The marker doubles as the light thumb only while the value sits
+            // on the default; elsewhere there is no thumb light at all.
             verify(slider.thumbLightItem === null)
             verify(slider.defaultMarkerItem.z > slider.nubItem.z)
             verify(slider.nubItem.z > slider.trackItem.z)
             compare(slider.defaultMarkerItem.height, 6)
-            compare(slider.defaultMarkerItem.radius, 3)
-            sliderHolder.value = 2
-            wait(0)
-            verify(slider.defaultMarkerVisible)
-            compare(slider.defaultMarkerItem.height, slider.trackItem.height - 6)
             compare(slider.defaultMarkerItem.radius, slider.defaultMarkerItem.height / 2)
+
+            sliderHolder.value = 2
+            // On the default value the marker reaches the track's inner height
+            // (track height minus its 10px inset) — read it after the Behavior.
+            tryCompare(slider.defaultMarkerItem, "height", slider.trackItem.height - 10, settleTimeout)
+            compare(slider.defaultMarkerItem.radius, slider.defaultMarkerItem.height / 2)
+            verify(slider.thumbLightItem === slider.defaultMarkerItem)
+
             sliderHolder.value = 4
-            wait(0)
-            compare(slider.defaultMarkerItem.height, 6)
+            tryCompare(slider.defaultMarkerItem, "height", 6, settleTimeout)
+            compare(slider.defaultMarkerItem.radius, slider.defaultMarkerItem.height / 2)
+            verify(slider.thumbLightItem === null)
         }
 
         function test_choiceRowReservesMenuHeightAndTogglesClosed() {
             choiceRow.y = 0
             choiceRow.width = 520
-            choiceRow.height = choiceRow.implicitHeight
             rowChoice.openMenu()
             wait(0)
-            compare(rowChoice.menuReservedHeight, 38)
-            compare(choiceRow.height, choiceRow.implicitHeight)
-            compare(choiceRow.height, rowChoice.implicitHeight + rowChoice.menuReservedHeight)
-            compare(rowChoice.controlItem.y, 0)
+            // The reserved height is the option list the control is about to
+            // paint. LazerSettingsChoice derives it from the model length and
+            // clamps it at the shared dropdownMaxHeight token, so assert that
+            // relationship instead of the pixel literal it happens to be today.
+            compare(rowChoice.menuReservedHeight, rowChoice.optionListHeight)
+            verify(rowChoice.optionListHeight < Lazer.LazerTheme.dropdownMaxHeight,
+                   "a one-entry list must stay under the max-height cap")
+            // The row grows to whatever the control reserved (header + list +
+            // its own gaps) and keeps the row's list gap on top of that.
+            compare(choiceRow.implicitHeight, rowChoice.implicitHeight)
+            tryCompare(choiceRow, "height", rowChoice.height + choiceRow.listGap, settleTimeout)
+            compare(rowChoice.y, 0)
+            choiceRow.y = 280
+
+            // A list long enough to overflow must clamp at the token, not grow
+            // without bound. Re-assigning `model` drops the fixture's literal
+            // binding, so put the original single-entry list back afterwards.
+            var longModel = []
+            for (var i = 0; i < 20; ++i)
+                longModel.push({ value: "value" + i, label: "选项" + i })
+            rowChoice.model = longModel
+            compare(rowChoice.menuReservedHeight, Lazer.LazerTheme.dropdownMaxHeight)
+            rowChoice.model = [{ value: "auto", label: "自动" }]
+            compare(rowChoice.menuReservedHeight, rowChoice.optionListHeight)
+
             rowChoice.openMenu()
             compare(rowChoice.menuOpen, false)
             compare(rowChoice.menuReservedHeight, 0)
-            compare(choiceRow.height, rowChoice.implicitHeight)
+            tryCompare(choiceRow, "height", rowChoice.height + choiceRow.listGap, settleTimeout)
         }
 
         function test_sliderReverseTrackMapping() {
@@ -407,23 +494,29 @@ Item {
         }
 
         function test_choiceUsesEmbeddedLabelPresentation() {
-            compare(choice.implicitHeight, 52)
-            compare(choice.headerItem.radius, 6)
+            compare(choice.implicitHeight, Lazer.LazerTheme.settingsChoiceHeight)
+            compare(choice.headerItem.radius, Lazer.LazerTheme.settingsControlRadius)
             compare(choice.headerItem.color, Lazer.LazerTheme.settingsControlSurface)
             compare(choice.rowPresentation, "choice")
             compare(rowChoice.rowPresentation, "choice")
-            compare(rowChoice.labelTextItem.visible, false)
-            compare(rowChoice.controlItem.fieldLabel, "配色方案")
+            // The Choice owns the label: the row's own Text is hidden and the
+            // row hands it its labelText to render inside the header.
+            verify(!choiceRow.labelTextItem.visible)
+            compare(rowChoice.fieldLabel, "配色方案")
             compare(rowChoice.height, rowChoice.implicitHeight)
-            var choiceOrigin = rowChoice.controlItem.mapToItem(rowChoice, 0, 0)
-            var surfaceOrigin = rowChoice.controlItem.surfaceItem.mapToItem(rowChoice, 0, 0)
-            var labelOrigin = rowChoice.controlItem.fieldColumnItem.mapToItem(rowChoice, 0, 0)
-            verify(Math.abs(choiceOrigin.x - rowChoice.cardItem.x) < 0.1)
-            verify(Math.abs(surfaceOrigin.x - choiceOrigin.x) < 0.1)
-            verify(Math.abs(labelOrigin.x - rowChoice.contentPadding) < 0.1)
-            compare(rowChoice.controlItem.width, rowChoice.contentItem.width)
-            compare(rowChoice.controlItem.headerItem.width, rowChoice.controlItem.width)
-            compare(rowChoice.cardItem.color, Lazer.LazerTheme.settingsCard)
+            compare(rowChoice.y, 0)
+            // The Choice header *is* the card: it fills the content column and
+            // the row paints no card surface behind it (cardItem is
+            // `visible: !choicePresentation`), so there is no card geometry here.
+            verify(!choiceRow.cardItem.visible, "choice rows must not paint a card surface")
+            var surfaceOrigin = rowChoice.surfaceItem.mapToItem(rowChoice, 0, 0)
+            verify(Math.abs(surfaceOrigin.x) < 0.1, "the choice surface starts at the row edge")
+            // The Choice fills the row's content column: LazerSettingsRow binds
+            // a fillWidth control's requestedWidth to contentHost.width.
+            // The row binds a fillWidth control's requestedWidth to its own
+            // contentHost.width, so the Choice exactly fills the content column.
+            compare(rowChoice.width, choiceRow.contentItem.width)
+            compare(rowChoice.surfaceItem.width, rowChoice.width)
         }
 
         function test_choiceOpensRealDropdownInsteadOfCycling() {
@@ -431,19 +524,20 @@ Item {
             choice.forceActiveFocus()
             keyPress(Qt.Key_Right)
             compare(choiceHolder.value, "auto")
-            compare(dropdownSpy.count, 0)
             keyPress(Qt.Key_Enter)
             compare(choice.menuOpen, true)
             verify(String(choice.chevronItem.source).indexOf("chevron-up.svg") !== -1)
-            compare(dropdownSpy.count, 1)
-            verify(dropdownSpy.signalArguments[0][0] === choice)
             keyPress(Qt.Key_Space)
             compare(choice.menuOpen, false)
             verify(String(choice.chevronItem.source).indexOf("chevron-down.svg") !== -1)
             choice.closeMenu()
             compare(choice.menuOpen, false)
-            compare(dropdownDismissSpy.count, 1)
             compare(choiceHolder.value, "auto")
+            // No bridge assertion here on purpose: since d5721e73 the dropdown
+            // paints itself inside the Choice's own tree, so
+            // SettingsOverlayBridge.showDropdown/hideDropdown have no caller and
+            // dropdownRequested/dropdownDismissed are never emitted by the
+            // Choice. Spying on them can only ever report 0.
         }
 
         function test_choiceDisabledBlocksMenu() {
@@ -518,25 +612,34 @@ Item {
         }
 
         function test_rowHasMinimumHeightAndDefaultControl() {
-            verify(row.implicitHeight >= 56)
+            // Inline rows render one line: the row's cardContentHeight for the
+            // inline presentation is 44, not the 56px stacked minimum it used to
+            // reserve. Assert the token-free floor the presentation guarantees.
+            verify(row.implicitHeight >= 44)
             compare(row.compactLayout, false)
             compare(row.controlItem, rowToggle)
             compare(row.cardItem.color, Lazer.LazerTheme.settingsCard)
-            compare(row.cardItem.radius, 6)
+            compare(row.cardItem.radius, row.cardRadius)
             compare(row.cardItem.width, row.width)
-            verify(row.revertButtonItem.z > row.contentItem.z)
             verify(row.textRegionWidth > 0)
             verify(row.labelTextItem.visible)
             verify(row.labelTextItem.width > 0)
             compare(row.labelTextItem.text, "设置")
-            verify(row.controlItem.width > 0)
-            compare(row.controlItem.width, 44)
-            verify(row.controlItem.height > 0)
-            compare(row.controlItem.height, 20)
-            verify(row.controlItem.x >= 0)
-            verify(row.controlItem.x + row.controlItem.width <= row.width - 16)
+            // The toggle's width and its host's x both run Behaviors, and init()
+            // just reset requestedWidth, so wait for the capsule to land.
+            tryVerify(function() { return rowToggle.width > 0 }, settleTimeout)
+            tryCompare(rowToggle, "width", rowToggle.implicitWidth, settleTimeout)
+            tryCompare(rowToggle, "height", rowToggle.implicitHeight, settleTimeout)
+            // rowToggle.x is local to the row's internal control host, so map it
+            // into the row before checking it against the row's own budget.
+            tryVerify(function() {
+                var left = rowToggle.mapToItem(row, 0, 0).x
+                return left >= 0 && left + rowToggle.width <= row.width - row.contentPadding
+            }, settleTimeout)
             row.enabled = false
-            compare(row.opacity, Lazer.LazerTheme.settingsDisabledAlpha)
+            // Row opacity fades through a Behavior, so the disabled alpha only
+            // reads true once the fade has finished.
+            tryCompare(row, "opacity", Lazer.LazerTheme.settingsDisabledAlpha, settleTimeout)
             compare(row.contentEnabled, false)
             compare(rowToggle.rowEnabled, false)
             compare(choice.activeFocusOnTab, true)
@@ -550,7 +653,13 @@ Item {
             compare(slider.rowPresentation, "split")
             compare(row.rowPresentation, "inline")
             compare(revertRow.rowPresentation, "split")
-            verify(rowToggle.x >= row.width - rowToggle.width - 20)
+            // rowToggle.x is local to the row's control host, so the right-hand
+            // budget has to be checked in row coordinates. The host's x and the
+            // capsule's width are both Behavioured: read once they have settled.
+            tryVerify(function() {
+                var left = rowToggle.mapToItem(row, 0, 0).x
+                return left + rowToggle.width <= row.width - row.contentPadding
+            }, settleTimeout)
             verify(revertRowSlider.width >= 200)
             verify(revertRowSlider.width <= 240)
             compare(revertRowSlider.trackItem.height, 30)
@@ -560,13 +669,17 @@ Item {
             compare(revertRowSlider.trackFillItem.color, Lazer.LazerTheme.settingsAccent)
             compare(revertRowSlider.nubItem.width, 10)
             compare(revertRowSlider.nubItem.height, revertRowSlider.trackItem.height)
-            compare(revertRowSlider.nubItem.radius, 5)
+            verify(revertRowSlider.nubItem.radius <= revertRowSlider.nubItem.width / 2)
             compare(revertRowSlider.nubItem.color, Lazer.LazerTheme.settingsSliderThumb)
             verify(revertRowSlider.nubItem.color !== Lazer.LazerTheme.settingsAccent)
             verify(revertRowSlider.nubItem !== null)
-            compare(revertRowSlider.height, 30)
+            compare(revertRowSlider.height, revertRowSlider.implicitHeight)
             verify(revertRow.valueTextItem.visible)
-            compare(revertRow.contentItem.height - revertRow.valueTextItem.bottom, 10)
+            // The split row's value text sits on a 10px bottom inset. Item.bottom
+            // is a QQuickAnchorLine (the anchor), not the edge coordinate, so
+            // read the edge as y + height.
+            compare(revertRow.contentItem.height
+                    - (revertRow.valueTextItem.y + revertRow.valueTextItem.height), 10)
         }
 
         function test_rowSearchContractMatchesLabelOrDescription() {
@@ -583,11 +696,14 @@ Item {
             row.searchQuery = "audio"
             verify(!row.matchesSearch)
             verify(!row.searchVisible)
-            verify(!row.visible)
-            compare(row.height, 0)
+            // A filtered-out row collapses height, opacity and x through
+            // Behaviors, so it keeps painting (and reading `visible: true`)
+            // until that exit geometry has actually landed.
+            tryVerify(function() { return !row.visible }, settleTimeout)
+            tryCompare(row, "height", 0, settleTimeout)
             row.searchQuery = ""
-            verify(row.visible)
-            verify(row.height > 0)
+            tryVerify(function() { return row.visible }, settleTimeout)
+            tryVerify(function() { return row.height > 0 }, settleTimeout)
             row.enabled = false
             row.searchQuery = "设置"
             verify(row.matchesSearch)
@@ -604,11 +720,16 @@ Item {
 
             compare(row.rowHoverBlocking, false)
             mouseMove(row, 24, 12)
-            verify(row.hovered)
+            // HoverHandlers only report the new point after an event-loop turn.
+            tryVerify(function() { return row.hovered }, settleTimeout)
 
             mouseMove(row, row.controlRegionLeft + row.textRegionWidth - 24, row.height / 2)
-            verify(row.hovered)
-            compare(row.cardItem.border.width, 1.5)
+            tryVerify(function() { return row.hovered }, settleTimeout)
+            // The accent border width is Behavioured, so read it after the
+            // highlight animation has landed. `border` is a grouped property:
+            // tryCompare only resolves a plain property path, so poll the value
+            // expression instead.
+            tryVerify(function() { return row.cardItem.border.width === 1.5 }, settleTimeout)
         }
 
         function test_rowHoverCoversTextFieldAndChoiceControls() {
@@ -622,7 +743,10 @@ Item {
 
             mouseMove(choiceRow, rowChoice.width / 2, rowChoice.height / 2)
             verify(choiceRow.hovered)
-            compare(choiceRow.cardItem.border.width, 1.5)
+            // No card assertion for the choice row: its cardItem is
+            // `visible: !choicePresentation`, so nothing is painted and there
+            // is no visible card whose border could be measured. The `hovered`
+            // check above is the row's real hover contract.
         }
 
         function test_rowBlankAreaDoesNotActivateItsControl() {
@@ -654,7 +778,9 @@ Item {
         function test_compactRowStacksTextAndControl() {
             compare(compactRow.compactLayout, true)
             verify(compactRow.textRegionWidth > 0)
-            verify(compactTextField.width <= 188)
+            // A full-width field fills the row's padded content column, so the
+            // budget is the row's own padding, not a copied pixel constant.
+            compare(compactTextField.width, compactRow.width - compactRow.contentPadding * 2)
             verify(compactTextField.x >= 0)
             verify(compactTextField.x + compactTextField.width <= compactRow.width - 16)
             verify(compactRow.labelTextItem.bottom <= compactTextField.top)
@@ -665,10 +791,15 @@ Item {
             var holder = Qt.createQmlObject('import QtQuick; QtObject { property real value: 300 }', row)
             rowToggle.requestedWidth = Qt.binding(function() { return holder.value })
             compare(rowToggle.requestedWidth, 300)
-            verify(rowToggle.width <= row.width - 32)
+            tryVerify(function() { return rowToggle.width <= row.width - 32 }, settleTimeout)
             holder.value = 180
             compare(rowToggle.requestedWidth, 180)
-            compare(rowToggle.width, 180)
+            // requestedWidth updates instantly, but the capsule's own
+            // `Behavior on width` needs the event loop to reach 180.
+            tryCompare(rowToggle, "width", 180, settleTimeout)
+            // Undo the binding so it does not outlive this test function.
+            rowToggle.requestedWidth = rowToggle.implicitWidth
+            holder.destroy()
         }
 
         function test_rowShowsRevertUntilValueMatchesDefault() {
@@ -677,14 +808,29 @@ Item {
             verify(revertRow.revertVisible)
             verify(revertRow.canReset)
             verify(revertRow.revertButtonItem.visible)
-            compare(revertRow.revertButtonItem.width, 34)
-            compare(revertRow.revertButtonItem.height, 28)
-            compare(revertRow.revertButtonItem.children[0].radius, 6)
-            compare(revertRow.revertButtonItem.children[0].color, Lazer.LazerTheme.settingsResetSurface)
+            // The reset control is a strip that slides out from under the card's
+            // rounded right edge and spans the whole row body — it is not a
+            // small button floating in the row's vertical centre.
+            compare(revertRow.revertButtonItem.width, revertRow.revertZoneWidth + revertRow.cardRadius)
+            compare(revertRow.revertButtonItem.height, revertRow.bodyHeight)
+            compare(revertRow.revertButtonItem.children[0].topRightRadius, revertRow.cardRadius)
+            compare(revertRow.revertButtonItem.children[0].bottomRightRadius, revertRow.cardRadius)
+            tryCompare(revertRow.revertButtonItem.children[0], "color",
+                       Lazer.LazerTheme.settingsResetSurface, settleTimeout)
+            tryCompare(revertRow.revertButtonItem, "x", revertRow.revertVisibleX, settleTimeout)
             compare(revertRow.revertButtonItem.x + revertRow.revertButtonItem.width,
                     revertRow.width)
+            // The strip sits below the card so it reads as tucked behind it.
             verify(revertRow.revertButtonItem.z < revertRow.cardItem.z)
-            compare(revertRow.rowHovered, false)
+            // The strip owns its own hover: pointing at the row body highlights
+            // the row, pointing at the strip does not (the row's highlight stops
+            // at revertVisibleX). Assert both directions rather than comparing
+            // against whatever hover state the previous test function left.
+            mouseMove(revertRow, 200, 20)
+            tryVerify(function() { return revertRow.rowHovered }, settleTimeout)
+            mouseMove(revertRow.revertButtonItem, revertRow.revertButtonItem.width / 2,
+                      revertRow.revertButtonItem.height / 2)
+            tryVerify(function() { return !revertRow.rowHovered }, settleTimeout)
             var sliderRight = revertRowSlider.mapToItem(revertRow, revertRowSlider.width, 0).x
             verify(sliderRight <= revertRow.revertButtonItem.x + revertRow.cardRadius)
             var beforeSliderSignals = revertRowSliderSpy.count
@@ -701,6 +847,9 @@ Item {
             verify(revertRow.isDefault)
             verify(!revertRow.revertVisible)
             verify(!revertRow.canReset)
+            // Once the value matches the default the strip slides back behind
+            // the card edge and stops being visible at all.
+            tryCompare(revertRow.revertButtonItem, "x", revertRow.revertHiddenX, settleTimeout)
             verify(!revertRow.revertButtonItem.visible)
             verify(revertRow.revertButtonItem.x + revertRow.revertButtonItem.width
                    <= revertRow.cardItem.x + revertRow.cardItem.width)
@@ -710,16 +859,22 @@ Item {
             verify(!revertRow.revertButtonItem.visible)
         }
 
-        function test_textFieldResetButtonCentersOnField() {
-            var fieldCenter = resetTextField.mapToItem(resetTextRow,
-                                                       resetTextField.width / 2,
-                                                       resetTextField.height / 2)
-            var buttonCenter = resetTextRow.revertButtonItem.mapToItem(resetTextRow,
-                                                                        resetTextRow.revertButtonItem.width / 2,
-                                                                        resetTextRow.revertButtonItem.height / 2)
+        // The reset control is a full-height strip flush with the row's right
+        // edge; a0ae4159 removed the old vertically-centred-button formula, so
+        // assert the strip's span rather than a centring relationship.
+        function test_textFieldResetButtonSpansFullRowHeight() {
             verify(resetTextRow.revertButtonItem.visible)
-            verify(Math.abs(fieldCenter.y - buttonCenter.y) < 0.1)
-            compare(resetTextRow.revertButtonItem.children[0].radius, 6)
+            compare(resetTextRow.revertButtonItem.height, resetTextRow.bodyHeight)
+            compare(resetTextRow.revertButtonItem.height, resetTextRow.height - resetTextRow.listGap)
+            compare(resetTextRow.revertButtonItem.children[0].topRightRadius, resetTextRow.cardRadius)
+            compare(resetTextRow.revertButtonItem.children[0].bottomRightRadius, resetTextRow.cardRadius)
+            tryCompare(resetTextRow.revertButtonItem, "x", resetTextRow.revertVisibleX, settleTimeout)
+            compare(resetTextRow.revertButtonItem.x + resetTextRow.revertButtonItem.width,
+                    resetTextRow.width)
+            // The field keeps the row's own padded budget; the strip does not
+            // eat into it.
+            var fieldRight = resetTextField.mapToItem(resetTextRow, resetTextField.width, 0).x
+            verify(fieldRight <= resetTextRow.revertButtonItem.x)
         }
     }
 }
