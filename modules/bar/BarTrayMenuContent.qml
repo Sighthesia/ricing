@@ -384,9 +384,9 @@ Item {
         acceptedButtons: Qt.NoButton
         // NOTE: onEntered carries no mouse parameter; use the mouseX/mouseY
         // item properties instead (valid in any handler).
-        onEntered: { root.rememberCursor(mouseX, mouseY); root.hoverAtCatcher(mouseY + menuFlick.contentY) }
-        onPositionChanged: { root.rememberCursor(mouseX, mouseY); root.hoverAtCatcher(mouseY + menuFlick.contentY) }
-        onExited: root.hoverLeaveCatcher()
+        onEntered: { root.traceEvent("primary", "enter", mouseX, mouseY); root.rememberCursor(mouseX, mouseY); root.hoverAtCatcher(mouseY + menuFlick.contentY) }
+        onPositionChanged: { root.traceEvent("primary", "move", mouseX, mouseY); root.rememberCursor(mouseX, mouseY); root.hoverAtCatcher(mouseY + menuFlick.contentY) }
+        onExited: { root.traceEvent("primary", "exit", mouseX, mouseY); root.hoverLeaveCatcher() }
     }
     // Submenu column: the whole band beside the primary is one input surface,
     // not just the painted panel. The panel hangs from its trigger row's bottom
@@ -426,6 +426,7 @@ Item {
             // delivers right after the enter does not read as movement.
             lastColumnX = mouseX
             lastColumnY = mouseY
+            root.traceEvent("band", "enter", mouseX, mouseY)
             if (debugLeave)
                 console.log("[afloat:TrayDebug] enter column-band at " + mouseX + "," + mouseY)
             root.hoverAtSubColumn(mouseX, mouseY)
@@ -434,11 +435,13 @@ Item {
             var moved = mouseX !== lastColumnX || mouseY !== lastColumnY
             lastColumnX = mouseX
             lastColumnY = mouseY
+            root.traceEvent("band", "move", mouseX, mouseY)
             root.hoverAtSubColumn(mouseX, mouseY)
             if (moved)
                 root.transitToSubmenu()
         }
         onExited: {
+            root.traceEvent("band", "exit", mouseX, mouseY)
             root.highlightedSubmenuRow = null
             // Same reasoning as the primary catcher: report the position while
             // it is still known, so the host can check it against the region.
@@ -449,6 +452,41 @@ Item {
                 console.log("[afloat:TrayDebug] leave column-band at " + mouseX + "," + mouseY)
         }
     }
+    // Event-level hover trace, off unless diagnostics are on. Sampled snapshots
+    // at 120ms cannot see a delivery that stops between two samples, and "the
+    // panel is visible but nothing on it reacts" is exactly that shape of bug.
+    // Each owner reports its first and last event, so a chain that breaks shows
+    // up as the last owner that spoke — which is the only thing that
+    // distinguishes "Qt never delivered" from "we mishandled it".
+    property bool debugEvents: false
+    property int _evPrimary: 0
+    property int _evBand: 0
+    property int _evPanel: 0
+    property string _evFirstPrimary: "none"
+    property string _evFirstBand: "none"
+    property string _evFirstPanel: "none"
+    function traceEvent(owner, kind, lx, ly) {
+        if (!debugEvents)
+            return
+        var n = owner === "primary" ? root._evPrimary
+            : owner === "band" ? root._evBand : root._evPanel
+        if (owner === "primary") {
+            root._evPrimary += 1
+            if (root._evFirstPrimary === "none")
+                root._evFirstPrimary = kind + "@" + lx + "," + ly
+        } else if (owner === "band") {
+            root._evBand += 1
+            if (root._evFirstBand === "none")
+                root._evFirstBand = kind + "@" + lx + "," + ly
+        } else {
+            root._evPanel += 1
+            if (root._evFirstPanel === "none")
+                root._evFirstPanel = kind + "@" + lx + "," + ly
+        }
+        console.log("[afloat:TrayEvent] " + owner + " " + kind + " at " + lx + "," + ly
+            + " n=" + n)
+    }
+
     function transitToSubmenu() {
         // A leaf activation dismisses the whole popup; a transit arrival
         // landing in that window must not bounce the retracting submenu back
@@ -790,6 +828,23 @@ Item {
                 color: Lazer.LazerTheme.textPrimary
                 font.pixelSize: 13
                 font.bold: true
+            }
+        }
+
+        // Does the VISIBLE panel receive pointer events at all? This is the one
+        // measurement that separates "the panel is dead" from "the panel is live
+        // and the mapping is wrong", and the two look identical from outside.
+        // Non-blocking so it observes alongside the rows' handlers rather than
+        // competing with them for delivery.
+        HoverHandler {
+            id: submenuPanelProbe
+            blocking: false
+            onHoveredChanged: {
+                root.traceEvent("panel", hovered ? "enter" : "exit", -1, -1)
+            }
+            onPointChanged: function(point) {
+                root.traceEvent("panel", "move", Math.round(point.position.x),
+                    Math.round(point.position.y))
             }
         }
 

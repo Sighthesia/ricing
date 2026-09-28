@@ -165,6 +165,10 @@ PanelWindow {
     // "the user left", which is wrong when the compositor dropped focus while
     // the pointer sat inside the region — this is what tells the two apart.
     property string _lastLeave: "none"
+    // The popup surface's own unfiltered pointer position, in container
+    // coordinates. Survives the leave, so it records where the pointer was when
+    // the surface lost it.
+    property var _lastRawPoint: null
     property string _lastDeparture: "none"
     // True when the most recent tray departure was reported from inside the
     // committed input region, i.e. the pointer was still over the popup. The
@@ -295,6 +299,8 @@ PanelWindow {
             return
         if (tc.debugLeave !== root.debugEnabled)
             tc.debugLeave = root.debugEnabled
+        if (tc.debugEvents !== root.debugEnabled)
+            tc.debugEvents = root.debugEnabled
         // The tray reports a departure with the position it still remembers, so
         // the host can judge the exit against the input region instead of
         // guessing from a memory it may already have lost.
@@ -379,6 +385,15 @@ PanelWindow {
                 "notifClaimsInput": Number(PopupInputArbitration.notifHeight) > 0,
                 "pointerStolenBy": root._thiefAt(root._cursorInViewport(
                     root._trayContent())),
+                // Unfiltered pointer, plus the per-owner event tally. The owner
+                // that stopped speaking is the link where delivery broke.
+                "rawPoint": root._lastRawPoint,
+                "evPrimary": tc ? Number(tc._evPrimary) : -1,
+                "evBand": tc ? Number(tc._evBand) : -1,
+                "evPanel": tc ? Number(tc._evPanel) : -1,
+                "firstPrimary": String(tc ? tc._evFirstPrimary : "none"),
+                "firstBand": String(tc ? tc._evFirstBand : "none"),
+                "firstPanel": String(tc ? tc._evFirstPanel : "none"),
             },
             "host": {
                 "phase": root.open ? "open" : (root.surfaceActive ? "revealing" : "closed"),
@@ -1324,7 +1339,26 @@ PanelWindow {
             HoverHandler {
                 id: popupHoverHandler
                 blocking: false
-                onHoveredChanged: root.popupHovered = hovered
+                onHoveredChanged: {
+                    root.popupHovered = hovered
+                    // The compositor's own view of the pointer, before any
+                    // MouseArea filtering. When the panel is visibly under the
+                    // cursor but nothing on it reacts, this is the only source
+                    // that says whether the pointer is still ours at all — and
+                    // its last known position on the way out is where delivery
+                    // actually stopped.
+                    if (!hovered && root.debugEnabled)
+                        root.debugLog("popupPointerGone", {
+                            "lastRaw": root._lastRawPoint,
+                            "region": root._debugRect(popupInputRegion),
+                        })
+                }
+                onPointChanged: function(point) {
+                    root._lastRawPoint = {
+                        "x": Math.round(point.position.x * 10) / 10,
+                        "y": Math.round(point.position.y * 10) / 10,
+                    }
+                }
             }
 
             // Flip compensation: both layers glide right by the container's
