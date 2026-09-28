@@ -512,17 +512,21 @@ Item {
             })
             var ring = findByName(item, "wifiScanRing")
             verify(ring !== null, "wifi panel should carry a scan ring")
-            compare(ring.visible, false, "ring is hidden while idle")
+            // `active` (which drives opacity) is the ring's on/off state, not
+            // `visible`: the ring holds its slot in the Row so the label cannot
+            // shift. See test_wifiScanRingDoesNotMoveTheLabel.
+            compare(ring.active, false, "ring is idle while nothing is scanning")
 
             svc.scanningActive = true
             wait(50)
-            compare(ring.visible, true, "ring shows during a scan")
+            compare(ring.active, true, "ring runs during a scan")
+            compare(ring.running, true)
             compare(findByName(item, "wifiRescanLabel").text, "Scanning…")
 
             svc.connecting = true
             svc.connectingTo = "HomeWifi"
             wait(50)
-            compare(ring.visible, false, "ring yields to a connection attempt")
+            compare(ring.active, false, "ring yields to a connection attempt")
             compare(findByName(item, "wifiRescanLabel").text, "Connecting…")
         }
 
@@ -556,7 +560,7 @@ Item {
             var ring = findByName(item, "btScanRing")
             var label = findByName(item, "btEmptyText")
             verify(ring !== null && label !== null, "bluetooth empty state should exist")
-            compare(ring.visible, false, "ring is hidden when no scan is running")
+            compare(ring.active, false, "ring is idle when no scan is running")
             compare(label.text, "No devices found")
 
             svc.scanningActive = true

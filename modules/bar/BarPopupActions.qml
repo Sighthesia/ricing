@@ -1287,9 +1287,11 @@ Item {
                         objectName: "btScanRing"
                         width: 16
                         height: 16
-                        visible: root.btScanning
-                        active: visible
-                        running: visible
+                        // Same contract as the network panel's ring: hold the
+                        // slot and fade via `active`, so the claim next to it
+                        // never slides as a scan starts.
+                        active: root.btScanning
+                        running: active
                     }
 
                     Text {
@@ -1662,9 +1664,13 @@ Item {
                             objectName: "wifiScanRing"
                             width: 16
                             height: 16
-                            visible: root.wifiScanning && !root.wifiConnecting
-                            active: visible
-                            running: visible
+                            // Stay in the Row at all times. `active` already fades
+                            // the ring, whereas flipping `visible` drops its slot
+                            // and slides the label sideways the moment a scan
+                            // starts — the opposite of what the shared centre
+                            // unit is for.
+                            active: root.wifiScanning && !root.wifiConnecting
+                            running: active
                         }
 
                         Text {
