@@ -126,18 +126,26 @@ QtObject {
     property bool panelVisible: false
     // Keep hover diagnostics opt-in and independent from persisted settings.
     property bool hoverDebugEnabled: false
-    // Newest popup hover snapshot. Mirrored to disk because the popup half of
-    // the diagnostics otherwise exists only in the shell's stdout, which a bug
-    // report cannot reach (and which is unreachable when the shell was started
-    // outside this terminal).
+    // Newest popup hover snapshot, kept as a short timeline. Mirrored to disk
+    // because the popup half of the diagnostics otherwise exists only in the
+    // shell's stdout, which a bug report cannot reach (and which is
+    // unreachable when the shell was started outside this terminal). The host
+    // already suppresses identical snapshots, so every line here is a change.
     property string lastHoverSnapshot: ""
+    property var hoverHistory: []
+    readonly property int hoverHistoryLimit: 80
     property FileView _hoverSnapshotFile: FileView {
         path: Quickshell.cacheDir + "/hover-debug.json"
         printErrors: false
     }
     function recordHoverSnapshot(line) {
         root.lastHoverSnapshot = line
-        root._hoverSnapshotFile.setText(line)
+        var next = root.hoverHistory.slice()
+        next.push(line)
+        while (next.length > root.hoverHistoryLimit)
+            next.shift()
+        root.hoverHistory = next
+        root._hoverSnapshotFile.setText(next.join("\n"))
     }
     property int hoverDebugToken: 0
     property int hoverDebugOpenToken: 0
