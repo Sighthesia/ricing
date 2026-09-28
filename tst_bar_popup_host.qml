@@ -858,6 +858,25 @@ Item {
                             Number(snap.input.region.x) + Number(snap.input.region.width)
                                 >= Number(colRect.x) + Number(colRect.width), true)
                     }
+                    // The region must not track the animating container. Every
+                    // geometry change re-commits set_input_region and the
+                    // compositor re-evaluates pointer focus on each commit, so a
+                    // mask that glides with the container re-commits ~30 times
+                    // per submenu flight. A leave is only undone by physical
+                    // motion, so a parked cursor never gets the pointer back.
+                    var widthsSeen = []
+                    var containerBefore = host.displayWidth
+                    for (var wstep = 0; wstep < 6; wstep++) {
+                        host.displayWidth = containerBefore + wstep * 40
+                        widthsSeen.push(root.findByName(host.popupViewportItem,
+                            "popupInputRegion").width)
+                    }
+                    host.displayWidth = containerBefore
+                    var uniqueWidths = widthsSeen.filter(function(v, idx, arr) {
+                        return arr.indexOf(v) === idx
+                    })
+                    root.check("input region does not follow the animating container",
+                        uniqueWidths.length, 1)
                 }
                 // The close rule: a leave reported from INSIDE the region is not
                 // the user leaving. Measured on the desktop as 1366.9,113.5 —

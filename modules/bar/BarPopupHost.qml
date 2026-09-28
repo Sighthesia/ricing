@@ -152,20 +152,6 @@ PanelWindow {
     // Reuse the settings-panel diagnostics channel so one IPC switch turns on
     // both surfaces; every popup decision is logged without adding an owner.
     readonly property bool debugEnabled: Services.SettingsService.hoverDebugEnabled
-
-    // Publish pointer ownership to the notification host. Both surfaces live in
-    // the Top layer and cannot be ordered by the client; the notification host
-    // maps later, so a visible card would sit above this popup and steal the
-    // pointer the moment its region became non-empty. Claiming ownership for the
-    // whole surface lifetime (not just while open) is deliberate: the region is
-    // committed on geometry changes, so releasing it must not hand the pointer
-    // back mid-reveal, when the popup is still on screen and still expecting it.
-    readonly property bool ownsPointer: surfaceActive
-    onOwnsPointerChanged: PopupInputArbitration.popupOwnsPointer = root.ownsPointer
-    Component.onDestruction: {
-        if (PopupInputArbitration.popupOwnsPointer)
-            PopupInputArbitration.popupOwnsPointer = false
-    }
     // Push the debug switch into the tray content so its hover exits are traced
     // on the same switch. A singleton write from here, not a separate owner.
     onDebugEnabledChanged: {
@@ -291,8 +277,7 @@ PanelWindow {
     function _thiefAt(p) {
         if (!p)
             return "none"
-        if (!PopupInputArbitration.popupOwnsPointer
-            && PopupInputArbitration.coversPoint(p.x, p.y))
+        if (PopupInputArbitration.coversPoint(p.x, p.y))
             return "notifications"
         return root._pointInRect(p.x, p.y, popupInputRegion) ? "popup" : "none"
     }
@@ -391,8 +376,7 @@ PanelWindow {
                     "width": PopupInputArbitration.notifWidth,
                     "height": PopupInputArbitration.notifHeight,
                 },
-                "notifClaimsInput": !PopupInputArbitration.popupOwnsPointer
-                    && Number(PopupInputArbitration.notifHeight) > 0,
+                "notifClaimsInput": Number(PopupInputArbitration.notifHeight) > 0,
                 "pointerStolenBy": root._thiefAt(root._cursorInViewport(
                     root._trayContent())),
             },
@@ -1301,21 +1285,30 @@ PanelWindow {
                 : root.activeScreenHeight - root.activeBarHeight - root.activeFloatingMargin
         clip: true
 
-        // Input-region owner for the layer-shell mask: the union of the
-        // displayed container and its committed target, in the same coordinate
-        // space. Sizing the mask off the animated container alone left the
-        // tray submenu painted outside the region: the pointer crossing toward
-        // it produced a compositor leave and the popup closed before the
-        // pointer ever reached the panel. The union also keeps the region wide
-        // until a retract glide has actually finished.
+        // Input-region owner for the layer-shell mask.
+        //
+        // Driven by the COMMITTED target geometry only, never by the animating
+        // container. That distinction is the whole point: every geometry change
+        // of a Region's item re-commits wl_surface.set_input_region, and the
+        // compositor re-evaluates pointer focus on each one. The container
+        // width glides 260→512 across the submenu flight, so an
+        // animation-following mask re-committed the region ~30 times per open,
+        // and each commit could hand the pointer away mid-flight. A leave is
+        // not self-healing: the pointer only comes back on physical motion, so
+        // a user who parks the cursor on the arriving panel sees no highlight
+        // and no click until they wiggle the mouse.
+        //
+        // target* is committed synchronously when the submenu is summoned
+        // (computeAndCommitTargets reacts to extraWidth), so the region already
+        // covers the second level on the first frame of the summon and then
+        // holds still for the whole 500ms flight.
         Item {
             id: popupInputRegion
             objectName: "popupInputRegion"
-            x: Math.min(popupContainer.x, root.targetX)
-            y: Math.min(popupContainer.y, root.targetY - popupViewport.y)
-            width: Math.max(popupContainer.x + popupContainer.width,
-                root.targetX + root.targetWidth) - x
-            height: Math.max(popupContainer.height, root.targetHeight)
+            x: root.targetX
+            y: root.targetY - popupViewport.y
+            width: root.targetWidth
+            height: root.targetHeight
         }
 
         // Position the rendered popup inside the bar-edge clipping viewport.

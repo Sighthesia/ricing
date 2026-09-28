@@ -41,27 +41,17 @@ Variants {
                 left: Services.NotificationService.notificationLeft ? 16 : 8
                 right: Services.NotificationService.notificationRight ? 16 : 8
             }
-            // Stand down while a bar popup owns the pointer. This host and the
-            // popup are both in the Top layer and the client cannot order two
-            // surfaces within one layer — the compositor decides, at map time,
-            // and NotificationHost maps later (shell.qml declares it after
-            // TopBar), so a card's region sits permanently above the popup's.
-            // niri then hands the pointer to this surface and the popup gets a
-            // leave with the pointer still over it: no row highlight, no click,
-            // menu closed. Emptying the mask is the only lever that works,
-            // because stacking is not ours to choose.
-            mask: Region {
-                item: !PopupInputArbitration.popupOwnsPointer
-                    && notificationStack.implicitHeight > 0
-                    ? notificationStack : null
-            }
+            mask: Region { item: notificationStack.implicitHeight > 0 ? notificationStack : null }
 
             // Publish the claimed region in screen coordinates for diagnostics.
             // Without this, "the pointer was stolen by another surface" stays an
-            // assumption; with it, a departure landing inside this rect names
-            // the thief. Bound to the STACK's geometry, not the window's: the
-            // window is anchors-driven and has no x/y to observe, while the
-            // region the compositor sees is the stack's.
+            // assumption; with it, a departure landing inside this rect names the
+            // thief — which is how the notification theory was ruled out (the
+            // failure happened with no notification on screen at all).
+            // Note this host does NOT stand down for the bar popup: the
+            // notification host and the popup share the Top layer, but the
+            // surface that actually covers the tray column is afloat-bar, which
+            // is on the Overlay layer and so above both.
             function publishClaimedRegion() {
                 if (notificationStack.implicitHeight <= 0) {
                     PopupInputArbitration.releaseInputRegion()

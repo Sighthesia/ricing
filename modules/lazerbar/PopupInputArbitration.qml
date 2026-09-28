@@ -1,27 +1,24 @@
 pragma Singleton
 import QtQuick
 
-// One-bit arbitration between the bar popup and the notification host.
+// Shared read-only view of which rival surface is entitled to claim input at a
+// given screen pixel.
 //
-// Both are layer-shell surfaces in the same layer, and the client cannot order
-// two surfaces within one layer: the compositor decides, and decides it once, at
-// map time. NotificationHost is declared after TopBar in shell.qml, so it maps
-// later and therefore permanently sits ABOVE the popup. Whenever a notification
-// card is on screen its input region (right edge, under the bar) overlaps the
-// popup's rectangle, niri hands the pointer to the notification surface, and the
-// popup receives a leave with the pointer still visibly over it — no highlight,
-// no click, menu gone. Reproduced on the desktop: the tray submenu died at
-// screen (1366.9, 165.5) with the notification region spanning x 1278..1638.
+// This exists because the tray submenu kept losing the pointer with healthy
+// local state: the region covered the point, hit-testing reached the band, and
+// the tray logic was correct — yet a leave arrived anyway. Diagnosing that
+// needs one question answered per sample: "who is allowed to own this pixel?",
+// asked of every surface that could compete, not just the one suspected.
 //
-// This is the same one-owner-per-pixel rule the screen bezel already follows:
-// the surface that owns a region paints it, and no other surface claims input
-// over it. So while a bar popup owns the pointer, the notification host stands
-// down. Stacking is not the lever here — the compositor owns that.
+// Note the layer layout this was built against:
+//   afloat-popup        Top      (the bar popup)
+//   afloat-notifications Top     (mapped after TopBar, so above the popup)
+//   afloat-bar          Overlay  (ABOVE the Top layer entirely)
+//   afloat-launcher     Top      (full screen, masked)
+// A client cannot order two surfaces within one layer, and Overlay outranks
+// Top, so afloat-bar is the surface that can take input from the popup without
+// any cooperation from us.
 QtObject {
-    // True while any bar popup is open or completing its exit reveal. Set by
-    // the popup host; read by the notification host's input mask.
-    property bool popupOwnsPointer: false
-
     // The notification stack's claimed input rect, published by its own owner
     // because that surface — not the popup — knows where its cards are. Kept in
     // screen coordinates so any surface can test a point against it without
