@@ -440,6 +440,9 @@ Item {
         }
         onExited: {
             root.highlightedSubmenuRow = null
+            // Same reasoning as the primary catcher: report the position while
+            // it is still known, so the host can check it against the region.
+            root.pointerDeparted(root.lastCursorX, root.lastCursorY, "column-band")
             root.forgetCursor()
             if (root.debugLeave)
                 console.log("[afloat:TrayDebug] leave column-band at " + mouseX + "," + mouseY)
@@ -554,6 +557,10 @@ Item {
     // dropping focus; which exit fired, and where the pointer was, tells them
     // apart.
     property bool debugLeave: false
+    // Set once the host has subscribed to pointerDeparted. The tray instance is
+    // replaced when the popup changes intent, so the host re-wires on each new
+    // one rather than assuming a single instance.
+    property bool departuresWired: false
     function rememberCursor(x, y) { lastCursorX = x; lastCursorY = y }
     function forgetCursor() { lastCursorX = -1; lastCursorY = -1 }
     // Row currently under the cursor, owned by the catcher for highlight.
@@ -578,8 +585,18 @@ Item {
         // that really leave the second level are handled by its own catcher.
         if (pointerOverSubmenu())
             return
+        // Announce the departure BEFORE forgetting. The host has to judge this
+        // exit against the input region, and forgetCursor() would leave it
+        // unable to tell a real departure from a compositor-side leave that
+        // happened while the pointer was still over us.
+        pointerDeparted(lastCursorX, lastCursorY, "primary-catcher")
         forgetCursor()
     }
+    // Last known pointer position when this surface believes the pointer left.
+    // The host compares it against the committed input region: inside means the
+    // leave did not come from the user, and closing on it is what kills the
+    // first expand.
+    signal pointerDeparted(real x, real y, string source)
     // Is the remembered point still over the second level's column (the input
     // band beside the primary)? Used to decide whether a primary exit means
     // "left the menu" or "moved across to the submenu".

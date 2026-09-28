@@ -126,12 +126,6 @@ QtObject {
     property bool panelVisible: false
     // Keep hover diagnostics opt-in and independent from persisted settings.
     property bool hoverDebugEnabled: false
-    // Popup input-region override for bisecting a lost-pointer bug against the
-    // mask itself: "region" (default, mask follows the popup) or "full" (the
-    // whole surface is clickable, so the mask cannot be the cause). Not a user
-    // setting — it only exists so the diagnostic can toggle it over IPC without
-    // a restart, which is the difference between one reproduction and five.
-    property string popupMaskMode: "region"
     // Newest popup hover snapshot, kept as a short timeline. Mirrored to disk
     // because the popup half of the diagnostics otherwise exists only in the
     // shell's stdout, which a bug report cannot reach (and which is
@@ -187,11 +181,7 @@ QtObject {
             return root.lastHoverSnapshot
         }
         function snapshotHover() { root.requestHoverSnapshot() }
-        function debugMask(mode: string) {
-            root.popupMaskMode = String(mode) === "full" ? "full" : "region"
-            console.log("[afloat:PopupMaskMode]", root.popupMaskMode)
-            return root.popupMaskMode
-        }
+
         function openHoverDebug(screenName: string) { root.requestHoverDebugOpen(screenName) }
         function debugCategory(category: string) { root.setHoverDebugCategory(category) }
         function maskOverride(mode: string) { root.setSettingsMaskOverride(mode) }
