@@ -278,6 +278,33 @@ PanelWindow {
     // Which surface is entitled to the pixel the pointer was last seen on. The
     // notification host publishes its own claimed rect, so this needs no
     // reference into a surface the popup does not own.
+    // Window-space rect of an item — the space wl_surface.set_input_region is
+    // expressed in. Everything else in this snapshot is viewport-local.
+    function _sceneRect(item) {
+        if (!item || !item.mapToScene)
+            return null
+        var a = item.mapToScene(0, 0)
+        var b = item.mapToScene(item.width, item.height)
+        return {
+            "x": Math.round(a.x * 10) / 10, "y": Math.round(a.y * 10) / 10,
+            "width": Math.round((b.x - a.x) * 10) / 10,
+            "height": Math.round((b.y - a.y) * 10) / 10,
+        }
+    }
+    function _cursorInScene(tc) {
+        if (!tc || Number(tc.lastCursorX) < 0)
+            return null
+        var p = tc.mapToScene(Number(tc.lastCursorX), Number(tc.lastCursorY))
+        return { "x": Math.round(p.x * 10) / 10, "y": Math.round(p.y * 10) / 10 }
+    }
+    function _sceneCovers(tc) {
+        var p = root._cursorInScene(tc)
+        var r = root._sceneRect(popupInputRegion)
+        if (!p || !r)
+            return false
+        return root._pointInRect(p.x, p.y, r)
+    }
+
     function _thiefAt(p) {
         if (!p)
             return "none"
@@ -388,6 +415,17 @@ PanelWindow {
                 // Unfiltered pointer, plus the per-owner event tally. The owner
                 // that stopped speaking is the link where delivery broke.
                 "rawPoint": root._lastRawPoint,
+                // The region as the COMPOSITOR sees it. Region.item builds the
+                // wl_surface input region from mapToScene, i.e. window
+                // coordinates — NOT the viewport-local rect every other field
+                // here reports. Comparing a viewport-local cursor against a
+                // viewport-local rect can only ever agree, so "the region covers
+                // the pointer" was never actually being tested. Both sides are
+                // mapped to the window here, which is the only comparison that
+                // means anything.
+                "regionScene": root._sceneRect(popupInputRegion),
+                "cursorScene": root._cursorInScene(root._trayContent()),
+                "cursorInRegionScene": root._sceneCovers(root._trayContent()),
                 "evPrimary": tc ? Number(tc._evPrimary) : -1,
                 "evBand": tc ? Number(tc._evBand) : -1,
                 "evPanel": tc ? Number(tc._evPanel) : -1,
