@@ -811,6 +811,20 @@ Item {
                 trayIncoming.submenuProgress = 1
             root.check("exchange with submenu open keeps slot clipped",
                 slideSlot.clip, true)
+            // The layer-shell mask must already cover the second level when it
+            // is summoned. Sizing it off the animated container width left the
+            // panel painted outside the region: the pointer crossing toward it
+            // produced a compositor leave and the popup closed under it, which
+            // is why only the first submenu of a session was unreachable.
+            var inputRegion = root.findByName(host.popupViewportItem, "popupInputRegion")
+            root.check("input region item exists", inputRegion !== null, true)
+            if (inputRegion) {
+                root.check("input region covers the summoned submenu column",
+                    inputRegion.width >= host.targetWidth, true)
+                root.check("input region covers the submenu column right edge",
+                    inputRegion.x + inputRegion.width
+                        >= host.targetX + host.targetWidth, true)
+            }
             if (trayIncoming)
                 trayIncoming.submenuProgress = 0
             root.check("exchange starts incoming transparent", incomingActions.opacity, 0)

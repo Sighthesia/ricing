@@ -802,7 +802,12 @@ PanelWindow {
     // No input when closed; the window otherwise masks only the popup.
     // Keep the visual/input region alive for the exit reveal after open flips
     // false; clearing it at close start cuts the second layer off immediately.
-    mask: Region { item: root.surfaceActive ? popupContainer : null }
+    // The region follows the union of the displayed container and its committed
+    // target: driven by the animated width alone it lagged the summon, leaving
+    // the second level painted outside it — the compositor sent a leave while
+    // the pointer crossed and the popup closed under it. The union also keeps
+    // the region wide until a retract glide has actually finished.
+    mask: Region { item: root.surfaceActive ? popupInputRegion : null }
     // Do not keep a full-screen transparent surface above the settings window
     // when no bar popup is open or completing its reveal.
     visible: root.surfaceActive
@@ -1049,6 +1054,23 @@ PanelWindow {
                 ? root.activeScreenHeight - root.activeBarHeight - root.activeFloatingMargin
                 : root.activeScreenHeight - root.activeBarHeight - root.activeFloatingMargin
         clip: true
+
+        // Input-region owner for the layer-shell mask: the union of the
+        // displayed container and its committed target, in the same coordinate
+        // space. Sizing the mask off the animated container alone left the
+        // tray submenu painted outside the region: the pointer crossing toward
+        // it produced a compositor leave and the popup closed before the
+        // pointer ever reached the panel. The union also keeps the region wide
+        // until a retract glide has actually finished.
+        Item {
+            id: popupInputRegion
+            objectName: "popupInputRegion"
+            x: Math.min(popupContainer.x, root.targetX)
+            y: Math.min(popupContainer.y, root.targetY - popupViewport.y)
+            width: Math.max(popupContainer.x + popupContainer.width,
+                root.targetX + root.targetWidth) - x
+            height: Math.max(popupContainer.height, root.targetHeight)
+        }
 
         // Position the rendered popup inside the bar-edge clipping viewport.
         Item {
