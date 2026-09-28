@@ -23,11 +23,53 @@
 // Corner order used by the mask: top-left, top-right, bottom-right, bottom-left.
 var CORNER_COUNT = 4
 
+// Corner bits, so a host can paint a subset. The bezel is split across two
+// surfaces (see cornerSplit): whichever corners a host covers itself, it must
+// not also leave them to the shared bezel surface.
+var TOP_LEFT = 1
+var TOP_RIGHT = 2
+var BOTTOM_RIGHT = 4
+var BOTTOM_LEFT = 8
+var ALL_CORNERS = TOP_LEFT | TOP_RIGHT | BOTTOM_RIGHT | BOTTOM_LEFT
+
 // Path command verbs emitted by cornerPath.
 var MOVE = "M"
 var LINE = "L"
 var ARC = "A"
 var CLOSE = "Z"
+
+// Bit for one corner index.
+function cornerBit(corner) {
+    return 1 << normalizeCorner(corner)
+}
+
+// Corner indices selected by a bit mask, in the fixed corner order.
+function cornersForMask(mask) {
+    var bits = Number(mask) || 0
+    var selected = []
+    for (var i = 0; i < CORNER_COUNT; i++) {
+        if (bits & cornerBit(i))
+            selected.push(i)
+    }
+    return selected
+}
+
+// Corners a bar surface already paints, so the shared bezel surface must skip
+// them. The bar and the bezel are two separate overlay-layer surfaces, and a
+// client cannot order them against each other: the compositor decides which
+// wins, so a corner claimed by both flickers with whichever was mapped last.
+// Handing the bar's own corners to the bar removes the race. A floating bar is
+// inset by its margin and never reaches the screen corner, so it covers none.
+function barCornerMask(position, floating) {
+    if (floating)
+        return 0
+    return position === "bottom" ? (BOTTOM_LEFT | BOTTOM_RIGHT) : (TOP_LEFT | TOP_RIGHT)
+}
+
+// Corners the shared bezel surface still owns: everything the bar does not.
+function barFreeCornerMask(position, floating) {
+    return ALL_CORNERS & ~barCornerMask(position, floating)
+}
 
 // Keep the radius inside the shorter screen edge: two wedges on the same edge
 // must never grow past their shared midpoint.

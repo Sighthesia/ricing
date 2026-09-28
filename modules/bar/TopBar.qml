@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../lazerbar"
+import "../lazerbar/ScreenCornerMask.js" as CornerMask
 import "../../services" as Services
 
 // Mount the layout-driven bar plus the launcher wave owner per screen.
@@ -111,6 +112,26 @@ Variants {
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+            }
+
+            // The screen bezel corners this bar physically covers. The bezel's
+            // own surface is a separate overlay-layer surface, and a client
+            // cannot order two of them against each other, so the corners the
+            // bar overlaps are painted here instead: above this window's own
+            // fill they are always the topmost thing, whatever the compositor
+            // does with the other surface. Painted after the fill so the wedge
+            // stays opaque black rather than being tinted by it.
+            ScreenCornerMask {
+                anchors.fill: parent
+                radius: Math.max(0, Number(Services.SettingsService.appearance.screenCornerRadius) || 0)
+                corners: CornerMask.barCornerMask(
+                    String(Services.SettingsService.bar.position || "top"),
+                    Services.SettingsService.bar.floating === true)
+                // Clamp against the screen, not against this one-strip-tall
+                // window, so the radius matches the corners the bezel surface
+                // paints on the opposite edge.
+                screenWidth: screenScope.modelData.width
+                screenHeight: screenScope.modelData.height
             }
 
             BarContent {

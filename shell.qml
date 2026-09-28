@@ -150,8 +150,10 @@ ShellRoot {
 
             LazerBar.NotificationHost {}
 
-            // Fake rounded display corners; mounted last so the bezel composites above
-            // the wallpaper and the bar within the overlay layer.
+            // Fake rounded display corners. This surface paints only the corners
+            // the bar does not physically cover: two overlay-layer surfaces
+            // cannot be ordered against each other by the client, so the bar
+            // paints its own corners from its own window. See TopBar.qml.
             LazerBar.ScreenRoundedCorners {}
 
             // Compositor-enforced session lock; creates one surface per screen.

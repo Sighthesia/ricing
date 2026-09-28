@@ -28,6 +28,34 @@ Item {
         radius: 0
     }
 
+    // Stands in for the bar: a host that paints only the corners it covers, in
+    // a one-strip-tall window, and so passes the real screen extent for clamping.
+    Lazer.ScreenCornerMask {
+        id: partialMask
+        width: 200; height: 48
+        screenWidth: 1645; screenHeight: 1028
+        radius: 16
+        corners: Mask.TOP_LEFT | Mask.BOTTOM_RIGHT
+    }
+
+    // The two real hosts, bound exactly as TopBar.qml and ScreenRoundedCorners
+    // bind them, so the split is checked against the shipped configuration and
+    // not only against the pure-JS masks.
+    Lazer.ScreenCornerMask {
+        id: barHost
+        width: 200; height: 48
+        screenWidth: 1645; screenHeight: 1028
+        radius: 16
+        corners: Mask.barCornerMask("top", false)
+    }
+
+    Lazer.ScreenCornerMask {
+        id: bezelHost
+        anchors.fill: parent
+        radius: 16
+        corners: Mask.barFreeCornerMask("top", false)
+    }
+
     TestCase {
         name: "ScreenCornerMask"
         when: windowShown
@@ -61,6 +89,55 @@ Item {
             compare(Mask.cornerBoxSize(16, 0), 16)
             compare(Mask.cornerBoxSize(0, 2), 2)
             compare(Mask.cornerBoxSize(16, -4), 16)
+        }
+
+        function test_cornerBitsMapOneToOne() {
+            // Every corner has its own bit, and all four cover the full mask.
+            compare(Mask.TOP_LEFT, 1)
+            compare(Mask.TOP_RIGHT, 2)
+            compare(Mask.BOTTOM_RIGHT, 4)
+            compare(Mask.BOTTOM_LEFT, 8)
+            compare(Mask.ALL_CORNERS, 15)
+            compare(Mask.cornerBit(0), Mask.TOP_LEFT)
+            compare(Mask.cornerBit(1), Mask.TOP_RIGHT)
+            compare(Mask.cornerBit(2), Mask.BOTTOM_RIGHT)
+            compare(Mask.cornerBit(3), Mask.BOTTOM_LEFT)
+            // Out-of-range indices wrap rather than shifting past the mask.
+            compare(Mask.cornerBit(4), Mask.TOP_LEFT)
+            compare(Mask.cornerBit(-1), Mask.BOTTOM_LEFT)
+        }
+
+        function test_cornersForMaskKeepsCornerOrder() {
+            compare(Mask.cornersForMask(Mask.ALL_CORNERS), [0, 1, 2, 3])
+            compare(Mask.cornersForMask(Mask.TOP_LEFT | Mask.BOTTOM_RIGHT), [0, 2])
+            compare(Mask.cornersForMask(Mask.BOTTOM_LEFT), [3])
+            compare(Mask.cornersForMask(0), [])
+            compare(Mask.cornersForMask(undefined), [])
+        }
+
+        function test_barAndBezelNeverClaimTheSameCorner() {
+            // Top bar, attached: the bar takes the top pair.
+            compare(Mask.barCornerMask("top", false), Mask.TOP_LEFT | Mask.TOP_RIGHT)
+            compare(Mask.barFreeCornerMask("top", false), Mask.BOTTOM_LEFT | Mask.BOTTOM_RIGHT)
+            // Bottom bar, attached: the ownership swaps.
+            compare(Mask.barCornerMask("bottom", false), Mask.BOTTOM_LEFT | Mask.BOTTOM_RIGHT)
+            compare(Mask.barFreeCornerMask("bottom", false), Mask.TOP_LEFT | Mask.TOP_RIGHT)
+            // A floating bar is inset by its margin and reaches no corner, so
+            // the bezel surface keeps all four.
+            compare(Mask.barCornerMask("top", true), 0)
+            compare(Mask.barFreeCornerMask("top", true), Mask.ALL_CORNERS)
+            // The two masks must partition the corners for every placement, or
+            // a corner is either painted twice or not at all.
+            for (var i = 0; i < 2; i++) {
+                for (var j = 0; j < 2; j++) {
+                    var position = i === 0 ? "top" : "bottom"
+                    var floating = j === 0
+                    var owned = Mask.barCornerMask(position, floating)
+                    var shared = Mask.barFreeCornerMask(position, floating)
+                    compare(owned & shared, 0, "a corner is claimed twice")
+                    compare(owned | shared, Mask.ALL_CORNERS, "a corner is claimed by nobody")
+                }
+            }
         }
 
         function test_cornerOriginHangsTheWedgePastTheScreenEdge() {
@@ -180,8 +257,81 @@ Item {
                 verify(!hidden[j].visible, "radius 0 must hide corner " + j)
         }
 
-        function test_geometryAndPaintChangesRebuildTheWedgeSource() {
-            var wedge = cornerItems(mask)[0]
+        function test_onlySelectedCornersGetAWedge() {
+            // The bar paints the corners it covers and the shared bezel surface
+            // paints the rest, so a host must not emit wedges for corners it
+            // was not given: a wedge the compositor then covers is invisible
+            // work, and one both surfaces claim flickers.
+            var items = cornerItems(partialMask)
+            compare(items.length, 2, "only the selected corners get a wedge")
+            // Top-left sits on the host's own top-left, bottom-right on its
+            // bottom-right, so the geometry is still relative to this item.
+            compare(items[0].x, -2)
+            compare(items[0].y, -2)
+            compare(items[1].x, 200 - 18)
+            compare(items[1].y, 48 - 18)
+            // The clamp reads the screen, not this window, so the radius is
+            // identical to the one the bezel surface uses for the other edge.
+            compare(partialMask.effectiveRadius, mask.effectiveRadius)
+            for (var i = 0; i < items.length; i++)
+                verify(items[i].visible, "selected corner " + i + " must paint")
+        }
+
+        function test_radiusClampsAgainstTheScreenNotTheHost() {
+            // A one-strip-tall host must not cap the radius at half its own
+            // height, or the two surfaces would disagree about the same bezel.
+            compare(partialMask.height, 48)
+            compare(partialMask.effectiveRadius, 16, "a 48px host must not clamp a 16px radius")
+            // A radius past half the host height still survives, because the
+            // clamp reads the screen extent the host passed in.
+            partialMask.radius = 40
+            compare(partialMask.effectiveRadius, 40)
+            partialMask.radius = 16
+        }
+
+        // Screen corner each wedge actually lands on, read from its geometry
+        // rather than from the index that created it.
+        function cornerNamesAt(target) {
+            var names = []
+            var items = cornerItems(target)
+            for (var i = 0; i < items.length; i++) {
+                var w = items[i]
+                if (w.x <= 0 && w.y <= 0) names.push("top-left")
+                else if (w.x > 0 && w.y <= 0) names.push("top-right")
+                else if (w.x > 0 && w.y > 0) names.push("bottom-right")
+                else names.push("bottom-left")
+            }
+            return names
+        }
+
+        function test_theTwoHostsCoverAllFourCornersExactlyOnce() {
+            // This is the regression guard for the reported bug: the bar and the
+            // bezel are separate overlay-layer surfaces, so a corner painted by
+            // both ends up showing whichever the compositor put on top, and a
+            // corner painted by neither shows the desktop through.
+            var barCovers = cornerNamesAt(barHost)
+            var bezelCovers = cornerNamesAt(bezelHost)
+            compare(barCovers, ["top-left", "top-right"], "an attached top bar covers the top pair")
+            compare(bezelCovers, ["bottom-right", "bottom-left"], "the bezel surface keeps the bottom pair")
+
+            var all = barCovers.concat(bezelCovers)
+            compare(all.length, 4, "all four corners must be painted")
+            for (var i = 0; i < Mask.CORNER_COUNT; i++) {
+                var name = cornerNamesAt(mask)[i]
+                compare(all.filter(function(c) { return c === name }).length, 1,
+                    "corner " + name + " must be painted exactly once")
+            }
+        }
+
+        function test_bothHostsResolveTheSameRadius() {
+            // The hosts paint opposite edges of one bezel, so a radius
+            // disagreement would show as a corner that does not match its
+            // opposite.
+            compare(barHost.effectiveRadius, bezelHost.effectiveRadius)
+            compare(barHost.effectiveRadius, 16)
+        }
+
+        function test_geometryAndPaintChangesRebuildTheWedgeSource() {            var wedge = cornerItems(mask)[0]
             var before = String(wedge.source)
             // A new radius and a new colour both change the rasterized document,
             // which is what puts fresh pixels in the wedge after a remap.

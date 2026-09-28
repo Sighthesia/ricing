@@ -29,23 +29,36 @@ Item {
     // Bezel paint. Pure black reads as real monitor hardware in both the dark
     // and the light color scheme; must stay opaque.
     property color maskColor: "#000000"
+    // Which of the four corners this instance paints. Defaults to all of them;
+    // the bar passes only the corners its own surface covers, because two
+    // overlay-layer surfaces cannot be ordered against each other by the client.
+    property int corners: MaskLogic.ALL_CORNERS
+    // Screen extent the radius is clamped against. Defaults to this item's own
+    // size, but a host that paints only some corners passes the real screen so
+    // the clamp does not shrink the radius to half the host's height (the bar's
+    // window is one short strip, and would otherwise cap the radius at 24).
+    property real screenWidth: width
+    property real screenHeight: height
     // Radius after clamping to the shorter screen edge, so wedges on the same
     // edge can never overlap past their shared midpoint.
-    readonly property real effectiveRadius: MaskLogic.clampRadius(root.radius, root.width, root.height)
+    readonly property real effectiveRadius: MaskLogic.clampRadius(root.radius, root.screenWidth, root.screenHeight)
     // Side length of each wedge box: the clamped radius plus the off-screen bleed.
     readonly property real boxSize: MaskLogic.cornerBoxSize(root.effectiveRadius, root.bleed)
 
-    // One wedge per screen corner; the mask itself stays click-through because
-    // it only paints decoration.
+    // One wedge per selected corner; the mask itself stays click-through
+    // because it only paints decoration. The model is the selected corner ids,
+    // so `index` is a position in that list rather than a corner id: the corner
+    // itself arrives as `modelData`.
     Repeater {
         id: cornerRepeater
-        model: MaskLogic.CORNER_COUNT
+        model: MaskLogic.cornersForMask(root.corners)
 
         delegate: Image {
             id: wedge
-            required property int index
+            required property int modelData
+            readonly property int corner: modelData
             readonly property real r: root.effectiveRadius
-            readonly property var origin: MaskLogic.cornerOrigin(wedge.index, root.boxSize, root.bleed, root.width, root.height)
+            readonly property var origin: MaskLogic.cornerOrigin(wedge.corner, root.boxSize, root.bleed, root.width, root.height)
 
             visible: r > 0
             x: origin[0]
@@ -64,7 +77,7 @@ Item {
             // rather than handed an empty document the image loader would reject.
             source: r > 0
                 ? "data:image/svg+xml;utf8,"
-                    + encodeURIComponent(MaskLogic.cornerSvg(wedge.r, root.bleed, wedge.index, String(root.maskColor)))
+                    + encodeURIComponent(MaskLogic.cornerSvg(wedge.r, root.bleed, wedge.corner, String(root.maskColor)))
                 : ""
         }
     }
