@@ -163,6 +163,29 @@ PanelWindow {
         }
     }
 
+    function _pointInRect(px, py, rect) {
+        if (px < 0 || !rect)
+            return false
+        return px >= rect.x && px <= rect.x + rect.width
+            && py >= rect.y && py <= rect.y + rect.height
+    }
+    // Is the remembered pointer inside the active input region? Mapped through
+    // the live scene graph rather than compared numerically: the memory is in
+    // tray-content coordinates while the region is in viewport coordinates, and
+    // the two differ by the container's anchored position.
+    function _pointInRegion(tc) {
+        if (!tc || Number(tc.lastCursorX) < 0)
+            return false
+        var p = tc.mapToItem(popupViewport, Number(tc.lastCursorX), Number(tc.lastCursorY))
+        return root._pointInRect(p.x, p.y, popupInputRegion)
+    }
+    function _rectInside(inner, outer) {
+        if (!inner || !outer)
+            return false
+        return _pointInRect(inner.x, inner.y, outer)
+            && _pointInRect(inner.x + inner.width, inner.y + inner.height, outer)
+    }
+
     // Tray submenu internals: phase/geometry/highlight of the second level.
     // The host snapshot only sees the two layers, so the failure modes that
     // live inside the tray menu (cold fetch, anchor clamp, hover memory) are
@@ -203,6 +226,23 @@ PanelWindow {
     function debugSnapshot() {
         return {
             "tray": root._trayDebug(),
+            "input": {
+                // The layer-shell mask is the only thing that decides whether the
+                // compositor routes pointer events into this surface at all, so a
+                // silent "no hover, no click" with healthy local state is
+                // indistinguishable from a region that does not cover the point.
+                "region": root._debugRect(popupInputRegion),
+                "regionActive": root.surfaceActive,
+                // Both must land inside the region for the submenu column to be
+                // reachable: the pointer Qt last saw, and where the column band
+                // actually is. Anything outside means the compositor, not the
+                // tray content, dropped the event. The tray cursor memory lives
+                // in tray-content coordinates, so it is mapped up into the
+                // viewport the region is expressed in.
+                "cursorInRegion": root._pointInRegion(tc),
+                "columnInRegion": root._rectInside(tc ? tc.submenuColumn : null,
+                    popupInputRegion),
+            },
             "host": {
                 "phase": root.open ? "open" : (root.surfaceActive ? "revealing" : "closed"),
                 "surfaceActive": root.surfaceActive, "widgetHovered": root.widgetHovered,

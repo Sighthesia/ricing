@@ -894,6 +894,119 @@ Item {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
         }
+        function test_parkedPointerLightsUpOnFirstExpandWithoutPoking() {
+            // The user's actual first-expand gesture: hover the trigger row, let
+            // the panel fly in while the pointer stays put, then read it. Nothing
+            // calls the resolver from here — the settle path has to do it on its
+            // own, because a pointer parked over a panel that is still assembling
+            // never produces another hover event.
+            // Motion stays ON (500ms flight): a reduced-motion run would skip the
+            // settle path that owns this behaviour.
+            mouseMove(root, 380, 760); wait(20)
+            mouseMove(root, 8, 700); wait(20)
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+            var row = null
+            for (var i = 0; i < 200 && row === null; i++) {
+                wait(10)
+                var rows = primaryRowsOf(item)
+                if (rows.length >= 3 && rows[1].height > 0)
+                    row = rows[1]
+            }
+            verify(row !== null, "primary rows never laid out")
+            var rowPoint = row.mapToItem(item, 40, 16)
+            hoverFresh(item, rowPoint.x, rowPoint.y)
+            // Park beside the primary, where the first submenu row will come to
+            // rest. Use the surface's LAYOUT position, not mapToItem: the panel
+            // slides in from the right, so mid-flight its mapped position is
+            // still over the primary column and parking there is a different
+            // (and correctly unhighlighted) situation.
+            var surface = findByName(item, "traySubmenuSurface")
+            verify(surface !== null, "no submenu surface")
+            var target = { x: surface.x + 40, y: surface.y + 48 + 8 + 16 }
+            verify(target.x >= findByName(item, "traySubmenuColumnCatcher").x,
+                "the resting row position is not inside the submenu column")
+            verify(pollAct(function() { mouseMove(item, target.x, target.y) },
+                function() { return item.lastCursorX === target.x }),
+                "the resting row position is not live input")
+            var memoryX = item.lastCursorX
+            var memoryY = item.lastCursorY
+            // The cold batch lands; then the panel flies in and settles. From
+            // here the pointer never moves again.
+            item.submenuEntries = [fakeEntry("Child")]
+            var settled = false
+            for (var j = 0; j < 400 && !settled; j++) {
+                wait(10)
+                settled = item.submenuPhase === "open" && item.submenuInteractable
+                    && item.highlightedSubmenuRow !== null
+            }
+            verify(item.submenuPhase === "open", "panel never settled on first expand")
+            verify(item.submenuInteractable, "rows never became tappable after settle")
+            verify(item.lastCursorX === memoryX && item.lastCursorY === memoryY,
+                "the parked pointer was forgotten while the panel assembled")
+            verify(item.highlightedSubmenuRow !== null,
+                "parked pointer got no highlight when the panel settled")
+            // And it is actually the row under the cursor, not some other row.
+            var flick = findByName(item, "traySubmenuFlick")
+            var live = flick.mapToItem(item, 40, 16)
+            verify(Math.abs(live.x - target.x) < 2 && Math.abs(live.y - target.y) < 2,
+                "the panel settled somewhere other than where the pointer parked")
+            var dismissed = 0
+            item.dismissRequested.connect(function() { dismissed++ })
+            verify(pollAct(function() { mouseClick(item, target.x, target.y) },
+                function() { return dismissed === 1 }),
+                "clicking the highlighted first-expand row did nothing")
+        }
+        function test_lateBatchAfterFlightStillOpensAndTakesHover() {
+            // Coldest first-open shape: the DBus fetch outlasts the flight, so
+            // the panel settles on an EMPTY body and the rows land afterwards.
+            // Nothing re-runs the animation then, so "open" (which is what makes
+            // rows tappable) has to already be true when the batch arrives.
+            mouseMove(root, 380, 760); wait(20)
+            mouseMove(root, 8, 700); wait(20)
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+            var row = null
+            for (var i = 0; i < 200 && row === null; i++) {
+                wait(10)
+                var rows = primaryRowsOf(item)
+                if (rows.length >= 3 && rows[1].height > 0)
+                    row = rows[1]
+            }
+            verify(row !== null, "primary rows never laid out")
+            var rowPoint = row.mapToItem(item, 40, 16)
+            hoverFresh(item, rowPoint.x, rowPoint.y)
+            var flew = false
+            for (var j = 0; j < 400 && !flew; j++) {
+                wait(10)
+                flew = item.submenuPhase === "open"
+            }
+            verify(flew, "panel never finished its flight with no content")
+            verify(item.hasSubmenuContent === false, "stub should report no content yet")
+            // Park where the rows will be, then let the batch land post-settle.
+            var surface = findByName(item, "traySubmenuSurface")
+            var target = { x: surface.x + 40, y: surface.y + 48 + 8 + 16 }
+            verify(pollAct(function() { mouseMove(item, target.x, target.y) },
+                function() { return item.lastCursorX === target.x }),
+                "the resting row position is not live input")
+            item.submenuEntries = [fakeEntry("Child")]
+            var ready = false
+            for (var k = 0; k < 300 && !ready; k++) {
+                wait(10)
+                ready = item.submenuInteractable && item.highlightedSubmenuRow !== null
+            }
+            verify(item.submenuPhase === "open",
+                "a late batch knocked the panel out of the open phase")
+            verify(item.submenuInteractable,
+                "rows stayed untappable when the batch landed after the flight")
+            verify(item.highlightedSubmenuRow !== null,
+                "a late batch left the parked pointer with no highlight")
+            var dismissed = 0
+            item.dismissRequested.connect(function() { dismissed++ })
+            verify(pollAct(function() { mouseClick(item, target.x, target.y) },
+                function() { return dismissed === 1 }),
+                "a row delivered after the flight could not be clicked")
+        }
         function test_scrollableSubmenuRowStaysTappable() {
             // A scrollable submenu must still take taps: the Flickable claims
             // the press for dragging, so rows below it can go dead.
