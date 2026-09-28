@@ -1181,6 +1181,64 @@ Item {
                 function() { return item.highlightedSubmenuRow !== null }),
                 "moving right along the trigger row's line highlighted nothing")
         }
+        function test_continuousCrossingFromPrimaryOntoSubmenuRow() {
+            // The real gesture, with no hop away first. Every other hover test
+            // parks the pointer somewhere neutral and then moves in, so none of
+            // them exercise the thing that actually happens on the desktop: the
+            // pointer travels continuously out of the primary catcher, across
+            // the seam, and along the submenu rows. If a legacy MouseArea's exit
+            // does not hand hover to the sibling band below it, that only shows
+            // up on a continuous crossing.
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = makeMenu([fakeEntry("Top"), parent, fakeEntry("Bottom")])
+            item.submenuEntries = [fakeEntry("Child A"), fakeEntry("Child B")]
+            var row = null
+            for (var i = 0; i < 300 && row === null; i++) {
+                wait(10)
+                var rows = primaryRowsOf(item)
+                if (rows.length >= 3 && rows[1].height > 0)
+                    row = rows[1]
+            }
+            verify(row !== null, "primary rows never laid out")
+            var rowPoint = row.mapToItem(item, 40, 16)
+            item.openSubmenu(parent, row)
+            var settled = false
+            for (var j = 0; j < 300 && !settled; j++) {
+                wait(10)
+                settled = item.submenuPhase === "open" && item.submenuInteractable
+            }
+            verify(settled, "submenu never settled")
+            var surface = findByName(item, "traySubmenuSurface")
+            var flick = findByName(item, "traySubmenuFlick")
+            // Start ON the trigger row, then walk right in small steps, exactly
+            // as a hand does. No intermediate parking.
+            mouseMove(item, rowPoint.x, rowPoint.y)
+            wait(40)
+            verify(item.highlightedRow !== null, "the trigger row did not light up")
+            var target = { x: surface.x + 40, y: surface.y + 48 + 8 + 16 }
+            var crossed = false
+            var steps = 60
+            for (var s = 1; s <= steps && !crossed; s++) {
+                var t = s / steps
+                mouseMove(item,
+                    rowPoint.x + (target.x - rowPoint.x) * t,
+                    rowPoint.y + (target.y - rowPoint.y) * t)
+                if (item.highlightedSubmenuRow !== null)
+                    crossed = true
+            }
+            verify(crossed,
+                "walking continuously right from the trigger row never lit a submenu row")
+            // And it must be the row actually under the pointer.
+            var landed = { x: target.x, y: target.y }
+            verify(pollAct(function() { mouseMove(item, landed.x, landed.y) },
+                function() { return item.highlightedSubmenuRow !== null }),
+                "the submenu row could not be highlighted after the crossing")
+            var dismissed = 0
+            item.dismissRequested.connect(function() { dismissed++ })
+            verify(pollAct(function() { mouseClick(item, landed.x, landed.y) },
+                function() { return dismissed === 1 }),
+                "the submenu row could not be clicked after a continuous crossing")
+        }
         function test_scrollableSubmenuRowStaysTappable() {
             // A scrollable submenu must still take taps: the Flickable claims
             // the press for dragging, so rows below it can go dead.
