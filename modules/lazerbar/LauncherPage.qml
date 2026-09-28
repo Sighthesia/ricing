@@ -297,6 +297,15 @@ Item {
     }
 
     function focusSearch() {
+        // Same contract as the reclaim timer above: a disabled copy (the
+        // surface's prewarm page shares this session) must never steal
+        // keyboard ownership. Without this guard the hidden copy focuses its
+        // own invisible editor when the session turns visible, which Qt
+        // answers by clearing the window's active focus — the visible
+        // launcher then opens with no focused search box, and Escape reaches
+        // nothing at all.
+        if (!root.enabled)
+            return
         searchSurface.focusEditor()
     }
 

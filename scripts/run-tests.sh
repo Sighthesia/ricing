@@ -30,7 +30,11 @@ GUI_TIMEOUT=${AFLOAT_GUI_TIMEOUT:-180}
 
 # Offscreen is the whole isolation story: no window can be mapped, and the
 # offscreen font database is empty unless QT_QPA_FONTDIR points at real fonts.
-HEADLESS_ENV=(QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR=/usr/share/fonts)
+# QML_XHR_ALLOW_FILE_READ lets the harnesses that assert on repo assets (the
+# lock PAM asset) read them; without it every one of those throws
+# "Invalid state" and reports a phantom failure.
+HEADLESS_ENV=(QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR=/usr/share/fonts
+    QML_XHR_ALLOW_FILE_READ=1)
 
 RUN_GUI=0
 RUN_PYTHON=1
