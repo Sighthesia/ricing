@@ -172,6 +172,12 @@ PanelWindow {
     // looks exactly like "the panel is there but nothing on it reacts". The
     // counter makes that churn visible in the timeline instead of inferred.
     property int _mapChurn: 0
+    // Counts geometry changes of the mask's Region item, each of which
+    // silently re-commits set_input_region and makes the compositor re-evaluate
+    // pointer focus. _mapChurn only counts surface visibility, so it reported a
+    // stable "1" while the region was in fact sweeping 260 -> 504.
+    property int _regionCommits: 0
+    readonly property Item _regionItem: popupInputRegion
     onSurfaceActiveChanged: root._noteMap("surfaceActive")
     // The popup surface's own unfiltered pointer position, in container
     // coordinates. Survives the leave, so it records where the pointer was when
@@ -209,8 +215,21 @@ PanelWindow {
         }
     }
 
+    // Every geometry change of the mask's Region item silently re-commits
+    // set_input_region, and the compositor re-evaluates pointer focus on each
+    // one. _mapChurn only counted surface visibility, so it reported a stable
+    // "1" while the region was in fact sweeping 260 -> 504 across the open.
+    Connections {
+        target: popupInputRegion
+        function onXChanged() { root._regionCommits += 1 }
+        function onYChanged() { root._regionCommits += 1 }
+        function onWidthChanged() { root._regionCommits += 1 }
+        function onHeightChanged() { root._regionCommits += 1 }
+    }
+
     function _noteMap(what) {
         root._mapChurn += 1
+        root._regionCommits += 1
         root.debugLog("map", { "what": what, "active": root.surfaceActive,
             "visible": root.visible, "churn": root._mapChurn,
             "regionScene": root._sceneRect(popupInputRegion) })
@@ -434,6 +453,7 @@ PanelWindow {
                 // that stopped speaking is the link where delivery broke.
                 "rawPoint": root._lastRawPoint,
                 "mapChurn": Number(root._mapChurn),
+                "regionCommits": Number(root._regionCommits),
                 "surfaceActive": root.surfaceActive,
                 "windowVisible": root.visible === true,
                 // The region as the COMPOSITOR sees it. Region.item builds the
@@ -1428,11 +1448,21 @@ PanelWindow {
                             "region": root._debugRect(popupInputRegion),
                         })
                 }
-                onPointChanged: function(point) {
-                    root._lastRawPoint = {
-                        "x": Math.round(point.position.x * 10) / 10,
-                        "y": Math.round(point.position.y * 10) / 10,
-                    }
+                // Read the `point` PROPERTY. pointChanged() takes no parameter
+                // in C++ (`void pointChanged();` on QQuickSinglePointHandler),
+                // so a `function(point)` handler receives undefined and
+                // `point.position` throws on every event — which silently left
+                // _lastRawPoint null forever and made a healthy surface look
+                // like one that had never seen the pointer. 519 of those
+                // TypeErrors were sitting in the log the whole time.
+                onPointChanged: {
+                    var p = point
+                    root._lastRawPoint = p ? {
+                        "x": Math.round(p.position.x * 10) / 10,
+                        "y": Math.round(p.position.y * 10) / 10,
+                        "sx": Math.round(p.scenePosition.x * 10) / 10,
+                        "sy": Math.round(p.scenePosition.y * 10) / 10,
+                    } : null
                 }
             }
 
