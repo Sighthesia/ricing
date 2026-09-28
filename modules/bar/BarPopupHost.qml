@@ -236,6 +236,9 @@ PanelWindow {
             return
         root._lastDebugSignature = signature
         console.log("[afloat:PopupDebug]", signature)
+        // Mirror to the settings cache: the popup half of the hover diagnostics
+        // is otherwise only readable from the shell's stdout.
+        Services.SettingsService.recordHoverSnapshot(signature)
     }
 
     function emitDebugSnapshot() {
@@ -1210,12 +1213,15 @@ PanelWindow {
                      }
 
                     // Retarget the layer-shell mask when a tray submenu grows or retracts.
+                    // extraWidth is the only channel needed: it flips 0<->panelWidth once
+                    // per open, which is exactly when the mask must widen. Retargeting on
+                    // submenuProgress instead restarted the geometry glide on every frame of
+                    // the slide, pinning displayWidth at its old value until the animation
+                    // ended: the panel was painted outside the input region the whole time,
+                    // so hover and taps stayed dead until the mask caught up afterwards.
                     Connections {
                         target: popupActions.trayMenuContent
                         function onExtraWidthChanged() {
-                            root.updateTargetGeometry(root.currentIntent)
-                        }
-                        function onSubmenuProgressChanged() {
                             root.updateTargetGeometry(root.currentIntent)
                         }
                     }

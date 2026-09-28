@@ -126,6 +126,19 @@ QtObject {
     property bool panelVisible: false
     // Keep hover diagnostics opt-in and independent from persisted settings.
     property bool hoverDebugEnabled: false
+    // Newest popup hover snapshot. Mirrored to disk because the popup half of
+    // the diagnostics otherwise exists only in the shell's stdout, which a bug
+    // report cannot reach (and which is unreachable when the shell was started
+    // outside this terminal).
+    property string lastHoverSnapshot: ""
+    property FileView _hoverSnapshotFile: FileView {
+        path: Quickshell.cacheDir + "/hover-debug.json"
+        printErrors: false
+    }
+    function recordHoverSnapshot(line) {
+        root.lastHoverSnapshot = line
+        root._hoverSnapshotFile.setText(line)
+    }
     property int hoverDebugToken: 0
     property int hoverDebugOpenToken: 0
     property string hoverDebugOpenScreen: ""
@@ -152,6 +165,13 @@ QtObject {
 
         function toggle() { root.togglePanel() }
         function debugHover(enabled: string) { root.setHoverDebug(enabled) }
+        function lastHover() {
+            // Echo to stdout as well as returning: `qs ipc call` does not
+            // reliably echo a string return, and the file mirror
+            // (cacheDir/hover-debug.json) is the channel a report can read.
+            console.log("[afloat:LastHover]", root.lastHoverSnapshot)
+            return root.lastHoverSnapshot
+        }
         function snapshotHover() { root.requestHoverSnapshot() }
         function openHoverDebug(screenName: string) { root.requestHoverDebugOpen(screenName) }
         function debugCategory(category: string) { root.setHoverDebugCategory(category) }
