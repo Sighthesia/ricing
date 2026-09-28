@@ -442,7 +442,8 @@ Item {
             root.highlightedSubmenuRow = null
             // Same reasoning as the primary catcher: report the position while
             // it is still known, so the host can check it against the region.
-            root.pointerDeparted(root.lastCursorX, root.lastCursorY, "column-band")
+            if (root.lastCursorX >= 0)
+                root.pointerDeparted(root.lastCursorX, root.lastCursorY, "column-band")
             root.forgetCursor()
             if (root.debugLeave)
                 console.log("[afloat:TrayDebug] leave column-band at " + mouseX + "," + mouseY)
@@ -589,7 +590,11 @@ Item {
         // exit against the input region, and forgetCursor() would leave it
         // unable to tell a real departure from a compositor-side leave that
         // happened while the pointer was still over us.
-        pointerDeparted(lastCursorX, lastCursorY, "primary-catcher")
+        // Emitted only when a position is actually known: this menu's content
+        // slides in from the right, so a legitimate pointer x can be negative
+        // and must not be mistaken for "no pointer".
+        if (lastCursorX >= 0)
+            pointerDeparted(lastCursorX, lastCursorY, "primary-catcher")
         forgetCursor()
     }
     // Last known pointer position when this surface believes the pointer left.

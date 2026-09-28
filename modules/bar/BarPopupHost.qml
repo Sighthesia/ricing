@@ -166,6 +166,14 @@ PanelWindow {
     // the pointer sat inside the region — this is what tells the two apart.
     property string _lastLeave: "none"
     property string _lastDeparture: "none"
+    // True when the most recent tray departure was reported from inside the
+    // committed input region, i.e. the pointer was still over the popup. The
+    // close timer consults this; see the comment there.
+    property bool _departureInsideRegion: false
+    // Re-arms allowed for inside-region departures before the popup closes
+    // anyway. Bounded on purpose: the pointer really can leave, and a popup that
+    // refuses to close is worse than one that closes a beat early.
+    property int _regionLeaveBudget: 3
 
     function noteLeave(source) {
         var tc = root._trayContent()
@@ -292,14 +300,20 @@ PanelWindow {
     // the region is a compositor-side leave, and closing on it is what makes
     // the first expand unusable.
     function onTrayPointerDeparted(x, y, source) {
-        if (Number(x) < 0) {
+        var tc = root._trayContent()
+        if (!tc || !isFinite(Number(x)) || !isFinite(Number(y))) {
             root._lastDeparture = String(source) + " at none"
+            root._departureInsideRegion = false
             return
         }
-        var p = popupViewport.mapFromItem(root._trayContent(), Number(x), Number(y))
+        // No "x < 0 means no pointer" test here: the tray content slides in from
+        // the right, so a real pointer can sit at a negative x in its own
+        // coordinates. The tray emits only when it truly has a position.
+        var p = popupViewport.mapFromItem(tc, Number(x), Number(y))
         var inside = root._pointInRect(p.x, p.y, popupInputRegion)
         root._lastDeparture = String(source) + " at " + Math.round(p.x * 10) / 10 + ","
             + Math.round(p.y * 10) / 10 + (inside ? " INSIDE" : " outside")
+        root._departureInsideRegion = inside
         root.debugLog("depart", { "source": root._lastDeparture,
             "region": root._debugRect(popupInputRegion), "regionActive": root.surfaceActive,
             "widgetHovered": root.widgetHovered, "popupHovered": root.popupHovered })
@@ -412,6 +426,11 @@ PanelWindow {
         if (popupHoverWasActive && !popupHovered) {
             root.noteLeave("popup-surface")
             requestClose()
+        } else if (popupHovered) {
+            // The pointer is demonstrably back on the popup, so any deferred
+            // close was a hand-off artefact and the debt is settled.
+            root._regionLeaveBudget = 3
+            root._departureInsideRegion = false
         }
         popupHoverWasActive = popupHovered
     }
@@ -965,16 +984,6 @@ PanelWindow {
     // No input when closed; the window otherwise masks only the popup.
     // Keep the visual/input region alive for the exit reveal after open flips
     // false; clearing it at close start cuts the second layer off immediately.
-    // "region" follows the union of the displayed container and its committed
-    // target: driven by the animated width alone it lagged the summon, leaving
-    // the second level painted outside it. The union also keeps the region wide
-    // until a retract glide has actually finished.
-    // "full" makes the entire surface clickable, which removes the mask as a
-    // variable — the bisect that separates "the compositor dropped the pointer"
-    // from "the mask never covered the point" without a restart per attempt.
-    // No input when closed; the window otherwise masks only the popup.
-    // Keep the visual/input region alive for the exit reveal after open flips
-    // false; clearing it at close start cuts the second layer off immediately.
     // The region follows the union of the displayed container and its committed
     // target: driven by the animated width alone it lagged the summon, leaving
     // the second level painted outside it. The union also keeps the region wide
@@ -994,26 +1003,44 @@ PanelWindow {
         id: closeTimer
         interval: MotionTokens.fast
         onTriggered: {
-            if (BarHoverLogic.shouldClose(root.widgetHovered, root.popupHovered, true)) {
-                root.debugLog("closed", { "revealProgress": Number(popup.revealProgress) })
-                // Freeze geometry but keep an in-flight content slide/height
-                // alive under the exit reveal; retain both intents until the
-                // exit reveal cleanup has completed.
-                transitionMotion.stop()
-                root.transitionSerial += 1
-                root.pendingIntent = null
-                root._deferredRebaseSerial = -1
-                // Retract any open tray submenu with the popup; otherwise it
-                // stays open and greets the user stale on the next reveal.
-                var tc = popupActions ? popupActions.trayMenuContent : null
-                if (tc) {
-                    tc.closeSubmenu()
-                    tc.forgetCursor()
-                }
-                root.open = false
-                root.closeRequested()
-                clearIntentTimer.restart()
+            if (!BarHoverLogic.shouldClose(root.widgetHovered, root.popupHovered, true))
+                return
+            // "No owner holds hover" is not the same as "the pointer left".
+            // Measured on the desktop: crossing the primary's right edge into
+            // the submenu column produced a leave at 1366.9,113.5 — inside the
+            // committed input region, with the pointer demonstrably still over
+            // the popup. Closing on that is what made the first expand dead:
+            // no highlight, no click, popup gone. So a leave whose last known
+            // position is still inside the region is treated as the pointer
+            // being handed off, and re-arms the close instead of closing.
+            // Bounded, so a genuinely departed pointer still closes promptly.
+            if (root._departureInsideRegion && root._regionLeaveBudget > 0) {
+                root._regionLeaveBudget -= 1
+                root.debugLog("closeDeferred", {
+                    "departure": String(root._lastDeparture),
+                    "budget": root._regionLeaveBudget,
+                })
+                closeTimer.restart()
+                return
             }
+            root.debugLog("closed", { "revealProgress": Number(popup.revealProgress) })
+            // Freeze geometry but keep an in-flight content slide/height
+            // alive under the exit reveal; retain both intents until the
+            // exit reveal cleanup has completed.
+            transitionMotion.stop()
+            root.transitionSerial += 1
+            root.pendingIntent = null
+            root._deferredRebaseSerial = -1
+            // Retract any open tray submenu with the popup; otherwise it
+            // stays open and greets the user stale on the next reveal.
+            var tc = popupActions ? popupActions.trayMenuContent : null
+            if (tc) {
+                tc.closeSubmenu()
+                tc.forgetCursor()
+            }
+            root.open = false
+            root.closeRequested()
+            clearIntentTimer.restart()
         }
     }
 

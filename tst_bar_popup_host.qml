@@ -859,6 +859,31 @@ Item {
                                 >= Number(colRect.x) + Number(colRect.width), true)
                     }
                 }
+                // The close rule: a leave reported from INSIDE the region is not
+                // the user leaving. Measured on the desktop as 1366.9,113.5 —
+                // the pointer had crossed into the submenu column and was still
+                // over the popup when the leave fired, and closing on it is what
+                // made the first expand dead. A departure outside the region
+                // must still close, or the popup would never go away.
+                root.check("host starts with no pending inside-region departure",
+                    host._departureInsideRegion, false)
+                // The host maps tray-content coordinates into region space, so
+                // pick a region point that is unambiguously covered and invert it
+                // into tray coordinates. Deriving it beats hardcoding: the tray's
+                // own origin is mid-slide during the exchange and lands outside.
+                var regionNow = host.debugSnapshot().input.region
+                var insideRegion = trayIncoming.mapFromItem(host.popupViewportItem,
+                    Number(regionNow.x) + 10, Number(regionNow.y) + 10)
+                host.onTrayPointerDeparted(insideRegion.x, insideRegion.y,
+                    "primary-catcher")
+                root.check("a departure inside the region is marked as such",
+                    host._departureInsideRegion, true)
+                host.onTrayPointerDeparted(-5000, 5, "primary-catcher")
+                root.check("a departure outside the region is not inside",
+                    host._departureInsideRegion, false)
+                host.onTrayPointerDeparted(NaN, NaN, "primary-catcher")
+                root.check("a departure with no usable pointer is not inside",
+                    host._departureInsideRegion, false)
             }
             if (trayIncoming)
                 trayIncoming.submenuProgress = 0
