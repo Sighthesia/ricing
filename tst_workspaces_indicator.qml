@@ -7,6 +7,13 @@ import "./modules/lazerbar" as Lazer
 // and verifies app icons render, the focused icon stays bright, the single
 // indicator tracks workspace/app switches, and rapid content bursts never
 // lose icon delegates (delegate-churn-icon-storm).
+//
+// This harness runs in its own `qs` process, so cutLiveSession() below only
+// ever affects that process. It is mandatory, not hygiene: with the live niri
+// event stream attached, a busy desktop rewrites focus and the window list
+// between ticks, so the settle gates in phase 2 (icon opacity, indicator dx,
+// resting bar width) never converge and the run dies at the deadline —
+// passing or failing purely by how busy the user's session happened to be.
 Item {
     id: root
 
@@ -19,12 +26,16 @@ Item {
     property int churnLeft: 0
     property int burstLeft: 0
     property bool burstToggle: false
-    // Real workspace ids (or faked when no compositor): squares come from
-    // NiriService.workspaces; fake 900-ids are fed through updateWindows and
-    // re-fed if a live compositor event clobbers the scenario mid-run.
+    // Faked workspace ids: the squares come from NiriService.workspaces,
+    // which cutLiveSession() leaves unwritten by anything else; fake 900-ids
+    // are fed through updateWindows.
     property string wsA: ""
     property string wsB: ""
     property string wantedFocus: "901"
+    // Gate values sampled by the current phase, reported when the run hits the
+    // deadline so a stalled gate names the value that never settled instead of
+    // just a phase number.
+    property string gateNote: ""
 
     function log(line) {
         console.log(line)
@@ -175,26 +186,43 @@ Item {
         return NaN
     }
 
-    function feedInitial() {
-        // Discover squares from the live model; fall back to a fake pair
-        // when no compositor is present (no event stream to fight there).
-        var ids = []
-        var model = Services.NiriService.workspaces
-        for (var i = 0; i < model.count; i++) {
+    // Sever every path that would pull live compositor state into the model:
+    // the continuous event stream plus the two one-shot "initial fetch"
+    // processes, whose late stdout would otherwise replace the fake ids a few
+    // ticks after feedInitial() installed them. NiriService is a lazy
+    // singleton — referencing it instantiates it and its Processes start
+    // running on construction, so this has to happen before the scenario.
+    function cutLiveSession() {
+        // One try per process: a single shared block would let the first
+        // failure silently skip the rest, and a partial detach would leave the
+        // harness quietly coupled to the live session again.
+        var detached = []
+        var failed = []
+        var targets = ["_eventStream", "_fetcher", "_workspaceFetcher"]
+        for (var i = 0; i < targets.length; ++i) {
             try {
-                ids.push(String(model.get(i).wsId))
+                Services.NiriService[targets[i]].running = false
+                detached.push(targets[i])
             } catch (e) {
+                failed.push(targets[i])
             }
         }
-        if (ids.length < 2) {
-            Services.NiriService.updateWorkspaces({ workspaces: [
-                { id: 1, idx: 1, is_active: true, name: "1" },
-                { id: 2, idx: 2, is_active: false, name: "2" }
-            ] })
-            ids = ["1", "2"]
-        }
-        root.wsA = ids[0]
-        root.wsB = ids[1]
+        root.log("live session detached: " + detached.join(", ")
+            + (failed.length ? "  FAILED: " + failed.join(", ") : ""))
+        if (failed.length)
+            root.failures++
+    }
+
+    function feedInitial() {
+        // Fixed fake workspaces, always: cutLiveSession() guarantees nothing
+        // else writes this model, so the scenario never has to re-derive its
+        // ids from whatever the real session happens to look like.
+        Services.NiriService.updateWorkspaces({ workspaces: [
+            { id: 1, idx: 1, is_active: true, name: "1" },
+            { id: 2, idx: 2, is_active: false, name: "2" }
+        ] })
+        root.wsA = "1"
+        root.wsB = "2"
         root.wantedFocus = "901"
         root.inject()
     }
@@ -225,8 +253,10 @@ Item {
         root.feedRows(root.standardRows())
     }
 
-    // A live event may still rewrite the service model between ticks; restore
-    // the scenario instead of stalling until the deadline.
+    // Delegates need a few ticks to appear; re-inject the scenario instead of
+    // stalling until the deadline. Nothing rewrites the model underneath us
+    // any more (see cutLiveSession), so a false here means a delegate was
+    // genuinely dropped or the map was rebuilt.
     function ensureState() {
         if (!root.wsInstance || root.wsA === "")
             return false
@@ -269,10 +299,19 @@ Item {
         onTriggered: root.tick()
     }
 
+    // Own the model before anything mounts: the widget and the scenario both
+    // read NiriService, so this is the first chance to stop the real session
+    // from writing underneath them.
+    Component.onCompleted: root.cutLiveSession()
+
     function tick() {
         root.ticks++
+        // A gate note only describes the phase that sampled it.
+        if (root.phase !== 2)
+            root.gateNote = "phase " + root.phase + ": no gate sampled"
         if (root.ticks > 250) {
-            root.check("harness completes before deadline (phase " + root.phase + ")", false)
+            root.check("harness completes before deadline (phase " + root.phase + ")", false,
+                       root.gateNote)
             root.finish()
             return
         }
@@ -286,8 +325,12 @@ Item {
             break
         case 1: {
             // Wait for delegates: both squares present with their icons.
-            if (!root.ensureState())
+            if (!root.ensureState()) {
+                root.gateNote = "phase 1: delegates pending (squares="
+                                + root.squares().length + " focus=" + root.wsInstance.focusedWinId
+                                + " want=" + root.wantedFocus + ")"
                 return
+            }
             root.phase = 2
             break
         }
@@ -298,6 +341,9 @@ Item {
             var a1 = root.squareById(root.wsA)
             var o901 = root.iconOpacity(a1, 901)
             var o902 = root.iconOpacity(a1, 902)
+            // Sample the gates as we go, so a deadline reports which value
+            // never settled instead of only naming the phase.
+            root.gateNote = "phase 2: o901=" + o901 + " o902=" + o902
             if (o901 < 0 || o902 < 0)
                 return
             // Opacity animates (100ms); wait for it to settle before judging.
@@ -311,15 +357,20 @@ Item {
                 return
             root.check("indicator keeps workspace green", String(bar.color) === String(Lazer.LazerTheme.osuGreen),
                        "color=" + bar.color)
-            if (!root.wsInstance.indicatorVisible)
+            if (!root.wsInstance.indicatorVisible) {
+                root.gateNote += " indicatorVisible=false"
                 return
+            }
             var target = root.expectedCenterXFor(901)
-            if (!isFinite(target))
+            if (!isFinite(target)) {
+                root.gateNote += " target=" + target
                 return
+            }
             var dx = Math.abs(root.indicatorCenterX() - target)
             // The trail stretches the bar toward travel direction; wait for
             // the edges to converge before asserting the resting width.
             var expectedW = Lazer.LazerTheme.barWidgetHeight - 16
+            root.gateNote += " dx=" + dx + " bar.width=" + bar.width + " expectedW=" + expectedW
             if (dx >= 3 || Math.abs(bar.width - expectedW) >= 1)
                 return
             root.check("indicator reuses volume bar width at rest",
@@ -421,8 +472,9 @@ Item {
             if (Math.abs(root.indicatorCenterX() - t1) >= 3)
                 return
             root.check("indicator back on 901 after churn", true)
-            // Hand control back to the live service path: a real refresh must
-            // still leave the truly focused window bright with a visible bar.
+            // Hand control back to the production refresh path: a real
+            // refreshWindowMap must still leave the truly focused window
+            // bright with a visible bar.
             root.wsInstance.refreshWindowMap()
             root.phase = 7
             break

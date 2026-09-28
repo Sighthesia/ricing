@@ -73,17 +73,12 @@ Item {
             compare(TextDiff.staggerDelayMs(0, 2, 24, 120), 24)
         }
 
-        function test_staggerStepShrinksThenFloors() {
-            // Short removals keep the 24ms pace; longer ones shrink toward
-            // the perceptible floor instead of collapsing to zero.
-            compare(TextDiff.staggerDelayMs(8, 10, 24, 120) - TextDiff.staggerDelayMs(9, 10, 24, 120),
-                    Math.floor(120 / 9))
-            compare(TextDiff.staggerDelayMs(8, 10, 24, 120), 16 * 2)
-        }
-
         function test_staggerStepFloorsAtPerceptibleMinimum() {
             // Long removals must never compress adjacent delays below ~16ms:
             // the tail of the cascade would read as one simultaneous drop.
+            // The step is min(stepMs, maxTotal/(n-1)) and then floored at 16,
+            // so the shrink only shows while maxTotal/(n-1) stays above the
+            // floor — do not add a case asserting both at once.
             for (var n = 2; n <= 30; n++) {
                 var minGap = 999
                 for (var i = 0; i < n - 1; i++) {
@@ -154,8 +149,12 @@ Item {
             var ghost = field.ghostLayerItem.children[0]
             verify(ghost.y >= 0)
             var startY = ghost.y
-            tryCompare(ghost, "opacity", 0, 700)
+            // The fade-out animation and the retire timer end on the same
+            // tick, so the object is already destroyed by the time a poll
+            // could sample `opacity` (it reads undefined). Assert the visible
+            // motion while the ghost is alive, then its disposal.
             tryVerify(function() { return ghost.y > startY }, 700)
+            tryCompare(field, "ghostCount", 0, 900)
             field.focus = false
         }
 

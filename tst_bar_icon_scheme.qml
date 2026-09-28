@@ -15,6 +15,8 @@ Item {
     property string savedScheme: ""
     property var iconInstance: null
     property var identityInstance: null
+    // Ticks spent waiting for the header Row's first layout pass.
+    property int layoutTicks: 0
 
     function check(label, cond, extra) {
         if (cond) {
@@ -166,7 +168,10 @@ Item {
             if (!rowItem)
                 return
             var textX = -1
+            var iconX = -1
+            var rowImplicitW = -1
             try {
+                rowImplicitW = rowItem.implicitWidth
                 for (var ti = 0; ti < rowItem.children.length; ti++) {
                     var tc = rowItem.children[ti]
                     // The text column is the wide child; the icon slot is 16.
@@ -174,13 +179,29 @@ Item {
                         textX = tc.x
                         break
                     }
+                    if (tc && iconX < 0)
+                        iconX = tc.x
                 }
             } catch (e8) {
             }
             if (textX < 0)
                 return
+            // A Row lays out on the first render tick, so one tick after
+            // creation both children still read their constructed x=0 even
+            // though the geometry is already correct. Wait that out — but
+            // only for a bounded number of ticks, so a positioner that really
+            // does refuse to lay out still fails here (with the geometry it
+            // measured) instead of silently stalling to the deadline.
+            if (textX === 0 && iconX === 0) {
+                root.layoutTicks++
+                if (root.layoutTicks <= 20)
+                    return
+            } else {
+                root.layoutTicks = 0
+            }
             root.check("identity text column sits right of icon", textX >= 20,
-                       "textX=" + textX)
+                       "textX=" + textX + " iconX=" + iconX
+                       + " row.implicitWidth=" + rowImplicitW)
             // Light scheme: token and live overlay must read dark; bar
             // surface and rail take their scheme branches (palette-free
             // fallbacks here since colorService is not injected).
