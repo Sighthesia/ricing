@@ -235,6 +235,21 @@ PanelWindow {
     // viewport-space region rect. Read through a function because the region
     // rect is latched inside computeAndCommitTargets, which can run before the
     // viewport's geometry binding has settled on the first open.
+    // The content column's own enabled flag, read from the live item. A plain
+    // traversal rather than a stored reference, because the slot is rebuilt
+    // whenever the popup's content is exchanged.
+    function _contentSlotEnabled() {
+        var host = popupItem ? popupItem.contentLayer : null
+        if (!host)
+            return null
+        var slot = null
+        for (var i = 0; i < host.children.length; i++) {
+            if (host.children[i] && host.children[i].objectName === "popupContentSlot")
+                slot = host.children[i]
+        }
+        return slot ? slot.enabled === true : null
+    }
+
     function _viewportY() {
         return popupViewport.y
     }
@@ -312,6 +327,14 @@ PanelWindow {
             "viewY": view ? Math.round(Number(view.y)) : -1,
             "viewInteractive": view ? view.interactive === true : false,
             "contentInteractive": root.contentInteractive,
+            // Read the gate off the item it is applied to, not through the
+            // property that drives it. `enabled: root.contentInteractive` on
+            // popupContentSlot disables the ENTIRE content column — every tray
+            // row and the whole submenu — while the popup's own HoverHandler,
+            // which lives outside that column, keeps tracking the pointer
+            // normally. That asymmetry is exactly what the failure looks like
+            // from outside: the panel stays painted, nothing on it reacts.
+            "contentEnabled": root._contentSlotEnabled(),
             "cursorX": Math.round(Number(tc.lastCursorX)),
             "cursorY": Math.round(Number(tc.lastCursorY)),
             "highlightSub": tc.highlightedSubmenuRow ? 1 : 0,
