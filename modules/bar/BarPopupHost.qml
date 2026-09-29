@@ -465,6 +465,9 @@ PanelWindow {
                 // that stopped speaking is the link where delivery broke.
                 "rawPoint": root._lastRawPoint,
                 "mapChurn": Number(root._mapChurn),
+                "surfaceSized": root.surfaceSized,
+                "windowSize": { "w": Math.round(root.width), "h": Math.round(root.height) },
+                "windowPos": { "x": Math.round(root.x), "y": Math.round(root.y) },
                 "regionCommits": Number(root._regionCommits),
                 "surfaceActive": root.surfaceActive,
                 "windowVisible": root.visible === true,
@@ -1121,17 +1124,33 @@ PanelWindow {
     // Keep the layer-shell surface fixed at screen size; only the inner
     // clipped content animates so per-frame resizes never cross a protocol
     // commit boundary.
-    implicitWidth: screen ? screen.width : root.screenWidth
-    implicitHeight: screen ? screen.height : root.screenHeight
+    implicitWidth: root.surfaceSized
+        ? Math.max(1, root.regionRect.width) : (screen ? screen.width : root.screenWidth)
+    implicitHeight: root.surfaceSized
+        ? Math.max(1, root.regionRect.y + root.regionRect.height)
+        : (screen ? screen.height : root.screenHeight)
     // Keep the host full-screen; the inner popup owns its absolute bar-adjacent
     // placement so an upward popup can occupy the space above a bottom bar.
+    // "fullscreen" (default): a full-screen transparent surface with a small
+    // input mask, which is the configuration that has been failing. "sized":
+    // the surface itself is only as large as the popup, so the whole surface is
+    // the input region and no mask is involved at all — the way an ordinary menu
+    // window is built. A client cannot order two surfaces within one layer, and
+    // this is the last structural difference from a normal menu that has not
+    // been tested.
+    readonly property bool surfaceSized: Services.SettingsService.popupSurfaceMode === "sized"
     anchors {
         top: true
-        bottom: true
+        bottom: !root.surfaceSized
         left: true
-        right: true
+        right: !root.surfaceSized
     }
-    margins { top: 0; bottom: 0; left: 0; right: 0 }
+    margins {
+        top: 0
+        bottom: 0
+        left: root.surfaceSized ? Math.max(0, root.regionRect.x) : 0
+        right: 0
+    }
     // No input when closed; the window otherwise masks only the popup.
     // Keep the visual/input region alive for the exit reveal after open flips
     // false; clearing it at close start cuts the second layer off immediately.
@@ -1144,10 +1163,24 @@ PanelWindow {
     // needs the *widget* hover, and a full-screen mask keeps the popup above the
     // bar permanently, so widgetHovered can never return and every popup dies
     // immediately — the mode breaks the shell rather than isolating the mask.
-    mask: Region { item: root.surfaceActive ? popupInputRegion : null }
+    mask: Region {
+        item: !root.surfaceActive ? null
+            : (root.surfaceSized ? popupFullRegion : popupInputRegion)
+    }
     // Do not keep a full-screen transparent surface above the settings window
     // when no bar popup is open or completing its reveal.
     visible: root.surfaceActive
+
+    // In "sized" mode the window is exactly the popup, so the whole surface is
+    // the input region and no sub-rect mask is needed. This item exists only to
+    // give the mask a source in that mode; it paints nothing. It is a child of
+    // the root, not of popupViewport, because the viewport is deliberately
+    // larger than the window and offset from it.
+    Item {
+        id: popupFullRegion
+        objectName: "popupFullRegion"
+        anchors.fill: parent
+    }
 
     // Close after MotionTokens.fast if both hover owners are gone.
     Timer {
@@ -1405,7 +1438,11 @@ PanelWindow {
     Item {
         id: popupViewport
         objectName: "popupViewport"
-        x: 0
+        // In "sized" mode the window's left edge sits at the region's x, so the
+        // viewport shifts back to keep every child expressed in screen
+        // coordinates. Nothing inside the viewport needs to know which mode is
+        // active — the container math is unchanged.
+        x: root.surfaceSized ? -Math.max(0, root.regionRect.x) : 0
         y: root.direction === "down"
                 ? root.activeBarHeight + root.activeFloatingMargin : 0
         width: root.activeScreenWidth

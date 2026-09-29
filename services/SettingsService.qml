@@ -126,6 +126,12 @@ QtObject {
     property bool panelVisible: false
     // Keep hover diagnostics opt-in and independent from persisted settings.
     property bool hoverDebugEnabled: false
+    // Popup surface shape, switchable so it can be A/B'd on a live desktop
+    // without a restart: "fullscreen" (the default, and what has been failing)
+    // is a full-screen transparent surface with a small input mask; "sized" makes
+    // the surface itself only as large as the popup, so the entire surface is
+    // the input region and no mask is involved at all.
+    property string popupSurfaceMode: "fullscreen"
     // Newest popup hover snapshot, kept as a short timeline. Mirrored to disk
     // because the popup half of the diagnostics otherwise exists only in the
     // shell's stdout, which a bug report cannot reach (and which is
@@ -181,6 +187,11 @@ QtObject {
             return root.lastHoverSnapshot
         }
         function snapshotHover() { root.requestHoverSnapshot() }
+        function debugSurface(mode: string) {
+            root.popupSurfaceMode = String(mode) === "sized" ? "sized" : "fullscreen"
+            console.log("[afloat:PopupSurfaceMode]", root.popupSurfaceMode)
+            return root.popupSurfaceMode
+        }
 
         function openHoverDebug(screenName: string) { root.requestHoverDebugOpen(screenName) }
         function debugCategory(category: string) { root.setHoverDebugCategory(category) }
