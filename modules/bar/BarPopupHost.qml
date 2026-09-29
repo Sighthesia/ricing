@@ -1671,12 +1671,14 @@ PanelWindow {
                          enabled: root._exchangeCommitted && !MotionTokens.reducedMotion
                          NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutCubic }
                      }
-                    // Keep hover replacement layers inside the content column;
-                    // an open tray submenu is the only intentional overflow.
-                    // While an exchange is mounted both bodies slide
-                    // horizontally, so force the clip even with a submenu open:
-                    // otherwise the sliding layers paint past the slot edge.
-                    clip: root._transitionOutgoingIntent !== null || !root.traySubmenuOverflowActive
+                     // The tray submenu is an intentional horizontal overflow of
+                     // this slot. Keep it unclipped during content exchange too:
+                     // clipping the slot while the first body is being replaced
+                     // removes the submenu from hit testing even though its
+                     // surface and input region remain present. The inner bodies
+                     // already own their transition positions, so the host does
+                     // not need an exchange-specific clip here.
+                     clip: !root.traySubmenuOverflowActive
                      enabled: root.contentInteractive
                      onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
                      onImplicitWidthChanged: root.updateTargetGeometry(root.currentIntent)
