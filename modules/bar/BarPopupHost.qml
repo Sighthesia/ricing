@@ -946,9 +946,39 @@ PanelWindow {
         return { x: left, y: top, width: width, height: height }
     }
 
+    // How much input region to reserve for a tray submenu that has not been
+    // summoned yet.
+    //
+    // The tray is the only intent that can grow sideways, and the region has to
+    // cover that growth from the moment the popup opens. Growing it on summon
+    // re-commits set_input_region at the exact instant the pointer is
+    // travelling toward the second level, and the compositor re-evaluates
+    // pointer focus on that commit — measured: on the first open of a session
+    // the region went 260 -> 504 at progress 0.082 and the pointer was taken
+    // away, with the panel visible and inert. On every later open the target
+    // was already wide, no commit landed mid-traverse, and the submenu worked
+    // (92 band events, highlight on). Hence: reserve up front.
+    //
+    // Cost: while a tray menu is open, the strip to its right claims input even
+    // with no submenu shown. That strip is exactly where the submenu appears, so
+    // nothing is lost in practice — but a click there no longer reaches the
+    // desktop, which is the trade this makes.
+    function _submenuAllowance(intentObj, trayContent) {
+        if (!trayContent || !intentObj)
+            return 0
+        if (String(intentObj.actionKind || "") !== "tray")
+            return 0
+        // The band spans the primary's width plus the panel, so reserving the
+        // band is what actually keeps the pointer inside the region.
+        var band = trayContent.submenuColumn
+        if (!band || !isFinite(Number(band.width)) || Number(band.width) <= 0)
+            return 0
+        return Number(band.width)
+    }
+
     function computeAndCommitTargets(intentObj) {
-        var trayExtraWidth = popupActions && popupActions.trayMenuContent
-                ? Number(popupActions.trayMenuContent.extraWidth) : 0
+        var trayContent = popupActions ? popupActions.trayMenuContent : null
+        var trayExtraWidth = trayContent ? Number(trayContent.extraWidth) : 0
         var baseWidth = Math.max(240, popup.sidebarLayer.implicitWidth || 260,
                 popup.contentLayer.implicitWidth || 260)
         var width = baseWidth
@@ -1003,7 +1033,7 @@ PanelWindow {
         root.regionRect = {
             "x": geometry.x,
             "y": geometry.y - root._viewportY(),
-            "width": geometry.width,
+            "width": geometry.width + root._submenuAllowance(displayedIntent, trayContent),
             "height": geometry.height,
         }
         root.commitRevealDistance()

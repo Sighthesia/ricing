@@ -890,6 +890,20 @@ Item {
                         host._regionCommits - commitsBefore <= 2, true)
                     root.check("the latched region tracks the committed target x",
                         host.regionRect.x, targetBefore.x)
+                    // The tray must reserve its submenu column up front. Growing
+                    // the region on summon re-commits set_input_region while the
+                    // pointer is travelling toward the second level, and the
+                    // compositor re-evaluates pointer focus on that commit —
+                    // which is why only the first expand of a session failed.
+                    if (trayIncoming) {
+                        var trayTarget = host.targetWidth
+                        host.updateTargetGeometry({
+                            widgetId: "tray", instanceKey: "tray", kind: "hover",
+                            actionKind: "tray", anchorX: 1251
+                        })
+                        root.check("a tray popup reserves its submenu column",
+                            host.regionRect.width >= trayTarget, true)
+                    }
                     // The first open in a session commits the target geometry
                     // before the content tree has laid out, so targetY and
                     // targetHeight are still their property defaults. The
