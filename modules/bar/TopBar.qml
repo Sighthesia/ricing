@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import "../lazerbar"
 import "../lazerbar/ScreenCornerMask.js" as CornerMask
 import "./FullscreenBarLogic.js" as RevealLogic
+import "./WindowHintMenuLogic.js" as HintMenu
 import "../../services" as Services
 
 // Mount the layout-driven bar plus the launcher wave owner per screen.
@@ -30,6 +31,9 @@ Variants {
         readonly property int effectiveHeight:
             Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
         readonly property bool atTop: String(Services.SettingsService.bar.position || "top") !== "bottom"
+        // Output identity, for effects that must only answer on their own
+        // screen (the bar's glow pulse, for one).
+        readonly property string screenName: screenScope.modelData ? String(screenScope.modelData.name || "") : ""
         readonly property bool autoHideEnabled: Services.SettingsService.bar.autoHideFullscreen === true
         // Per-output: a fullscreen window on a background workspace of another
         // monitor must not collapse this screen's bar.
@@ -46,8 +50,8 @@ Variants {
         // launcher can never render against a bar that is off-screen.
         property var _revealState: RevealLogic.initialState()
         readonly property bool revealed: _revealState.revealed
-        // 0 while collapsed, 1 while shown. Animated so the content slide, the
-        // fill fade and the edge hint stay one continuous reveal.
+        // 0 while collapsed, 1 while shown. Drives the slide offset and the edge
+        // hint only — the bar itself does not fade.
         property real revealProgress: revealed ? 1 : 0
         Behavior on revealProgress {
             enabled: !MotionTokens.reducedMotion
@@ -57,10 +61,87 @@ Variants {
         // open bar popup, the launcher wave and the settings panel all anchor
         // below the bar, and none of them can render against a bar that is
         // off-screen. Opening the launcher from a fullscreen window therefore
-        // also brings the bar back.
+        // also brings the bar back. The mod hint is named explicitly as well as
+        // covered by `popupHost.open`, so the pin holds for the whole hold
+        // rather than only for the frames the popup has finished opening.
         readonly property bool _pinned: popupHost.open
                 || launcherSurface.host.interactive
                 || settingsOverlay.interactive
+                || screenScope.windowHintHeld
+        readonly property bool windowHintHeld: Services.WindowHintService.hintHeld
+
+        // Hold-key window hint, presented as a bar popup. The service owns the
+        // snapshot; this scope only translates a hold into a hover intent and
+        // back, so the hint reuses the popup's reveal, surface and input
+        // region instead of owning a second floating surface.
+        //
+        // Identity keys stay constant across refreshes on purpose: the host
+        // treats a same-identity intent as a live update and leaves the popup
+        // in place, so switching workspaces while mod is held updates the rows
+        // without a replacement crossfade.
+        function buildWindowHintIntent() {
+            const hint = Services.WindowHintService.activeHint
+            if (!hint)
+                return null
+            return {
+                widgetId: "window-hint",
+                instanceKey: "hint:" + (screenScope.modelData ? String(screenScope.modelData.name || "") : ""),
+                kind: "hover",
+                actionKind: "window-hint",
+                title: HintMenu.identityTitle(hint),
+                // The focused window's own icon carries the header, so the
+                // identity stays true to what the menu is listing.
+                iconSource: hint.currentWindowIcon || "",
+                tintIcon: false,
+                summary: HintMenu.identitySummary(hint),
+                anchorX: barContent.hintAnchorX(),
+                screenWidth: screenScope.modelData ? Number(screenScope.modelData.width) : 1920,
+                screenHeight: screenScope.modelData ? Number(screenScope.modelData.height) : 1080,
+                barPosition: String(Services.SettingsService.bar.position || "top"),
+                effectiveBarHeight: screenScope.effectiveHeight,
+                floatingMargin: screenScope.floatingMargin,
+                payload: {
+                    hint: hint,
+                    // niri owns workspace and window activation. The route
+                    // matches the workspace widget's own chips.
+                    onHintWorkspace: index => Quickshell.execDetached([
+                        "niri", "msg", "action", "focus-workspace", String(index)
+                    ]),
+                    onHintWindow: windowId => Quickshell.execDetached([
+                        "niri", "msg", "action", "focus-window", "--id", String(windowId)
+                    ])
+                }
+            }
+        }
+
+        function openWindowHint() {
+            const intent = buildWindowHintIntent()
+            if (!intent)
+                return
+            // Nothing hovers this popup, so the host's own hover owner has to
+            // be latched or the close timer would retire it on the first tick.
+            popupHost.widgetHovered = true
+            popupHost.updateIntent(intent)
+        }
+
+        function refreshWindowHint() {
+            if (!Services.WindowHintService.hintHeld)
+                return
+            const intent = buildWindowHintIntent()
+            if (intent)
+                popupHost.updateIntent(intent)
+        }
+
+        function closeWindowHint() {
+            // A widget can still sit under the pointer: hand its popup back
+            // rather than closing the surface, because the widget emits no new
+            // hover event and would otherwise stay popup-less until the
+            // pointer left and returned.
+            if (barContent.reemitHoverIntent())
+                return
+            popupHost.widgetHovered = false
+            popupHost.dismissAnimated()
+        }
 
         // Feed one transition into the state machine. The returned state is
         // always stored; only the reveal edge effects (drop a popup, arm the
@@ -120,6 +201,21 @@ Variants {
             }
         }
 
+        // Mirror the reveal chain for out-of-process inspection. A collapse that
+        // silently fails looks identical to one that never triggered, so the
+        // debugFullscreenBar IPC target reads this instead of guessing.
+        readonly property var _debugEntry: ({
+            screenName: screenName,
+            fullscreenActive: fullscreenActive,
+            autoHideEnabled: autoHideEnabled,
+            revealed: revealed,
+            revealProgress: revealProgress,
+            pinned: _pinned,
+            state: _revealState
+        })
+        on_DebugEntryChanged: Services.BarDebugState.sync(screenName, _debugEntry)
+        Component.onDestruction: Services.BarDebugState.remove(screenName)
+
         onFullscreenActiveChanged: _sendReveal("fullscreen", fullscreenActive)
         onAutoHideEnabledChanged: _sendReveal("enabled", autoHideEnabled)
         // Losing the pin (a popup or overlay just closed) must not strand a bar
@@ -155,6 +251,34 @@ Variants {
             function onOpenRequested() {
                 overlayCoordinator.request("settings", null, true)
             }
+        }
+
+        // Drive the hold-key window hint through the shared popup host. One
+        // connection per screen scope, so every screen shows the same snapshot
+        // anchored over its own bar; the service is a singleton, so this is the
+        // only place the trigger is consumed.
+        //
+        // The snapshot refresh lands separately from the hold: a workspace
+        // switch while mod is down is a data change, not a reopen, and must
+        // keep the popup in place.
+        Connections {
+            target: Services.WindowHintService
+            function onHintHeldChanged() {
+                if (Services.WindowHintService.hintHeld)
+                    screenScope.openWindowHint()
+                else
+                    screenScope.closeWindowHint()
+            }
+            function onActiveHintChanged() {
+                screenScope.refreshWindowHint()
+            }
+        }
+
+        // The hint's anchor is the bar's own midpoint, so a bar width change is
+        // the only thing that can invalidate it.
+        Connections {
+            target: barContent
+            function onAnchorInvalidated() { screenScope.refreshWindowHint() }
         }
 
         // Mirror the shared island settings route into this screen's owner.
@@ -220,8 +344,14 @@ Variants {
 
             // Slide the painted bar out of view. Only the inner content moves, so
             // the layer-shell surface, its exclusive zone and its blur region
-            // never resize per frame. Both the offset and the fade read the one
-            // animated revealProgress, so they cannot drift apart.
+            // never resize per frame.
+            //
+            // No opacity on this container: the bar translates as a solid object
+            // and never fades. A bar that dissolves while sliding reads as two
+            // things happening at once and looks half-broken on a fast throw,
+            // and osu!lazer's panel moves are position-only for the same reason.
+            // The edge hint below is the only thing that fades, since it is a
+            // cue rather than a surface in motion.
             //
             // Geometry is set outright rather than with anchors.fill: an explicit
             // `y` would silently fight the top anchor, and a per-frame re-anchor
@@ -233,7 +363,6 @@ Variants {
                         * (screenScope.atTop ? -barSlide.height : barSlide.height)
                 width: parent.width
                 height: parent.height
-                opacity: screenScope.revealProgress
 
                 // Paint the continuous sharp bar silhouette behind every widget.
                 Rectangle {
@@ -244,6 +373,47 @@ Variants {
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                     Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                }
+
+                // The pre-lazer full-screen ripple, re-hosted: the ring, its
+                // luminous core and the afterglow band sweep across this bar
+                // strip instead of the whole display, clipped to the strip.
+                // Painted under the widgets so the sweep lights the bar's own
+                // surface and the glyphs stay legible on top of it.
+                RippleGlow {
+                    id: barGlow
+
+                    anchors.fill: parent
+                    glowEnabled: Services.SettingsService.appearance.ripplePulseEnabled !== false
+                    originXRatio: 0.5
+                    originYRatio: 0.5
+
+                    // A pulse published for another screen is not ours to
+                    // play; a screen-agnostic one (a notification) is.
+                    function playPulse() {
+                        if (!Services.RipplePulseService.matchesScreen(screenScope.screenName))
+                            return
+                        originXRatio = Services.RipplePulseService.pulseOriginXRatio
+                        play()
+                    }
+
+                    Connections {
+                        target: Services.RipplePulseService
+                        function onTokenChanged() { barGlow.playPulse() }
+                    }
+
+                    // A notification is not a bar event, so it is announced on
+                    // the notification service instead of the pulse bus. The
+                    // sweep starts on the side the card flies in from.
+                    Connections {
+                        target: Services.NotificationService
+                        function onPopupArrived() {
+                            if (!Services.SettingsService.appearance.ripplePulseEnabled)
+                                return
+                            barGlow.originXRatio = Services.NotificationService.notificationRight ? 0.82 : 0.18
+                            barGlow.play()
+                        }
+                    }
                 }
 
                 // The screen bezel corners this bar physically covers. The bezel's
@@ -271,9 +441,20 @@ Variants {
                     anchors.fill: parent
                     screenName: screenScope.modelData ? String(screenScope.modelData.name || "") : ""
 
+                    // While mod is held the hint owns the popup, so a widget's own hover traffic
+                    // must not reach the host. Two reasons, both observable:
+                    // a leave from the widget the pointer started on would run
+                    // the host's close timer and retire the hint while mod is
+                    // still down, and a second widget's hover or anchor update
+                    // would take the popup over mid-hold, turning every refresh
+                    // into an alternating replacement crossfade. The widget's
+                    // recorded intent is kept either way, so releasing mod hands
+                    // the popup straight back to it (see closeWindowHint).
+                    readonly property bool hintOwnsPopup: screenScope.windowHintHeld
+
                     // Forward hover intents to the per-screen popup host.
                     onPopupRequested: intent => {
-                        if (!intent) return
+                        if (!intent || screenScope.hintOwnsPopup) return
                         var enriched = Object.assign({}, intent)
                         enriched.screenWidth = screenScope.modelData ? Number(screenScope.modelData.width) : 1920
                         enriched.screenHeight = screenScope.modelData ? Number(screenScope.modelData.height) : 1080
@@ -284,11 +465,12 @@ Variants {
                         popupHost.updateIntent(enriched)
                     }
                     onPopupCloseRequested: {
+                        if (screenScope.hintOwnsPopup) return
                         popupHost.widgetHovered = false
                         popupHost.requestClose()
                     }
                     onPopupAnchorUpdate: intent => {
-                        if (!intent || !popupHost.open) return
+                        if (!intent || !popupHost.open || screenScope.hintOwnsPopup) return
                         var enriched = Object.assign({}, intent)
                         enriched.screenWidth = screenScope.modelData ? Number(screenScope.modelData.width) : 1920
                         enriched.screenHeight = screenScope.modelData ? Number(screenScope.modelData.height) : 1080

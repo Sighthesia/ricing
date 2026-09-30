@@ -106,6 +106,23 @@ ShellRoot {
                 + " screens=[" + rows.join(" | ") + "]"
                 + " activeWs=" + activeWs
                 + " coveringTile=" + covering)
+
+            // The bar's own reveal chain. `fullscreenActive` is what the bar
+            // resolved; the rest is whether the state machine and the painted
+            // slide actually followed it.
+            const bars = Services.BarDebugState.bars
+            const lines = []
+            for (let i = 0; i < bars.length; i++) {
+                const b = bars[i]
+                lines.push(b.screenName
+                    + "{fullscreenActive:" + b.fullscreenActive
+                    + ",autoHideEnabled:" + b.autoHideEnabled
+                    + ",revealed:" + b.revealed
+                    + ",revealProgress:" + b.revealProgress
+                    + ",pinned:" + b.pinned
+                    + ",state:" + JSON.stringify(b.state) + "}")
+            }
+            console.log("[fsbar] bars=[" + lines.join(" | ") + "]")
         }
     }
 
